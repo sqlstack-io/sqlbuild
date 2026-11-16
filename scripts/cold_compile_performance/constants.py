@@ -4,8 +4,13 @@ UNLIMITED_CGROUP_MEMORY_VALUE: str = "max"
 COMPILE_MEMORY_LIMIT_ENV_VAR: str = "SQLBUILD_COMPILE_MEMORY_LIMIT_BYTES"
 COMPILE_MEASUREMENT_FIELD_COUNT: int = 6
 DENSE_RULE_SELECT: str = (
-    'select = ["SQBR", "SQBRPERFORMANCE101", "SQBRPERFORMANCE102", "SQBRPYTHON", '
-    '"SQBRPYTHON306", "SQBRPYTHON507", "SQLCLEAN", "XSQBR"]'
+    'select = ["SQBR", "SQBRPYTHON", "SQBRPYTHON306", "SQBRPYTHON507", "SQLCLEAN", "XSQBR"]'
+)
+# SQBRPERFORMANCE102 compares models across the project, so a Snowflake compile that selects it
+# never takes the delta path. Edit and base/head benchmarks leave the opt-in performance rules
+# out; the all-rules benchmarks select them.
+DENSE_ALL_RULE_SELECT: str = DENSE_RULE_SELECT.replace(
+    '"SQBR", ', '"SQBR", "SQBRPERFORMANCE101", "SQBRPERFORMANCE102", '
 )
 
 DENSE_JOIN_THRESHOLDS: tuple[int, ...] = (55, 75, 90, 99)
