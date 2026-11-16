@@ -10,7 +10,6 @@ from typing import Any
 from sqlbuild._native import (
     CostContext,
     DiscoveredLoaderFunction,
-    LoaderConnectionMode,
     SourceEntry,
     SourceWriteStrategy,
 )
@@ -27,7 +26,6 @@ from sqlbuild.executor.load._helpers.cursors import (
     load_staging_cursor_bounds,
 )
 from sqlbuild.executor.load._helpers.execution import load_resource_kind, row_write_entry
-from sqlbuild.executor.load._helpers.external import execute_external_source_load
 from sqlbuild.executor.load._helpers.loader_invocation import (
     build_loader_context,
     build_loader_relation_guard,
@@ -126,19 +124,6 @@ def _execute_source_load(
             phase="load",
         ):
             resource_kind: ExecutionResourceKind = load_resource_kind(source_entry)
-            if loader_function.connection_mode == LoaderConnectionMode.EXTERNAL:
-                return execute_external_source_load(
-                    source_entry=source_entry,
-                    loader_function=loader_function,
-                    adapter=adapter,
-                    connection_config=connection_config,
-                    destination=destination,
-                    runtime=runtime,
-                    statement_recorder=statement_recorder,
-                    resource_kind=resource_kind,
-                    start=start,
-                    on_progress=on_progress,
-                )
             validate_source_write_strategy(source_entry)
             if not runtime.schema_prepared:
                 adapter.ensure_schema(

@@ -8,13 +8,13 @@ use crate::python_plan::tests::test_types::LifecycleTestCase;
 fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
     let test_cases = [
         LifecycleTestCase {
-            description: "a warehouse loader pulls its selected upstream tasks into ingress",
+            description: "a loader pulls its selected upstream tasks into ingress",
             selected: &["fetch_rates", "load_orders", "report", "check_orders"],
             nodes: &[
-                ("fetch_rates", "task", false),
-                ("load_orders", "loader", false),
-                ("report", "asset", false),
-                ("check_orders", "check", false),
+                ("fetch_rates", "task"),
+                ("load_orders", "loader"),
+                ("report", "asset"),
+                ("check_orders", "check"),
             ],
             upstream: &[("load_orders", &["fetch_rates", "unselected"])],
             expected_ingress: &["fetch_rates", "load_orders"],
@@ -22,24 +22,12 @@ fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
             expected_read_side: &["report"],
         },
         LifecycleTestCase {
-            description: "external loaders are neither ingress loaders nor read-side nodes",
-            selected: &["sync_orders", "export"],
-            nodes: &[("sync_orders", "loader", true), ("export", "task", false)],
-            upstream: &[("export", &["sync_orders"])],
-            expected_ingress: &[],
-            expected_loaders: &[],
-            expected_read_side: &["export"],
-        },
-        LifecycleTestCase {
-            description: "a selected external loader upstream of a warehouse loader is ingress",
+            description: "a selected loader upstream of another loader is ingress",
             selected: &["sync_orders", "load_orders"],
-            nodes: &[
-                ("sync_orders", "loader", true),
-                ("load_orders", "loader", false),
-            ],
+            nodes: &[("sync_orders", "loader"), ("load_orders", "loader")],
             upstream: &[("load_orders", &["sync_orders"])],
             expected_ingress: &["load_orders", "sync_orders"],
-            expected_loaders: &["load_orders"],
+            expected_loaders: &["load_orders", "sync_orders"],
             expected_read_side: &[],
         },
     ];

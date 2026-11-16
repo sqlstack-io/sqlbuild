@@ -70,17 +70,6 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
             expected_ingress_loader_names=frozenset({"fetch_pages"}),
             expected_read_side_python_names=frozenset({"export_orders"}),
         ),
-        PythonSqlRunLifecycleTestCase(
-            description="excludes external loader from ingress so it runs pre-connection",
-            python_graph_case="external_loader",
-            selection=PythonSqlRunSelection(
-                sql_keys=frozenset(),
-                python_node_names=frozenset({"load_events"}),
-            ),
-            expected_ingress_python_names=frozenset(),
-            expected_ingress_loader_names=frozenset(),
-            expected_read_side_python_names=frozenset(),
-        ),
     ],
     ids=lambda case: case.description,
 )

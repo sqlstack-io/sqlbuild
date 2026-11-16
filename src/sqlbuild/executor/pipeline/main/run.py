@@ -10,9 +10,6 @@ from sqlbuild._native import BuildPhaseTimingTracker, CostContext, PlanOutput, S
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.diagnostics.main.diagnostics_context import diagnostics_context
 from sqlbuild.executor.build.main._execute import execute_build_plan
-from sqlbuild.executor.build.main._external_source_loads import (
-    run_external_source_loads_before_connections,
-)
 from sqlbuild.executor.build.models import (
     BuildCallbacks,
     BuildCustomizations,
@@ -20,7 +17,6 @@ from sqlbuild.executor.build.models import (
     BuildExecutionTimings,
     BuildInitialState,
     BuildRuntimeParams,
-    ExternalSourceLoadResults,
 )
 from sqlbuild.executor.build.types import BuildStatus
 from sqlbuild.executor.pipeline._helpers.auditing import (
@@ -169,28 +165,6 @@ def _run_build_pipeline(
     effective_concurrency: int = min(
         max(1, runtime.max_concurrency), runnable_graph_width(plan=plan)
     )
-    external_source_load_results: ExternalSourceLoadResults = (
-        run_external_source_loads_before_connections(
-            plan=plan,
-            loader_functions=inputs.customizations.loader_functions,
-            adapter=adapter,
-            connection_config=connection_config,
-            runtime=inputs.runtime,
-            callbacks=inputs.callbacks,
-            precompleted_keys=inputs.initial_state.precompleted_keys,
-        )
-    )
-    merged_initial_state: BuildInitialState = replace(
-        inputs.initial_state,
-        precompleted_keys=inputs.initial_state.precompleted_keys
-        | external_source_load_results.completed_keys,
-        initial_load_results=(
-            *inputs.initial_state.initial_load_results,
-            *external_source_load_results.results,
-        ),
-        initial_failed_keys=inputs.initial_state.initial_failed_keys
-        | external_source_load_results.failed_keys,
-    )
     preparation: BuildConnectionPreparation = prepare_build_connections(
         plan=plan,
         adapter=adapter,
@@ -211,7 +185,7 @@ def _run_build_pipeline(
             runtime=inputs.runtime,
             callbacks=inputs.callbacks,
             customizations=inputs.customizations,
-            initial_state=merged_initial_state,
+            initial_state=inputs.initial_state,
             schema_prepared=True,
         )
         execution_seconds: float = time.monotonic() - execution_start

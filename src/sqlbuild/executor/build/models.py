@@ -213,15 +213,6 @@ class NodeCompletion:
 
 
 @dataclass(frozen=True)
-class ExternalSourceLoadResults:
-    """Results and scheduler state from pre-connection external source loads."""
-
-    results: tuple[LoadExecutionResult, ...]
-    completed_keys: frozenset[CompiledObjectKey]
-    failed_keys: frozenset[CompiledObjectKey]
-
-
-@dataclass(frozen=True)
 class BuildExecutionResult:
     """Aggregate outcome of a full build execution."""
 

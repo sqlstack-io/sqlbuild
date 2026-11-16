@@ -184,7 +184,7 @@ pub const OPERATION_KINDS: [&str; 10] = [
     "subprocess",
     "warehouse",
 ];
-pub const OPERATION_NAMES: [&str; 57] = [
+pub const OPERATION_NAMES: [&str; 55] = [
     "adbc_driver_install",
     "audit_evaluation",
     "clone_execution",
@@ -202,8 +202,6 @@ pub const OPERATION_NAMES: [&str; 57] = [
     "discovery_project_assembly",
     "discovery_python_import",
     "external_manifest_discovery",
-    "external_source_load",
-    "ingestr_command",
     "janitor_candidate_planning",
     "janitor_cleanup_action",
     "janitor_execution",

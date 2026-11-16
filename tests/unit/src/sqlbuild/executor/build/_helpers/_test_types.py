@@ -122,18 +122,6 @@ class BuildSourceNodeExecutionTestCase:
 
 
 @dataclass(frozen=True)
-class ExternalBuildSourceLoadTestCase:
-    """One pre-connection build source-load behavior case."""
-
-    description: str
-    source_name: str
-    loader_name: str
-    expected_status: ExecutionStatus
-    expected_completed_key_count: int
-    expected_lifecycle_message: str
-
-
-@dataclass(frozen=True)
 class MaterializationRecreatesRelationTestCase:
     description: str
     materialization_type: MaterializationType
