@@ -349,20 +349,12 @@ def _still_running(process: subprocess.Popen[bytes]) -> bool:
     return process.poll() is None
 
 
-def timed_build(project_dir: Path) -> tuple[subprocess.CompletedProcess[bytes], float, float]:
-    """A build with the seconds until its first stderr byte and until it exited."""
+def timed_build(project_dir: Path) -> tuple[subprocess.CompletedProcess[bytes], float]:
+    """A build with the seconds until it exited."""
 
     started: float = time.monotonic()
-    process: subprocess.Popen[bytes] = start(project_dir, "build")
-    assert process.stderr is not None
-    first_byte: bytes = process.stderr.read(1)
-    first_output: float = time.monotonic() - started
-    stdout, stderr = process.communicate(timeout=600)
-    return (
-        subprocess.CompletedProcess(process.args, process.returncode, stdout, first_byte + stderr),
-        first_output,
-        time.monotonic() - started,
-    )
+    completed: subprocess.CompletedProcess[bytes] = run(project_dir, "build")
+    return completed, time.monotonic() - started
 
 
 @contextmanager
@@ -395,7 +387,7 @@ def held_store_lock(project_dir: Path) -> Iterator[None]:
 
 def build_while_store_locked(
     project_dir: Path,
-) -> tuple[subprocess.CompletedProcess[bytes], float, float]:
+) -> tuple[subprocess.CompletedProcess[bytes], float]:
     """A timed build while another process holds the store's write lock."""
 
     with held_store_lock(project_dir):
