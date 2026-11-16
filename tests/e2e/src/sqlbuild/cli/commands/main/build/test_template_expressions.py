@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 from textwrap import dedent
 
@@ -18,112 +17,102 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     table_exists,
 )
 
-_QUOTED_FALLBACK_CASE: TemplateExpressionsBuildE2ETestCase = TemplateExpressionsBuildE2ETestCase(
-    description="build uses if eq ne, coalesce and quoted-argument templates in config",
-    repo_files={
-        "sqlbuild_project.toml": dedent(
-            """
-
-        name = "template_expressions_project"
-
-        adapter = "duckdb"
-
-        default_target = "dev"
-
-
-
-        [connection]
-
-        database = "template_expressions.duckdb"
-
-
-
-        [defaults]
-
-        materialized = "incremental"
-
-        incremental_strategy = "append"
-
-        append_cursor_inclusive = "${if(eq(ENV:APPEND_INCLUSIVE, '0'), false, true)}"
-
-
-
-        [targets]
-
-
-
-        [targets.dev]
-
-        schema = "${coalesce(ENV:TEMPLATE_SCHEMA, 'tpl_${ENV:TEMPLATE_USER}')}"
-
-            """
-        ).strip()
-        + "\n",
-        "sources/raw.yml": dedent(
-            """
-            sources:
-              - name: raw_orders
-                description: Test source raw_orders.
-                schema: main
-                table: raw_orders
-            """
-        ).strip()
-        + "\n",
-        "models/orders.sql": dedent(
-            """
-            MODEL (description "Test model orders.",
-              cursor ordered_at,
-              cursor_type timestamp,
-              cursor_grain second,
-              alias '${if(eq(ENV:ALIAS_MODE, "zero"), "orders_zero", if(
-                ne(ENV:ALIAS_MODE, "zero"),
-                "orders_nonzero",
-                "orders_nonzero"
-              ))}',
-            );
-
-            SELECT id, ordered_at
-            FROM __source("raw_orders")
-            """
-        ).strip()
-        + "\n",
-    },
-    initial_seed_sql=dedent(
+_REPO_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": dedent(
         """
-        CREATE TABLE main.raw_orders (id INTEGER, ordered_at TIMESTAMP);
 
-        INSERT INTO main.raw_orders VALUES
-          (1, '2026-01-01 00:00:00'),
-          (2, '2026-01-01 01:00:00');
+    name = "template_expressions_project"
+
+    adapter = "duckdb"
+
+    default_target = "dev"
+
+
+
+    [connection]
+
+    database = "template_expressions.duckdb"
+
+
+
+    [defaults]
+
+    materialized = "incremental"
+
+    incremental_strategy = "append"
+
+    append_cursor_inclusive = "${if(eq(ENV:APPEND_INCLUSIVE, '0'), false, true)}"
+
+
+
+    [targets]
+
+
+
+    [targets.dev]
+
+    schema = "${coalesce(ENV:TEMPLATE_SCHEMA, 'tpl_${ENV:TEMPLATE_USER}')}"
+
         """
-    ).strip(),
-    mutation_sql=(
-        "INSERT INTO main.raw_orders VALUES (3, '2026-01-01 01:00:00')",
-        "INSERT INTO main.raw_orders VALUES (4, '2026-01-01 02:00:00')",
-    ),
-    env={
-        "APPEND_INCLUSIVE": "0",
-        "TEMPLATE_USER": "demo",
-        "ALIAS_MODE": "one",
-    },
-    command=("--no-color", "build"),
-    expected_exit_code=0,
-    expected_runtime_sql_fragment=(
-        "WHERE ordered_at > TIMESTAMP '2026-01-01 00:00:00' "
-        "AND ordered_at < TIMESTAMP '2026-01-01T02:00:01'"
-    ),
-    expected_query_results=(
+    ).strip()
+    + "\n",
+    "sources/raw.yml": dedent(
+        """
+        sources:
+          - name: raw_orders
+            description: Test source raw_orders.
+            schema: main
+            table: raw_orders
+        """
+    ).strip()
+    + "\n",
+    "models/orders.sql": dedent(
+        """
+        MODEL (description "Test model orders.",
+          cursor ordered_at,
+          cursor_type timestamp,
+          cursor_grain second,
+          alias '${if(eq(ENV:ALIAS_MODE, "zero"), "orders_zero", if(
+            ne(ENV:ALIAS_MODE, "zero"),
+            "orders_nonzero",
+            "orders_nonzero"
+          ))}',
+        );
+
+        SELECT id, ordered_at
+        FROM __source("raw_orders")
+        """
+    ).strip()
+    + "\n",
+}
+_INITIAL_SEED_SQL: str = dedent(
+    """
+    CREATE TABLE main.raw_orders (id INTEGER, ordered_at TIMESTAMP);
+
+    INSERT INTO main.raw_orders VALUES
+      (1, '2026-01-01 00:00:00'),
+      (2, '2026-01-01 01:00:00');
+    """
+).strip()
+_MUTATION_SQL: tuple[str, ...] = (
+    "INSERT INTO main.raw_orders VALUES (3, '2026-01-01 01:00:00')",
+    "INSERT INTO main.raw_orders VALUES (4, '2026-01-01 02:00:00')",
+)
+_EXPECTED_RUNTIME_SQL_FRAGMENT: str = (
+    "WHERE ordered_at > TIMESTAMP '2026-01-01 00:00:00' "
+    "AND ordered_at < TIMESTAMP '2026-01-01T02:00:01'"
+)
+_EXPECTED_QUERY_RESULTS: tuple[tuple[str, tuple[tuple[object, ...], ...]], ...] = (
+    (
         (
-            (
-                "SELECT id, CAST(ordered_at AS VARCHAR) "
-                "FROM tpl_demo.orders_nonzero ORDER BY id, ordered_at"
-            ),
-            (
-                (2, "2026-01-01 01:00:00"),
-                (2, "2026-01-01 01:00:00"),
-                (3, "2026-01-01 01:00:00"),
-                (4, "2026-01-01 02:00:00"),
-            ),
+            "SELECT id, CAST(ordered_at AS VARCHAR) "
+            "FROM tpl_demo.orders_nonzero ORDER BY id, ordered_at"
+        ),
+        (
+            (2, "2026-01-01 01:00:00"),
+            (2, "2026-01-01 01:00:00"),
+            (3, "2026-01-01 01:00:00"),
+            (4, "2026-01-01 02:00:00"),
         ),
     ),
 )
@@ -132,11 +121,27 @@ _QUOTED_FALLBACK_CASE: TemplateExpressionsBuildE2ETestCase = TemplateExpressions
 @pytest.mark.parametrize(
     "test_case",
     [
-        _QUOTED_FALLBACK_CASE,
-        replace(
-            _QUOTED_FALLBACK_CASE,
+        TemplateExpressionsBuildE2ETestCase(
+            description="build uses if eq ne, coalesce and quoted-argument templates in config",
+            repo_files=_REPO_FILES,
+            initial_seed_sql=_INITIAL_SEED_SQL,
+            mutation_sql=_MUTATION_SQL,
+            env={"APPEND_INCLUSIVE": "0", "TEMPLATE_USER": "demo", "ALIAS_MODE": "one"},
+            command=("--no-color", "build"),
+            expected_exit_code=0,
+            expected_runtime_sql_fragment=_EXPECTED_RUNTIME_SQL_FRAGMENT,
+            expected_query_results=_EXPECTED_QUERY_RESULTS,
+        ),
+        TemplateExpressionsBuildE2ETestCase(
             description="a set schema variable wins without reading the quoted fallback's variable",
+            repo_files=_REPO_FILES,
+            initial_seed_sql=_INITIAL_SEED_SQL,
+            mutation_sql=_MUTATION_SQL,
             env={"APPEND_INCLUSIVE": "0", "TEMPLATE_SCHEMA": "tpl_demo", "ALIAS_MODE": "one"},
+            command=("--no-color", "build"),
+            expected_exit_code=0,
+            expected_runtime_sql_fragment=_EXPECTED_RUNTIME_SQL_FRAGMENT,
+            expected_query_results=_EXPECTED_QUERY_RESULTS,
         ),
     ],
     ids=lambda case: case.description,
