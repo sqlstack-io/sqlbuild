@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
@@ -599,12 +599,31 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
     state
 }
 
+/// When the next safety sync is due, if this report's page completes the sync: the last page of the last scan, without failure.
+pub(crate) fn completed_sync_next_at(
+    state: &LocationMetadataSync,
+    failure: Option<WarehouseSyncFailure>,
+    now: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    let completes = failure.is_none()
+        && state.index + 1 == state.locations.len() * WarehouseHistoryKind::ALL.len()
+        && state
+            .pending
+            .as_ref()
+            .is_none_or(|page| page.next_source_after.is_none());
+    (completes && state.safety_seconds > 0)
+        .then(|| i64::try_from(state.safety_seconds).ok())
+        .flatten()
+        .and_then(|seconds| now.checked_add_signed(chrono::Duration::seconds(seconds)))
+}
+
 /// Operational cost is elapsed IO time, not an estimate of warehouse billing.
 pub(crate) async fn metadata_health(
     state: &LocationMetadataSync,
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
     (started, failure): (Instant, Option<WarehouseSyncFailure>),
 ) {
+    let next_sync_at = completed_sync_next_at(state, failure, Utc::now());
     let report = LocationHealthReport {
         event_id: Uuid::now_v7(),
         session_id: poll.session_id,
@@ -619,6 +638,7 @@ pub(crate) async fn metadata_health(
                 .as_ref()
                 .map_or(0, |page| page.batch.records.len()) as u64,
             elapsed_millis: started.elapsed().as_millis() as u64,
+            next_sync_at,
         },
     };
     if let Err(error) = client.report_health(&report).await {

@@ -530,6 +530,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/mirrored-totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonMirroredTotals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/node-states": {
         parameters: {
             query?: never;
@@ -2003,6 +2019,11 @@ export interface components {
             /** @enum {string} */
             kind: "warehouse_sync";
             location: components["schemas"]["WarehouseStateLocation"];
+            /**
+             * Format: date-time
+             * @description On the report that completes a sync, when the next safety sync is due unless a run ends first; absent otherwise and from older locations.
+             */
+            next_sync_at?: string | null;
             /** Format: int64 */
             records_sent: number;
             table: components["schemas"]["WarehouseHistoryKind"];
@@ -2203,6 +2224,12 @@ export interface components {
             model: string;
             physical_generation_id: string;
             target_name: string;
+        };
+        /** @description How many records the server holds for one mirrored state table of a target. */
+        MirroredTotal: {
+            /** Format: int64 */
+            records: number;
+            table: components["schemas"]["WarehouseHistoryKind"];
         };
         MutationResponse: {
             applied: boolean;
@@ -5018,6 +5045,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["MicrobatchCoverage"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonMirroredTotals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records the server mirrors of each state table of this target, in sync order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MirroredTotal"][];
                 };
             };
             /** @description Session rejected */

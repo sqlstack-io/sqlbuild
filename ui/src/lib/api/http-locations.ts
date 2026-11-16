@@ -162,10 +162,17 @@ export function connectionDetailsOf(published: Wire['PublishedSnapshot'] | null)
 }
 
 /**
- * A location target's connection from its health reports and newest snapshot: the settings it published,
- * the newest connection check, where its state tables are read from, and each table's newest sync.
+ * A location target's connection from its health reports, newest snapshot and mirrored totals: the
+ * settings it published, the newest connection check, where its state tables are read from, each
+ * table's newest sync and how many records the server mirrors of it, and when the next sync is due.
+ * `totals` is null when the server doesn't report them.
  */
-export function toWarehouseConnection(location: Location, observations: Wire['LocationHealthObservation'][], published: Wire['PublishedSnapshot'] | null = null): WarehouseConnection {
+export function toWarehouseConnection(
+	location: Location,
+	observations: Wire['LocationHealthObservation'][],
+	published: Wire['PublishedSnapshot'] | null = null,
+	totals: Wire['MirroredTotal'][] | null = null
+): WarehouseConnection {
 	const { syncs, newest } = syncsOf(observations);
 	const tables: WarehouseTableSync[] = [...newest.values()]
 		.map(({ received_at, report: { health } }) => ({
@@ -176,8 +183,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 			failure: health.failure ? syncProblemOf(health.failure) : null,
 			waiting: health.failure === 'busy',
 			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null,
-			// The server reports only the rows each sync sent, not the table's mirrored total.
-			mirroredTotal: null
+			mirroredTotal: totals ? (totals.find((t) => t.table === health.table)?.records ?? 0) : null
 		}))
 		.sort((a, b) => a.table.localeCompare(b.table));
 	const state = syncs[0]?.report.health.location;
@@ -188,7 +194,8 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 		details: connectionDetailsOf(published),
 		stateLocation: state ? { database: state.database ?? null, schema: state.schema } : null,
 		lastTest: connectionTestOf(observations),
-		nextSyncAt: null,
+		// The report that completes a sync names the next safety sync; one still running names none.
+		nextSyncAt: syncs[0]?.report.health.next_sync_at ?? null,
 		tables
 	};
 }

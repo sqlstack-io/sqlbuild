@@ -49,6 +49,7 @@ use crate::api::_helpers::resources::{
     person_reads::sensor_state,
     person_reads::snapshots,
     person_reads::health,
+    person_reads::mirrored_totals,
     person_reads::problems,
     person_reads::platform_events,
     person_operations::catalog,

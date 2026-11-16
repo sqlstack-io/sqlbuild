@@ -688,9 +688,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const locations = (await bootstrapLocations()).filter((l) => !healthRefused.has(l.id));
 			const read = await Promise.all(
 				locations.map(async (location) => {
-					const [{ data, response }, snapshot] = await locationHealth(location.id);
+					const { locationId, target } = parseLocationKey(location.id);
+					const [[{ data, response }, snapshot], totals] = await Promise.all([
+						locationHealth(location.id),
+						http.GET('/api/control/locations/{location_id}/targets/{target}/mirrored-totals', { params: { path: { location_id: locationId, target } } })
+					]);
 					if (response.status === 403) healthRefused.add(location.id);
-					return data ? [toWarehouseConnection(location, data, snapshot)] : [];
+					return data ? [toWarehouseConnection(location, data, snapshot, totals.data ?? null)] : [];
 				})
 			);
 			return read.flat();

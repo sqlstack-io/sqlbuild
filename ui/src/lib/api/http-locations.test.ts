@@ -108,6 +108,23 @@ describe('warehouseSyncOf', () => {
 		]);
 	});
 
+	it('counts the records mirrored of each table, and names the next sync from the report that completed one', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const completed = sync('2026-11-08T12:03:00Z', 'statistics', null);
+		const observations = [{ ...completed, report: { ...completed.report, health: { ...completed.report.health, next_sync_at: '2026-11-08T12:33:00Z' } } }, sync('2026-11-08T12:02:00Z', 'catalog', null)];
+		const connection = toWarehouseConnection(location, observations, null, [
+			{ table: 'catalog', records: 120 },
+			{ table: 'statistics', records: 4_800 }
+		]);
+		expect(connection.tables.map((t) => [t.table, t.mirroredTotal])).toEqual([
+			['catalog', 120],
+			['statistics', 4_800]
+		]);
+		expect(connection.nextSyncAt).toBe('2026-11-08T12:33:00Z');
+		const running = toWarehouseConnection(location, [sync('2026-11-08T12:40:00Z', 'catalog', null), ...observations]);
+		expect([running.nextSyncAt, running.tables[0].mirroredTotal]).toEqual([null, null]);
+	});
+
 	it('shows the connection settings published with the newest snapshot, and none before it publishes them', () => {
 		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
 		const published = {

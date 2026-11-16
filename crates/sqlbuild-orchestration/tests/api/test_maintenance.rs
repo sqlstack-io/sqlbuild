@@ -181,6 +181,46 @@ fn given_moves_views_and_cleanups_when_people_read_maintenance_then_each_model_s
                 .0,
                 StatusCode::FORBIDDEN
             );
+            let totals_path =
+                format!("/api/control/locations/{location}/targets/development/mirrored-totals");
+            let (status, totals) = get(&client, (&api.url, &viewer), &totals_path).await;
+            assert_eq!(status, StatusCode::OK, "{}", test_case.description);
+            let counted: Vec<(&str, u64)> = totals
+                .as_array()
+                .expect("totals")
+                .iter()
+                .filter(|total| total["records"] != 0)
+                .map(|total| {
+                    (
+                        total["table"].as_str().expect("table"),
+                        total["records"].as_u64().expect("records"),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                (totals.as_array().expect("totals").len(), counted),
+                (
+                    14,
+                    vec![
+                        ("janitor_events", 2),
+                        ("migrations", 3),
+                        ("old_name_views", 4)
+                    ]
+                ),
+                "{}: every state table, counting only this target's mirrored records",
+                test_case.description
+            );
+            assert_eq!(
+                get(
+                    &client,
+                    (&api.url, &viewer),
+                    &totals_path.replace("development", "preview")
+                )
+                .await
+                .0,
+                StatusCode::FORBIDDEN,
+                "mirrored totals need the same view as the target's health"
+            );
             stop_api(api).await;
             close_test_store(fixture_store).await;
         });

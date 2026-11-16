@@ -16,6 +16,8 @@ mod paths;
 mod project_facts;
 #[path = "tests/test_rules.rs"]
 mod rules;
+#[path = "tests/test_sync_schedule.rs"]
+mod sync_schedule;
 #[path = "tests/test_terminal.rs"]
 mod terminal;
 #[path = "tests/test_types.rs"]

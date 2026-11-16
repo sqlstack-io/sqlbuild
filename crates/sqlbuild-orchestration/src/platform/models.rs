@@ -61,6 +61,9 @@ pub enum LocationHealth {
         failure: Option<WarehouseSyncFailure>,
         records_sent: u64,
         elapsed_millis: u64,
+        /// On the report that completes a sync, when the next safety sync is due unless a run ends first; absent otherwise and from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        next_sync_at: Option<DateTime<Utc>>,
     },
 }
 
@@ -92,6 +95,13 @@ pub struct LocationHealthReport {
     pub session_id: Uuid,
     pub target: String,
     pub health: LocationHealth,
+}
+
+/// How many records the server holds for one mirrored state table of a target.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MirroredTotal {
+    pub table: WarehouseHistoryKind,
+    pub records: u64,
 }
 
 /// Narrows a location's health history to one target, so other targets' traffic cannot crowd it out.
