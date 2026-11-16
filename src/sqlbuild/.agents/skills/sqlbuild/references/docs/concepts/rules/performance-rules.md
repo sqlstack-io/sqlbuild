@@ -1,0 +1,128 @@
+<!-- generated-by: sqlbuild skills -->
+
+# Performance Rules
+
+> Catch semi-structured payloads that repeat on every row and multiply storage and scan cost.
+
+Online: https://sqlbuild.com/docs/concepts/rules/performance-rules/
+
+## Contents
+
+- SQBRPERFORMANCE101: a flattened parent copied onto its children
+- SQBRPERFORMANCE102: a payload copied onto a finer grain
+- Details
+
+The `SQBRPERFORMANCE` Rules find JSON payloads copied onto rows that are finer than the payload
+itself. Each copy stores and scans the same value again, so the cost grows with the row count.
+Name their codes in `select` to turn them on:
+
+```toml
+[rules]
+select = ["SQBRPERFORMANCE101", "SQBRPERFORMANCE102"]
+```
+
+Both Rules are off by default: selecting the `SQBRPERFORMANCE` family alone does not run them. They
+run on the Snowflake dialect.
+
+| Code | Name | Reports |
+|---|---|---|
+| `SQBRPERFORMANCE101` | `flatten-parent-copy` | A FLATTEN element copied whole onto the rows of a deeper FLATTEN of its own child array |
+| `SQBRPERFORMANCE102` | `json-finer-grain` | A `VARIANT`, `OBJECT` or `ARRAY` column copied from an input with a coarser unique key |
+
+## SQBRPERFORMANCE101: a flattened parent copied onto its children
+
+An output column must not copy the `value` of a FLATTEN whose child array a deeper FLATTEN in the
+same query reads. Every child row then carries its whole parent, children included:
+
+```sql
+SELECT
+  r.order_id,
+  o.value AS line_json,
+  l.value:code::string AS option_code
+FROM __ref("orders") r, LATERAL FLATTEN(input => r.payload:lines) o, LATERAL FLATTEN(o.value:options) l
+```
+
+```text
+error[SQBRPERFORMANCE101]: line_json copies o.value whole onto every row flattened from o.value:options
+  --> models/line_options.sql:7:3
+```
+
+The parent also counts as copied through a cast, a conversion such as `TO_JSON` or `TO_VARIANT`,
+or a constructor that embeds it: `OBJECT_CONSTRUCT`, `OBJECT_INSERT` or `ARRAY_CONSTRUCT`. Paths
+into it, such as `o.value:sku`, and other functions of it, such as `MD5(TO_VARCHAR(o.value))`, are
+not copies.
+
+Read the fields you need from the parent, such as `o.value:sku::string`, or remove the child array
+before copying the rest:
+
+```sql
+SELECT
+  r.order_id,
+  OBJECT_DELETE(o.value, 'options') AS line_json,
+  l.value:code::string AS option_code
+FROM __ref("orders") r, LATERAL FLATTEN(input => r.payload:lines) o, LATERAL FLATTEN(o.value:options) l
+```
+
+## SQBRPERFORMANCE102: a payload copied onto a finer grain
+
+A `VARIANT`, `OBJECT` or `ARRAY` output column must not come from an input whose unique key is a
+strict subset of the model's unique key. Here `orders` has one row per `order_id` and the model has
+one row per `(order_id, line_no)`, so each order's payload repeats on every line:
+
+```sql
+SELECT
+  l.order_id,
+  l.line_no,
+  l.sku,
+  o.payload AS order_payload
+FROM __ref("order_lines") l
+JOIN __ref("orders") o ON o.order_id = l.order_id
+```
+
+```text
+error[SQBRPERFORMANCE102]: order_payload copies VARIANT from orders, one row per (order_id), onto rows keyed by (order_id, line_no), so the same value repeats on every row
+  --> models/order_lines_enriched.sql:12:3
+```
+
+Read the fields the model needs, such as `o.payload:customer::string`, or leave the payload on the
+input and join it where it is used.
+
+The Rule compares the unique keys SQLBuild knows from each relation's declaration:
+
+| Declaration | Key |
+|---|---|
+| A column with `nullable false` (or a `not_null` audit) and a `unique` audit | That column |
+| An incremental model with `unique_key` and the `merge` strategy | The `unique_key` columns |
+| A seed whose file holds at most one data row | No columns |
+
+A model with another declared key that one of the input's keys covers is not reported: that key already
+proves one row per input row. An incremental model with `unique_key [order_id, order_date]` and a
+unique, not-null `order_id` column has one row per order.
+
+Aggregated columns, such as `ARRAY_AGG(l.sku)`, are not copies and are not reported.
+
+### Published views
+
+A model whose only readers are published views of its own entity is not reported: the view
+publishes the same grain on purpose. The views follow the
+[SQBRGRAPH103 allowance](published-layer-rules.md#sqbrgraph103-no-published-reads-within-a-domain):
+`shop__mart_v__order_lines` reading `shop__mart__order_lines`. Its `published_layers` option sets
+which layers count.
+
+### Skipped models
+
+`SQBRPERFORMANCE102` needs column lineage and inferred column types. A model without them is
+skipped, not reported. The run counts skipped models in a note:
+
+```text
+note: SQBRPERFORMANCE102 skipped 2 models without column lineage or inferred types; `sqb plan --verbose` lists them
+```
+
+`sqb plan --verbose` and `sqb build --verbose` list each skipped model with the missing fact.
+
+## Details
+
+- `SQBRPERFORMANCE101` reports the select item that copies the parent, inside a CTE or subquery
+  when the copy is made there.
+- `SQBRPERFORMANCE102` reports the column where the root query projects it.
+- `SQBRPERFORMANCE102` reports nothing for a model without a declared unique key.
