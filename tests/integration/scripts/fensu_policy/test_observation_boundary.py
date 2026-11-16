@@ -40,6 +40,21 @@ from tests.integration.scripts.fensu_policy.helpers import check_rust, write_obs
             expected_faults=(" --> crates/sqlbuild-python/src/planner.rs:1:0",),
         ),
         ObservationBoundaryTestCase(
+            description="planner calling the observation write and registration entry points",
+            rule="XSB078",
+            allowed=("crates/sqlbuild-python/src/observations",),
+            planner=(
+                "pub fn plan() {}\n"
+                "pub fn record(rows: &[Row]) { append_observations(rows); }\n"
+                "pub fn install(module: &Module) { register_observations_state(module); }\n"
+            ),
+            expected_returncode=1,
+            expected_faults=(
+                " --> crates/sqlbuild-python/src/planner.rs:2:0",
+                " --> crates/sqlbuild-python/src/planner.rs:3:0",
+            ),
+        ),
+        ObservationBoundaryTestCase(
             description="allowed path that no longer names observation state",
             rule="XSB078",
             allowed=(

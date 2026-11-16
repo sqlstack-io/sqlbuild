@@ -1707,6 +1707,9 @@ allowed_paths = [
     "crates/sqlbuild-python-front/src/native_host/_helpers/mod.rs=Declares the observation state module.",
     "crates/sqlbuild-python-front/src/native_host/main/append_observations.rs=Writes observations after a build.",
     "crates/sqlbuild-python-front/src/native_host/main/register_observations_state.rs=Registers the observation state bindings.",
+    "crates/sqlbuild-python/src/bindings/_helpers/cli/registration.rs=Registers the observation state bindings.",
+    "crates/sqlbuild-python/src/bindings/_helpers/observations=Writes observations after a build.",
+    "crates/sqlbuild-python-front/src/native_host/main/mod.rs=Declares the observation write and registration entries.",
 ]
 
 [targets.rust.rule_options.XSB079]
