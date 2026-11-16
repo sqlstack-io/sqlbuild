@@ -60,14 +60,14 @@ pub(crate) async fn current_view(
     refresh_view(cache, scope, (&entry, false)).await
 }
 
-/// Replace the view when states differ and push the difference, or an empty one when `announced`; the caller holds `entry.refresh`.
+/// Replace the view when states or the changed build differ and push the difference, or an empty one when `announced`; a new changed build is pushed as `full`, so clients read it with the states. The caller holds `entry.refresh`.
 pub(crate) async fn refresh_view(
     cache: &NodeStateCache,
     (location_id, target): (Uuid, &str),
     (entry, announced): (&TargetCache, bool),
 ) -> Result<Arc<TargetView>, ControlError> {
     let previous = held_view(entry);
-    let (catalog, states) = read_target(
+    let (catalog, states, changed_build) = read_target(
         &cache.store,
         (location_id, target),
         previous.as_ref().map(|view| view.catalog.clone()),
@@ -75,7 +75,10 @@ pub(crate) async fn refresh_view(
     .await?;
     let previous_version = previous.as_ref().map_or(0, |previous| previous.version);
     let changed = match &previous {
-        Some(previous) if previous.catalog.snapshot_id == catalog.snapshot_id => {
+        Some(previous)
+            if previous.catalog.snapshot_id == catalog.snapshot_id
+                && previous.changed_build.as_deref() == changed_build.as_ref() =>
+        {
             Some(changed_states(&previous.states, &states))
         }
         _ => None,
@@ -96,6 +99,7 @@ pub(crate) async fn refresh_view(
                 version: previous_version + 1,
                 catalog,
                 states: Arc::new(states),
+                changed_build: changed_build.map(Arc::new),
                 nodes_body: Default::default(),
                 states_body: Default::default(),
             });

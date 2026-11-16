@@ -9,10 +9,14 @@ use uuid::Uuid;
 use crate::api::models::{ApiAuthentication, HumanLogin};
 use crate::api::tests::changes_helpers::{next_notice, opened, request_person_feed};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
-use crate::api::tests::test_types::{NodeStatesTestCase, PushedStatesTestCase};
+use crate::api::tests::test_types::{
+    ChangedBuildTestCase, NodeStatesTestCase, PushedStatesTestCase,
+};
 use crate::credentials::tests::role_helpers::{SUPPORT_ROLE, orders_grant, role_fixture};
 use crate::node_states::_helpers::views::{current_view, refresh_view, target_cache};
+use crate::node_states::main::report_changed_build::report_changed_build;
 use crate::node_states::main::start_node_states::start_node_states;
+use crate::node_states::models::ChangedBuildReport;
 use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::main::request_job_run::request_job_run;
@@ -20,6 +24,7 @@ use crate::runs::models::JobRunRequest;
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
+use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::ControlStore;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -282,6 +287,131 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
                     json!({"topic": "runs"}),
                 ],
                 "{}: a signal that changes no state keeps the version and pushes no states",
+                test_case.description
+            );
+            stop_api(api).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_changed_build_reports_when_people_read_node_states_then_only_the_current_generations_plan_is_served()
+ {
+    let test_cases = [
+        ChangedBuildTestCase {
+            description: "SQLite changed build",
+            backend: Backend::Sqlite,
+        },
+        ChangedBuildTestCase {
+            description: "PostgreSQL changed build",
+            backend: Backend::Postgres,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let location = roles.location_id;
+            let mut input = orders_snapshot(location, &["orders", "customers"]);
+            input.generation = 2;
+            publish_snapshot(store, &input).await.expect("orders");
+            let session_id = reader(store, location).await;
+            let api = start_api_with_authentication(
+                store,
+                ApiAuthentication {
+                    login: HumanLogin::Password("https://control.example.com".into()),
+                    ..ApiAuthentication::default()
+                },
+            )
+            .await;
+            let client = reqwest::Client::new();
+            let admin = roles.administrator.bearer.clone();
+            let changed_build = || async {
+                let states: Value = client
+                    .get(format!(
+                        "{}/api/control/locations/{location}/targets/development/node-states",
+                        api.url
+                    ))
+                    .header(header::HOST, "control.example.com")
+                    .header(header::COOKIE, format!("__Host-sqb-session={admin}"))
+                    .send()
+                    .await
+                    .expect("states")
+                    .json()
+                    .await
+                    .expect("states body");
+                let mut build = states["changed_build"].clone();
+                if let Some(build) = build.as_object_mut() {
+                    assert!(build.remove("reported_at").is_some_and(|at| at.is_string()));
+                }
+                build
+            };
+            assert_eq!(
+                changed_build().await,
+                Value::Null,
+                "{}: unknown before the location plans it",
+                test_case.description
+            );
+            let mut feed =
+                opened(request_person_feed(&client, &api, (location, "development", &admin)).await)
+                    .await;
+            let report = |generation: i64, changed: &[&str]| ChangedBuildReport {
+                session_id,
+                generation,
+                changed: changed.iter().map(|key| (*key).to_owned()).collect(),
+                downstream: vec!["model:customers".into()],
+            };
+            report_changed_build(
+                store,
+                (location, "development"),
+                &report(2, &["model:orders"]),
+            )
+            .await
+            .expect("changed build");
+            assert_eq!(
+                next_notice(&mut feed).await.expect("node status"),
+                json!({"topic": "node_status:development", "version": 2, "previous_version": 1, "full": true}),
+                "{}: a new changed build tells clients to read the states again",
+                test_case.description
+            );
+            assert_eq!(
+                changed_build().await,
+                json!({"generation": 2, "changed": ["model:orders"], "downstream": ["model:customers"]}),
+                "{}: served with the node states",
+                test_case.description
+            );
+            let refused = [
+                report_changed_build(
+                    store,
+                    (location, "development"),
+                    &report(1, &["model:orders"]),
+                )
+                .await,
+                report_changed_build(store, (location, "development"), &report(2, &["orders"]))
+                    .await,
+            ];
+            assert!(
+                matches!(
+                    refused,
+                    [Err(ControlError::Fenced), Err(ControlError::Invalid(_))]
+                ),
+                "{}: an older generation is fenced and nodes must be keys: {refused:?}",
+                test_case.description
+            );
+            let mut republished = input.clone();
+            republished.generation = 3;
+            publish_snapshot(store, &republished)
+                .await
+                .expect("new snapshot");
+            assert_eq!(
+                changed_build().await,
+                Value::Null,
+                "{}: a new snapshot's changed build is unknown until the location plans it",
                 test_case.description
             );
             stop_api(api).await;

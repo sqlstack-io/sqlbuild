@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::api::errors::ClientError;
 use crate::api::main::client_response::client_response;
 use crate::api::models::MutationResponse;
+use crate::node_states::models::ChangedBuildReport;
 use crate::platform::models::{
     LocationHealthObservation, LocationHealthReport, LocationWorkClaim, LocationWorkClient,
     LocationWorkPoll, LocationWorkResult,
@@ -105,6 +106,26 @@ impl LocationWorkClient {
     ) -> Result<PreviewCopy, ClientError> {
         self.post_metadata((target, Some("preview-copy")), request)
             .await
+    }
+
+    /// Report what the default `sqb build --changed` runs, planned from the synced copy for `report.generation`.
+    pub async fn report_changed_build(
+        &self,
+        target: &str,
+        report: &ChangedBuildReport,
+    ) -> Result<bool, ClientError> {
+        let location_id = self.location_id.to_string();
+        let endpoint = self.connection.endpoint(&[
+            "api",
+            "locations",
+            &location_id,
+            "targets",
+            target,
+            "changed-build",
+        ])?;
+        let response: MutationResponse =
+            client_response(self.connection.client.post(endpoint).json(report)).await?;
+        Ok(response.applied)
     }
 
     /// Metadata shares the location's scoped pool, not the scheduler's execution authority.

@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
-    administrators, audit, changes, location_health, location_work, person_bootstrap,
-    person_checks, person_location_work, person_maintenance, person_node_sql, person_operations,
-    person_plans, person_reads, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
+    administrators, audit, changed_builds, changes, location_health, location_work,
+    person_bootstrap, person_checks, person_location_work, person_maintenance, person_node_sql,
+    person_operations, person_plans, person_reads, run_reads, runs, snapshots, trigger_reads,
+    warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -103,6 +104,7 @@ use crate::api::_helpers::resources::{
     trigger_reads::ticks,
     warehouse_metadata::report,
     warehouse_metadata::preview_copy,
+    changed_builds::report,
     warehouse_metadata::statistics_due,
     warehouse_metadata::retention,
     warehouse_metadata::sync_due,
@@ -250,7 +252,7 @@ pub struct ChangeNotice {
     /// `node_status` only: the nodes whose state changed, absent when `full` is set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub states: Option<std::collections::BTreeMap<String, crate::node_states::models::NodeState>>,
-    /// `node_status` only: too many nodes or a new snapshot changed; refetch node states.
+    /// `node_status` only: too many nodes changed, or the snapshot or changed build is new; refetch node states.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub full: Option<bool>,
 }

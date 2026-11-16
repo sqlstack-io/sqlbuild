@@ -68,5 +68,6 @@ fn state_record(view: &TargetView) -> NodeStatesRecord {
         snapshot_id: view.catalog.snapshot_id,
         version: view.version,
         states: (*view.states).clone(),
+        changed_build: view.changed_build.as_deref().cloned(),
     }
 }

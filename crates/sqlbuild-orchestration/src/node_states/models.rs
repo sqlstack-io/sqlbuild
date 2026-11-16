@@ -5,6 +5,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
 
 use axum::body::Bytes;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -29,6 +30,39 @@ pub struct NodeStatesRecord {
     pub snapshot_id: Option<Uuid>,
     pub version: u64,
     pub states: BTreeMap<String, NodeState>,
+    /// What the default `sqb build --changed` would run; null until the location plans it for the current snapshot.
+    #[serde(default)]
+    pub changed_build: Option<ChangedBuild>,
+}
+
+/// The nodes the default `sqb build --changed` runs, as the location last planned it from the synced copy.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ChangedBuild {
+    /// The publication generation it was planned for.
+    pub generation: i64,
+    /// When the server received it.
+    pub reported_at: DateTime<Utc>,
+    /// Nodes that run for a change of their own, as `kind:name`.
+    pub changed: Vec<String>,
+    /// Nodes that run only because an upstream they read runs.
+    pub downstream: Vec<String>,
+}
+
+/// The stored node lists of a changed build.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct ChangedBuildNodes {
+    pub(crate) changed: Vec<String>,
+    pub(crate) downstream: Vec<String>,
+}
+
+/// A location's plan of the default `sqb build --changed`, fenced to its reader session and generation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ChangedBuildReport {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub changed: Vec<String>,
+    pub downstream: Vec<String>,
 }
 
 /// A serialized response and the entity tag naming its snapshot and state version.
@@ -65,6 +99,7 @@ pub(crate) struct TargetView {
     pub(crate) version: u64,
     pub(crate) catalog: Arc<SnapshotCatalog>,
     pub(crate) states: Arc<BTreeMap<String, NodeState>>,
+    pub(crate) changed_build: Option<Arc<ChangedBuild>>,
     pub(crate) nodes_body: tokio::sync::OnceCell<Bytes>,
     pub(crate) states_body: tokio::sync::OnceCell<Bytes>,
 }

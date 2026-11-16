@@ -6,13 +6,13 @@ use std::sync::Arc;
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
-use crate::node_states::models::{NodeState, SnapshotCatalog};
+use crate::node_states::models::{ChangedBuild, ChangedBuildNodes, NodeState, SnapshotCatalog};
 use crate::snapshots::main::read_current_record::read_current_record;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit};
-use crate::store::models::{ControlStore, ControlTransaction, TransactionMode};
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::warehouse_history::main::read_node_check_counts::read_node_check_counts;
 use crate::warehouse_metadata::_helpers::catalog_nodes::{
     catalog_node, last_outcome, latest_attempts,
@@ -24,12 +24,19 @@ use crate::warehouse_metadata::models::{CatalogNodeBuild, DefinitionEvidence, Fi
 /// The definition fields node states read: the name and destination of builds, and the planner identity.
 const STATE_FIELDS: [&str; 3] = ["name", "destination", "planner_identity"];
 
-/// The current catalog, reusing `held` while the snapshot is unchanged, and its node states.
+/// A target's read: its catalog, every node's state, and the changed build planned for the current snapshot.
+pub(crate) type TargetRead = (
+    Arc<SnapshotCatalog>,
+    BTreeMap<String, NodeState>,
+    Option<ChangedBuild>,
+);
+
+/// The current catalog, reusing `held` while the snapshot is unchanged, its node states and changed build.
 pub(crate) async fn read_target(
     store: &ControlStore,
     (location_id, target): (Uuid, &str),
     held: Option<Arc<SnapshotCatalog>>,
-) -> Result<(Arc<SnapshotCatalog>, BTreeMap<String, NodeState>), ControlError> {
+) -> Result<TargetRead, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
     let (transaction, snapshot) = read_current_record(transaction, (location_id, target)).await?;
     let snapshot_id = snapshot.map(|snapshot| snapshot.snapshot_id);
@@ -43,8 +50,41 @@ pub(crate) async fn read_target(
     };
     let (transaction, states) =
         node_states(transaction, (location_id, target), &catalog.inputs).await?;
+    let (transaction, changed_build) = changed_build(transaction, (location_id, target)).await?;
     commit(transaction).await?;
-    Ok((catalog, states))
+    Ok((catalog, states, changed_build))
+}
+
+/// The location's newest changed build, only when it was planned for the current snapshot's generation.
+async fn changed_build(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, Option<ChangedBuild>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT b.generation, b.reported_at, b.report_json FROM sqb_changed_builds b \
+         JOIN sqb_current_snapshots c ON c.location_id=b.location_id AND c.target=b.target \
+         JOIN sqb_snapshots s ON s.snapshot_id=c.snapshot_id \
+         WHERE b.location_id=$1 AND b.target=$2 AND s.generation=b.generation",
+        vec![Parameter::Id(location_id), Parameter::Text(target.into())],
+    )
+    .await?;
+    let Some(row) = rows.into_iter().next() else {
+        return Ok((transaction, None));
+    };
+    let invalid =
+        |error: serde_json::Error| ControlError::Invalid(format!("stored changed build: {error}"));
+    let report: ChangedBuildNodes =
+        serde_json::from_value(row["report_json"].clone()).map_err(invalid)?;
+    Ok((
+        transaction,
+        Some(ChangedBuild {
+            generation: row["generation"].as_i64().unwrap_or_default(),
+            reported_at: serde_json::from_value(row["reported_at"].clone()).map_err(invalid)?,
+            changed: report.changed,
+            downstream: report.downstream,
+        }),
+    ))
 }
 
 fn snapshot_catalog(snapshot_id: Uuid, nodes: BTreeMap<String, SnapshotNode>) -> SnapshotCatalog {

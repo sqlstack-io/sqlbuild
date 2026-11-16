@@ -6,8 +6,8 @@ use axum::{Extension, Router, middleware};
 
 use crate::api::_helpers::authentication::bearer::authenticate;
 use crate::api::_helpers::resources::{
-    changes, location_health, location_work, run_reads, runs, snapshots, trigger_reads,
-    warehouse_metadata,
+    changed_builds, changes, location_health, location_work, run_reads, runs, snapshots,
+    trigger_reads, warehouse_metadata,
 };
 use crate::api::constants::BODY_BYTES;
 use crate::api::models::ChangeFeed;
@@ -34,6 +34,10 @@ pub(crate) fn router(store: &ControlStore, feed: ChangeFeed) -> Router<ControlSt
         .route(
             "/api/locations/{location_id}/targets/{target}/metadata",
             post(warehouse_metadata::report),
+        )
+        .route(
+            "/api/locations/{location_id}/targets/{target}/changed-build",
+            post(changed_builds::report),
         )
         .route(
             "/api/locations/{location_id}/targets/{target}/metadata/preview-copy",

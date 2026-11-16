@@ -1,5 +1,6 @@
 pub(crate) mod administrators;
 pub(crate) mod audit;
+pub(crate) mod changed_builds;
 pub(crate) mod changes;
 pub(crate) mod client;
 pub(crate) mod compression;

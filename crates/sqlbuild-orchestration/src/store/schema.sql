@@ -68,6 +68,14 @@ CREATE TABLE sqb_current_snapshots (
     FOREIGN KEY (location_id, target, snapshot_id)
         REFERENCES sqb_snapshots(location_id, target, snapshot_id)
 );
+CREATE TABLE sqb_changed_builds (
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    generation BIGINT NOT NULL,
+    reported_at {time} NOT NULL,
+    report_json {json} NOT NULL,
+    PRIMARY KEY (location_id, target)
+);
 CREATE TABLE sqb_snapshot_changes (
     snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
     change_seq BIGINT NOT NULL,

@@ -85,6 +85,11 @@ pub(crate) struct NodeStatesTestCase {
     pub(crate) expected_listed: usize,
 }
 
+pub(crate) struct ChangedBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+}
+
 pub(crate) struct PushedStatesTestCase {
     pub(crate) description: &'static str,
     pub(crate) built: usize,
