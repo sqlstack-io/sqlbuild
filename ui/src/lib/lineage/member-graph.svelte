@@ -9,7 +9,8 @@
 	import TooManyCard from '$lib/components/lineage/too-many-card.svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
-	import { layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
+	import { folderBoxId, folderCardId, layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
+	import { absolutePosition as positionOn, anchoredViewport } from '$lib/lineage/fit';
 	import { innerId, memberGraph, memberNodeId, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
 	import { toggled } from '$lib/lineage/member-expand';
 	import JobBoxNode from './job-box-node.svelte';
@@ -42,13 +43,27 @@
 	/** Selects a member and opens or closes it, from its card or its box's header. */
 	function toggle(jobKey: string) {
 		selection = { member: jobKey };
+		anchorOn(memberNodeId(jobKey), memberNodeId(jobKey));
 		expanded = toggled(expanded, jobKey);
+	}
+	// Opening or closing a member or a folder keeps the clicked card or box where it is on screen;
+	// the view fits only when the graph first shows and on the Fit button.
+	let anchor: { id: string; before: { x: number; y: number }; view: Viewport } | null = null;
+	function anchorOn(from: string, to: string) {
+		const before = positionOn(nodes, from);
+		anchor = before ? { id: to, before, view: viewport } : null;
 	}
 	function setFolders(jobKey: string, next: ReadonlySet<string>) {
 		openFolders = new Map([...openFolders, [jobKey, next]]);
 	}
-	const closeFolder = (jobKey: string, folder: string) => setFolders(jobKey, withFolderClosed(openFolders.get(jobKey) ?? new Set(), folder));
-	const openFolder = (jobKey: string, folder: string) => setFolders(jobKey, new Set([...(openFolders.get(jobKey) ?? []), folder]));
+	function closeFolder(jobKey: string, folder: string) {
+		anchorOn(innerId(jobKey, folderBoxId(folder)), innerId(jobKey, folderCardId(folder)));
+		setFolders(jobKey, withFolderClosed(openFolders.get(jobKey) ?? new Set(), folder));
+	}
+	function openFolder(jobKey: string, folder: string) {
+		anchorOn(innerId(jobKey, folderCardId(folder)), innerId(jobKey, folderBoxId(folder)));
+		setFolders(jobKey, new Set([...(openFolders.get(jobKey) ?? []), folder]));
+	}
 
 	const graph = $derived(memberGraph(members, info, { catalog, links, expanded, openFolders, ontoggle: toggle, oncloseFolder: closeFolder }));
 	const tooMany = $derived(tooManyToDraw(graph));
@@ -138,7 +153,15 @@
 		if (laidOut === shape || !nodes.length || !cards.every((n) => n.measured?.width && n.measured?.height)) return;
 		laidOut = shape;
 		nodes = layoutFolderGraph(nodes, edges);
-		tick().then(() => requestAnimationFrame(() => fit?.()));
+		const held = anchor;
+		anchor = null;
+		tick().then(() =>
+			requestAnimationFrame(() => {
+				const after = held && positionOn(nodes, held.id);
+				if (held && after && setViewport && fitted) setViewport(anchoredViewport(held.view, held.before, after));
+				else if (!fitted) fit?.();
+			})
+		);
 	});
 
 	function onnodeclick({ node, event }: { node: Node; event: MouseEvent | TouchEvent }) {

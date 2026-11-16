@@ -39,7 +39,7 @@
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
-	import { READABLE_ZOOM } from '$lib/lineage/fit';
+	import { READABLE_ZOOM, anchoredViewport, absolutePosition as positionOn } from '$lib/lineage/fit';
 	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
 	import { scaleGraph } from '$lib/mock/scale-graph';
@@ -60,7 +60,7 @@
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
-	import { MAX_DRAWN, expandAll, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
+	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
 	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
@@ -169,7 +169,12 @@
 	});
 
 	/** Redraws the graph after folders open or close, keeping the selection; the layout effect then places it. */
-	function regroup(next: { grouped?: boolean; expanded?: ReadonlySet<string> }) {
+	// The view fits the graph only on first load, a scope or filter change, and the Fit button. Opening or
+	// closing a folder keeps the clicked box where it was on screen instead (`anchor`).
+	let pendingFit = true;
+	let anchor: { id: string; before: { x: number; y: number }; view: Viewport } | null = null;
+	function regroup(next: { grouped?: boolean; expanded?: ReadonlySet<string>; fit?: boolean }) {
+		if (next.fit) pendingFit = true;
 		const data = catalog.data;
 		if (!data) return;
 		grouped = next.grouped ?? grouped;
@@ -186,10 +191,17 @@
 		if (grouped) regroup({ expanded: next });
 		else expanded = next;
 	}
+	/** Keeps the clicked card or box, `from`, on screen where it is once it is redrawn as `to`. */
+	function anchorOn(from: string, to: string) {
+		const before = positionOn(nodes, from);
+		anchor = before ? { id: to, before, view: viewport } : null;
+	}
 	function openFolder(folder: string) {
+		anchorOn(folderCardId(folder), folderBoxId(folder));
 		setOpen(new Set([...expanded, folder]));
 	}
 	function closeFolder(folder: string) {
+		anchorOn(folderBoxId(folder), folderCardId(folder));
 		setOpen(withFolderClosed(expanded, folder));
 	}
 	/** Opens or closes a folder in the side list only. */
@@ -210,7 +222,7 @@
 		url.searchParams.delete(NODES_PARAM);
 		if (url.search !== page.url.search) void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
 		// A folder filter is the default view scoped to the folders: their subfolders start closed.
-		regroup({ grouped: scopeOpensByFolder(next), expanded: new Set() });
+		regroup({ grouped: scopeOpensByFolder(next), expanded: new Set(), fit: true });
 	}
 	/** Whether the scope draws by folder, as the default view decides for the whole project. */
 	function scopeOpensByFolder(selected: string[] = selectedFolders): boolean {
@@ -238,7 +250,7 @@
 		const url = new URL(page.url);
 		url.searchParams.set(NODES_PARAM, next.join(','));
 		if (url.search !== page.url.search) void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
-		regroup({});
+		regroup({ fit: true });
 	}
 	/** Adds a folder to what is drawn: a stub's click, Ctrl/⌘-click or a tree checkbox. With picked nodes, a stub adds its folder's nodes to them. */
 	function addFolder(folder: string) {
@@ -259,7 +271,7 @@
 	}
 	function showOutOfDate() {
 		staleOnly = true;
-		regroup({ grouped: scopeOpensByFolder(), expanded: new Set() });
+		regroup({ grouped: scopeOpensByFolder(), expanded: new Set(), fit: true });
 	}
 	function pickFolders() {
 		browserOpen = true;
@@ -616,7 +628,7 @@
 			const own = tree.chains.get(id)?.at(-1);
 			if (pickedNodes.length && !pickedNodes.includes(id)) setPickedNodes([...pickedNodes, id]);
 			else if (outsideFolders && own) setFolderSelection(withFolderAdded(selectedFolders, own));
-			else if (outsideStale) regroup({});
+			else if (outsideStale) regroup({ fit: true });
 		}
 		await selectModel(id, true);
 	}
@@ -748,7 +760,15 @@
 		tick().then(() => {
 			const centre = pendingCentre;
 			pendingCentre = null;
-			if (!centre || !centreOn(centre)) fitFlow?.({ duration: 0 });
+			const held = anchor;
+			anchor = null;
+			const after = held && positionOn(nodes, held.id);
+			if (held && after && setFlowViewport && fitted) setFlowViewport(anchoredViewport(held.view, held.before, after));
+			else if (centre && centreOn(centre)) return;
+			else if (pendingFit || !fitted) {
+				pendingFit = false;
+				fitFlow?.({ duration: 0 });
+			}
 		});
 	});
 
@@ -846,7 +866,7 @@
 		<Button
 			variant="ghost"
 			aria-pressed={grouped}
-			onclick={() => regroup({ grouped: !grouped, expanded: new Set() })}
+			onclick={() => regroup({ grouped: !grouped, expanded: new Set(), fit: true })}
 			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
 		>
 			<FolderIcon />Folders
@@ -954,7 +974,7 @@
 					<strong>Too many nodes to draw at once</strong>
 					<p>This view has {tooManyCount.toLocaleString('en')} cards; the graph draws at most {MAX_DRAWN.toLocaleString('en')}.</p>
 					<div class="too-many-actions">
-						{#if !grouped}<Button variant="outline" size="bar" onclick={() => regroup({ grouped: true, expanded: new Set() })}><FolderIcon size={13} />Show folders</Button>{/if}
+						{#if !grouped}<Button variant="outline" size="bar" onclick={() => regroup({ grouped: true, expanded: new Set(), fit: true })}><FolderIcon size={13} />Show folders</Button>{/if}
 						{#if !staleOnly && outOfDateCount > 0 && outOfDateCount <= MAX_DRAWN}<Button variant="outline" size="bar" onclick={showOutOfDate}>Show the {outOfDateCount.toLocaleString('en')} out of date</Button>{/if}
 						<Button variant="outline" size="bar" onclick={pickFolders}>Pick folders</Button>
 					</div>

@@ -106,3 +106,27 @@ describe('folder graph layout', () => {
 		expect(box('folder:staging').x + box('folder:staging').w).toBeLessThanOrEqual(box('folder:marts').x);
 	});
 });
+
+describe('opening a folder', () => {
+	it('moves its siblings out of the way: no boxes or cards overlap at any level', () => {
+		const many: CatalogNode[] = [];
+		for (let f = 0; f < 14; f++)
+			for (let i = 0; i < 5; i++) many.push(node(`model:f${f}_${i}`, `models/marts/f${f}/sub${i % 2}/m${i}.sql`, i ? [`model:f${f}_0`] : f ? ['model:f0_0'] : []));
+		const t = folderTree(many);
+		const size = (n: Node) => ({ w: n.width ?? 236, h: n.height ?? 61 });
+		for (const open of [['marts/f0'], ['marts/f3'], ['marts/f3', 'marts/f3/sub0'], ['marts/f13'], ['marts/f3', 'marts/f3/sub0', 'marts/f3/sub1']]) {
+			const g = folderGraph(many, new Set(open), { tree: t, scope: ['marts'] });
+			const placed = layoutFolderGraph(g.nodes, g.edges);
+			const overlaps = [...Map.groupBy(placed, (n) => n.parentId ?? '').values()].flatMap((group) =>
+				group.flatMap((a) =>
+					group.filter((b) => {
+						if (a.id >= b.id) return false;
+						const [sa, sb] = [size(a), size(b)];
+						return a.position.x < b.position.x + sb.w && b.position.x < a.position.x + sa.w && a.position.y < b.position.y + sb.h && b.position.y < a.position.y + sa.h;
+					}).map((b) => `${a.id} × ${b.id}`)
+				)
+			);
+			expect(overlaps, open.join(', ')).toEqual([]);
+		}
+	});
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { READABLE_ZOOM, fitViewport, largestBox } from './fit';
+import { READABLE_ZOOM, absolutePosition, anchoredViewport, fitViewport, largestBox } from './fit';
 
 describe('fitting a graph to the view', () => {
 	it('centres a graph that fits, never closer than full size', () => {
@@ -36,5 +36,30 @@ describe('fitting a graph to the view', () => {
 		const card = { x: 0, y: 0, width: 236, height: 61, box: false };
 		expect(largestBox([card, { x: 10, y: 10, width: 500, height: 400, box: true }, { x: 0, y: 0, width: 300, height: 300, box: true }])).toEqual({ x: 10, y: 10, width: 500, height: 400 });
 		expect(largestBox([card])).toBeNull();
+	});
+});
+
+describe('keeping the view steady when a folder opens or closes', () => {
+	it('pans by the clicked box’s layout shift, at the same zoom, so it stays put on screen', () => {
+		const view = { x: 40, y: -20, zoom: 0.8 };
+		const before = { x: 300, y: 120 };
+		const after = { x: 360, y: 90 };
+		const next = anchoredViewport(view, before, after);
+		expect(next.zoom).toBe(0.8);
+		// The pan moves by the shift, scaled to the screen, and the box's screen position is unchanged.
+		expect(next.x - view.x).toBeCloseTo(-(after.x - before.x) * view.zoom);
+		expect(next.y - view.y).toBeCloseTo(-(after.y - before.y) * view.zoom);
+		expect(after.x * next.zoom + next.x).toBeCloseTo(before.x * view.zoom + view.x);
+		expect(after.y * next.zoom + next.y).toBeCloseTo(before.y * view.zoom + view.y);
+	});
+
+	it('finds a card’s place on the graph through the boxes around it', () => {
+		const nodes = [
+			{ id: 'folder:orders', position: { x: 100, y: 50 } },
+			{ id: 'folder:orders/staging', position: { x: 14, y: 44 }, parentId: 'folder:orders' },
+			{ id: 'model:orders', position: { x: 14, y: 44 }, parentId: 'folder:orders/staging' }
+		];
+		expect(absolutePosition(nodes, 'model:orders')).toEqual({ x: 128, y: 138 });
+		expect(absolutePosition(nodes, 'group:missing')).toBeNull();
 	});
 });

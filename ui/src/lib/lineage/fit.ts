@@ -49,3 +49,26 @@ export function largestBox(items: readonly (Rect & { box: boolean })[]): Rect | 
 	for (const item of items) if (item.box && (!best || item.width * item.height > best.width * best.height)) best = item;
 	return best && { x: best.x, y: best.y, width: best.width, height: best.height };
 }
+
+type Placed = { id: string; position: { x: number; y: number }; parentId?: string };
+
+/** A node's position on the graph, adding up the boxes around it, or null when it isn't drawn. */
+export function absolutePosition(nodes: readonly Placed[], id: string): { x: number; y: number } | null {
+	const byId = new Map(nodes.map((n) => [n.id, n]));
+	let at = byId.get(id);
+	if (!at) return null;
+	let { x, y } = at.position;
+	while (at.parentId && (at = byId.get(at.parentId))) {
+		x += at.position.x;
+		y += at.position.y;
+	}
+	return { x, y };
+}
+
+/**
+ * The view after a re-layout that keeps a box where it was on screen: the same zoom, panned by the
+ * box's layout shift, so its top-left stays under the pointer that opened or closed it.
+ */
+export function anchoredViewport(view: Viewport, before: { x: number; y: number }, after: { x: number; y: number }): Viewport {
+	return { zoom: view.zoom, x: view.x - (after.x - before.x) * view.zoom, y: view.y - (after.y - before.y) * view.zoom };
+}
