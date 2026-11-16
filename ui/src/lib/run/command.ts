@@ -5,6 +5,7 @@
 
 import type { ChangedBuild, CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
 import { flagSpec, VERBS, type FlagSpec } from './command-table';
+import { plural } from '$lib/format/plural';
 
 /** The command line read for the panel's own controls: verb tabs, flag hints and verb switching. */
 export type CommandParts = {
@@ -124,7 +125,7 @@ export type ChangedBuildLabel = { label: string; extra: string | null; tooltip: 
 export function changedBuildLabel(changed: number, downstream: number | null, place: 'bar' | 'banner'): ChangedBuildLabel {
 	const nodes = changed === 1 ? '1 changed node' : `${changed} changed nodes`;
 	const reaches = changed === 1 ? 'it reaches' : 'they reach';
-	const reach = downstream === null ? ` and the downstream nodes ${reaches}` : downstream === 0 ? '' : ` and the ${downstream} downstream ${downstream === 1 ? 'node' : 'nodes'} ${reaches}`;
+	const reach = downstream === null ? ` and the downstream nodes ${reaches}` : downstream === 0 ? '' : ` and the ${plural(downstream, 'downstream node')} ${reaches}`;
 	return {
 		label: `Build ${changed} changed`,
 		extra: downstream ? (place === 'bar' ? ` (+${downstream})` : ` (+${downstream} downstream)`) : null,

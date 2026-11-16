@@ -3,8 +3,8 @@
 import type { Capability, RunDetail } from '$lib/api';
 import { isActiveRun } from '$lib/status';
 import type { RerunChoice } from '../types';
+import { plural } from '$lib/format/plural';
 
-const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
 
 export function rerunChoices(detail: RunDetail, selected: readonly string[], can: (c: Capability) => boolean): RerunChoice[] {
 	const { run } = detail;

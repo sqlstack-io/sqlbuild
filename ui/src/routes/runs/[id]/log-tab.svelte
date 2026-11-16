@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -119,7 +120,7 @@
 					{:else}
 						<span class="dot" style:background={e.tone}></span><span title={e.title}>{e.text}</span>
 						{#if e.queries.length}
-							<DisclosureButton open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} class="ml-2 gap-0.5 text-[11.5px]">{e.queries.length} {e.queries.length === 1 ? 'query' : 'queries'}</DisclosureButton>
+							<DisclosureButton open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} class="ml-2 gap-0.5 text-[11.5px]">{plural(e.queries.length, 'query', 'queries')}</DisclosureButton>
 						{/if}
 					{/if}
 					{#if e.statementId && e.nodeKey && onstatement && e.category === 'queries'}

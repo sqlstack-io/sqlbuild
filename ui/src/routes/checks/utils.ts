@@ -1,6 +1,7 @@
 // Pure helpers for the Checks pages.
 
 import type { Check, CheckEvaluation, CheckOutcome, EvaluationMode } from '$lib/api';
+import { plural } from '$lib/format/plural';
 
 /** The outcome buckets the Checks list filters by. */
 export type OutcomeFilter = 'all' | 'failing' | 'warn' | 'pass' | 'other';
@@ -22,7 +23,7 @@ export function checkValue(evaluation: CheckEvaluation | null, mode: EvaluationM
 	if (evaluation.outcome === 'error') return 'error';
 	if (mode === 'measurement') return evaluation.measuredValue === null ? '—' : String(evaluation.measuredValue);
 	if (evaluation.violationCount === null) return '—';
-	return evaluation.violationCount === 0 ? '0 rows' : `${evaluation.violationCount.toLocaleString('en-US')} ${evaluation.violationCount === 1 ? 'row' : 'rows'}`;
+	return evaluation.violationCount === 0 ? '0 rows' : plural(evaluation.violationCount, 'row');
 }
 
 /** What kind of check it is, e.g. `audit · not_null`; just the definition where the kind is unknown. */

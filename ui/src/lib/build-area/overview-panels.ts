@@ -2,6 +2,7 @@
 
 import type { GroupStatus, SnapshotChange } from '$lib/api';
 import { formatAgo } from '$lib/format/time';
+import { plural } from '$lib/format/plural';
 
 /** Deploys that changed something the Recent changes panel shows. */
 export const RECENT_DEPLOYS = 4;
@@ -57,7 +58,7 @@ export function quietDeployLine(row: Extract<RecentDeployRow, { kind: 'quiet' }>
 	const newest = formatAgo(row.newestAt, now);
 	const oldest = formatAgo(row.oldestAt, now);
 	const when = newest === oldest ? newest : `${newest.replace(/ ago$/, '')}–${oldest}`;
-	return `${row.count} ${row.count === 1 ? 'deploy' : 'deploys'} without changes · ${when}`;
+	return `${plural(row.count, 'deploy')} without changes · ${when}`;
 }
 
 /** Whether a folder has failed, changed or behind nodes. */

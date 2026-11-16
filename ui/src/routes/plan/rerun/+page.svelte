@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { noun, plural } from '$lib/format/plural';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
@@ -143,7 +144,7 @@
 				<div class="loading" role="status"><RotateCwIcon size={14} class="animate-spin" /> Loading the run…</div>
 			{:else if single && first}
 				<div class="summary">
-					<b>{nodes.length}</b> node{nodes.length === 1 ? '' : 's'}<span>·</span>{runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)}
+					<b>{nodes.length}</b> {noun(nodes.length, 'node')}<span>·</span>{runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)}
 					<div class="tabs"><SegmentedFilter label="View" bind:value={view} options={[{ value: 'nodes', label: 'Nodes' }, { value: 'graph', label: 'Graph' }]} /></div>
 				</div>
 				{#if view === 'graph' && catalog.data}
@@ -168,7 +169,7 @@
 						<tr class:off={!!r.blocked || !r.nodes.length}>
 							<td><a href={to(`/runs/${r.detail.run.id}`)}>{what(r.detail)}</a> <span class="faint mono">{shortRunId(r.detail.run.id)}</span></td>
 							<td class="faint">{runStatusLabel[r.detail.run.status].toLowerCase()} {formatAgo(r.detail.run.endedAt, app.now)}</td>
-							<td class="faint">{r.blocked ?? (r.nodes.length ? `${r.nodes.length} node${r.nodes.length === 1 ? '' : 's'}` : 'Nothing to rerun')}</td>
+							<td class="faint">{r.blocked ?? (r.nodes.length ? `${plural(r.nodes.length, 'node')}` : 'Nothing to rerun')}</td>
 						</tr>
 					{/snippet}
 				</DataTable>

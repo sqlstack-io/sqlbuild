@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural, noun } from '$lib/format/plural';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -140,7 +141,7 @@
 							<!-- The out-of-date alert below already counts these. -->
 							{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
 							{#if m.stale?.behind && !staleListed}<span><i class="status-dot behind"></i><b>{m.stale.behind}</b> behind</span>{/if}
-							{#if m.checks.failing}<a class="fact-link" href={to(FAILING_CHECKS_HREF)}><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</a>{/if}
+							{#if m.checks.failing}<a class="fact-link" href={to(FAILING_CHECKS_HREF)}><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {noun(m.checks.failing, 'check')}</a>{/if}
 						</div>
 					{/if}
 					{#if latest}<a href={to(`/runs/${latest.id}`)}>View latest run →</a>{/if}
@@ -231,7 +232,7 @@
 						<div class="metric">
 							<span class="metric-label">Stale</span>
 							<div><strong class="stale-value">{m.stale.nodes}</strong><small>nodes</small></div>
-							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late{/if}</span>
+							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {plural(m.stale.sources, 'source')} late{/if}</span>
 						</div>
 					{/if}
 					{#if m.cost}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
@@ -55,7 +56,7 @@
 			/>
 		</Panel>
 		{#if warehouse.stats.length}
-			<Panel title="Rows over time" note="{formatNumber(warehouse.stats.length)} {warehouse.stats.length === 1 ? 'sample' : 'samples'}">
+			<Panel title="Rows over time" note={plural(warehouse.stats.length, 'sample')}>
 				<svg viewBox="0 0 {W} {H}" class="spark" preserveAspectRatio="none" aria-label="Row count over time">
 					<path d={path} fill="none" stroke="var(--primary)" stroke-width="1.6" vector-effect="non-scaling-stroke" />
 				</svg>
@@ -89,7 +90,7 @@
 			</div>
 			<div class="legend">
 				<span><i style:background={batchTone.complete}></i>complete</span>
-				<span title="Holes between completed partitions"><i style:background={batchTone.gap}></i>{microbatch.knownGaps} known {microbatch.knownGaps === 1 ? 'gap' : 'gaps'}</span>
+				<span title="Holes between completed partitions"><i style:background={batchTone.gap}></i>{plural(microbatch.knownGaps, 'known gap')}</span>
 				<span><i style:background={batchTone.replay_required}></i>replay required</span>
 				<span class="muted">{microbatch.batchesTruncated ? 'Newest only · ' : ''}since {bound(microbatch.earliest)}</span>
 			</div>

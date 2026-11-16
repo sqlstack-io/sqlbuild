@@ -1,6 +1,6 @@
 import type { ProviderConnection, ProviderConsumer } from '$lib/api';
+import { plural } from '$lib/format/plural';
 
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
 
 export const consumerKindLabel: Record<ProviderConsumer['kind'], string> = {
 	loader: 'loader',

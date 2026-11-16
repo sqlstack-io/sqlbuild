@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
@@ -28,7 +29,6 @@
 	const data = $derived(summary.data && catalog.data ? { cost: summary.data, folders: costByFolder(summary.data.byNode, catalog.data) } : null);
 	const cost = $derived(data?.cost ?? null);
 	type Row = { key: string; label: string; title?: string; credits: number; usd: number | null; detail: string; href?: string };
-	const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 	const columns = $derived<{ title: string; rows: Row[] }[]>(
 		cost && data
 			? [

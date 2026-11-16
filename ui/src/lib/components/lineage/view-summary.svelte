@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import InspectorSection from './inspector-section.svelte';
 	import { nodeKindPlural } from '$lib/build-area/labels';
 	import type { ViewSummary } from '$lib/lineage/view-summary';
 
 	// A graph's sidebar with nothing selected: what is in view, the filters narrowing it, and what the colours mean.
 	let { summary, filters = [] }: { summary: ViewSummary; filters?: string[] } = $props();
-	const plural = (n: number, word: string) => `${n.toLocaleString('en')} ${word}${n === 1 ? '' : 's'}`;
 	const key = [
 		{ tone: 'var(--sb-success)', label: 'Last build succeeded' },
 		{ tone: 'var(--sb-error)', label: 'Last build failed' },

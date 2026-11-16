@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Loading from '$lib/components/loading.svelte';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import { to } from '$lib/paths';
@@ -500,7 +501,7 @@
 	const outOfDateCount = $derived(catalogNodes.filter((c) => (c.stale?.length ?? 0) > 0).length);
 	/** The toolbar chip's text, e.g. "orders, inventory"; empty when every folder is drawn. */
 	const selectionLabel = $derived.by(() => {
-		if (pickedNodes.length) return `${pickedNodes.length.toLocaleString('en')} picked node${pickedNodes.length === 1 ? '' : 's'}`;
+		if (pickedNodes.length) return plural(pickedNodes.length, 'picked node');
 		const parts = selectedFolders.length > 3 ? [...selectedFolders.slice(0, 3), `${selectedFolders.length - 3} more`] : [...selectedFolders];
 		if (staleOnly) parts.push(`${outOfDateCount.toLocaleString('en')} out of date`);
 		return parts.join(', ');
@@ -519,7 +520,7 @@
 	const inView = $derived(viewSummary(shownNodes(catalogNodes, { selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree })));
 	const activeFilters = $derived(
 		[
-			pickedNodes.length ? `${pickedNodes.length.toLocaleString('en')} picked node${pickedNodes.length === 1 ? '' : 's'}` : '',
+			pickedNodes.length ? plural(pickedNodes.length, 'picked node') : '',
 			!pickedNodes.length && selectedFolders.length ? `Folders: ${selectedFolders.join(', ')}` : '',
 			staleOnly ? 'Only nodes out of date' : '',
 			kindFilter ? `Kind: ${nodeKindPlural[kindFilter as keyof typeof nodeKindPlural] ?? kindFilter} (others dimmed)` : '',

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -193,7 +194,7 @@
 						<InspectorHead title={selectedMember} href={to(`/jobs/${selectedMember}`)} linkLabel="Open job ↗" linkTitle="Open the page of {selectedMember}">
 							{#snippet meta()}
 								<span>Job in {name}</span>
-								{#if memberFacts?.nodeCount !== null && memberFacts?.nodeCount !== undefined}<span>{memberFacts.nodeCount} node{memberFacts.nodeCount === 1 ? '' : 's'}</span>{/if}
+								{#if memberFacts?.nodeCount !== null && memberFacts?.nodeCount !== undefined}<span>{plural(memberFacts.nodeCount, 'node')}</span>{/if}
 							{/snippet}
 						</InspectorHead>
 						<InspectorSection title="Description">

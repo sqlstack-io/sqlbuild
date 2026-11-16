@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import { to } from '$lib/paths';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
@@ -16,7 +17,6 @@
 	let { data }: NodeProps = $props();
 	const d = $derived(data as JobBoxData);
 	const folder = $derived('folder' in data ? (data as FolderBoxData) : null);
-	const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 </script>
 
 <div class="box" class:collapsed={!folder && d.collapsed}>
@@ -41,7 +41,7 @@
 			</button>
 		{/if}
 		<a href={to(`/jobs/${d.jobKey}`)} class="name">{d.jobKey}</a>
-		<span class="faint" title={d.drawnElsewhere ? `${d.drawnElsewhere} also in a smaller job` : undefined}>{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>
+		<span class="faint" title={d.drawnElsewhere ? `${d.drawnElsewhere} also in a smaller job` : undefined}>{plural(d.nodeCount, 'node')}</span>
 		{#if d.lastRun}
 			<!-- The dot carries the status, so the header fits a box one card wide. -->
 			<a href={to(`/runs/${d.lastRun.id}`)} class="last" title="Last run of {d.jobKey}: {runStatusLabel[d.lastRun.status]}">

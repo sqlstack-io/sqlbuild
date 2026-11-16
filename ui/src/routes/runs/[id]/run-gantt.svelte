@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import MinusIcon from '@lucide/svelte/icons/minus';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -115,7 +116,7 @@
 
 <div class="gantt">
 <div class="gantt-head">
-	<span class="count">{nodes.length} node{nodes.length === 1 ? '' : 's'}</span>
+	<span class="count">{plural(nodes.length, 'node')}</span>
 	<div class="zoom">
 		<Button variant="ghost" size="icon-sm" onclick={() => zoomBy(1 / 1.5)} disabled={zoom <= ZOOM_MIN} title="Zoom out" aria-label="Zoom out"><MinusIcon /></Button>
 		<input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.1" bind:value={zoom} title="Zoom" />

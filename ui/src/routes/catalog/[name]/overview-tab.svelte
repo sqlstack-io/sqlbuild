@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
@@ -144,7 +145,7 @@
 			<section>
 				<h3>Jobs</h3>
 				{#each node.jobs as j (j.key)}
-					<a class="job-row" href={to(`/jobs/${j.key}`)}><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${j.triggerIds.length} ${j.triggerIds.length === 1 ? 'trigger' : 'triggers'}` : ' · manual'}</small></a>
+					<a class="job-row" href={to(`/jobs/${j.key}`)}><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${plural(j.triggerIds.length, 'trigger')}` : ' · manual'}</small></a>
 				{:else}
 					<p class="muted">No jobs.</p>
 				{/each}

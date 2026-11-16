@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
@@ -29,7 +30,7 @@
 	</div>
 	<div class="facts">
 		{#if d.expandable}<ChevronRightIcon size={12} class="glyph" />{/if}
-		{#if d.nodeCount !== null}<span>{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>{/if}
+		{#if d.nodeCount !== null}<span>{plural(d.nodeCount, 'node')}</span>{/if}
 		{#if d.waitsFor}<span class="waits">waits for {d.waitsFor}</span>{/if}
 		{#if d.needs.changed || d.needs.behind}
 			<span class="needs" title="Needs building: {needsTitle}">

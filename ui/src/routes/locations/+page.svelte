@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -92,7 +93,7 @@
 							<span title={partialTitle}><StatusLabel tone="var(--sb-text-faint)" label="Unknown" muted /></span>
 						{/if}
 						{#if l.activeProblems}
-							<div class="cell-desc"><a class="link" href={to(`/locations/${l.id}#problems`)}>{l.activeProblems} open problem{l.activeProblems === 1 ? '' : 's'}</a></div>
+							<div class="cell-desc"><a class="link" href={to(`/locations/${l.id}#problems`)}>{plural(l.activeProblems, 'open problem')}</a></div>
 						{/if}
 					</td>
 					<td>

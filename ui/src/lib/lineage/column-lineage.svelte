@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -370,7 +371,7 @@
 			<aside class="derivation sb-scroll">
 				<div class="dv-head">
 					<strong>How it's derived</strong>
-					<span>{hops.length - 1} {hops.length - 1 === 1 ? 'step' : 'steps'} from source</span>
+					<span>{plural(hops.length - 1, 'step')} from source</span>
 				</div>
 				<ol class="dv-steps">
 					{#each hops as st (st.cid)}

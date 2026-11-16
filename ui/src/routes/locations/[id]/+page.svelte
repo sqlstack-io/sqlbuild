@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
@@ -68,7 +69,7 @@
 				<span class="muted">· {targetWords(detail.target)}</span>
 				<span class="right">
 					<span title={healthHelp[detail.health]}><StatusLabel tone={healthTone[detail.health]} label={healthLabel[detail.health]} /></span>
-					{#if openProblems}<a class="warn" href="#problems">· {openProblems} open problem{openProblems === 1 ? '' : 's'}</a>{/if}
+					{#if openProblems}<a class="warn" href="#problems">· {plural(openProblems, 'open problem')}</a>{/if}
 				</span>
 			</div>
 

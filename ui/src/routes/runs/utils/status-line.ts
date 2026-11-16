@@ -4,8 +4,8 @@ import type { RunRow } from '$lib/api';
 import { formatAgo, formatStamp } from '$lib/format/time';
 import { formatSeconds, outcomeCounts, waitTechnical, waitText } from '$lib/operate/labels';
 import type { StatusLine } from '../types';
+import { plural } from '$lib/format/plural';
 
-const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
 
 export function statusLine(row: RunRow, now: number): StatusLine {
 	const { run, progress } = row;

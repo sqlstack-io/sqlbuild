@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import ProblemList from '$lib/components/platform/problem-list.svelte';
@@ -50,7 +51,7 @@
 			<span class="sep">·</span>
 			<span class="item" title={sink.title}>Event forwarding <i style:background={sink.tone}></i><b>{sink.text}</b></span>
 		{/if}
-		{#if openServerProblems}<span class="sep">·</span><span class="warn">{openServerProblems} open server problem{openServerProblems === 1 ? '' : 's'}</span>{/if}
+		{#if openServerProblems}<span class="sep">·</span><span class="warn">{plural(openServerProblems, 'open server problem')}</span>{/if}
 	{/if}
 	<Button variant="link" size="inline" class="ml-auto" onclick={() => (open = !open)} aria-expanded={open}>{open ? 'Hide details' : 'Details'}</Button>
 </section>
