@@ -1178,7 +1178,8 @@ max_positional_args = 1
 [[targets.python.threshold_overrides]]
 paths = ["src/sqlbuild/__init__.py"]
 # Raised from 89,457 for the shared Python identity pass (identity_pass.py, object_source.py).
-thresholds = { max_crate_code_lines = 89626 }
+# Raised from 89,626 for helper-class anchors in Python identity (object_source.py, identity.py).
+thresholds = { max_crate_code_lines = 89643 }
 reason = "The runtime package is above the code-line limit; this caps it at its current size until it is split into packages by area. Lower the cap as code moves out."
 
 [targets.python.rule_options.XSB074]
@@ -1703,8 +1704,8 @@ select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078", "X
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-# Raised from 206,367: SQBRPERFORMANCE102 bindings plumbing, +77 with sqlbuild-python-base.
-thresholds = { max_crate_code_lines = 206439 }
+# Raised from 206,371: SQBRPERFORMANCE102 bindings plumbing, +77 with sqlbuild-python-base.
+thresholds = { max_crate_code_lines = 206443 }
 reason = "The Python bindings crate is above the code-line limit; this caps it at its current size until it is split into crates by area. Lower the cap as code moves out."
 
 [[targets.rust.threshold_overrides]]

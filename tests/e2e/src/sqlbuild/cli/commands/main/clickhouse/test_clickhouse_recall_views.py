@@ -375,6 +375,15 @@ def test_given_one_invocation_lookup_when_planned_then_each_table_is_read_once_b
         parent=tmp_path, config=clickhouse_e2e_config, database=recall_database
     )
     assert run(project_dir, "build").returncode == 0
+    # A command that ends before its first heartbeat writes none, and ClickHouse plans a table
+    # with no parts as a read of nothing, so give the heartbeats table a part before planning.
+    execute_clickhouse_sql(
+        config=clickhouse_e2e_config,
+        statements=(
+            f"INSERT INTO {recall_database}.recall_heartbeats (invocation_id) "
+            "VALUES ('planning-setup')",
+        ),
+    )
     sql: str = (
         f"SELECT * FROM {recall_database}.{test_case.view} WHERE invocation_id = 'any-invocation'"
     )
