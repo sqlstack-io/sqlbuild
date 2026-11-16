@@ -123,6 +123,38 @@ A group takes `name`, `description` and `jobs`, and the same `targets`, `owner`,
 `concurrency_groups`, `schedule` and `[retry]` as a job. Its members are jobs, never other
 groups.
 
+### Choose what happens after a failure
+
+`[dependencies]` sets how a member reacts when a job it depends on fails:
+
+```toml
+# orchestration/job_groups/nightly_job_group.toml
+name = "nightly_job_group"
+description = "Orders, inventory and the partner export"
+jobs = ["orders_job", "inventory_job", "partner_export_job"]
+schedule = { cron = "0 21 * * *", timezone = "UTC" }
+
+[dependencies]
+wait_for = "job"
+on_failure = "partial"
+
+[dependencies.partner_export_job]
+on_failure = "skip"
+```
+
+| Setting | Value | Meaning |
+| --- | --- | --- |
+| `wait_for` | `job` (default) | A member starts once the jobs it reads from have finished |
+| `on_failure` | `partial` (default) | Build what can still be built; nodes downstream of a failed node are skipped |
+| | `skip` | Don't run the member; all its nodes end skipped and the member ends `failed` |
+| | `run` | Run every node of the member regardless |
+
+- `[dependencies.<job>]` overrides the group's settings for one member, and must name a job in
+  `jobs`. Overrides live in the group file because a job can belong to several groups.
+- A member skipped by `skip` counts as failed for the jobs that depend on it.
+- `wait_for = "node"`, which would start each node as soon as the nodes it reads are built, is not
+  available yet; `sqb compile` refuses it.
+
 ## Schedule a job
 
 `schedule` takes a cron expression or the name of a calendar, and always a timezone.

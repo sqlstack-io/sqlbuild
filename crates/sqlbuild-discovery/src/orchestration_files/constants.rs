@@ -17,7 +17,7 @@ pub const JOB_KEYS: [&str; 13] = [
     "settings",
 ];
 /// Top-level keys of a job group file.
-pub const GROUP_KEYS: [&str; 10] = [
+pub const GROUP_KEYS: [&str; 11] = [
     "name",
     "description",
     "jobs",
@@ -28,7 +28,16 @@ pub const GROUP_KEYS: [&str; 10] = [
     "schedule",
     "retry",
     "on_failure",
+    "dependencies",
 ];
+/// The group table that sets how members wait for and react to the jobs they depend on.
+pub(crate) const DEPENDENCIES_KEY: &str = "dependencies";
+/// The `[dependencies]` setting for when a member starts, and its values.
+pub(crate) const WAIT_FOR_KEY: &str = "wait_for";
+pub(crate) const WAIT_FOR_VALUES: [&str; 2] = ["job", "node"];
+/// The `[dependencies]` setting for a failed dependency, and its values.
+pub(crate) const DEPENDENCY_FAILURE_KEY: &str = "on_failure";
+pub(crate) const DEPENDENCY_FAILURE_VALUES: [&str; 3] = ["partial", "skip", "run"];
 /// The fewest and most reruns `retry.attempts` allows.
 pub const RETRIES_RANGE: (u8, u8) = (1, 10);
 /// The shortest and longest `retry.delay_seconds`, a day.

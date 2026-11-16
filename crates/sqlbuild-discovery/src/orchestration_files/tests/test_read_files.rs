@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 
+use crate::orchestration_files::_helpers::read_group_file::read_group_file;
 use crate::orchestration_files::_helpers::read_job_file::read_job_file;
 use crate::orchestration_files::models::{
-    InitialStatus, Overlap, RetryPolicy, ScheduleFile, ScheduleSource,
+    DependencyFailure, DependencySettings, GroupDependencies, InitialStatus, Overlap, RetryPolicy,
+    ScheduleFile, ScheduleSource, WaitFor,
 };
 use crate::orchestration_files::tests::helpers::{at, group_members, written};
 use crate::orchestration_files::tests::test_types::{
-    FileErrorTestCase, GroupReadTestCase, JobReadTestCase,
+    FileErrorTestCase, GroupDependenciesTestCase, GroupReadTestCase, JobReadTestCase,
 };
 
 const FULL_JOB: &str = r#"name = "orders_export_job"
@@ -315,6 +317,93 @@ fn given_group_files_when_reading_then_keeps_member_positions_and_refuses_repeat
         assert_eq!(
             group_members(test_case.text),
             test_case.expected_members,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+const DEPENDENCY_GROUP: &str = "name = \"nightly_job_group\"\ndescription = \"d\"\njobs = [\"orders_job\", \"partner_export_job\"]\n\n";
+
+#[test]
+fn given_group_dependencies_when_reading_then_types_defaults_and_member_overrides() {
+    let test_cases = [
+        GroupDependenciesTestCase {
+            description: "no dependencies table keeps today's behaviour",
+            dependencies: "",
+            expected: Ok(GroupDependencies::default()),
+        },
+        GroupDependenciesTestCase {
+            description: "defaults and a member override",
+            dependencies: "[dependencies]\nwait_for = \"job\"\non_failure = \"run\"\n\n[dependencies.partner_export_job]\non_failure = \"skip\"\n",
+            expected: Ok(GroupDependencies {
+                defaults: DependencySettings {
+                    wait_for: Some(WaitFor::Job),
+                    on_failure: Some(DependencyFailure::Run),
+                },
+                members: [(
+                    "partner_export_job".to_owned(),
+                    DependencySettings {
+                        wait_for: None,
+                        on_failure: Some(DependencyFailure::Skip),
+                    },
+                )]
+                .into(),
+            }),
+        },
+        GroupDependenciesTestCase {
+            description: "partial is the explicit default",
+            dependencies: "dependencies = { on_failure = \"partial\" }\n",
+            expected: Ok(GroupDependencies {
+                defaults: DependencySettings {
+                    wait_for: None,
+                    on_failure: Some(DependencyFailure::Partial),
+                },
+                members: [].into(),
+            }),
+        },
+        GroupDependenciesTestCase {
+            description: "an override must name a member",
+            dependencies: "[dependencies.inventory_job]\non_failure = \"skip\"\n",
+            expected: Err((
+                "dependencies.inventory_job is neither `wait_for`, `on_failure` nor a job in `jobs`",
+                at(5, 15),
+            )),
+        },
+        GroupDependenciesTestCase {
+            description: "an unknown failure policy",
+            dependencies: "[dependencies]\non_failure = \"retry\"\n",
+            expected: Err((
+                "on_failure must be one of \"partial\", \"skip\", \"run\"",
+                at(6, 14),
+            )),
+        },
+        GroupDependenciesTestCase {
+            description: "an unknown override key",
+            dependencies: "[dependencies.orders_job]\nretries = 2\n",
+            expected: Err((
+                "unknown dependencies.orders_job key 'retries'; expected `wait_for` or `on_failure`",
+                at(6, 1),
+            )),
+        },
+        GroupDependenciesTestCase {
+            description: "waiting node by node is not available yet",
+            dependencies: "[dependencies]\nwait_for = \"node\"\n",
+            expected: Err((
+                "wait_for = \"node\" is not supported yet; use \"job\"",
+                at(6, 12),
+            )),
+        },
+    ];
+    for test_case in test_cases {
+        let text = format!("{DEPENDENCY_GROUP}{}", test_case.dependencies);
+        assert_eq!(
+            read_group_file(&text)
+                .map(|group| group.dependencies)
+                .map_err(|error| (error.message, error.position)),
+            test_case
+                .expected
+                .map_err(|(message, position)| (message.to_owned(), position)),
             "{}",
             test_case.description
         );

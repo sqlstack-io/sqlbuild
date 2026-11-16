@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::orchestration_files::models::{
-    FilePosition, Overlap, Positioned, RetryPolicy, ScheduleFile,
+    FilePosition, GroupDependencies, Overlap, Positioned, RetryPolicy, ScheduleFile,
 };
 
 pub(super) struct JobReadTestCase {
@@ -46,4 +46,10 @@ pub(super) struct InventoryErrorTestCase {
     pub(super) files: Vec<(&'static str, &'static str)>,
     pub(super) expected_message: &'static str,
     pub(super) expected_help: Option<&'static str>,
+}
+
+pub(super) struct GroupDependenciesTestCase {
+    pub(super) description: &'static str,
+    pub(super) dependencies: &'static str,
+    pub(super) expected: Result<GroupDependencies, (&'static str, FilePosition)>,
 }

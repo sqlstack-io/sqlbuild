@@ -18,6 +18,8 @@ mod test_coalesce;
 mod test_faults;
 #[path = "test_group_admission.rs"]
 mod test_group_admission;
+#[path = "test_group_dependencies.rs"]
+mod test_group_dependencies;
 #[path = "test_groups.rs"]
 mod test_groups;
 #[path = "test_job_detail.rs"]

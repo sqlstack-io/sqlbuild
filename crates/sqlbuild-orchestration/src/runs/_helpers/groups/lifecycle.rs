@@ -5,10 +5,12 @@ use std::num::NonZeroU32;
 
 use uuid::Uuid;
 
+use crate::declarations::models::DependencyFailure;
 use crate::runs::_helpers::groups::admission::{
     admission_limits, earlier_waiter_blocks, limit_waiters,
 };
 use crate::runs::_helpers::groups::context::load_group;
+use crate::runs::_helpers::groups::selection::{failed_upstream, member_dependencies};
 use crate::runs::_helpers::lifecycle::claims::reserve_claims;
 use crate::runs::_helpers::lifecycle::publish_change::publish_change;
 use crate::runs::models::{
@@ -82,6 +84,8 @@ pub(crate) async fn advance_group(
                 .await?;
             }
         }
+    } else if parent.state.status == RunStatus::Running {
+        transaction = skip_blocked_members(transaction, &group).await?;
     } else if parent.state.status == RunStatus::Queued && parent.request_json.due(transaction.now) {
         let admission = RunRequest {
             concurrency_groups: admission_limits(
@@ -116,6 +120,75 @@ pub(crate) async fn advance_group(
             .all(|child| child.state.status.is_terminal())
     {
         transaction = finish_group(transaction, &group, stopped).await?;
+    }
+    Ok(transaction)
+}
+
+/// End each queued member whose policy is `skip` once a job it depends on ended without success.
+async fn skip_blocked_members(
+    mut transaction: ControlTransaction,
+    group: &GroupContext,
+) -> Result<ControlTransaction, ControlError> {
+    let Some(declaration) = group
+        .parent
+        .request_json
+        .job_key
+        .as_ref()
+        .and_then(|name| group.definitions.groups.get(name))
+    else {
+        return Ok(transaction);
+    };
+    for child in &group.children {
+        let request = &child.request_json;
+        let Some(name) = request.job_key.as_deref() else {
+            continue;
+        };
+        if child.state.status != RunStatus::Queued
+            || child.state.cancel_requested_at.is_some()
+            || declaration.member_dependency_failure(name) != DependencyFailure::Skip
+        {
+            continue;
+        }
+        let Some(failed) = failed_upstream(group, &member_dependencies(group, name)) else {
+            continue;
+        };
+        let failed_job = failed.request_json.job_key.clone().unwrap_or_default();
+        let rows;
+        (transaction, rows) = query(transaction,
+            "SELECT n.node_key, n.skipped_because_of FROM sqb_run_nodes n WHERE n.run_id=$1 AND n.kind='node' \
+             AND n.status IN ('failed','skipped','cancelled') ORDER BY CASE n.status WHEN 'failed' THEN 0 ELSE 1 END, n.node_key LIMIT 1",
+            vec![Parameter::Id(failed.request_json.run_id)]).await?;
+        let cause: Option<String> = rows.first().and_then(|row| {
+            row["skipped_because_of"]
+                .as_str()
+                .or_else(|| row["node_key"].as_str())
+                .map(str::to_owned)
+        });
+        for node_key in &request.selection {
+            transaction = group_change(
+                transaction,
+                request.run_id,
+                RunChange::NodeFinished {
+                    node_key: node_key.clone(),
+                    outcome: NodeOutcome::Skipped,
+                    rows_affected: None,
+                    error_code: None,
+                    skipped_because_of: cause.clone(),
+                    error_message: None,
+                },
+            )
+            .await?;
+        }
+        transaction = group_change(
+            transaction,
+            request.run_id,
+            RunChange::Finished {
+                outcome: RunOutcome::Failed,
+                reason: format!("skipped because {failed_job} did not succeed"),
+                exit_code: None,
+            },
+        )
+        .await?;
     }
     Ok(transaction)
 }

@@ -41,6 +41,40 @@ pub struct Deprecation {
     pub position: FilePosition,
 }
 
+/// When a group member starts: once the jobs it reads from end (`job`), or node by node (`node`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WaitFor {
+    #[default]
+    Job,
+    Node,
+}
+
+/// What a group member does when a job it depends on failed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DependencyFailure {
+    /// Build what can still be built, skipping nodes downstream of the failure.
+    #[default]
+    Partial,
+    /// Do not run the member.
+    Skip,
+    /// Run every node regardless.
+    Run,
+}
+
+/// One level of a group's `[dependencies]`: the group default or one member's override.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DependencySettings {
+    pub wait_for: Option<WaitFor>,
+    pub on_failure: Option<DependencyFailure>,
+}
+
+/// A group's `[dependencies]` table: defaults, and per-member overrides keyed by job name.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GroupDependencies {
+    pub defaults: DependencySettings,
+    pub members: BTreeMap<String, DependencySettings>,
+}
+
 /// A 1-based line and column in a declaration file.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FilePosition {
@@ -107,6 +141,8 @@ pub struct JobFile {
 pub struct GroupFile {
     pub run: RunFile,
     pub jobs: Vec<Positioned<String>>,
+    /// `[dependencies]`; every override names a job in `jobs`.
+    pub dependencies: GroupDependencies,
 }
 
 /// A calendar or sensor module and the declaration it makes.
