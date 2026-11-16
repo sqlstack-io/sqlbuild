@@ -22,7 +22,7 @@
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
+	import { concurrencyText, formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
 	import { memberLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
@@ -86,7 +86,14 @@
 		const took = finished.flatMap((r) => (r.startedAt && r.endedAt ? [Date.parse(r.endedAt) - Date.parse(r.startedAt)] : [])).sort((a, b) => a - b);
 		return took.length ? took[Math.floor(took.length / 2)] : null;
 	});
-	const hasSettings = $derived(!!def && (!!def.overlap || !!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length) || !!def.concurrency?.length || (def.concurrency === null && def.concurrencyGroups.length > 0)));
+	// Each concurrency group's rule as published; from a server that only names the groups, the
+	// group alone, its limit unknown.
+	const concurrencyRules = $derived(
+		!def ? [] : def.concurrencyRules.length ? def.concurrencyRules : def.concurrencyGroups.map((group) => ({ group, limit: null, sharedWith: [] }))
+	);
+	/** Runs holding a concurrency group's slots now, where the server reports them. */
+	const holdersOf = (group: string) => def?.concurrency?.find((g) => g.key === group)?.holders ?? [];
+	const hasSettings = $derived(!!def && (!!def.overlap || !!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length) || concurrencyRules.length > 0));
 	let actionError = $state<string | null>(null);
 
 	async function toggleTrigger(t: Trigger) {
@@ -298,24 +305,28 @@
 									{#if def.onFailure}<div><dt>Retries</dt><dd title="[retry] attempts = {def.onFailure.retries + 1}, delay_seconds = {def.onFailure.retryDelaySeconds}{def.memberOf?.length ? '. Inside a group run, the group retries this job while the jobs that depend on it wait' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
 									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
 									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
+									{#each concurrencyRules as rule (rule.group)}
+										{@const text = concurrencyText(rule)}
+										{@const holders = holdersOf(rule.group)}
+										<div class="concurrency">
+											<dt>Concurrency</dt>
+											<dd>
+												<span
+													>{text.rule}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span
+												>
+												<span class="detail">({text.detail})</span>
+												{#if holders.length}
+													<span class="detail">Running now: {#each holders as h, i (h)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}</span>
+												{/if}
+											</dd>
+										</div>
+									{/each}
 								</dl>
 								{#if def.settings && Object.keys(def.settings).length}
 									<p class="label">Options</p>
 									{#each Object.entries(def.settings) as [flag, value] (flag)}
 										<p class="setting"><code>{flag}{value === true ? '' : ` ${value}`}</code></p>
 									{/each}
-								{/if}
-								{#if def.concurrency?.length}
-									<p class="label">Shared slots</p>
-									{#each def.concurrency as g (g.key)}
-										<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
-											<span>{g.holders.length}/{g.limit} {slotLabel(g.key)}</span>
-											{#each g.holders as h (h)}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}
-										</p>
-									{/each}
-								{:else if def.concurrency === null && def.concurrencyGroups.length}
-									<p class="label">Shared slots</p>
-									{#each def.concurrencyGroups as g (g)}<p class="setting" title="Concurrency group {g}">{slotLabel(g)}</p>{/each}
 								{/if}
 							</InspectorSection>
 						{/if}
@@ -495,6 +506,22 @@
 	}
 	.picked li {
 		padding: 2px 0;
+	}
+	/* A sentence, so it takes the row's width under its label: the rule, then the group it comes from
+	   and any runs holding it now, quieter, each on its line. */
+	dl div.concurrency {
+		flex-direction: column;
+		gap: 2px;
+	}
+	.concurrency dd {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		text-align: left;
+	}
+	.concurrency .detail {
+		color: var(--muted-foreground);
+		font-size: 11.5px;
 	}
 	code,
 	.mono {

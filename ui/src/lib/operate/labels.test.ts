@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeWait, onFailureText, overlapPlain, triggerKindLabel, waitTechnical } from './labels';
+import { concurrencyText, describeWait, onFailureText, overlapPlain, triggerKindLabel, waitTechnical } from './labels';
 import type { QueueWait } from '$lib/api';
 
 const text = (w: QueueWait) => describeWait(w).map((p) => p.text).join('');
@@ -25,5 +25,29 @@ describe('operate labels are short facts', () => {
 	it('names policies and sensor kinds in a word or two', () => {
 		expect(overlapPlain).toEqual({ queue: 'Queue', skip: 'Skip' });
 		expect(triggerKindLabel.job_sensor).toBe('Job sensor');
+	});
+});
+
+describe('concurrency in plain words', () => {
+	it('states a limit of one as one run at a time, with what shares it and the group as detail', () => {
+		expect(concurrencyText({ group: 'nightly_window', limit: 1, sharedWith: ['orders_refresh'] })).toEqual({
+			rule: 'One run at a time',
+			shared: ['orders_refresh'],
+			more: 0,
+			detail: 'concurrency group nightly_window, limit 1'
+		});
+	});
+
+	it('states a larger limit as at most so many runs, and names only the first few sharing it', () => {
+		const text = concurrencyText({ group: 'warehouse', limit: 3, sharedWith: ['a', 'b', 'c', 'd', 'e'] });
+		expect(text.rule).toBe('At most 3 runs at a time');
+		expect(text.shared).toEqual(['a', 'b', 'c']);
+		expect(text.more).toBe(2);
+	});
+
+	it("doesn't imply a limit the snapshot doesn't record", () => {
+		const text = concurrencyText({ group: 'warehouse', limit: null, sharedWith: [] });
+		expect(text.rule).toBe('Runs in a concurrency group');
+		expect(text.detail).toBe('concurrency group warehouse, no limit recorded in this snapshot');
 	});
 });

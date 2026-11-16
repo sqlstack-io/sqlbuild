@@ -3,6 +3,7 @@
 import { formatStamp } from '$lib/format/time';
 
 import type {
+	ConcurrencyRule,
 	LivenessState,
 	NodeCounts,
 	OnFailure,
@@ -105,6 +106,29 @@ export function shortRunId(id: string): string {
 }
 
 /** A concurrency group's slots in words, e.g. `warehouse_heavy` → `warehouse heavy`, `target:prod` → `prod target`. */
+/** How many of the jobs sharing a concurrency group are named before "+N more". */
+export const SHARED_SHOWN = 3;
+
+/**
+ * A concurrency group's rule in plain words: "One run at a time" or "At most 3 runs at a time", the
+ * other jobs and groups sharing it (the first `SHARED_SHOWN`, then `more`), and the group itself as a
+ * secondary detail. A limit the snapshot doesn't record isn't implied: the rule says only that the
+ * group is shared.
+ */
+export function concurrencyText(rule: ConcurrencyRule): { rule: string; shared: string[]; more: number; detail: string } {
+	const shared = rule.sharedWith.slice(0, SHARED_SHOWN);
+	const more = rule.sharedWith.length - shared.length;
+	if (rule.limit === null) {
+		return { rule: 'Runs in a concurrency group', shared, more, detail: `concurrency group ${rule.group}, no limit recorded in this snapshot` };
+	}
+	return {
+		rule: rule.limit === 1 ? 'One run at a time' : `At most ${rule.limit} runs at a time`,
+		shared,
+		more,
+		detail: `concurrency group ${rule.group}, limit ${rule.limit}`
+	};
+}
+
 export function slotLabel(group: string): string {
 	if (group.startsWith('target:')) return `${group.slice('target:'.length)} target`;
 	return group.replace(/[_-]+/g, ' ');
