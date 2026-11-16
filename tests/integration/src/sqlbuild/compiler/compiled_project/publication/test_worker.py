@@ -1459,7 +1459,7 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
     [
         WorkerExecutionTestCase(
             "a rejected start report stops the run at concurrency 2",
-            "SELECT count(*) AS amount FROM range(200000000) t(value) WHERE value % 7 = 0",
+            "SELECT count(*) AS amount FROM range(500000000) t(value) WHERE value % 7 = 0",
             "SELECT table_name FROM duckdb_tables() "
             "WHERE table_name IN ('orders', 'refunds', 'returns') ORDER BY table_name",
             "partial",

@@ -522,7 +522,8 @@ class BuildScheduler:
                 # An error that escaped a node stops the run as it does at concurrency 1, once
                 # the nodes already running have finished.
                 if completion.error is not None:
-                    escaped = escaped or completion.error
+                    if escaped is None:
+                        escaped = completion.error
                     self._stop = True
                     continue
                 if completion.result is not None:
