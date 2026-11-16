@@ -7,7 +7,7 @@ use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_referenc
 use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 
 use crate::bindings::_helpers::analysis::relation_names::{
-    RelationRow, extract_sql_relation_names,
+    RelationRow, extract_sql_relation_names, prefetch_sql_relation_names,
 };
 use crate::bindings::_helpers::native_host::consumption_state::optional_text;
 use crate::bindings::_helpers::records::fields::{field as native_field, mapping_items};
@@ -124,6 +124,25 @@ fn names((name, schema, database): &RelationRow, location: &RelationKey) -> bool
         })
 }
 
+/// `sql` with function calls as plain calls, as the read check parses it.
+fn plain_calls(sql: String) -> String {
+    FUNCTION_CALLS.iter().fold(sql, |sql, function| {
+        replace_reference_calls(&sql, function, |_| {
+            Ok::<_, std::convert::Infallible>(Some((*function).to_owned()))
+        })
+        .unwrap_or_else(|never| match never {})
+    })
+}
+
+/// Parse the relations each of `sqls` reads, in parallel, ahead of their read checks.
+pub(crate) fn prefetch_reads(
+    py: Python<'_>,
+    sqls: Vec<String>,
+    dialect: Option<&str>,
+) -> PyResult<()> {
+    prefetch_sql_relation_names(py, sqls.into_iter().map(plain_calls).collect(), dialect)
+}
+
 /// True when `sql` cannot be parsed or names an ambiguous relation or one no input writes.
 pub(crate) fn sql_reads_undeclared(
     py: Python<'_>,
@@ -131,12 +150,7 @@ pub(crate) fn sql_reads_undeclared(
     (inputs, own): (&[InputFact], Option<&RelationKey>),
     (locations, dialect): (&Locations, Option<&str>),
 ) -> PyResult<bool> {
-    let sql: String = FUNCTION_CALLS.iter().fold(sql, |sql, function| {
-        replace_reference_calls(&sql, function, |_| {
-            Ok::<_, std::convert::Infallible>(Some((*function).to_owned()))
-        })
-        .unwrap_or_else(|never| match never {})
-    });
+    let sql: String = plain_calls(sql);
     let Some((relations, temporary)) = extract_sql_relation_names(py, &sql, dialect)? else {
         return Ok(true);
     };

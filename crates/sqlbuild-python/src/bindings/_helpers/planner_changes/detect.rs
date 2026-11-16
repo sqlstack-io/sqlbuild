@@ -379,11 +379,13 @@ pub(crate) fn model_change<'py>(
     let mut query_changed: bool = false;
     if let (Some(hash), Some(recorded)) = (&compiled_query_hash, &recorded) {
         query_changed = origins.is_none() && definition_changed;
-        log_query_check(
-            (model, &model_name, &fingerprint),
-            hash,
-            (&recorded.definition_hash, query_changed),
-        )?;
+        if query_changed {
+            log_query_check(
+                (model, &model_name, &fingerprint),
+                hash,
+                &recorded.definition_hash,
+            )?;
+        }
     }
     let findings: Vec<SchemaFindingRow> =
         model_schema_findings(model, snapshot, &model_name, &dialect)?;
@@ -434,10 +436,11 @@ fn recorded_fingerprint(fingerprint: &Bound<'_, PyAny>) -> PyResult<Option<Recor
     }))
 }
 
+/// Log why a model's query counts as changed, with both SQL texts; unchanged models log nothing.
 fn log_query_check(
     (model, model_name, fingerprint): (&Bound<'_, PyAny>, &Bound<'_, PyAny>, &Bound<'_, PyAny>),
     compiled_query_hash: &str,
-    (definition_hash, query_changed): (&str, bool),
+    definition_hash: &str,
 ) -> PyResult<()> {
     let py: Python<'_> = model.py();
     let logger: Bound<'_, PyAny> =
@@ -451,22 +454,14 @@ fn log_query_check(
                 "message",
                 text(&format!(
                     "fingerprint comparison compiled_query_hash={compiled_query_hash} \
-                     fingerprint_definition_hash={definition_hash} query_changed={}",
-                    if query_changed { "True" } else { "False" }
+                     fingerprint_definition_hash={definition_hash} query_changed=True"
                 )),
             ),
             ("sqlbuild_subject", text("model")),
             ("sqlbuild_name", model_name.clone()),
             ("sqlbuild_event", text("query_change_check")),
             ("sqlbuild_phase", text("planner")),
-            (
-                "sqlbuild_status",
-                text(if query_changed {
-                    "changed"
-                } else {
-                    "unchanged"
-                }),
-            ),
+            ("sqlbuild_status", text("changed")),
         ],
     )?;
     let log_sql: Bound<'_, PyAny> = host::entry(py, ExecutorHost::LogSql)?;
