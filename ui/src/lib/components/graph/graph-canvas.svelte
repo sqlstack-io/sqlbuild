@@ -5,6 +5,7 @@
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
 	import CountEdge from '$lib/lineage/count-edge.svelte';
+	import { READABLE_ZOOM } from '$lib/lineage/fit';
 
 	// Every graph in the UI is drawn here, so they share one canvas: the same background, fit controls
 	// and readable fit (a large graph opens on its cards at a zoom where they read, never as dots), and
@@ -21,7 +22,7 @@
 		viewport = $bindable({ x: 0, y: 0, zoom: 1 }),
 		setViewport = $bindable(),
 		readable = true,
-		fitFloor,
+		fitFloor = READABLE_ZOOM,
 		controls = 'fit',
 		showLock = false,
 		framed = false,
@@ -41,7 +42,7 @@
 		setViewport?: (v: Viewport) => void;
 		/** The readable fit: a graph too large to show whole opens at the readable zoom on its cards. */
 		readable?: boolean;
-		/** The lowest zoom an automatic fit goes to; the readable zoom by default. */
+		/** The lowest zoom an automatic fit goes to: the readable zoom, unless a page draws a very large graph whole. */
 		fitFloor?: number;
 		/** `fit`: zoom buttons with a readable fit; `full`: the library's own controls, for a very large graph drawn whole. */
 		controls?: 'fit' | 'full' | 'none';

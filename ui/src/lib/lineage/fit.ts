@@ -3,8 +3,15 @@
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Viewport = { x: number; y: number; zoom: number };
 
-/** The smallest zoom an automatic fit goes to, where card names stay readable. Zooming out by hand can go further. */
-export const READABLE_ZOOM = 0.6;
+/** A card's title size on the canvas (`.name` in the node cards), and the smallest it may appear on screen. */
+export const CARD_TITLE_PX = 12.5;
+export const MIN_TITLE_PX = 11;
+
+/**
+ * The smallest zoom an automatic fit goes to, where card titles are still at least `MIN_TITLE_PX` on
+ * screen. Zooming out by hand can go further.
+ */
+export const READABLE_ZOOM = MIN_TITLE_PX / CARD_TITLE_PX;
 
 type FitOptions = {
 	/** Share of the view left empty on each side. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { READABLE_ZOOM, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
+import { CARD_TITLE_PX, MIN_TITLE_PX, READABLE_ZOOM, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
 
 describe('fitting a graph to the view', () => {
 	it('centres a graph that fits, never closer than full size', () => {
@@ -7,8 +7,8 @@ describe('fitting a graph to the view', () => {
 	});
 
 	it('shrinks a larger graph to fit while it stays readable', () => {
-		const v = fitViewport({ x: 0, y: 0, width: 1500, height: 300 }, 1000, 500, { padding: 0 });
-		expect(v.zoom).toBeCloseTo(1000 / 1500);
+		const v = fitViewport({ x: 0, y: 0, width: 1100, height: 300 }, 1000, 500, { padding: 0 });
+		expect(v.zoom).toBeCloseTo(1000 / 1100);
 		expect(v.x).toBeCloseTo(0);
 	});
 
@@ -84,5 +84,12 @@ describe('a large graph without a box', () => {
 		// The bare corner would have shown no card at all.
 		const corner = fitViewport(bounds, 1000, 500, { padding: 0, minZoom: 0.6 });
 		expect(cards.some((c) => inside(c, corner))).toBe(false);
+	});
+});
+
+describe('the readable zoom', () => {
+	it('keeps card titles at least 11 px on screen', () => {
+		expect(MIN_TITLE_PX).toBeGreaterThanOrEqual(11);
+		expect(CARD_TITLE_PX * READABLE_ZOOM).toBeGreaterThanOrEqual(MIN_TITLE_PX - 1e-9);
 	});
 });

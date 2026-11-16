@@ -11,6 +11,7 @@
 	// model's column count — so it scales to 100+ columns.
 	import type { Node, Edge } from '@xyflow/svelte';
 	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import { READABLE_ZOOM } from '$lib/lineage/fit';
 	import ColCellNode from '$lib/components/lineage/col-cell-node.svelte';
 	import { layoutGraph } from '$lib/lineage/layout';
 	import { highlightSqlbuild } from '$lib/sql/highlight';
@@ -355,7 +356,7 @@
 			}}
 		>
 			{#if selectedCol}
-				<GraphCanvas bind:nodes bind:edges bind:fit={fitFn} fitFloor={0.3} readable={false} fitOnInit {nodeTypes} fitViewOptions={{ padding: 0.12, maxZoom: 1, minZoom: 0.3 }} nodesDraggable />
+				<GraphCanvas bind:nodes bind:edges bind:fit={fitFn} readable={false} fitOnInit {nodeTypes} fitViewOptions={{ padding: 0.12, maxZoom: 1, minZoom: READABLE_ZOOM }} nodesDraggable />
 
 			{:else}
 				<div class="text-[var(--sb-text-faint)] grid h-full place-items-center text-[12px]">Select a column to trace its lineage.</div>

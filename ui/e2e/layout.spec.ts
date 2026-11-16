@@ -73,6 +73,16 @@ async function checkLayout(page: Page, label: string) {
 		}
 		// Every graph has finished its first fit: an unfitted graph stays hidden.
 		if (document.querySelector('.graph-canvas.unfitted')) problems.push('a graph never fitted');
+		// A graph opens with its card titles readable: at least 11 px on screen. (A graph with the library's
+		// own controls is drawn whole at any zoom, as Lineage's very large graphs are.)
+		for (const canvas of document.querySelectorAll<HTMLElement>('.graph-canvas:not(.unfitted)')) {
+			if (!canvas.querySelector('.fit-control')) continue;
+			const scale = /scale\(([\d.]+)\)/.exec(canvas.querySelector<HTMLElement>('.svelte-flow__viewport')?.style.transform ?? '');
+			const title = canvas.querySelector('.svelte-flow__node .name');
+			if (!scale || !title) continue;
+			const px = parseFloat(getComputedStyle(title).fontSize) * Number(scale[1]);
+			if (px < 10.95) problems.push(`card titles show at ${px.toFixed(1)} px`);
+		}
 		// Every scroll area has the themed scrollbar, not the browser's default.
 		for (const el of [document.documentElement, ...document.querySelectorAll<HTMLElement>('body *')]) {
 			const style = getComputedStyle(el);
