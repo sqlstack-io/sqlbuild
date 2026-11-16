@@ -20,7 +20,9 @@ pub fn group_dependencies(
     Ok(waits.edges)
 }
 
-/// A job that builds a node itself, such as a shared function, never waits for its other builders.
+/// Each member waits for the members that build the first nodes it reaches upstream, and no further:
+/// those members wait for whatever their own nodes read. A job that builds a node itself, such as a
+/// shared function, never waits for its other builders and keeps walking past it.
 fn lineage_dependencies(
     input: &SnapshotInput,
     jobs: &BTreeMap<String, JobDefinition>,
@@ -52,6 +54,7 @@ fn lineage_dependencies(
                             format!("{key} reads {upstream}")
                         });
                     }
+                    continue;
                 }
                 pending.push(upstream);
             }
