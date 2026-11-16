@@ -19,6 +19,7 @@ from sqlbuild.executor.janitor.models import (
 from tests.unit.src.sqlbuild.executor.janitor.main._test_types import (
     JanitorExecuteTestCase,
     JanitorPlanTestCase,
+    JanitorTargetSchemaTestCase,
     relation_info,
 )
 from tests.unit.src.sqlbuild.executor.janitor.main.helpers import (
@@ -261,6 +262,38 @@ def test_given_project_and_warehouse_when_building_janitor_plan_then_returns_exp
         )
     assert tuple(blocked_schema_sources) == test_case.expected_blocked_schema_sources
     assert tuple(suppressed_candidate_names) == test_case.expected_suppressed_candidate_names
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        JanitorTargetSchemaTestCase(
+            description="a real target schema is inspected for artifacts",
+            target_schema="dev",
+            expected_inspected=True,
+        ),
+        JanitorTargetSchemaTestCase(
+            description="a preserve target schema names no schema to inspect",
+            target_schema="preserve",
+            expected_inspected=False,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_target_schema_when_building_janitor_plan_then_only_a_real_schema_is_inspected(
+    test_case: JanitorTargetSchemaTestCase,
+) -> None:
+    adapter: FakeJanitorAdapter = FakeJanitorAdapter(relation_infos=())
+
+    _ = build_janitor_plan(
+        project=build_project(target_schema=test_case.target_schema),
+        adapter=adapter,
+        connection=object(),
+        retention_days=7,
+        direct_mode=True,
+    )
+
+    assert (test_case.target_schema in adapter.listed_schemas) == test_case.expected_inspected
 
 
 @pytest.mark.parametrize(

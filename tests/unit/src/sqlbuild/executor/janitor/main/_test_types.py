@@ -32,6 +32,13 @@ class JanitorPlanTestCase:
 
 
 @dataclass(frozen=True)
+class JanitorTargetSchemaTestCase:
+    description: str
+    target_schema: str
+    expected_inspected: bool
+
+
+@dataclass(frozen=True)
 class JanitorExecuteTestCase:
     description: str
     relation_infos: tuple[RelationInfo, ...]
