@@ -11,9 +11,12 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::claim_location_work::claim_location_work;
 use crate::platform::main::complete_location_work::complete_location_work;
 use crate::platform::main::read_person_plan::read_person_plan;
+use crate::platform::main::read_person_plan_rows::read_person_plan_rows;
+use crate::platform::main::read_person_plan_summary::read_person_plan_summary;
 use crate::platform::main::request_location_work::request_location_work;
 use crate::platform::models::{
     LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult, PlanRequest,
+    PlanRowSection, PlanRowsQuery,
 };
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -326,7 +329,8 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 );
             }
             let document = json!({
-                "models": [{"name": "orders", "action": "create_table", "reason": "first_run", "query_diff": ["-SELECT 1", "+SELECT 2"], "config_diff": ["-a", "+b"]}],
+                "models": [{"name": "orders", "action": "create_table", "reason": "first_run", "query_diff": ["-SELECT 1", "+SELECT 2"], "config_diff": ["-a", "+b"]},
+                    {"name": "customers", "action": "create_view", "reason": "no_change", "config_diff": ["-a", "+b"]}],
                 "warnings": [{"severity": "warning", "message": "connect failed: db_password=orders-pass"}],
                 "python_nodes": [{"name": "orders_export", "identity_diff": {"source_diff": ["-a", "+b"]}}],
             });
@@ -384,8 +388,66 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 "{description}: viewers lack view.sql",
                 description = test_case.description
             );
+            let plan = (location, "development", first.request_id);
+            let summary = read_person_plan_summary(store, (&context, viewer), plan)
+                .await
+                .expect("summary")
+                .and_then(|summary| summary.outcome);
+            let Some(LocationWorkOutcome::Plan { document: summary }) = summary else {
+                panic!(
+                    "{description}: plan summary",
+                    description = test_case.description
+                )
+            };
+            let rows = |reader: Uuid, offset: usize| {
+                read_person_plan_rows(
+                    store,
+                    (&context, reader),
+                    plan,
+                    PlanRowsQuery {
+                        section: PlanRowSection::RoutineModels,
+                        offset: Some(offset),
+                        limit: Some(1),
+                    },
+                )
+            };
+            let page = rows(viewer, 0).await.expect("rows").expect("planned");
+            assert_eq!(
+                (
+                    summary["models"].as_array().map(Vec::len),
+                    summary["models"][0].get("query_diff").is_none(),
+                    summary["built_model_names"].clone(),
+                    summary["pages"].clone(),
+                    page.total,
+                    page.rows.first().map(|row| row["name"].clone()),
+                    page.rows
+                        .first()
+                        .map(|row| row.get("config_diff").is_none()),
+                    rows(viewer, 1)
+                        .await
+                        .expect("rows")
+                        .map(|page| page.rows.len()),
+                ),
+                (
+                    Some(1),
+                    true,
+                    json!(["orders", "customers"]),
+                    json!({"routine_models": 1}),
+                    1,
+                    Some(json!("customers")),
+                    Some(true),
+                    Some(0),
+                ),
+                "{description}: the summary carries the changed model and pages the routine one, both without diffs",
+                description = test_case.description
+            );
             assert!(
-                read(developer).await.expect("read").is_none(),
+                read(developer).await.expect("read").is_none()
+                    && read_person_plan_summary(store, (&context, developer), plan)
+                        .await
+                        .expect("summary")
+                        .is_none()
+                    && rows(developer, 0).await.expect("rows").is_none(),
                 "{description}: only the requester reads a plan",
                 description = test_case.description
             );

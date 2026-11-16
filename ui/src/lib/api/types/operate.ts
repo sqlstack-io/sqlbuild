@@ -667,7 +667,17 @@ export type PlanDocument = {
 	synced_copy: PlanSyncedCopy | null;
 	/** What `--changed` runs, holds back and skips; `null` without `--changed`. */
 	changed: PlanChanged | null;
+	/** A server summary's every built model, of which `models` holds the changed ones and the routine ones loaded so far. */
+	built_model_names?: string[];
+	/** A server summary's large sections, by size; their rows load a page at a time. */
+	pages?: Partial<Record<PlanPageSection, number>>;
 };
+
+/** The large plan sections a server summary pages: routine models, and `--changed`'s held-back and unchanged nodes. */
+export type PlanPageSection = 'routine_models' | 'held_back' | 'unchanged';
+
+/** One page of a plan section: its rows, the section's size, and the `--changed` runs of the page's models. */
+export type PlanPage = { total: number; rows: unknown[]; runs: PlanChanged['runs'] };
 
 /** `sqb plan --changed`'s decision. Nodes are keys such as `model:orders`. */
 export type PlanChanged = {
@@ -692,7 +702,7 @@ export type PlanSyncedCopy = {
 };
 
 /** The location's plan of a build command, or why it could not plan it. */
-export type PlanResult = { plan: PlanDocument; error: null } | { plan: null; error: string };
+export type PlanResult = { plan: PlanDocument; error: null; requestId?: string } | { plan: null; error: string };
 
 /** Cursor window for a launch, typed from the selected nodes' cursor type. */
 export type CursorWindow = {

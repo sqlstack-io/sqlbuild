@@ -70,6 +70,8 @@ use crate::api::_helpers::resources::{
     person_location_work::result,
     person_plans::request,
     person_plans::read,
+    person_plans::summary,
+    person_plans::rows,
     person_selection::evaluate,
     person_selection::vocabulary,
     person_node_sql::read,

@@ -43,3 +43,9 @@ pub const SYNCED_COPY_READING: &str = "Reading the synced warehouse state...";
 pub const SYNCED_COPY_DEFER_REFUSAL: &str =
     "plan previews from the synced copy cannot use --defer-to";
 pub const SYNCED_COPY_DEFER_HELP: &str = "Run re-plans live, including deferral.";
+/// Change reasons of a model that builds as it always does; a plan summary counts and pages them.
+pub(crate) const ROUTINE_PLAN_REASONS: [&str; 2] = ["no_change", "normal_incremental"];
+/// The planner's action for a model the run leaves alone.
+pub(crate) const SKIP_ACTION: &str = "skip";
+/// The plan document sections a summary pages instead of carrying.
+pub(crate) const PAGED_CHANGED_SECTIONS: [&str; 2] = ["held_back", "unchanged"];

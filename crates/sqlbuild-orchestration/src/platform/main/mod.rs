@@ -12,6 +12,8 @@ pub mod read_person_connection_test;
 pub mod read_person_location_health;
 pub mod read_person_mirrored_totals;
 pub mod read_person_plan;
+pub mod read_person_plan_rows;
+pub mod read_person_plan_summary;
 pub mod read_person_problems;
 pub(crate) mod read_platform_events;
 pub mod report_location_health;

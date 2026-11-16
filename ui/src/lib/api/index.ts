@@ -12,6 +12,7 @@ export type { ApiClient } from './client';
 export { ApiError, isRefusal } from './client';
 export * from './types';
 export * from './signals';
+export { mergePlanPage } from './http-runs';
 export { hasCapability, hasAnyCapability, ADMIN_CAPABILITIES } from './capabilities';
 
 const ROLES: readonly BuiltInRole[] = ['viewer', 'operator', 'developer', 'admin'];

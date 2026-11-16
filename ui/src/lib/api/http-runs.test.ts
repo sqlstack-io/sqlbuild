@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { groupRunNodes, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, mergePlanPage, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -309,5 +309,34 @@ describe('planResultOf', () => {
 		expect(result.error).toBe(expected.error);
 		expect(result.plan?.models[0]?.name ?? null).toBe(expected.plan);
 		if (result.plan) expect(result.plan.warnings).toEqual([]);
+	});
+});
+
+describe('mergePlanPage', () => {
+	const summary = planResultOf({
+		kind: 'plan',
+		document: {
+			models: [{ name: 'orders', action: 'create_table', reason: 'query_changed' }],
+			built_model_names: ['orders', 'customers', 'payments'],
+			pages: { routine_models: 2, unchanged: 3 },
+			changed: { counts: ['definition'], reach: 'all', runs: [{ node: 'model:orders', reason: 'definition changed', downstream_of: null }], held_back: [], unchanged: [] }
+		}
+	} as never).plan!;
+	it.each([
+		{
+			description: 'a routine page adds its models and their runs after the changed ones',
+			section: 'routine_models' as const,
+			page: { total: 2, rows: [{ name: 'customers', reason: 'no_change' }], runs: [{ node: 'model:customers', reason: 'upstream changed', downstream_of: 'model:orders' }] },
+			expected: { models: ['orders', 'customers'], runs: ['model:orders', 'model:customers'], unchanged: [], pages: { routine_models: 2, unchanged: 3 } }
+		},
+		{
+			description: 'an unchanged page adds its nodes and keeps the models',
+			section: 'unchanged' as const,
+			page: { total: 3, rows: ['model:payments'], runs: [] },
+			expected: { models: ['orders'], runs: ['model:orders'], unchanged: ['model:payments'], pages: { routine_models: 2, unchanged: 3 } }
+		}
+	])('$description', ({ section, page, expected }) => {
+		const merged = mergePlanPage(summary, section, page as never);
+		expect({ models: merged.models.map((m) => m.name), runs: merged.changed?.runs.map((r) => r.node), unchanged: merged.changed?.unchanged, pages: merged.pages }).toEqual(expected);
 	});
 });

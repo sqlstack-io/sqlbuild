@@ -32,3 +32,22 @@ pub struct TimestampGrainFacts {
     pub downstream_grain: Option<String>,
     pub input_grains: Vec<Option<String>>,
 }
+
+/// A plan document section too large to carry whole, read a page at a time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlanPageSection {
+    /// Built models with no change of their own.
+    RoutineModels,
+    /// `--changed` nodes held back for a job's own run.
+    HeldBack,
+    /// `--changed` nodes that run only when something they read changed.
+    Unchanged,
+}
+
+/// One page of a plan section, the section's size, and the `--changed` runs of the page's models.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PlanPage {
+    pub total: usize,
+    pub rows: Vec<serde_json::Value>,
+    pub runs: Vec<serde_json::Value>,
+}

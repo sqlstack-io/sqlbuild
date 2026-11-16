@@ -2,7 +2,7 @@
 // terminal read the same: work that runs first, one section per change reason with each model's detail,
 // then the routine models, functions, seeds and warnings.
 
-import type { PlanChanged, PlanDocument, PlanModel, PlanWarning, Trigger } from '$lib/api';
+import type { PlanChanged, PlanDocument, PlanModel, PlanPageSection, PlanWarning, Trigger } from '$lib/api';
 import { formatIn } from '$lib/format/time';
 import { plural } from '$lib/format/plural';
 
@@ -19,8 +19,14 @@ export type PlanEntry = {
 	warnings?: PlanWarning[];
 };
 
-/** `collapsed` sections show one line, such as "4 unchanged, skipped by --changed", until opened. */
-export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolean; collapsed?: boolean };
+/**
+ * `collapsed` sections show one line, such as "4 unchanged, skipped by --changed", until opened. A `page`d section
+ * holds the rows loaded so far of its `total`; the rest load from the server's plan a page at a time.
+ */
+export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolean; collapsed?: boolean; page?: PlanPageSection; total?: number };
+
+/** The section's size: its paged total, or the rows it holds. */
+export const sectionSize = (s: PlanSection) => s.total ?? s.entries.length;
 
 /** The change reasons that get their own section, in the CLI's order. */
 const REASON_GROUPS: [string, string][] = [
@@ -41,6 +47,15 @@ const keyName = (key: string) => key.slice(key.indexOf(':') + 1);
 export function builtModels(plan: PlanDocument): PlanModel[] {
 	return plan.models.filter((m) => m.action !== 'skip' && runsUnderChanged(plan, `model:${m.name}`));
 }
+
+/** Rows of a paged section the plan holds so far, which is the offset of its next page. */
+export function loadedRows(plan: PlanDocument, section: PlanPageSection): number {
+	if (section === 'routine_models') return plan.models.filter((m) => ROUTINE.has(m.reason)).length;
+	return section === 'held_back' ? (plan.changed?.held_back.length ?? 0) : (plan.changed?.unchanged.length ?? 0);
+}
+
+/** The names of every model the run builds, including routine ones a server summary has not loaded yet. */
+export const builtModelNames = (plan: PlanDocument): string[] => plan.built_model_names ?? builtModels(plan).map((m) => m.name);
 
 /** Without `--changed` every planned node runs; with it, only those its decision runs. */
 function runsUnderChanged(plan: PlanDocument, key: string): boolean {
@@ -114,15 +129,16 @@ function changedEntry(m: PlanModel, reason: string, windowStart?: string): PlanE
 /** Whether the plan reads as one full refresh: every model being built is one, as in the CLI. */
 export function isFullRefresh(plan: PlanDocument): boolean {
 	const active = builtModels(plan);
-	return active.length > 0 && active.every((m) => m.reason === 'full_refresh');
+	return active.length > 0 && !plan.pages?.routine_models && active.every((m) => m.reason === 'full_refresh');
 }
 
 /** The plan's sections in the order `sqb plan` prints them. Skipped models are left out, as there. */
 export function planSections(plan: PlanDocument): PlanSection[] {
 	const active = builtModels(plan);
 	const sections: PlanSection[] = [];
-	const add = (title: string, entries: PlanEntry[], changed = false) => {
-		if (entries.length) sections.push({ title, entries, changed });
+	const add = (title: string, entries: PlanEntry[], changed = false, page?: PlanPageSection) => {
+		const total = page && plan.pages?.[page];
+		if (entries.length || total) sections.push({ title, entries, changed, ...(page && total !== undefined ? { page, total } : {}) });
 	};
 	// Work that runs before any model builds comes first, as in the CLI.
 	add('Migrations', plan.migrations.map((r) => ({ name: r.model, value: [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · '), detail: [] })), true);
@@ -149,7 +165,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => {
 			const run = why.get(m.name);
 			return { name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(run ? [run.downstream_of ? `reads ${keyName(run.downstream_of)}` : run.reason] : [])] };
-		}));
+		}), false, 'routine_models');
 	}
 	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry));
 	const seedLabel: Record<string, string> = { first_run: 'first_run', config_changed: 'seed_changed', no_change: 'current' };
@@ -189,11 +205,12 @@ export function changedModelKeys(plan: PlanDocument): string[] {
 }
 
 /** The Held back and Unchanged sections of a `--changed` plan; `refresh` words what refreshes a job's nodes. */
-export function changedSections(changed: PlanChanged, refresh: (job: string) => string): PlanSection[] {
+export function changedSections(changed: PlanChanged, refresh: (job: string) => string, pages: PlanDocument['pages'] = {}): PlanSection[] {
 	const sections: PlanSection[] = [];
+	const paged = (page: 'held_back' | 'unchanged') => (pages?.[page] !== undefined ? { page, total: pages[page] } : {});
 	const held = changed.held_back.map((h) => ({ name: keyName(h.node), value: 'refreshed_by' in h ? h.refreshed_by.map(refresh).join(' · ') : `reads ${keyName(h.reads)}, which is held back`, detail: [] }));
-	if (held.length) sections.push({ title: 'Held back', entries: held, changed: false });
-	if (changed.unchanged.length) sections.push({ title: 'Unchanged', entries: changed.unchanged.map((key) => ({ name: keyName(key), value: 'skipped by --changed', detail: [] })), changed: false, collapsed: true });
+	if (held.length || pages?.held_back) sections.push({ title: 'Held back', entries: held, changed: false, ...paged('held_back') });
+	if (changed.unchanged.length || pages?.unchanged) sections.push({ title: 'Unchanged', entries: changed.unchanged.map((key) => ({ name: keyName(key), value: 'skipped by --changed', detail: [] })), changed: false, collapsed: true, ...paged('unchanged') });
 	return sections;
 }
 

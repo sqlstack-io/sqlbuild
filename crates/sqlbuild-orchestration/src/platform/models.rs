@@ -290,6 +290,47 @@ pub struct PlanRequest {
     pub command: Vec<String>,
 }
 
+/// A plan's large sections, read a page at a time beside its summary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanRowSection {
+    /// Built models with no change of their own, each with its `--changed` run when it has one.
+    RoutineModels,
+    /// `--changed` nodes held back for a job's own run.
+    HeldBack,
+    /// `--changed` nodes that run only when something they read changed.
+    Unchanged,
+}
+
+/// One page of a plan section, in plan order; `offset` defaults to 0 and `limit` to the cap.
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanRowsQuery {
+    pub section: PlanRowSection,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
+}
+
+/// A page of a plan section, how many rows the section holds, and the `--changed` runs of its models.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanRows {
+    pub total: usize,
+    #[schema(value_type = Vec<Object>)]
+    pub rows: Vec<serde_json::Value>,
+    #[schema(value_type = Vec<Object>)]
+    pub runs: Vec<serde_json::Value>,
+}
+
+/// A plan request's state with its summary: changed models in full, large sections as counts to page.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanSummaryRead {
+    pub expires_at: DateTime<Utc>,
+    /// `None` until the location answers; a plan's document is its summary.
+    pub outcome: Option<LocationWorkOutcome>,
+}
+
 /// A person asks a location for one named read-only operation, such as a connection test.
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

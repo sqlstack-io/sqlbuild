@@ -1,6 +1,8 @@
 import type {
 	AdhocRunCheck,
 	PlanResult,
+	PlanPage,
+	PlanPageSection,
 	AdhocRunRequest,
 	Bootstrap,
 	BulkRunResult,
@@ -140,6 +142,8 @@ export interface ApiClient extends PlatformApi {
 	launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run>;
 	/** Asks the location to run `sqb plan` on a build command against the warehouse, and waits for it. */
 	planBuild(scope: Scope, command: string[]): Promise<PlanResult>;
+	/** One page of a large section of the plan `requestId` names, which its summary only counts. */
+	planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number): Promise<PlanPage>;
 
 	listJobs(scope: Scope): Promise<Job[]>;
 	getJob(scope: Scope, key: string): Promise<JobDetail | null>;

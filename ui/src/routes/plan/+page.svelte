@@ -18,7 +18,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import XIcon from '@lucide/svelte/icons/x';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
-	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument, PlatformEvent } from '$lib/api';
+	import { mergePlanPage, type AdhocRunCheck, type AdhocRunRequest, type LaunchVerb, type PlanDocument, type PlanPageSection, type PlatformEvent } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import SyncingNote from '$lib/components/platform/syncing-note.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
@@ -31,7 +31,7 @@
 	import PlanReport from '$lib/run/plan-report.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { builtModels, builtSeeds, changedModelKeys, jobRefreshText } from '$lib/run/plan-text';
+	import { builtModelNames, builtSeeds, changedModelKeys, jobRefreshText, loadedRows } from '$lib/run/plan-text';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
@@ -123,6 +123,8 @@
 
 	// ---- the location's plan of a build (one at a time; the latest command wins) ----
 	let plan = $state<PlanDocument | null>(null);
+	/** The server's plan request, which pages the plan's large sections. */
+	let planRequestId = $state<string | null>(null);
 	let plannedKey = $state('');
 	let planning = $state(false);
 	let planError = $state<{ key: string; message: string } | null>(null);
@@ -137,6 +139,7 @@
 				const result = await app.client.planBuild(scope, request.command);
 				if (result.plan) {
 					plan = result.plan;
+					planRequestId = result.requestId ?? null;
 					plannedKey = key;
 					planError = null;
 				} else planError = { key, message: result.error };
@@ -148,6 +151,14 @@
 		}, 400);
 		return () => clearTimeout(timer);
 	});
+	/** The next page of a large plan section, added to the plan shown. */
+	async function morePlan(section: PlanPageSection) {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		if (!scope || !plan || !requestId) return;
+		const page = await app.client.planRows(scope, requestId, section, loadedRows(plan, section));
+		if (planRequestId === requestId && plan) plan = mergePlanPage(plan, section, page);
+	}
 	function replan() {
 		plannedKey = '';
 		planError = null;
@@ -161,7 +172,7 @@
 	/** The recorded checks on the models and seeds the plan builds, which run after them. */
 	const planChecks = $derived.by(() => {
 		if (!plan) return [];
-		const built = new Set([...builtModels(plan).map((m) => m.name), ...builtSeeds(plan).map((s) => s.name)]);
+		const built = new Set([...builtModelNames(plan), ...builtSeeds(plan).map((s) => s.name)]);
 		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && built.has(c.node.slice(c.node.indexOf(':') + 1)));
 	});
 	/** The tab shown: a replan with no checks leaves the Checks tab for the plan. */
@@ -258,7 +269,7 @@
 	);
 
 	/** The banner shows only problems that stop this run or touch what it builds; the rest stay on the Overview. */
-	const planRelations = $derived(new Set((plan?.models ?? []).flatMap((m) => [m.name, m.qualified_name?.split('.').at(-1)]).filter((n): n is string => !!n).map((n) => n.toLowerCase())));
+	const planRelations = $derived(new Set([...(plan?.models ?? []).flatMap((m) => [m.name, m.qualified_name?.split('.').at(-1)]), ...(plan?.built_model_names ?? [])].filter((n): n is string => !!n).map((n) => n.toLowerCase())));
 	function affectsPlan(event: PlatformEvent): boolean {
 		if (event.kind === 'scheduler_no_leader') return true;
 		if (event.locationId !== app.location?.id) return false;
@@ -383,7 +394,7 @@
 					{/snippet}
 				</DataTable>
 			{:else if shown?.verb === 'build' && plan}
-				<PlanReport {plan} {refresh} />
+				<PlanReport {plan} {refresh} more={planRequestId ? morePlan : undefined} />
 			{:else if shown?.verb && shown.verb !== 'build'}
 				<DataTable class="static compact" embedded columns={nodeColumns} rows={picked} key={(key) => key} rowHeight={32} empty="No nodes selected.">
 					{#snippet row(key)}

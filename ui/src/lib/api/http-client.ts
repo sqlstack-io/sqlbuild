@@ -16,13 +16,13 @@ import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './ht
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
 import { timelineOf } from './http-timeline';
-import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
+import { RUN_WINDOW, groupRunNodes, mergePlanPage, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
 import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -98,7 +98,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'selectionVocabulary',
 	'checkAdhocRun',
 	'launchAdhocRun',
-	'planBuild'
+	'planBuild',
+	'planRows'
 ]);
 
 /** How often a connection test asks for the location's answer, and the longest it waits. */
@@ -107,6 +108,8 @@ const CONNECTION_TEST_WAIT_MS = 60_000;
 
 /** How often the plan page asks for the location's plan; the server expires a plan after ten minutes. */
 const PLAN_POLL_MS = 750;
+/** Rows of each paged plan section loaded with the summary, as many as the plan report shows before "Show more". */
+const PLAN_FIRST_PAGE = 50;
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
 const AUDIT_PAGE = 100;
@@ -318,6 +321,18 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		samples.set(key, { records, after });
 		return records;
 	}
+	/** One page of a plan section, under the plan's authorization. */
+	async function planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number): Promise<PlanPage> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/rows', {
+			params: { path: { location_id: locationId, target, request_id: requestId }, query: { section, offset, limit } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		if (!data) throw new ApiError('The plan request disappeared', 404);
+		return data as unknown as PlanPage;
+	}
+
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: changes ?? new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -549,7 +564,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
 		},
-		/** Queues the plan, then waits for the location's document; a plan the location could not make is a result, not a throw. */
+		/**
+		 * Queues the plan, then waits for the location's summary: changed models in full and the large sections counted.
+		 * The first page of each large section loads with it; a plan the location could not make is a result, not a throw.
+		 */
 		async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };
@@ -563,17 +581,26 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!asked.response.ok) throw new ApiError(errorText(asked.error, asked.response), asked.response.status);
 			for (;;) {
 				await new Promise((resolve) => setTimeout(resolve, PLAN_POLL_MS));
-				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}', {
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/summary', {
 					params: { path: { ...path, request_id: requestId } }
 				});
 				if (response.status === 401) onUnauthorized();
 				if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 				if (!data) throw new ApiError('The plan request disappeared', 404);
-				const outcome = data.result_json?.outcome;
-				if (outcome) return planResultOf(outcome);
+				const outcome = data.outcome;
+				if (outcome) {
+					const result = planResultOf(outcome);
+					if (!result.plan) return result;
+					let plan = result.plan;
+					for (const [section, total] of Object.entries(plan.pages ?? {}) as [PlanPageSection, number][]) {
+						if (total) plan = mergePlanPage(plan, section, await planRows(scope, requestId, section, 0, PLAN_FIRST_PAGE));
+					}
+					return { plan, error: null, requestId };
+				}
 				if (Date.parse(data.expires_at) <= Date.now()) return { plan: null, error: 'The location did not plan the command in time; check that sqb location serve is running' };
 			}
 		},
+		planRows,
 		async listSnapshotChanges(scope: Scope, query: { limit?: number } = {}): Promise<SnapshotChange[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const [snapshots, runs] = await Promise.all([

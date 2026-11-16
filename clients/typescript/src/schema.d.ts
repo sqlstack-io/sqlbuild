@@ -674,6 +674,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlanRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlanSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/providers": {
         parameters: {
             query?: never;
@@ -2683,6 +2715,18 @@ export interface components {
             command: string[];
             /** Format: uuid */
             request_id: string;
+        };
+        /** @description A page of a plan section, how many rows the section holds, and the `--changed` runs of its models. */
+        PlanRows: {
+            rows: Record<string, never>[];
+            runs: Record<string, never>[];
+            total: number;
+        };
+        /** @description A plan request's state with its summary: changed models in full, large sections as counts to page. */
+        PlanSummaryRead: {
+            /** Format: date-time */
+            expires_at: string;
+            outcome?: null | components["schemas"]["LocationWorkOutcome"];
         };
         PlatformEvent: {
             /** @enum {string} */
@@ -5735,6 +5779,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["LocationWorkRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPlanRows: {
+        parameters: {
+            query: {
+                /** @description The section to page */
+                section: "routine_models" | "held_back" | "unchanged";
+                /** @description Rows to skip; 0 by default */
+                offset?: number;
+                /** @description At most this many rows, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["PlanRows"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPlanSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["PlanSummaryRead"];
                 };
             };
             /** @description Session rejected */

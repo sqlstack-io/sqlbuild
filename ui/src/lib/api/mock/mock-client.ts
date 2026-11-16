@@ -8,6 +8,8 @@ import type {
 	SelectionRequest,
 	SelectionVocabulary,
 	PlanResult,
+	PlanPage,
+	PlanPageSection,
 	AdhocRunRequest,
 	Bootstrap,
 	BuiltInRole,
@@ -351,6 +353,13 @@ export class MockApiClient implements ApiClient {
 			? new Map((await this.#build.listCatalogNodes(scope)).filter((n) => n.stale?.some((r) => r.reason === 'changed')).map((n) => [n.key, 'definition changed']))
 			: null;
 		return this.#operate.planBuild(scope, command, changed);
+	}
+
+	/** The mock plans whole documents, so no section is paged. */
+	async planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number): Promise<PlanPage> {
+		this.#location(scope);
+		void [requestId, section, offset];
+		return { total: 0, rows: [], runs: [] };
 	}
 
 	async listJobs(scope: Scope): Promise<Job[]> {

@@ -44,3 +44,5 @@ pub(crate) const CHECKPOINT_READER_WAIT_MS: u64 = 200;
 pub const MAX_REPORTED_RULE_FINDINGS: usize = 50;
 /// The longest code, message or path of a reported rule finding, in characters.
 pub const MAX_RULE_FINDING_CHARS: usize = 500;
+/// The most rows one page of a plan section returns.
+pub const PLAN_ROWS_LIMIT: usize = 1000;

@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanDocument, PlanResult, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -36,10 +36,24 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			table_type_conversions: list(document.table_type_conversions),
 			retention: list(document.retention),
 			synced_copy: document.synced_copy ?? null,
-			changed: document.changed ?? null
+			changed: document.changed ?? null,
+			...(document.built_model_names ? { built_model_names: document.built_model_names } : {}),
+			...(document.pages ? { pages: document.pages } : {})
 		},
 		error: null
 	};
+}
+
+/** `plan` with one more page of a paged section: routine models with their `--changed` runs, or held-back or unchanged nodes. */
+export function mergePlanPage(plan: PlanDocument, section: PlanPageSection, page: PlanPage): PlanDocument {
+	const pages = { ...plan.pages, [section]: page.total };
+	if (section === 'routine_models') {
+		const changed = plan.changed && { ...plan.changed, runs: [...plan.changed.runs, ...page.runs] };
+		return { ...plan, pages, changed, models: [...plan.models, ...(page.rows as PlanDocument['models'])] };
+	}
+	if (!plan.changed) return { ...plan, pages };
+	if (section === 'held_back') return { ...plan, pages, changed: { ...plan.changed, held_back: [...plan.changed.held_back, ...(page.rows as PlanChanged['held_back'])] } };
+	return { ...plan, pages, changed: { ...plan.changed, unchanged: [...plan.changed.unchanged, ...(page.rows as string[])] } };
 }
 
 /** The server's dry run of an ad-hoc command. */

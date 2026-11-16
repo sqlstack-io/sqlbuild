@@ -5,12 +5,25 @@
 	// then the routine models.
 	import { to } from '$lib/paths';
 	import type { PlanDocument } from '$lib/api';
-	import { changedSections, looseWarnings, planSections, warningText, type PlanEntry } from './plan-text';
+	import type { PlanPageSection } from '$lib/api';
+	import { changedSections, looseWarnings, planSections, sectionSize, warningText, type PlanEntry, type PlanSection } from './plan-text';
 
-	/** `refresh` words what refreshes the nodes a `--changed` plan holds back for a job. */
-	let { plan, refresh = (job: string) => `job ${job}` }: { plan: PlanDocument; refresh?: (job: string) => string } = $props();
+	/** `refresh` words what refreshes the nodes a `--changed` plan holds back for a job; `more` loads the next page of a paged section. */
+	let { plan, refresh = (job: string) => `job ${job}`, more }: { plan: PlanDocument; refresh?: (job: string) => string; more?: (section: PlanPageSection) => Promise<void> } = $props();
 
-	const sections = $derived([...planSections(plan), ...(plan.changed ? changedSections(plan.changed, refresh) : [])]);
+	const sections = $derived([...planSections(plan), ...(plan.changed ? changedSections(plan.changed, refresh, plan.pages) : [])]);
+	let loading = $state<Record<string, boolean>>({});
+	/** Show every loaded row of the section, and load the next page while the server holds more. */
+	async function showMore(s: PlanSection) {
+		expanded[s.title] = true;
+		if (!s.page || !more || s.entries.length >= sectionSize(s) || loading[s.title]) return;
+		loading[s.title] = true;
+		try {
+			await more(s.page);
+		} finally {
+			loading[s.title] = false;
+		}
+	}
 	/** Rows a section shows before "Show all", as the CLI truncates long sections. */
 	const limit = 50;
 	let expanded = $state<Record<string, boolean>>({});
@@ -24,12 +37,12 @@
 	{#each sections as s (s.title)}
 		{#if s.collapsed && !expanded[s.title]}
 			<div class="collapsed">
-				<DisclosureButton open={false} onclick={() => (expanded[s.title] = true)} class="w-full py-1 text-[12.5px]"><i></i>{s.entries.length} {s.title.toLowerCase()}, {s.entries[0].value}</DisclosureButton>
+				<DisclosureButton open={false} onclick={() => (expanded[s.title] = true)} class="w-full py-1 text-[12.5px]"><i></i>{sectionSize(s)} {s.title.toLowerCase()}, {s.entries[0]?.value ?? ''}</DisclosureButton>
 			</div>
 		{:else}
 		{@const shown = expanded[s.title] ? s.entries : s.entries.slice(0, limit)}
 		<section>
-			<h4><i class:changed={s.changed}></i>{s.title} <span>({s.entries.length})</span></h4>
+			<h4><i class:changed={s.changed}></i>{s.title} <span>({sectionSize(s)})</span></h4>
 			{#each shown as e (`${e.name}:${e.value}`)}
 				{@const link = href(e, s.title)}
 				{@const hasDiff = !!(e.queryDiff?.length || e.configDiff?.length || e.schema?.length)}
@@ -56,8 +69,8 @@
 					{/if}
 				</div>
 			{/each}
-			{#if s.entries.length > shown.length}
-				<Button variant="link" size="inline" class="mt-1 self-start text-[11.5px]" onclick={() => (expanded[s.title] = true)}>Show {s.entries.length - shown.length} more</Button>
+			{#if sectionSize(s) > shown.length && !(expanded[s.title] && !more)}
+				<Button variant="link" size="inline" class="mt-1 self-start text-[11.5px]" disabled={loading[s.title]} onclick={() => showMore(s)}>{loading[s.title] ? 'Loading…' : `Show ${sectionSize(s) - shown.length} more`}</Button>
 			{/if}
 		</section>
 		{/if}

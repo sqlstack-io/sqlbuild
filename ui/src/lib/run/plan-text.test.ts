@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { actionText, changedSections, jobRefreshText, looseWarnings, planSections, warningText } from './plan-text';
+import { actionText, builtModelNames, changedSections, jobRefreshText, loadedRows, looseWarnings, planSections, sectionSize, warningText } from './plan-text';
 
 const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	name,
@@ -184,3 +184,22 @@ describe('plan under --changed', () => {
 	});
 });
 
+
+describe('plan from a server summary', () => {
+	const summary = plan([model('orders', { reason: 'query_changed' }), model('customers')], {
+		built_model_names: ['orders', 'customers', 'payments', 'refunds'],
+		pages: { routine_models: 3, unchanged: 120 },
+		changed: { counts: ['definition'], reach: 'all', runs: [{ node: 'model:orders', reason: 'definition changed', downstream_of: null }, { node: 'model:customers', reason: 'upstream changed', downstream_of: 'model:orders' }], held_back: [], unchanged: ['model:events'] }
+	});
+	it.each([
+		{ description: 'routine models count the whole section and page from what is loaded', title: 'Models', expected: { size: 3, loaded: 1, page: 'routine_models' } },
+		{ description: 'unchanged nodes count the whole section', title: 'Unchanged', expected: { size: 120, loaded: 1, page: 'unchanged' } }
+	])('$description', ({ title, expected }) => {
+		const section = [...planSections(summary), ...changedSections(summary.changed!, (job) => job, summary.pages)].find((s) => s.title === title)!;
+		expect({ size: sectionSize(section), loaded: section.entries.length, page: section.page }).toEqual(expected);
+		expect(loadedRows(summary, section.page!)).toBe(expected.loaded);
+	});
+	it('names every built model, loaded or not, for the checks the run triggers', () => {
+		expect(builtModelNames(summary)).toEqual(['orders', 'customers', 'payments', 'refunds']);
+	});
+});
