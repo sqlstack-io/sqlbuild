@@ -6,6 +6,10 @@ pub(crate) const POSITIVE_INTEGER_CONVERTER: &str = "_positive_integer";
 pub(crate) const POSITIVE_INTEGER_MESSAGE: &str = "value must be a positive integer";
 pub(crate) const NO_COLOR_OPTION: &str = "--no-color";
 pub(crate) const NO_COLOR_VARIABLE: &str = "NO_COLOR";
+/// Set by CI systems; `sqb dev` then prints plain lines.
+pub(crate) const CI_VARIABLE: &str = "CI";
+/// Turns live progress off; `sqb dev` then prints plain lines.
+pub(crate) const NO_PROGRESS_VARIABLE: &str = "SQLBUILD_NO_PROGRESS";
 pub(crate) const COLUMNS_VARIABLE: &str = "COLUMNS";
 /// `shutil.get_terminal_size`'s fallback width.
 pub(crate) const FALLBACK_COLUMNS: i64 = 80;
@@ -92,6 +96,10 @@ pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
 pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 /// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.
 pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
+/// Failed reads in a row, waiting twice as long after each, that stop a sync until one is requested.
+pub(crate) const METADATA_FAILURE_LIMIT: u32 = 5;
+/// Characters of a failed read's error that its health report carries.
+pub(crate) const METADATA_ERROR_CHARS: usize = 500;
 /// A metadata reader that ignores end of input this long after a synchronization is killed.
 pub(crate) const METADATA_READER_CLOSE_SECONDS: u64 = 5;
 /// How often a location asks git whether `HEAD` moved.
@@ -116,3 +124,7 @@ pub(crate) const PLAN_COMMAND: &str = "plan";
 /// How much `sqb plan --json` output a location reads; model diffs over the server's cap are dropped.
 pub(crate) const PLAN_OUTPUT_BYTES: usize =
     8 * sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
+/// `sqb dev` names at most this many changed inputs per change event.
+pub(crate) const CHANGED_PATHS_SHOWN: usize = 3;
+/// The spaces every `sqb dev` screen row starts with.
+pub(crate) const SCREEN_INDENT: usize = 2;

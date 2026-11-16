@@ -684,6 +684,15 @@ pub struct WarehouseHistoryPage {
     pub unchanged: bool,
 }
 
+/// A location runtime's failed history read: its redacted error, and whether a smaller page could succeed.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseHistoryFailure {
+    pub reason: String,
+    /// The read ran out of memory or time, so a smaller page may succeed; any other error repeats.
+    pub page_size: bool,
+}
+
 /// Typed import columns are selected by code, never from location-supplied field names.
 #[derive(Debug)]
 pub(crate) struct StateEventImport {

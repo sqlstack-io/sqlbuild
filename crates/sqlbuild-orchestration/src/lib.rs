@@ -7,6 +7,7 @@ pub mod api;
 pub mod authorization;
 pub mod credentials;
 pub mod declarations;
+pub mod dev_events;
 pub mod platform;
 pub mod runs;
 pub mod scheduler;

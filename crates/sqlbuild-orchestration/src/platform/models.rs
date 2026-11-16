@@ -31,7 +31,7 @@ pub struct LocationWorkClient {
     pub(crate) location_id: Uuid,
 }
 
-/// Locations report bounded facts, never connection strings or user exception text.
+/// Locations report bounded facts, never connection strings; a failed warehouse read carries only its redacted error text.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LocationHealth {
@@ -55,10 +55,13 @@ pub enum LocationHealth {
         failure: Option<WarehouseSyncFailure>,
         records_sent: u64,
         elapsed_millis: u64,
+        /// A failed read's warehouse error, redacted and bounded; absent otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
     },
 }
 
-/// Closed failure stages keep warehouse errors and credentials out of health observations.
+/// The stage a warehouse sync failed at; only a failed read also reports its redacted error.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WarehouseSyncFailure {
