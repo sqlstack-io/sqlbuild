@@ -13,9 +13,8 @@
 				ghost: "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground",
 				destructive: "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30",
 				link: "text-primary underline-offset-4 hover:underline",
-				// Purple means "needs building": solid deep purple (white text, the weight of the primary
-				// blue) for building changed nodes; the outlined pale purple is only for nodes behind.
-				stale: "bg-(--sb-stale-solid) text-white hover:bg-(--sb-stale-solid)/85",
+				// Purple means "needs building": solid for changed nodes, outlined for nodes only behind.
+				stale: "bg-(--sb-stale) text-background hover:bg-(--sb-stale)/85",
 				"stale-outline": "border-(--sb-stale) bg-background text-(--sb-stale) hover:bg-(--sb-stale)/10",
 			},
 			size: {

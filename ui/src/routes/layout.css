@@ -57,8 +57,6 @@
 	--sb-error: #c74757;
 	--sb-running: #2677d9;
 	--sb-stale: #7756b9;
-	/* The solid "Build N changed" action: a deep purple at the weight of --primary, with white text. */
-	--sb-stale-solid: #6741c2;
 	/* Needs building: changed nodes use --sb-stale; nodes only behind an upstream rebuild use this lighter purple. */
 	--sb-behind: #a089d3;
 	--sb-secondary: #16826f;
@@ -136,7 +134,6 @@
 	--sb-error: #f47089;
 	--sb-running: #69aaf6;
 	--sb-stale: #a78bfa;
-	--sb-stale-solid: #7550dc;
 	--sb-behind: #8a77c4;
 	--sb-secondary: #4dd6c4;
 	--sb-text-faint: #626975;
