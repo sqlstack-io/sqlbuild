@@ -13980,6 +13980,7 @@ class ModelPlanEntry(NativeRecord):
     start_cursor_config: StartCursorsConfig | None
     invocation_time: datetime | None
     unique_key: tuple[str, ...]
+    replace_key: tuple[str, ...]
     merge_exclude_columns: tuple[str, ...]
     snapshot_strategy: str | None
     updated_at_column: str | None
@@ -14068,6 +14069,7 @@ class ModelPlanEntry(NativeRecord):
         start_cursor_config: StartCursorsConfig | None = ...,
         invocation_time: datetime | None = ...,
         unique_key: tuple[str, ...] = ...,
+        replace_key: tuple[str, ...] = ...,
         merge_exclude_columns: tuple[str, ...] = ...,
         snapshot_strategy: str | None = ...,
         updated_at_column: str | None = ...,

@@ -5,6 +5,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
 
+use sqlbuild_analysis::planner_strategy::main::group_replacement_refusal::group_replacement_refusal;
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
 use sqlbuild_analysis::planner_strategy::main::microbatch_lookback::microbatch_lookback;
 use sqlbuild_analysis::planner_strategy::main::physical_layout_warning::physical_layout_warning;
@@ -52,8 +53,9 @@ use sqlbuild_python_project::compiled_views::main::compiled_models::name_object:
 use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use sqlbuild_python_project::compiled_views::main::compiled_models::relative_path::relative_path;
 use sqlbuild_python_project::planner_strategy::constants::{
-    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, MICROBATCH_MODE,
-    PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE, TABLE_RECREATING_ACTIONS,
+    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, GROUP_REPLACEMENT_UNSUPPORTED_CODE,
+    MICROBATCH_MODE, PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE,
+    TABLE_RECREATING_ACTIONS,
 };
 use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
 
@@ -678,6 +680,26 @@ pub(crate) fn assemble_model_plan_entry<'py>(
         (&enforcement, &warehouse_columns),
     )?;
     let unique_key: Bound<'py, PyTuple> = string_list(&values.0, "unique_key")?;
+    let replace_key: Bound<'py, PyTuple> = string_list(&values.0, "replace_key")?;
+    if let Some(refusal) = group_replacement_refusal(
+        &model_name(model)?,
+        (
+            &native_field(&request.adapter, "adapter_name")?
+                .str()?
+                .to_string(),
+            native_field(&request.adapter, "sql_analysis_dialect_name")?
+                .extract::<Option<String>>()?
+                .as_deref(),
+        ),
+        !replace_key.is_empty()?,
+    ) {
+        return Err(input_error(
+            py,
+            ErrorId::CompileInput,
+            &refusal,
+            Some(GROUP_REPLACEMENT_UNSUPPORTED_CODE),
+        ));
+    }
     let merge_exclude: Bound<'py, PyTuple> =
         config_text_tuple(py, &values, "merge_exclude_columns")?
             .unwrap_or_else(|| PyTuple::empty(py));
@@ -693,9 +715,14 @@ pub(crate) fn assemble_model_plan_entry<'py>(
         )?,
         "value",
     )?;
+    let delete_key: &Bound<'py, PyTuple> = if replace_key.is_empty()? {
+        &unique_key
+    } else {
+        &replace_key
+    };
     let ddl: String = logical_ddl(
         request,
-        (&unique_key, &merge_exclude),
+        (delete_key, &merge_exclude),
         (&warehouse_columns, ddl_cursor_bounds(request)?),
     )?;
     let entry: Bound<'py, PyDict> = PyDict::new(py);
@@ -717,6 +744,7 @@ pub(crate) fn assemble_model_plan_entry<'py>(
     config_fields(request, &values, &entry)?;
     execution_limit_fields(model, &values, &entry)?;
     entry.set_item("unique_key", unique_key)?;
+    entry.set_item("replace_key", replace_key)?;
     entry.set_item("merge_exclude_columns", merge_exclude)?;
     entry.set_item("table_type", table_type)?;
     storage_fields(request, &values, &entry)?;

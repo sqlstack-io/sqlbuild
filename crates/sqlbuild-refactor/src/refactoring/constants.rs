@@ -29,9 +29,10 @@ pub const GENERIC_AUDIT_DIRECTORY: &str = "generic";
 pub const RELATIONSHIPS_AUDIT: &str = "relationships";
 pub const RELATIONSHIPS_TO_KEY: &str = "to";
 pub const RELATIONSHIPS_FIELD_KEY: &str = "field";
-pub const COLUMN_VALUED_CONFIG_KEYS: [&str; 9] = [
+pub const COLUMN_VALUED_CONFIG_KEYS: [&str; 10] = [
     "cursor",
     "unique_key",
+    "replace_key",
     "updated_at",
     "check_columns",
     "merge_exclude_columns",

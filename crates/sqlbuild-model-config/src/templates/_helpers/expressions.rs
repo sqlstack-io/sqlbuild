@@ -49,6 +49,10 @@ impl Parser {
                 self.index += 1;
                 Ok(Expression::Text(text))
             }
+            TokenKind::Interpolated { parts, .. } => {
+                self.index += 1;
+                Ok(Expression::Interpolated(parts))
+            }
             TokenKind::Word(word) => {
                 self.index += 1;
                 if self.match_symbol('(') {
