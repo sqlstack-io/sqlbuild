@@ -9,6 +9,7 @@ import json
 import os
 import random
 import secrets
+import select
 import signal
 import sqlite3
 import subprocess
@@ -546,6 +547,53 @@ def wait_for_log(
         assert process.poll() is None, log.read_text()
         assert time.monotonic() < deadline, log.read_text()
         time.sleep(0.02)
+
+
+def wait_for_development_ready(
+    process: subprocess.Popen[bytes], log: Path, *, timeout: float = 60
+) -> tuple[str, str]:
+    """The UI URL and location ID from `sqb dev`'s plain `ready` and `location` lines."""
+    wait_for_log(process, log, "sqlbuild dev: ready ", timeout=timeout)
+    text: str = log.read_text()
+    url: str = text.partition("sqlbuild dev: ready ")[2].splitlines()[0]
+    identity: str = text.partition("sqlbuild dev: location ")[2].split()[0]
+    return url, identity
+
+
+def wait_for_connection_health(
+    api: SnapshotApi, process: subprocess.Popen[bytes], log: Path
+) -> dict[str, Any]:
+    """The location's first connection report, sent once its own connection check finished."""
+    deadline: float = time.monotonic() + 45
+    while True:
+        reports: list[dict[str, Any]] = [
+            report["report"]["health"]
+            for report in location_health_reports(api)
+            if report["report"]["health"]["kind"] == "connection"
+        ]
+        if reports:
+            return reports[0]
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, log.read_text()
+        time.sleep(0.05)
+
+
+def read_terminal_until(
+    terminal: int,
+    process: subprocess.Popen[bytes],
+    done: Callable[[str], bool],
+    *,
+    timeout: float = 60,
+) -> str:
+    """Everything the process wrote to its terminal until `done` holds, read as it arrives."""
+    deadline: float = time.monotonic() + timeout
+    written: bytes = b""
+    while not done(written.decode(errors="replace")):
+        assert process.poll() is None, written.decode(errors="replace")
+        assert time.monotonic() < deadline, written.decode(errors="replace")
+        readable, _, _ = select.select([terminal], [], [], 0.1)
+        written += os.read(terminal, 65536) if readable else b""
+    return written.decode(errors="replace")
 
 
 def wait_for_idle_sync(process: subprocess.Popen[bytes], log: Path) -> None:

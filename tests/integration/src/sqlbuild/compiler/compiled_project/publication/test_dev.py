@@ -31,8 +31,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     current_snapshot,
     location_process,
     stop_location,
+    wait_for_connection_health,
+    wait_for_development_ready,
     wait_for_generation,
-    wait_for_log,
     wait_for_run,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -111,11 +112,7 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
     log: Path = tmp_path / "development.log"
     output: Path = tmp_path / "publications.jsonl"
     with location_process(arguments, log, output, env=environment) as process:
-        wait_for_log(process, log, "Development API ready: ")
-        url: str = (
-            "http://" + log.read_text().partition("Development API ready: ")[2].splitlines()[0]
-        )
-        identity: str = log.read_text().partition("Development location: ")[2].splitlines()[0]
+        url, identity = wait_for_development_ready(process, log)
         api: SnapshotApi = SnapshotApi(url, identity, "local-development")
         scope: str = f"{url}/api/locations/{identity}/targets/{quote(test_case.target, safe='')}"
         _ = wait_for_generation(api, test_case.target, 1, process, log)
@@ -172,13 +169,13 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
             )
         stop_location(process, first_interpreter, log)
     _ = log.write_text("")
+    with sqlite3.connect(control) as connection:
+        _ = connection.execute("DELETE FROM sqb_scheduler_lease")
     with location_process(
         arguments + ["--no-scheduler", "--triggers"], log, output, env=environment
     ) as restarted:
-        wait_for_log(restarted, log, "Development API ready: ")
-        url = "http://" + log.read_text().partition("Development API ready: ")[2].splitlines()[0]
-        assert log.read_text().partition("Development location: ")[2].splitlines()[0] == identity
-        assert "Starting development scheduler" not in log.read_text()
+        url, restarted_identity = wait_for_development_ready(restarted, log)
+        assert restarted_identity == identity
         api = SnapshotApi(url, identity, "local-development")
         scope = f"{url}/api/locations/{identity}/targets/{quote(test_case.target, safe='')}"
         _ = wait_for_generation(api, test_case.target, 2, restarted, log)
@@ -211,6 +208,7 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
         assert statuses == {"annual_orders_job": "paused", "additional_orders_job": "running"}
         stop_location(restarted, int(pidfile.read_text()), log)
     with sqlite3.connect(control) as connection:
+        assert connection.execute("SELECT count(*) FROM sqb_scheduler_lease").fetchone() == (0,)
         assert connection.execute("SELECT count(*) FROM sqb_development_locations").fetchone() == (
             1,
         )
@@ -254,7 +252,11 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
     environment: dict[str, str] = dict(os.environ)
     _ = environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
     with location_process(arguments, log, output, env=environment) as process:
-        wait_for_log(process, log, "connection check passed", timeout=60)
+        url, identity = wait_for_development_ready(process, log)
+        health: dict[str, Any] = wait_for_connection_health(
+            SnapshotApi(url, identity, "local-development"), process, log
+        )
+        assert health["healthy"], log.read_text()
         interpreters: list[str] = imports.read_text().splitlines()
         stop_location(process, int(interpreters[0]), log)
 

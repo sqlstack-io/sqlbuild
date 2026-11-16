@@ -289,6 +289,14 @@ class DevelopmentDiscoveryTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentTerminalTestCase:
+    description: str
+    environment: dict[str, str | None]
+    expected_ready: str
+    expected_sign_ins: list[str]
+
+
+@dataclass(frozen=True)
 class ComposeDeploymentTestCase:
     description: str
     expected_warehouse_rows: list[list[int]]
