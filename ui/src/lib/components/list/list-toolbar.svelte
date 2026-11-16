@@ -114,12 +114,19 @@
 	}
 	.list-filters {
 		display: flex;
+		min-width: 0;
+		max-width: 100%;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 2px;
 	}
+	/* The counts and total wrap onto another line rather than run past the window's edge. */
 	.list-summary {
 		display: flex;
+		min-width: 0;
+		max-width: 100%;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 		align-items: center;
 		gap: 14px;
 		margin-left: auto;

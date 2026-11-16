@@ -27,9 +27,12 @@
 </div>
 
 <style>
+	/* Its options wrap onto another row before the control would run past the toolbar. */
 	.segmented-filter {
 		display: flex;
 		width: fit-content;
+		max-width: 100%;
+		flex-wrap: wrap;
 		gap: 2px;
 		padding: 2px;
 		border-radius: 2px;

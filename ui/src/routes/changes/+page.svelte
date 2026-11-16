@@ -247,6 +247,8 @@
 	.title {
 		display: flex;
 		min-width: 0;
+		flex: 1 1 auto;
+		overflow-wrap: anywhere;
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 4px 10px;
@@ -273,12 +275,17 @@
 		color: var(--primary);
 		font: 12px var(--font-mono);
 	}
+	/* Author and time wrap within the header rather than push it past the window's edge. */
 	.who {
 		display: flex;
-		flex: 0 0 auto;
+		min-width: 0;
+		max-width: 40%;
+		flex: 0 1 auto;
 		flex-direction: column;
 		align-items: flex-end;
 		margin-left: auto;
+		overflow-wrap: anywhere;
+		text-align: right;
 		font-size: 12px;
 		line-height: 1.45;
 	}

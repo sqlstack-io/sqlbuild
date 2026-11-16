@@ -53,7 +53,7 @@ async function checkLayout(page: Page, label: string) {
 		// The page itself never scrolls sideways; lists scroll inside their own box.
 		if (document.documentElement.scrollWidth > width + 1) problems.push(`page is ${document.documentElement.scrollWidth}px wide in a ${width}px window`);
 		// Page headers and toolbars stay inside the window.
-		for (const el of document.querySelectorAll<HTMLElement>('.app-topbar, .list-toolbar, .head, .toolbar')) {
+		for (const el of document.querySelectorAll<HTMLElement>('.app-topbar, .list-toolbar, .head, .toolbar, article > header, .page-body-inner > header')) {
 			const box = el.getBoundingClientRect();
 			if (box.width && box.right > width + 1) problems.push(`${el.className.split(' ')[0]} ends at ${Math.round(box.right)}px`);
 			for (const child of el.querySelectorAll<HTMLElement>('*')) {
