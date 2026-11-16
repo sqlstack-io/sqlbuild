@@ -15,16 +15,6 @@ use sqlbuild_rules::lint_text::main::scan_fixture_null_candidates::scan_fixture_
 
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::discovery::declaration_records::discover_model_schema_files;
-use crate::bindings::_helpers::discovery::model_records::discover_model_files;
-use crate::bindings::_helpers::discovery::project_config::load_local_config_file;
-use crate::bindings::_helpers::discovery::project_config::load_project_config_file;
-use crate::bindings::_helpers::discovery::snapshot::directory_snapshot_scope;
-use crate::bindings::_helpers::discovery::sql_test_records::discover_test_files;
-use crate::bindings::_helpers::discovery::yaml_records::{
-    discover_schema_files, discover_source_files,
-};
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -37,6 +27,15 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::discovery::main::project::load_local_config_file::load_local_config_file;
+use sqlbuild_python_front::discovery::main::project::load_project_config_file::load_project_config_file;
+use sqlbuild_python_front::discovery::main::records::discover_model_files::discover_model_files;
+use sqlbuild_python_front::discovery::main::records::discover_model_schema_files::discover_model_schema_files;
+use sqlbuild_python_front::discovery::main::records::discover_schema_files::discover_schema_files;
+use sqlbuild_python_front::discovery::main::records::discover_source_files::discover_source_files;
+use sqlbuild_python_front::discovery::main::records::discover_test_files::discover_test_files;
+use sqlbuild_python_front::discovery::main::snapshots::directory_snapshot_scope::directory_snapshot_scope;
 
 const SELECTION_CODE: &str = "S007";
 

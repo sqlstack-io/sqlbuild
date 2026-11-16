@@ -12,10 +12,6 @@ use sqlbuild_orchestration::sensors::models::{
 };
 
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::python_declarations;
-use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
-use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
-use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
-use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -23,6 +19,11 @@ use sqlbuild_python_base::native_host::constants::SENSOR_CONTEXT_PARAMETER;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 use sqlbuild_python_base::orchestration_reads::main::callback_code_hash::callback_code_hash;
 use sqlbuild_python_base::orchestration_reads::main::orchestration_code_hash::orchestration_code_hash;
+use sqlbuild_python_front::discovery::main::python_files::discover_provider_classes::discover_provider_classes;
+use sqlbuild_python_front::discovery::main::python_files::provider_by_name::provider_by_name;
+use sqlbuild_python_front::discovery::main::python_files::provider_usages::provider_usages;
+use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
+use sqlbuild_python_front::discovery::models::SecretPolicy;
 
 pub(crate) fn evaluate_sensor(
     py: Python<'_>,

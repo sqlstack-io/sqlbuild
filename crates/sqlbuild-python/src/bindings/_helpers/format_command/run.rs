@@ -18,7 +18,6 @@ use sqlbuild_rules::lint_text::models::{
     FormatFault, FormatFile, FormattedBodies, SuppressionFinding,
 };
 
-use crate::bindings::_helpers::discovery::description_inputs::externally_described_models;
 use crate::bindings::_helpers::format_command::cache::FormatCache;
 use crate::bindings::_helpers::format_command::files::{
     FormatChange, PendingWrite, persist_changes,
@@ -46,6 +45,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_front::discovery::main::records::externally_described_models::externally_described_models;
 
 const DESCRIPTION_PRESENT: &str = "description-present";
 /// The fix that rewrites descriptions escaping or doubling double quotes as `"""` strings.

@@ -30,12 +30,12 @@ use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSes
 use crate::bindings::_helpers::compiled_views::compiled_model_view::CompiledViewClasses;
 use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
-use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::lineage::lineage_facts::{confidence_member, transform_kind_member};
-use crate::bindings::_helpers::render::macro_call_rows::span_expansion;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::render::main::calls::span_expansion::span_expansion;
 
 const COMPILE_PHASE: &str = "compile";
 const ERROR_SEVERITY: &str = "error";

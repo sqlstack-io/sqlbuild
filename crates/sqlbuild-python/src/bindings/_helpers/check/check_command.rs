@@ -8,9 +8,6 @@ use crate::bindings::_helpers::compile_driver::relation_targets::build_project_r
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::discovery::provider_secrets::{
-    consumer_uses, require_used_secrets, sink_uses,
-};
 use crate::bindings::_helpers::graph::algorithms::transitive_closure_many;
 use crate::bindings::_helpers::graph::execution_gates::sql_ref_key;
 use crate::bindings::_helpers::graph::python_lifecycle::build_python_sql_run_lifecycle;
@@ -36,6 +33,9 @@ use sqlbuild_python_base::native_host::main::connection_failure::connection_fail
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
+use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
+use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
 
 use crate::bindings::_helpers::check::check_core::{
     ReadSideInputs, load_results_by_loader_name, record_python_run_state_results,

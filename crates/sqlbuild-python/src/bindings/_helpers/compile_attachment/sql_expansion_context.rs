@@ -8,14 +8,7 @@ use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::compile_attachment::declaration_scope::build_declaration_scope;
 use crate::bindings::_helpers::compile_attachment::declaration_scope::rebind_declaration_scope;
-use crate::bindings::_helpers::compile_attachment::effective_config::{
-    build_effective_vars, target_selection,
-};
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_collection_rendering;
-use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
-use crate::bindings::_helpers::render::declaration_indexes::public_declaration_indexes;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -23,6 +16,12 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::compile_attachment::main::build_effective_vars::build_effective_vars;
+use sqlbuild_python_front::compile_attachment::main::target_selection::target_selection;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::contracts::main::resolve_effective_collection_rendering::resolve_effective_collection_rendering;
+use sqlbuild_python_front::render::main::declarations::public_declaration_indexes::public_declaration_indexes;
+use sqlbuild_python_front::render::models::SqlExpansionInputs;
 
 /// Build the declaration scope of `discovered`; a static scope lends only its index to macros.
 fn declaration_scope<'py>(

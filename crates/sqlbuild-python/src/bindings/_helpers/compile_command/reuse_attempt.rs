@@ -41,9 +41,7 @@ use crate::bindings::_helpers::compile_driver::phases::{elapsed_ms, monotonic};
 use crate::bindings::_helpers::compile_outputs::reuse::{
     ReuseCheckPy, ReuseRulesPy, check_compile_reuse,
 };
-use crate::bindings::_helpers::discovery::project_config::warn_deprecated_settings;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
-use crate::bindings::_helpers::macro_bridge::first_compile::keep_delta_claim;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -58,6 +56,8 @@ use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
 use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_front::discovery::main::project::warn_deprecated_settings::warn_deprecated_settings;
+use sqlbuild_python_front::macro_bridge::main::keep_delta_claim::keep_delta_claim;
 
 const REUSE_REQUEST: FacadeHost = FacadeHost::CompileReuseRequest;
 const HIT: &str = "hit";

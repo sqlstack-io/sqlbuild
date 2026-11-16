@@ -17,9 +17,7 @@ use sqlbuild_core::panics::main::native_failure::native_failure;
 use sqlbuild_model_config::templates::models::Scalar;
 use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::authored_values::project_vars::project_var_text;
 use crate::bindings::_helpers::compiled_views::model_input_view::input_reference_rows;
-use crate::bindings::_helpers::model_config::template_data::record_reads;
 use crate::bindings::_helpers::project_assembly::models::{
     NativeProjectResources, NativeResourceFailure,
 };
@@ -34,6 +32,8 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_front::authored_values::main::project_var_text::project_var_text;
+use sqlbuild_python_front::model_config::main::config::record_reads::record_reads;
 
 const OS_MODULE: &str = "os";
 const PROJECT_ASSEMBLY_CONTEXT: &str = "native project assembly";

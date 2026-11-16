@@ -22,17 +22,17 @@ use crate::bindings::_helpers::command_runtime::runtime_errors::{
     expected_resolution_error, raised,
 };
 use crate::bindings::_helpers::command_runtime::warehouse_scope::current_command_warehouse_scope;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_runtime_config;
-use crate::bindings::_helpers::compile_driver::config_validation::session_warehouse_support;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
-use crate::bindings::_helpers::discovery::configuration::discover_project_configuration;
-use crate::bindings::_helpers::model_config::template_data::expanded_template_data;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
+use sqlbuild_python_front::compile_driver::main::session_warehouse_support::session_warehouse_support;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
+use sqlbuild_python_front::discovery::main::project::discover_project_configuration::discover_project_configuration;
+use sqlbuild_python_front::model_config::main::config::expanded_template_data::expanded_template_data;
 
 /// The `WarehouseGroup` whose warehouse is a target's `warehouses.build`; any other reads `query`.
 const BUILD_GROUP: &str = "build";
