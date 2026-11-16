@@ -16,6 +16,7 @@
 	import MemberNode from './member-node.svelte';
 	import MemberBoxNode from './member-box-node.svelte';
 	import CountEdge from './count-edge.svelte';
+	import { edgeStyle, edgesTouching } from '$lib/lineage/visible-edges';
 
 	// A job group's member jobs, one card each. Clicking a card selects it and opens the member in
 	// place, a box around its nodes, as a folder opens on Lineage; edges follow what is visible at
@@ -88,6 +89,21 @@
 	let shape = '';
 	let laidOut = '';
 	const selectedId = $derived(selection ? (selection.node ? innerId(selection.member, selection.node) : memberNodeId(selection.member)) : null);
+	// Hovering or selecting a card or box lights its edges and dims the rest, as on Lineage.
+	let hoveredId = $state<string | null>(null);
+	const focusId = $derived(hoveredId ?? selectedId);
+	$effect(() => {
+		const id = focusId;
+		// Tracks the edges too, so a redrawn graph is lit again; it writes only when a style changes.
+		const current = edges;
+		const lit = id ? edgesTouching(id, current, untrack(() => nodes)) : null;
+		const styled = current.map((e) => {
+			const count = (e.data as { count?: number } | undefined)?.count ?? 1;
+			const style = edgeStyle(Math.max(1, count), !lit ? 'neutral' : lit.has(e.id) ? 'on' : 'dim', count === 0);
+			return e.style === style ? e : { ...e, style };
+		});
+		if (styled.some((e, i) => e !== current[i])) edges = styled;
+	});
 	const marked = (list: Node[], id: string | null) => list.map((n) => (!!n.selected === (n.id === id) ? n : { ...n, selected: n.id === id }));
 	$effect(() => {
 		const id = selectedId;
@@ -137,7 +153,7 @@
 </script>
 
 <div class="graph sb-flow" bind:this={panel} class:unfitted={!fitted && nodes.length > 0}>
-	<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {onnodeclick} onpaneclick={() => (selection = null)}>
+	<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {onnodeclick} onpaneclick={() => (selection = null)} onnodepointerenter={({ node }) => (hoveredId = node.id)} onnodepointerleave={() => (hoveredId = null)}>
 		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport readable />
 		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 		<FitControls onfit={() => fit?.()} />

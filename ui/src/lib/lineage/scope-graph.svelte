@@ -13,6 +13,7 @@
 	import { folderGraph, folderTree, layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { jobGraph, layoutJobGraph, type JobBox } from '$lib/lineage/job-graph';
 	import JobBoxNode from './job-box-node.svelte';
+	import CountEdge from './count-edge.svelte';
 
 	// Nodes and the lineage between them; each box, such as a group's member job, is drawn around its nodes.
 	// Clicking a node selects it; Shift, Ctrl or Cmd adds to the selection.
@@ -27,6 +28,7 @@
 	}: { keys: string[]; catalog: CatalogNode[]; boxes?: JobBox[]; members?: JobGroupMember[]; onselect: (keys: string[]) => void } = $props();
 
 	const nodeTypes = { asset: AssetNode, job: JobBoxNode, folder: FolderNode, folderBox: JobBoxNode };
+	const edgeTypes = { count: CountEdge };
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
 	let fit = $state<((opts?: { duration?: number }) => void) | undefined>();
@@ -107,6 +109,7 @@
 		bind:nodes
 		bind:edges
 		{nodeTypes}
+		{edgeTypes}
 		nodesDraggable={false}
 		multiSelectionKey={['Meta', 'Control', 'Shift']}
 		minZoom={0.1}

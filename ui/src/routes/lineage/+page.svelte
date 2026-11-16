@@ -24,7 +24,9 @@
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import { layoutGraph } from '$lib/lineage/layout';
 	import { nodeFields } from '$lib/lineage/node-fields.svelte';
-	import { neighbourEdgeIds, tracePath } from '$lib/lineage/trace';
+	import { tracePath } from '$lib/lineage/trace';
+	import { edgeStyle, edgesTouching } from '$lib/lineage/visible-edges';
+	import CountEdge from '$lib/lineage/count-edge.svelte';
 	import { outlineSql } from '$lib/sql/outline';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
 	import SqlViewer from '$lib/components/code/sql-viewer.svelte';
@@ -72,6 +74,7 @@
 	let modelQuery = $state('');
 
 	const nodeTypes = { asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode, stub: StubNode };
+	const edgeTypes = { count: CountEdge };
 	// Automatic fits stop at a zoom where cards stay readable; the fit button and the wheel go further, to the whole graph.
 	const FIT_FLOOR = READABLE_ZOOM;
 
@@ -390,14 +393,12 @@
 			return tracePath(selectedIds, edges);
 		}
 		if (hoveredId) {
-			return { nodes: new Set([hoveredId]), edges: neighbourEdgeIds(hoveredId, edges) };
+			// A hovered box lights the edges of everything inside it.
+			return { nodes: new Set([hoveredId]), edges: edgesTouching(hoveredId, edges, nodes) };
 		}
 		return null;
 	});
 
-	const EDGE_NEUTRAL = 'stroke: var(--sb-edge); stroke-width: 1.5;';
-	const EDGE_ON = 'stroke: var(--primary); stroke-width: 2;';
-	const EDGE_DIM = 'stroke: var(--sb-edge-dim); stroke-width: 1.2;';
 
 	// Apply highlight styling back into the bound arrays whenever the lit set
 	// changes. Guarded so it doesn't fight drag/selection (only touches style
@@ -406,7 +407,9 @@
 		const l = lit;
 		let edgesChanged = false;
 		const nextEdges = edges.map((e) => {
-			const style = !l ? EDGE_NEUTRAL : l.edges.has(e.id) ? EDGE_ON : EDGE_DIM;
+			// Thickness keeps saying how many node links an edge stands for, lit or dimmed.
+			const count = (e.data as { count?: number } | undefined)?.count ?? 1;
+			const style = edgeStyle(count, !l ? 'neutral' : l.edges.has(e.id) ? 'on' : 'dim');
 			const animated = !!l && l.edges.has(e.id) && selectedIds.size > 0;
 			if (e.style !== style || e.animated !== animated) edgesChanged = true;
 			return { ...e, style, animated };
@@ -926,6 +929,7 @@
 			bind:nodes
 			bind:edges
 			{nodeTypes}
+			{edgeTypes}
 			fitView
 			fitViewOptions={{ padding: 0.08, maxZoom: 1, minZoom: scaleMode ? undefined : FIT_FLOOR, includeHiddenNodes: scaleMode }}
 			minZoom={scaleMode ? 0.02 : 0.05}

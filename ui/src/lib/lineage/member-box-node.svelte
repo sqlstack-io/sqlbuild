@@ -14,7 +14,13 @@
 
 <div class="box" class:selected>
 	<Handle type="target" position={Position.Left} class="box-handle" />
-	<div class="head">
+	<!-- The whole header row closes the box; its links go where they say. Zoomed out, the target grows upward. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<span class="head-hit nodrag" aria-hidden="true" onclick={() => d.ontoggle?.(d.jobKey)}></span>
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="head nodrag" onclick={(e) => !(e.target as Element).closest('a, button') && d.ontoggle?.(d.jobKey)}>
 		<!-- raw-button: the header of a member box on the group graph, clickable as a whole to close it -->
 		<button class="toggle nodrag" title="Close {d.jobKey}" aria-expanded="true" onclick={() => d.ontoggle?.(d.jobKey)}>
 			<ChevronDownIcon size={14} class="chevron" />
@@ -33,6 +39,7 @@
 
 <style>
 	.box {
+		position: relative;
 		width: 100%;
 		height: 100%;
 		border: 1px solid var(--border-strong);
@@ -52,6 +59,20 @@
 		white-space: nowrap;
 		border-bottom: 1px solid var(--border);
 		font-size: 12px;
+	}
+	.head {
+		cursor: pointer;
+	}
+	.head:hover {
+		background: var(--sb-hover);
+	}
+	.head-hit {
+		position: absolute;
+		top: calc(30px * (1 - var(--sb-unzoom, 1)));
+		right: 0;
+		left: 0;
+		height: calc(30px * (var(--sb-unzoom, 1) - 1));
+		cursor: pointer;
 	}
 	.toggle {
 		display: flex;

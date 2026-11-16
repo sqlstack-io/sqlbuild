@@ -8,6 +8,7 @@
 	// frame never shows cards at unlaid-out positions that then jump into place.
 	import { useStore, useSvelteFlow, useViewport, type Viewport } from '@xyflow/svelte';
 	import { fitViewport, largestBox, type Rect } from './fit';
+	import { unzoom } from './hit-area';
 
 	let {
 		fitView = $bindable(),
@@ -79,5 +80,10 @@
 	setViewport = (v) => flow.setViewport(v);
 	$effect(() => {
 		viewport = vp.current;
+	});
+	// Card controls such as a folder's chevron and an open box's header keep at least their on-screen
+	// size when the graph is zoomed out, by growing with `--sb-unzoom`.
+	$effect(() => {
+		store.domNode?.style.setProperty('--sb-unzoom', String(unzoom(vp.current.zoom)));
 	});
 </script>

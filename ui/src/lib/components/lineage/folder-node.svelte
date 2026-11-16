@@ -15,7 +15,7 @@
 		<FolderIcon size={14} strokeWidth={1.75} class="glyph" />
 		<span class="name">{d.label ?? d.group}</span>
 		<span class="count">{d.count}</span>
-		<ChevronRightIcon size={13} class="glyph" />
+		<span class="hit" aria-hidden="true"><ChevronRightIcon size={13} class="glyph" /></span>
 	</div>
 	<div class="status">
 		{#if d.ok}<span><i style:background="var(--sb-success)"></i>{d.ok} ok</span>{/if}
@@ -67,6 +67,22 @@
 	.count {
 		color: var(--sb-text-faint);
 		font-size: 11px;
+	}
+	/* The chevron's target: at least 28 px square on screen, however far the graph is zoomed out
+	   (--sb-unzoom, set by the graph). The whole card opens the folder too. */
+	.hit {
+		display: inline-grid;
+		width: 28px;
+		height: 28px;
+		flex: 0 0 28px;
+		margin-right: -8px;
+		place-items: center;
+		border-radius: 3px;
+		transform: scale(var(--sb-unzoom, 1));
+		transform-origin: center right;
+	}
+	.group:hover .hit {
+		background: var(--sb-hover);
 	}
 	.status {
 		display: flex;

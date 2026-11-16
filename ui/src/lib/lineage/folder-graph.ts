@@ -5,6 +5,8 @@ import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode } from '$lib/api';
 import { GROUPED_ABOVE, catalogGraph, cardData, folderOf, groupCard, type GroupCard } from './catalog-graph';
 import { layoutLayer, type LayoutItem } from './job-graph';
+import { visibleEdges } from './visible-edges';
+import { shortName } from '$lib/build-area/labels';
 
 /**
  * The most cards and boxes the browser lays out at once. Beyond it the page asks the person to open
@@ -107,9 +109,10 @@ export type FolderBoxData = { folder: string; label: string; nodeCount: number; 
 
 /**
  * The lineage with each closed folder as one card and each open folder as a box around its
- * subfolders and nodes, parents before children as Svelte Flow needs. An edge joins whatever stands
- * for each end, once per pair: the node when every folder around it is open, otherwise the
- * outermost closed folder. Boxes take no edges; an edge inside a closed folder disappears.
+ * subfolders and nodes, parents before children as Svelte Flow needs. Edges are drawn at the visible
+ * level (`visibleEdges`): one per pair of whatever stands for each end, the node when every folder
+ * around it is open, otherwise the outermost closed folder, with the number of node links it stands
+ * for. Boxes take no edges; an edge inside a closed folder disappears.
  */
 export function folderGraph(
 	nodes: CatalogNode[],
@@ -141,17 +144,9 @@ export function folderGraph(
 	for (const key of top.nodes) drawn.push({ id: key, type: 'asset', position: { x: 0, y: 0 }, data: cardData(byKey.get(key)!) });
 
 	const standIn = standInOf(tree, open);
-	const pairs = new Map<string, Edge>();
-	for (const n of nodes) {
-		const target = standIn(n.key);
-		for (const up of n.upstream) {
-			if (!byKey.has(up)) continue;
-			const source = standIn(up);
-			const id = `${source}-${target}`;
-			if (source !== target && !pairs.has(id)) pairs.set(id, { id, source, target, type: 'bezier' });
-		}
-	}
-	return { nodes: drawn, edges: [...pairs.values()] };
+	const links = nodes.flatMap((n) => n.upstream.filter((up) => byKey.has(up)).map((up) => ({ from: up, to: n.key })));
+	const label = (id: string) => (id.startsWith('group:') ? tree.folders.get(id.slice('group:'.length))?.label ?? id : shortName(id));
+	return { nodes: drawn, edges: visibleEdges(links, standIn, { label }) };
 }
 
 /**

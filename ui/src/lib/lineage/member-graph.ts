@@ -6,6 +6,7 @@ import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode, JobGroupMember, RunRef } from '$lib/api';
 import { folderTree, scopeGraph, type FolderTree } from './folder-graph';
 import { needsBuilding, type NeedsBuilding } from './view-summary';
+import { edgeStyle, edgeWidth, visibleEdges, type NodeLink } from './visible-edges';
 
 export { needsBuilding };
 
@@ -38,7 +39,8 @@ export type MemberCardData = {
 export type MemberSelection = { member: string; node?: string };
 
 /** One node-level reason a member waits for another: `from` in the upstream member feeds `to` in the waiting one. */
-export type NodeLink = { from: string; to: string };
+export type { NodeLink };
+export { edgeWidth };
 
 export type MemberEdgeData = {
 	/** How many node-level links the edge stands for; 0 for a wait with no lineage between drawn nodes. */
@@ -46,13 +48,11 @@ export type MemberEdgeData = {
 	/** The members it joins, upstream first. */
 	from: string;
 	to: string;
+	/** The tooltip. */
+	title: string;
 };
 
-const edgeStyle = 'stroke: var(--sb-edge); stroke-width: 1.5;';
-const waitStyle = 'stroke: var(--sb-edge); stroke-width: 1.5; stroke-dasharray: 5 4;';
 
-/** An edge's width: thicker the more node links it stands for, capped so a busy pair stays readable. */
-export const edgeWidth = (count: number) => (count <= 1 ? 1.5 : Math.min(4.5, 1.5 + Math.log2(count) * 0.75));
 
 export const memberNodeId = (jobKey: string) => `member:${jobKey}`;
 /** A node, folder card or folder box drawn inside an expanded member. Members may share nodes, so ids carry the member. */
@@ -165,30 +165,29 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 		const tree: FolderTree = folderTree(nodes);
 		const sub = scopeGraph(nodes, { open: openFolders.get(jobKey) ?? new Set<string>(), tree, onclose: oncloseFolder && ((folder) => oncloseFolder(jobKey, folder)) });
 		for (const n of sub.nodes) drawn.push({ ...n, id: inside(n.id), parentId: n.parentId ? inside(n.parentId) : id, extent: 'parent', data: { ...n.data, member: jobKey } });
-		for (const e of sub.edges) internal.push({ ...e, id: inside(e.id), source: inside(e.source), target: inside(e.target), style: edgeStyle });
+		for (const e of sub.edges) internal.push({ ...e, id: inside(e.id), source: inside(e.source), target: inside(e.target), style: e.style ?? edgeStyle(1) });
 		standIns.set(jobKey, (key) => inside(sub.standIn(key)));
 	}
 
 	const at = (jobKey: string, key: string) => standIns.get(jobKey)?.(key) ?? memberNodeId(jobKey);
-	const between = new Map<string, Edge & { data: MemberEdgeData }>();
+	const crossing: Edge[] = [];
 	for (const m of members) {
 		for (const upstream of waits.get(m.jobKey)!) {
 			const found = links.get(pairKey(upstream, m.jobKey)) ?? [];
 			if (!found.length) {
 				const [source, target] = [memberNodeId(upstream), memberNodeId(m.jobKey)];
-				between.set(`wait:${source}>${target}`, { id: `wait:${source}>${target}`, source, target, type: 'count', style: waitStyle, data: { count: 0, from: upstream, to: m.jobKey } });
+				const data: MemberEdgeData = { count: 0, from: upstream, to: m.jobKey, title: '' };
+				crossing.push({ id: `wait:${source}-${target}`, source, target, type: 'count', style: edgeStyle(1, 'neutral', true), data: { ...data, title: edgeTitle(data) } });
 				continue;
 			}
-			for (const link of found) {
-				const [source, target] = [at(upstream, link.from), at(m.jobKey, link.to)];
-				const id = `${source}>${target}`;
-				const edge = between.get(id);
-				if (edge) edge.data.count++;
-				else between.set(id, { id, source, target, type: 'count', style: edgeStyle, data: { count: 1, from: upstream, to: m.jobKey } });
-			}
+			// The same edges as Lineage's folders: one per visible pair, ends standing in for hidden nodes.
+			// Each end is keyed with its member, as members may share nodes.
+			const pairLinks = found.map((l: NodeLink) => ({ from: `${upstream}\u0000${l.from}`, to: `${m.jobKey}\u0000${l.to}` }));
+			const split = (k: string) => k.split('\u0000') as [string, string];
+			const title = (count: number) => edgeTitle({ count, from: upstream, to: m.jobKey, title: '' });
+			for (const e of visibleEdges(pairLinks, (k) => at(...split(k)), { title })) crossing.push({ ...e, data: { ...e.data, from: upstream, to: m.jobKey } satisfies MemberEdgeData });
 		}
 	}
-	const crossing = [...between.values()].map((e) => (e.data.count > 1 ? { ...e, style: `stroke: var(--sb-edge); stroke-width: ${edgeWidth(e.data.count)};` } : e));
 	return { nodes: drawn, edges: [...crossing, ...internal] };
 }
 

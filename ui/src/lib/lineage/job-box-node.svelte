@@ -22,6 +22,10 @@
 <div class="box" class:collapsed={!folder && d.collapsed}>
 	<Handle type="target" position={Position.Left} class="box-handle" />
 	{#if folder}
+		<!-- Zoomed out, the header's target grows upward so it stays at least its height on screen. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<span class="head-hit nodrag" aria-hidden="true" onclick={() => folder.ontoggle?.(folder.folder)}></span>
 		<!-- raw-button: the header of a box on the lineage canvas, clickable as a whole to close it -->
 		<button class="head folder-head nodrag" title="Close {folder.folder}" aria-expanded="true" onclick={() => folder.ontoggle?.(folder.folder)}>
 			<ChevronDownIcon size={14} class="chevron" />
@@ -51,6 +55,7 @@
 
 <style>
 	.box {
+		position: relative;
 		width: 100%;
 		height: 100%;
 		border: 1px solid var(--border-strong);
@@ -92,6 +97,14 @@
 		padding-left: 8px;
 		cursor: pointer;
 		text-align: left;
+	}
+	.head-hit {
+		position: absolute;
+		top: calc(30px * (1 - var(--sb-unzoom, 1)));
+		right: 0;
+		left: 0;
+		height: calc(30px * (var(--sb-unzoom, 1) - 1));
+		cursor: pointer;
 	}
 	.folder-head:hover {
 		background: var(--sb-hover);
