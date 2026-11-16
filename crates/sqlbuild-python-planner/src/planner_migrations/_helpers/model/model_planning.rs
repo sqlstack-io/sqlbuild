@@ -2,7 +2,7 @@
 
 use crate::planner_changes::main::plan_reference_renames::plan_reference_renames;
 use crate::planner_migrations::_helpers::column::column_objects::{config, replace};
-use crate::planner_migrations::_helpers::discovery::discovery::discover_model_migrations;
+use crate::planner_migrations::_helpers::discovery::model_discovery::discover_model_migrations;
 use crate::planner_migrations::_helpers::planning::planning_origin::{
     require_same_database, resolve_origin,
 };

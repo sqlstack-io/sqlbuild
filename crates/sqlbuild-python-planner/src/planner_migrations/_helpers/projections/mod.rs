@@ -1,3 +1,3 @@
 pub(crate) mod fingerprint;
 pub(crate) mod getters;
-pub(crate) mod projections;
+pub(crate) mod query_shapes;

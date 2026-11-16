@@ -70,7 +70,7 @@ pub(crate) fn identical_renames<'py>(
         for (old, new) in pairs {
             renames.set_item(old, new)?;
         }
-        crate::planner_migrations::_helpers::projections::projections::explain(
+        crate::planner_migrations::_helpers::projections::query_shapes::explain(
             &previous,
             &current,
             &renames.into_any(),

@@ -1,7 +1,7 @@
 //! Gather live candidate evidence without changing adapter inspection ownership.
 
 use crate::planner_migrations::_helpers::column::column_objects::{config, definition_hash, lower};
-use crate::planner_migrations::_helpers::projections::projections::parse_query_shape;
+use crate::planner_migrations::_helpers::projections::query_shapes::parse_query_shape;
 use crate::planner_migrations::models::{ColumnCandidate, ColumnMigrationInputs, MigrationPhase};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};

@@ -1,7 +1,7 @@
 //! Register the projections functions and classes.
 
-use crate::planner_migrations::_helpers::projections::projections::parse_query_shape;
-use crate::planner_migrations::_helpers::projections::projections::renames_explain_change;
+use crate::planner_migrations::_helpers::projections::query_shapes::parse_query_shape;
+use crate::planner_migrations::_helpers::projections::query_shapes::renames_explain_change;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
 

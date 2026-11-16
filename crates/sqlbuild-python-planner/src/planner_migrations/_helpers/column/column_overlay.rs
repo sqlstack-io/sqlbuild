@@ -3,7 +3,7 @@
 use crate::planner_migrations::_helpers::column::column_objects::{
     config, definition_hash, lower, native, replace,
 };
-use crate::planner_migrations::_helpers::projections::projections::renames_explain_change;
+use crate::planner_migrations::_helpers::projections::query_shapes::renames_explain_change;
 use crate::planner_migrations::models::ColumnCandidate;
 use crate::planner_migrations::models::{ColumnMigrationInputs, MigrationPhase};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
