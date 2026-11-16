@@ -2,12 +2,14 @@
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
+	import { to } from '$lib/paths';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
 	import type { MemberCardData } from './member-graph';
 
-	// A job group's member job, drawn as a Lineage card; clicking it opens the member in place, as a folder opens on Lineage.
+	// A job group's member job, drawn as a Lineage card; clicking it opens the member in place, as a
+	// folder opens on Lineage, and "Open job" goes to the job's own page.
 	let { data, selected }: NodeProps = $props();
 	const d = $derived(data as MemberCardData);
 	const tone = $derived(d.lastRun ? runStatusTone[d.lastRun.status] : 'var(--sb-text-faint)');
@@ -19,8 +21,12 @@
 	<div class="head">
 		<WorkflowIcon size={14} strokeWidth={1.75} class="glyph" />
 		<span class="name">{d.jobKey}</span>
-		{#if d.nodeCount !== null}<span class="count">{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>{/if}
-		{#if d.expandable}<ChevronRightIcon size={13} class="glyph" />{/if}
+		<a class="open nodrag" href={to(`/jobs/${d.jobKey}`)} title="Open the page of {d.jobKey}">Open job ↗</a>
+	</div>
+	<div class="facts">
+		{#if d.expandable}<ChevronRightIcon size={12} class="glyph" />{/if}
+		{#if d.nodeCount !== null}<span>{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>{/if}
+		{#if d.waitsFor}<span class="waits">waits for {d.waitsFor}</span>{/if}
 	</div>
 	<div class="status" style:--tone={tone}>
 		<i></i>
@@ -30,7 +36,6 @@
 		{:else}
 			<span class="label faint">No runs yet</span>
 		{/if}
-		{#if d.waitsFor}<span class="waits">waits for {d.waitsFor}</span>{/if}
 	</div>
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
@@ -38,7 +43,7 @@
 <style>
 	.node {
 		width: 236px;
-		height: 62px;
+		height: 82px;
 		overflow: hidden;
 		border: 1px solid var(--node-border);
 		border-radius: 2px;
@@ -59,7 +64,7 @@
 	}
 	.head {
 		display: flex;
-		height: 34px;
+		height: 32px;
 		align-items: center;
 		gap: 8px;
 		padding: 0 10px;
@@ -77,10 +82,32 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.count {
+	.open {
 		flex: 0 0 auto;
+		color: var(--muted-foreground);
+		font-size: 11px;
+	}
+	.open:hover {
+		color: var(--primary);
+	}
+	.facts {
+		display: flex;
+		height: 20px;
+		align-items: center;
+		gap: 6px;
+		padding: 0 10px 2px 10px;
 		color: var(--sb-text-faint);
 		font-size: 11px;
+		white-space: nowrap;
+	}
+	.facts :global(.glyph) {
+		flex: 0 0 auto;
+		margin-left: -2px;
+		color: var(--muted-foreground);
+	}
+	.waits::before {
+		content: '·';
+		margin-right: 6px;
 	}
 	.status {
 		display: flex;
@@ -113,10 +140,6 @@
 	.when::before {
 		content: '·';
 		margin-right: 6px;
-		color: var(--sb-text-faint);
-	}
-	.waits {
-		margin-left: auto;
 		color: var(--sb-text-faint);
 	}
 	.node :global(.node-handle) {

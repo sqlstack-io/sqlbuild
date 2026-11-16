@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
+	import { to } from '$lib/paths';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
@@ -25,6 +26,7 @@
 				<i style:background={runStatusTone[d.lastRun.status]}></i>{d.lastRun.startedAt ? formatAgo(d.lastRun.startedAt, app.now) : runStatusLabel[d.lastRun.status]}
 			</span>
 		{/if}
+		<a class="open nodrag" href={to(`/jobs/${d.jobKey}`)} title="Open the page of {d.jobKey}">Open job ↗</a>
 	</div>
 	<Handle type="source" position={Position.Right} class="box-handle" />
 </div>
@@ -83,6 +85,12 @@
 		align-items: center;
 		gap: 5px;
 		color: var(--muted-foreground);
+	}
+	.open {
+		color: var(--muted-foreground);
+	}
+	.open:hover {
+		color: var(--primary);
 	}
 	.last i {
 		width: 7px;

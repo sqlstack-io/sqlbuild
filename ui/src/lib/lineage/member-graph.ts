@@ -8,7 +8,7 @@ import { GROUPED_ABOVE, cardData } from './catalog-graph';
 import { folderGraph, folderTree, standInOf, type FolderTree } from './folder-graph';
 
 export const MEMBER_WIDTH = 236;
-export const MEMBER_HEIGHT = 62;
+export const MEMBER_HEIGHT = 82;
 
 /** What the jobs list reports for a member; null where it isn't known. */
 export type MemberInfo = {
@@ -34,6 +34,9 @@ export type MemberCardData = {
 	expanded: boolean;
 	ontoggle?: (jobKey: string) => void;
 };
+
+/** What is selected on a group's graph: a member job, or one of its nodes drawn inside it. */
+export type MemberSelection = { member: string; node?: string };
 
 /** One node-level reason a member waits for another: `from` in the upstream member feeds `to` in the waiting one. */
 export type NodeLink = { from: string; to: string };

@@ -9,32 +9,39 @@
 	import TooManyCard from '$lib/components/lineage/too-many-card.svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
-	import { memberGraph, type MemberInfo, type NodeLink } from '$lib/lineage/member-graph';
+	import { innerId, memberGraph, memberNodeId, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
 	import { toggled } from '$lib/lineage/member-expand';
 	import JobBoxNode from './job-box-node.svelte';
 	import MemberNode from './member-node.svelte';
 	import MemberBoxNode from './member-box-node.svelte';
 	import CountEdge from './count-edge.svelte';
 
-	// A job group's member jobs, one card each. Clicking a card opens the member in place, a box
-	// around its nodes, as a folder opens on Lineage; edges follow what is visible at each end.
+	// A job group's member jobs, one card each. Clicking a card selects it and opens the member in
+	// place, a box around its nodes, as a folder opens on Lineage; edges follow what is visible at
+	// each end. Clicking a node inside selects that node; clicking the canvas clears the selection.
 	let {
 		members,
 		info,
 		catalog = [],
-		links = new Map()
+		links = new Map(),
+		selection = $bindable(null)
 	}: {
 		members: JobGroupMember[];
 		info: ReadonlyMap<string, MemberInfo>;
 		catalog?: readonly CatalogNode[];
 		links?: ReadonlyMap<string, NodeLink[]>;
+		selection?: MemberSelection | null;
 	} = $props();
 
 	const nodeTypes = { member: MemberNode, memberBox: MemberBoxNode, asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode };
 	const edgeTypes = { count: CountEdge };
 	let expanded = $state<ReadonlySet<string>>(new Set());
 	let openFolders = $state<ReadonlyMap<string, ReadonlySet<string>>>(new Map());
-	const toggle = (jobKey: string) => (expanded = toggled(expanded, jobKey));
+	/** Selects a member and opens or closes it, from its card or its box's header. */
+	function toggle(jobKey: string) {
+		selection = { member: jobKey };
+		expanded = toggled(expanded, jobKey);
+	}
 	function setFolders(jobKey: string, next: ReadonlySet<string>) {
 		openFolders = new Map([...openFolders, [jobKey, next]]);
 	}
@@ -49,6 +56,13 @@
 	let fitted = $state(false);
 	let shape = '';
 	let laidOut = '';
+	const selectedId = $derived(selection ? (selection.node ? innerId(selection.member, selection.node) : memberNodeId(selection.member)) : null);
+	const marked = (list: Node[], id: string | null) => list.map((n) => (!!n.selected === (n.id === id) ? n : { ...n, selected: n.id === id }));
+	$effect(() => {
+		const id = selectedId;
+		const current = untrack(() => nodes);
+		if (current.some((n) => !!n.selected !== (n.id === id))) nodes = marked(current, id);
+	});
 
 	$effect(() => {
 		const next = graph;
@@ -66,7 +80,7 @@
 		} else {
 			shape = sig;
 			laidOut = '';
-			nodes = next.nodes;
+			nodes = marked(next.nodes, untrack(() => selectedId));
 		}
 		edges = next.edges;
 	});
@@ -82,13 +96,17 @@
 
 	function onnodeclick({ node, event }: { node: Node; event: MouseEvent | TouchEvent }) {
 		if ((event.target as Element | null)?.closest('a, button')) return;
-		if (node.type === 'member' && node.data.expandable) toggle(String(node.data.jobKey));
+		if (node.type === 'member') {
+			if (node.data.expandable) toggle(String(node.data.jobKey));
+			else selection = { member: String(node.data.jobKey) };
+		} else if (node.type === 'memberBox') selection = { member: String(node.data.jobKey) };
 		else if (node.type === 'folder') openFolder(String(node.data.member), String(node.data.group));
+		else if (node.type === 'asset') selection = { member: String(node.data.member), node: String(node.data.name) };
 	}
 </script>
 
 <div class="graph sb-flow" class:unfitted={!fitted && nodes.length > 0}>
-	<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {onnodeclick}>
+	<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {onnodeclick} onpaneclick={() => (selection = null)}>
 		<FlowController bind:fitView={fit} bind:fitted fitFloor={0.3} />
 		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 		<Controls showLock={false} />
@@ -116,7 +134,8 @@
 		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
 		opacity: 0;
 	}
-	.graph :global(.svelte-flow__node-folder) {
+	.graph :global(.svelte-flow__node-folder),
+	.graph :global(.svelte-flow__node-asset) {
 		cursor: pointer;
 	}
 	.graph :global(.svelte-flow__controls-button) {
