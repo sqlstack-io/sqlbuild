@@ -1,11 +1,12 @@
-import type { ApiClient, CatalogNode, ChangedSignal, NodeState, NodeStatusDelta, Scope } from '$lib/api';
+import type { ApiClient, CatalogNode, ChangedBuild, ChangedSignal, NodeState, NodeStatusDelta, Scope } from '$lib/api';
 import { ApiError, isRefusal } from '$lib/api';
 import { applyNodeStates, deltaAction } from '$lib/api/node-states';
 
 /** How long a burst of signals may last before one read starts. */
 const SIGNAL_PAUSE_MS = 300;
 
-export type CatalogView = { nodes: CatalogNode[] | undefined; error: string | null; loading: boolean };
+/** `changedBuild` comes with the node states; null until they are read, or when the server has none. */
+export type CatalogView = { nodes: CatalogNode[] | undefined; error: string | null; loading: boolean; changedBuild: ChangedBuild | null };
 
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason));
 
@@ -24,7 +25,7 @@ const unsupported = (reason: unknown) => reason instanceof ApiError && (reason.s
  * states, a `node_status` signal reads the listing again, as pages did before.
  */
 export class CatalogFeed {
-	#view: CatalogView = { nodes: undefined, error: null, loading: false };
+	#view: CatalogView = { nodes: undefined, error: null, loading: false, changedBuild: null };
 	#scope: Scope | null = null;
 	/** Bumped by a scope change, so reads for the old scope are dropped when they answer. */
 	#epoch = 0;
@@ -93,7 +94,7 @@ export class CatalogFeed {
 		if (this.#pause) clearTimeout(this.#pause);
 		this.#pause = null;
 		this.#want = { listing: false, states: false };
-		this.#set({ nodes: undefined, error: null, loading: false });
+		this.#set({ nodes: undefined, error: null, loading: false, changedBuild: null });
 	}
 
 	#set(view: Partial<CatalogView>) {
@@ -160,6 +161,7 @@ export class CatalogFeed {
 					this.#snapshotId = answer.snapshotId;
 					this.#version = answer.version;
 					this.#overlay = { ...answer.states };
+					this.#set({ changedBuild: answer.changedBuild ?? null });
 					if (this.#base) this.#set({ nodes: applyNodeStates(this.#base, answer.states) });
 					// A publication the snapshot signal has not announced yet: the listing is out of date too.
 					if (snapshotChanged && this.#listingRead > 0) this.#schedule(true, false);

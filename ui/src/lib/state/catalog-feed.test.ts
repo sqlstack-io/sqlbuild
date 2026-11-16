@@ -38,6 +38,7 @@ function server({ states = true }: { states?: boolean | 'missing' } = {}) {
 	let snapshotId = 's1';
 	let version = 1;
 	let held: Record<string, NodeState> = {};
+	let changedBuild: NodeStates['changedBuild'] = null;
 	const client = {
 		supports: (method: string) => method !== 'listNodeStates' || states !== false,
 		listCatalogNodes: async () => {
@@ -47,16 +48,17 @@ function server({ states = true }: { states?: boolean | 'missing' } = {}) {
 		listNodeStates: async (): Promise<NodeStates> => {
 			reads.states += 1;
 			if (states === 'missing') throw new ApiError('not found', 404);
-			return { snapshotId, version, states: held };
+			return { snapshotId, version, states: held, changedBuild };
 		}
 	} as unknown as ApiClient;
 	return {
 		client,
 		reads,
-		set(next: { version?: number; states?: Record<string, NodeState>; snapshotId?: string }) {
+		set(next: { version?: number; states?: Record<string, NodeState>; snapshotId?: string; changedBuild?: NodeStates['changedBuild'] }) {
 			version = next.version ?? version;
 			held = next.states ?? held;
 			snapshotId = next.snapshotId ?? snapshotId;
+			changedBuild = next.changedBuild === undefined ? changedBuild : next.changedBuild;
 		},
 		/** Holds the next states read open until the returned function is called. */
 		hold() {
@@ -112,6 +114,18 @@ describe('CatalogFeed', () => {
 		expect(feed.view.nodes?.[0].lastOutcome).toBe('failed');
 		// The newer upstream build puts its downstream behind.
 		expect(feed.view.nodes?.[1].stale?.map((r) => r.reason)).toEqual(['behind']);
+	});
+
+	it('holds the changed build the states carry, and reads a new one when a full change announces it', async () => {
+		const s = server();
+		const { feed } = feedOver(s.client);
+		feed.ensure(SCOPE);
+		await settle();
+		expect(feed.view.changedBuild).toBeNull();
+		s.set({ version: 2, changedBuild: { generation: 1, changed: ['model:orders'], downstream: ['model:order_items'] } });
+		feed.handle(signal(`node_status:${SCOPE.locationId}`, { previousVersion: 1, version: 2, full: true }));
+		await settle();
+		expect(feed.view.changedBuild).toEqual({ generation: 1, changed: ['model:orders'], downstream: ['model:order_items'] });
 	});
 
 	it('reads the states again after a version gap or a full change, and applies the answer', async () => {

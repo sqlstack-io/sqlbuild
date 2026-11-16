@@ -8,7 +8,7 @@ import type { Resource } from './resource.svelte';
  * job view, plan, rerun and the overview read it here instead of each reading the listing.
  */
 class CatalogNodes {
-	view = $state.raw<CatalogView>({ nodes: undefined, error: null, loading: false });
+	view = $state.raw<CatalogView>({ nodes: undefined, error: null, loading: false, changedBuild: null });
 	#feed = new CatalogFeed(
 		() => app.client,
 		(view) => (this.view = view)

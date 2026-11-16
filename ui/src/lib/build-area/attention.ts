@@ -1,12 +1,12 @@
 // Presentation of the overview's attention items. Pure; no side effects.
 
-import type { AttentionItem, QueueWait } from '$lib/api';
+import type { AttentionItem, ChangedBuild, QueueWait } from '$lib/api';
 import { describeWait, outcomeCounts } from '$lib/operate/labels';
 import { eventKindLabel, problemHref } from '$lib/platform/labels';
 import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
 import { shortName } from '$lib/build-area/labels';
-import { CHANGED_PLAN_HREF, changedBuildLabel, planHref } from '$lib/run/command';
+import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
 
 export type AttentionTone = 'error' | 'warning' | 'stale' | 'info';
 
@@ -62,7 +62,8 @@ export function staleSentence(changed: string[], behind: string[]): string {
 	return `${counts}. Including ${all.slice(0, STALE_NAMES_SHOWN).join(', ')} and ${all.length - STALE_NAMES_SHOWN} more.`;
 }
 
-export function attentionView(item: AttentionItem, now: number): AttentionView {
+/** `changedBuild` is what the location planned `sqb build --changed` to run, when it has. */
+export function attentionView(item: AttentionItem, now: number, changedBuild: ChangedBuild | null = null): AttentionView {
 	switch (item.kind) {
 		case 'run_problem':
 			return {
@@ -106,8 +107,10 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				action: 'View in catalog',
 				consequences: [],
 				build: item.changed.length
-					? // The server does not report how many downstream nodes the plan runs yet, so the brackets stay off.
-						{ ...changedBuildLabel(new Set(item.changed).size, null, 'banner'), href: CHANGED_PLAN_HREF, variant: 'stale' }
+					? (() => {
+							const counts = changedBuildCounts(new Set(item.changed).size, changedBuild);
+							return { ...changedBuildLabel(counts.changed, counts.downstream, 'banner'), href: CHANGED_PLAN_HREF, variant: 'stale' as const };
+						})()
 					: { label: `Rebuild ${all.length}`, extra: null, tooltip: null, href: planHref(all), variant: 'stale-outline' }
 			};
 		}
@@ -192,8 +195,8 @@ function consequenceOf(item: AttentionItem, view: AttentionView): Consequence {
 }
 
 /** The items as alerts, errors first: an item that follows from another alert's cause is listed under it, not on its own. */
-export function attentionViews(items: AttentionItem[], now: number): { item: AttentionItem; view: AttentionView }[] {
-	const viewed = items.map((item) => ({ item, view: attentionView(item, now) }));
+export function attentionViews(items: AttentionItem[], now: number, changedBuild: ChangedBuild | null = null): { item: AttentionItem; view: AttentionView }[] {
+	const viewed = items.map((item) => ({ item, view: attentionView(item, now, changedBuild) }));
 	const byKey = new Map(viewed.map((v) => [v.view.key, v]));
 	const shown = viewed.filter(({ item, view }) => {
 		const cause = byKey.get(causeOf(item, items) ?? '');

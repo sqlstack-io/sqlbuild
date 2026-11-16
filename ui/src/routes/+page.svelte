@@ -17,7 +17,7 @@
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
-	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { catalogNodes, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
@@ -48,7 +48,7 @@
 		stale: HistoryIcon,
 		info: InfoIcon
 	};
-	const viewed = $derived(attentionViews(data?.attention ?? [], app.now));
+	const viewed = $derived(attentionViews(data?.attention ?? [], app.now, catalogNodes.view.changedBuild));
 	const acknowledgementOf = (item: AttentionItem) => ('acknowledged' in item ? item.acknowledged : null);
 	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
 	const issues = $derived(viewed.filter(({ item }) => !acknowledgementOf(item)));

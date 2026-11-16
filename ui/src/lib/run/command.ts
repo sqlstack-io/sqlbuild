@@ -3,7 +3,7 @@
 // nodes. The server resolves selectors and refuses flags; nothing here decides
 // whether a command may run. Pure: no side effects.
 
-import type { CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
+import type { ChangedBuild, CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
 import { flagSpec, VERBS, type FlagSpec } from './command-table';
 
 /** The command line read for the panel's own controls: verb tabs, flag hints and verb switching. */
@@ -104,6 +104,14 @@ export function planHref(selection: string[] = [], verb: LaunchVerb = 'build', n
 
 /** The plan of `sqb build --changed`: what changed, what runs downstream of it, and what waits for its job. */
 export const CHANGED_PLAN_HREF = planHref([], 'build', { flags: { '--changed': true } });
+
+/**
+ * The counts the "Build N changed" button shows: the location's plan of `CHANGED_PLAN_HREF` when it
+ * names a change, else the nodes whose definitions changed, with the downstream count unknown.
+ */
+export function changedBuildCounts(definitionChanged: number, build: ChangedBuild | null): { changed: number; downstream: number | null } {
+	return build?.changed.length ? { changed: build.changed.length, downstream: build.downstream.length } : { changed: definitionChanged, downstream: null };
+}
 
 /** The "Build N changed" button's main label, its lighter bracketed part (null without one), and its tooltip. */
 export type ChangedBuildLabel = { label: string; extra: string | null; tooltip: string };

@@ -1074,6 +1074,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/changed-build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_changed_build"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/changes": {
         parameters: {
             query?: never;
@@ -1612,7 +1628,7 @@ export interface components {
         };
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
         ChangeNotice: {
-            /** @description `node_status` only: too many nodes or a new snapshot changed; refetch node states. */
+            /** @description `node_status` only: too many nodes changed, or the snapshot or changed build is new; refetch node states. */
             full?: boolean | null;
             /**
              * Format: int64
@@ -1629,6 +1645,32 @@ export interface components {
              * @description `node_status` only: the state version after this change.
              */
             version?: number | null;
+        };
+        /** @description The nodes the default `sqb build --changed` runs, as the location last planned it from the synced copy. */
+        ChangedBuild: {
+            /** @description Nodes that run for a change of their own, as `kind:name`. */
+            changed: string[];
+            /** @description Nodes that run only because an upstream they read runs. */
+            downstream: string[];
+            /**
+             * Format: int64
+             * @description The publication generation it was planned for.
+             */
+            generation: number;
+            /**
+             * Format: date-time
+             * @description When the server received it.
+             */
+            reported_at: string;
+        };
+        /** @description A location's plan of the default `sqb build --changed`, fenced to its reader session and generation. */
+        ChangedBuildReport: {
+            changed: string[];
+            downstream: string[];
+            /** Format: int64 */
+            generation: number;
+            /** Format: uuid */
+            session_id: string;
         };
         /** @description One result's stored evidence rows; `view.evidence` reads them, audited. */
         CheckEvidence: {
@@ -2317,6 +2359,7 @@ export interface components {
         };
         /** @description Every current node's state at one version; `snapshot_id` is null before the first publication. */
         NodeStatesRecord: {
+            changed_build?: null | components["schemas"]["ChangedBuild"];
             /** Format: uuid */
             snapshot_id?: string | null;
             states: {
@@ -6685,6 +6728,62 @@ export interface operations {
             };
             /** @description Location not authorized */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_changed_build: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangedBuildReport"];
+            };
+        };
+        responses: {
+            /** @description Stored; it replaces the target's previous report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

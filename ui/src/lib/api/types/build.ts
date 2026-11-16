@@ -91,7 +91,14 @@ export type NodeState = {
 };
 
 /** Every node's state at one status version of a snapshot. */
-export type NodeStates = { snapshotId: string | null; version: number; states: Record<string, NodeState> };
+/**
+ * What `sqb build --changed` with default options runs, as the location planned it from the synced copy
+ * after its last publication or sync: nodes changed themselves, and nodes downstream of them, as keys.
+ */
+export type ChangedBuild = { generation: number; changed: string[]; downstream: string[] };
+
+/** `changedBuild` is null until the location plans the current snapshot, and from an older server. */
+export type NodeStates = { snapshotId: string | null; version: number; states: Record<string, NodeState>; changedBuild: ChangedBuild | null };
 
 /**
  * A `node_status` change: the states that changed between two versions, or `full` when too many

@@ -176,7 +176,11 @@ export class MockApiClient implements ApiClient {
 		const held = this.#nodeStates.get(scope.locationId);
 		const version = held && JSON.stringify(held.states) === JSON.stringify(states) ? held.version : (held?.version ?? 0) + 1;
 		this.#nodeStates.set(scope.locationId, { version, states });
-		return { snapshotId: location.snapshot?.id ?? 'unpublished', version, states };
+		// The demo's location plans what changed: each changed node, and every node reading one of them.
+		const nodes = await this.#build.listCatalogNodes(scope);
+		const changed = nodes.filter((n) => states[n.key]?.definitionChanged).map((n) => n.key);
+		const downstream = nodes.filter((n) => !changed.includes(n.key) && n.upstream.some((u) => changed.includes(u))).map((n) => n.key);
+		return { snapshotId: location.snapshot?.id ?? 'unpublished', version, states, changedBuild: { generation: 1, changed, downstream } };
 	}
 	getCatalogNode(...args: Parameters<ApiClient['getCatalogNode']>) {
 		this.#location(args[0]);

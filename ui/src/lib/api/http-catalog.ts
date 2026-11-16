@@ -69,7 +69,13 @@ export function toNodeState(wire: Wire['NodeState']): NodeState {
 }
 
 export function toNodeStates(wire: Wire['NodeStatesRecord']): NodeStates {
-	return { snapshotId: wire.snapshot_id ?? null, version: wire.version, states: Object.fromEntries(Object.entries(wire.states).map(([key, state]) => [key, toNodeState(state)])) };
+	const build = wire.changed_build;
+	return {
+		snapshotId: wire.snapshot_id ?? null,
+		version: wire.version,
+		states: Object.fromEntries(Object.entries(wire.states).map(([key, state]) => [key, toNodeState(state)])),
+		changedBuild: build ? { generation: build.generation, changed: build.changed, downstream: build.downstream } : null
+	};
 }
 
 /**

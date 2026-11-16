@@ -32,7 +32,7 @@
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
-	import { CHANGED_PLAN_HREF, changedBuildLabel, planHref } from '$lib/run/command';
+	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
 	import { scaleGraph } from '$lib/mock/scale-graph';
 	import { layoutDag } from '$lib/lineage/graph-layout';
@@ -47,7 +47,7 @@
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
-	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { catalogNodes as sharedCatalog, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
@@ -447,8 +447,9 @@
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
 	/** Nodes whose own definition changed, which `sqb build --changed` starts from. */
 	const changedCount = $derived(catalogNodes.filter((c) => c.stale?.some((r) => r.reason === 'changed')).length);
-	// The server does not report how many downstream nodes the plan runs yet, so the brackets stay off.
-	const changedLabel = $derived(changedBuildLabel(changedCount, null, 'bar'));
+	/** The location's plan of what changed when it has one, else the definition changes with the downstream count unknown. */
+	const changedCounts = $derived(changedBuildCounts(changedCount, sharedCatalog.view.changedBuild));
+	const changedLabel = $derived(changedBuildLabel(changedCounts.changed, changedCounts.downstream, 'bar'));
 	const outOfDateCount = $derived(catalogNodes.filter((c) => (c.stale?.length ?? 0) > 0).length);
 	/** The toolbar chip's text, e.g. "orders, inventory"; empty when every folder is drawn. */
 	const selectionLabel = $derived.by(() => {
@@ -753,7 +754,7 @@
 <AppTopbar title="Lineage">
 	<RefreshButton onclick={() => catalog.refresh()} />
 	{#if app.client.supports('launchAdhocRun')}
-		{#if changedCount}<GatedButton size="bar" requires="run.adhoc" variant="stale" hint={changedLabel.tooltip} onclick={() => goto(to(CHANGED_PLAN_HREF))}
+		{#if changedCounts.changed}<GatedButton size="bar" requires="run.adhoc" variant="stale" hint={changedLabel.tooltip} onclick={() => goto(to(CHANGED_PLAN_HREF))}
 				><HammerIcon /><span>{changedLabel.label}{#if changedLabel.extra}<span class="label-extra">{changedLabel.extra}</span>{/if}</span></GatedButton
 			>{/if}
 		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}><PlayIcon class="size-3.5 fill-current stroke-none" />Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>

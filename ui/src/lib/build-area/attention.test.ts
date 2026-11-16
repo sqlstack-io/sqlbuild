@@ -81,6 +81,11 @@ describe('overview alerts', () => {
 		expect(build([], ['model:b', 'model:c'])).toEqual({ label: 'Rebuild 2', extra: null, tooltip: null, href: planHref(['model:b', 'model:c']), variant: 'stale-outline' });
 	});
 
+	it('labels the build with the location\'s plan of what changed and how much it reaches downstream', () => {
+		const [{ view }] = attentionViews([{ kind: 'stale_models', changed: ['model:a'], behind: ['model:b'] }], now, { generation: 2, changed: ['model:a', 'model:c'], downstream: ['model:b'] });
+		expect([view.build?.label, view.build?.extra]).toEqual(['Build 2 changed', ' (+1 downstream)']);
+	});
+
 	it('states how many nodes are out of date, counting a node both changed and behind once', () => {
 		const view = (changed: string[], behind: string[]) => attentionViews([{ kind: 'stale_models', changed, behind }], now)[0].view;
 		expect(view(['model:a', 'model:b'], ['model:b']).title).toBe('2 nodes out of date');

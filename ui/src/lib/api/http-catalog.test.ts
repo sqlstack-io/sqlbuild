@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toColumnLineage, toMicrobatchCoverage, toNodeRuns } from './http-catalog';
+import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toColumnLineage, toMicrobatchCoverage, toNodeRuns, toNodeStates } from './http-catalog';
 import { toCheck } from './http-checks';
 
 type W = components['schemas'];
@@ -249,5 +249,14 @@ describe('column lineage mapping', () => {
 
 	it('has nothing to show when no lineage reaches the node', () => {
 		expect(toColumnLineage({ snapshot_id: 's', nodes: [], edges: [] }, nodes)).toBeNull();
+	});
+});
+
+describe('node states mapping', () => {
+	it('carries the changed build planned for the current snapshot, and none from an older server', () => {
+		const record = { snapshot_id: 'snap-1', version: 3, states: {} };
+		const build = { generation: 2, reported_at: '2026-11-08T12:00:00Z', changed: ['model:orders'], downstream: ['model:customers'] };
+		expect(toNodeStates({ ...record, changed_build: build }).changedBuild).toEqual({ generation: 2, changed: ['model:orders'], downstream: ['model:customers'] });
+		expect(toNodeStates(record).changedBuild).toBeNull();
 	});
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SnapshotNode } from '$lib/api';
-import { changedBuildLabel, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, planHref, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow } from './command';
+import { changedBuildCounts, changedBuildLabel, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, planHref, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow } from './command';
 
 const node = (key: string, kind: SnapshotNode['kind'], path: string, tags: string[] = []): SnapshotNode => ({ key, kind, group: '', tags, path, cursor: null, upstream: [] });
 
@@ -106,5 +106,13 @@ describe('changed build label', () => {
 			extra: null,
 			tooltip: 'Plan a build of the 1 changed node and the downstream nodes it reaches. You review the plan before anything runs.'
 		});
+	});
+});
+
+describe('changed build counts', () => {
+	it('shows the location\'s plan when it names a change, else the definition changes with the downstream unknown', () => {
+		expect(changedBuildCounts(4, { generation: 3, changed: ['model:orders', 'model:customers'], downstream: ['model:revenue'] })).toEqual({ changed: 2, downstream: 1 });
+		expect(changedBuildCounts(4, { generation: 3, changed: [], downstream: [] })).toEqual({ changed: 4, downstream: null });
+		expect(changedBuildCounts(4, null)).toEqual({ changed: 4, downstream: null });
 	});
 });
