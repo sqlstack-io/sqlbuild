@@ -5,6 +5,7 @@
 	import { to } from '$lib/paths';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import { untrack, type Snippet } from 'svelte';
 	import type { TimelineBar, TimelineTickMarker } from '$lib/api';
@@ -160,7 +161,7 @@
 	// `--tl-gutter` is registered as a length (see the style block), so `ch` resolves once, at the job names'
 	// font size on `.tl`, and the header, rows and grid overlay all share the same pixel width.
 	const longestName = $derived(Math.max(0, ...(timeline.data?.jobKeys ?? []).map((j) => j.length)));
-	const gutter = $derived(`clamp(200px, calc(${longestName}ch + 30px), 380px)`);
+	const gutter = $derived(`clamp(200px, calc(${longestName}ch + 52px), 380px)`);
 
 	const tone = (r: Bar) => (r.status === 'projected' ? 'transparent' : runStatusTone[r.status]);
 	const label = (r: Bar) => (r.status === 'projected' ? 'Scheduled' : runStatusLabel[r.status]);
@@ -222,7 +223,7 @@
 			</div>
 			{#each jobs as job (job.name)}
 				<div class="row">
-					<a class="gutter job" href={to(`/jobs/${job.name}`)} title={job.name}>{job.name}</a>
+					<a class="gutter job" href={to(`/jobs/${job.name}`)} title="Open {job.name}"><PlayIcon class="job-icon" aria-hidden="true" /><span class="job-name">{job.name}</span></a>
 					<div class="track">
 						{#each runsByJob.get(job.name) ?? [] as r (r.key)}
 							{@const left = Math.max(0, pct(r.startMs))}
@@ -462,15 +463,33 @@
 	.job {
 		display: flex;
 		align-items: center;
+		gap: 8px;
 		overflow: hidden;
 		padding: 0 14px;
 		color: var(--foreground);
 		font-size: 12.5px;
-		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	.job :global(.job-icon) {
+		width: 13px;
+		height: 13px;
+		flex: none;
+		color: var(--muted-foreground);
+	}
+	.job-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 	.job:hover {
+		background: var(--sb-hover);
 		color: var(--primary);
+	}
+	.job:hover :global(.job-icon) {
+		color: var(--primary);
+	}
+	.job:hover .job-name {
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 	.track {
 		position: relative;
