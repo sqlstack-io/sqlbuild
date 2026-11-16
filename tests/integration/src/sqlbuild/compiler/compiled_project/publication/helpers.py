@@ -1774,3 +1774,54 @@ def changed_build_and_plan_from_copy(
     outcome: dict[str, Any] = result["result_json"]["outcome"]
     assert outcome["kind"] == "plan", outcome
     return json.loads(published[1]), outcome["document"]
+
+
+def plans_from_copy(
+    tmp_path: Path, project: Path, requests: list[tuple[list[str], dict[str, object]]]
+) -> list[dict[str, Any]]:
+    """Serve `project` until its first sync completes, then plan each request from the copy."""
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+    started: datetime = datetime.now(UTC)
+    documents: list[dict[str, Any]] = []
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "development", 1, location, log)
+        _ = wait_for_warehouse_sync_health(
+            api,
+            {"failure": None, "tables": ["catalog", "consumption", "fingerprints"]},
+            location,
+            log,
+            after=started,
+        )
+        for selection, settings in requests:
+            request_id: str = request_plan(control, selection, settings)
+            result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
+            outcome: dict[str, Any] = result["result_json"]["outcome"]
+            assert outcome["kind"] == "plan", outcome
+            documents.append(outcome["document"])
+    return documents
+
+
+def changed_runs(plan: dict[str, Any]) -> tuple[str, ...]:
+    """The nodes a changed plan runs."""
+    return tuple(run["node"] for run in plan["changed"]["runs"])

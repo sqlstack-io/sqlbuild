@@ -16,6 +16,7 @@ import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ChangedPlanPreviewTestCase,
+    HeldPlanTestCase,
     PlanPreviewTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
@@ -24,9 +25,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalo
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     changed_build_and_plan_from_copy,
+    changed_runs,
     live_plan,
     location_process,
     plan_from_copy,
+    plans_from_copy,
     run_sqb,
     snapshot_api,
     wait_for_generation,
@@ -131,6 +134,7 @@ _UNKNOWN: list[str] = [
     "column rename support",
     "sources outside mirrored schemas",
 ]
+_HELD: str = "Planning from the published compiled project."
 _REPLAYED: str = (
     "cursor window of daily_orders (the run starts it away from the last build's cursor)"
 )
@@ -385,3 +389,48 @@ def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_
         assert changed_build() == {"changed": [], "downstream": []}, (
             "a sync that mirrored the new build plans again"
         )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        HeldPlanTestCase(
+            description=(
+                "only the plan that sets variables compiles the project again; the other two "
+                "and the changed-build count plan from the published project"
+            ),
+            settings=(
+                {"changed": True},
+                {"changed": True, "vars": {"batch": "2"}},
+                {"changed": True},
+            ),
+            expected_runs=((), ("model:order_count",), ()),
+            expected_compiles=1,
+            expected_held_plans=3,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_plan_requests_when_the_location_plans_them_then_only_variables_compile_the_project_again(
+    test_case: HeldPlanTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    files: dict[str, str] = _PROJECT_FILES | {
+        "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"] + '[vars]\nbatch = "1"\n',
+        "models/order_count.sql": _PROJECT_FILES["models/order_count.sql"].replace(
+            "AS order_count", "AS order_count, @@batch AS batch"
+        ),
+    }
+    write_files(project_dir=project, files=files)
+    built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
+    assert built.returncode == 0, built.stderr
+    requests: list[tuple[list[str], dict[str, object]]] = [
+        (["model:order_count"], settings) for settings in test_case.settings
+    ]
+
+    plans: list[dict[str, Any]] = plans_from_copy(tmp_path, project, requests)
+
+    log: str = (tmp_path / "location.log").read_text()
+    assert tuple(map(changed_runs, plans)) == test_case.expected_runs, log
+    assert log.count("Compiling project...") == test_case.expected_compiles, log
+    assert log.count(_HELD) == test_case.expected_held_plans, log

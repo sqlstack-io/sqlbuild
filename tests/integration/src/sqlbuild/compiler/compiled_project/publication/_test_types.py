@@ -494,3 +494,12 @@ class PlanPreviewTestCase:
     expected_window_models: tuple[str, ...]
     expected_unplanned_cursor_models: tuple[str, ...]
     expected_added_unknowns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class HeldPlanTestCase:
+    description: str
+    settings: tuple[dict[str, object], ...]
+    expected_runs: tuple[tuple[str, ...], ...]
+    expected_compiles: int
+    expected_held_plans: int
