@@ -1,11 +1,10 @@
 //! `CursorAlgebraError(message)`.
 
-use crate::cursor::_helpers::conversion;
-use pyo3::prelude::PyErr;
-use pyo3::prelude::Python;
+use pyo3::prelude::{PyErr, Python};
+use sqlbuild_host::entries::models::FacadeHost;
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 
 /// `CursorAlgebraError(message)`.
-#[inline]
 pub fn algebra_error(py: Python<'_>, message: &str) -> PyErr {
-    conversion::algebra_error(py, message)
+    host_error(py, FacadeHost::CursorAlgebraError, message)
 }

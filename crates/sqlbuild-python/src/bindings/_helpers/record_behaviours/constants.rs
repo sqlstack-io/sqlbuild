@@ -1,9 +1,6 @@
 //! Native behaviour of the hosted shapes: computed attributes, methods, ordering and validation.
 
 use crate::bindings::_helpers::freshness::observation::normalize_observation;
-use crate::bindings::_helpers::lineage::lineage_facts::{
-    facts_eq, facts_getitem, facts_iter, facts_len, facts_projected, facts_resource_name,
-};
 use crate::bindings::_helpers::record_behaviours::auditing::{
     finish_measurement_contract, finish_threshold_bound, finish_thresholds,
 };
@@ -73,14 +70,20 @@ use crate::bindings::_helpers::record_behaviours::values::{
     finish_fingerprint_set, logical_type_display_name, sql_value_kind,
 };
 use crate::bindings::_helpers::{
-    analysis, analysis_session, build_progress, compile_command, compiled_views, compute_logs,
-    dbt_events, dbt_interop, event_exporting, execution_history, graph, planner_entries,
-    planner_migrations, planner_phases, project_assembly, result_output, rules,
+    analysis, analysis_session, build_progress, compile_command, compute_logs, dbt_events,
+    dbt_interop, event_exporting, execution_history, planner_entries, planner_migrations,
+    planner_phases, project_assembly, result_output, rules,
 };
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
 use sqlbuild_python_base::records::types::ClassProperty;
 use sqlbuild_python_base::records::types::RecordFinish;
+use sqlbuild_python_project::lineage::main::facts_eq::facts_eq;
+use sqlbuild_python_project::lineage::main::facts_getitem::facts_getitem;
+use sqlbuild_python_project::lineage::main::facts_iter::facts_iter;
+use sqlbuild_python_project::lineage::main::facts_len::facts_len;
+use sqlbuild_python_project::lineage::main::facts_projected::facts_projected;
+use sqlbuild_python_project::lineage::main::facts_resource_name::facts_resource_name;
 
 /// Compiler records whose bound values are normalized or validated natively.
 pub(crate) const BEHAVIOUR_FINISHERS: &[(&str, RecordFinish)] = &[
@@ -359,7 +362,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     build_progress::getters::GETTERS,
     compile_command::getters::GETTERS,
     sqlbuild_python_base::compile_context::constants::GETTERS,
-    compiled_views::getters::GETTERS,
+    sqlbuild_python_project::compiled_views::constants::GETTERS,
     compute_logs::getters::GETTERS,
     dbt_events::getters::GETTERS,
     dbt_interop::getters::GETTERS,
@@ -367,7 +370,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     sqlbuild_python_front::discovery::constants::GETTERS,
     event_exporting::getters::GETTERS,
     execution_history::getters::GETTERS,
-    graph::getters::GETTERS,
+    sqlbuild_python_project::graph::constants::GETTERS,
     sqlbuild_python_front::model_config::constants::GETTERS,
     planner_entries::getters::GETTERS,
     planner_migrations::getters::GETTERS,

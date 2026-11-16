@@ -2,15 +2,12 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
 use crate::bindings::_helpers::planner_migrations::column_candidates::declared_names;
 use crate::bindings::_helpers::planner_migrations::column_objects::{lower, model, replace};
 use crate::bindings::_helpers::planner_migrations::columns::identical_renames;
 use crate::bindings::_helpers::planner_migrations::columns::rename_hints;
 use crate::bindings::_helpers::planner_migrations::constants::{AUTOMATIC, DONE};
 use crate::bindings::_helpers::planner_migrations::models::{CheckedColumns, ColumnCandidate};
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PyTuple};
@@ -23,6 +20,9 @@ use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::state_rows::main::migrations::newest_column::newest_column;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::planner_phases::main::object::object;
 
 pub(super) fn decide<'py>(
     runtime: &Bound<'py, PyAny>,
@@ -69,8 +69,11 @@ pub(super) fn decide<'py>(
             outputs.push(name.to_lowercase());
         }
     }
-    let relation = host_entry(py, ExecutorHost::MigrationRelationForLocation)?
-        .call1((model_reads::destination(&candidate.model)?,))?;
+    let relation = host_entry(py, ExecutorHost::MigrationRelationForLocation)?.call1((
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
+            &candidate.model,
+        )?,
+    ))?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
     for (origin_name, destination, discovery) in pairs {
         let origin_key = lower(&origin_name)?;
@@ -107,8 +110,8 @@ pub(super) fn decide<'py>(
             py,
             RecordId::ColumnMigrationPlanEntry,
             &[
-                ("model_name", model_reads::name_object(&candidate.model)?),
-                ("destination", model_reads::destination(&candidate.model)?),
+                ("model_name", name_object(&candidate.model)?),
+                ("destination", sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&candidate.model)?),
                 (
                     "origin_column",
                     if let Some(origin) = origin {
@@ -162,7 +165,10 @@ pub(super) fn checked<'py>(
             warnings: Vec::new(),
         });
     }
-    let destination = model_reads::destination(&candidate.model)?;
+    let destination =
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
+            &candidate.model,
+        )?;
     let qualified = native_field(&destination, "qualified_name")?;
     let relation = if physical.is_truthy()? {
         physical.clone()
@@ -243,7 +249,7 @@ pub(super) fn hints<'py>(
             Some(keywords(
                 py,
                 &[
-                    ("model_name", model_reads::name_object(&candidate.model)?),
+                    ("model_name", name_object(&candidate.model)?),
                     ("previous", candidate.previous.clone()),
                     ("current", candidate.current.clone()),
                     ("excluded", excluded.call_method1("union", (claimed,))?),

@@ -1,7 +1,5 @@
 //! Build scenario relation locations through adapter qualification callbacks.
 
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::planner_scenario::constants::{REF, SOURCE};
 use crate::bindings::_helpers::planner_scenario::constants::{
     SCENARIO_PLAN_INTERNAL, SCENARIO_PLAN_MISSING_RELATION_TARGET,
@@ -16,6 +14,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 
 #[pyfunction(name = "build_scenario_relation_plan")]
 #[pyo3(signature = (**kwargs))]
@@ -66,11 +65,14 @@ pub(crate) fn build_scenario_relation_plan<'py>(
         )?;
     }
     let sources = PyDict::new(py);
-    for source in project_reads::sources(&args.project)?.try_iter()? {
+    for source in
+        sqlbuild_python_project::compiled_views::main::project::sources::sources(&args.project)?
+            .try_iter()?
+    {
         let source = source?;
         sources.set_item(
-            source_reads::name(&source)?,
-            source_reads::source_entry(&source)?,
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?,
+            source_entry(&source)?,
         )?;
     }
     let models = PyDict::new(py);

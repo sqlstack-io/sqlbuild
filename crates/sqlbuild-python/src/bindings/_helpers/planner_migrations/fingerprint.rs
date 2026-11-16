@@ -1,7 +1,5 @@
 //! Migration identity binding with unchanged metadata and hash format.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
@@ -10,6 +8,8 @@ use sqlbuild_analysis::planner_migrations::main::{migration_fingerprint, migrati
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::native_host::models::ModelLookup;
 use std::collections::BTreeMap;
 
 /// Hash normalized SQL and non-storage metadata through rename identities.
@@ -103,7 +103,7 @@ pub(crate) fn with_migration_fingerprints<'py>(
         let fingerprint = call_with(
             &native_field(cache, "fingerprint")?,
             &[
-                ("query_sql", model_reads::query_sql(&model)?),
+                ("query_sql", query_sql(&model)?),
                 ("metadata_json", metadata),
                 ("ref_identities", PyDict::new(py).into_any()),
                 ("dialect", dialect.clone()),

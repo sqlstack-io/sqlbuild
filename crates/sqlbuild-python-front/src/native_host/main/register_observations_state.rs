@@ -1,12 +1,15 @@
 //! Register the observations state functions and classes.
 
-use crate::native_host::_helpers::observations_state;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::native_host::_helpers::observations_state::build_observations_create_table_sql;
+use crate::native_host::_helpers::observations_state::build_observations_prune_sql;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the observations state functions and classes.
-#[inline]
 pub fn register_observations_state(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    observations_state::register(module)
+    module.add_function(wrap_pyfunction!(
+        build_observations_create_table_sql,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(build_observations_prune_sql, module)?)
 }

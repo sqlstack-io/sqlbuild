@@ -1,14 +1,11 @@
 //! The scope lookup of a full scope index: canonical orders, mappings, targets and visibility.
 
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
-use pyo3::{pyclass, pyfunction, wrap_pyfunction};
+use pyo3::{pyclass, pyfunction};
 use sqlbuild_scopes::scope_index::main::identity_failure_message::identity_failure_message;
 use sqlbuild_scopes::scope_index::main::normalize_scope_path::normalize_scope_path;
 use sqlbuild_scopes::scope_index::main::rejected_path_message::rejected_path_message;
-use sqlbuild_scopes::scope_index::main::report_lookup::report_lookup;
 use sqlbuild_scopes::scope_index::main::report_target::report_target;
 use sqlbuild_scopes::scope_index::main::resolve_report_visibility::resolve_report_visibility;
 use sqlbuild_scopes::scope_index::models::{
@@ -16,13 +13,9 @@ use sqlbuild_scopes::scope_index::models::{
     ResolvedVisibility, ResolvedVisible, ResourceRecord, TargetFailure, TargetMatch,
     VisibilityGroups,
 };
-use sqlbuild_scopes::scope_report::main::cached_report_records::cached_report_records;
 
-use crate::scopes::_helpers::declarations::placement::QualifiedRow;
-use crate::scopes::_helpers::declarations::placement::qualified_identity;
-use crate::scopes::_helpers::index::scope_objects::read_index;
+use crate::scopes::_helpers::declarations::placement::{QualifiedRow, qualified_identity};
 use crate::scopes::_helpers::index::scope_objects::resource_identity_object;
-use crate::scopes::_helpers::index::scope_objects::tuple_attribute;
 use crate::scopes::models::ScopeClasses;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -53,17 +46,17 @@ pub(crate) struct NativeScopeLookup {
     pub(crate) records: ReportRecords,
     pub(crate) lookup: ReportLookup,
     /// Each input resource, declaration and grant's canonical position.
-    canonical: CanonicalPositions,
+    pub(crate) canonical: CanonicalPositions,
 }
 
 /// The inverse of the lookup's canonical orders.
-struct CanonicalPositions {
-    resources: Vec<usize>,
-    declarations: Vec<usize>,
-    grants: Vec<usize>,
+pub(crate) struct CanonicalPositions {
+    pub(crate) resources: Vec<usize>,
+    pub(crate) declarations: Vec<usize>,
+    pub(crate) grants: Vec<usize>,
 }
 
-fn inverse(order: &[usize]) -> Vec<usize> {
+pub(crate) fn inverse(order: &[usize]) -> Vec<usize> {
     let mut positions: Vec<usize> = vec![0; order.len()];
     for (canonical, input) in order.iter().enumerate() {
         positions[*input] = canonical;
@@ -82,7 +75,7 @@ pub(crate) fn grant_kind(value: &str) -> PyResult<GrantKind> {
 }
 
 /// Input positions as canonical positions.
-fn canonical(order: &[usize], positions: Vec<usize>) -> Vec<usize> {
+pub(crate) fn canonical(order: &[usize], positions: Vec<usize>) -> Vec<usize> {
     positions
         .into_iter()
         .map(|position| order[position])
@@ -171,7 +164,10 @@ fn resolved_rows(resolved: ResolvedVisibility, grants: &[usize]) -> ResolvedRows
     )
 }
 
-fn picked<'py>(values: &Bound<'py, PyTuple>, order: &[usize]) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn picked<'py>(
+    values: &Bound<'py, PyTuple>,
+    order: &[usize],
+) -> PyResult<Bound<'py, PyTuple>> {
     let items: Vec<Bound<'py, PyAny>> = order
         .iter()
         .map(|position| values.get_item(*position))
@@ -188,7 +184,7 @@ fn mapping_proxy<'py>(entries: &Bound<'py, PyDict>) -> PyResult<Bound<'py, PyAny
 }
 
 /// Python's `_mapping`: each group keyed by its first record's `key` attribute.
-fn grouped<'py>(
+pub(crate) fn grouped<'py>(
     groups: &KeyedGroups,
     records: &Bound<'py, PyTuple>,
     key: &str,
@@ -201,7 +197,7 @@ fn grouped<'py>(
     mapping_proxy(&entries)
 }
 
-fn path_grouped<'py>(
+pub(crate) fn path_grouped<'py>(
     groups: &KeyedGroups,
     records: &Bound<'py, PyTuple>,
     paths: &[String],
@@ -224,7 +220,7 @@ fn positions_by<'py>(
     mapping_proxy(&mapping)
 }
 
-fn visibility_index<'py>(
+pub(crate) fn visibility_index<'py>(
     classes: &ScopeClasses<'py>,
     canonical_declarations: &Bound<'py, PyTuple>,
     visibility: &VisibilityGroups,
@@ -256,91 +252,10 @@ pub(crate) fn scope_path_error(py: Python<'_>, message: String) -> PyResult<PyEr
     ))
 }
 
-/// Python's `build_scope_lookup`: the canonical index, its mappings and the native lookup.
-#[pyfunction]
-#[pyo3(signature = (*, index))]
-pub(crate) fn build_scope_lookup(py: Python<'_>, index: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    let records: ReportRecords = cached_report_records(&read_index(index)?);
-    let built = py
-        .compiler_detach(|| Ok(report_lookup(&records)))
-        .map_err(compiler_error)?;
-    let lookup: ReportLookup = match built {
-        Ok(lookup) => lookup,
-        Err(rejected) => return Err(scope_path_error(py, rejected_path_message(&rejected))?),
-    };
-    let classes: ScopeClasses<'_> = ScopeClasses::new(py)?;
-    let resources: Bound<'_, PyTuple> = tuple_attribute(index, "resources")?;
-    let declarations: Bound<'_, PyTuple> = tuple_attribute(index, "declarations")?;
-    let usages: Bound<'_, PyTuple> = tuple_attribute(index, "usages")?;
-    let grants: Bound<'_, PyTuple> = tuple_attribute(index, "grants")?;
-    let canonical_declarations: Bound<'_, PyTuple> = picked(&declarations, &lookup.declarations)?;
-    let canonical_index: Bound<'_, PyAny> = classes.model(RecordId::ScopeIndex)?.call1((
-        picked(&tuple_attribute(index, "ownership_roots")?, &lookup.roots)?,
-        picked(&resources, &lookup.resources)?,
-        &canonical_declarations,
-        picked(&usages, &lookup.usages)?,
-        picked(&grants, &lookup.grants)?,
-        native_field(index, "visibility")?,
-        native_field(index, "inaccessible")?,
-        picked(&tuple_attribute(index, "diagnostics")?, &lookup.diagnostics)?,
-        native_field(index, "completeness")?,
-    ))?;
-    let groups = &lookup.groups;
-    let mappings: [Bound<'_, PyAny>; 6] = [
-        grouped(&groups.resources, &resources, "identity")?,
-        path_grouped(
-            &groups.resources_by_path,
-            &resources,
-            &lookup.resource_paths,
-        )?,
-        grouped(&groups.declarations, &declarations, "identity")?,
-        grouped(&groups.usages_by_consumer, &usages, "consumer")?,
-        grouped(&groups.usages_by_declaration, &usages, "declaration")?,
-        grouped(&groups.grants_by_resource, &grants, "resource")?,
-    ];
-    let visibility: Bound<'_, PyAny> =
-        visibility_index(&classes, &canonical_declarations, &lookup.visibility)?;
-    let canonical: CanonicalPositions = CanonicalPositions {
-        resources: inverse(&lookup.resources),
-        declarations: inverse(&lookup.declarations),
-        grants: inverse(&lookup.grants),
-    };
-    let native: Py<NativeScopeLookup> = Py::new(
-        py,
-        NativeScopeLookup {
-            records,
-            lookup,
-            canonical,
-        },
-    )?;
-    let [
-        by_identity,
-        by_path,
-        by_declaration,
-        by_consumer,
-        by_used,
-        by_resource,
-    ] = mappings;
-    Ok(classes
-        .model(RecordId::ScopeLookup)?
-        .call1((
-            canonical_index,
-            by_identity,
-            by_path,
-            by_declaration,
-            by_consumer,
-            by_used,
-            by_resource,
-            visibility,
-            native,
-        ))?
-        .unbind())
-}
-
 /// The canonical project-relative POSIX path; absolute or escaping paths raise.
 #[pyfunction]
 #[pyo3(name = "normalize_scope_path", signature = (*, path))]
-fn scope_normalize_path(py: Python<'_>, path: &Bound<'_, PyAny>) -> PyResult<String> {
+pub(crate) fn scope_normalize_path(py: Python<'_>, path: &Bound<'_, PyAny>) -> PyResult<String> {
     let path: String = path.str()?.extract()?;
     match normalize_scope_path(&path) {
         Ok(normalized) => Ok(normalized),
@@ -349,11 +264,4 @@ fn scope_normalize_path(py: Python<'_>, path: &Bound<'_, PyAny>) -> PyResult<Str
             rejected_path_message(&RejectedPath { failure, path }),
         )?),
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeScopeLookup>()?;
-    module.add_function(wrap_pyfunction!(build_scope_lookup, module)?)?;
-    module.add_function(wrap_pyfunction!(scope_normalize_path, module)?)?;
-    Ok(())
 }

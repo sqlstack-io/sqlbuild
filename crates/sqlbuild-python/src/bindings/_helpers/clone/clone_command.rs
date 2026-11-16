@@ -29,7 +29,6 @@ use crate::bindings::_helpers::command_runtime::connection::resolve_target_conne
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::planner_entries::clone_plans::PhaseTimings;
-use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use crate::bindings::_helpers::result_output::documents::format_clone_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -48,6 +47,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
+use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 
 const CLONE_LOGGER: &str = "sqlbuild.clone";
 /// The clone phase that copies relations into the destination.

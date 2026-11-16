@@ -1,14 +1,15 @@
 //! Parse the scope-relevant authored roots while retaining independent file faults.
 
-use crate::discovery::_helpers::snapshots::scope_snapshot;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::discovery::_helpers::snapshots::scope_snapshot::tolerant_discovery;
+use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use pyo3::pyfunction;
 
 /// Parse the scope-relevant authored roots while retaining independent file faults.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, project_dir))]
 pub fn discover_scope_snapshot<'py>(
     project_dir: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    scope_snapshot::discover_scope_snapshot(project_dir)
+    in_snapshot(project_dir, || tolerant_discovery(project_dir))
 }

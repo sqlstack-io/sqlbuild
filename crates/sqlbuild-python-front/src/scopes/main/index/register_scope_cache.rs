@@ -1,12 +1,11 @@
 //! Register the scope cache functions and classes.
 
-use crate::scopes::_helpers::index::scope_cache;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::scopes::_helpers::index::scope_cache::scope_index_fingerprint;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the scope cache functions and classes.
-#[inline]
 pub fn register_scope_cache(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    scope_cache::register(module)
+    module.add_function(wrap_pyfunction!(scope_index_fingerprint, module)?)?;
+    Ok(())
 }

@@ -1,12 +1,9 @@
 //! Column name.
 
-use crate::discovery::_helpers::project::project_facts;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Column name.
-#[inline]
 pub fn column_name(column: &Bound<'_, PyAny>) -> PyResult<String> {
-    project_facts::column_name(column)
+    native_field(column, "name")?.extract()
 }

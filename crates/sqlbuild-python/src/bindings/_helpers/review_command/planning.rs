@@ -24,12 +24,7 @@ use crate::bindings::_helpers::change_selection::definition_snapshot::project_wi
 use crate::bindings::_helpers::change_selection::selection::{ChangedProject, changed_project};
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::execution_history::conversion::optional_text;
-use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
-use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
 use crate::bindings::_helpers::review_command::support::review_error;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;
@@ -41,6 +36,12 @@ use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::reso
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_front::discovery::main::project::configured_git_base_ref::configured_git_base_ref;
 use sqlbuild_python_front::discovery::main::project::configured_review::configured_review;
+use sqlbuild_python_project::compiled_views::main::compiled_models::dep_rows::dep_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
+use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 
 const BASE_REF_ALIAS: &str = "@base";
 const UDF_KIND: &str = "udf";
@@ -213,12 +214,15 @@ fn key_columns(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
 
 /// One model as a review node, critical by its `critical` key or one of the critical tags.
 fn model_node(model: &Bound<'_, PyAny>, critical_tags: &[String]) -> PyResult<ReviewNode> {
-    let values: Bound<'_, PyAny> = native_field(&model_reads::config(model)?, "values")?;
+    let values: Bound<'_, PyAny> = native_field(
+        &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(model)?,
+        "values",
+    )?;
     let tags: Vec<String> = strings(&config_value(&values, "tags")?)?;
     let marked: Bound<'_, PyAny> = config_value(&values, "critical")?;
     let materialized: Bound<'_, PyAny> = config_value(&values, "materialized")?;
     Ok(ReviewNode {
-        name: model_reads::model_name(model)?,
+        name: model_name(model)?,
         kind: MODEL_KIND.to_owned(),
         critical: (!marked.is_none() && marked.is_truthy()?)
             || tags.iter().any(|tag| critical_tags.contains(tag)),
@@ -377,10 +381,16 @@ fn review_graph(
         stateful: BTreeSet::new(),
         databases: BTreeMap::new(),
     };
-    for seed in project_reads::seeds(project)?.try_iter()? {
+    for seed in seeds(project)?.try_iter()? {
         let seed: Bound<'_, PyAny> = seed?;
-        let name: String = seed_reads::name(&seed)?.extract()?;
-        if let Some(database) = destination_database(&seed_reads::destination(&seed)?)? {
+        let name: String =
+            sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?
+                .extract()?;
+        if let Some(database) = destination_database(
+            &sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(
+                &seed,
+            )?,
+        )? {
             project_graph.databases.insert(name.clone(), database);
         }
         project_graph
@@ -397,7 +407,7 @@ fn review_graph(
         );
     }
     let mut dependencies: Vec<(String, Vec<(String, String)>)> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
         let node: ReviewNode = model_node(&model, critical_tags)?;
         if node.materialized == INCREMENTAL_MATERIALIZATION
@@ -405,13 +415,13 @@ fn review_graph(
         {
             project_graph.stateful.insert(node.name.clone());
         }
-        if let Some(database) = destination_database(&model_reads::destination(&model)?)? {
+        if let Some(database) = destination_database(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?)? {
             project_graph.databases.insert(node.name.clone(), database);
         }
         project_graph
             .keys
             .insert(node.name.clone(), node_key(MODEL_KIND, &node.name));
-        dependencies.push((node.name.clone(), model_reads::dep_rows(&model)?));
+        dependencies.push((node.name.clone(), dep_rows(&model)?));
         project_graph.graph.nodes.insert(node.name.clone(), node);
     }
     let mut sources: BTreeMap<String, Vec<String>> = BTreeMap::new();

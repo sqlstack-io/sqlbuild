@@ -20,7 +20,6 @@ use crate::bindings::_helpers::freshness::observation::{
 };
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
 use crate::bindings::_helpers::freshness::support::text;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
@@ -32,6 +31,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::warehouse_access::main::is_warehouse_access_refused::is_warehouse_access_refused;
 use sqlbuild_python_front::state_rows::main::event_rows::age_policy::age_policy;
 use sqlbuild_python_front::state_rows::main::event_rows::equivalent::equivalent;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavailable";

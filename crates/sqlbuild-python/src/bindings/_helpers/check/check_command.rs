@@ -11,13 +11,7 @@ use crate::bindings::_helpers::compile_driver::targets::{
     TargetSettingsValues, project_target_settings,
 };
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::graph::algorithms::transitive_closure_many;
-use crate::bindings::_helpers::graph::execution_gates::sql_ref_key;
-use crate::bindings::_helpers::graph::python_lifecycle::build_python_sql_run_lifecycle;
 use crate::bindings::_helpers::planner_entries::command_plans::build_relation_command_plan;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_selection::selectors::parse_project_selector;
-use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -39,6 +33,12 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
 use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
+use sqlbuild_python_project::graph::main::nodes::sql_ref_key::sql_ref_key;
+use sqlbuild_python_project::graph::main::nodes::transitive_closure_many::transitive_closure_many;
+use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_selection::main::parse_project_selector::parse_project_selector;
+use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 
 use crate::bindings::_helpers::check::check_core::{
     ReadSideInputs, load_results_by_loader_name, record_python_run_state_results,
@@ -49,8 +49,6 @@ use crate::bindings::_helpers::check::check_results::{
 };
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_python_check_runtime_target;
-use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
-use crate::bindings::_helpers::graph::python_selection::python_node_names;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -58,6 +56,8 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_names::python_node_names;
 
 const GRAPH_OPERATOR_CODE: &str = "C681";
 const GRAPH_OPERATOR_MESSAGE: &str = "sqb check selectors do not support graph operators; \

@@ -3,7 +3,7 @@
 use sqlbuild_analysis::assembly::analysis_session::main::finished_model_facts::finished_model_facts;
 use sqlbuild_analysis::assembly::analysis_session::models::{ColumnFact, SessionModelFacts};
 
-use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
+use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
 
 /// The facts the finished `session` kept for model `name`, which the payload left out.
 pub(crate) fn session_model_facts<'a>(

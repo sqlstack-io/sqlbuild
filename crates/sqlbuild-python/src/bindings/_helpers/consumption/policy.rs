@@ -9,10 +9,10 @@ use sqlbuild_state::consumption::models::{
     ChangeKind, ChangedPolicy, NodeKey, Reach, TriggeredJob,
 };
 
-use crate::bindings::_helpers::compiled_project::job_catalog::triggered_jobs;
-use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
+use sqlbuild_python_project::compiled_project::main::triggered_jobs::triggered_jobs;
+use sqlbuild_python_project::graph::models::NativeProjectGraph;
 
 const DEFINITION: &str = "definition";
 const SOURCE_DATA: &str = "source_data";

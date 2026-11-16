@@ -1,18 +1,17 @@
 //! The Python model validators, run natively up to the first error they raise.
 
-use crate::model_config::models::NativeModelValidator;
+use crate::model_config::main::config::native_config_error::native_config_error;
 use sqlbuild_python_base::positional_record;
 use std::collections::HashSet;
 
 use pyo3::IntoPyObject;
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_model_config::model_validation::models::ValidationStop;
 
 use crate::discovery::main::project::column_name::column_name;
 use crate::discovery::main::project::each::each;
 use crate::discovery::main::project::stem::stem;
-use crate::model_config::_helpers::config::config_errors::native_config_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
@@ -99,9 +98,4 @@ pub(crate) fn stop_object(py: Python<'_>, stop: ValidationStop) -> PyResult<Py<P
         Err(index) => Ok(index.into_pyobject(py)?.into_any().unbind()),
         Ok(error) => Ok(native_config_error(py, error)?.into_any()),
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeModelValidator>()?;
-    Ok(())
 }

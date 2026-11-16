@@ -18,7 +18,6 @@ use sqlbuild_cli::diff_report::types::DiffNamedValue;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::compile_driver::diff::run_diff_pipeline;
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::dagster_invocation::access::string_tuple as texts;
 use crate::bindings::_helpers::diff_report::command::target_max_full_rows;
 use crate::bindings::_helpers::diff_report::facts::diff_facts;
@@ -33,6 +32,7 @@ use sqlbuild_python_base::build_command::main::boolean::boolean;
 use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 
 const KEYED_CHECK: &str = "keyed comparison";
 const MAX_EXAMPLE_LENGTH: usize = 80;
@@ -78,7 +78,7 @@ fn models_named<'py>(
     names: &[String],
 ) -> PyResult<Vec<(String, Bound<'py, PyAny>)>> {
     let mut models: Vec<(String, Bound<'py, PyAny>)> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'py, PyAny> = model?;
         let name: String = native_field(&model, "name")?.extract()?;
         if names.contains(&name) {

@@ -28,13 +28,13 @@ use crate::bindings::_helpers::janitor::janitor_keys::{
 use crate::bindings::_helpers::janitor::janitor_old_names::{
     OldNamePlanning, pending_migration_origins, plan_old_name_views,
 };
-use crate::bindings::_helpers::relation_naming::fitting::shared_error;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_project::relation_naming::main::shared_error::shared_error;
 
 const LIFECYCLE: ExecutorHost = ExecutorHost::OperationLifecycle;
 

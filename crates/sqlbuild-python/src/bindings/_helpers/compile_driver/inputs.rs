@@ -11,8 +11,9 @@ use sqlbuild_python_front::compile_attachment::main::build_effective_settings::b
 use sqlbuild_python_front::compile_attachment::main::build_effective_vars::build_effective_vars;
 use crate::bindings::_helpers::compile_attachment::model_inputs::build_model_inputs;
 use sqlbuild_python_base::compile_context::main::diagnostic_collector::collect_compile_diagnostics::collect_compile_diagnostics;
-use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::records::{compile_inputs_view, inputs_with};
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
+use sqlbuild_python_project::compiled_views::main::project::compile_inputs_view::compile_inputs_view;
+use sqlbuild_python_project::compiled_views::main::project::inputs_with::inputs_with;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use crate::bindings::_helpers::input_loops::attachment::{attach_checks, attach_resources};
 use sqlbuild_python_front::model_config::main::config::run_id::run_id;

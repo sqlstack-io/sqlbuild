@@ -2,28 +2,15 @@
 
 use std::path::PathBuf;
 
+use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyOSError, PyValueError};
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_config::project::errors::{ConfigFailure, FailureClass, LoadFailure};
-use sqlbuild_config::project::main::deprecated_setting_warnings::deprecated_setting_warnings;
-use sqlbuild_config::project::main::load_changes_config::load_changes_config;
-use sqlbuild_config::project::main::load_git_base_ref::load_git_base_ref;
-use sqlbuild_config::project::main::load_local_config::load_local_config;
-use sqlbuild_config::project::main::load_project_config::load_project_config;
-use sqlbuild_config::project::main::load_review_config::load_review_config;
-use sqlbuild_config::project::main::local_sql_analysis_failure::local_sql_analysis_failure;
-use sqlbuild_config::project::main::resolve_config_file::resolve_config_file;
-use sqlbuild_config::project::models::{
-    Built, ChangesConfig, ConfigFile, ConfigPaths, ReviewConfig,
-};
+use sqlbuild_config::project::models::{Built, ConfigFile, ConfigPaths};
 
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_python_base::boundary::main::config_value_to_python::config_value_to_python;
-use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
@@ -41,12 +28,12 @@ const PYTHON_ENUM_MODULES: [(&str, &str); 1] =
     [("AuditSeverity", "sqlbuild.compiler.auditing.types")];
 
 /// The four configuration file paths of a project directory, as Python and native paths.
-struct Files<'py> {
-    python: Vec<Bound<'py, PyAny>>,
-    native: ConfigPaths,
+pub(crate) struct Files<'py> {
+    pub(crate) python: Vec<Bound<'py, PyAny>>,
+    pub(crate) native: ConfigPaths,
 }
 
-fn files<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Files<'py>> {
+pub(crate) fn files<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Files<'py>> {
     let python = FILE_NAMES
         .iter()
         .map(|name| project_dir.call_method1("__truediv__", (*name,)))
@@ -69,7 +56,7 @@ fn files<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Files<'py>> {
     })
 }
 
-fn file_index(file: ConfigFile) -> usize {
+pub(crate) fn file_index(file: ConfigFile) -> usize {
     match file {
         ConfigFile::Project => 0,
         ConfigFile::LegacyProject => 1,
@@ -78,7 +65,11 @@ fn file_index(file: ConfigFile) -> usize {
     }
 }
 
-fn config_error(py: Python<'_>, failure: &ConfigFailure, files: &Files<'_>) -> PyResult<PyErr> {
+pub(crate) fn config_error(
+    py: Python<'_>,
+    failure: &ConfigFailure,
+    files: &Files<'_>,
+) -> PyResult<PyErr> {
     use sqlbuild_config::project::errors::MessagePiece;
     let pieces = failure
         .message
@@ -110,7 +101,11 @@ fn os_error(py: Python<'_>, error: &std::io::Error, path: &Bound<'_, PyAny>) -> 
     Ok(PyErr::from_value(value))
 }
 
-fn load_error(py: Python<'_>, failure: &LoadFailure, files: &Files<'_>) -> PyResult<PyErr> {
+pub(crate) fn load_error(
+    py: Python<'_>,
+    failure: &LoadFailure,
+    files: &Files<'_>,
+) -> PyResult<PyErr> {
     match failure {
         LoadFailure::Config(failure) => config_error(py, failure, files),
         LoadFailure::Io(file, error) => os_error(py, error, &files.python[file_index(*file)]),
@@ -142,7 +137,7 @@ fn object<'py>(
     new_record(py, record_named(class)?, (), Some(&keywords))
 }
 
-fn built(py: Python<'_>, value: Built) -> PyResult<Py<PyAny>> {
+pub(crate) fn built(py: Python<'_>, value: Built) -> PyResult<Py<PyAny>> {
     match value {
         Built::Value(value) => config_value_to_python(py, value),
         Built::Object(class, fields) => Ok(object(py, class, fields)?.unbind()),
@@ -168,101 +163,11 @@ fn built(py: Python<'_>, value: Built) -> PyResult<Py<PyAny>> {
     }
 }
 
-/// Write a warning line to stderr for each deprecated setting alias `project_dir` still sets.
-pub(crate) fn warn_deprecated_settings(
-    py: Python<'_>,
-    project_dir: &Bound<'_, PyAny>,
-) -> PyResult<()> {
-    let files = files(project_dir)?;
-    match deprecated_setting_warnings(&files.native) {
-        Ok(warnings) => warnings
-            .iter()
-            .try_for_each(|warning| write_console(py, "stderr", &format!("{warning}\n"))),
-        Err(failure) => Err(load_error(py, &failure, &files)?),
-    }
-}
-
-/// `load_project_config`: the validated `ProjectConfig` of `project_dir`.
-#[pyfunction]
-pub(crate) fn load_project_config_file(
-    py: Python<'_>,
-    project_dir: &Bound<'_, PyAny>,
-) -> PyResult<Py<PyAny>> {
-    let files = files(project_dir)?;
-    match load_project_config(&files.native) {
-        Ok(config) => built(py, config),
-        Err(failure) => Err(load_error(py, &failure, &files)?),
-    }
-}
-
-/// `[git] base_ref` of the project at `project_dir`, which `--since @base` names.
-pub(crate) fn configured_git_base_ref(project_dir: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    configured(project_dir, load_git_base_ref)
-}
-
-/// `[review]` of the project at `project_dir`: the defaults `sqb review` falls back to.
-pub(crate) fn configured_review(project_dir: &Bound<'_, PyAny>) -> PyResult<ReviewConfig> {
-    configured(project_dir, load_review_config)
-}
-
-/// `[changes]` of the project at `project_dir`: what `--changed` counts and reaches by default.
-pub(crate) fn configured_changes(project_dir: &Bound<'_, PyAny>) -> PyResult<ChangesConfig> {
-    configured(project_dir, load_changes_config)
-}
-
 /// One configuration section of the project at `project_dir`, with load failures raised as Python's.
-fn configured<T>(
+pub(crate) fn configured<T>(
     project_dir: &Bound<'_, PyAny>,
     load: fn(&ConfigPaths) -> Result<T, LoadFailure>,
 ) -> PyResult<T> {
     let files: Files<'_> = files(project_dir)?;
     load(&files.native).or_else(|failure| Err(load_error(project_dir.py(), &failure, &files)?))
-}
-
-/// `load_local_config`: the validated `LocalConfig` of `project_dir`, or the default.
-#[pyfunction]
-pub(crate) fn load_local_config_file(
-    py: Python<'_>,
-    project_dir: &Bound<'_, PyAny>,
-) -> PyResult<Py<PyAny>> {
-    let files = files(project_dir)?;
-    match load_local_config(&files.native) {
-        Ok(config) => built(py, config),
-        Err(failure) => Err(load_error(py, &failure, &files)?),
-    }
-}
-
-/// The project or local configuration file path, rejecting an unconverted legacy file.
-#[pyfunction]
-pub(crate) fn resolve_config_file_path<'py>(
-    py: Python<'py>,
-    project_dir: &Bound<'py, PyAny>,
-    local: bool,
-) -> PyResult<Bound<'py, PyAny>> {
-    let files = files(project_dir)?;
-    match resolve_config_file(&files.native, local) {
-        Ok(file) => Ok(files.python[file_index(file)].clone()),
-        Err(failure) => Err(config_error(py, &failure, &files)?),
-    }
-}
-
-/// `validate_local_sql_analysis_policy` from the project requirement and the local setting.
-#[pyfunction]
-pub(crate) fn validate_local_sql_analysis(
-    py: Python<'_>,
-    project_dir: &Bound<'_, PyAny>,
-    flags: (bool, bool, bool),
-) -> Result<(), PyErr> {
-    let files = files(project_dir)?;
-    match local_sql_analysis_failure(&files.native, flags) {
-        None => Ok(()),
-        Some(failure) => Err(config_error(py, &failure, &files)?),
-    }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(load_project_config_file, module)?)?;
-    module.add_function(wrap_pyfunction!(load_local_config_file, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_config_file_path, module)?)?;
-    module.add_function(wrap_pyfunction!(validate_local_sql_analysis, module)?)
 }

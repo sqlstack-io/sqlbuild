@@ -5,14 +5,6 @@ use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::GraphIndexes;
 use std::collections::HashSet;
 
-use crate::bindings::_helpers::auditing::render::render_audit_sql;
-use crate::bindings::_helpers::compiled_views::audit_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::graph::keys::native_key;
-use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::planner_scope::values::edges;
 use crate::bindings::_helpers::planner_strategy::audits::{
     attachment, outside_target_lineage, resolve_effective_run_scope,
 };
@@ -23,17 +15,40 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyListMethods, PyString
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::assert_no_unresolved_sql_markers;
+use sqlbuild_python_project::auditing::main::render_audit_sql::render_audit_sql;
+use sqlbuild_python_project::compiled_views::main::project::audits::audits;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
+use sqlbuild_python_project::graph::models::NativeProjectGraph;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_scope::main::edges::edges;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::resource_views::main::audit_reads::always_run::always_run;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_column_name::attached_column_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_kind::attached_target_kind;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_name::attached_target_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::definition_name::definition_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::description::description;
+use sqlbuild_python_project::resource_views::main::audit_reads::evaluation_mode::evaluation_mode;
+use sqlbuild_python_project::resource_views::main::audit_reads::evidence_limit::evidence_limit;
+use sqlbuild_python_project::resource_views::main::audit_reads::evidence_sql::evidence_sql;
+use sqlbuild_python_project::resource_views::main::audit_reads::measurement_contract::measurement_contract;
+use sqlbuild_python_project::resource_views::main::audit_reads::meta::meta;
+use sqlbuild_python_project::resource_views::main::audit_reads::minimum_samples::minimum_samples;
+use sqlbuild_python_project::resource_views::main::audit_reads::run_scope::run_scope;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
+use sqlbuild_python_project::resource_views::main::audit_reads::sql_body::sql_body;
+use sqlbuild_python_project::resource_views::main::audit_reads::thresholds::thresholds;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::Request;
 
-use crate::bindings::_helpers::planner_strategy::constants::{
-    AUDIT_TYPES_MODULE, COMPILE_TYPES_MODULE, MODEL_ATTACHMENT, SOURCE_ATTACHMENT,
-};
-use crate::bindings::_helpers::planner_strategy::models::AuditPlanning;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::planner_strategy::constants::{
+    AUDIT_TYPES_MODULE, COMPILE_TYPES_MODULE, MODEL_ATTACHMENT, SOURCE_ATTACHMENT,
+};
+use sqlbuild_python_project::planner_strategy::models::AuditPlanning;
 
 /// One attribute read of a compiled audit.
 type AuditRead<'py> = fn(&Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>;
@@ -113,13 +128,15 @@ fn plan_audit<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = audit.py();
     let audit = audit.clone();
-    let name: String = audit_reads::name(&audit)?.extract()?;
+    let name: String =
+        sqlbuild_python_project::resource_views::main::audit_reads::name::name(&audit)?
+            .extract()?;
     let resolved = render_query(
         request,
-        audit_reads::sql_body(&audit)?,
+        sql_body(&audit)?,
         &format!("audit '{name}' planned SQL"),
     )?;
-    let evidence = audit_reads::evidence_sql(&audit)?;
+    let evidence = evidence_sql(&audit)?;
     let evidence_resolved = if evidence.is_none() {
         py.None().into_bound(py)
     } else {
@@ -142,33 +159,43 @@ fn plan_audit<'py>(
     } else {
         py.None().into_bound(py)
     };
-    let requested = audit_enum(audit_reads::run_scope(&audit)?, "AuditRunScope", "final")?;
-    let severity = audit_enum(audit_reads::severity(&audit)?, "AuditSeverity", "warn")?;
+    let requested = audit_enum(run_scope(&audit)?, "AuditRunScope", "final")?;
+    let severity = audit_enum(
+        sqlbuild_python_project::resource_views::main::audit_reads::severity::severity(&audit)?,
+        "AuditSeverity",
+        "warn",
+    )?;
     let effective = resolve_effective_run_scope(&requested, &materialization)?;
-    let mut target_kind = audit_reads::attached_target_kind(&audit)?;
+    let mut target_kind = attached_target_kind(&audit)?;
     if target_kind.is_none() && (kind_text == MODEL_ATTACHMENT || kind_text == SOURCE_ATTACHMENT) {
         target_kind =
             imported(py, COMPILE_TYPES_MODULE, "AttachedAuditTargetKind")?.call1((kind_text,))?;
     }
     let values = PyDict::new(py);
     let reads: [(&str, AuditRead<'py>); 12] = [
-        ("key", audit_reads::key),
-        ("name", audit_reads::name),
-        ("definition_name", audit_reads::definition_name),
-        ("evaluation_mode", audit_reads::evaluation_mode),
-        ("thresholds", audit_reads::thresholds),
-        ("minimum_samples", audit_reads::minimum_samples),
-        ("evidence_limit", audit_reads::evidence_limit),
-        ("scope_deps", audit_reads::scope_deps),
-        ("attached_column_name", audit_reads::attached_column_name),
-        ("always_run", audit_reads::always_run),
-        ("description", audit_reads::description),
-        ("meta", audit_reads::meta),
+        (
+            "key",
+            sqlbuild_python_project::resource_views::main::audit_reads::key::key,
+        ),
+        (
+            "name",
+            sqlbuild_python_project::resource_views::main::audit_reads::name::name,
+        ),
+        ("definition_name", definition_name),
+        ("evaluation_mode", evaluation_mode),
+        ("thresholds", thresholds),
+        ("minimum_samples", minimum_samples),
+        ("evidence_limit", evidence_limit),
+        ("scope_deps", scope_deps),
+        ("attached_column_name", attached_column_name),
+        ("always_run", always_run),
+        ("description", description),
+        ("meta", meta),
     ];
     for (field, read) in reads {
         values.set_item(field, read(&audit)?)?;
     }
-    let measurement = audit_reads::measurement_contract(&audit)?;
+    let measurement = measurement_contract(&audit)?;
     for field in ["value_column", "sample_count_column", "sample_unit"] {
         values.set_item(
             field,
@@ -181,16 +208,13 @@ fn plan_audit<'py>(
     }
     for (field, value) in [
         ("resolved_sql", resolved),
-        ("unresolved_sql", audit_reads::sql_body(&audit)?),
+        ("unresolved_sql", sql_body(&audit)?),
         ("attachment_kind", kind),
         ("severity", severity),
         ("requested_run_scope", requested),
         ("effective_run_scope", effective),
         ("evidence_resolved_sql", evidence_resolved),
-        (
-            "evidence_unresolved_sql",
-            audit_reads::evidence_sql(&audit)?,
-        ),
+        ("evidence_unresolved_sql", evidence_sql(&audit)?),
         ("attached_target_kind", target_kind),
         ("attached_target_name", target),
         (
@@ -211,8 +235,8 @@ pub(crate) fn audit_is_selected(
     selected_keys: &HashSet<ObjectKey>,
 ) -> PyResult<bool> {
     let py = audit.py();
-    let kind = audit_reads::attached_target_kind(audit)?;
-    let name = audit_reads::attached_target_name(audit)?;
+    let kind = attached_target_kind(audit)?;
+    let name = attached_target_name(audit)?;
     if !kind.is_none() && !name.is_none() {
         let target_value = native_field(
             &imported(py, COMPILE_TYPES_MODULE, "AttachedAuditTargetKind")?.call1((kind,))?,
@@ -221,7 +245,7 @@ pub(crate) fn audit_is_selected(
         let key = (target_value.extract()?, name.extract()?);
         return Ok(selected_keys.contains(&key));
     }
-    for dependency in audit_reads::scope_deps(audit)?.try_iter()? {
+    for dependency in scope_deps(audit)?.try_iter()? {
         if selected_keys.contains(&native_key(&dependency?)?) {
             return Ok(true);
         }
@@ -238,7 +262,7 @@ pub(crate) fn build_selected_audit_entries<'py>(
     let project = request.get("project")?;
     let scope = scope_data(&request.get("scope")?)?;
     let mut selected: Vec<Bound<'py, PyAny>> = Vec::new();
-    for audit in project_reads::audits(&project)?.try_iter()? {
+    for audit in audits(&project)?.try_iter()? {
         let audit = audit?;
         if audit_is_selected(&audit, &scope.selected)? {
             selected.push(audit);

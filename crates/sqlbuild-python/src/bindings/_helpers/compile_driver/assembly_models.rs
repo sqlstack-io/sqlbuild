@@ -8,14 +8,9 @@ use sqlbuild_analysis::analysis_route::main::analysis_route::analysis_route;
 use sqlbuild_analysis::analysis_route::models::AnalysisRoute;
 
 use crate::bindings::_helpers::analysis_session::model_analyses::ModelAnalyses;
-use crate::bindings::_helpers::analysis_session::profile_inputs::profile_dialect;
-use crate::bindings::_helpers::analysis_session::query_columns::ColumnsRow;
-use crate::bindings::_helpers::analysis_session::stage_functions::query_column_rows;
 use crate::bindings::_helpers::compile_driver::assembly_analysis::{
     AnalysisContext, model_stem, selected_for_analysis,
 };
-use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
-use crate::bindings::_helpers::compiled_views::model_input_view::input_analysis_sql;
 use crate::bindings::_helpers::hand_built::compiled_model::compiled_model as hand_built_model;
 use crate::bindings::_helpers::project_assembly::syntax_checks::model_placeholders;
 use crate::bindings::_helpers::project_assembly::syntax_validation::{
@@ -28,6 +23,11 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
 use sqlbuild_python_front::render::main::calls::top_level_macro_call_names::top_level_macro_call_names;
+use sqlbuild_python_project::analysis_session::main::profile_dialect::profile_dialect;
+use sqlbuild_python_project::analysis_session::main::query_column_rows::query_column_rows;
+use sqlbuild_python_project::analysis_session::types::ColumnsRow;
+use sqlbuild_python_project::compiled_views::main::model_inputs::input_analysis_sql::input_analysis_sql;
+use sqlbuild_python_project::compiled_views::models::NativeModelInput;
 
 const NATIVE_FAILURE_PREFIX: &str = "NativeCompilerError: ";
 const HOOK_NAMES: [&str; 2] = ["pre_hooks", "post_hooks"];

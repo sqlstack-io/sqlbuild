@@ -13,15 +13,10 @@ use sqlbuild_scopes::scope_index::models::{
     ResourceKind, ResourceRecord,
 };
 
-use crate::scopes::_helpers::declarations::placement::DeclarationRow;
-use crate::scopes::_helpers::declarations::placement::IdentityRow;
-use crate::scopes::_helpers::declarations::placement::QualifiedRow;
-use crate::scopes::_helpers::declarations::placement::RootRow;
-use crate::scopes::_helpers::declarations::placement::declaration_identity;
-use crate::scopes::_helpers::declarations::placement::declaration_record;
-use crate::scopes::_helpers::declarations::placement::ownership_root;
-use crate::scopes::_helpers::declarations::placement::qualified_identity;
-use crate::scopes::_helpers::declarations::placement::resource_identity;
+use crate::scopes::_helpers::declarations::placement::{
+    DeclarationRow, IdentityRow, QualifiedRow, RootRow, declaration_identity, declaration_record,
+    ownership_root, qualified_identity, resource_identity,
+};
 use crate::scopes::_helpers::index::scope_lookup::grant_kind;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;

@@ -1,11 +1,9 @@
 //! Append-only state table DDL and the source freshness insert, rendered through adapter callbacks.
 
 use pyo3::exceptions::PyKeyError;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString, PyStringMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_state::freshness::constants::{
@@ -71,7 +69,7 @@ pub(crate) fn state_table_create_sql<'py>(
 /// Render create-if-missing DDL for string, integer, and text-timestamp state columns.
 #[pyfunction(name = "render_state_table_create_sql")]
 #[pyo3(signature = (**request))]
-fn render_create_sql(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
+pub(crate) fn render_create_sql(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
     let request = Request::new("render_state_table_create_sql", request)?;
     state_table_create_sql(
         &request.get("qualified_name")?.extract::<String>()?,
@@ -99,7 +97,7 @@ fn adapter_user_error(py: Python<'_>, message: &str) -> PyErr {
 /// Render DML that appends source freshness records.
 #[pyfunction]
 #[pyo3(signature = (*, database, schema, records, render_qualified_name))]
-fn render_insert_source_freshness_records_sql<'py>(
+pub(crate) fn render_insert_source_freshness_records_sql<'py>(
     database: &Bound<'py, PyAny>,
     schema: &Bound<'py, PyAny>,
     records: &Bound<'py, PyAny>,
@@ -142,12 +140,4 @@ fn render_insert_source_freshness_records_sql<'py>(
         &names,
         &rows,
     ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(render_create_sql, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        render_insert_source_freshness_records_sql,
-        module
-    )?)
 }

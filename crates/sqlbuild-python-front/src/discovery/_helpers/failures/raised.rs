@@ -1,11 +1,9 @@
 //! Native discovery failures as the Python exceptions discovery raises for them.
 
 use pyo3::exceptions::{PyKeyError, PyRuntimeError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyBytes, PyDict, PyDictMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_discovery::models::{DiscoveryFailure, ReadFailure, StageFailure};
 use sqlbuild_discovery::tree::models::ProjectTree;
 
@@ -135,7 +133,7 @@ pub(crate) fn relative_read_error(
 /// The error `read_error` builds for an operating-system read failure, for the platform oracle.
 #[pyfunction]
 #[pyo3(signature = (errno, winerror, message, *, file_path))]
-fn _oracle_read_error<'py>(
+pub(crate) fn _oracle_read_error<'py>(
     errno: Option<i32>,
     winerror: Option<i32>,
     message: String,
@@ -150,8 +148,4 @@ fn _oracle_read_error<'py>(
         .into_value(file_path.py())
         .into_bound(file_path.py())
         .into_any()
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(_oracle_read_error, module)?)
 }

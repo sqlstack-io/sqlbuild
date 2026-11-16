@@ -1,6 +1,5 @@
 //! Native migration discovery over existing inspection and fingerprint cache boundaries.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::matching::{
     match_migration_fingerprints, migration_destination_fingerprints,
 };
@@ -14,6 +13,7 @@ use pyo3::prelude::{PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple, PyTupleMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use std::collections::BTreeSet;
 
 /// Manual and automatically discovered migration requests with their destination fingerprints.
@@ -57,7 +57,7 @@ pub(super) fn discover_model_migrations<'py>(
     let declared = discovery_events::declared(&declarations, &state)?;
     let names = PyDict::new(py);
     for item in &models {
-        names.set_item(model_reads::name_object(item)?, item)?;
+        names.set_item(name_object(item)?, item)?;
     }
     let event_renames = discovery_events::renames(&runtime, &names, &state)?;
     for (name, origin) in declared.iter() {
@@ -75,7 +75,7 @@ pub(super) fn discover_model_migrations<'py>(
     }
     let unbuilt = PyDict::new(py);
     for item in &models {
-        let name = model_reads::name_object(item)?;
+        let name = name_object(item)?;
         if !declared_names.contains(&name)?
             && call_with(
                 &native_field(&state, "named_fingerprint")?,

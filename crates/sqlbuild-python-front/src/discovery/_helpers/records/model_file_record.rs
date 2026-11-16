@@ -205,18 +205,6 @@ fn posix(text: &str) -> String {
     text.replace(std::path::MAIN_SEPARATOR, "/")
 }
 
-/// `text` as the Python string `cache` shares with every reader, built on first read.
-pub(crate) fn projected_text<'py>(
-    py: Python<'py>,
-    cache: &PyOnceLock<Py<PyString>>,
-    text: &str,
-) -> Bound<'py, PyString> {
-    cache
-        .get_or_init(py, || PyString::new(py, text).unbind())
-        .bind(py)
-        .clone()
-}
-
 /// A model header's authored values: native entries, with the Python dict built on first read.
 pub(crate) struct HeaderValues {
     pub(crate) native: Option<Arc<[(String, AuthoredValue)]>>,

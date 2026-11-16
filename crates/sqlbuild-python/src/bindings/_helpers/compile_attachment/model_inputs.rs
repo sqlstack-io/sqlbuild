@@ -11,8 +11,6 @@ use sqlbuild_analysis::assembly::project::main::sql_analysis_opt_out_help::sql_a
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::compile_attachment::model_config::native_model_config_session;
-use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
 use crate::bindings::_helpers::input_loops::loop_classes::model_loop_classes;
 use crate::bindings::_helpers::input_loops::model_loop::{LoopSwitches, NativeModelLoop};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -29,6 +27,8 @@ use sqlbuild_python_front::model_config::main::model_nodes::unicode_environment:
 use sqlbuild_python_front::model_config::models::NativeModelValidator;
 use sqlbuild_python_front::render::main::expansion::macro_expansion_classes::macro_expansion_classes;
 use sqlbuild_python_front::render::models::ConstantRendering;
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
+use sqlbuild_python_project::compiled_views::models::NativeModelInput;
 
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

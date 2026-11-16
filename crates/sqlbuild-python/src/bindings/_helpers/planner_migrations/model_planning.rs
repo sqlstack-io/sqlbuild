@@ -1,7 +1,5 @@
 //! Model migration orchestration over Python-owned live inspection.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_changes::renames::plan_reference_renames;
 use crate::bindings::_helpers::planner_migrations::column_objects::{config, replace};
 use crate::bindings::_helpers::planner_migrations::discovery::discover_model_migrations;
@@ -12,9 +10,7 @@ use crate::bindings::_helpers::planner_migrations::models::{
 use crate::bindings::_helpers::planner_migrations::planning_origin::{
     require_same_database, resolve_origin,
 };
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyString, PyTuple};
 use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
@@ -29,6 +25,10 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 const MIGRATE_FROM_KEY: &str = "migrate_from";
 const MIGRATE_FORCE_KEY: &str = "migrate_force";
@@ -103,7 +103,7 @@ fn discover<'py>(
     let snapshot = phase.snapshot.clone();
     let mut declared_requests: Vec<ModelMigrationRequest<'py>> = Vec::new();
     for item in
-        project_reads::models(&runtime_field(&runtime, |runtime| &runtime.project)?)?.try_iter()?
+        compiled_models(&runtime_field(&runtime, |runtime| &runtime.project)?)?.try_iter()?
     {
         if let Some(request) = declared(&item?)? {
             declared_requests.push(request);
@@ -119,7 +119,7 @@ fn discover<'py>(
     for request in &declared_requests {
         let (origin_location, origin_model) = resolve_origin(request, &runtime, state)?;
         declarations.push(ModelMigrationDeclaration {
-            model_name: model_reads::name_object(&request.model)?,
+            model_name: name_object(&request.model)?,
             origin_location,
             origin_model,
         });
@@ -185,7 +185,7 @@ fn finish<'py>(
         let policy = super::planning_boundary::missing_origin_policy(&runtime)?;
         for (request, origin, origin_model) in resolved {
             let item = request.model.clone();
-            let name = model_reads::name_object(&item)?;
+            let name = name_object(&item)?;
             let decided = super::model_entries::decide(&MigrationDecisionRequest {
                 runtime: runtime.clone(),
                 request,

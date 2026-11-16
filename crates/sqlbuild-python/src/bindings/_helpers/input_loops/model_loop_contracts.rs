@@ -13,8 +13,7 @@ use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_model_config::header_metadata::models::ParsedAudit;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::main::config::config_node::config_node;
-use sqlbuild_python_front::model_config::models::HeaderColumn;
-use sqlbuild_python_front::model_config::models::HeaderColumns;
+use sqlbuild_python_front::model_config::models::{HeaderColumn, HeaderColumns};
 use sqlbuild_python_front::model_config::types::PyConfigNode;
 
 const CASES_ATTRIBUTE: &str = "cases";

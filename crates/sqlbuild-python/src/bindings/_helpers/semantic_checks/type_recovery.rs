@@ -16,11 +16,6 @@ use sqlbuild_analysis::semantic_checks::models::{
 use sqlbuild_analysis::semantic_checks::types::RevisedBinding;
 use sqlbuild_analysis::semantic_validation::models as validation;
 
-use crate::bindings::_helpers::analysis::binding_catalog::schema_validations;
-use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::LineageInput;
-use crate::bindings::_helpers::compiled_views::model_reads::{inferred_names, lineage_inputs};
-use crate::bindings::_helpers::compiled_views::records::with_type_recovery;
 use crate::bindings::_helpers::semantic_checks::constants::SCHEMA_REVALIDATIONS;
 use crate::bindings::_helpers::semantic_checks::failures::{internal_error, semantic_error};
 use crate::bindings::_helpers::semantic_checks::inputs::revalidation_request;
@@ -28,7 +23,6 @@ use crate::bindings::_helpers::semantic_checks::session_facts::{
     column_names, session_model_facts,
 };
 use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
-use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -36,6 +30,13 @@ use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_project::analysis::main::schema_validations::schema_validations;
+use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_names::inferred_names;
+use sqlbuild_python_project::compiled_views::main::compiled_models::lineage_inputs::lineage_inputs;
+use sqlbuild_python_project::compiled_views::main::project::with_type_recovery::with_type_recovery;
+use sqlbuild_python_project::compiled_views::types::LineageInput;
+use sqlbuild_python_project::semantic_shapes::main::project_shapes::project_shapes;
 
 const UNCHANGED: &str = "unchanged";
 const UNKNOWN_RECOVERED_TYPE: &str = "UNKNOWN";

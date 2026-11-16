@@ -15,8 +15,7 @@ use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_s
 use sqlbuild_render::macro_calls::models::{MacroCallScan, MacroCallSite};
 
 use crate::render::_helpers::calls::macro_arguments::parsed_arguments;
-use crate::render::_helpers::expansion::macro_expansion::ExpansionClasses;
-use crate::render::_helpers::expansion::macro_expansion::raised;
+use crate::render::_helpers::expansion::macro_expansion::{ExpansionClasses, raised};
 use crate::render::_helpers::expansion::macro_expansion_facts::ResourceRef;
 use crate::render::models::NativeMacroExpansion;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

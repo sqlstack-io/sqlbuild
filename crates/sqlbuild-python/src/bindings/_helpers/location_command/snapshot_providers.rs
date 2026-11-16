@@ -6,7 +6,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use serde_json::{Value, json};
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 
-use crate::bindings::_helpers::compiled_project::snapshot_boundary::relative_path;
 use crate::bindings::_helpers::location_command::constants::{
     MODEL_NODE_KIND, SNAPSHOT_HIDDEN_SETTING, SOURCE_NODE_KIND,
 };
@@ -14,6 +13,7 @@ use sqlbuild_python_base::orchestration_reads::main::missing_secrets::missing_se
 use sqlbuild_python_base::orchestration_reads::main::provider_class_settings::provider_class_settings;
 use sqlbuild_python_base::orchestration_reads::main::setting_rows::setting_rows;
 use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_project::project_snapshot::main::relative_path::relative_path;
 
 /// How a consumer's code runs inside other snapshot nodes, besides its own node.
 #[derive(Clone, Copy)]

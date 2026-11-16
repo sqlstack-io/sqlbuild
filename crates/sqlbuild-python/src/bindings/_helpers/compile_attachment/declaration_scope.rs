@@ -4,7 +4,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyTuple;
 
-use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_EXPECTED_MODELS_SCAN_ALGORITHM;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::cache::models::SqlTestScanCache;
@@ -22,6 +21,7 @@ use sqlbuild_python_front::scopes::main::index::build_scope_lookup::build_scope_
 use sqlbuild_python_front::scopes::main::index::open_native_scope_index::open_native_scope_index;
 use sqlbuild_python_front::sql_test_glue::main::validate_authored_sql_test_ctes::validate_authored_sql_test_ctes;
 use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
+use sqlbuild_python_project::sql_test_glue::constants::SQL_TEST_EXPECTED_MODELS_SCAN_ALGORITHM;
 
 fn compile_error(py: Python<'_>, message: Bound<'_, PyAny>) -> PyResult<PyErr> {
     Ok(PyErr::from_value(

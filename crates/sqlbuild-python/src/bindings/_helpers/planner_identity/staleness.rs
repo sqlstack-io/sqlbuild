@@ -18,13 +18,13 @@ use sqlbuild_analysis::planner_identity::models::{
 };
 
 use crate::bindings::_helpers::planner_changes::detect::{ModelPass, model_change};
-use crate::bindings::_helpers::planner_identity::hashing::graph_key;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::planner_identity::main::graph_key::graph_key;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 /// Change kinds that mean the model's own identity changed.
 const OWN_CHANGE_KINDS: [&str; 5] = [

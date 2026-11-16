@@ -3,9 +3,9 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
+use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
 
 /// The getter readers of this module's native pyclasses.
 pub(crate) const GETTERS: &[GetterEntry] = &[GetterEntry {
