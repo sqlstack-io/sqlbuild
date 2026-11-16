@@ -1,6 +1,6 @@
 use std::cell::RefCell;
-use std::time::{Duration, Instant};
 
+use crate::templates::_helpers::pattern::counted_template_spans;
 use crate::templates::errors::TemplateError;
 use crate::templates::main::expand_template_string::expand_template_string;
 use crate::templates::models::{StringExpansion, TemplateFailure, TemplateOptions};
@@ -296,7 +296,7 @@ fn given_template_strings_when_expanding_then_values_and_reads_match_python() {
 }
 
 #[test]
-fn given_malformed_nested_templates_when_expanding_then_time_stays_linear() {
+fn given_malformed_nested_templates_when_finding_templates_then_the_scan_stays_linear() {
     let test_cases: [(&str, String); 3] = [
         (
             "an unclosed chain of nested templates with alternating quotes",
@@ -312,23 +312,12 @@ fn given_malformed_nested_templates_when_expanding_then_time_stays_linear() {
         ),
     ];
     for (description, text) in test_cases {
-        let host = TestHost {
-            variables: vec![("env", Value::Text("prod".to_owned()))],
-            environment: Vec::new(),
-            context: Vec::new(),
-            reads: RefCell::new(Vec::new()),
-        };
-        let options = TemplateOptions {
-            allow_context: true,
-            preserve_context_tokens: false,
-            preserve_unknown_context: true,
-        };
-        let started = Instant::now();
-        let _ = expand_template_string(&host, &text, options);
-        let elapsed = started.elapsed();
+        let (_, steps) = counted_template_spans(&text);
+        let limit: usize = 20 * text.len();
         assert!(
-            elapsed < Duration::from_secs(1),
-            "{description}: took {elapsed:?}"
+            steps <= limit,
+            "{description}: {steps} steps over {} characters",
+            text.len()
         );
     }
 }

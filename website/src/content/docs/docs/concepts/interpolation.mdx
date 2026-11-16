@@ -122,8 +122,8 @@ Details:
 - A backslash in a quoted string keeps the next character as written, so `'\${ENV:USER}'` is the
   text `${ENV:USER}`. Inside a TOML or YAML double-quoted value, write the backslash twice:
   `"${coalesce('\\${ENV:USER}')}"`.
-- A template inside a quoted string can use the same quotes as the string around it, and templates
-  nest up to eight levels deep.
+- A template inside a quoted string can use the same quotes as the string around it. Templates nest
+  up to eight levels deep; a template nested deeper stays as written text.
 
 ## Context variables
 
