@@ -3,13 +3,14 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyList, PyTuple, PyTupleMethods};
 
-use crate::bindings::_helpers::compile_context::diagnostic_collector::report_compile_diagnostic;
 use crate::bindings::_helpers::compile_driver::assembly_checks::test_model_query_overrides;
-use crate::bindings::_helpers::compile_driver::stage_work::{SQL_TEST_ASSEMBLY, count_stage};
 use crate::bindings::_helpers::sql_test_glue::compiled_tests::assemble_native_sql_tests;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_base::compile_context::main::diagnostic_collector::report_compile_diagnostic::report_compile_diagnostic;
+use sqlbuild_python_base::compile_driver::constants::SQL_TEST_ASSEMBLY;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

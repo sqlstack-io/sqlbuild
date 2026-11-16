@@ -13,7 +13,6 @@ use sqlbuild_scopes::scope_text::main::render_scope_text::render_scope_text;
 use sqlbuild_scopes::scope_text::main::scope_result_failed::scope_result_failed;
 use sqlbuild_scopes::scope_text::models::ScopeTextRequest;
 
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::scopes::scope_loading::load_or_build_scope_index;
 use crate::bindings::_helpers::scopes::scope_lookup::build_scope_lookup;
 use crate::bindings::_helpers::scopes::scope_objects::ScopeClasses;
@@ -22,6 +21,7 @@ use crate::bindings::_helpers::scopes::scope_reports::{
     ExplainArguments, ListArguments, ReportArguments, scope_browse, scope_explain, scope_list,
     scope_move_preview, scope_report, serialize_scope_report,
 };
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;

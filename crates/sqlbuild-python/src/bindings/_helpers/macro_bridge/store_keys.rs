@@ -9,15 +9,16 @@ use pyo3::types::{
     PyTuple, PyTypeMethods,
 };
 use pyo3::{create_exception, pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::boundary::main::utf16_units::utf16_units;
 
 use sqlbuild_cache::macro_store_keys::main::canonical_sort_text::canonical_sort_text;
 use sqlbuild_cache::macro_store_keys::main::context_store_token::context_store_token as context_key;
 use sqlbuild_cache::macro_store_keys::main::macro_store_token::macro_store_token as macro_key;
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 
-use crate::bindings::_helpers::frontier::encoder::emit_error;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::frontier::main::emit_error::emit_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
@@ -49,20 +50,10 @@ fn type_name(kind: &Bound<'_, PyAny>) -> PyResult<String> {
 
 /// A Python `str` as JSON text; one holding a lone surrogate as UTF-16 code units.
 pub(crate) fn text(value: &Bound<'_, PyString>) -> PyResult<JsonValue> {
-    if let Ok(text) = value.to_str() {
-        return Ok(JsonValue::String(text.to_owned()));
+    match value.to_str() {
+        Ok(text) => Ok(JsonValue::String(text.to_owned())),
+        Err(_) => utf16_units(value).map(JsonValue::Utf16),
     }
-    let encoded: Bound<'_, PyBytes> = value
-        .call_method1("encode", ("utf-16-le", "surrogatepass"))?
-        .downcast_into::<PyBytes>()?;
-    Ok(JsonValue::Utf16(
-        pyo3::types::PyBytesMethods::as_bytes(&encoded)
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect(),
-    ))
 }
 
 /// `[tag, value]`.

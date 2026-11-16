@@ -8,7 +8,6 @@ use sqlbuild_core::text::main::python_casefold::python_casefold;
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::contracts::spec_resolution::matching_dynamic_families;
-use crate::bindings::_helpers::type_system::equality::types_equal as native_types_equal;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
@@ -17,6 +16,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::type_system::main::types_equal::types_equal as native_types_equal;
 
 const MODEL_RESOURCE: &str = "model";
 const SOURCE_RESOURCE: &str = "source";

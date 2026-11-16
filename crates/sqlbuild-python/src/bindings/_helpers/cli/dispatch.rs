@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use crate::bindings::_helpers::audit_command::command::run_audit_command;
 use crate::bindings::_helpers::build_command::command::run_build_command;
 use crate::bindings::_helpers::check::check_command::run_check_command;
-use crate::bindings::_helpers::cli::launch_state::withhold_launch_record;
 use crate::bindings::_helpers::clone::clone_command::run_clone_command;
 use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
 use crate::bindings::_helpers::command_runtime::warehouses::validate_cli_warehouse;
@@ -55,6 +54,7 @@ use sqlbuild_cli::dispatch::models::{
     ClassRef, CommandFacts, DiffSide, Dispatch, DispatchFailure, Field, Route, Source,
 };
 use sqlbuild_core::format_command::main::format_path_selectors::format_path_selectors;
+use sqlbuild_python_base::cli::main::withhold_launch_record::withhold_launch_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 

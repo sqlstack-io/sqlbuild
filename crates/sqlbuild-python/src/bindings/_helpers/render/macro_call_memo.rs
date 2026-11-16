@@ -7,7 +7,8 @@ use sqlbuild_cache::store::models::NativeStore;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::bindings::_helpers::cache::native_store::{open_store, save_store};
+use sqlbuild_python_base::cache::main::open_store::open_store;
+use sqlbuild_python_base::cache::main::save_store::save_store;
 
 use crate::bindings::_helpers::render::macro_call_classes::CallClassState;
 
@@ -62,7 +63,7 @@ impl MacroCallMemo {
         path: PathBuf,
         environment: &str,
     ) -> PyResult<(Vec<u8>, usize)> {
-        if crate::bindings::_helpers::compile_context::delta::injection().is_some() {
+        if sqlbuild_python_base::compile_context::main::delta::injection::injection().is_some() {
             return Err(pyo3::exceptions::PyRuntimeError::new_err(
                 "a delta compile leaves the macro call store to full compiles",
             ));
@@ -83,7 +84,7 @@ impl MacroCallMemo {
 
     /// Whether this compile may use the call store; a delta compile leaves it to full compiles.
     fn store_allowed(&self) -> bool {
-        crate::bindings::_helpers::compile_context::delta::injection().is_none()
+        sqlbuild_python_base::compile_context::main::delta::injection::injection().is_none()
     }
 
     /// Whether this compile recorded calls the attached store does not hold yet.

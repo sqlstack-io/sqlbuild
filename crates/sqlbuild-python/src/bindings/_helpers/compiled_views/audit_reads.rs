@@ -3,8 +3,9 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::compile_driver::stage_work::{COMPILED_VIEW_FALLBACKS, count_stage};
 use crate::bindings::_helpers::compiled_views::audit_views::NativeCompiledAudit;
+use sqlbuild_python_base::compile_driver::constants::COMPILED_VIEW_FALLBACKS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The native view behind an audit object; any other object is a Python-built record, counted.

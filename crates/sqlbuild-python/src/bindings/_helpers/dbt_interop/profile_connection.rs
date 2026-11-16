@@ -7,6 +7,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::text::main::python_strip::python_strip;
 use sqlbuild_host::entries::models::ThirdPartyHost;
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 
 use crate::bindings::_helpers::dbt_interop::cli::resolved_path;
 use crate::bindings::_helpers::dbt_interop::profile::normalize_dbt_profile_connection;
@@ -31,11 +32,7 @@ const PROFILE_CONNECTION_OPTIONS: (&[&str], &[&str]) = (
 const NON_EMPTY_MESSAGE: &str = "dbt_profile connection values must be non-empty strings";
 
 pub(crate) fn profile_error(py: Python<'_>, message: String) -> PyErr {
-    match host_entry(py, ThirdPartyHost::DbtProfileError).and_then(|class| class.call1((message,)))
-    {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(error) => error,
-    }
+    host_error(py, ThirdPartyHost::DbtProfileError, &message)
 }
 
 /// A raw connection value as a stripped non-empty string, or `None` when absent.

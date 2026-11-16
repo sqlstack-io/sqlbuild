@@ -8,7 +8,7 @@ use pyo3::types::{PyCFunction, PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::compile_context::diagnostic_collector::collect_compile_diagnostics;
+use sqlbuild_python_base::compile_context::main::diagnostic_collector::collect_compile_diagnostics::collect_compile_diagnostics;
 use crate::bindings::_helpers::compile_driver::assembly_project::assembled_project;
 use crate::bindings::_helpers::compile_driver::project::lineage_mode;
 use crate::bindings::_helpers::compiled_views::records::project_with;

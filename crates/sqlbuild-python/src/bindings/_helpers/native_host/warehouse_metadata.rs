@@ -39,17 +39,17 @@ use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::fingerprints::latest_rows::row_fingerprint;
 use crate::bindings::_helpers::freshness::state_io::row_record;
 use crate::bindings::_helpers::freshness::support::presumed_utc_datetime;
-use crate::bindings::_helpers::native_host::constants::HISTORY_STREAM_PAGES;
-use crate::bindings::_helpers::native_host::warehouse_catalog::read_catalog;
-use crate::bindings::_helpers::native_host::warehouse_statistics::read_statistics;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::constants::HISTORY_STREAM_PAGES;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::warehouse_access::main::read_catalog::read_catalog;
+use sqlbuild_python_base::warehouse_access::main::read_statistics::read_statistics;
 
 /// One read-only adapter session serves every page of one synchronization.
 pub(crate) struct HistorySession<'py> {

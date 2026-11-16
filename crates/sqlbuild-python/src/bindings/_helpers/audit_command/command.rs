@@ -17,7 +17,6 @@ use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome};
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use crate::bindings::_helpers::build_progress::audit_progress::AuditProgressReporter;
-use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
@@ -27,7 +26,6 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_entries::command_plans::build_audit_command_plan;
 use crate::bindings::_helpers::result_output::documents::{
     audit_execution_json, audit_projection, write_execution_json_output,
@@ -38,7 +36,9 @@ use crate::bindings::_helpers::result_output::resource_ids::audit_identity;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

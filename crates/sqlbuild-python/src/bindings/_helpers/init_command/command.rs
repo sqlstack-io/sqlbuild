@@ -14,10 +14,10 @@ use sqlbuild_core::init_command::main::init_project_toml::init_project_toml;
 use sqlbuild_core::init_command::main::render_init_summary::render_init_summary;
 
 use crate::bindings::_helpers::init_command::scaffold::scaffold_blank_project;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::workspace_commands::commands::update_sqlbuild_skills;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;

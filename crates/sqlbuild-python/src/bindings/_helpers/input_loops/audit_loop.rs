@@ -22,7 +22,6 @@ use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::header_metadata::main::parse_measurement_policy::parse_measurement_policy;
 use sqlbuild_sqltext::sql_references::models::SqlReference;
 
-use crate::bindings::_helpers::compile_context::delta::record_source_reads;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::{
     AuditBlockRow, AuditFileRow, AuditSettings,
 };
@@ -45,6 +44,7 @@ use crate::bindings::_helpers::model_config::header_metadata::thresholds;
 use crate::bindings::_helpers::model_config::model_validator::NativeModelValidator;
 use sqlbuild_project::models::AttachedTarget;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const THRESHOLDS_KEY: &str = "thresholds";

@@ -9,9 +9,10 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cache::digest::main::sha256_hex::sha256_hex;
 use sqlbuild_host::compile_context::main::record_compile_metric::record_compile_metric;
 
-use crate::bindings::_helpers::planner_identity::json_values::{COMPACT, unicode_sorted_dumps};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::planner_identity::constants::COMPACT;
+use sqlbuild_python_base::planner_identity::main::unicode_sorted_dumps::unicode_sorted_dumps;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;

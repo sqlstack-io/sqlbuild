@@ -27,10 +27,10 @@ use crate::bindings::_helpers::model_config::contract_classes::contract_classes;
 use crate::bindings::_helpers::model_config::header_metadata::{
     ContractClasses, HeaderValue, audit_instance, thresholds,
 };
-use crate::bindings::_helpers::native_host::header_projection::AuditProjection;
-use crate::bindings::_helpers::result_output::integration_values::json_value;
 use crate::bindings::_helpers::sqltext::authored_values::authored_value_to_python;
+use sqlbuild_python_base::native_host::models::AuditProjection;
 use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::result_output::main::json_value::json_value;
 
 /// Native-built specs never become Python audit records just to be read by attachment.
 pub(crate) enum AuditInstance<'py> {

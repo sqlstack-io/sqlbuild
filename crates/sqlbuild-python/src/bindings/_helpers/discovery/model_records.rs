@@ -115,7 +115,7 @@ pub(crate) fn discovered_model_files<'py>(
     let py: Python<'py> = project_dir.py();
     let options: ModelFileOptions = model_file_options(
         extraction,
-        crate::bindings::_helpers::compile_context::delta::injection()
+        sqlbuild_python_base::compile_context::main::delta::injection::injection()
             .map(|injection| std::sync::Arc::new(injection.model_paths.clone())),
     );
     let items: Vec<ModelItem<'py>> = model_items(project_dir, &options)?;

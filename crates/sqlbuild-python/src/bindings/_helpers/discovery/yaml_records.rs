@@ -14,6 +14,7 @@ use sqlbuild_discovery::yaml_files::main::load_yaml_text::load_yaml_text;
 use sqlbuild_discovery::yaml_files::main::schema_yaml_paths::schema_yaml_paths;
 use sqlbuild_discovery::yaml_files::main::source_yaml_paths::source_yaml_paths;
 use sqlbuild_discovery::yaml_files::models::{YamlFileOutcome, YamlPathFailure};
+use sqlbuild_python_base::compile_context::main::yaml_cache::retain_read_sources::retain_read_sources;
 use std::path::PathBuf;
 
 use crate::bindings::_helpers::discovery::faults::{FileFaults, record_tuple};
@@ -155,13 +156,14 @@ fn load_files<'py>(
     let py: Python<'py> = project_dir.py();
     let tree: Bound<'py, NativeProjectTree> = project_tree(project_dir)?;
     let root: ProjectRoot = project_root(project_dir)?;
-    let mut documents: Option<
-        crate::bindings::_helpers::compile_context::yaml_cache::DocumentStore,
-    > = if matches!(kind, YamlKind::Source) {
-        crate::bindings::_helpers::compile_context::yaml_cache::open_documents(py)
-    } else {
-        None
-    };
+    let mut documents: Option<sqlbuild_python_base::compile_context::models::DocumentStore> =
+        if matches!(kind, YamlKind::Source) {
+            sqlbuild_python_base::compile_context::main::yaml_cache::open_documents::open_documents(
+                py,
+            )
+        } else {
+            None
+        };
     for batch in batches(&tree.get().inner, paths, YAML_BATCH_BYTES) {
         let named: Vec<String> = batch
             .iter()
@@ -185,9 +187,7 @@ fn load_files<'py>(
         let mut outcomes: Vec<YamlFileOutcome> =
             outcomes.map_err(|failure| stage_error(&tree.get().inner, project_dir, failure))?;
         if matches!(kind, YamlKind::Source) {
-            crate::bindings::_helpers::compile_context::yaml_cache::retain_read_sources(
-                &mut outcomes,
-            );
+            outcomes = retain_read_sources(outcomes);
         }
         let mut outcomes = outcomes.into_iter();
         for path in batch {
@@ -212,7 +212,9 @@ fn load_files<'py>(
         }
     }
     if let Some(documents) = &documents {
-        crate::bindings::_helpers::compile_context::yaml_cache::save_documents(py, documents);
+        sqlbuild_python_base::compile_context::main::yaml_cache::save_documents::save_documents(
+            py, documents,
+        );
     }
     Ok(())
 }

@@ -5,7 +5,7 @@ use std::cell::Cell;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::bindings::_helpers::native_host::provider_settings::missing_secrets;
+use sqlbuild_python_base::orchestration_reads::main::missing_secrets::missing_secrets;
 use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::ErrorId;

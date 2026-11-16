@@ -2,10 +2,11 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::cache::{native_store, sql_test_scan_store};
+use sqlbuild_python_base::cache::main::register_native_store::register_native_store;
+use sqlbuild_python_base::cache::main::register_sql_test_scan_store::register_sql_test_scan_store;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    native_store::register(module)?;
-    sql_test_scan_store::register(module)?;
+    register_native_store(module)?;
+    register_sql_test_scan_store(module)?;
     Ok(())
 }

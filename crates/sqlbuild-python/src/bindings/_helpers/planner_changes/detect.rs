@@ -44,7 +44,6 @@ use crate::bindings::_helpers::planner_identity::metadata::{
 };
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::semantic_shapes::shapes::snapshot_validity_columns;
-use crate::bindings::_helpers::type_system::equality::types_equal as native_types_equal;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -54,6 +53,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::type_system::main::types_equal::types_equal as native_types_equal;
 
 const CHANGES_LOGGER: &str = "sqlbuild.planner.changes";
 const REPLAY_CONFIG_KEY: &str = "replay_on_change";

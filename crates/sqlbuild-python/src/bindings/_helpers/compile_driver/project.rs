@@ -29,9 +29,6 @@ use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::compile_driver::assembly::assemble_project;
 use crate::bindings::_helpers::compile_driver::selection_phases::resolve_analysis_model_names;
-use crate::bindings::_helpers::compile_driver::stage_work::{
-    PROJECT_GRAPHS, PROMOTION_CONFLICTS, count_stage,
-};
 use crate::bindings::_helpers::compiled_views::records::project_with;
 use crate::bindings::_helpers::contracts::contract_diagnostics::promotion_conflict_diagnostics;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
@@ -40,6 +37,9 @@ use pyo3::IntoPyObjectExt;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_core::constants::TABLE_PROMOTION_MODE_SETTING_KEY;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::compile_driver::constants::PROJECT_GRAPHS;
+use sqlbuild_python_base::compile_driver::constants::PROMOTION_CONFLICTS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";

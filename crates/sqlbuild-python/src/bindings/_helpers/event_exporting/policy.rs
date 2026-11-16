@@ -10,9 +10,9 @@ use sqlbuild_core::event_export::models::{ExportPolicy, ExportSeverity};
 use sqlbuild_core::lifecycle_events::constants::CURRENT_LIFECYCLE_EVENT_SCHEMA_VERSION;
 use sqlbuild_core::lifecycle_events::main::catalog::catalog;
 
-use crate::bindings::_helpers::event_exporting::values::{
-    export_policy, severity_from, severity_object,
-};
+use sqlbuild_python_base::event_exporting::main::export_policy::export_policy;
+use sqlbuild_python_base::event_exporting::main::severity_from::severity_from;
+use sqlbuild_python_base::event_exporting::main::severity_object::severity_object;
 
 /// `{event_type: (kind, severity, priority)}` for every catalogued lifecycle event, in catalogue order.
 #[pyfunction]

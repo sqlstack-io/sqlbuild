@@ -22,9 +22,10 @@ use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_core::constants::PANIC_MESSAGE;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 
-use crate::bindings::_helpers::cache::native_parse_store::{NativeParseStore, parse_key};
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::input_loops::model_loop_prepass::spawned;
+use sqlbuild_python_base::cache::main::parse_key::parse_key;
+use sqlbuild_python_base::cache::models::NativeParseStore;
 
 use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, NativeModelLoop, compile_error,

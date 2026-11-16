@@ -25,7 +25,6 @@ use sqlbuild_rules::models::{
     RowsEvaluation, RowsRequest, RulesConfig,
 };
 
-use crate::bindings::_helpers::cache::native_store::current_code_identity;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::compiled_views::audit_views::NativeCompiledAudit;
@@ -39,14 +38,15 @@ use crate::bindings::_helpers::rules::rule_run::bulk_cache_file;
 use crate::bindings::_helpers::rules::selection::rules_error;
 use crate::bindings::_helpers::rules::sql_test_objects::{scenario_fact, sql_test_fact};
 use crate::bindings::_helpers::scopes::scope_reports::metadata_projection_value;
-use crate::bindings::_helpers::type_system::equality::types_equal;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::cache::main::current_code_identity::current_code_identity;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::type_system::main::types_equal::types_equal;
 use sqlbuild_python_base::types::CompilerDetach;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
@@ -325,7 +325,8 @@ fn built_request(
         request.models = built_models(&rows, &request, model_rows)?;
         let request: EvaluateRequest =
             crate::bindings::_helpers::compile_delta::rules_rows::whole_project_request(request)?;
-        let delta: bool = crate::bindings::_helpers::compile_context::delta::injection().is_some();
+        let delta: bool =
+            sqlbuild_python_base::compile_context::main::delta::injection::injection().is_some();
         let memo: Option<(String, PathBuf)> = rows
             .memo
             .take()
@@ -334,7 +335,7 @@ fn built_request(
         Ok(RowsRequest {
             request,
             memo,
-            retain: crate::bindings::_helpers::compile_context::delta::capturing(),
+            retain: sqlbuild_python_base::compile_context::main::delta::capturing::capturing(),
         })
     })
 }
@@ -375,9 +376,9 @@ fn evaluated<'py>(
         RowsError::Io(error) => PyOSError::new_err(error.to_string()),
     })?;
     if let Some(retained) = evaluation.retained.take() {
-        crate::bindings::_helpers::compile_context::delta::capture(|capture| {
+        sqlbuild_python_base::compile_context::main::delta::capture::capture(|capture| {
             capture.rules =
-                Some(crate::bindings::_helpers::compile_context::delta::CapturedRules { retained });
+                Some(sqlbuild_python_base::compile_context::models::CapturedRules { retained });
         });
     }
     let classes = FindingClasses::new(py)?;

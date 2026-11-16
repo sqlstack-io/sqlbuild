@@ -6,7 +6,6 @@ pub(crate) mod event_writer;
 pub(crate) mod getters;
 pub(crate) mod integration_envelope;
 pub(crate) mod integration_records;
-pub(crate) mod integration_values;
 pub(crate) mod projection;
 pub(crate) mod registration;
 pub(crate) mod resource_ids;

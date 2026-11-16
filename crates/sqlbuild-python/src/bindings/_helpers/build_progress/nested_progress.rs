@@ -13,13 +13,24 @@ use sqlbuild_core::nested_progress::main::render_nested_spinner_line::render_nes
 use sqlbuild_core::nested_progress::models::{NestedChildRow, NestedItem, NestedLayout};
 
 use crate::bindings::_helpers::build_progress::result_text::text;
-use crate::bindings::_helpers::build_progress::terminal::{
-    CLEAR_LINE, HIDE_CURSOR, SHOW_CURSOR, SPINNER_FRAMES, SPINNER_TICK_SECONDS, claim,
-    consume_terminal, flush, join_spinner, projector, release, shared_lines, start_spinner,
-    terminal_columns, tty_flag, write,
-};
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_progress::constants::CLEAR_LINE;
+use sqlbuild_python_base::build_progress::constants::HIDE_CURSOR;
+use sqlbuild_python_base::build_progress::constants::SHOW_CURSOR;
+use sqlbuild_python_base::build_progress::constants::SPINNER_FRAMES;
+use sqlbuild_python_base::build_progress::constants::SPINNER_TICK_SECONDS;
+use sqlbuild_python_base::build_progress::main::terminal::claim::claim;
+use sqlbuild_python_base::build_progress::main::terminal::consume_terminal::consume_terminal;
+use sqlbuild_python_base::build_progress::main::terminal::flush::flush;
+use sqlbuild_python_base::build_progress::main::terminal::join_spinner::join_spinner;
+use sqlbuild_python_base::build_progress::main::terminal::projector::projector;
+use sqlbuild_python_base::build_progress::main::terminal::release::release;
+use sqlbuild_python_base::build_progress::main::terminal::shared_lines::shared_lines;
+use sqlbuild_python_base::build_progress::main::terminal::start_spinner::start_spinner;
+use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
+use sqlbuild_python_base::build_progress::main::terminal::tty_flag::tty_flag;
+use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MIN_NAME_WIDTH: usize = 50;

@@ -18,9 +18,6 @@ use sqlbuild_rules::lint_text::models::{
     FormatFault, FormatFile, FormattedBodies, SuppressionFinding,
 };
 
-use crate::bindings::_helpers::compile_driver::stage_work::{
-    FORMAT_CACHE_HITS, FORMAT_CACHE_MISSES, FORMAT_LINT_BATCHES, FORMAT_LINT_FILES, count_stage,
-};
 use crate::bindings::_helpers::discovery::description_inputs::externally_described_models;
 use crate::bindings::_helpers::format_command::cache::FormatCache;
 use crate::bindings::_helpers::format_command::files::{
@@ -38,6 +35,11 @@ use crate::bindings::_helpers::rules::lint_pipeline::{
 use crate::bindings::_helpers::rules::lint_text::{relative_parts, unsafe_fault};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::compile_driver::constants::FORMAT_CACHE_HITS;
+use sqlbuild_python_base::compile_driver::constants::FORMAT_CACHE_MISSES;
+use sqlbuild_python_base::compile_driver::constants::FORMAT_LINT_BATCHES;
+use sqlbuild_python_base::compile_driver::constants::FORMAT_LINT_FILES;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

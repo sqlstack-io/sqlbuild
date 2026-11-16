@@ -3,7 +3,6 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::bindings::_helpers::compile_driver::stage_work::{COMPILED_VIEW_FALLBACKS, count_stage};
 use crate::bindings::_helpers::compiled_views::compiled_model_view::{
     NativeCompiledModel, model_graph_row,
 };
@@ -12,6 +11,8 @@ use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
 use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;
 use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;
+use sqlbuild_python_base::compile_driver::constants::COMPILED_VIEW_FALLBACKS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// A resource's graph facts without constructing its public keys or dependency tuple.

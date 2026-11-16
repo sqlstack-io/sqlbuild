@@ -4,7 +4,8 @@ use sqlbuild_discovery::header_changes::main::header_key_digests::header_key_dig
 use sqlbuild_discovery::header_changes::types::HeaderKeys;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
-use crate::bindings::_helpers::compile_context::delta::{capture, capturing};
+use sqlbuild_python_base::compile_context::main::delta::capture::capture;
+use sqlbuild_python_base::compile_context::main::delta::capturing::capturing;
 
 /// Record one discovered model's header keys for the image.
 pub(crate) fn record_header_keys(relative_path: &str, values: &[(String, AuthoredValue)]) {

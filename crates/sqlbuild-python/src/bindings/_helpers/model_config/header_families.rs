@@ -4,7 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyTuple;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 
-use crate::bindings::_helpers::native_host::header_projection::FamilyProjection;
+use sqlbuild_python_base::native_host::models::FamilyProjection;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;

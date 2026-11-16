@@ -11,5 +11,6 @@ pub mod native_compiler_error;
 pub mod register_expected_errors;
 pub mod register_native_compiler_error;
 pub mod register_oracles;
+pub mod utf16_units;
 pub mod value_error;
 pub mod within;
