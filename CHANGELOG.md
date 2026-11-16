@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.236.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.235.0...v0.236.0) (2026-11-16)
+
+
+### Features
+
+* target settings for Python nodes and providers, and statement summaries for sqb test ([#1522](https://github.com/sqlstack-io/sqlbuild/issues/1522)) ([28e341a](https://github.com/sqlstack-io/sqlbuild/commit/28e341a94cbc22f647d553ba07a0e7a9f1606896))
+
 ## [0.235.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.234.0...v0.235.0) (2026-11-16)
 
 
