@@ -34,7 +34,9 @@ class JanitorPlanTestCase:
 @dataclass(frozen=True)
 class JanitorTargetSchemaTestCase:
     description: str
+    target_database: str | None
     target_schema: str
+    location: tuple[str | None, str]
     expected_inspected: bool
 
 

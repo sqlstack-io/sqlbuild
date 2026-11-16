@@ -269,13 +269,24 @@ def test_given_project_and_warehouse_when_building_janitor_plan_then_returns_exp
     [
         JanitorTargetSchemaTestCase(
             description="a real target schema is inspected for artifacts",
+            target_database=None,
             target_schema="dev",
+            location=(None, "dev"),
             expected_inspected=True,
         ),
         JanitorTargetSchemaTestCase(
             description="a preserve target schema names no schema to inspect",
+            target_database=None,
             target_schema="preserve",
+            location=(None, "preserve"),
             expected_inspected=False,
+        ),
+        JanitorTargetSchemaTestCase(
+            description="a preserve target database names no database for the target schema",
+            target_database="preserve",
+            target_schema="dev",
+            location=(None, "dev"),
+            expected_inspected=True,
         ),
     ],
     ids=lambda case: case.description,
@@ -286,14 +297,17 @@ def test_given_a_target_schema_when_building_janitor_plan_then_only_a_real_schem
     adapter: FakeJanitorAdapter = FakeJanitorAdapter(relation_infos=())
 
     _ = build_janitor_plan(
-        project=build_project(target_schema=test_case.target_schema),
+        project=build_project(
+            target_schema=test_case.target_schema, target_database=test_case.target_database
+        ),
         adapter=adapter,
         connection=object(),
         retention_days=7,
         direct_mode=True,
     )
 
-    assert (test_case.target_schema in adapter.listed_schemas) == test_case.expected_inspected
+    assert (test_case.location in adapter.listed_locations) == test_case.expected_inspected
+    assert all(database != "preserve" for database, _ in adapter.listed_locations)
 
 
 @pytest.mark.parametrize(

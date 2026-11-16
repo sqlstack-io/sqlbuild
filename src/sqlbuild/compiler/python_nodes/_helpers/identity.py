@@ -182,9 +182,9 @@ def _visit_object(
             collected_dependencies: dict[tuple[str, str], PythonIdentityDependency] = dependencies
             collected_dependencies[key] = dependency
 
-    target: object = inspect.unwrap(cast(Any, obj))
+    unwrapped: object = inspect.unwrap(cast(Any, obj))
     globals_map: Mapping[str, object] | None = getattr(
-        class_anchor(target) or target, "__globals__", None
+        class_anchor(unwrapped) or unwrapped, "__globals__", None
     )
     if globals_map is None:
         module: ModuleType | None = memo.module(obj)

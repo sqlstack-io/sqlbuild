@@ -79,7 +79,7 @@ class FakeJanitorAdapter(BaseAdapter):
         self.dropped_view_targets: list[str] = []
         self.renamed_targets: list[tuple[str, str]] = []
         self.executed_sql: list[str] = []
-        self.listed_schemas: list[str] = []
+        self.listed_locations: list[tuple[str | None, str]] = []
         self.tracked_relations: tuple[tuple[str | None, str | None, str], ...] = tracked_relations
         self._tracked_rows: tuple[tuple[Any, ...], ...] = tuple(
             (
@@ -173,7 +173,7 @@ class FakeJanitorAdapter(BaseAdapter):
         schemas: tuple[str, ...] | None,
         names: tuple[str, ...] | None = None,
     ) -> tuple[RelationInfo, ...]:
-        self.listed_schemas.extend(schemas or ())
+        self.listed_locations.extend((database, schema) for schema in schemas or ())
         selected: list[RelationInfo] = []
         available_schemas: tuple[str, ...] = schemas or tuple(
             relation.schema or "" for relation in self._available_relations
@@ -551,6 +551,7 @@ def build_project(
     destination_schema: str = "analytics",
     migrate_from: str | None = None,
     target_schema: str | None = None,
+    target_database: str | None = None,
 ) -> CompiledProjectView:
     source: CompiledSourceView = CompiledSource(
         key=CompiledObjectKey(
@@ -572,6 +573,7 @@ def build_project(
         run_id="run-1",
         effective_target_name="dev",
         effective_target_schema=target_schema,
+        effective_target_database=target_database,
         effective_connection={},
         effective_vars={},
         models=(

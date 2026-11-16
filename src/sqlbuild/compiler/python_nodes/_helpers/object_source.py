@@ -69,7 +69,10 @@ def class_anchor(obj: object) -> FunctionType | None:
         return None
     value: object
     for value in vars(obj).values():
-        function: object = inspect.unwrap(getattr(value, "__func__", value))
+        method: object = value.__func__ if isinstance(value, staticmethod | classmethod) else value
+        if not isinstance(method, FunctionType):
+            continue
+        function: object = inspect.unwrap(method)
         if (
             isinstance(function, FunctionType)
             and function.__qualname__.startswith(f"{obj.__qualname__}.")
