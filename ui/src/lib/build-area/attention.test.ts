@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AttentionItem, AttentionRun, PlatformEvent } from '$lib/api';
-import { attentionViews } from './attention';
+import { attentionViews, staleSentence } from './attention';
 import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
 
 const now = Date.parse('2026-01-01T12:00:00Z');
@@ -76,12 +76,40 @@ describe('overview alerts', () => {
 	});
 
 	it('states how many nodes are out of date, counting a node both changed and behind once', () => {
-		const detail = (changed: string[], behind: string[]) => attentionViews([{ kind: 'stale_models', changed, behind }], now)[0].view;
-		expect(detail(['model:a', 'model:b'], ['model:b']).title).toBe('2 nodes out of date');
-		expect(detail(['model:a', 'model:b'], ['model:b']).detail).toBe('2 changed since their last build, 1 of them also behind an upstream rebuild: a, b');
-		expect(detail(['model:a', 'model:b'], ['model:b', 'model:c']).detail).toBe('2 changed since their last build, 1 of them also behind an upstream rebuild, and 1 more behind an upstream rebuild: a, b, c');
-		expect(detail(['model:a'], ['model:c']).detail).toBe('1 changed since its last build and 1 behind an upstream rebuild: a, c');
-		expect(detail(['model:a'], ['model:a']).detail).toBe('1 changed since its last build, also behind an upstream rebuild: a');
-		expect(detail([], ['model:c', 'model:d']).detail).toBe('2 behind an upstream rebuild: c, d');
+		const view = (changed: string[], behind: string[]) => attentionViews([{ kind: 'stale_models', changed, behind }], now)[0].view;
+		expect(view(['model:a', 'model:b'], ['model:b']).title).toBe('2 nodes out of date');
+		expect(view(['model:a', 'model:b'], ['model:b', 'model:c']).detail).toBe('2 changed since their last build, and 1 more is behind an upstream rebuild: a, b and c.');
+	});
+});
+
+describe('the out-of-date sentence', () => {
+	const keys = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `model:${prefix}${i + 1}`);
+
+	it('reads as plain English, with counts that add up to the total and at most three names', () => {
+		// 30 changed, 9 of them also behind, and 82 only behind: 112 in all.
+		const changed = keys('orders_', 30);
+		const behind = [...changed.slice(0, 9), ...keys('customers_', 82)];
+		expect(staleSentence(changed, behind)).toBe(
+			'30 changed since their last build, and 82 more are behind an upstream rebuild. Including orders_1, orders_2, orders_3 and 109 more.'
+		);
+	});
+
+	it('drops the overlap: nodes changed and also behind count only as changed', () => {
+		expect(staleSentence(['model:orders', 'model:customers'], ['model:customers'])).toBe('2 changed since their last build: orders and customers.');
+		expect(staleSentence(['model:orders'], ['model:orders'])).toBe('1 changed since its last build: orders.');
+	});
+
+	it('handles singular and plural for each part', () => {
+		expect(staleSentence(['model:orders'], ['model:customers'])).toBe('1 changed since its last build, and 1 more is behind an upstream rebuild: orders and customers.');
+		expect(staleSentence(keys('orders_', 2), keys('customers_', 2))).toBe(
+			'2 changed since their last build, and 2 more are behind an upstream rebuild. Including orders_1, orders_2, customers_1 and 1 more.'
+		);
+	});
+
+	it('words only-changed and only-behind nodes naturally', () => {
+		expect(staleSentence(keys('orders_', 5), [])).toBe('5 changed since their last build. Including orders_1, orders_2, orders_3 and 2 more.');
+		expect(staleSentence([], ['model:inventory'])).toBe('1 is behind an upstream rebuild: inventory.');
+		expect(staleSentence([], ['model:inventory', 'model:orders', 'model:customers'])).toBe('3 are behind an upstream rebuild: inventory, orders and customers.');
+		expect(staleSentence([], keys('inventory_', 4))).toBe('4 are behind an upstream rebuild. Including inventory_1, inventory_2, inventory_3 and 1 more.');
 	});
 });

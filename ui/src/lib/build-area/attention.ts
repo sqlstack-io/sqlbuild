@@ -37,6 +37,31 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 const minutes = (seconds: number | null) => (seconds === null ? '—' : seconds % 3600 === 0 ? `${seconds / 3600}h` : `${Math.round(seconds / 60)}m`);
 const waitText = (waits: QueueWait[]) => waits.map((w) => describeWait(w).map((p) => p.text).join('')).join(' · ');
 
+/** How many names the out-of-date sentence lists before "and N more". */
+export const STALE_NAMES_SHOWN = 3;
+
+/** "a", "a and b", "a, b and c". */
+const andList = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
+
+/**
+ * The out-of-date alert's sentence, e.g. "30 changed since their last build, and 82 more are behind an upstream
+ * rebuild. Including a, b, c and 109 more." A node both changed and behind counts once, as changed, so the two
+ * counts add up to the alert's total. Up to three names; a complete list follows a colon instead.
+ */
+export function staleSentence(changed: string[], behind: string[]): string {
+	const changedSet = new Set(changed);
+	const changedCount = changedSet.size;
+	const onlyBehind = new Set(behind.filter((key) => !changedSet.has(key))).size;
+	const all = [...new Set([...changed, ...behind])].map(shortName);
+	const behindText = (n: number, more: string) => `${n}${more} ${n === 1 ? 'is' : 'are'} behind an upstream rebuild`;
+	const counts = changedCount
+		? `${changedCount} changed since ${changedCount === 1 ? 'its' : 'their'} last build${onlyBehind ? `, and ${behindText(onlyBehind, ' more')}` : ''}`
+		: behindText(onlyBehind, '');
+	if (all.length === 0) return `${counts}.`;
+	if (all.length <= STALE_NAMES_SHOWN) return `${counts}: ${andList(all)}.`;
+	return `${counts}. Including ${all.slice(0, STALE_NAMES_SHOWN).join(', ')} and ${all.length - STALE_NAMES_SHOWN} more.`;
+}
+
 export function attentionView(item: AttentionItem, now: number): AttentionView {
 	switch (item.kind) {
 		case 'run_problem':
@@ -70,20 +95,12 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 			};
 		}
 		case 'stale_models': {
-			const changed = new Set(item.changed);
-			const both = item.behind.filter((key) => changed.has(key)).length;
 			const all = [...new Set([...item.changed, ...item.behind])];
-			const only = item.behind.length - both;
-			const alsoBehind = both ? `, ${item.changed.length === 1 ? 'also' : `${both} of them also`} behind an upstream rebuild` : '';
-			const onlyBehind = only ? `${both ? `, and ${only} more` : ` and ${only}`} behind an upstream rebuild` : '';
-			const counts = item.changed.length
-				? `${item.changed.length} changed since ${item.changed.length === 1 ? 'its' : 'their'} last build${alsoBehind}${onlyBehind}`
-				: `${only} behind an upstream rebuild`;
 			return {
 				key: 'stale',
 				tone: 'stale',
 				title: `${plural(all.length, 'node')} out of date`,
-				detail: `${counts}: ${all.slice(0, 4).map(shortName).join(', ')}${all.length > 4 ? ` and ${all.length - 4} more` : ''}`,
+				detail: staleSentence(item.changed, item.behind),
 				since: '',
 				href: '/catalog?stale=1',
 				action: 'View in catalog',
