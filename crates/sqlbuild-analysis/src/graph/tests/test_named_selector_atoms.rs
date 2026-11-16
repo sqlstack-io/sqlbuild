@@ -30,6 +30,11 @@ fn given_a_selection_when_listing_named_atoms_then_only_single_node_names_count(
             expected_atoms: &[],
         },
         NamedAtomsTestCase {
+            description: "kinds do not count",
+            selection: "kind:model kind:task",
+            expected_atoms: &[],
+        },
+        NamedAtomsTestCase {
             description: "folder paths do not count",
             selection: "models/orders python/orders path:models/finance",
             expected_atoms: &[],

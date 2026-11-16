@@ -12,10 +12,10 @@ use crate::graph::main::parse_selector::parse_selector;
 use crate::graph::models::{EdgeDirection, ParsedSelector, ProjectGraph};
 use crate::python_selection::constants::{
     ASSET_KIND, CHECK_KIND, INTERSECTION_SEPARATOR, JOB_KIND, LOADER_KIND, NAME_KIND,
-    PATH_BETWEEN_CODE, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PATTERN_CHARACTERS,
-    SQL_MODEL_PATH_ROOT, TAG_KIND, TASK_KIND, TEST_KIND, UNIT_TEST_CODE,
-    UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE, UNKNOWN_TAG_CODE,
-    UNMAPPED_KIND_CODE,
+    NODE_KIND_KIND, PATH_BETWEEN_CODE, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR,
+    PATTERN_CHARACTERS, PLANNER_DEFAULT_CODE, SQL_MODEL_PATH_ROOT, TAG_KIND, TASK_KIND, TEST_KIND,
+    UNIT_TEST_CODE, UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE,
+    UNKNOWN_TAG_CODE, UNMAPPED_KIND_CODE,
 };
 use crate::python_selection::models::{
     NodeIndex, PythonSelectionGraph, PythonSelectionNode, SelectionContext, SqlSelectionGraph,
@@ -181,6 +181,7 @@ fn single(index: &NodeIndex<'_>, raw: &str) -> Resolved {
         TEST_KIND => return Err(unit_test_error(raw)),
         TAG_KIND => tagged(index, &value)?,
         PATH_KIND => under_path(index, &value)?,
+        NODE_KIND_KIND => of_kind(index, &value)?,
         _ => {
             let names: Names = lookup(index, &kind, &value)?;
             if names.is_empty() {
@@ -208,6 +209,29 @@ fn tagged(index: &NodeIndex<'_>, tag: &str) -> Resolved {
         return Err(error(
             UNKNOWN_TAG_CODE,
             format!("no Python nodes found with tag '{tag}'"),
+        ));
+    }
+    Ok(names)
+}
+
+/// The Python nodes of one kind, such as every `task`.
+fn of_kind(index: &NodeIndex<'_>, kind: &str) -> Resolved {
+    if ![TASK_KIND, ASSET_KIND, LOADER_KIND, CHECK_KIND].contains(&kind) {
+        return Err(error(
+            UNMAPPED_KIND_CODE,
+            format!("node kind '{kind}' is not a Python node kind"),
+        ));
+    }
+    let names: Names = index
+        .by_name
+        .values()
+        .filter(|node| node.kind == kind)
+        .map(|node| node.name.clone())
+        .collect();
+    if names.is_empty() {
+        return Err(error(
+            PLANNER_DEFAULT_CODE,
+            format!("no nodes found of kind '{kind}'"),
         ));
     }
     Ok(names)
