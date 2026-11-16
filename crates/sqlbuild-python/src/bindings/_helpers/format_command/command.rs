@@ -16,7 +16,6 @@ use sqlbuild_core::format_command::main::render_lint_text::render_lint_text;
 use sqlbuild_core::format_command::models::LintReport;
 use sqlbuild_rules::lint_text::main::scan_fixture_null_candidates::scan_fixture_null_candidates;
 
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::format_command::config::{FormatConfig, format_config, lint_config};
 use crate::bindings::_helpers::format_command::files::FormatChange;
 use crate::bindings::_helpers::format_command::report::lint_report;
@@ -32,6 +31,7 @@ use sqlbuild_python_base::build_progress::main::transient_status::status_reporte
 use sqlbuild_python_base::frontier::main::emit_error::emit_error;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 
 const SQL_ANALYSIS_SETTING_KEY: &str = "sql_analysis";
 const DEFAULT_DIALECT: &str = "generic";

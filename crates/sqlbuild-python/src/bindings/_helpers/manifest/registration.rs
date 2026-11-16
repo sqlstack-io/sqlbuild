@@ -2,8 +2,8 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::manifest::builder;
+use sqlbuild_python_compile::manifest::main::register_builder::register_builder;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    builder::register(module)
+    register_builder(module)
 }

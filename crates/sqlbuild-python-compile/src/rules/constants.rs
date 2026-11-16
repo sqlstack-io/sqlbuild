@@ -1,0 +1,56 @@
+//! Public constants of rules.
+
+use crate::rules::_helpers::checking::getters::read_early_sql_lint;
+use crate::rules::models::EarlySqlLint;
+use sqlbuild_python_base::records::main::registry::class_of::class_of;
+use sqlbuild_python_base::records::models::GetterEntry;
+
+pub(crate) const MODEL_TEST_MODE: &str = "model";
+
+/// The rule codes whose fixes `sqb format --fix` may apply after compiler verification.
+pub(crate) const SAFE_RULE_FIX_CODES: [&str; 8] = [
+    "SQLCLEAN002",
+    "SQLCLEAN003",
+    "SQLCLEAN005",
+    "SQLCLEAN006",
+    "SQLCLEAN008",
+    "SQLCLEAN017",
+    "SQLCLEAN025",
+    "SQLCLEAN042",
+];
+
+/// The note attached to a rule finding that has an available fix.
+pub const RULE_FIX_AVAILABLE_NOTE: &str =
+    "Fix available: `sqb format --fix` applies it after compiler verification";
+
+pub(crate) const RULES_NATIVE_API_VERSION: i64 = 1;
+
+/// File name of the custom-rule result cache under the project cache directory.
+pub(crate) const CUSTOM_RULES_CACHE_FILE: &str = "custom-rules.json";
+
+/// Code prefix of the SQL lint rules, which check each selected file on its own.
+pub(crate) const SQL_RULE_PREFIX: &str = "SQLCLEAN";
+
+/// Suffix of a custom host scratch directory abandoned by a cancelled run.
+pub(crate) const CUSTOM_HOST_ABANDONED_SUFFIX: &str = ".abandoned";
+
+/// Marker file whose presence tells split custom hosts the run was cancelled.
+pub(crate) const CUSTOM_HOST_CANCELLED_MARKER: &str = "cancelled";
+
+/// Rules that need proven column types and are skipped without SQL analysis.
+pub(crate) const TYPE_PROOF_RULE_CODES: [&str; 2] = ["SQBRCONTRACT105", "SQBRPERFORMANCE102"];
+
+/// Runtime identity custom-rule hosts and their cache entries record.
+pub const CUSTOM_HOST_RUNTIME_VERSION: &str = "sqlbuild-rules-custom-v3";
+
+/// Native rules evaluations answered from the response memo.
+pub(crate) const RULES_MEMO_REUSES: &str = "rules_memo_reuses";
+
+/// The `RulesError` attribute holding how to turn off default Rules, printed only with human error text.
+pub const DEFAULT_RULES_NOTICE_ATTR: &str = "default_rules_notice";
+
+/// The getter readers of this module's native pyclasses.
+pub const GETTERS: &[GetterEntry] = &[GetterEntry {
+    class: class_of::<EarlySqlLint>,
+    read: read_early_sql_lint,
+}];

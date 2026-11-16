@@ -7,6 +7,7 @@ SCANNED_SOURCE_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-python-front/src",
     "crates/sqlbuild-python-project/src",
     "crates/sqlbuild-python-planner/src",
+    "crates/sqlbuild-python-compile/src",
     "crates/sqlbuild-python/src",
     "crates/sqlbuild-cli/src",
     "crates/sqlbuild-host/src",

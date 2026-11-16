@@ -20,7 +20,6 @@ use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::policies::build_command_error;
 use crate::bindings::_helpers::build_command::policies::enforce_model_execution_limit_binding;
 use crate::bindings::_helpers::clone::clone_pipeline::run_clone_pipeline_with_options;
-use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -30,6 +29,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::build_compiled_project::build_compiled_project;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_project::planner_scope::main::build_planner_scope::build_planner_scope;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;

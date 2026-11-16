@@ -17,7 +17,6 @@ use sqlbuild_cli::diff_report::models::{
 use sqlbuild_cli::diff_report::types::DiffNamedValue;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::compile_driver::diff::run_diff_pipeline;
 use crate::bindings::_helpers::dagster_invocation::access::string_tuple as texts;
 use crate::bindings::_helpers::diff_report::command::target_max_full_rows;
 use crate::bindings::_helpers::diff_report::facts::diff_facts;
@@ -32,6 +31,7 @@ use sqlbuild_python_base::build_command::main::boolean::boolean;
 use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_compile::compile_driver::main::stages::run_diff_pipeline::run_diff_pipeline;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 
 const KEYED_CHECK: &str = "keyed comparison";

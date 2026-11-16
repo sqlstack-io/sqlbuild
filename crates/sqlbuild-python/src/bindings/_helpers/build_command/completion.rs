@@ -19,10 +19,6 @@ use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
 use crate::bindings::_helpers::build_progress::result_text::build_result_text;
 use crate::bindings::_helpers::check::check_results::check_result_text;
-use crate::bindings::_helpers::compile_driver::pipeline_entries::plan_has_executable_work;
-use crate::bindings::_helpers::compile_outputs::runtime_target::{
-    write_python_check_runtime_target, write_runtime_target,
-};
 use crate::bindings::_helpers::cost_report::degradation::{
     finalize_build_cost as finalize_cost, render_build_cost,
 };
@@ -44,6 +40,9 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::plan_has_executable_work::plan_has_executable_work;
+use sqlbuild_python_compile::compile_outputs::main::write_python_check_runtime_target::write_python_check_runtime_target;
+use sqlbuild_python_compile::compile_outputs::main::write_runtime_target::write_runtime_target;
 
 const SUCCESS_STATUS: &str = "success";
 const CHECK_KIND: &str = "check";

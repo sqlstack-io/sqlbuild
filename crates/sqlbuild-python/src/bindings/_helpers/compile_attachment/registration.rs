@@ -1,11 +1,13 @@
 //! Register the compile-input attachment functions.
 
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
-use pyo3::wrap_pyfunction;
 
-use crate::bindings::_helpers::compile_attachment::{
-    declaration_scope, model_config, model_inputs, sql_expansion_context, target,
-};
+use sqlbuild_python_compile::compile_attachment::main::build_compile_target_context_function::build_compile_target_context_function;
+use sqlbuild_python_compile::compile_attachment::main::build_declaration_scope_function::build_declaration_scope_function;
+use sqlbuild_python_compile::compile_attachment::main::build_model_inputs_function::build_model_inputs_function;
+use sqlbuild_python_compile::compile_attachment::main::build_sql_expansion_context_function::build_sql_expansion_context_function;
+use sqlbuild_python_compile::compile_attachment::main::native_model_config_session_function::native_model_config_session_function;
+use sqlbuild_python_compile::compile_attachment::main::rebind_declaration_scope_function::rebind_declaration_scope_function;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config_function::build_effective_connection_config_function;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_function::build_effective_connection_function;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config_function::build_effective_runtime_config_function;
@@ -16,10 +18,7 @@ use sqlbuild_python_front::compile_attachment::main::build_effective_vars_functi
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles_function::resolve_cursor_input_roles_function;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        sql_expansion_context::build_sql_expansion_context,
-        module
-    )?)?;
+    module.add_function(build_sql_expansion_context_function(module)?)?;
     module.add_function(build_effective_connection_function(module)?)?;
     module.add_function(build_effective_settings_function(module)?)?;
     module.add_function(build_effective_vars_function(module)?)?;
@@ -27,23 +26,11 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(build_effective_connection_config_function(module)?)?;
     module.add_function(build_effective_runtime_config_function(module)?)?;
     module.add_function(build_effective_settings_config_function(module)?)?;
-    module.add_function(wrap_pyfunction!(
-        model_config::native_model_config_session,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(model_inputs::build_model_inputs, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        target::build_compile_target_context,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        declaration_scope::build_declaration_scope,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        declaration_scope::rebind_declaration_scope,
-        module
-    )?)?;
+    module.add_function(native_model_config_session_function(module)?)?;
+    module.add_function(build_model_inputs_function(module)?)?;
+    module.add_function(build_compile_target_context_function(module)?)?;
+    module.add_function(build_declaration_scope_function(module)?)?;
+    module.add_function(rebind_declaration_scope_function(module)?)?;
     module.add_function(resolve_cursor_input_roles_function(module)?)?;
     Ok(())
 }

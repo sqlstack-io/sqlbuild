@@ -69,8 +69,8 @@ use crate::bindings::_helpers::record_behaviours::values::{
     finish_fingerprint_set, logical_type_display_name, sql_value_kind,
 };
 use crate::bindings::_helpers::{
-    analysis, analysis_session, build_progress, compile_command, compute_logs, dbt_events,
-    dbt_interop, event_exporting, execution_history, project_assembly, result_output, rules,
+    build_progress, compute_logs, dbt_events, dbt_interop, event_exporting, execution_history,
+    result_output,
 };
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
@@ -356,10 +356,10 @@ pub(crate) const BEHAVIOUR_ORDERED: &[&str] = &[
 
 /// The getter tables of every module that defines native pyclasses.
 pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
-    analysis::getters::GETTERS,
-    analysis_session::getters::GETTERS,
+    sqlbuild_python_compile::analysis::constants::GETTERS,
+    sqlbuild_python_compile::analysis_session::constants::GETTERS,
     build_progress::getters::GETTERS,
-    compile_command::getters::GETTERS,
+    sqlbuild_python_compile::compile_command::constants::GETTERS,
     sqlbuild_python_base::compile_context::constants::GETTERS,
     sqlbuild_python_project::compiled_views::constants::GETTERS,
     compute_logs::getters::GETTERS,
@@ -375,9 +375,9 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     sqlbuild_python_planner::planner_migrations::constants::GETTERS,
     sqlbuild_python_planner::planner_phases::constants::GETTERS,
     sqlbuild_python_base::presentation_text::constants::GETTERS,
-    project_assembly::getters::GETTERS,
+    sqlbuild_python_compile::project_assembly::constants::GETTERS,
     result_output::getters::GETTERS,
-    rules::getters::GETTERS,
+    sqlbuild_python_compile::rules::constants::GETTERS,
     sqlbuild_python_front::scopes::constants::GETTERS,
 ];
 

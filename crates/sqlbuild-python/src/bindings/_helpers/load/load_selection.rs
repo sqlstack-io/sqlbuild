@@ -17,12 +17,6 @@ use sqlbuild_core::load_command::main::select_load_entries::select_load_entries 
 use sqlbuild_core::load_command::models::{LoadEntry, LoadGraph};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::compile_attachment::target::{
-    connection_is_default_target, project_location,
-};
-use crate::bindings::_helpers::compile_driver::targets::{
-    expanded_loader_namespace, managed_write_schema, preserved_loader_schemas,
-};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -32,6 +26,11 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_attachment::main::connection_is_default_target::connection_is_default_target;
+use sqlbuild_python_compile::compile_attachment::main::project_location::project_location;
+use sqlbuild_python_compile::compile_driver::main::setup::expanded_loader_namespace::expanded_loader_namespace;
+use sqlbuild_python_compile::compile_driver::main::setup::managed_write_schema::managed_write_schema;
+use sqlbuild_python_compile::compile_driver::main::setup::preserved_loader_schemas::preserved_loader_schemas;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::contracts::main::loader_destination_parts::loader_destination_parts;

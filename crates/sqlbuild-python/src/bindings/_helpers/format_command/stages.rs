@@ -14,8 +14,8 @@ use sqlbuild_rules::dsl_headers::main::format_headers::format_headers;
 use sqlbuild_rules::dsl_headers::main::scan_headers::scan_headers;
 use sqlbuild_rules::dsl_headers::models::{HeaderRulesConfig, HeaderViolation};
 
-use crate::bindings::_helpers::rules::dsl_headers::header_violations;
-use crate::bindings::_helpers::rules::native_header_parser::NativeHeaderParser;
+use sqlbuild_python_compile::rules::main::checking::header_violations::header_violations;
+use sqlbuild_python_compile::rules::models::NativeHeaderParser;
 
 /// The header kind of a SQL macro file.
 const MACRO_HEADER_KIND: &str = "MACRO";

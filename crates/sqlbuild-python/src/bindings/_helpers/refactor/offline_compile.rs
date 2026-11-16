@@ -7,8 +7,6 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyString, PyTuple};
 
-use crate::bindings::_helpers::compile_command::target_writer::{Prepared, planning_diagnostics};
-use crate::bindings::_helpers::compile_driver::analysis::analyze_compile_project;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -17,6 +15,9 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_command::main::artifacts::planning_diagnostics::planning_diagnostics;
+use sqlbuild_python_compile::compile_command::models::Prepared;
+use sqlbuild_python_compile::compile_driver::main::stages::analyze_compile_project::analyze_compile_project;
 
 const DEFAULT_ERROR_CODE: &str = "E001";
 
