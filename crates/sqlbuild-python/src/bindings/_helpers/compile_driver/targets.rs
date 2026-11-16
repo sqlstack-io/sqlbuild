@@ -22,9 +22,9 @@ use sqlbuild_core::text::main::python_strip::python_strip;
 
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::model_config::template_data::expanded_template_data;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_front::model_config::main::config::expanded_template_data::expanded_template_data;
 
 /// Connection settings that identify the warehouse two targets write to.
 const CONNECTION_IDENTITY_KEYS: [&str; 7] = [
@@ -41,11 +41,7 @@ const EXPLICIT_TARGET_ADAPTERS: [&str; 3] = ["snowflake", "bigquery", "databrick
 const LOADER_NAMESPACE_LABEL: &str = "managed loader target namespace";
 const DEFAULTS_HELP_PURPOSE: &str = "to set project-wide defaults";
 const NAMED_TARGET_HELP_PURPOSE: &str = "to build this target into that schema";
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_runtime_config;
 use crate::bindings::_helpers::compile_attachment::target::resolved_target;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
-use crate::bindings::_helpers::discovery::guidance::setting_help;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -53,6 +49,10 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
+use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_front::discovery::main::failures::setting_help::setting_help;
 const DEFAULTS_SECTION: &str = "defaults";
 
 /// One optional `(database, schema)` namespace.

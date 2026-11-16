@@ -2,15 +2,17 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::sqltext::{
-    code_scanner, ddl_effects, model_headers, placeholders, sql_references,
-};
+use sqlbuild_python_front::sqltext::main::register_code_scanner::register_code_scanner;
+use sqlbuild_python_front::sqltext::main::register_ddl_effects::register_ddl_effects;
+use sqlbuild_python_front::sqltext::main::register_model_headers::register_model_headers;
+use sqlbuild_python_front::sqltext::main::register_placeholders::register_placeholders;
+use sqlbuild_python_front::sqltext::main::register_sql_references::register_sql_references;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    model_headers::register(module)?;
-    code_scanner::register(module)?;
-    sql_references::register(module)?;
-    placeholders::register(module)?;
-    ddl_effects::register(module)?;
+    register_model_headers(module)?;
+    register_code_scanner(module)?;
+    register_sql_references(module)?;
+    register_placeholders(module)?;
+    register_ddl_effects(module)?;
     Ok(())
 }

@@ -19,7 +19,6 @@ use crate::bindings::_helpers::analysis_session::session::{
     ContractRow, ExpressionShapesRow, FamilyRow, NativeModelAnalysisSession, PivotModelRow,
     PivotRequestRow, infer_expression_source_shapes, prove_dynamic_column_contracts,
 };
-use crate::bindings::_helpers::model_config::header_families::family_specs;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::compile_driver::constants::EXPRESSION_SHAPE_BATCHES;
@@ -30,6 +29,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::headers::family_specs::family_specs;
 
 const BATCH_MODE: &str = "batch";
 const TABLE_FUNCTION_KIND: &str = "table_fn";

@@ -3,7 +3,6 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::cursor::conversion::GRAIN_NAMES;
 use crate::bindings::_helpers::plan_output::display::{
     aligned_timestamp_bounds, resolve_effective_microbatch_batch_size,
 };
@@ -12,6 +11,7 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::constants::GRAIN_NAMES;
 
 const MICROBATCH_MODE: &str = "microbatch";
 const TIMESTAMP_CURSOR: &str = "timestamp";

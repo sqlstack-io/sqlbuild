@@ -21,8 +21,8 @@ use crate::bindings::_helpers::compiled_views::model_input_view::{
 use crate::bindings::_helpers::compiled_views::source_views::{
     SourceKeyFacts, SourceViews, read_source_view,
 };
-use crate::bindings::_helpers::discovery::project_facts::seed_csv_settings;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::discovery::main::project::seed_csv_settings::seed_csv_settings;
 
 const MATERIALIZED_CONFIG: &str = "materialized";
 const INCREMENTAL_MODE_CONFIG: &str = "incremental_mode";

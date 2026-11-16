@@ -48,7 +48,6 @@ use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInpu
 use crate::bindings::_helpers::compiled_views::source_views::{
     AttachedSource, NativeSourceInput, retain_sources,
 };
-use crate::bindings::_helpers::discovery::model_file_record::{ModelFileTexts, NativeModelFile};
 use crate::bindings::_helpers::input_loops::audit_loop::{AttachmentOwner, attached_audits};
 use crate::bindings::_helpers::input_loops::function_loop::{
     attached_functions, checked_table_function_arities,
@@ -91,28 +90,32 @@ use crate::bindings::_helpers::input_loops::model_loop_visibility::{
 };
 use crate::bindings::_helpers::input_loops::source_loop::attached_sources;
 use crate::bindings::_helpers::input_loops::sql_test_loop::TestScope;
-use crate::bindings::_helpers::model_config::config_classes::ConfigClasses;
-use crate::bindings::_helpers::model_config::config_errors::raised_config_exception;
-use crate::bindings::_helpers::model_config::header_metadata::ContractClasses;
-use crate::bindings::_helpers::model_config::model_validator::NativeModelValidator;
-use crate::bindings::_helpers::render::declaration_expansion::{
-    DeclarationExpansion, ExpandedDeclarations, ExpansionClasses, ExpansionConsumer,
-    expand_declarations,
-};
-use crate::bindings::_helpers::render::declaration_values::ConstantRendering;
-use crate::bindings::_helpers::render::macro_call_rows::SpanRow;
-use crate::bindings::_helpers::render::macro_call_rows::span_row;
-use crate::bindings::_helpers::render::sql_macro_host::{SqlCallOrigin, SqlMacroSource};
-use crate::bindings::_helpers::sqltext::declaration_references::declaration_scan;
-use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
-use crate::bindings::_helpers::sqltext::static_sql::{
-    InterpolationRow as SqlInterpolationRow, InterpolationSources, interpolation_batch,
-};
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::cache::models::NativeParseStore;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_front::discovery::models::ModelFileTexts;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::model_config::main::config::raised_config_exception::raised_config_exception;
+use sqlbuild_python_front::model_config::models::ConfigClasses;
+use sqlbuild_python_front::model_config::models::ContractClasses;
+use sqlbuild_python_front::model_config::models::NativeModelValidator;
+use sqlbuild_python_front::render::main::calls::span_row::span_row;
+use sqlbuild_python_front::render::main::declarations::expand_declarations::expand_declarations;
+use sqlbuild_python_front::render::models::ConstantRendering;
+use sqlbuild_python_front::render::models::DeclarationExpansion;
+use sqlbuild_python_front::render::models::DeclarationExpansionClasses;
+use sqlbuild_python_front::render::models::ExpandedDeclarations;
+use sqlbuild_python_front::render::models::ExpansionConsumer;
+use sqlbuild_python_front::render::models::SqlCallOrigin;
+use sqlbuild_python_front::render::models::SqlMacroSource;
+use sqlbuild_python_front::render::types::SpanRow;
+use sqlbuild_python_front::sqltext::main::declaration_scan::declaration_scan;
+use sqlbuild_python_front::sqltext::main::interpolation_batch::interpolation_batch;
+use sqlbuild_python_front::sqltext::models::InterpolationRow as SqlInterpolationRow;
+use sqlbuild_python_front::sqltext::models::InterpolationSources;
+use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
 
 const MATERIALIZED_KEY: &str = "materialized";
 const CURSOR_KEY: &str = "cursor";
@@ -659,7 +662,7 @@ impl NativeModelLoop {
         };
         let interpolated: String = applied_interpolation(context, interpolation)?;
         let (references, stop) = scan.clone().unwrap_or_default();
-        let expansion_classes: ExpansionClasses<'py> = ExpansionClasses {
+        let expansion_classes: DeclarationExpansionClasses<'py> = DeclarationExpansionClasses {
             usage_record: context.classes.usage_record.clone(),
             compile_error: context.classes.compile_error.clone(),
         };

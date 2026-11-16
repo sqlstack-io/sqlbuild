@@ -9,7 +9,6 @@ use crate::bindings::_helpers::analysis_session::session::{
     FamilyRow, NativeModelAnalysisSession, PivotRequestRow, prove_dynamic_column_contracts,
 };
 use crate::bindings::_helpers::compile_driver::assembly_analysis::AnalysisContext;
-use crate::bindings::_helpers::model_config::header_families::HeaderFamilies;
 use crate::bindings::_helpers::project_assembly::models::{NativeModelFacts, NativeProjectFacts};
 use crate::bindings::_helpers::project_assembly::native_resources::assemble_native_project_resources;
 use crate::bindings::_helpers::project_assembly::syntax_checks::model_syntax_checks;
@@ -22,6 +21,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::models::HeaderFamilies;
 
 /// `NativeProjectFacts` of `inputs`: resources, syntax validity, deps and standalone pivot proofs.
 pub(crate) fn native_project_facts<'py>(

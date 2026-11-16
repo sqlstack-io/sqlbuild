@@ -19,9 +19,7 @@ use sqlbuild_core::fingerprint_identity::main::stable_identity_hash::stable_iden
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::discovery::hook_entries::hook_entries;
 use crate::bindings::_helpers::microbatches::conversion::timestamp;
-use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_identity::hashing::{
     baselined_function_definition_hash, function_definition_hash,
 };
@@ -34,6 +32,9 @@ use sqlbuild_python_base::planner_identity::main::sorted_dumps::sorted_dumps;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_front::discovery::main::headers::hook_entries::hook_entries;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 const LOCAL_FUNCTION_HASHES_KEY: &str = "local_function_hashes";
 const DATACLASSES_MODULE: &str = "dataclasses";

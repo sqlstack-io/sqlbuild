@@ -13,12 +13,13 @@ use sqlbuild_analysis::planner_selection::models::{
 };
 
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_selection::carrier::Carrier;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 const TAGS_KEY: &str = "tags";
 

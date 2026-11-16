@@ -2,7 +2,6 @@
 
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::dbt_interop::cli::resolve_dbt_executable;
 use crate::bindings::_helpers::dbt_interop::cli::route_dbt_interop_args;
 use crate::bindings::_helpers::dbt_interop::graph::build_dbt_combined_graph;
@@ -18,6 +17,7 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 
 use crate::bindings::_helpers::dbt_interop::reference_resolver::DbtCompileReferenceResolver;
 use crate::bindings::_helpers::dbt_interop::runtime_config::{

@@ -18,7 +18,6 @@ use sqlbuild_model_config::model_validation::models::ColumnMigration;
 use sqlbuild_model_config::types::NodeKind;
 
 use crate::bindings::_helpers::compiled_project::schema_facts::family_fact;
-use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, compile_error, config_error,
 };
@@ -29,20 +28,24 @@ use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
 use crate::bindings::_helpers::input_loops::model_loop_schema::{
     DeclaredColumns, ModelSchema, merged_columns, schema_enums,
 };
-use crate::bindings::_helpers::model_config::column_migrations::column_migration_error;
-use crate::bindings::_helpers::model_config::config_errors::native_config_error;
-use crate::bindings::_helpers::model_config::header_audits::HeaderAudits;
-use crate::bindings::_helpers::model_config::header_families::HeaderFamilies;
-use crate::bindings::_helpers::model_config::header_metadata::{
-    HeaderColumn, HeaderColumns, HeaderValue, NativeColumnSpec, native_schema_column,
-    parsed_audit_identity,
-};
-use crate::bindings::_helpers::model_config::typed_config::{config_node_of, typed_values};
 use sqlbuild_discovery::model_files::models::{HeaderFacts, NativeColumn};
 use sqlbuild_python_base::compile_driver::constants::NATIVE_HEADER_COLUMNS;
 use sqlbuild_python_base::compile_driver::constants::PARSED_HEADER_COLUMNS;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
+use sqlbuild_python_front::model_config::main::config::native_config_error::native_config_error;
+use sqlbuild_python_front::model_config::main::config::typed_values::typed_values;
+use sqlbuild_python_front::model_config::main::headers::native_schema_column::native_schema_column;
+use sqlbuild_python_front::model_config::main::headers::parsed_audit_identity::parsed_audit_identity;
+use sqlbuild_python_front::model_config::main::model_nodes::column_migration_error::column_migration_error;
+use sqlbuild_python_front::model_config::models::HeaderAudits;
+use sqlbuild_python_front::model_config::models::HeaderColumn;
+use sqlbuild_python_front::model_config::models::HeaderColumns;
+use sqlbuild_python_front::model_config::models::HeaderFamilies;
+use sqlbuild_python_front::model_config::models::NativeColumnSpec;
+use sqlbuild_python_front::model_config::types::HeaderValue;
 
 const DESCRIPTION_KEY: &str = "description";
 const COLUMNS_KEY: &str = "columns";

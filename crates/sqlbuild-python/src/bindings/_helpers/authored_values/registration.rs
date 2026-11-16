@@ -1,7 +1,11 @@
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    crate::bindings::_helpers::authored_values::fields::register(module)?;
-    crate::bindings::_helpers::authored_values::project_vars::register(module)?;
-    crate::bindings::_helpers::authored_values::python_nodes::register(module)
+    sqlbuild_python_front::authored_values::main::register_fields::register_fields(module)?;
+    sqlbuild_python_front::authored_values::main::register_project_vars::register_project_vars(
+        module,
+    )?;
+    sqlbuild_python_front::authored_values::main::register_python_nodes::register_python_nodes(
+        module,
+    )
 }

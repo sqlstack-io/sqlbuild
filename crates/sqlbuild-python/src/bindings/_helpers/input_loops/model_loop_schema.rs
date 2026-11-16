@@ -8,8 +8,8 @@ use sqlbuild_analysis::compiled_project::models::SchemaColumnFact;
 use crate::bindings::_helpers::compiled_project::schema_facts::python_column_fact;
 use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, compile_error};
 use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
-use crate::bindings::_helpers::model_config::header_metadata::HeaderColumn;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::model_config::models::HeaderColumn;
 
 const MODEL_SCHEMA_KEY: &str = "model_schema";
 const NAME_FIELD: &str = "name";

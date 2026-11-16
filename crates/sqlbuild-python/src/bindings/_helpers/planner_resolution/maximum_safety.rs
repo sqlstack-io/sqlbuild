@@ -1,7 +1,5 @@
 //! Maximum automatic-start recovery and evidence boundary.
 
-use crate::bindings::_helpers::cursor::conversion::CursorSession;
-use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::cursor_bounds::apply_typed_cursor_replay_policy;
 use crate::bindings::_helpers::planner_resolution::cursor_bounds::{
@@ -28,6 +26,8 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
+use sqlbuild_python_front::cursor::models::CursorSession;
 use std::cmp::Ordering;
 
 #[pyfunction]

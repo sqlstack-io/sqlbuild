@@ -28,10 +28,10 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     janitor::registration::register(module)?;
     plan_command::registration::register(module)?;
     freshness::registration::register(module)?;
-    crate::bindings::_helpers::native_host::consumption_state::register(module)?;
-    crate::bindings::_helpers::native_host::observations_state::register(module)?;
+    sqlbuild_python_front::native_host::main::register_consumption_state::register_consumption_state(module)?;
+    sqlbuild_python_front::native_host::main::register_observations_state::register_observations_state(module)?;
     crate::bindings::_helpers::native_host::resource_costs_state::register(module)?;
-    crate::bindings::_helpers::native_host::audit_results_state::register(module)?;
+    sqlbuild_python_front::native_host::main::register_audit_results_state::register_audit_results_state(module)?;
     clone::registration::register(module)?;
     compute_logs::registration::register(module)?;
     execution_history::registration::register(module)?;

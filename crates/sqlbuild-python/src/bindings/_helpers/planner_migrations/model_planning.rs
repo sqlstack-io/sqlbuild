@@ -2,9 +2,6 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::model_config::typed_config::{
-    config_node_of, config_value, model_values,
-};
 use crate::bindings::_helpers::planner_changes::renames::plan_reference_renames;
 use crate::bindings::_helpers::planner_migrations::column_objects::{config, replace};
 use crate::bindings::_helpers::planner_migrations::discovery::discover_model_migrations;
@@ -29,6 +26,9 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 const MIGRATE_FROM_KEY: &str = "migrate_from";
 const MIGRATE_FORCE_KEY: &str = "migrate_force";

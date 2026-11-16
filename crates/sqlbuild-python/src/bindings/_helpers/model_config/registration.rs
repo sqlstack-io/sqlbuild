@@ -2,18 +2,21 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::model_config::{
-    config_errors, config_values, header_columns, model_config_builder, model_validator,
-    template_data, unicode_environment,
-};
+use sqlbuild_python_front::model_config::main::config::register_config_errors::register_config_errors;
+use sqlbuild_python_front::model_config::main::config::register_config_values::register_config_values;
+use sqlbuild_python_front::model_config::main::config::register_template_data::register_template_data;
+use sqlbuild_python_front::model_config::main::headers::register_header_columns::register_header_columns;
+use sqlbuild_python_front::model_config::main::model_nodes::register_model_config_builder::register_model_config_builder;
+use sqlbuild_python_front::model_config::main::model_nodes::register_model_validator::register_model_validator;
+use sqlbuild_python_front::model_config::main::model_nodes::register_unicode_environment::register_unicode_environment;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    config_errors::register(module)?;
-    config_values::register(module)?;
-    header_columns::register(module)?;
-    model_config_builder::register(module)?;
-    model_validator::register(module)?;
-    template_data::register(module)?;
-    unicode_environment::register(module)?;
+    register_config_errors(module)?;
+    register_config_values(module)?;
+    register_header_columns(module)?;
+    register_model_config_builder(module)?;
+    register_model_validator(module)?;
+    register_template_data(module)?;
+    register_unicode_environment(module)?;
     Ok(())
 }

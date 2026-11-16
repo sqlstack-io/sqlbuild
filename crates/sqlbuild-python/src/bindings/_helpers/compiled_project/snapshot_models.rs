@@ -13,7 +13,6 @@ use sqlbuild_analysis::compiled_project::models::CompiledModelFacts;
 use sqlbuild_analysis::sql_macros::main::typed_analysis_sql::typed_analysis_sql;
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 
-use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_splices;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_project::snapshot::{
     dependency_keys, destination, insert_node,
@@ -21,6 +20,7 @@ use crate::bindings::_helpers::compiled_project::snapshot::{
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
+use sqlbuild_python_front::attachments::main::analysis_cursor_splices::analysis_cursor_splices;
 
 /// Each model's snapshot node, and the `columns` document of ranges kept out of node identity.
 pub(crate) fn model_nodes(
