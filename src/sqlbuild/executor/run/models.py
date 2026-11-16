@@ -26,6 +26,7 @@ from sqlbuild._native import (
     PythonHookEntry,
     SourceEntry,
     StartCursorsConfig,
+    TargetSettings,
     TimestampValue,
 )
 from sqlbuild._native import cursor_compare as compare
@@ -56,7 +57,6 @@ from sqlbuild.microbatches.models import MicrobatchScope
 from sqlbuild.microbatches.types import MicrobatchEventStore
 from sqlbuild.provider.main.runtime import ProviderContainer, _empty_provider_container
 from sqlbuild.python_nodes.models import SqlResourceRef
-from sqlbuild.runtime.contracts.models import TargetSettings
 
 
 @dataclass(frozen=True, kw_only=True, init=False)

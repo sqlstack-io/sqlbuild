@@ -554,7 +554,6 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "PruneResult": ("sqlbuild.runtime.compute_logs.models", "PruneResult"),
     "ComputeLogStream": ("sqlbuild.runtime.compute_logs.types", "ComputeLogStream"),
     "ConnectionHooks": ("sqlbuild.runtime.contracts.models", "ConnectionHooks"),
-    "TargetSettings": ("sqlbuild.runtime.contracts.models", "TargetSettings"),
     "ExecutionResourceKind": ("sqlbuild.runtime.contracts.types", "ExecutionResourceKind"),
     "ExecutionHistoryStorageError": (
         "sqlbuild.runtime.execution_history.exceptions",

@@ -364,7 +364,8 @@ pub(crate) fn execute_build_plan<'py>(
                     &context.get("discovered_inputs")?,
                     &project,
                     (&connection_config, &adapter),
-                )?,
+                )?
+                .record(py)?,
             ),
             ("start_cursor_ts", start_ts.clone()),
             ("end_cursor_ts", end_ts.clone()),
@@ -649,7 +650,8 @@ fn check_runtime<'py>(
                     &context.get("discovered_inputs")?,
                     &project,
                     (&context.get("connection_config")?, &adapter),
-                )?,
+                )?
+                .record(py)?,
             ),
             (
                 "default_database",

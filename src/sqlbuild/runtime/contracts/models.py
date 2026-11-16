@@ -9,18 +9,6 @@ from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback
 
 
 @dataclass(frozen=True)
-class TargetSettings:
-    """The active target's database and schemas, resolved as SQLBuild uses them."""
-
-    name: str | None
-    database: str | None
-    schema: str | None
-    loader_schema: str | None
-    database_preserved: bool = False
-    schema_preserved: bool = False
-
-
-@dataclass(frozen=True)
 class ConnectionHooks:
     """Progress and connection lifecycle callbacks for long-running operations."""
 

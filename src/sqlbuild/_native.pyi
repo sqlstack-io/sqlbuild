@@ -131,7 +131,7 @@ from sqlbuild.runtime.compute_logs.models import (
     PruneResult,
 )
 from sqlbuild.runtime.compute_logs.types import ComputeLogStream
-from sqlbuild.runtime.contracts.models import ConnectionHooks, TargetSettings
+from sqlbuild.runtime.contracts.models import ConnectionHooks
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind
 from sqlbuild.runtime.execution_history.models import (
     EventFilter,
@@ -2281,7 +2281,6 @@ def run_check_read_side_dependencies(
     validation_refs: frozenset[SqlResourceRef] | None = None,
     project_relations: dict[SqlResourceRef, str] | None = None,
     providers: ProviderContainer | None = None,
-    target_config: TargetSettings | None = None,
 ) -> tuple[PythonNodeExecutionResult, ...]: ...
 def finalize_build_cost(finalization: BuildCostFinalization) -> CostRunRecord | None: ...
 def format_cost_breakdown(
@@ -11899,6 +11898,25 @@ class TargetDiffConfig(NativeRecord):
     def __init__(
         self,
         max_full_rows: int | Literal["unlimited"] | None = ...,
+    ) -> None: ...
+
+class TargetSettings(NativeRecord):
+    """The active target's database and schemas, resolved as SQLBuild uses them."""
+
+    name: str | None
+    database: str | None
+    schema: str | None
+    loader_schema: str | None
+    database_preserved: bool
+    schema_preserved: bool
+    def __init__(
+        self,
+        name: str | None = ...,
+        database: str | None = ...,
+        schema: str | None = ...,
+        loader_schema: str | None = ...,
+        database_preserved: bool = ...,
+        schema_preserved: bool = ...,
     ) -> None: ...
 
 class TargetWarehousesConfig(NativeRecord):

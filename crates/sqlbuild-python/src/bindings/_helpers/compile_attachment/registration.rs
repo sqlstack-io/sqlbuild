@@ -36,10 +36,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(
-        target::build_effective_target_namespace,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
         declaration_scope::build_declaration_scope,
         module
     )?)?;

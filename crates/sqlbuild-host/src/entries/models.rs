@@ -329,7 +329,6 @@ pub enum ExecutorHost {
     PruneResult,
     ComputeLogStream,
     ConnectionHooks,
-    TargetSettings,
     ExecutionResourceKind,
     ExecutionHistoryStorageError,
     IntegrityConflictError,

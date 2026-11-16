@@ -37,6 +37,15 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     table_exists,
 )
 
+_TARGET_CONFIG_RECORDER: str = (
+    "import dataclasses, json\n"
+    "from pathlib import Path\n\n"
+    "def record(ctx, node):\n"
+    "    line = {'node': node, **dataclasses.asdict(ctx.target_config)}\n"
+    "    with Path(__file__).parents[1].joinpath('target_config.jsonl').open('a') as out:\n"
+    "        out.write(json.dumps(line) + '\\n')\n"
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -1807,16 +1816,6 @@ def test_given_loader_status_result_when_building_then_persists_loader_status_ro
         )
         == test_case.expected_rows
     )
-
-
-_TARGET_CONFIG_RECORDER: str = (
-    "import dataclasses, json\n"
-    "from pathlib import Path\n\n"
-    "def record(ctx, node):\n"
-    "    line = {'node': node, **dataclasses.asdict(ctx.target_config)}\n"
-    "    with Path(__file__).parents[1].joinpath('target_config.jsonl').open('a') as out:\n"
-    "        out.write(json.dumps(line) + '\\n')\n"
-)
 
 
 @pytest.mark.parametrize(

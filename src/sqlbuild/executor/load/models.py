@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlbuild._native import DiscoveredLoaderFunction, SourceEntry
+from sqlbuild._native import DiscoveredLoaderFunction, SourceEntry, TargetSettings
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import ColumnInfo, LifeCycleEvent
@@ -27,7 +27,6 @@ from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.provider.main.runtime import ProviderContainer, _empty_provider_container
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import SqlResourceRefKind
-from sqlbuild.runtime.contracts.models import TargetSettings
 from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback, ExecutionResourceKind
 
 

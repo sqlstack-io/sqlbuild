@@ -18,6 +18,7 @@ from sqlbuild._native import (
     SnapshotsConfig,
     SourceLoadPlanEntry,
     SqlTestPlanEntry,
+    TargetSettings,
 )
 from sqlbuild.adapter.contract.models import LifeCycleEvent, RelationInfo
 from sqlbuild.adapter.contract.types import TablePromotionMode
@@ -34,7 +35,6 @@ from sqlbuild.microbatches.models import MicrobatchScope
 from sqlbuild.microbatches.types import MicrobatchEventStore
 from sqlbuild.provider.main.runtime import ProviderContainer
 from sqlbuild.python_nodes.models import SqlResourceRef
-from sqlbuild.runtime.contracts.models import TargetSettings
 from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback, NodeStartCallback
 from sqlbuild.runtime.execution_limits.models import RunItemTimeouts
 
