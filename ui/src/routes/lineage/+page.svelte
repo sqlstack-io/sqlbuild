@@ -36,6 +36,8 @@
 	import { viewSummary } from '$lib/lineage/view-summary';
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
+	import FitControls from '$lib/lineage/fit-controls.svelte';
+	import { READABLE_ZOOM } from '$lib/lineage/fit';
 	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
 	import { scaleGraph } from '$lib/mock/scale-graph';
@@ -69,7 +71,7 @@
 
 	const nodeTypes = { asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode, stub: StubNode };
 	// Automatic fits stop at a zoom where cards stay readable; the fit button and the wheel go further, to the whole graph.
-	const FIT_FLOOR = 0.3;
+	const FIT_FLOOR = READABLE_ZOOM;
 
 	// The graph is the catalog: every node in the current snapshot with its
 	// build state. Later refreshes update card data in place so positions,
@@ -909,9 +911,9 @@
 			onnodepointerenter={({ node }) => (hoveredId = node.id)}
 			onnodepointerleave={() => (hoveredId = null)}
 		>
-			<FlowController bind:fitView={fitFlow} bind:viewport bind:setViewport={setFlowViewport} bind:fitted fitFloor={scaleMode ? undefined : FIT_FLOOR} />
+			<FlowController bind:fitView={fitFlow} bind:viewport bind:setViewport={setFlowViewport} bind:fitted fitFloor={scaleMode ? undefined : FIT_FLOOR} readable={!scaleMode} />
 			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-			<Controls />
+			{#if scaleMode}<Controls />{:else}<FitControls onfit={() => fitFlow?.()} showLock />{/if}
 		</SvelteFlow>
 		{#if tooMany}
 			<div class="graph-too-many">

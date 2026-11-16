@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '@xyflow/svelte/dist/style.css';
-	import { Background, Controls, SvelteFlow, type Edge, type Node } from '@xyflow/svelte';
+	import { Background, SvelteFlow, type Edge, type Node, type Viewport } from '@xyflow/svelte';
 	import { tick, untrack } from 'svelte';
 	import type { CatalogNode, JobGroupMember } from '$lib/api';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -8,6 +8,7 @@
 	import FolderNode from '$lib/components/lineage/folder-node.svelte';
 	import TooManyCard from '$lib/components/lineage/too-many-card.svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
+	import FitControls from '$lib/lineage/fit-controls.svelte';
 	import { layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { innerId, memberGraph, memberNodeId, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
 	import { toggled } from '$lib/lineage/member-expand';
@@ -54,6 +55,36 @@
 	let edges = $state.raw<Edge[]>([]);
 	let fit = $state<((opts?: { duration?: number }) => void) | undefined>();
 	let fitted = $state(false);
+	let viewport = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
+	let setViewport = $state<(v: Viewport) => void>();
+	let panel = $state<HTMLDivElement>();
+	// The sidebar opening narrows the graph; the zoom stays, and the view pans only when the selection would end up out of view.
+	$effect(() => {
+		if (!panel) return;
+		const ro = new ResizeObserver(() => untrack(keepSelectionInView));
+		ro.observe(panel);
+		return () => ro.disconnect();
+	});
+	function keepSelectionInView() {
+		const node = nodes.find((n) => n.selected);
+		if (!node || !panel || !setViewport || !fitted) return;
+		let { x: px, y: py } = node.position;
+		for (let parent = node.parentId; parent; ) {
+			const p = nodes.find((n) => n.id === parent);
+			if (!p) break;
+			px += p.position.x;
+			py += p.position.y;
+			parent = p.parentId;
+		}
+		const { width, height } = panel.getBoundingClientRect();
+		const { x, y, zoom } = viewport;
+		const w = (node.measured?.width ?? node.width ?? 236) * zoom;
+		const h = (node.measured?.height ?? node.height ?? 61) * zoom;
+		const left = px * zoom + x;
+		const top = py * zoom + y;
+		if (left >= 0 && left + w <= width && top >= 0 && top + h <= height) return;
+		setViewport({ zoom, x: (width - w) / 2 - px * zoom, y: (height - h) / 2 - py * zoom });
+	}
 	let shape = '';
 	let laidOut = '';
 	const selectedId = $derived(selection ? (selection.node ? innerId(selection.member, selection.node) : memberNodeId(selection.member)) : null);
@@ -105,11 +136,11 @@
 	}
 </script>
 
-<div class="graph sb-flow" class:unfitted={!fitted && nodes.length > 0}>
+<div class="graph sb-flow" bind:this={panel} class:unfitted={!fitted && nodes.length > 0}>
 	<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {onnodeclick} onpaneclick={() => (selection = null)}>
-		<FlowController bind:fitView={fit} bind:fitted fitFloor={0.3} />
+		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport readable />
 		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-		<Controls showLock={false} />
+		<FitControls onfit={() => fit?.()} />
 	</SvelteFlow>
 	{#if tooMany}
 		<TooManyCard count={graph.nodes.length}>
