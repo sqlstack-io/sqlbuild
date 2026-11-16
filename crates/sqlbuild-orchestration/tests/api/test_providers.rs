@@ -123,6 +123,10 @@ fn given_published_providers_when_people_read_them_then_jobs_using_their_nodes_a
                     ],
                     "nodes": ["check:stock_levels", "model:orders"],
                     "jobs": test_case.expected_jobs,
+                    "job_nodes": {
+                        "order_exports": ["model:orders"],
+                        "stock_alerts": ["check:stock_levels"],
+                    },
                 }]),
                 "{}: jobs selecting a node that runs the provider, including a model through its hook, and none the document names",
                 test_case.description

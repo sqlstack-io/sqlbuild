@@ -47,10 +47,18 @@ pub async fn read_person_providers(
     };
     for provider in &mut providers {
         provider.jobs.clear();
-        let nodes: BTreeSet<&String> = provider.nodes.iter().collect();
+        provider.job_nodes.clear();
         for job in &jobs {
-            if job.selection.iter().any(|key| nodes.contains(key)) {
+            let selected: BTreeSet<&String> = job.selection.iter().collect();
+            let matched: Vec<String> = provider
+                .nodes
+                .iter()
+                .filter(|key| selected.contains(key))
+                .cloned()
+                .collect();
+            if !matched.is_empty() {
                 provider.jobs.push(job.job_key.clone());
+                provider.job_nodes.insert(job.job_key.clone(), matched);
             }
         }
     }

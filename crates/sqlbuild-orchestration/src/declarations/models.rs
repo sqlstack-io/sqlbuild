@@ -376,6 +376,9 @@ pub struct ProviderRecord {
     /// Jobs whose selection includes one of those nodes.
     #[serde(default)]
     pub jobs: Vec<String>,
+    /// Each of those jobs with the provider's nodes it selects, in node order.
+    #[serde(default)]
+    pub job_nodes: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 /// One declared setting field; its value stays in the location's environment.
