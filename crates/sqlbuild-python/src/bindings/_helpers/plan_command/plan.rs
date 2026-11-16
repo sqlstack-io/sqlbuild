@@ -1,13 +1,13 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
 use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
+    Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
 };
-use pyo3::types::{PyBool, PyDict, PyDictMethods};
+use pyo3::types::{PyBool, PyCFunction, PyDict, PyDictMethods};
 use pyo3::wrap_pyfunction;
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_core::plan_display::constants::{
-    SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY,
+    SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY, SYNCED_COPY_READING,
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
@@ -211,17 +211,35 @@ fn resolve_invocation<'py>(
     })
 }
 
-/// A `ConnectionHooks` forwarding to the plan's progress reporters.
+/// A `ConnectionHooks` forwarding to the plan's progress reporters; a synced copy opens no connection.
 fn connection_hooks<'py>(invocation: &PlanInvocation<'py>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = invocation.stream.py();
+    let on_progress: Bound<'py, PyAny> =
+        native_field(&invocation.planning_progress, "on_progress")?;
+    if invocation.synced_copy.is_some() {
+        let progress: Py<PlanningProgressReporter> = invocation
+            .planning_progress
+            .downcast::<PlanningProgressReporter>()?
+            .clone()
+            .unbind();
+        let reading = PyCFunction::new_closure(py, None, None, move |arguments, _keywords| {
+            progress
+                .get()
+                .on_progress(arguments.py(), SYNCED_COPY_READING)
+        })?;
+        return call_with(
+            &host::entry(py, ExecutorHost::ConnectionHooks)?,
+            &[
+                ("on_progress", on_progress),
+                ("on_connection_start", reading.into_any()),
+            ],
+        );
+    }
     let connection: &Bound<'py, PyAny> = &invocation.connection_progress;
     call_with(
         &host::entry(py, ExecutorHost::ConnectionHooks)?,
         &[
-            (
-                "on_progress",
-                native_field(&invocation.planning_progress, "on_progress")?,
-            ),
+            ("on_progress", on_progress),
             (
                 "on_connection_start",
                 native_field(connection, "on_connection_start")?,

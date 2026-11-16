@@ -37,6 +37,8 @@ pub(crate) const QUERY_DIFF_INDENT: &str = "      ";
 pub(crate) const UNIFIED_DIFF_HEADER_PREFIXES: [&str; 3] = ["---", "+++", "@@"];
 /// The plan JSON key describing the synced copy a preview planned from.
 pub const SYNCED_COPY_KEY: &str = "synced_copy";
+/// What a preview prints where a plan would connect to the warehouse: it reads the synced copy.
+pub const SYNCED_COPY_READING: &str = "Reading the synced warehouse state...";
 /// Why a preview refuses `--defer-to`: deferral reads another target's live state.
 pub const SYNCED_COPY_DEFER_REFUSAL: &str =
     "plan previews from the synced copy cannot use --defer-to";

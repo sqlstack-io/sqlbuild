@@ -135,6 +135,7 @@ _UNKNOWN: list[str] = [
     "sources outside mirrored schemas",
 ]
 _HELD: str = "Planning from the published compiled project."
+_SYNCED_READING: str = "Reading the synced warehouse state..."
 _REPLAYED: str = (
     "cursor window of daily_orders (the run starts it away from the last build's cursor)"
 )
@@ -434,3 +435,5 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
     assert tuple(map(changed_runs, plans)) == test_case.expected_runs, log
     assert log.count("Compiling project...") == test_case.expected_compiles, log
     assert log.count(_HELD) == test_case.expected_held_plans, log
+    assert log.count(_SYNCED_READING) == test_case.expected_held_plans + 1, log
+    assert "Warehouse connected" not in log, "a synced copy opens no warehouse connection"
