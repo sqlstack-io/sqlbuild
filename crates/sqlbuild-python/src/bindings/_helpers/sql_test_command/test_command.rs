@@ -58,6 +58,7 @@ use crate::bindings::_helpers::sql_test_command::timeouts::{
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_command::main::emit::emit;
 use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -679,13 +680,12 @@ fn complete(
     let style: CliStyle = CliStyle {
         use_color: invocation.getattr("use_color")?.is_truthy()?,
     };
+    let completion: String = render_test_completion((passed, results.len()), &failures, style);
+    emit(&stream, &completion)?;
     let report: Option<StatementReport> = StatementReport::of_invocation(invocation, started)?;
-    let mut completion: String = render_test_completion((passed, results.len()), &failures, style);
     if let Some(line) = report.as_ref().and_then(StatementReport::line) {
-        completion.push_str(&format!("\n{line}\n"));
+        emit(&stream, &format!("\n{line}\n"))?;
     }
-    stream.call_method1("write", (completion,))?;
-    stream.call_method0("flush")?;
     let payload: String = with_since_section(test_execution_json(py, results)?, since_json)?;
     Ok((
         test_exit_code(passed, results.len()),
