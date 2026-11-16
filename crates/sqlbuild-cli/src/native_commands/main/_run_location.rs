@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use sqlbuild_orchestration::platform::main::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::{
-    LocationHealth, LocationWorkClient, LocationWorkPoll,
+    ConnectionCheckTrigger, LocationHealth, LocationWorkClient, LocationWorkPoll,
 };
 use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::sync::mpsc;
@@ -63,6 +63,8 @@ async fn watch_location(
     let mut watch = location_watch(&options.project_dir);
     let mut work_at = Instant::now() + Duration::from_secs(2);
     let mut published_generation = None;
+    // The first connection check of this process is its startup check.
+    let mut checked = false;
     let mut metadata = None;
     let mut clock = location_clock();
     let stopped = shutdown_signal();
@@ -131,16 +133,22 @@ async fn watch_location(
                     options.safety_sync_seconds,
                 ),
             ));
+            let trigger = if checked {
+                ConnectionCheckTrigger::Publish
+            } else {
+                ConnectionCheckTrigger::Startup
+            };
             let Some(files) = check_published_location(
                 options,
                 script,
-                (bearer, poll.session_id, generation),
+                (bearer, poll.session_id, generation, trigger),
                 stopped.as_mut(),
             )
             .await?
             else {
                 return Ok(());
             };
+            checked = true;
             watch = exclude_location_databases(&options.project_dir, files, watch);
         } else {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));

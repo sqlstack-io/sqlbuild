@@ -1692,6 +1692,11 @@ export interface components {
             rejected_sha256: string;
             table: components["schemas"]["Table"];
         };
+        /**
+         * @description When a location checks its warehouse connection on its own.
+         * @enum {string}
+         */
+        ConnectionCheckTrigger: "startup" | "publish";
         /** @description A target's connection settings as its location publishes them: names only, never a secret. */
         ConnectionDetails: {
             account?: string | null;
@@ -1971,11 +1976,17 @@ export interface components {
             /** @enum {string} */
             kind: "compile_failed";
         } | {
+            /**
+             * Format: int64
+             * @description How long the check took; absent from older locations.
+             */
+            elapsed_millis?: number | null;
             /** Format: int64 */
             generation: number;
             healthy: boolean;
             /** @enum {string} */
             kind: "connection";
+            trigger?: null | components["schemas"]["ConnectionCheckTrigger"];
         } | {
             /** Format: int64 */
             generation: number;

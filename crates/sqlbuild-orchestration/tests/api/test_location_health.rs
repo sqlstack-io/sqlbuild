@@ -3,7 +3,9 @@ use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope, DefaultRole};
 use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::report_remote_location_health::report_remote_location_health;
-use crate::platform::models::{LocationHealth, LocationHealthObservation, LocationHealthReport};
+use crate::platform::models::{
+    ConnectionCheckTrigger, LocationHealth, LocationHealthObservation, LocationHealthReport,
+};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -137,6 +139,8 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                 health: LocationHealth::Connection {
                     generation: 1,
                     healthy: false,
+                    trigger: Some(ConnectionCheckTrigger::Startup),
+                    elapsed_millis: Some(410),
                 },
                 ..heartbeat.clone()
             };
@@ -266,6 +270,8 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                     health: LocationHealth::Connection {
                         generation: 1,
                         healthy: true,
+                        trigger: None,
+                        elapsed_millis: None,
                     },
                     ..busy_heartbeat.clone()
                 };

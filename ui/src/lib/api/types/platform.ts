@@ -133,8 +133,8 @@ export type ConnectionTest = {
 	at: Iso;
 	durationMs: number;
 	/**
-	 * `publish` when the location ran it after publishing a snapshot; `startup` when `sqb dev` ran it on
-	 * starting (not reported by the server yet); `manual` for Test connection.
+	 * `publish` when the location ran it after publishing a snapshot; `startup` when the location ran it on
+	 * starting (`sqb dev` or `sqb location serve`); `manual` for Test connection.
 	 */
 	trigger: 'publish' | 'startup' | 'manual';
 	by: Principal | null;
@@ -254,7 +254,7 @@ export type WarehouseConnection = {
 	details: ConnectionDetails | null;
 	/** Where SQLBuild's own tables are read back from; null before a sync reports it. */
 	stateLocation: { database: string | null; schema: string } | null;
-	/** The newest recorded connection check: after a deploy, or on startup once the server records it. */
+	/** The newest recorded connection check: on startup, after a deploy, or a manual test. */
 	lastTest: ConnectionTest | null;
 	/** When the next background state history sync is due; null when not reported (not reported by the server yet). */
 	nextSyncAt: Iso | null;

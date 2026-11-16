@@ -30,12 +30,23 @@ export function healthOf(observations: Wire['LocationHealthObservation'][], now:
 	return { health, liveInstances: live.size, lastSeenAt };
 }
 
-/** The connection check a location ran after publishing; the server keeps no message or duration. */
+/**
+ * The newest connection check a location ran on its own: on starting, or after publishing. Older
+ * locations report neither why nor how long, so their checks count as after publishing, with no duration.
+ */
 export function connectionTestOf(observations: Wire['LocationHealthObservation'][]): ConnectionTest | null {
 	const latest = latestOf(observations, 'connection');
 	if (!latest) return null;
-	const ok = latest.report.health.healthy;
-	return { outcome: ok ? 'ok' : 'failed', at: latest.received_at, durationMs: 0, trigger: 'publish', by: null, message: ok ? 'Connected after publishing' : 'Could not connect after publishing' };
+	const { healthy: ok, trigger, elapsed_millis } = latest.report.health;
+	const when = trigger === 'startup' ? 'on startup' : 'after publishing';
+	return {
+		outcome: ok ? 'ok' : 'failed',
+		at: latest.received_at,
+		durationMs: elapsed_millis ?? 0,
+		trigger: trigger ?? 'publish',
+		by: null,
+		message: ok ? `Connected ${when}` : `Could not connect ${when}`
+	};
 }
 
 /**

@@ -25,8 +25,8 @@ use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::{
-    LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
-    WarehouseSyncFailure,
+    ConnectionCheckTrigger, LocationHealth, LocationHealthReport, LocationWorkClient,
+    LocationWorkPoll, RetentionPolicies, WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
@@ -801,10 +801,11 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
 }
 
+/// Check the connection after a publication: the first in a process is its startup check.
 pub(crate) async fn check_published_location(
     options: &LocationServe,
     script: &Path,
-    (bearer, session_id, generation): (&str, Uuid, i64),
+    (bearer, session_id, generation, trigger): (&str, Uuid, i64, ConnectionCheckTrigger),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Vec<PathBuf>>, ControlError> {
     drop(write_output(&[(
@@ -812,14 +813,21 @@ pub(crate) async fn check_published_location(
         "Checking location connection with sqb debug...\n",
     )]));
     tokio::pin!(stopped);
+    let started = Instant::now();
     let Some((connected, missing, files)) =
         check_location_connection(options, script, stopped.as_mut()).await?
     else {
         return Ok(None);
     };
+    let health = LocationHealth::Connection {
+        generation,
+        healthy: connected,
+        trigger: Some(trigger),
+        elapsed_millis: Some(u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)),
+    };
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
-        () = report_location_health(options, bearer, session_id, LocationHealth::Connection { generation, healthy: connected }) => {},
+        () = report_location_health(options, bearer, session_id, health) => {},
     }
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },

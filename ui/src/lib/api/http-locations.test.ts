@@ -37,6 +37,16 @@ describe('location health', () => {
 		expect(healthOf(observations, now).health).toBe('degraded');
 		expect(connectionTestOf(observations)).toMatchObject({ outcome: 'failed', at: at(5) });
 	});
+
+	it('records the startup check with its duration, and an older location\'s check as after publishing', () => {
+		expect(connectionTestOf([seen(5, { kind: 'connection', generation: 1, healthy: true, trigger: 'startup', elapsed_millis: 410 })])).toMatchObject({
+			outcome: 'ok',
+			trigger: 'startup',
+			durationMs: 410,
+			message: 'Connected on startup'
+		});
+		expect(connectionTestOf([seen(5, { kind: 'connection', generation: 2, healthy: false })])).toMatchObject({ trigger: 'publish', durationMs: 0, message: 'Could not connect after publishing' });
+	});
 });
 
 describe('location processes', () => {
