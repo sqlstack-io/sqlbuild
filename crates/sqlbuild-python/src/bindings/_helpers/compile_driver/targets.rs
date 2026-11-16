@@ -21,6 +21,7 @@ use sqlbuild_analysis::assembly::target_checks::main::target_error_message::targ
 use sqlbuild_analysis::assembly::target_checks::models::{LoaderCollision, MissingParts};
 use sqlbuild_core::text::main::python_strip::python_strip;
 
+use sqlbuild_model_config::templates::main::holds_context_placeholder::holds_context_placeholder;
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -500,6 +501,17 @@ pub(crate) fn target_settings<'py>(
         schema,
         loader_schema,
     })
+}
+
+/// A target `location` that Python nodes can use outside any model: `default` when it is unset, empty, or resolves only inside a model, such as a `${CTX:...}` schema.
+pub(crate) fn model_free_location<'py>(
+    location: Bound<'py, PyAny>,
+    default: impl FnOnce() -> PyResult<Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    match location.extract::<Option<String>>()? {
+        Some(text) if !text.is_empty() && !holds_context_placeholder(&text) => Ok(location),
+        _ => default(),
+    }
 }
 
 /// The selected target's settings, with its database and schema resolved as `sqb debug` resolves them.

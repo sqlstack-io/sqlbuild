@@ -1991,6 +1991,15 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "    record(ctx, 'loader')\n"
                 "    return [{'order_id': 1}]\n"
             ),
+            "python/tasks/configured.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.tasks import task\n\n"
+                "@task\n"
+                "def configured_task(ctx):\n"
+                '    """Test task configured_task."""\n'
+                "    record(ctx, 'task')\n"
+                "    return ctx.result()\n"
+            ),
             "sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
@@ -2006,7 +2015,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
 
     results: list[subprocess.CompletedProcess[str]] = [
         run_sqb(command=("--no-color", *command), project_dir=project_dir)
-        for command in (("build", "--select", "orders"), ("load",), ("check",))
+        for command in (("build",), ("load",), ("check",))
     ]
 
     for result in results:
@@ -2021,8 +2030,19 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
         for line in (project_dir / "target_config.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert [(line["node"], line["name"], line["loader_schema"]) for line in recorded] == [
-        ("loader", "dev", test_case.expected_loader_schema)
+        ("loader", "dev", test_case.expected_loader_schema),
+        ("task", "dev", test_case.expected_loader_schema),
+        ("loader", "dev", test_case.expected_loader_schema),
     ], recorded
+    # Python node results land in the adapter's default schema; no schema keeps the template.
+    assert table_exists(db_path=db_path, table_name="_sqlbuild_node_results", schema="main")
+    schemas: list[str] = [
+        str(row[0])
+        for row in query_duckdb(
+            db_path=db_path, sql="SELECT schema_name FROM information_schema.schemata"
+        )
+    ]
+    assert not [schema for schema in schemas if "${" in schema], schemas
 
 
 @pytest.mark.parametrize(

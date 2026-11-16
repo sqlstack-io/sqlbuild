@@ -15,7 +15,7 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::compile_driver::targets::{
-    TargetSettingsValues, project_target_settings,
+    TargetSettingsValues, model_free_location, project_target_settings,
 };
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -23,7 +23,6 @@ use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;
 use sqlbuild_python_base::build_command::main::emit::emit;
 use sqlbuild_python_base::build_command::main::frozenset::frozenset;
-use sqlbuild_python_base::build_command::main::or_none::or_none;
 use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -439,10 +438,10 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         project: &project,
         reload: context.request_flag("reload_sources")?,
         defaults: (
-            or_none(native_field(&project, "effective_target_database")?, || {
+            model_free_location(native_field(&project, "effective_target_database")?, || {
                 adapter.call_method0("default_database")
             })?,
-            or_none(native_field(&project, "effective_target_schema")?, || {
+            model_free_location(native_field(&project, "effective_target_schema")?, || {
                 adapter.call_method0("default_schema")
             })?,
         ),

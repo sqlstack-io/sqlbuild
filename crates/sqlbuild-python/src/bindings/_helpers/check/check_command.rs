@@ -8,7 +8,7 @@ use crate::bindings::_helpers::compile_driver::relation_targets::build_project_r
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::compile_driver::targets::{
-    TargetSettingsValues, project_target_settings,
+    TargetSettingsValues, model_free_location, project_target_settings,
 };
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
@@ -280,19 +280,6 @@ fn compile_pipeline<'py>(
     )
 }
 
-fn target_default<'py>(
-    project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    (field, fallback): (&str, &str),
-) -> PyResult<Bound<'py, PyAny>> {
-    let value: Bound<'py, PyAny> = native_field(project, field)?;
-    if value.is_none() {
-        adapter.call_method0(fallback)
-    } else {
-        Ok(value)
-    }
-}
-
 /// The discovered Python graph, after refusing unit-test selectors, and the selected checks.
 fn python_selection<'py>(
     request: &Bound<'py, PyAny>,
@@ -370,16 +357,12 @@ fn prepare<'py>(
         relation_targets,
         relation_refs,
         defaults: (
-            target_default(
-                &project,
-                &adapter,
-                ("effective_target_database", "default_database"),
-            )?,
-            target_default(
-                &project,
-                &adapter,
-                ("effective_target_schema", "default_schema"),
-            )?,
+            model_free_location(native_field(&project, "effective_target_database")?, || {
+                adapter.call_method0("default_database")
+            })?,
+            model_free_location(native_field(&project, "effective_target_schema")?, || {
+                adapter.call_method0("default_schema")
+            })?,
         ),
         project_relations: object(
             py,
