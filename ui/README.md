@@ -24,8 +24,12 @@ npm run build   # writes static assets to build/
 ## Copy
 
 UI text follows the style guide in [COPY.md](COPY.md); a unit test checks it
-- [PERF.md](PERF.md): performance budgets and rules for pages, lists and graphs.
 against a baseline that may only shrink.
+
+## Performance
+
+Pages, lists and graphs follow the budgets and rules in [PERF.md](PERF.md); the end-to-end
+performance tests enforce them with the CPU slowed 6×.
 
 ## Generated files
 
