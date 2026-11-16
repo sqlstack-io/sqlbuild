@@ -115,6 +115,20 @@ describe('the card a large graph opens on', () => {
 	});
 });
 
+describe('a small graph opens in full form', () => {
+	// A job's graph as the job page draws it: 1136 × 294 in a 1054 × 635 canvas.
+	const bounds = { x: 0, y: 0, width: 1136, height: 294 };
+	it("opens at the compact zoom, not below it for the sake of the margin, when it fits whole there", () => {
+		const v = fitViewport(bounds, 1054, 635, { minZoom: LABEL_MIN_ZOOM });
+		expect(v.zoom).toBe(COMPACT_ZOOM);
+		expect(v.x).toBeGreaterThanOrEqual(ANCHOR_MARGIN);
+		expect(v.x + bounds.width * v.zoom).toBeLessThanOrEqual(1054 - ANCHOR_MARGIN);
+	});
+	it('still goes compact for a graph too wide for that', () => {
+		expect(fitViewport({ ...bounds, width: 1600 }, 1054, 635, { minZoom: LABEL_MIN_ZOOM }).zoom).toBeLessThan(COMPACT_ZOOM);
+	});
+});
+
 describe('semantic zoom', () => {
 	it('draws cards in full down to the compact zoom, well below the readable fit zoom', () => {
 		expect(compactLevel(1)).toBe(0);

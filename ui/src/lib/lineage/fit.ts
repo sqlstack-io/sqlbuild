@@ -71,7 +71,11 @@ type FitOptions = {
  */
 export function fitViewport(bounds: Rect, width: number, height: number, { padding = 0.08, maxZoom = 1, minZoom = READABLE_ZOOM, focus = null, start = null }: FitOptions = {}): Viewport {
 	const [padX, padY] = [width * padding, height * padding];
-	const whole = Math.min(maxZoom, (width - 2 * padX) / Math.max(1, bounds.width), (height - 2 * padY) / Math.max(1, bounds.height));
+	const fits = (marginX: number, marginY: number) => Math.min(maxZoom, (width - 2 * marginX) / Math.max(1, bounds.width), (height - 2 * marginY) / Math.max(1, bounds.height));
+	let whole = fits(padX, padY);
+	// The margin alone mustn't tip a graph into compact cards: one that fits whole at the compact zoom
+	// with `ANCHOR_MARGIN` around it opens there, its cards drawn in full.
+	if (whole < COMPACT_ZOOM && fits(ANCHOR_MARGIN, ANCHOR_MARGIN) >= COMPACT_ZOOM) whole = COMPACT_ZOOM;
 	if (whole >= minZoom) {
 		return { zoom: whole, x: width / 2 - (bounds.x + bounds.width / 2) * whole, y: height / 2 - (bounds.y + bounds.height / 2) * whole };
 	}
