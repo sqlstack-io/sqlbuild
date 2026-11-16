@@ -217,7 +217,7 @@ sources:
         type: VARCHAR
 ```
 
-Self-managed loaders must not declare a `write_strategy`. They are useful when you want to use adapter-specific SQL (e.g. `COPY INTO`, external tables), call an external ingestion tool like [dlt](/docs/integrations/dlt), or handle writes in a way that doesn't fit the dict-return pattern.
+Self-managed loaders must not declare a `write_strategy`. They are useful when you want to use adapter-specific SQL (e.g. `COPY INTO`, external tables), call an external ingestion tool, or handle writes in a way that doesn't fit the dict-return pattern.
 
 ## Loader context
 
