@@ -66,7 +66,7 @@
 		{ id: 'job', label: 'Job', minWidth: 240, truncate: false },
 		...(showSelection ? [{ id: 'selection', label: 'Selection', width: '26%', truncate: false }] : []),
 		{ id: 'nodes', label: 'Nodes', width: '80px', align: 'right' as const },
-		...(showPolicy ? [{ id: 'policy', label: 'Overlap and retries', width: '170px', title: 'Whether scheduled requests skip while a run is active, and whether failed runs retry' }] : []),
+		...(showPolicy ? [{ id: 'policy', label: 'Policy', width: '170px', title: 'Whether scheduled requests skip while a run is active, and whether failed runs retry' }] : []),
 		{ id: 'starts', label: 'Started by', width: '220px', truncate: false },
 		...(showOwner ? [{ id: 'owner', label: 'Owner', width: '170px' }] : []),
 		{ id: 'last', label: 'Last run', width: '170px' }
@@ -85,7 +85,7 @@
 	total="{filtered.length} of {all.length}"
 	counts={[
 		{ tone: 'var(--sb-success)', count: scheduledCount, label: 'start automatically' },
-		{ tone: 'var(--sb-error)', count: failingCount, label: 'last run failed or partial' }
+		{ tone: 'var(--sb-error)', count: failingCount, label: 'failing', title: 'Last run failed or partial' }
 	]}
 >
 	{#snippet filters()}
@@ -113,7 +113,7 @@
 	{/snippet}
 </ListToolbar>
 
-<DataTable columns={jobColumns} rows={filtered} key={(j) => j.key} resource={jobs} empty={all.length ? 'No jobs match the filter.' : 'No jobs yet. Declare jobs and groups in the project code and deploy; they show up here.'}>
+<DataTable columns={jobColumns} rows={filtered} key={(j) => j.key} resource={jobs} empty={all.length ? 'No jobs match the filter.' : 'No jobs yet.'}>
 	{#snippet row(j)}
 				{@const jobTriggers = j.triggerIds.map((id) => triggerById.get(id)).filter((t) => t !== undefined)}
 				<tr onclick={(e) => openRow(e, `/jobs/${j.key}`)}>
@@ -151,7 +151,7 @@
 					{#if showPolicy}<td class="muted nowrap" title={[j.overlap ? `overlap = ${j.overlap}: ${overlapHelp[j.overlap]}` : '', j.onFailure ? `[retry] attempts = ${j.onFailure.retries + 1}, delay_seconds = ${j.onFailure.retryDelaySeconds}` : '', j.priority ? 'Higher priority runs go first when they wait for the same slot' : ''].filter(Boolean).join('\n') || undefined}>{jobPolicyText(j) || '—'}</td>{/if}
 					<td>
 						{#if jobTriggers.length === 0}
-							<span class="muted nowrap" title="No schedule or sensor starts it; start it from its page">Only by hand</span>
+							<span class="muted nowrap" title="No schedule or sensor starts it; start it from its page">Manual</span>
 						{:else}
 							{@const capped = capLines(jobTriggers)}
 							<div class="flex flex-col gap-1">
