@@ -18,7 +18,7 @@ use sqlbuild_rules::constants::API_VERSION;
 use sqlbuild_rules::engine::main::build_models::build_models;
 use sqlbuild_rules::engine::main::evaluate_rows::evaluate_rows;
 use sqlbuild_rules::engine::main::finalize_rows::finalize_rows;
-use sqlbuild_rules::engine::main::json_grains::{json_grains, needs_json_grains};
+use sqlbuild_rules::engine::main::json_grains::{json_grains, needs_json_grains, skipped_models};
 use sqlbuild_rules::engine::main::project_model_rows::project_model_rows;
 use sqlbuild_rules::errors::RowsError;
 use sqlbuild_rules::models::{
@@ -374,6 +374,7 @@ fn evaluated<'py>(
     early: Option<(EarlyBuiltinRules, &AtomicBool)>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let request: RowsRequest = taken_rows(request)?;
+    let skipped: Vec<(String, String)> = skipped_models(&request.request.models);
     let evaluation: Result<RowsEvaluation, RowsError> = match early {
         None => py
             .compiler_detach(|| Ok(evaluate_rows(request)))
@@ -416,6 +417,7 @@ fn evaluated<'py>(
             ),
             ("built_in_ms", evaluation.built_in_ms.into_bound_py_any(py)?),
             ("reused", evaluation.reused.into_bound_py_any(py)?),
+            ("skipped_models", PyTuple::new(py, skipped)?.into_any()),
         ],
     )
 }

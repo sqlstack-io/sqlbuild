@@ -6,6 +6,7 @@ use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
+use sqlbuild_rules::rule_results::main::format_skipped_models::format_skipped_models;
 
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
 use crate::bindings::_helpers::compile_driver::pipeline::{
@@ -138,6 +139,13 @@ fn run_rules_gate<'py>(
         let elapsed: f64 = monotonic(py)? - started;
         let message: String = rules_progress(elapsed, &result, true)?;
         on_progress.call1((message,))?;
+        let verbose: bool = native_field(options, "verbose")?.is_truthy()?;
+        if let Some(note) = format_skipped_models(
+            &native_field(&result, "skipped_models")?.extract::<Vec<_>>()?,
+            verbose,
+        ) {
+            on_progress.call1((format!("note: {note}"),))?;
+        }
     }
     let mut failing: Vec<Bound<'py, PyAny>> = Vec::new();
     for finding in native_field(&result, "findings")?.try_iter()? {

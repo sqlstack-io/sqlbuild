@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::models::{EvaluateRequest, GrainColumn, JsonGrain, LineageColumn, ModelRow};
+use crate::models::{EvaluateRequest, GrainColumn, JsonGrain, LineageColumn, Model, ModelRow};
 use crate::query_facts::constants::SNOWFLAKE_DIALECT;
 use crate::rules::main::request_selects::request_selects;
 
@@ -54,6 +54,18 @@ pub fn json_grains(
     for (row, grain) in rows.iter_mut().zip(grains) {
         row.json_grain = grain;
     }
+}
+
+/// `(path, reason)` of each analysed model SQBRPERFORMANCE102 skipped for missing facts.
+pub fn skipped_models(models: &[Model]) -> Vec<(String, String)> {
+    models
+        .iter()
+        .filter(|model| !model.sql_analysis_disabled)
+        .filter_map(|model| {
+            let reason: &String = model.json_grain.as_ref()?.skipped.as_ref()?;
+            Some((model.relative_path.clone(), reason.clone()))
+        })
+        .collect()
 }
 
 fn grain(
