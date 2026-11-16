@@ -198,9 +198,10 @@ pub(crate) fn finish_lost_stdout(lost: Option<&LostStdout>, exit_code: i32) -> i
     }
 }
 
-/// Whether the `sqb dev` screen can redraw in place: stderr is a terminal and nothing asks for plain lines.
+/// Whether the `sqb dev` screen can redraw in place: on Unix, stderr is a terminal and nothing asks for plain lines.
 pub(crate) fn live_screen() -> bool {
-    io::stderr().is_terminal()
+    cfg!(unix)
+        && io::stderr().is_terminal()
         && [NO_COLOR_VARIABLE, CI_VARIABLE, NO_PROGRESS_VARIABLE]
             .iter()
             .all(|variable| std::env::var_os(variable).is_none())

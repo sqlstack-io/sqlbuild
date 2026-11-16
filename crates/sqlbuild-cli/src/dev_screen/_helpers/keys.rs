@@ -3,13 +3,16 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::thread::JoinHandle;
+#[cfg(unix)]
 use std::time::Duration;
 
+#[cfg(unix)]
 use rustix::termios::{
     LocalModes, OptionalActions, SpecialCodeIndex, Termios, tcgetattr, tcsetattr,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
+#[cfg(unix)]
 use crate::dev_screen::constants::KEY_POLL;
 use crate::dev_screen::models::{KeyGate, ScreenMessage};
 
@@ -21,6 +24,7 @@ pub(crate) struct KeyReader {
 
 impl KeyReader {
     /// Start reading keys into `keys`, or `None` when stdin is not a terminal.
+    #[cfg(unix)]
     pub(crate) fn start(keys: UnboundedSender<ScreenMessage>) -> Option<Self> {
         let cooked: Termios = match tcgetattr(std::io::stdin()) {
             Ok(cooked) => cooked,
@@ -33,6 +37,12 @@ impl KeyReader {
             gate,
             thread: Some(thread),
         })
+    }
+
+    /// Hotkeys need a Unix terminal; the screen is plain elsewhere.
+    #[cfg(not(unix))]
+    pub(crate) fn start(_keys: UnboundedSender<ScreenMessage>) -> Option<Self> {
+        None
     }
 
     pub(crate) fn gate(&self) -> Arc<KeyGate> {
@@ -50,6 +60,7 @@ impl Drop for KeyReader {
 }
 
 /// Keys without echo or line buffering; Ctrl-C still interrupts, and reads give up after a tenth of a second.
+#[cfg(unix)]
 fn raw_mode(cooked: &Termios) -> Termios {
     let mut raw: Termios = cooked.clone();
     raw.local_modes -= LocalModes::ICANON | LocalModes::ECHO;
@@ -58,6 +69,7 @@ fn raw_mode(cooked: &Termios) -> Termios {
     raw
 }
 
+#[cfg(unix)]
 fn read_keys(gate: &KeyGate, cooked: &Termios, keys: &UnboundedSender<ScreenMessage>) {
     let raw: Termios = raw_mode(cooked);
     let mut byte: [u8; 1] = [0];

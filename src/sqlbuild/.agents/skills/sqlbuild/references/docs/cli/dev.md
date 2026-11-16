@@ -71,8 +71,8 @@ The location reads warehouse history once the connection succeeds.
 
 ## Plain output
 
-When `NO_COLOR`, `CI` or `SQLBUILD_NO_PROGRESS` is set, or stderr is not a terminal, `sqb dev`
-prints one stable line per step, event and warning, with no redraws or keys:
+On Windows, when `NO_COLOR`, `CI` or `SQLBUILD_NO_PROGRESS` is set, or when stderr is not a
+terminal, `sqb dev` prints one stable line per step, event and warning, with no redraws or keys:
 
 ```text
 sqlbuild dev: control store ready (0.1s)
