@@ -6,12 +6,16 @@ use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::models::ParsedSelector;
 use sqlbuild_core::text::main::close_matches::close_matches;
 use sqlbuild_orchestration::runs::models::{
-    SelectionField, SelectionLocation, SelectionProblem, SelectionVocabulary, VocabularyEntry,
+    SelectionField, SelectionLocation, SelectionProblem, SelectionRefusal, SelectionVocabulary,
+    VocabularyEntry,
 };
 
 use crate::adhoc::_helpers::planner::resolve_with_tests;
 use crate::adhoc::_helpers::publication::{IndexedPublication, is_sql_test, name_of};
-use crate::adhoc::constants::{BUILD_VERB, PROJECT_FOLDER, SUGGESTION_CUTOFF, SUGGESTION_LIMIT};
+use crate::adhoc::constants::{
+    BUILD_VERB, FUNCTION_KIND_ALIAS, FUNCTION_KINDS, GLOB_CHARACTERS, GLOB_SELECTOR, NAME_SELECTOR,
+    PROJECT_FOLDER, SUGGESTION_CUTOFF, SUGGESTION_LIMIT,
+};
 use crate::adhoc::models::Refusal;
 
 /// The sorted keys `sqb build --select <select> --exclude <exclude>` selects, or why and where it refuses them.
@@ -53,6 +57,13 @@ pub(crate) fn vocabulary(publication: &IndexedPublication) -> SelectionVocabular
             *paths.entry(folder).or_default() += 1;
         }
     }
+    let functions: u64 = FUNCTION_KINDS
+        .iter()
+        .filter_map(|kind| kinds.get(*kind))
+        .sum();
+    if functions > 0 {
+        kinds.insert(FUNCTION_KIND_ALIAS.to_owned(), functions);
+    }
     let jobs: BTreeMap<String, u64> = publication
         .jobs
         .iter()
@@ -92,6 +103,9 @@ fn problem(
         .as_ref()
         .map(|location| suggestions(publication, &location.token))
         .unwrap_or_default();
+    let refused: Option<SelectionRefusal> = location
+        .as_ref()
+        .and_then(|location| refusal_of(publication, &location.token));
     let (code, message, help) = match refusal {
         Refusal::Selector(error) => (Some(error.code.to_owned()), error.message, error.help),
         Refusal::Selection(message) => (None, message, None),
@@ -102,6 +116,7 @@ fn problem(
         help,
         location,
         suggestions,
+        refused,
     }
 }
 
@@ -154,13 +169,39 @@ fn utf16_offset(text: &str, byte: usize) -> u32 {
     u32::try_from(text[..byte].encode_utf16().count()).unwrap_or(u32::MAX)
 }
 
+/// The first comma part of `token` that is refused on its own, with its position.
+fn refused_part<'token>(
+    publication: &IndexedPublication,
+    token: &'token str,
+) -> Option<(usize, &'token str)> {
+    token
+        .split(',')
+        .enumerate()
+        .find(|(_, part)| built(publication, &[(*part).to_owned()], &[]).is_err())
+}
+
+/// The refused part's text, position, selector type and value; a path-between part names no single value.
+fn refusal_of(publication: &IndexedPublication, token: &str) -> Option<SelectionRefusal> {
+    let (index, part) = refused_part(publication, token)?;
+    let Ok(ParsedSelector::Kind { kind, value, .. }) = parse_selector(part) else {
+        return None;
+    };
+    let selector_type: String = if kind == NAME_SELECTOR && value.contains(GLOB_CHARACTERS) {
+        GLOB_SELECTOR.to_owned()
+    } else {
+        kind
+    };
+    Some(SelectionRefusal {
+        part: part.to_owned(),
+        index: u32::try_from(index).unwrap_or(u32::MAX),
+        selector_type,
+        value,
+    })
+}
+
 /// `token` with its first refused comma part's value replaced by the closest values of that selector type.
 fn suggestions(publication: &IndexedPublication, token: &str) -> Vec<String> {
-    let parts: Vec<&str> = token.split(',').collect();
-    let Some(index) = parts
-        .iter()
-        .position(|part| built(publication, &[(*part).to_owned()], &[]).is_err())
-    else {
+    let Some((index, part)) = refused_part(publication, token) else {
         return Vec::new();
     };
     let Ok(ParsedSelector::Kind {
@@ -168,11 +209,12 @@ fn suggestions(publication: &IndexedPublication, token: &str) -> Vec<String> {
         value,
         upstream,
         downstream,
-    }) = parse_selector(parts[index])
+    }) = parse_selector(part)
     else {
         return Vec::new();
     };
-    let typed: bool = parts[index].trim_matches('+').contains(':');
+    let parts: Vec<&str> = token.split(',').collect();
+    let typed: bool = part.trim_matches('+').contains(':');
     let candidates: Vec<String> = candidates(publication, &kind);
     let candidates: Vec<&str> = candidates.iter().map(String::as_str).collect();
     let marked = |replacement: &str| -> String {

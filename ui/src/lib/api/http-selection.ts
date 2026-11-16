@@ -18,10 +18,15 @@ export function toSelectionEvaluation(wire: Wire['SelectionEvaluation']): Select
 			help: problem.help ?? null,
 			location: problem.location ?? null,
 			suggestions: problem.suggestions,
-			// The server reports the refused token, not which part of it or that part's type and value.
-			refused: null
+			refused: problem.refused ? toRefusal(problem.refused) : null
 		}
 	};
+}
+
+/** The server's refused part in the UI's shape: its index as `part`, and a bare name or glob as type `null`. */
+function toRefusal(refused: Wire['SelectionRefusal']): NonNullable<SelectionEvaluation['error']>['refused'] {
+	const bare = refused.type === 'name' || refused.type === 'glob';
+	return { part: refused.index, type: bare ? null : refused.type, value: refused.value };
 }
 
 export function toSelectionVocabulary(wire: Wire['SelectionVocabulary']): SelectionVocabulary {

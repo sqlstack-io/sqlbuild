@@ -3435,8 +3435,23 @@ export interface components {
             help?: string | null;
             location?: null | components["schemas"]["SelectionLocation"];
             message: string;
+            refused?: null | components["schemas"]["SelectionRefusal"];
             /** @description Replacements for that whole token, closest first. */
             suggestions: string[];
+        };
+        /** @description One refused comma part: its exact text and position in the token, its selector type and value. */
+        SelectionRefusal: {
+            /**
+             * Format: int32
+             * @description Which comma part of the token it is, from 0.
+             */
+            index: number;
+            /** @description The part as typed, such as `+tag:finanse`. */
+            part: string;
+            /** @description `tag`, `path`, `job`, `source`, `seed`, `kind`, `test`, `name`, `glob`, or a Python node type such as `task`. */
+            type: string;
+            /** @description The value the part names, without its type prefix or `+` markers, such as `finanse`. */
+            value: string;
         };
         /** @description The values each selector type takes in the current publication, with how many nodes each one selects. */
         SelectionVocabulary: {

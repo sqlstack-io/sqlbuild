@@ -983,6 +983,22 @@ pub struct SelectionProblem {
     pub location: Option<SelectionLocation>,
     /// Replacements for that whole token, closest first.
     pub suggestions: Vec<String>,
+    /// The comma part of that token `sqb` refused, when it names one selector value.
+    pub refused: Option<SelectionRefusal>,
+}
+
+/// One refused comma part: its exact text and position in the token, its selector type and value.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionRefusal {
+    /// The part as typed, such as `+tag:finanse`.
+    pub part: String,
+    /// Which comma part of the token it is, from 0.
+    pub index: u32,
+    /// `tag`, `path`, `job`, `source`, `seed`, `kind`, `test`, `name`, `glob`, or a Python node type such as `task`.
+    #[serde(rename = "type")]
+    pub selector_type: String,
+    /// The value the part names, without its type prefix or `+` markers, such as `finanse`.
+    pub value: String,
 }
 
 /// One selector token in the request's `select` or `exclude` text.

@@ -37,3 +37,12 @@ pub(super) struct VocabularyTestCase {
     ) -> &[sqlbuild_orchestration::runs::models::VocabularyEntry],
     pub(super) expected_entries: &'static [(&'static str, u64)],
 }
+
+/// A refused selection, its error code and the part `(text, index, type, value)` it reports.
+pub(super) struct RefusedPartTestCase {
+    pub(super) description: &'static str,
+    /// `select`, optionally followed by ` --exclude ` and the exclude text.
+    pub(super) select: &'static str,
+    pub(super) expected_code: Option<&'static str>,
+    pub(super) expected_refused: Option<(&'static str, u32, &'static str, &'static str)>,
+}

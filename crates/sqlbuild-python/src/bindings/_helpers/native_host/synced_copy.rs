@@ -14,7 +14,6 @@ use sqlbuild_analysis::fingerprint_storage::constants::FINGERPRINT_COLUMNS;
 use sqlbuild_analysis::fingerprint_storage::main::read_latest_sql::read_latest_sql;
 use sqlbuild_cache::digest::main::base64_text::base64_text;
 use sqlbuild_cache::digest::main::sha256_hex::sha256_hex;
-use sqlbuild_core::constants::{FINGERPRINT_TABLE_NAME, STATE_TABLE_NAMES};
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_orchestration::warehouse_metadata::models::{PreviewCopy, WarehouseCatalogRecord};
 use sqlbuild_state::consumption::models::{
@@ -26,6 +25,7 @@ use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KI
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, SqliteCursor};
+use crate::bindings::_helpers::native_host::synced_relations::{RelationFilter, SyncedRelations};
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 create_exception!(
@@ -84,19 +84,6 @@ fn same(left: Option<&str>, right: Option<&str>) -> bool {
     left.unwrap_or_default().to_lowercase() == right.unwrap_or_default().to_lowercase()
 }
 
-/// Whether `wanted` is unset or holds `value`, compared as the warehouse folds case.
-fn any_same(wanted: Option<&[String]>, value: &str) -> bool {
-    let Some(wanted) = wanted else {
-        return true;
-    };
-    for item in wanted {
-        if same(Some(value), Some(item)) {
-            return true;
-        }
-    }
-    false
-}
-
 fn literal(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
@@ -125,6 +112,7 @@ impl SyncedCopyConnection {
 pub(crate) struct SyncedCopyAdapter {
     adapter: Py<PyAny>,
     copy: PreviewCopy,
+    relations: SyncedRelations,
     store: SqliteConnection,
     views: Mutex<Vec<(Option<String>, String)>>,
     unknowns: Mutex<BTreeSet<String>>,
@@ -135,7 +123,7 @@ impl SyncedCopyAdapter {
     /// The facade over `adapter` answering from the copy written at `path`.
     pub(crate) fn load(py: Python<'_>, adapter: Bound<'_, PyAny>, path: &str) -> PyResult<Self> {
         let text: String = std::fs::read_to_string(path)?;
-        let copy: PreviewCopy = serde_json::from_str(&text)
+        let mut copy: PreviewCopy = serde_json::from_str(&text)
             .map_err(|error| PyRuntimeError::new_err(format!("invalid synced copy: {error}")))?;
         let store: SqliteConnection = SqliteConnection::open(py, MEMORY_PATH)?;
         let columns: Vec<&str> = FINGERPRINT_STORE_COLUMNS
@@ -178,9 +166,11 @@ impl SyncedCopyAdapter {
                 &values,
             )?;
         }
+        let relations: SyncedRelations = SyncedRelations::new(std::mem::take(&mut copy.relations));
         Ok(Self {
             adapter: adapter.unbind(),
             copy,
+            relations,
             store,
             views: Mutex::new(Vec::new()),
             unknowns: Mutex::new(BTreeSet::new()),
@@ -338,30 +328,11 @@ impl SyncedCopyAdapter {
         let database: Option<String> = arguments.value("database")?.extract()?;
         let schemas: Option<Vec<String>> = arguments.value("schemas")?.extract()?;
         let names: Option<Vec<String>> = arguments.value("names")?.extract()?;
-        Ok(self.listed(database.as_deref(), schemas.as_deref(), names.as_deref()))
-    }
-
-    fn listed(
-        &self,
-        database: Option<&str>,
-        schemas: Option<&[String]>,
-        names: Option<&[String]>,
-    ) -> Vec<&WarehouseCatalogRecord> {
-        let mut listed: Vec<&WarehouseCatalogRecord> = Vec::new();
-        for record in &self.copy.relations {
-            if (STATE_TABLE_NAMES.contains(&record.name.as_str())
-                && record.name != FINGERPRINT_TABLE_NAME)
-                || !(database.is_none()
-                    || record.state_database.is_none()
-                    || same(record.state_database.as_deref(), database))
-                || !any_same(schemas, &record.state_schema)
-                || !any_same(names, &record.name)
-            {
-                continue;
-            }
-            listed.push(record);
-        }
-        listed
+        Ok(self.relations.listed(&RelationFilter {
+            database: database.as_deref(),
+            schemas: schemas.as_deref(),
+            names: names.as_deref(),
+        }))
     }
 
     fn relation_info<'py>(
@@ -489,7 +460,12 @@ impl SyncedCopyAdapter {
             let schemas: Option<Vec<String>> = schema.clone().map(|schema| vec![schema]);
             let names: [String; 1] = [name.clone()];
             if let Some(record) = self
-                .listed(database.as_deref(), schemas.as_deref(), Some(&names))
+                .relations
+                .listed(&RelationFilter {
+                    database: database.as_deref(),
+                    schemas: schemas.as_deref(),
+                    names: Some(&names),
+                })
                 .first()
             {
                 found.set_item((database, schema, name), self.columns(py, record)?)?;

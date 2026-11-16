@@ -98,6 +98,7 @@ pub(super) fn owned_evaluation(
                     .iter()
                     .map(|value| (*value).to_owned())
                     .collect(),
+                refused: None,
             })
         })
 }

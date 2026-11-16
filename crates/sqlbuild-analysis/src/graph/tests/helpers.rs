@@ -140,6 +140,19 @@ pub(super) const TABLE_FUNCTION_PROJECT: &[ResourceSpec] = &[
     ),
 ];
 
+/// A model reading a scalar function and a table function.
+pub(super) const FUNCTIONS_PROJECT: &[ResourceSpec] = &[
+    ("udf", "tax", &[], &[], None),
+    ("table_fn", "customer_orders", &[], &[], None),
+    (
+        "model",
+        "orders",
+        &[("udf", "tax"), ("table_fn", "customer_orders")],
+        &[],
+        None,
+    ),
+];
+
 pub(super) fn orders_graph() -> ProjectGraph {
     project_graph(ORDERS_PROJECT)
 }
