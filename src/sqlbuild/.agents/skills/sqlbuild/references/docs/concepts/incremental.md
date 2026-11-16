@@ -240,7 +240,7 @@ WHERE ordered_at >= __cursor_start()
   AND ordered_at < __cursor_end()
 ```
 
-`__cursor_start()` is the effective inclusive start and `__cursor_end()` is the effective exclusive end after cursor floors, lookback, replay policy, and command-line overrides have been applied. The intrinsics accept no arguments and are only valid in built-in cursor incremental model query SQL. They are rejected in functions, hooks, audits, SQL tests and scenarios, source expressions, non-incremental or cursorless models, custom materializations, and non-microbatch full refreshes. A non-microbatch model given a FULL backfill by `--full-refresh` fails with a message naming that cause; pass an explicit interval with `--start-cursor-ts` and `--end-cursor-ts` (or the `-int` forms) to rebuild it.
+`__cursor_start()` is the effective inclusive start and `__cursor_end()` is the effective exclusive end after cursor floors, lookback, replay policy, and command-line overrides have been applied. The intrinsics accept no arguments and are only valid in built-in cursor incremental model query SQL. They are rejected in functions, hooks, audits, SQL tests and scenarios, source expressions, non-incremental or cursorless models, custom materializations, and non-microbatch full refreshes. A non-microbatch model given a FULL backfill by `--full-refresh` fails planning with `S204`, naming that cause; pass an explicit interval with `--start-cursor-ts` and `--end-cursor-ts` (or the `-int` forms) to rebuild it.
 
 In microbatch mode, the intrinsics resolve to each batch's concrete bounds. A microbatch full refresh discovers its range from current inputs while ignoring the old destination watermark.
 

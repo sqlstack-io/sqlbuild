@@ -10,6 +10,7 @@ use crate::bindings::_helpers::model_config::typed_config::{
     config_node_of, config_text_is, config_text_object, config_value, model_values,
 };
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
+use crate::bindings::_helpers::planner_phases::constants::FULL_BACKFILL_WITHOUT_INTERVAL_CODE;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_resolution::cursor_model::{
     compute_model_cursor_bounds, unbounded,
@@ -285,6 +286,7 @@ fn unresolved_bounds_error(py: Python<'_>, name: &str, cause: Option<&str>) -> P
     let error = error_class(py, ErrorId::PlannerInput)?;
     let kwargs = PyDict::new(py);
     let message = if let Some(cause) = cause {
+        kwargs.set_item("code", FULL_BACKFILL_WITHOUT_INTERVAL_CODE)?;
         kwargs.set_item("help", "rebuild it with an explicit cursor interval (--start-cursor-ts and --end-cursor-ts, or the -int forms), or make it a microbatch model so a full rebuild can run batch by batch")?;
         format!(
             "Model '{name}' was given a FULL backfill ({cause}), but it uses cursor intrinsics and a non-microbatch full rebuild has no cursor interval"
