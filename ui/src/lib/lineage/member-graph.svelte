@@ -136,6 +136,12 @@
 		foldersOn = true;
 		openMemberFolders = initialFolders();
 		await tick();
+		// When the reset changed what is drawn, the new cards are measured and laid out first, and the
+		// layout fits them; fitting now would fit the cards being replaced.
+		if (laidOut !== shape) {
+			refitNext = true;
+			return;
+		}
 		if (nodes.length) nodes = layoutMemberGraph(nodes, edges);
 		await tick();
 		requestAnimationFrame(() => fit?.());

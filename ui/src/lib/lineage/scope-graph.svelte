@@ -84,6 +84,8 @@
 		grouped = keys.length > GROUPED_ABOVE;
 		expandNote = '';
 		await tick();
+		// A reset that changed what is drawn is laid out, and fitted, once the new cards are measured.
+		if (laidOut !== shape) return;
 		if (nodes.length) nodes = folderMode ? layoutFolderGraph(nodes, edges) : layoutJobGraph(nodes, edges);
 		await tick();
 		requestAnimationFrame(() => fit?.());

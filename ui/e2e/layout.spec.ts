@@ -47,8 +47,17 @@ const awkward = (path: string) => `${path}${path.includes('?') ? '&' : '?'}mock&
 async function settle(page: Page) {
 	await page.waitForLoadState('networkidle');
 	await page.waitForTimeout(500);
-	// A graph shows once its first fit is done, after its data loads; the layout check fails one still hidden.
-	await page.waitForFunction(() => !document.querySelector('.graph-canvas.unfitted'), null, { timeout: 10_000 }).catch(() => {});
+	// A graph is drawn once its data loads and shows once its first fit is done; the layout check fails
+	// one still hidden. Wait for every graph to have cards and be fitted, or to say it has too many to draw:
+	// a canvas without cards yet isn't marked unfitted, so waiting for that alone could stop too early.
+	await page
+		.waitForFunction(
+			() =>
+				[...document.querySelectorAll('.graph-canvas')].every((c) => (c.querySelector('.svelte-flow__node') ? !c.classList.contains('unfitted') : !!c.parentElement?.querySelector('.graph-too-many'))),
+			null,
+			{ timeout: 15_000 }
+		)
+		.catch(() => {});
 }
 
 /** In the page: each fitted graph's start card (`data-fit-anchor`) not wholly inside its canvas, as problems. */
@@ -70,6 +79,19 @@ function anchorOutside(): string[] {
 		if (further) found.push(`the graph opens beside its first column: ${further.dataset.id} starts ${Math.round(box.left - further.getBoundingClientRect().left)}px left of ${id}`);
 	}
 	return found;
+}
+
+/** The graph's pan and zoom, as Svelte Flow sets it on its viewport. */
+const viewOf = (page: Page) => page.locator('.svelte-flow__viewport').first().evaluate((el) => (el as HTMLElement).style.transform);
+
+/** Zooming in and pressing Reset comes back to the view the graph opened on. */
+async function expectResetToInitialView(page: Page, opened?: string) {
+	await page.waitForTimeout(400);
+	const initial = opened ?? (await viewOf(page));
+	await page.locator('.svelte-flow__controls-zoomin').first().click();
+	await expect.poll(() => viewOf(page)).not.toBe(initial);
+	await page.getByRole('button', { name: 'Reset' }).click();
+	await expect.poll(() => viewOf(page), { message: 'the view after Reset' }).toBe(initial);
 }
 
 async function checkLayout(page: Page, label: string) {
@@ -101,7 +123,9 @@ async function checkLayout(page: Page, label: string) {
 			const scale = /scale\(([\d.]+)\)/.exec(canvas.querySelector<HTMLElement>('.svelte-flow__viewport')?.style.transform ?? '');
 			const title = canvas.querySelector('.svelte-flow__node .name');
 			if (!scale || !title) continue;
-			const px = parseFloat(getComputedStyle(title).fontSize) * Number(scale[1]);
+			// Zoomed out, cards show their header alone, scaled up by --sb-title-scale.
+			const counter = canvas.classList.contains('compact') ? Number(getComputedStyle(canvas).getPropertyValue('--sb-title-scale')) || 1 : 1;
+			const px = parseFloat(getComputedStyle(title).fontSize) * Number(scale[1]) * counter;
 			if (px < 10.95) problems.push(`card titles show at ${px.toFixed(1)} px`);
 		}
 		// Every scroll area has the themed scrollbar, not the browser's default.
@@ -211,6 +235,23 @@ for (const width of WIDTHS) {
 			});
 		}
 
+		test('a real-sized Lineage overview opens whole, readable, and Reset comes back to it', async ({ page }) => {
+			await page.setViewportSize({ width: 1900, height: 1060 });
+			await page.goto('/lineage?mock&large');
+			await settle(page);
+			await checkLayout(page, 'large Lineage');
+			// About 13 folder cards: every one wholly in view, none cut by the canvas edge.
+			const cut = await page.evaluate(() => {
+				const flow = document.querySelector<HTMLElement>('.svelte-flow')!;
+				const pane = flow.getBoundingClientRect();
+				const cards = [...flow.querySelectorAll<HTMLElement>('.svelte-flow__node')];
+				return { cards: cards.length, cut: cards.filter((n) => { const r = n.getBoundingClientRect(); return r.left < pane.left || r.right > pane.right || r.top < pane.top || r.bottom > pane.bottom; }).map((n) => n.dataset.id) };
+			});
+			expect(cut.cards, 'folder cards drawn').toBeGreaterThanOrEqual(12);
+			expect(cut.cut, 'cards outside the canvas').toEqual([]);
+			await expectResetToInitialView(page);
+		});
+
 		test('the large mock group draws its direct waits only and opens on its cards', async ({ page }) => {
 			await page.goto(awkward(`/jobs/${BIG_GROUP}`));
 			await settle(page);
@@ -223,6 +264,7 @@ for (const width of WIDTHS) {
 					const inside = cards.filter((c) => c.width && c.left >= pane.left && c.right <= pane.right && c.top >= pane.top && c.bottom <= pane.bottom);
 					return { members: rect('.svelte-flow__node[data-id^="member:"]').length, folders: rect('.svelte-flow__node[data-id^="jobfolder:"]').length, cards: cards.length, edges: document.querySelectorAll('.svelte-flow__edge').length, inside: inside.length };
 				});
+			const opened = await viewOf(page);
 			// A group this large opens by folder, closed, with a line per pair of folders.
 			let found = await drawn();
 			expect(found.folders, 'closed folders drawn').toBeGreaterThan(1);
@@ -244,6 +286,9 @@ for (const width of WIDTHS) {
 			await page.getByRole('button', { name: 'Reset' }).click();
 			await expect.poll(boxes).toBe(0);
 			await expect.poll(async () => (await drawn()).folders).toBeGreaterThan(1);
+			// Back to the view it opened on, after all that, and again after zooming in.
+			await expect.poll(() => viewOf(page), { message: 'the view after Reset' }).toBe(opened);
+			await expectResetToInitialView(page, opened);
 		});
 
 		for (const { list, link } of ITEMS) {

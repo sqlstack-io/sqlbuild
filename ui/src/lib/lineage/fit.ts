@@ -16,6 +16,24 @@ export const ANCHOR_MARGIN = 24;
  */
 export const READABLE_ZOOM = MIN_TITLE_PX / CARD_TITLE_PX;
 
+/**
+ * A graph of up to this many cards opens, and resets, showing all of it; only a larger one opens at
+ * `READABLE_ZOOM` on its start card. Cards stay readable either way: below `READABLE_ZOOM` they show
+ * just their header, counter-scaled (`titleScale`).
+ */
+export const WHOLE_FIT_CARDS = 150;
+
+/** The lowest zoom down to which titles are counter-scaled to `MIN_TITLE_PX`, and the lowest a whole-graph fit goes. */
+export const LABEL_MIN_ZOOM = 0.35;
+
+/** How much a card's header is scaled up at `zoom` so its title shows at `MIN_TITLE_PX`: 1 at a readable zoom. */
+export function titleScale(zoom: number): number {
+	return Math.max(1, MIN_TITLE_PX / (CARD_TITLE_PX * Math.max(zoom, LABEL_MIN_ZOOM)));
+}
+
+/** Whether cards show only their header at `zoom`: where their title would otherwise show under `MIN_TITLE_PX`. */
+export const compactAt = (zoom: number) => zoom < READABLE_ZOOM - 1e-9;
+
 type FitOptions = {
 	/** Share of the view left empty on each side. */
 	padding?: number;

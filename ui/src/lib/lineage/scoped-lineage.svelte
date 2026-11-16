@@ -9,7 +9,7 @@
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import type { Node, Edge } from '@xyflow/svelte';
 	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
-	import { READABLE_ZOOM } from '$lib/lineage/fit';
+	import { LABEL_MIN_ZOOM } from '$lib/lineage/fit';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import { layoutGraph } from '$lib/lineage/layout';
 	import { tick } from 'svelte';
@@ -203,7 +203,7 @@
 			readable={false}
 			fitOnInit
 			{nodeTypes}
-			fitViewOptions={{ minZoom: READABLE_ZOOM }}
+			fitViewOptions={{ minZoom: LABEL_MIN_ZOOM }}
 			elementsSelectable
 			nodesDraggable
 			multiSelectionKey={['Shift', 'Meta', 'Control']}

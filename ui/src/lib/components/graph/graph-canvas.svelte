@@ -5,7 +5,7 @@
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
 	import CountEdge from '$lib/lineage/count-edge.svelte';
-	import { READABLE_ZOOM } from '$lib/lineage/fit';
+	import { READABLE_ZOOM, compactAt, titleScale } from '$lib/lineage/fit';
 
 	// Every graph in the UI is drawn here, so they share one canvas: the same background, fit controls
 	// and readable fit (a large graph opens on its cards at a zoom where they read, never as dots), and
@@ -55,9 +55,14 @@
 	} = $props();
 	// Every graph's edges merge into a trunk before the card they enter, the library's curves included.
 	const allEdgeTypes = $derived({ bezier: CountEdge, count: CountEdge, ...edgeTypes });
+	// Semantic zoom: zoomed out past the point where titles would show under 11 px, cards show just their
+	// header, scaled back up so the title stays readable; the other lines keep their space, hidden, so
+	// cards keep their size and edges don't move.
+	const compact = $derived(compactAt(viewport.zoom));
+	const scale = $derived(titleScale(viewport.zoom));
 </script>
 
-<div class="graph-canvas sb-flow" class:framed class:unfitted={!fitted && nodes.length > 0} bind:this={element}>
+<div class="graph-canvas sb-flow" class:framed class:compact class:unfitted={!fitted && nodes.length > 0} style:--sb-title-scale={scale} bind:this={element}>
 	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
 		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
 		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
@@ -87,6 +92,16 @@
 	}
 	.graph-canvas :global(.svelte-flow__controls-button svg) {
 		fill: var(--muted-foreground);
+	}
+	/* Compact cards: the header alone, scaled up over the hidden lines below it. */
+	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.head)),
+	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-member) .head :is(.kind, .open)) {
+		visibility: hidden;
+	}
+	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) .head) {
+		width: calc(100% / var(--sb-title-scale));
+		transform: scale(var(--sb-title-scale));
+		transform-origin: top left;
 	}
 	.unfitted :global(.svelte-flow__viewport),
 	.unfitted :global(.svelte-flow__controls) {

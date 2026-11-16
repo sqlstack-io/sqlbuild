@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANCHOR_MARGIN, CARD_TITLE_PX, MIN_TITLE_PX, READABLE_ZOOM, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
+import { ANCHOR_MARGIN, CARD_TITLE_PX, LABEL_MIN_ZOOM, compactAt, titleScale, MIN_TITLE_PX, READABLE_ZOOM, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
 
 describe('fitting a graph to the view', () => {
 	it('centres a graph that fits, never closer than full size', () => {
@@ -112,5 +112,17 @@ describe('the card a large graph opens on', () => {
 		expect(top).toBeGreaterThanOrEqual(ANCHOR_MARGIN);
 		expect(left + start.width * v.zoom).toBeLessThanOrEqual(view.width - ANCHOR_MARGIN);
 		expect(top + start.height * v.zoom).toBeLessThanOrEqual(view.height - ANCHOR_MARGIN);
+	});
+});
+
+describe('semantic zoom', () => {
+	it('scales titles back up to 11 px when zoomed out, down to the lowest label zoom, and goes compact there', () => {
+		expect(titleScale(1)).toBe(1);
+		expect(titleScale(READABLE_ZOOM)).toBeCloseTo(1);
+		expect(CARD_TITLE_PX * 0.5 * titleScale(0.5)).toBeCloseTo(MIN_TITLE_PX);
+		expect(titleScale(0.1)).toBeCloseTo(titleScale(LABEL_MIN_ZOOM));
+		expect(compactAt(1)).toBe(false);
+		expect(compactAt(READABLE_ZOOM)).toBe(false);
+		expect(compactAt(0.6)).toBe(true);
 	});
 });

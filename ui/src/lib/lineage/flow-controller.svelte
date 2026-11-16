@@ -7,7 +7,7 @@
 	// `fitted` turns true once a fit has been painted; graphs stay hidden until then, so the first
 	// frame never shows cards at unlaid-out positions that then jump into place.
 	import { useStore, useSvelteFlow, useViewport, type Viewport } from '@xyflow/svelte';
-	import { firstCard, fitViewport, largestBox, type Rect } from './fit';
+	import { LABEL_MIN_ZOOM, WHOLE_FIT_CARDS, firstCard, fitViewport, largestBox, type Rect } from './fit';
 	import { unzoom } from './hit-area';
 
 	let {
@@ -54,16 +54,21 @@
 		// Named on the canvas, so the layout test can check the view starts with it wholly in view.
 		const anchorId = focus ? rects.find((r) => r.box && r.x === focus.x && r.y === focus.y)?.id : start?.id;
 		store.domNode?.setAttribute('data-fit-anchor', anchorId ?? '');
-		void flow.setViewport(fitViewport(bounds, width, height, { minZoom: fitFloor, focus, start }), { duration });
+		// A modest graph is shown whole; a larger one opens readable on its start card.
+		const minZoom = all.length <= WHOLE_FIT_CARDS ? LABEL_MIN_ZOOM : fitFloor;
+		void flow.setViewport(fitViewport(bounds, width, height, { minZoom, focus, start }), { duration });
 		return true;
 	}
+
+	/** The lowest zoom a fit goes to: low enough to show a modest graph whole, else the page's floor. */
+	const floorFor = () => (fitFloor !== undefined && flow.getNodes().length <= WHOLE_FIT_CARDS ? Math.min(fitFloor, LABEL_MIN_ZOOM) : fitFloor);
 
 	fitView = (opts) => {
 		// Nothing to fit yet; a fit now would count the graph as shown before its cards exist.
 		if (!flow.getNodes().length) return;
 		if (fitted) {
 			if (readable && readableFit(opts?.duration ?? 300)) return;
-			void flow.fitView({ duration: 300, padding: 0.08, maxZoom: 1, minZoom: fitFloor, ...opts });
+			void flow.fitView({ duration: 300, padding: 0.08, maxZoom: 1, minZoom: floorFor(), ...opts });
 			return;
 		}
 		// Until the graph has been shown, fit without animating, so it appears already in place. A fit waits
@@ -74,7 +79,7 @@
 			for (let attempt = 0; attempt < 600; attempt++) {
 				const moved = fitted && (vp.current.x !== start.x || vp.current.y !== start.y || vp.current.zoom !== start.zoom);
 				if (moved) return;
-				const done = readable ? readableFit(0) : await Promise.race([flow.fitView({ padding: 0.08, maxZoom: 1, minZoom: fitFloor, ...opts, duration: 0 }), frame().then(() => false)]);
+				const done = readable ? readableFit(0) : await Promise.race([flow.fitView({ padding: 0.08, maxZoom: 1, minZoom: floorFor(), ...opts, duration: 0 }), frame().then(() => false)]);
 				if (done) {
 					await frame();
 					await frame();
