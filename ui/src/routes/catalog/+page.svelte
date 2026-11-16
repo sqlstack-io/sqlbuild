@@ -12,7 +12,6 @@
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
@@ -21,7 +20,8 @@
 	import { topFolder } from '$lib/lineage/catalog-graph';
 	import { app } from '$lib/state/app.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
-	import { createVirtualRows } from '$lib/components/list/virtual-rows.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
 	import { KIND_TABS, kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, parseKindTab, shortName, shortRunId, type KindTab } from '$lib/build-area/labels';
@@ -73,7 +73,6 @@
 		})
 	);
 
-	const columns = $derived(3 + (showBuildState ? 2 : 0) + (showChecks ? 1 : 0));
 	const counts = $derived({
 		failed: all.filter((n) => n.lastOutcome === 'failed').length,
 		warn: all.filter((n) => n.lastOutcome === 'warn').length,
@@ -89,8 +88,13 @@
 	];
 
 	const ROW_H = 52;
-	const win = createVirtualRows(ROW_H, () => filtered.length);
-	const visible = $derived(filtered.slice(win.first, win.last));
+	const tableColumns = $derived<TableColumn[]>([
+		{ id: 'name', label: 'Name', minWidth: 240 },
+		{ id: 'kind', label: 'Kind', width: '170px' },
+		...(showBuildState ? [{ id: 'outcome', label: 'Last outcome', width: '150px' }, { id: 'stale', label: 'Stale', width: '170px' }] : []),
+		...(showChecks ? [{ id: 'checks', label: 'Checks', width: '90px', align: 'right' as const }] : []),
+		{ id: 'built', label: 'Last built', width: '130px' }
+	]);
 
 	const filteredRunnable = $derived(filtered.filter((n) => n.kind !== 'source').map((n) => n.key));
 	const narrowed = $derived(filtered.length !== all.length);
@@ -126,29 +130,10 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="sb-list-wrap" {@attach win.attach}>
-	<table class="sb-list catalog">
-		<colgroup>
-			<col />
-			<col style:width="170px" />
-			{#if showBuildState}<col style:width="150px" /><col style:width="170px" />{/if}
-			{#if showChecks}<col style:width="90px" />{/if}
-			<col style:width="130px" />
-		</colgroup>
-		<thead>
-			<tr>
-				<th>Name</th>
-				<th>Kind</th>
-				{#if showBuildState}<th>Last outcome</th><th>Stale</th>{/if}
-				{#if showChecks}<th class="num">Checks</th>{/if}
-				<th>Last built</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#if win.first > 0}<tr class="spacer" style:height="{win.before}px"><td colspan={columns}></td></tr>{/if}
-			{#each visible as n (n.key)}
+<DataTable class="catalog" columns={tableColumns} rows={filtered} key={(n) => n.key} rowHeight={ROW_H} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet. Deploy the project to see its models, sources and seeds here.'}>
+	{#snippet row(n)}
 				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
-				<tr style:height="{ROW_H}px" onclick={(e) => linksNodes && openRow(e, `/catalog/${n.key}`)}>
+				<tr onclick={(e) => linksNodes && openRow(e, `/catalog/${n.key}`)}>
 					<td>
 						<div class="cell-name">
 							<Glyph size={15} strokeWidth={1.75} />
@@ -183,39 +168,17 @@
 						{:else}<span class="muted">Never</span>{/if}
 					</td>
 				</tr>
-			{:else}
-				<LoadRow colspan={columns} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet. Deploy the project to see its models, sources and seeds here.'} />
-			{/each}
-			{#if win.last < filtered.length}<tr class="spacer" style:height="{win.after}px"><td colspan={columns}></td></tr>{/if}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+</DataTable>
 
 <style>
-	/* Fixed layout: a long description truncates instead of widening the table past the page. */
-	.catalog {
-		min-width: 900px;
-		table-layout: fixed;
-	}
-	.catalog tbody tr:not(.load-row) td {
-		overflow: hidden;
-		padding-top: 4px;
-		padding-bottom: 4px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.catalog .cell-name a,
-	.catalog .cell-name .mono {
+	:global(.catalog) .cell-name a,
+	:global(.catalog) .cell-name .mono {
 		display: block;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.catalog :global(.stale-badges) {
+	:global(.catalog .stale-badges) {
 		flex-wrap: nowrap;
-	}
-	.spacer td,
-	.spacer {
-		padding: 0 !important;
-		border: 0 !important;
 	}
 </style>

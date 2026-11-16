@@ -1,6 +1,7 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import { TICK_OUTCOMES, type Tick, type TickOutcome } from '$lib/api';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
@@ -11,12 +12,19 @@
 
 	const LATE_AFTER_SECONDS = 60;
 	let outcome = $state<TickOutcome | 'late' | ''>('');
-	let shown = $state(60);
 	const filtered = $derived(
 		ticks.filter((t) => (outcome === 'late' ? t.lateBySeconds > LATE_AFTER_SECONDS || t.catchUp : !outcome || t.outcome === outcome))
 	);
 	// The server records no reason per tick; the column shows only where one exists.
 	const showWhy = $derived(ticks.some((t) => t.reason !== null));
+	const tickColumns = $derived<TableColumn[]>([
+		{ id: 'due', label: 'Due', width: '170px' },
+		{ id: 'handled', label: 'Handled', width: '170px', title: 'When the scheduler handled it' },
+		{ id: 'what', label: 'What happened', width: '200px' },
+		{ id: 'run', label: 'Run', minWidth: 200 },
+		{ id: 'late', label: 'Late by', width: '90px' },
+		...(showWhy ? [{ id: 'why', label: 'Why', width: '24%' }] : [])
+	]);
 </script>
 
 <div class="bar">
@@ -30,12 +38,8 @@
 	/>
 	<span class="faint" title="One entry (tick) per due time">{filtered.length} times due</span>
 </div>
-<table>
-	<thead>
-		<tr><th>Due</th><th title="When the scheduler handled it">Handled</th><th>What happened</th><th>Run</th><th>Late by</th>{#if showWhy}<th>Why</th>{/if}</tr>
-	</thead>
-	<tbody>
-		{#each filtered.slice(0, shown) as t (t.id)}
+<DataTable class="static compact" embedded columns={tickColumns} rows={filtered} key={(t) => t.id} empty={ticks.length ? 'Nothing matches the filter.' : 'It hasn’t been due yet.'}>
+	{#snippet row(t)}
 			<tr>
 				<td class="nowrap">{formatStamp(t.scheduledFor)}</td>
 				<td class="nowrap faint">{t.evaluatedAt ? formatStamp(t.evaluatedAt) : 'not yet'}</td>
@@ -49,14 +53,8 @@
 				<td class="faint nowrap">{t.lateBySeconds > LATE_AFTER_SECONDS ? formatSeconds(t.lateBySeconds) : '—'}</td>
 				{#if showWhy}<td class="faint" title={t.reason ?? undefined}>{t.outcome === 'covered' ? '' : (t.reason ?? '')}</td>{/if}
 			</tr>
-		{:else}
-			<tr><td colspan={showWhy ? 6 : 5} class="empty">{ticks.length ? 'Nothing matches the filter.' : 'It hasn’t been due yet.'}</td></tr>
-		{/each}
-	</tbody>
-</table>
-{#if filtered.length > shown}
-	<Button variant="link" size="inline" class="mt-2 text-[12px]" onclick={() => (shown += 100)}>Show {Math.min(100, filtered.length - shown)} more</Button>
-{/if}
+	{/snippet}
+</DataTable>
 
 <style>
 	.sans {
@@ -68,24 +66,6 @@
 		gap: 10px;
 		margin-bottom: 4px;
 		font-size: 12px;
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12.5px;
-	}
-	th {
-		padding: 6px 12px 6px 0;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		font-weight: 500;
-		text-align: left;
-	}
-	td {
-		padding: 6px 12px 6px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		vertical-align: top;
 	}
 	/* Only the dot carries the outcome's colour; a column of the usual outcome stays calm. */
 	.mono {
@@ -100,10 +80,5 @@
 	}
 	a {
 		color: var(--primary);
-	}
-	.empty {
-		padding: 24px;
-		color: var(--sb-text-faint);
-		text-align: center;
 	}
 </style>

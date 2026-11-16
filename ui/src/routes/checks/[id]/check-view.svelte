@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
@@ -65,6 +67,13 @@
 		}
 	}
 
+	const historyColumns = $derived<TableColumn[]>([
+		{ id: 'checked', label: 'Checked', width: '120px' },
+		{ id: 'outcome', label: 'Outcome', width: '130px' },
+		{ id: 'value', label: c?.evaluationMode === 'measurement' ? 'Measured' : 'Violations', width: '110px', align: 'right' },
+		{ id: 'run', label: 'Run', minWidth: 160 },
+		{ id: 'evidence', label: 'Evidence', width: '120px', truncate: false }
+	]);
 </script>
 
 <AppTopbar title="Checks">
@@ -94,12 +103,8 @@
 				</Panel>
 
 				<Panel title="History" help="Read back from the warehouse, so results of builds from the command line show too.">
-					<table class="sb-list">
-						<thead>
-							<tr><th>Checked</th><th>Outcome</th><th class="num">{c.evaluationMode === 'measurement' ? 'Measured' : 'Violations'}</th><th>Run</th><th>Evidence</th></tr>
-						</thead>
-						<tbody>
-							{#each c.history as e (e.id)}
+					<DataTable class="static" embedded columns={historyColumns} rows={c.history} key={(e) => e.id} empty="No results recorded yet.">
+						{#snippet row(e)}
 								<tr class:selected={evidenceFor === e.id}>
 									<td><span title={formatStamp(e.evaluatedAt)}>{formatAgo(e.evaluatedAt, app.now)}</span></td>
 									<td>
@@ -116,25 +121,19 @@
 										{:else}<span class="faint">—</span>{/if}
 									</td>
 								</tr>
-							{/each}
-						</tbody>
-					</table>
+						{/snippet}
+					</DataTable>
 				</Panel>
 
 				{#if evidenceError}<div class="msg err">{evidenceError}</div>{/if}
 				{#if evidence}
 					<Panel title="Evidence" note="Sample rows stored with the result · this read is recorded in the audit log">
 						{#snippet actions()}<Button variant="link" size="inline" onclick={() => { evidence = null; evidenceFor = null; }}>Close</Button>{/snippet}
-						<table class="sb-list evidence">
-							<thead><tr>{#each evidence.columns as col (col)}<th>{col}</th>{/each}</tr></thead>
-							<tbody>
-								{#each evidence.rows as row, i (i)}
-									<tr>{#each row as v, j (j)}<td class="mono">{cellText(v)}</td>{/each}</tr>
-								{:else}
-									<tr><td colspan={evidence.columns.length || 1} class="faint">No rows were stored.</td></tr>
-								{/each}
-							</tbody>
-						</table>
+						<DataTable class="static evidence" embedded columns={evidence.columns.map((col, i) => ({ id: `${i}`, label: col, minWidth: 100 }))} rows={evidence.rows.map((cells, i) => ({ cells, i }))} key={(r) => r.i} empty="No rows were stored.">
+							{#snippet row(r)}
+								<tr>{#each r.cells as v, j (j)}<td class="mono">{cellText(v)}</td>{/each}</tr>
+							{/snippet}
+						</DataTable>
 						{#if evidence.truncated}<p class="faint note">More rows matched than were stored.</p>{/if}
 					</Panel>
 				{/if}
@@ -265,7 +264,7 @@
 		margin-top: 8px;
 		font-size: 12px;
 	}
-	.evidence td {
+	:global(.evidence) td {
 		font-size: 12px;
 	}
 </style>

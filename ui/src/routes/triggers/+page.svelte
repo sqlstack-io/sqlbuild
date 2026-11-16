@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { openRow, to } from '$lib/paths';
 	import ClockIcon from '@lucide/svelte/icons/clock';
@@ -12,7 +14,6 @@
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -96,6 +97,16 @@
 		if (Date.parse(t.nextDueAt) < app.now) return `Late: was due ${formatAgo(t.nextDueAt, app.now)}`;
 		return formatIn(t.nextDueAt, app.now);
 	}
+	const tableColumns = $derived<TableColumn[]>([
+		{ id: 'sel', label: '', width: '44px', title: canToggle ? undefined : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)" },
+		{ id: 'name', label: 'Name', minWidth: 220, truncate: false },
+		{ id: 'kind', label: 'Kind', width: '150px' },
+		{ id: 'runs', label: 'Runs', width: '18%' },
+		{ id: 'status', label: 'Status', width: '130px' },
+		{ id: 'next', label: 'Next run', width: '190px' },
+		{ id: 'tick', label: 'Last time due', width: '170px', title: 'What happened the last time it was due (its last tick)' },
+		{ id: 'last', label: 'Last run', width: '170px' }
+	]);
 </script>
 
 <AppTopbar title="Triggers">
@@ -151,24 +162,11 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="sb-list-wrap">
-	<table class="sb-list">
-		<thead>
-			<tr>
-				<th class="check-col" title={canToggle ? undefined : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
-					<input type="checkbox" checked={allSelected} onchange={toggleAll} class="sb-check" aria-label="Select all" disabled={!canToggle} />
-				</th>
-				<th>Name</th>
-				<th>Kind</th>
-				<th>Runs</th>
-				<th class="status-col">Status</th>
-				<th class="next-col">Next run</th>
-				<th title="What happened the last time it was due (its last tick)">Last time due</th>
-				<th>Last run</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each filtered as t (t.id)}
+<DataTable columns={tableColumns} rows={filtered} key={(t) => t.id} resource={triggers} empty={all.length ? 'Nothing matches the filter.' : 'No schedules or sensors yet. Declare them in the project code and deploy.'}>
+	{#snippet head(c)}
+		{#if c.id === 'sel'}<input type="checkbox" checked={allSelected} onchange={toggleAll} class="sb-check" aria-label="Select all" disabled={!canToggle} />{/if}
+	{/snippet}
+	{#snippet row(t)}
 				<tr onclick={(e) => openRow(e, `/triggers/${t.id}`)}>
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -232,22 +230,13 @@
 						{/if}
 					</td>
 				</tr>
-			{:else}
-				<LoadRow colspan={8} resource={triggers} empty={all.length ? 'Nothing matches the filter.' : 'No schedules or sensors yet. Declare them in the project code and deploy.'} />
-			{/each}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+</DataTable>
 
 <style>
-	.check-col {
-		width: 44px;
-	}
 	/* Switching a trigger changes what these two cells say. Their widths fit every variant and they never
 	   wrap, so a switch can't resize the columns or change the row's height and move the page. */
 	.status-col {
-		width: 130px;
-		min-width: 130px;
 		white-space: nowrap;
 	}
 	/* A fixed height, so the pin coming and going never changes the row's height. */
@@ -257,8 +246,6 @@
 		align-items: center;
 	}
 	.next-col {
-		width: 190px;
-		min-width: 190px;
 		white-space: nowrap;
 	}
 	.type-cell {

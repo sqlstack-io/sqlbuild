@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
@@ -35,6 +37,11 @@
 	function addedOn(action: Capability): string[] {
 		return additions.filter((a) => a.action === action).map((a) => (a.selector === '*' ? 'every node' : a.selector));
 	}
+	const additionColumns: TableColumn[] = [
+		{ id: 'action', label: 'Action', minWidth: 220, truncate: false },
+		{ id: 'on', label: 'On', width: '30%' },
+		{ id: 'matches', label: 'Matches today', width: '200px' }
+	];
 </script>
 
 <AppTopbar title="Roles">
@@ -82,6 +89,7 @@
 									<p class="muted">No built-in base.</p>
 								{/if}
 								{#if compare}
+									<!-- raw-table: a two-column comparison of a role with its base role, not a list -->
 									<table class="compare">
 										<thead>
 											<tr><th>Action</th><th>{r.extends ? builtInLabel(r.extends) : 'Base'}</th><th>{r.name}</th></tr>
@@ -104,16 +112,8 @@
 							</Panel>
 
 							<Panel title="Additions" help="Approved actions on top of the base role.">
-								<table class="sb-list static framed">
-									<thead>
-										<tr>
-											<th>Action</th>
-											<th>On</th>
-											<th>Matches today</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each additions as a (a.action + a.selector)}
+								<DataTable class="static framed" embedded columns={additionColumns} rows={additions} key={(a) => a.action + a.selector} empty="No additions.">
+									{#snippet row(a)}
 											{@const m = matchOf(a.selector)}
 											<tr class:risky={PERMISSIONS[a.action].risk === 'changes_data' || PERMISSIONS[a.action].risk === 'administer'}>
 												<td>
@@ -129,11 +129,8 @@
 													{/if}
 												</td>
 											</tr>
-										{:else}
-											<tr><td colspan="3" class="empty">No additions.</td></tr>
-										{/each}
-									</tbody>
-								</table>
+									{/snippet}
+								</DataTable>
 							</Panel>
 
 							{#if r.selectors.length}
@@ -255,12 +252,6 @@
 	}
 	.compare tr.diff td:last-child {
 		color: var(--sb-success);
-	}
-	.framed {
-		border-top: 1px solid var(--border);
-	}
-	:global(.sb-list.static tbody tr) {
-		cursor: default;
 	}
 	tr.risky td:first-child {
 		box-shadow: inset 2px 0 0 var(--sb-warning);

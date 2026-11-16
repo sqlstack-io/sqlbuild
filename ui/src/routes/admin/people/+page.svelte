@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { openRow, to } from '$lib/paths';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import ShieldQuestionIcon from '@lucide/svelte/icons/shield-question';
@@ -8,7 +10,6 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import NoAccess from '$lib/components/platform/no-access.svelte';
@@ -36,6 +37,13 @@
 		for (const a of people.relevant(name)) seen.set(`${a.source}|${a.ssoGroup ?? ''}`, a);
 		return [...seen.values()];
 	}
+	const tableColumns = $derived<TableColumn[]>([
+		{ id: 'person', label: 'Person', minWidth: 220 },
+		{ id: 'role', label: people.locationId ? `Role in ${locations.find((l) => l.id === people.locationId)?.name}` : 'Highest role', width: '26%', truncate: false },
+		{ id: 'from', label: 'From', width: '22%', truncate: false },
+		{ id: 'active', label: 'Last active', width: '130px' },
+		{ id: 'status', label: 'Status', width: '110px' }
+	]);
 </script>
 
 <AppTopbar title="People">
@@ -59,19 +67,8 @@
 			{#if app.client.supports('explainAccess')}<Button variant="outline" size="bar" href={to(`/admin/check-access`)}><ShieldQuestionIcon size={14} /> Check access</Button>{/if}
 		{/snippet}
 	</ListToolbar>
-	<div class="sb-list-wrap">
-		<table class="sb-list">
-			<thead>
-				<tr>
-					<th>Person</th>
-					<th>{people.locationId ? `Role in ${locations.find((l) => l.id === people.locationId)?.name}` : 'Highest role'}</th>
-					<th>From</th>
-					<th>Last active</th>
-					<th>Status</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each people.shown as a (a.name)}
+	<DataTable columns={tableColumns} rows={people.shown} key={(a) => a.name} resource={d.accounts} empty={people.accounts.length ? 'No one matches these filters.' : 'No one has signed in yet.'}>
+		{#snippet row(a)}
 					{@const risky = d.riskyOf(a.name)}
 					<tr class:sb-row-off={a.disabled} class:static={!opensPeople} onclick={(e) => opensPeople && openRow(e, personHref(a))}>
 						<td>
@@ -102,12 +99,8 @@
 							{#if a.name === app.user?.name}<div class="cell-desc">you</div>{/if}
 						</td>
 					</tr>
-				{:else}
-					<LoadRow colspan={5} resource={d.accounts} empty={people.accounts.length ? 'No one matches these filters.' : 'No one has signed in yet.'} />
-				{/each}
-			</tbody>
-		</table>
-	</div>
+		{/snippet}
+	</DataTable>
 {/if}
 
 <style>

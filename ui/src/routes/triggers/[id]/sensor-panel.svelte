@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
@@ -18,7 +20,6 @@
 	let reason = $state('');
 	let busy = $state(false);
 	let error = $state<string | null>(null);
-	let shown = $state(25);
 
 	async function resetCursor() {
 		const scope = app.scope;
@@ -37,6 +38,19 @@
 	}
 
 	const changed = $derived(sensor.lastEvaluatedFingerprint !== null && sensor.lastEvaluatedFingerprint !== sensor.currentFingerprint);
+	const evaluationColumns: TableColumn[] = [
+		{ id: 'when', label: 'When', width: '120px' },
+		{ id: 'result', label: 'Result', width: '160px' },
+		{ id: 'position', label: 'Position', width: '24%', title: 'Cursor before → after' },
+		{ id: 'runs', label: 'Runs started', width: '110px', align: 'right' },
+		{ id: 'detail', label: 'Detail', minWidth: 220, truncate: false }
+	];
+	const requestColumns: TableColumn[] = [
+		{ id: 'key', label: 'Run key', minWidth: 200 },
+		{ id: 'run', label: 'Run', width: '120px' },
+		{ id: 'status', label: 'Status', width: '140px' },
+		{ id: 'requested', label: 'Requested', width: '130px' }
+	];
 </script>
 
 <section>
@@ -79,10 +93,8 @@
 {#if trigger.evaluations}
 <section>
 	<h3 title="Each time the sensor ran its check (an evaluation), newest first">Recent checks</h3>
-	<table>
-		<thead><tr><th>When</th><th>Result</th><th title="Cursor before → after">Position</th><th class="num">Runs started</th><th>Detail</th></tr></thead>
-		<tbody>
-			{#each trigger.evaluations.slice(0, shown) as e (e.id)}
+	<DataTable class="static compact" embedded columns={evaluationColumns} rows={trigger.evaluations} key={(e) => e.id} empty="It hasn't checked yet.">
+		{#snippet row(e)}
 				<tr>
 					<td class="nowrap" title={formatStamp(e.requestedAt)}>{formatAgo(e.requestedAt, app.now)}</td>
 					<td title="{e.outcome} · {e.id}"><StatusLabel tone={evaluationTone[e.outcome]} label={outcomeText[e.outcome] ?? e.outcome} /></td>
@@ -94,12 +106,8 @@
 						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="sb-tag ml-1.5" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
 					</td>
 				</tr>
-			{:else}
-				<tr><td colspan="5" class="empty">It hasn't checked yet.</td></tr>
-			{/each}
-		</tbody>
-	</table>
-	{#if trigger.evaluations.length > shown}<Button variant="link" size="inline" class="mt-2 text-[12px]" onclick={() => (shown += 50)}>Show more</Button>{/if}
+		{/snippet}
+	</DataTable>
 </section>
 {/if}
 
@@ -107,19 +115,16 @@
 <section>
 	<h3 title="Run requests by run key">Runs it started · {trigger.runRequests.length}</h3>
 	{#if trigger.runRequests.length}
-		<table>
-			<thead><tr><th>Run key</th><th>Run</th><th>Status</th><th>Requested</th></tr></thead>
-			<tbody>
-				{#each trigger.runRequests as r (r.runKey)}
+		<DataTable class="static compact" embedded columns={requestColumns} rows={trigger.runRequests} key={(r) => r.runKey} empty="No runs requested yet.">
+			{#snippet row(r)}
 					<tr>
 						<td class="mono">{r.runKey}</td>
 						<td class="mono"><a href={to(`/runs/${r.runId}`)} title={r.runId}>{shortRunId(r.runId)}</a></td>
 						<td><i class="dot" style:background={runStatusTone[r.runStatus]}></i>{runStatusLabel[r.runStatus]}</td>
 						<td class="faint" title={formatStamp(r.requestedAt)}>{formatAgo(r.requestedAt, app.now)}</td>
 					</tr>
-				{/each}
-			</tbody>
-		</table>
+			{/snippet}
+		</DataTable>
 	{:else}
 		<p class="faint">{trigger.jobKey ? 'It hasn’t started any runs yet.' : 'This sensor only runs its own code; it doesn’t start runs.'}</p>
 	{/if}
@@ -188,24 +193,6 @@
 		display: flex;
 		gap: 8px;
 	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12.5px;
-	}
-	th {
-		padding: 6px 12px 6px 0;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		font-weight: 500;
-		text-align: left;
-	}
-	td {
-		padding: 6px 12px 6px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		vertical-align: top;
-	}
 	.num {
 		text-align: right;
 	}
@@ -221,10 +208,5 @@
 	}
 	a {
 		color: var(--primary);
-	}
-	.empty {
-		padding: 24px;
-		color: var(--sb-text-faint);
-		text-align: center;
 	}
 </style>

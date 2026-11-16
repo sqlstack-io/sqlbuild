@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import type { CatalogNodeDetail, NodeBuildCost } from '$lib/api';
 	import { CREDIT_PRICE_HINT, formatQueryCost } from '$lib/operate/cost';
@@ -16,6 +18,15 @@
 	let { node, costs, costDays }: { node: CatalogNodeDetail; costs: NodeBuildCost[]; costDays: number } = $props();
 	const costOf = (r: NonNullable<CatalogNodeDetail['runs']>[number]) => costs.find((c) => (r.runId !== null && c.runId === r.runId) || c.buildRunId === r.fingerprintRunId);
 	const costText = (c: NodeBuildCost | undefined) => (!c ? '—' : c.status === 'pending' ? 'pending' : c.status === 'collection_failed' || c.status === 'unavailable' ? 'unavailable' : formatQueryCost(c));
+	const runColumns = $derived<TableColumn[]>([
+		{ id: 'outcome', label: 'Outcome', minWidth: 200, truncate: false },
+		{ id: 'run', label: 'Run', width: '24%' },
+		{ id: 'job', label: 'Job', width: '16%' },
+		{ id: 'rows', label: 'Rows', width: '90px', align: 'right' },
+		{ id: 'duration', label: 'Duration', width: '90px', align: 'right' },
+		...(costs.length ? [{ id: 'cost', label: 'Est. cost', width: '90px', align: 'right' as const, title: 'Estimated query cost of this node in the build' }] : []),
+		{ id: 'started', label: 'Started', width: '120px' }
+	]);
 </script>
 
 {#if costs.length}
@@ -23,10 +34,8 @@
 	{#if costs.some((c) => c.usd === null)}<p class="hint">{CREDIT_PRICE_HINT}</p>{/if}
 {/if}
 
-<table class="sb-list">
-	<thead><tr><th>Outcome</th><th>Run</th><th>Job</th><th class="num">Rows</th><th class="num">Duration</th>{#if costs.length}<th class="num" title="Estimated query cost of this node in the build">Est. cost</th>{/if}<th>Started</th></tr></thead>
-	<tbody>
-		{#each node.runs ?? [] as r, i (`${r.runId ?? r.fingerprintRunId}-${i}`)}
+<DataTable class="static" embedded columns={runColumns} rows={(node.runs ?? []).map((r, i) => ({ ...r, i }))} key={(r) => `${r.runId ?? r.fingerprintRunId}-${r.i}`} empty="No builds recorded in this location.">
+	{#snippet row(r)}
 			<tr>
 				<td>
 					<StatusLabel tone={nodeOutcomeTone[r.outcome]} label={nodeOutcomeLabel[r.outcome]} />
@@ -42,11 +51,8 @@
 				{#if costs.length}{@const c = costOf(r)}<td class="num muted" title={c?.status === 'partial' ? 'Partial: the warehouse has not reported every statement of this build' : undefined}>{costText(c)}{c?.status === 'partial' ? '*' : ''}</td>{/if}
 				<td><RelativeTime value={formatAgo(r.startedAt, app.now)} exact={formatStamp(r.startedAt)} /></td>
 			</tr>
-		{:else}
-			<tr><td colspan={costs.length ? 7 : 6} class="empty">No builds recorded in this location.</td></tr>
-		{/each}
-	</tbody>
-</table>
+	{/snippet}
+</DataTable>
 
 <style>
 	.mono,

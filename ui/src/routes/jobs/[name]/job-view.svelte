@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import Loading from '$lib/components/loading.svelte';
@@ -97,6 +99,16 @@
 	}
 
 	const targetBlocked = $derived(!!def?.targets && !def.targets.includes(app.target?.name ?? ''));
+	const runColumns = $derived<TableColumn[]>([
+		{ id: 'status', label: 'Status', width: '140px' },
+		{ id: 'run', label: 'Run', width: '150px' },
+		{ id: 'by', label: 'Started by', minWidth: 200 },
+		{ id: 'nodes', label: 'Nodes', width: '22%' },
+		{ id: 'took', label: 'Took', width: '90px' },
+		{ id: 'started', label: 'Started', width: '120px' },
+		{ id: 'who', label: 'Who', width: '140px' },
+		...(showCost ? [{ id: 'cost', label: 'Cost', width: '90px', align: 'right' as const }] : [])
+	]);
 </script>
 
 <AppTopbar title="Jobs">
@@ -308,31 +320,20 @@
 				{/if}
 			</div>
 		{:else if tab === 'runs'}
-			<div class="main sb-scroll">
-				{#if runs.length}
-					<table class="runs">
-						<thead>
-							<tr><th>Status</th><th>Run</th><th>Started by</th><th>Nodes</th><th>Took</th><th>Started</th><th>Who</th>{#if showCost}<th class="num">Cost</th>{/if}</tr>
-						</thead>
-						<tbody>
-							{#each runs as r (r.id)}
-								<tr onclick={(e) => openRow(e, `/runs/${r.id}`)}>
-									<td><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
-									<td><a href={to(`/runs/${r.id}`)} class="mono" title={r.id}>{shortRunId(r.id)}</a>{#if r.narrowing}<span class="part" title="Ran part of the job: sqb build {narrowingText(r.narrowing)}">part</span>{/if}</td>
-									<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>
-									<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
-									<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
-									<td class="faint" title={formatStamp(r.queuedAt)}>{formatAgo(r.startedAt ?? r.queuedAt, app.now)}</td>
-									<td class="faint" title={r.requestedBy.name}>{r.requestedBy.displayName}</td>
-									{#if showCost}<td class="faint num" title={r.cost ? `Estimated warehouse cost: ${r.cost.source}` : 'No cost reported'}>{formatCost(r.cost)}</td>{/if}
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{:else}
-					{#if jobRuns.data === undefined && !jobRuns.error}<Loading />{:else}<p class="faint">No runs yet.</p>{/if}
-				{/if}
-			</div>
+			<DataTable columns={runColumns} rows={runs} key={(r) => r.id} resource={jobRuns} empty="No runs yet.">
+				{#snippet row(r)}
+					<tr onclick={(e) => openRow(e, `/runs/${r.id}`)}>
+						<td><i class="dot" style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
+						<td><a href={to(`/runs/${r.id}`)} class="mono" title={r.id}>{shortRunId(r.id)}</a>{#if r.narrowing}<span class="part" title="Ran part of the job: sqb build {narrowingText(r.narrowing)}">part</span>{/if}</td>
+						<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>
+						<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
+						<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
+						<td class="faint" title={formatStamp(r.queuedAt)}>{formatAgo(r.startedAt ?? r.queuedAt, app.now)}</td>
+						<td class="faint" title={r.requestedBy.name}>{r.requestedBy.displayName}</td>
+						{#if showCost}<td class="faint" title={r.cost ? `Estimated warehouse cost: ${r.cost.source}` : 'No cost reported'}>{formatCost(r.cost)}</td>{/if}
+					</tr>
+				{/snippet}
+			</DataTable>
 		{:else if def.declaration}
 			<div class="main sb-scroll">
 				<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={200} />
@@ -377,12 +378,12 @@
 	}
 	.chip i,
 	dd i,
-	.runs td .part {
+	.part {
 		margin-left: 8px;
 		color: var(--muted-foreground);
 		font-size: 11.5px;
 	}
-	.runs td i {
+	i.dot {
 		display: inline-block;
 		width: 7px;
 		height: 7px;
@@ -468,20 +469,6 @@
 		overflow-wrap: anywhere;
 	}
 
-	.runs th {
-		padding: 6px 12px 6px 0;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		font-weight: 500;
-		text-align: left;
-	}
-	.runs thead tr {
-		cursor: default;
-	}
-	.runs thead tr:hover {
-		background: none;
-	}
 	.label {
 		color: var(--sb-text-faint);
 		font-size: 11.5px;
@@ -526,25 +513,6 @@
 		gap: 8px;
 		padding: 2px 0;
 		font-size: 12px;
-	}
-	.runs {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12.5px;
-	}
-	.runs tr {
-		cursor: pointer;
-	}
-	.runs tr:hover {
-		background: var(--sb-hover);
-	}
-	.runs td {
-		padding: 7px 12px 7px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		white-space: nowrap;
-	}
-	.num {
-		text-align: right;
 	}
 	a:hover {
 		color: var(--primary);

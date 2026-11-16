@@ -1,9 +1,10 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -36,6 +37,15 @@
 	const locations = $derived(app.bootstrap?.locations ?? []);
 	const linksPeople = $derived(app.client.supports('effectiveAccess'));
 	const checksDecisions = $derived(app.client.supports('lookupDecision'));
+	const tableColumns: TableColumn[] = [
+		{ id: 'when', label: 'When', width: '120px' },
+		{ id: 'who', label: 'Who', width: '150px' },
+		{ id: 'action', label: 'Action', width: '190px', title: 'The action the request needed' },
+		{ id: 'where', label: 'Where', width: '180px' },
+		{ id: 'result', label: 'Result', width: '190px' },
+		{ id: 'role', label: 'Allowed by role', width: '140px' },
+		{ id: 'detail', label: 'What happened', minWidth: 220 }
+	];
 </script>
 
 <AppTopbar title="Audit log">
@@ -74,21 +84,8 @@
 		<span class="total">{rows.length} entries</span>
 	</div>
 
-	<div class="sb-list-wrap">
-		<table class="sb-list static">
-			<thead>
-				<tr>
-					<th>When</th>
-					<th>Who</th>
-					<th title="The action the request needed">Action</th>
-					<th>Where</th>
-					<th>Result</th>
-					<th>Allowed by role</th>
-					<th>What happened</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each rows as e (e.id)}
+	<DataTable class="static" columns={tableColumns} rows={rows} key={(e) => e.id} rowHeight={56} resource={entries} empty="Nothing matches these filters.">
+		{#snippet row(e)}
 					{@const change = e.before !== null || e.after !== null ? `${e.before ?? '∅'} → ${e.after ?? '∅'}` : null}
 					<tr>
 						<td><RelativeTime value={formatAgo(e.at, app.now)} exact={formatStamp(e.at)} /></td>
@@ -123,18 +120,11 @@
 							</div>
 						</td>
 					</tr>
-				{:else}
-					<LoadRow colspan={7} resource={entries} empty="Nothing matches these filters." />
-				{/each}
-			</tbody>
-		</table>
-	</div>
+		{/snippet}
+	</DataTable>
 {/if}
 
 <style>
-	:global(.sb-list.static tbody tr) {
-		cursor: default;
-	}
 	.toolbar {
 		display: flex;
 		height: 50px;
@@ -174,17 +164,8 @@
 		color: var(--sb-warning);
 		font-size: 11.5px;
 	}
-	.detail {
-		max-width: 320px;
-	}
-	.where .clip {
-		max-width: 200px;
-	}
 	.decision .clip {
 		max-width: 110px;
-	}
-	.detail .clip {
-		max-width: 300px;
 	}
 	.clip {
 		overflow: hidden;

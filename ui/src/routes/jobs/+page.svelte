@@ -7,7 +7,8 @@
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -60,6 +61,15 @@
 	const showPolicy = $derived(all.some((j) => jobPolicyText(j) !== ''));
 	const showOwner = $derived(all.some((j) => j.owner !== null));
 	const showSelection = $derived(all.some((j) => j.select !== null || j.members !== null));
+	const jobColumns = $derived<TableColumn[]>([
+		{ id: 'job', label: 'Job', minWidth: 240, truncate: false },
+		...(showSelection ? [{ id: 'selection', label: 'Selection', width: '26%', truncate: false }] : []),
+		{ id: 'nodes', label: 'Nodes', width: '80px', align: 'right' as const },
+		...(showPolicy ? [{ id: 'policy', label: 'Overlap and retries', width: '170px', title: 'Whether scheduled requests skip while a run is active, and whether failed runs retry' }] : []),
+		{ id: 'starts', label: 'Started by', width: '220px', truncate: false },
+		...(showOwner ? [{ id: 'owner', label: 'Owner', width: '170px' }] : []),
+		{ id: 'last', label: 'Last run', width: '170px' }
+	]);
 	const failingCount = $derived(all.filter((j) => j.lastRun && isProblemRun(j.lastRun.status)).length);
 </script>
 
@@ -102,21 +112,8 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="sb-list-wrap">
-	<table class="sb-list">
-		<thead>
-			<tr>
-				<th>Job</th>
-				{#if showSelection}<th>Selection</th>{/if}
-				<th class="num">Nodes</th>
-				{#if showPolicy}<th title="Whether scheduled requests skip while a run is active, and whether failed runs retry">Overlap and retries</th>{/if}
-				<th>Started by</th>
-				{#if showOwner}<th>Owner</th>{/if}
-				<th>Last run</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each filtered as j (j.key)}
+<DataTable columns={jobColumns} rows={filtered} key={(j) => j.key} resource={jobs} empty={all.length ? 'No jobs match the filter.' : 'No jobs yet. Declare jobs and groups in the project code and deploy; they show up here.'}>
+	{#snippet row(j)}
 				{@const jobTriggers = j.triggerIds.map((id) => triggerById.get(id)).filter((t) => t !== undefined)}
 				<tr onclick={(e) => openRow(e, `/jobs/${j.key}`)}>
 					<td>
@@ -201,12 +198,8 @@
 						{/if}
 					</td>
 				</tr>
-			{:else}
-				<LoadRow colspan={7} resource={jobs} empty={all.length ? 'No jobs match the filter.' : 'No jobs yet. Declare jobs and groups in the project code and deploy; they show up here.'} />
-			{/each}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+</DataTable>
 
 <style>
 	/* Descriptions don't wrap, so without a width limit one long description widens the whole column

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { openRow, to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
@@ -13,11 +15,9 @@
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
-	import { createVirtualRows } from '$lib/components/list/virtual-rows.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel } from '$lib/build-area/labels';
@@ -65,11 +65,19 @@
 	const runSelection = $derived([...new Set(filtered.map((c) => c.node).filter((n): n is string => !!n))]);
 	const linksNodes = $derived(app.client.supports('getCatalogNode'));
 	const hasRecent = $derived(all.some((c) => c.recentOutcomes !== null));
-	const columns = $derived(hasRecent ? 9 : 8);
 
 	const ROW_H = 52;
-	const win = createVirtualRows(ROW_H, () => filtered.length);
-	const visible = $derived(filtered.slice(win.first, win.last));
+	const tableColumns = $derived<TableColumn[]>([
+		{ id: 'check', label: 'Check', minWidth: 220 },
+		{ id: 'outcome', label: 'Outcome', width: '120px' },
+		{ id: 'node', label: 'Attached to', width: '240px' },
+		{ id: 'severity', label: 'Severity', width: '100px' },
+		{ id: 'phase', label: 'Checks', width: '120px' },
+		{ id: 'mode', label: 'Result type', width: '130px' },
+		{ id: 'result', label: 'Result', width: '100px', align: 'right' },
+		...(hasRecent ? [{ id: 'recent', label: 'Recent', width: '100px' }] : []),
+		{ id: 'checked', label: 'Last checked', width: '130px' }
+	]);
 </script>
 
 <AppTopbar title="Checks">
@@ -95,37 +103,10 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="sb-list-wrap" {@attach win.attach}>
-	<table class="sb-list checks">
-		<colgroup>
-			<col />
-			<col style:width="120px" />
-			<col style:width="240px" />
-			<col style:width="100px" />
-			<col style:width="120px" />
-			<col style:width="130px" />
-			<col style:width="100px" />
-			{#if hasRecent}<col style:width="100px" />{/if}
-			<col style:width="130px" />
-		</colgroup>
-		<thead>
-			<tr>
-				<th>Check</th>
-				<th>Outcome</th>
-				<th>Attached to</th>
-				<th>Severity</th>
-				<th>Checks</th>
-				<th>Result type</th>
-				<th class="num">Result</th>
-				{#if hasRecent}<th>Recent</th>{/if}
-				<th>Last checked</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#if win.first > 0}<tr class="spacer" style:height="{win.before}px"><td colspan={columns}></td></tr>{/if}
-			{#each visible as c (c.id)}
+<DataTable class="checks" columns={tableColumns} rows={filtered} key={(c) => c.id} rowHeight={ROW_H} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet. Add audits or tests to a model and they show up here after the next deploy.'}>
+	{#snippet row(c)}
 				{@const o = outcomeOf(c)}
-				<tr style:height="{ROW_H}px" onclick={(e) => openRow(e, `/checks/${c.id}`)}>
+				<tr onclick={(e) => openRow(e, `/checks/${c.id}`)}>
 					<td>
 						<div class="cell-name">
 							<ShieldCheckIcon size={15} strokeWidth={1.75} />
@@ -147,32 +128,10 @@
 					{#if hasRecent}<td><span class="mini-strip">{#each c.recentOutcomes ?? [] as r, i (i)}<i style:background={checkOutcomeTone[r as CheckOutcome]}></i>{/each}</span></td>{/if}
 					<td><RelativeTime value={formatAgo(c.latest?.evaluatedAt, app.now)} exact={formatStamp(c.latest?.evaluatedAt)} /></td>
 				</tr>
-			{:else}
-				<LoadRow colspan={columns} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet. Add audits or tests to a model and they show up here after the next deploy.'} />
-			{/each}
-			{#if win.last < filtered.length}<tr class="spacer" style:height="{win.after}px"><td colspan={columns}></td></tr>{/if}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+</DataTable>
 
 <style>
-	/* Fixed layout: long names and node keys truncate instead of widening the table. */
-	.checks {
-		min-width: 1150px;
-		table-layout: fixed;
-	}
-	.checks tbody tr:not(.load-row) td {
-		overflow: hidden;
-		padding-top: 4px;
-		padding-bottom: 4px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.spacer td,
-	.spacer {
-		padding: 0 !important;
-		border: 0 !important;
-	}
 	.check-name {
 		display: block;
 		overflow: hidden;

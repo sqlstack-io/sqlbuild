@@ -1,11 +1,12 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { openRow, to } from '$lib/paths';
 	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { hasCapability, type ConnectionTest } from '$lib/api';
@@ -46,6 +47,14 @@
 			testing[id] = false;
 		}
 	}
+	const tableColumns = $derived<TableColumn[]>([
+		{ id: 'location', label: 'Location', minWidth: 220 },
+		{ id: 'health', label: 'Health', width: '170px' },
+		{ id: 'version', label: 'Deployed version', width: '160px' },
+		{ id: 'warehouse', label: 'Warehouse', width: '200px' },
+		{ id: 'processes', label: 'Location processes', width: '180px' },
+		...(knowsPolicy ? [{ id: 'policy', label: 'If a deploy fails', width: '220px', title: 'What happens when a deploy fails to load' }] : [])
+	]);
 </script>
 
 <AppTopbar title="Locations">
@@ -62,20 +71,8 @@
 	counts={[{ tone: 'var(--sb-warning)', count: unhealthy, label: 'need attention' }]}
 />
 
-<div class="sb-list-wrap">
-	<table class="sb-list">
-		<thead>
-			<tr>
-				<th>Location</th>
-				<th>Health</th>
-				<th>Deployed version</th>
-				<th>Warehouse</th>
-				<th>Location processes</th>
-				{#if knowsPolicy}<th title="What happens when a deploy fails to load">If a deploy fails</th>{/if}
-			</tr>
-		</thead>
-		<tbody>
-			{#each filtered as l (l.id)}
+<DataTable columns={tableColumns} rows={filtered} key={(l) => l.id} resource={locations} empty={all.length ? 'No locations match the search.' : 'No code locations yet. Register one with the server using a location token.'}>
+	{#snippet row(l)}
 				{@const test = tested[l.id] ?? l.connectionTest}
 				{@const opens = opensDetail && l.health !== null}
 				<tr class:static={!opens} onclick={(e) => opens && openRow(e, `/locations/${l.id}`)}>
@@ -132,12 +129,8 @@
 					</td>
 					{#if knowsPolicy}<td class="muted">{l.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : l.brokenDeployPolicy ? 'Hold scheduled runs until a deploy works' : '—'}</td>{/if}
 				</tr>
-			{:else}
-				<LoadRow colspan={knowsPolicy ? 6 : 5} resource={locations} empty={all.length ? 'No locations match the search.' : 'No code locations yet. Register one with the server using a location token.'} />
-			{/each}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+</DataTable>
 
 <style>
 	tr.static {

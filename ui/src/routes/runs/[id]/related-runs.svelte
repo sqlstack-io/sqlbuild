@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import type { Run } from '$lib/api';
 	import CopyButton from '$lib/components/copy-button.svelte';
@@ -23,6 +25,14 @@
 			...d.children.map((run) => ({ role: 'Job run', run }))
 		];
 	});
+	const invocationColumns: TableColumn[] = [
+		{ id: 'invocation', label: 'sqb invocation', minWidth: 200 },
+		{ id: 'run', label: 'Run', width: '110px' },
+		{ id: 'attempt', label: 'Attempt', width: '80px' },
+		{ id: 'started', label: 'Started', width: '170px' },
+		{ id: 'ended', label: 'Ended', width: '170px' },
+		{ id: 'exit', label: 'Exit code', width: '90px' }
+	];
 </script>
 
 {#if d}
@@ -88,10 +98,8 @@
 				{/if}
 			</dl>
 			{#if d.invocations.length}
-				<table>
-					<thead><tr><th>sqb invocation</th><th>Run</th><th>Attempt</th><th>Started</th><th>Ended</th><th>Exit code</th></tr></thead>
-					<tbody>
-						{#each d.invocations as inv (inv.invocationId)}
+				<DataTable class="static compact" embedded columns={invocationColumns} rows={d.invocations} key={(inv) => inv.invocationId} empty="No sqb invocations.">
+					{#snippet row(inv)}
 							<tr>
 								<td class="mono">{inv.invocationId}</td>
 								<td class="mono"><a href={to(`/runs/${inv.runId}`)}>{shortRunId(inv.runId)}</a></td>
@@ -100,9 +108,8 @@
 								<td>{inv.endedAt ? formatStamp(inv.endedAt) : '—'}</td>
 								<td>{inv.exitCode ?? '—'}</td>
 							</tr>
-						{/each}
-					</tbody>
-				</table>
+					{/snippet}
+				</DataTable>
 			{/if}
 		</div>
 	{/if}
@@ -175,20 +182,6 @@
 		width: fit-content;
 		color: var(--primary);
 		cursor: pointer;
-	}
-	table {
-		margin-top: 10px;
-		border-collapse: collapse;
-		font-size: 12px;
-	}
-	th {
-		padding: 4px 16px 4px 0;
-		color: var(--sb-text-faint);
-		font-weight: 500;
-		text-align: left;
-	}
-	td {
-		padding: 3px 16px 3px 0;
 	}
 	a:hover {
 		color: var(--primary);

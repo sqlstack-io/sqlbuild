@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
@@ -22,6 +24,20 @@
 	let openSyncs = $state<Record<string, boolean>>({});
 
 	const where = (s: { database: string | null; schema: string }) => (s.database ? `${s.database}.${s.schema}` : s.schema);
+	const userColumns: TableColumn[] = [
+		{ id: 'by', label: 'Used by', minWidth: 180 },
+		{ id: 'state', label: 'State tables', width: '30%' },
+		{ id: 'check', label: 'Last check', width: '200px' },
+		{ id: 'test', label: '', width: '150px', truncate: false }
+	];
+	const syncColumns: TableColumn[] = [
+		{ id: 'table', label: 'Table', minWidth: 180 },
+		{ id: 'newest', label: 'Newest sync', width: '180px' },
+		{ id: 'total', label: 'Mirrored total', width: '120px', align: 'right' },
+		{ id: 'added', label: 'Last sync added', width: '130px', align: 'right' },
+		{ id: 'took', label: 'Took', width: '80px', align: 'right' },
+		{ id: 'clean', label: 'Last clean sync', width: '130px' }
+	];
 </script>
 
 <AppTopbar title="Connections">
@@ -46,10 +62,8 @@
 					{/each}
 				</dl>
 				{#if !g.details}<p class="note">The location doesn't publish its connection settings yet. Secrets are never shown.</p>{/if}
-				<table class="sb-list users">
-					<thead><tr><th>Used by</th><th>State tables</th><th>Last check</th><th></th></tr></thead>
-					<tbody>
-						{#each g.users as c (c.id)}
+				<DataTable class="users static" embedded columns={userColumns} rows={g.users} key={(c) => c.id} empty="No location uses this connection.">
+					{#snippet row(c)}
 							<tr>
 								<td><a href={to(`/locations/${encodeURIComponent(c.id)}`)} class="link">{c.location} · {c.target}</a></td>
 								<td>{#if c.stateLocation}<code>{where(c.stateLocation)}</code>{:else}<span class="faint">Not reported yet</span>{/if}</td>
@@ -62,9 +76,8 @@
 								</td>
 								<td class="test"><ConnectionTest scope={{ locationId: c.id }} connection={c.target} last={c.lastTest} showLast={false} ontested={() => connections.refresh()} /></td>
 							</tr>
-						{/each}
-					</tbody>
-				</table>
+					{/snippet}
+				</DataTable>
 			</div>
 		</Panel>
 
@@ -78,10 +91,8 @@
 							{#if failing}<StatusLabel tone="var(--sb-error)" label="{failing} failing" />{/if}
 						</DisclosureButton>
 						{#if openSyncs[c.id]}
-							<table class="sb-list">
-								<thead><tr><th>Table</th><th>Newest sync</th><th class="num">Mirrored total</th><th class="num">Last sync added</th><th class="num">Took</th><th>Last clean sync</th></tr></thead>
-								<tbody>
-									{#each c.tables as t (t.table)}
+							<DataTable class="static" embedded columns={syncColumns} rows={c.tables} key={(t) => t.table} empty="No state tables reported.">
+								{#snippet row(t)}
 										<tr>
 											<td><code>{t.table}</code></td>
 											<td>
@@ -94,9 +105,8 @@
 											<td class="num">{formatMs(t.elapsedMs)}</td>
 											<td class="faint" title={t.lastSyncedAt ? formatStamp(t.lastSyncedAt) : undefined}>{t.lastSyncedAt ? formatAgo(t.lastSyncedAt, app.now) : 'never'}</td>
 										</tr>
-									{/each}
-								</tbody>
-							</table>
+								{/snippet}
+							</DataTable>
 						{/if}
 					{:else}
 						<p class="muted">No warehouse sync reported yet.</p>
@@ -171,10 +181,6 @@
 	}
 	.link:hover {
 		color: var(--primary);
-	}
-	.users .test {
-		width: 1%;
-		white-space: nowrap;
 	}
 	.num {
 		text-align: right;

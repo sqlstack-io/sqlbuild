@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { openRow, to } from '$lib/paths';
 	import type { CatalogNodeDetail } from '$lib/api';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -10,12 +12,19 @@
 	import { checkValue } from '../../checks/utils';
 
 	let { node }: { node: CatalogNodeDetail } = $props();
+	const checkColumns: TableColumn[] = [
+		{ id: 'check', label: 'Check', minWidth: 200 },
+		{ id: 'outcome', label: 'Outcome', width: '120px' },
+		{ id: 'severity', label: 'Severity', width: '100px' },
+		{ id: 'phase', label: 'Checks', width: '120px' },
+		{ id: 'mode', label: 'Result type', width: '130px' },
+		{ id: 'result', label: 'Result', width: '100px', align: 'right' },
+		{ id: 'checked', label: 'Last checked', width: '130px' }
+	];
 </script>
 
-<table class="sb-list">
-	<thead><tr><th>Check</th><th>Outcome</th><th>Severity</th><th>Checks</th><th>Result type</th><th class="num">Result</th><th>Last checked</th></tr></thead>
-	<tbody>
-		{#each node.checkResults as c (c.id)}
+<DataTable embedded columns={checkColumns} rows={node.checkResults} key={(c) => c.id} empty="No audits or checks attach to this node.">
+	{#snippet row(c)}
 			{@const o = c.latest?.outcome ?? 'skipped'}
 			<tr onclick={(e) => openRow(e, `/checks/${c.id}`)}>
 				<td><a class="mono" href={to(`/checks/${c.id}`)}>{c.name}</a>{#if c.column}<div class="cell-desc">column {c.column}</div>{/if}</td>
@@ -26,11 +35,8 @@
 				<td class="num">{checkValue(c.latest, c.evaluationMode)}</td>
 				<td><RelativeTime value={formatAgo(c.latest?.evaluatedAt, app.now)} exact={formatStamp(c.latest?.evaluatedAt)} /></td>
 			</tr>
-		{:else}
-			<tr><td colspan="7" class="empty">No audits or checks attach to this node.</td></tr>
-		{/each}
-	</tbody>
-</table>
+	{/snippet}
+</DataTable>
 
 <style>
 	.mono {

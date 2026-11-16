@@ -24,6 +24,7 @@
 </script>
 
 <div class="grid-wrap">
+	<!-- raw-table: a matrix of actions by location, with a row per risk group; not a list of records -->
 	<table class="grid">
 		<thead>
 			<tr>

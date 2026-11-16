@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
@@ -75,21 +77,18 @@
 		if (!confirm(message)) return;
 		void act(a.id, () => app.client.deleteRoleAssignment(a.id));
 	}
+	const tableColumns: TableColumn[] = [
+		{ id: 'role', label: 'Role', minWidth: 220, truncate: false },
+		{ id: 'where', label: 'Where', width: '160px' },
+		{ id: 'from', label: 'From', width: '170px' },
+		{ id: 'since', label: 'Since', width: '140px' },
+		{ id: 'action', label: '', width: '170px', align: 'right' }
+	];
 </script>
 
 <div class="assignments">
-	<table class="sb-list static framed">
-		<thead>
-			<tr>
-				<th>Role</th>
-				<th>Where</th>
-				<th>From</th>
-				<th>Since</th>
-				<th></th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each mine as a (a.id)}
+	<DataTable class="static framed" embedded columns={tableColumns} rows={mine} key={(a) => a.id} empty="No roles yet.">
+		{#snippet row(a)}
 				{@const role = roleOf(a.role)}
 				{@const hint = lockedHint(a)}
 				<tr class:sb-row-off={a.stale}>
@@ -115,11 +114,8 @@
 						{/if}
 					</td>
 				</tr>
-			{:else}
-				<tr><td colspan="5" class="empty">No roles yet.</td></tr>
-			{/each}
-		</tbody>
-	</table>
+		{/snippet}
+	</DataTable>
 
 	{#if app.can('role.assign')}
 		<div class="add">
@@ -138,12 +134,6 @@
 </div>
 
 <style>
-	:global(.sb-list.static tbody tr) {
-		cursor: default;
-	}
-	.framed {
-		border-top: 1px solid var(--border);
-	}
 	.warn {
 		display: flex;
 		align-items: center;

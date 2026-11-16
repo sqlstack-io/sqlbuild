@@ -1,5 +1,6 @@
 <script lang="ts">
-	import Loading from '$lib/components/loading.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import type { PlatformEventLink, PlatformEventReaction, PlatformEventRecord } from '$lib/api';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
@@ -46,19 +47,16 @@
 		Object.entries(p)
 			.map(([k, v]) => `${k}: ${v}`)
 			.join('\n');
+	const tableColumns = $derived<TableColumn[]>([
+		{ id: 'problem', label: 'Problem', minWidth: 260, truncate: false },
+		{ id: 'when', label: 'When', width: '150px' },
+		...(showAffected ? [{ id: 'affected', label: 'Affected', width: '22%', truncate: false }] : []),
+		...(showReactions ? [{ id: 'reactions', label: 'Sensors that reacted', width: '22%', truncate: false, title: 'Sensors that react to these problems, e.g. to post a message' }] : [])
+	]);
 </script>
 
-<table class="sb-list problems">
-	<thead>
-		<tr>
-			<th>Problem</th>
-			<th>When</th>
-			{#if showAffected}<th>Affected</th>{/if}
-			{#if showReactions}<th title="Sensors that react to these problems, e.g. to post a message">Sensors that reacted</th>{/if}
-		</tr>
-	</thead>
-	<tbody>
-		{#each events as e (e.id)}
+<DataTable class="problems static" embedded columns={tableColumns} rows={events} key={(e) => e.id} {resource} {empty}>
+	{#snippet row(e)}
 			<tr>
 				<td>
 					<div class="cell-name">
@@ -103,21 +101,14 @@
 				</td>
 				{/if}
 			</tr>
-		{:else}
-			<tr class="load-row">
-				<td colspan={2 + Number(showAffected) + Number(showReactions)} class="empty">
-					{#if resource.error}<span class="err">Couldn't load problems: {resource.error}</span>{:else if resource.data === undefined}<Loading lines={2} />{:else}{empty}{/if}
-				</td>
-			</tr>
-		{/each}
-	</tbody>
-</table>
+	{/snippet}
+</DataTable>
 
 <style>
 	:global(.sb-list.problems tbody tr) {
 		cursor: default;
 	}
-	.problems td {
+	:global(.problems) td {
 		vertical-align: top;
 	}
 	.dot {
@@ -175,8 +166,5 @@
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 		white-space: pre-wrap;
-	}
-	.err {
-		color: var(--sb-error);
 	}
 </style>

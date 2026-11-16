@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import { to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
@@ -87,6 +89,12 @@
 		void goto(to(planHref(selection)));
 	}
 	const Glyph = $derived(n ? (nodeIcon[nodeIconKey(n)] ?? nodeIcon.table) : nodeIcon.table);
+	const columnColumns: TableColumn[] = [
+		{ id: 'column', label: 'Column', minWidth: 180 },
+		{ id: 'type', label: 'Type', width: '160px' },
+		{ id: 'description', label: 'Description', width: '40%' },
+		{ id: 'audits', label: 'Audits', width: '22%', truncate: false }
+	];
 </script>
 
 <AppTopbar title="Catalog">
@@ -133,19 +141,16 @@
 			{#if tab === 'overview'}
 				<OverviewTab node={n} onTab={setTab} onSql={(mode) => { viewerMode = mode; setTab('sql'); }} />
 			{:else if tab === 'columns'}
-				<table class="sb-list">
-					<thead><tr><th>Column</th><th>Type</th><th>Description</th><th>Audits</th></tr></thead>
-					<tbody>
-						{#each n.columns as c (c.name)}
-							<tr>
-								<td><code>{c.name}</code></td>
-								<td><code class="muted">{c.type ?? '—'}</code></td>
-								<td class="muted">{c.description}</td>
-								<td><div class="flex flex-wrap gap-1">{#each c.audits as a (a)}<span class="sb-tag">{a}</span>{:else}<span class="muted">—</span>{/each}</div></td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<DataTable class="static" embedded columns={columnColumns} rows={n.columns} key={(c) => c.name} empty="No columns declared.">
+					{#snippet row(c)}
+						<tr>
+							<td><code>{c.name}</code></td>
+							<td><code class="muted">{c.type ?? '—'}</code></td>
+							<td class="muted">{c.description}</td>
+							<td><div class="flex flex-wrap gap-1">{#each c.audits as a (a)}<span class="sb-tag">{a}</span>{:else}<span class="muted">—</span>{/each}</div></td>
+						</tr>
+					{/snippet}
+				</DataTable>
 			{:else if tab === 'sql'}
 				{#if n.sql}
 					<SqlViewer name={shortName(n.key)} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={viewerMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(to(`/catalog/${m}?tab=sql`))} />

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { appPath, to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
@@ -281,6 +283,17 @@
 			launching = false;
 		}
 	}
+	const checkColumns: TableColumn[] = [
+		{ id: 'check', label: 'Check', minWidth: 200 },
+		{ id: 'node', label: 'Node', width: '30%' },
+		{ id: 'severity', label: 'Severity', width: '100px' },
+		{ id: 'last', label: 'Last result', width: '150px' }
+	];
+	const nodeColumns: TableColumn[] = [
+		{ id: 'node', label: 'Node', minWidth: 200 },
+		{ id: 'kind', label: 'Kind', width: '30%' },
+		{ id: 'built', label: 'Last built', width: '150px' }
+	];
 </script>
 
 <AppTopbar title="Plan" events={affectsPlan} />
@@ -357,33 +370,29 @@
 				{/if}
 			{:else if tab === 'checks' && shown?.verb === 'build' && plan}
 				<p class="faint graph-note">{planChecks.length} {planChecks.length === 1 ? 'check' : 'checks'} <HelpTip text="Checks run after the models they check, and a failing error check stops what depends on it." /></p>
-				<table class="nodes">
-					<tbody>
-						{#each planChecks as c (c.id)}
-							<tr>
-								<td><a href={to(`/checks/${encodeURIComponent(c.id)}`)} class="mono">{c.name}</a></td>
-								<td class="faint mono">{c.node ? c.node.slice(c.node.indexOf(':') + 1) : ''}{c.column ? `.${c.column}` : ''}</td>
-								<td class="faint">{c.severity}</td>
-								<td class="right">{#if c.latest}<StatusLabel tone={checkOutcomeTone[c.latest.outcome]} label="last {checkOutcomeLabel[c.latest.outcome].toLowerCase()}" />{/if}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<DataTable class="static compact" embedded columns={checkColumns} rows={planChecks} key={(c) => c.id} empty="No checks in this plan.">
+					{#snippet row(c)}
+						<tr>
+							<td><a href={to(`/checks/${encodeURIComponent(c.id)}`)} class="mono">{c.name}</a></td>
+							<td class="faint mono">{c.node ? c.node.slice(c.node.indexOf(':') + 1) : ''}{c.column ? `.${c.column}` : ''}</td>
+							<td class="faint">{c.severity}</td>
+							<td>{#if c.latest}<StatusLabel tone={checkOutcomeTone[c.latest.outcome]} label="last {checkOutcomeLabel[c.latest.outcome].toLowerCase()}" />{/if}</td>
+						</tr>
+					{/snippet}
+				</DataTable>
 			{:else if shown?.verb === 'build' && plan}
 				<PlanReport {plan} {refresh} />
 			{:else if shown?.verb && shown.verb !== 'build'}
-				<table class="nodes">
-					<tbody>
-						{#each picked as key (key)}
-							{@const node = byKey.get(key)}
-							<tr>
-								<td><a href={to(`/catalog/${key}`)} class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
-								<td class="faint">{node ? kindLine(node) : ''}</td>
-								<td class="faint right">{node?.lastBuild ? `built ${formatAgo(node.lastBuild.builtAt, app.now)}` : ''}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<DataTable class="static compact" embedded columns={nodeColumns} rows={picked} key={(key) => key} rowHeight={32} empty="No nodes selected.">
+					{#snippet row(key)}
+						{@const node = byKey.get(key)}
+						<tr>
+							<td><a href={to(`/catalog/${key}`)} class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
+							<td class="faint">{node ? kindLine(node) : ''}</td>
+							<td class="faint">{node?.lastBuild ? `built ${formatAgo(node.lastBuild.builtAt, app.now)}` : ''}</td>
+						</tr>
+					{/snippet}
+				</DataTable>
 			{/if}
 		</div>
 
@@ -582,19 +591,6 @@
 	}
 	.graph-note {
 		margin: 0 0 8px;
-	}
-	.nodes {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12.5px;
-	}
-	.nodes td {
-		padding: 5px 12px 5px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		white-space: nowrap;
-	}
-	.right {
-		text-align: right;
 	}
 	.foot {
 		display: flex;

@@ -56,6 +56,7 @@
 			</Panel>
 
 			<Panel title="How long things are kept">
+				<!-- raw-table: label and value pairs without a header, as a key/value list, not a list of records -->
 				<table class="sb-list static framed">
 					<tbody>
 						{#each s?.retention ?? [] as r (r.name)}
@@ -81,6 +82,7 @@
 							app.user.role && { label: 'Role', value: app.user.role }
 						].filter((row) => !!row)}
 					/>
+					<!-- raw-table: a permission matrix grouped by risk, with one group label per block of rows -->
 					<table class="caps">
 						<tbody>
 							{#each PERMISSIONS_BY_RISK as group (group.risk)}
@@ -118,12 +120,6 @@
 	.err {
 		color: var(--sb-error);
 		font-size: 12.5px;
-	}
-	.framed {
-		border-top: 1px solid var(--border);
-	}
-	:global(.sb-list.static tbody tr) {
-		cursor: default;
 	}
 	.caps {
 		width: 100%;

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import DisclosureButton from '$lib/components/disclosure-button.svelte';
@@ -80,6 +82,12 @@
 		a.click();
 		URL.revokeObjectURL(url);
 	}
+	const logColumns = $derived<TableColumn[]>([
+		{ id: 'time', label: 'Time', width: '110px' },
+		...(grouped ? [{ id: 'run', label: 'Job run', width: '100px' }] : []),
+		{ id: 'node', label: 'Node', width: '220px' },
+		{ id: 'what', label: 'What happened', minWidth: 300, truncate: false }
+	]);
 </script>
 
 <div class="filters">
@@ -97,23 +105,8 @@
 	<Button size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
 </div>
 
-<table class="log">
-	<colgroup>
-		<col style:width="110px" />
-		{#if grouped}<col style:width="100px" />{/if}
-		<col style:width="220px" />
-		<col />
-	</colgroup>
-	<thead>
-		<tr>
-			<th>Time</th>
-			{#if grouped}<th>Job run</th>{/if}
-			<th>Node</th>
-			<th>What happened</th>
-		</tr>
-	</thead>
-	<tbody>
-		{#each shown as e (e.id)}
+<DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
+	{#snippet row(e)}
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'}>
 				<td class="faint nowrap" title={formatStamp(e.at)}>{clockTime(e.at)}</td>
 				{#if grouped}<td class="mono faint"><a href={to(`/runs/${e.runId}`)}>{shortRunId(e.runId)}</a></td>{/if}
@@ -149,11 +142,8 @@
 					</tr>
 				{/each}
 			{/if}
-		{:else}
-			<tr><td colspan={grouped ? 4 : 3} class="empty">{entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}</td></tr>
-		{/each}
-	</tbody>
-</table>
+	{/snippet}
+</DataTable>
 
 <style>
 	.filters {
@@ -204,19 +194,6 @@
 		color: var(--foreground);
 		font-size: 12px;
 	}
-	.log {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12px;
-	}
-	th {
-		padding: 6px 16px;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		font-weight: 500;
-		text-align: left;
-	}
 	td {
 		padding: 5px 16px;
 		border-bottom: 1px solid var(--border-subtle);
@@ -258,11 +235,6 @@
 	}
 	.nowrap {
 		white-space: nowrap;
-	}
-	.empty {
-		padding: 32px;
-		color: var(--sb-text-faint);
-		text-align: center;
 	}
 	a:hover {
 		color: var(--primary);

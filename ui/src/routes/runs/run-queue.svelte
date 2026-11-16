@@ -1,7 +1,8 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { openRow, to } from '$lib/paths';
 	import type { QueueEntry } from '$lib/api';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import type { Resource } from '$lib/state/resource.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -27,24 +28,20 @@
 			cancelling = new Set([...cancelling].filter((id) => id !== runId));
 		}
 	}
+	const tableColumns: TableColumn[] = [
+		{ id: 'pos', label: '#', width: '50px', align: 'right' },
+		{ id: 'run', label: 'Run', width: '170px' },
+		{ id: 'job', label: 'Job', width: '20%' },
+		{ id: 'priority', label: 'Priority', width: '80px', align: 'right', title: 'Higher priority runs go first; equal priority runs go in queue order' },
+		{ id: 'since', label: 'Waiting since', width: '130px' },
+		{ id: 'why', label: 'Why it waits', minWidth: 240, truncate: false },
+		{ id: 'cancel', label: '', width: '100px', align: 'right' }
+	];
 </script>
 
 {#if error}<div class="queue-error">{error}</div>{/if}
-<div class="sb-list-wrap">
-	<table class="sb-list">
-		<thead>
-			<tr>
-				<th class="num">#</th>
-				<th>Run</th>
-				<th>Job</th>
-				<th class="num" title="Higher priority runs go first; equal priority runs go in queue order">Priority</th>
-				<th>Waiting since</th>
-				<th>Why it waits</th>
-				<th></th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each entries as q (q.run.id)}
+<DataTable columns={tableColumns} rows={entries} key={(q) => q.run.id} {resource} empty="Nothing is waiting. Runs wait here while another run is updating the same data, all slots are in use, or an earlier job hasn't finished.">
+	{#snippet row(q)}
 				<tr onclick={(e) => openRow(e, `/runs/${q.run.id}`)}>
 					<td class="num muted">{q.position}</td>
 					<td>
@@ -74,17 +71,10 @@
 						</span>
 					</td>
 				</tr>
-			{:else}
-				<LoadRow colspan={7} {resource} empty="Nothing is waiting. Runs wait here while another run is updating the same data, all slots are in use, or an earlier job hasn't finished." />
-			{/each}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+</DataTable>
 
 <style>
-	.waits {
-		max-width: 520px;
-	}
 	.wait + .wait {
 		margin-top: 3px;
 	}

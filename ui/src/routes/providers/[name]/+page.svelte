@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
@@ -22,6 +24,12 @@
 
 	type Tab = 'settings' | 'uses';
 	let tab = $state<Tab>('settings');
+	const settingColumns: TableColumn[] = [
+		{ id: 'setting', label: 'Setting', minWidth: 200, truncate: false },
+		{ id: 'type', label: 'Type', width: '140px' },
+		{ id: 'env', label: 'Environment variable', width: '34%' },
+		{ id: 'required', label: 'Required', width: '100px' }
+	];
 </script>
 
 <AppTopbar title="Providers">
@@ -56,12 +64,8 @@
 							<span>Values come from each location's environment and never reach the server. Declared in <code>{provider.sourceFile}</code>.</span>
 						</div>
 						{#if provider.settings.length}
-							<table class="sb-list settings">
-								<thead>
-									<tr><th>Setting</th><th>Type</th><th>Environment variable</th><th>Required</th></tr>
-								</thead>
-								<tbody>
-									{#each provider.settings as f (f.name)}
+							<DataTable class="settings static" embedded columns={settingColumns} rows={provider.settings} key={(f) => f.name} empty="This provider declares no settings.">
+								{#snippet row(f)}
 										<tr>
 											<td>
 												<div class="flex items-center gap-1.5"><code>{f.name}</code>{#if f.secret}<span class="secret" title="A secret type; its value is never shown"><LockIcon size={11} /> secret</span>{/if}</div>
@@ -71,9 +75,8 @@
 											<td><code>{f.env}</code>{#if f.missing}<span class="missing" title="Unset in the location's environment; runs that use this provider fail">missing</span>{/if}</td>
 											<td class="muted">{f.required ? 'Required' : 'Optional'}</td>
 										</tr>
-									{/each}
-								</tbody>
-							</table>
+								{/snippet}
+							</DataTable>
 						{:else}
 							<p class="text-muted-foreground text-[12.5px]">This provider declares no settings.</p>
 						{/if}
@@ -101,7 +104,7 @@
 </div>
 
 <style>
-	.settings {
+	:global(table.settings) {
 		max-width: 960px;
 	}
 	.secret {

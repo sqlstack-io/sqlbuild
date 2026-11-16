@@ -1,9 +1,10 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
@@ -55,6 +56,30 @@
 	}
 
 	const total = $derived(tab === 'migrations' ? `${shownMigrations.length} of ${migrations.length} renames and moves` : tab === 'views' ? `${shownViews.length} of ${views.length} old names` : `${shownJanitor.length} of ${janitor.length} clean-ups`);
+	const migrationColumns: TableColumn[] = [
+		{ id: 'when', label: 'When', width: '120px' },
+		{ id: 'what', label: 'What', width: '150px' },
+		{ id: 'from', label: 'From', minWidth: 200 },
+		{ id: 'to', label: 'To', minWidth: 200 },
+		{ id: 'data', label: 'What happened to the data', width: '22%' },
+		{ id: 'run', label: 'Run', width: '110px' }
+	];
+	const viewColumns: TableColumn[] = [
+		{ id: 'old', label: 'Old name', minWidth: 200 },
+		{ id: 'new', label: 'Now points to', minWidth: 200 },
+		{ id: 'status', label: 'Status', width: '180px' },
+		{ id: 'aliases', label: 'Renamed columns', width: '180px', title: 'Old column names kept as aliases', truncate: false },
+		{ id: 'grants', label: 'Grants copied', width: '110px', align: 'right', title: 'Access grants copied to the old name' },
+		{ id: 'history', label: 'History', width: '200px', truncate: false }
+	];
+	const janitorColumns: TableColumn[] = [
+		{ id: 'when', label: 'When', width: '120px' },
+		{ id: 'what', label: 'What', width: '170px' },
+		{ id: 'original', label: 'Original name', minWidth: 200 },
+		{ id: 'archive', label: 'Archived as', minWidth: 200 },
+		{ id: 'archived', label: 'Archived', width: '120px' },
+		{ id: 'run', label: 'Run', width: '110px' }
+	];
 </script>
 
 <AppTopbar title="Maintenance">
@@ -83,21 +108,9 @@
 >
 </ListToolbar>
 
-<div class="sb-list-wrap">
-	{#if tab === 'migrations'}
-		<table class="sb-list static">
-			<thead>
-				<tr>
-					<th>When</th>
-					<th>What</th>
-					<th>From</th>
-					<th>To</th>
-					<th>What happened to the data</th>
-					<th>Run</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each shownMigrations as m (m.eventId)}
+{#if tab === 'migrations'}
+	<DataTable class="static" columns={migrationColumns} rows={shownMigrations} key={(m) => m.eventId} resource={history} empty={migrations.length ? 'Nothing matches the search.' : 'No models have been renamed or moved in this location.'}>
+		{#snippet row(m)}
 					<tr>
 						<td><RelativeTime value={formatAgo(m.createdAt, app.now)} exact={formatStamp(m.createdAt)} /></td>
 						<td>
@@ -115,25 +128,11 @@
 						<td class="muted" title="decision = {m.decision}">{decisionLabel[m.decision]}</td>
 						<td class="nowrap"><code class="muted" title="The sqb run that did it: {m.runId}">{shortRunId(m.runId.replace(/^run-/, ''))}</code></td>
 					</tr>
-				{:else}
-					<LoadRow colspan={6} resource={history} empty={migrations.length ? 'Nothing matches the search.' : 'No models have been renamed or moved in this location.'} />
-				{/each}
-			</tbody>
-		</table>
+		{/snippet}
+	</DataTable>
 	{:else if tab === 'views'}
-		<table class="sb-list static">
-			<thead>
-				<tr>
-					<th>Old name</th>
-					<th>Now points to</th>
-					<th>Status</th>
-					<th title="Old column names kept as aliases">Renamed columns</th>
-					<th class="num" title="Access grants copied to the old name">Grants copied</th>
-					<th>History</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each shownViews as v (v.migrationEventId)}
+	<DataTable class="static" columns={viewColumns} rows={shownViews} key={(v) => v.migrationEventId} resource={history} empty={views.length ? 'Nothing matches the search.' : 'No old names are being kept working in this location.'}>
+		{#snippet row(v)}
 					{@const status = oldNameStatus(v, app.now)}
 					<tr class:sb-row-off={status === 'dropped' || status === 'not_kept'}>
 						<td title={v.archiveName ? `Old table archived as ${v.archiveName}` : undefined}>
@@ -164,25 +163,11 @@
 							</ol>
 						</td>
 					</tr>
-				{:else}
-					<LoadRow colspan={6} resource={history} empty={views.length ? 'Nothing matches the search.' : 'No old names are being kept working in this location.'} />
-				{/each}
-			</tbody>
-		</table>
+		{/snippet}
+	</DataTable>
 	{:else}
-		<table class="sb-list static">
-			<thead>
-				<tr>
-					<th>When</th>
-					<th>What</th>
-					<th>Original name</th>
-					<th>Archived as</th>
-					<th>Archived</th>
-					<th>Run</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each shownJanitor as j (j.eventId)}
+	<DataTable class="static" columns={janitorColumns} rows={shownJanitor} key={(j) => j.eventId} resource={history} empty={janitor.length ? 'Nothing matches the search.' : 'Nothing has been archived or deleted by clean-up in this location.'}>
+		{#snippet row(j)}
 					<tr>
 						<td><RelativeTime value={formatAgo(j.occurredAt, app.now)} exact={formatStamp(j.occurredAt)} /></td>
 						<td>
@@ -194,18 +179,11 @@
 						<td><RelativeTime value={formatAgo(j.archivedAt, app.now)} exact={formatStamp(j.archivedAt)} /></td>
 						<td class="nowrap"><code class="muted" title="The sqb run that did it: {j.runId}">{shortRunId(j.runId.replace(/^run-/, ''))}</code></td>
 					</tr>
-				{:else}
-					<LoadRow colspan={6} resource={history} empty={janitor.length ? 'Nothing matches the search.' : 'Nothing has been archived or deleted by clean-up in this location.'} />
-				{/each}
-			</tbody>
-		</table>
+		{/snippet}
+	</DataTable>
 	{/if}
-</div>
 
 <style>
-	:global(.sb-list.static tbody tr) {
-		cursor: default;
-	}
 	.model {
 		font-weight: 500;
 	}

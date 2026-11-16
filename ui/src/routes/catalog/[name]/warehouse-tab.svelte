@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import type { MicrobatchCoverage, WarehouseObject } from '$lib/api';
 	import KeyValues from '$lib/components/platform/key-values.svelte';
@@ -30,6 +32,12 @@
 	const batchLabel = { complete: 'complete', gap: 'gap', replay_required: 'replay required' } as const;
 	/** Timestamp bounds as local stamps; integer bounds as written. */
 	const bound = (text: string | null) => (microbatch?.cursorType === 'timestamp' ? formatStamp(text) : (text ?? '—'));
+	const columnColumns = $derived<TableColumn[]>([
+		{ id: 'column', label: 'Column', minWidth: 200 },
+		...(compared ? [{ id: 'declared', label: 'Declared', width: '22%' }] : []),
+		{ id: 'actual', label: 'In the warehouse', width: '22%' },
+		...(compared ? [{ id: 'state', label: 'State', width: '160px' }] : [])
+	]);
 </script>
 
 <div class="wrap">
@@ -60,19 +68,16 @@
 	</div>
 
 	<Panel title="Columns" note={!compared ? `${warehouse.columns.length} in the warehouse` : mismatched ? `${mismatched} differ from the code` : 'All match the code'}>
-		<table class="sb-list">
-			<thead><tr><th>Column</th>{#if compared}<th>Declared</th>{/if}<th>In the warehouse</th>{#if compared}<th>State</th>{/if}</tr></thead>
-			<tbody>
-				{#each warehouse.columns as c (c.name)}
+		<DataTable class="static" embedded columns={columnColumns} rows={warehouse.columns} key={(c) => c.name} empty="No columns reported.">
+			{#snippet row(c)}
 					<tr>
 						<td><code>{c.name}</code></td>
 						{#if compared}<td><code class="muted">{c.declaredType ?? '—'}</code></td>{/if}
 						<td><code class="muted">{c.actualType ?? '—'}</code></td>
 						{#if compared}<td>{#if c.state}<StatusLabel tone={warehouseColumnTone[c.state]} label={warehouseColumnLabel[c.state]} muted={c.state === 'match'} />{/if}</td>{/if}
 					</tr>
-				{/each}
-			</tbody>
-		</table>
+			{/snippet}
+		</DataTable>
 	</Panel>
 
 	{#if microbatch}

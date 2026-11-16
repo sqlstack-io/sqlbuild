@@ -6,7 +6,8 @@
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import RadarIcon from '@lucide/svelte/icons/radar';
 	import UserIcon from '@lucide/svelte/icons/user';
-	import { createVirtualRows } from '$lib/components/list/virtual-rows.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import type { RunRow } from '$lib/api';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import RunStatusPill from '$lib/components/operate/run-status-pill.svelte';
@@ -23,10 +24,16 @@
 	const ROW_H = 52;
 	const OVERSCAN = 8;
 	const rows = $derived(list.display);
-	const win = createVirtualRows(ROW_H, () => rows.length, OVERSCAN);
-	const first = $derived(win.first);
-	const last = $derived(win.last);
-	const visible = $derived(rows.slice(first, last));
+	let last = $state(0);
+	const runColumns: TableColumn[] = [
+		{ id: 'sel', label: '', width: '40px', class: 'sel' },
+		{ id: 'run', label: 'Run', width: '140px' },
+		{ id: 'what', label: 'What', minWidth: 200 },
+		{ id: 'by', label: 'Started by', width: '180px' },
+		{ id: 'status', label: 'Status', width: '220px' },
+		{ id: 'started', label: 'Started', width: '150px' },
+		{ id: 'took', label: 'Took', width: '90px', align: 'right' }
+	];
 
 	// Fetch the next cursor page when the window nears the end.
 	$effect(() => {
@@ -42,36 +49,16 @@
 	<button type="button" class="chip" onclick={() => onfilter(key, value)} {title}>{label}</button>
 {/snippet}
 
-<div class="sb-list-wrap scroller" {@attach win.attach}>
-	<table class="sb-list runs">
-		<colgroup>
-			<col style:width="40px" />
-			<col style:width="140px" />
-			<col />
-			<col style:width="180px" />
-			<col style:width="220px" />
-			<col style:width="150px" />
-			<col style:width="90px" />
-		</colgroup>
-		<thead>
-			<tr>
-				<th class="sel">
-					<input type="checkbox" class="sb-check" checked={list.allVisibleSelected} indeterminate={list.selected.size > 0 && !list.allVisibleSelected} onchange={() => list.toggleAll()} aria-label="Select all loaded runs" />
-				</th>
-				<th>Run</th>
-				<th>What</th>
-				<th>Started by</th>
-				<th>Status</th>
-				<th>Started</th>
-				<th class="num">Took</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#if first > 0}<tr class="spacer" style:height="{win.before}px"><td colspan="7"></td></tr>{/if}
-			{#each visible as d (d.key)}
+<DataTable class="runs" columns={runColumns} rows={rows} key={(d) => d.key} rowHeight={ROW_H} windowAbove={0} onwindow={(r) => (last = r.last)} empty={emptyText}>
+	{#snippet head(c)}
+		{#if c.id === 'sel'}
+			<input type="checkbox" class="sb-check" checked={list.allVisibleSelected} indeterminate={list.selected.size > 0 && !list.allVisibleSelected} onchange={() => list.toggleAll()} aria-label="Select all loaded runs" />
+		{/if}
+	{/snippet}
+	{#snippet row(d)}
 				{@const r = d.row.run}
 				{@const line = statusLine(d.row, app.now)}
-				<tr class:child={d.child} class:checked={list.selected.has(r.id)} style:height="{ROW_H}px" onclick={(e) => openRow(e, `/runs/${r.id}`)} onauxclick={(e) => e.button === 1 && openRow(e, `/runs/${r.id}`)}>
+				<tr class:child={d.child} class:checked={list.selected.has(r.id)} onclick={(e) => openRow(e, `/runs/${r.id}`)} onauxclick={(e) => e.button === 1 && openRow(e, `/runs/${r.id}`)}>
 					<td class="sel">
 						<i class="stripe" style:background={runStatusTone[r.status]}></i>
 						<input type="checkbox" class="sb-check" checked={list.selected.has(r.id)} onchange={() => list.toggleSelected(r.id)} aria-label="Select run {shortRunId(r.id)}" />
@@ -137,61 +124,34 @@
 						<span class:live={!r.endedAt && !!r.startedAt} class="muted took">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</span>
 					</td>
 				</tr>
-			{/each}
-			{#if last < rows.length}<tr class="spacer" style:height="{win.after}px"><td colspan="7"></td></tr>{/if}
-			{#if !rows.length}
-				<tr class="load-row">
-					<td colspan="7" class="empty">
-						{#if list.error}
-							<span class="err">Couldn't load runs: {list.error}</span> <Button variant="link" size="inline" onclick={() => list.refresh()}>Retry</Button>
-						{:else if list.resetting}
-							<Loading lines={4} />
-						{:else}
-							{emptyText}
-						{/if}
-					</td>
-				</tr>
-			{:else if list.loadingMore || list.hasMore}
-				<tr class="load-row"><td colspan="7" class="empty">Loading more…</td></tr>
-			{:else if rows.length > 20}
-				<tr class="load-row"><td colspan="7" class="empty">That's all {rows.length} runs.</td></tr>
-			{/if}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+	{#snippet emptyRow()}
+		<tr class="load-row">
+			<td colspan={runColumns.length} class="empty">
+				{#if list.error}
+					<span class="err">Couldn't load runs: {list.error}</span> <Button variant="link" size="inline" onclick={() => list.refresh()}>Retry</Button>
+				{:else if list.resetting}
+					<Loading lines={4} />
+				{:else}
+					{emptyText}
+				{/if}
+			</td>
+		</tr>
+	{/snippet}
+	{#snippet after()}
+		{#if list.loadingMore || list.hasMore}
+			<tr class="load-row"><td colspan={runColumns.length} class="empty">Loading more…</td></tr>
+		{:else if rows.length > 20}
+			<tr class="load-row"><td colspan={runColumns.length} class="empty">That's all {rows.length} runs.</td></tr>
+		{/if}
+	{/snippet}
+</DataTable>
 
 <style>
-	.scroller {
-		min-height: 0;
-		flex: 1;
-		overflow: auto;
-	}
-	.runs {
-		min-width: 1000px;
-		table-layout: fixed;
-	}
-	.runs thead th {
-		position: sticky;
-		top: 0;
-		z-index: 2;
-		background: var(--background);
-	}
-	.runs td {
-		overflow: hidden;
-		padding-top: 4px;
-		padding-bottom: 4px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.spacer td,
-	.spacer {
-		padding: 0 !important;
-		border: 0 !important;
-	}
 	tr.checked td {
 		background: color-mix(in srgb, var(--primary) 7%, transparent);
 	}
-	.sel {
+	:global(.runs .sel) {
 		position: relative;
 		padding-right: 4px !important;
 		padding-left: 14px !important;
