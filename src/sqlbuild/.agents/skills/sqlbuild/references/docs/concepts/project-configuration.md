@@ -517,6 +517,7 @@ delta_compile = true
 | `scenario_timeout` | none | Time limit for each scenario, or `"disabled"` |
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](../cli/compile.md#compiling-after-an-edit). |
 | `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](python-nodes/providers.md#secrets). |
+| `allow_warehouse_round_trips` | `false` | Allow a loader to depend on a task or asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](python-nodes/overview.md#warehouse-round-trips). |
 
 ### Unit test and scenario limits
 
