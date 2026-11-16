@@ -86,10 +86,6 @@ pub const PERMANENT_TABLE_TYPE: &str = "permanent";
 pub const TRANSIENT_TABLE_DDL: &str = "TRANSIENT TABLE";
 /// The permanent table DDL replacing the transient keyword.
 pub const PERMANENT_TABLE_DDL: &str = "TABLE";
-/// The incremental strategy that deletes matched rows before inserting.
-pub const DELETE_INSERT_STRATEGY: &str = "delete_insert";
-/// The note code of a `delete_insert` model matched by `unique_key`.
-pub const GROUP_KEY_NOTE_CODE: &str = "DELETE_INSERT_UNIQUE_KEY";
 /// The warning code of an incremental model whose table keeps an outdated physical layout.
 pub const PHYSICAL_LAYOUT_PENDING_WARNING_CODE: &str = "PHYSICAL_LAYOUT_PENDING";
 /// Model config keys of a table's physical layout, in the order warnings name them.

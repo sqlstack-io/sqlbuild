@@ -104,15 +104,6 @@ pub(super) struct TableTypeDdlTestCase {
     pub(super) expected_ddl: &'static str,
 }
 
-pub(super) struct GroupKeyNoteTestCase {
-    pub(super) description: &'static str,
-    pub(super) materialization: MaterializationType,
-    pub(super) strategy: Option<&'static str>,
-    pub(super) has_unique_key: bool,
-    pub(super) has_replace_key: bool,
-    pub(super) expected_code: Option<&'static str>,
-}
-
 pub(super) struct PhysicalLayoutWarningTestCase {
     pub(super) description: &'static str,
     pub(super) materialization: MaterializationType,

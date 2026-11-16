@@ -5,7 +5,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
 
-use sqlbuild_analysis::planner_strategy::main::group_key_note::group_key_note;
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
 use sqlbuild_analysis::planner_strategy::main::microbatch_lookback::microbatch_lookback;
 use sqlbuild_analysis::planner_strategy::main::physical_layout_warning::physical_layout_warning;
@@ -431,20 +430,6 @@ fn model_warnings<'py>(
     if let Some(layout_warning) = layout_warning(request, &name)? {
         warnings.push(layout_warning);
     }
-    let values: ConfigValues<'py> = model_values(model)?;
-    let strategy: Option<String> = config_text_object(py, &values, "incremental_strategy")?
-        .map(|value| text(&value))
-        .transpose()?;
-    if let Some(note) = group_key_note(
-        &text(&name)?,
-        (inputs.materialization, strategy.as_deref()),
-        (
-            !string_list(&values.0, "unique_key")?.is_empty()?,
-            !string_list(&values.0, "replace_key")?.is_empty()?,
-        ),
-    ) {
-        warnings.push(plan_warning(&name, note)?);
-    }
     PyTuple::new(py, warnings)
 }
 
@@ -684,6 +669,7 @@ pub(crate) fn assemble_model_plan_entry<'py>(
         )?,
         "value",
     )?;
+    // Only delete_insert accepts replace_key, and then it is the key whose rows are replaced.
     let delete_key: &Bound<'py, PyTuple> = if replace_key.is_empty()? {
         &unique_key
     } else {
