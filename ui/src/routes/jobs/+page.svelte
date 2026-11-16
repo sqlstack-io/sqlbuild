@@ -1,4 +1,5 @@
 <script lang="ts">
+	import UsersIcon from '@lucide/svelte/icons/users';
 	import { openRow, to } from '$lib/paths';
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
 	import LayersIcon from '@lucide/svelte/icons/layers';
@@ -180,7 +181,9 @@
 					{#if showOwner}
 						{@const owner = ownerChip(j.owner)}
 						<td>
-							{#if owner}
+							{#if owner?.kind === 'team'}
+								<span class="team" title="Team {owner.full}"><UsersIcon size={13} aria-hidden="true" />{owner.name}</span>
+							{:else if owner}
 								<span class="person" title={owner.full}><span class="initials" style:background={owner.colour} aria-hidden="true">{owner.initials}</span>{owner.name}</span>
 							{:else}
 								<span class="muted">—</span>
@@ -229,6 +232,13 @@
 	}
 	.pill .pfx {
 		color: var(--sb-text-faint);
+	}
+	.team {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--muted-foreground);
+		white-space: nowrap;
 	}
 	.person {
 		display: inline-flex;

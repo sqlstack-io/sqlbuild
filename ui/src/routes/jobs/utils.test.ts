@@ -60,8 +60,12 @@ describe('ownerChip', () => {
 	});
 
 	it('takes the first two letters of a single-word name', () => {
-		expect(ownerChip('orders@example.com')).toMatchObject({ initials: 'OR', name: 'Orders' });
-		expect(ownerChip('inventory-team')).toMatchObject({ initials: 'IT', name: 'Inventory Team' });
+		expect(ownerChip('orders@example.com')).toMatchObject({ kind: 'person', initials: 'OR', name: 'Orders' });
+	});
+
+	it('shows an owner that is not an email as a team, without initials', () => {
+		expect(ownerChip('team:orders')).toMatchObject({ kind: 'team', initials: null, name: 'orders', full: 'team:orders' });
+		expect(ownerChip('inventory-team')).toMatchObject({ kind: 'team', initials: null, name: 'inventory-team' });
 	});
 
 	it('gives the same colour to the same person', () => {
