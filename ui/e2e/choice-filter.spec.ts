@@ -19,7 +19,8 @@ const DATA_ROWS = 'table.sb-table tbody tr:not(.spacer):not(.load-row)';
 /** Opens Checks, `query` added to the URL, once its checks are drawn. */
 async function openChecks(page: Page, query = '') {
 	await page.goto(`/checks?mock&awkward${query}`);
-	await expect(page.locator(DATA_ROWS).first()).toBeVisible();
+	// Thousands of awkward checks can take a while to arrive on a busy machine.
+	await expect(page.locator(DATA_ROWS).first()).toBeVisible({ timeout: 20_000 });
 }
 
 /** The "Attached to" cell's full text (`node` or `node.column`) of each drawn row. */

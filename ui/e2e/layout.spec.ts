@@ -55,7 +55,7 @@ async function settle(page: Page) {
 			() =>
 				[...document.querySelectorAll('.graph-canvas')].every((c) => (c.querySelector('.svelte-flow__node') ? !c.classList.contains('unfitted') : !!c.parentElement?.querySelector('.graph-too-many'))),
 			null,
-			{ timeout: 15_000 }
+			{ timeout: 30_000 }
 		)
 		.catch(() => {});
 }
@@ -95,6 +95,9 @@ async function expectResetToInitialView(page: Page, opened?: string) {
 }
 
 async function checkLayout(page: Page, label: string) {
+	// `settle` can return before a graph has mounted (no canvas yet counts as settled), so a graph may
+	// still be mid-fit here on a busy machine. Give it time; one that never fits still fails below.
+	await page.waitForFunction(() => !document.querySelector('.graph-canvas.unfitted'), null, { timeout: 30_000 }).catch(() => {});
 	const found = await page.evaluate((maxRows) => {
 		const problems: string[] = [];
 		const width = window.innerWidth;

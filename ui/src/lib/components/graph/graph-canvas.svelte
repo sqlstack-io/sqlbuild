@@ -1,6 +1,8 @@
 <script lang="ts">
 	import '@xyflow/svelte/dist/style.css';
-	import { Background, Controls, SvelteFlow, type Edge, type Node, type Viewport } from '@xyflow/svelte';
+	import { Controls, SvelteFlow, ViewportPortal, type Edge, type Node, type Viewport } from '@xyflow/svelte';
+	import { untrack } from 'svelte';
+	import { unzoom } from '$lib/lineage/hit-area';
 	import type { ComponentProps, Snippet } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
@@ -55,17 +57,81 @@
 	} = $props();
 	// Every graph's edges merge into a trunk before the card they enter, the library's curves included.
 	const allEdgeTypes = $derived({ bezier: CountEdge, count: CountEdge, ...edgeTypes });
+	// Panning and zooming change only the viewport's transform. Everything that depends on the zoom is
+	// worked out once the view settles (SETTLE_MS after the last move), so a gesture restyles and
+	// repaints nothing per step: while it moves the viewport is its own layer (`moving`), moved and
+	// scaled by the compositor, and redrawn sharp once when it settles.
+	const SETTLE_MS = 200;
+	let settledZoom = $state(1);
+	let moving = $state(false);
+	let settleTimer: ReturnType<typeof setTimeout> | undefined;
+	/** The view the background grid was last drawn for, in flow coordinates. */
+	let gridArea = $state({ x: 0, y: 0, width: 0, height: 0 });
+	const GRID = 64;
+	function settle() {
+		moving = false;
+		settledZoom = viewport.zoom;
+		// The grid covers the view and half a view around it, on the grid's own lines, so it is still
+		// there under a pan until the view settles again; it is redrawn only then.
+		const width = (element?.clientWidth ?? 0) / viewport.zoom;
+		const height = (element?.clientHeight ?? 0) / viewport.zoom;
+		const [left, top] = [-viewport.x / viewport.zoom, -viewport.y / viewport.zoom];
+		// Redrawn only when the view has come near the edge of what is drawn, or zoomed far out of it.
+		const g = gridArea;
+		const covered = left >= g.x && top >= g.y && left + width <= g.x + g.width && top + height <= g.y + g.height && g.width <= 4 * width + 2 * GRID;
+		if (covered) return;
+		const x = Math.floor((left - width / 2) / GRID) * GRID;
+		const y = Math.floor((top - height / 2) / GRID) * GRID;
+		gridArea = { x, y, width: 2 * width + 2 * GRID, height: 2 * height + 2 * GRID };
+	}
+	$effect(() => {
+		void viewport.x;
+		void viewport.y;
+		void viewport.zoom;
+		untrack(() => {
+			clearTimeout(settleTimer);
+			// Before the first fit shows the graph, settle at once, so it appears drawn for its zoom.
+			if (!fitted) return settle();
+			if (!moving) moving = true;
+			settleTimer = setTimeout(settle, SETTLE_MS);
+		});
+	});
+	$effect(() => () => clearTimeout(settleTimer));
+	// A drag that pans the graph isn't a click: the browser still sends one on release, over whatever
+	// card or box header the drag began on, which opened it at the end of a pan. A pointer that moved
+	// more than a few pixels while pressed swallows that click.
+	const DRAG_PX = 4;
+	let press: { x: number; y: number; dragged: boolean } | null = null;
+	function onpointerdown(event: PointerEvent) {
+		press = { x: event.clientX, y: event.clientY, dragged: false };
+	}
+	function onpointermove(event: PointerEvent) {
+		if (press && !press.dragged && event.buttons && Math.hypot(event.clientX - press.x, event.clientY - press.y) > DRAG_PX) press.dragged = true;
+	}
+	function onclick(event: MouseEvent) {
+		if (press?.dragged) {
+			event.stopPropagation();
+			event.preventDefault();
+		}
+		press = null;
+	}
 	// Semantic zoom: zoomed out past the point where titles would show under 11 px, cards show just their
-	// header, scaled back up so the title stays readable; the other lines keep their space, hidden, so
-	// cards keep their size and edges don't move.
-	const compact = $derived(compactAt(viewport.zoom));
-	const scale = $derived(titleScale(viewport.zoom));
+	// header, scaled back up by one variable on the canvas so the title stays readable; the other lines
+	// keep their space, hidden, so cards keep their size and edges don't move. Card controls grow with
+	// `--sb-unzoom` so they keep their size on screen.
+	const compact = $derived(compactAt(settledZoom));
+	// In 5% steps, rounded up so titles stay at 11 px or more, so a small change of zoom doesn't restyle every card.
+	const scale = $derived(Math.ceil(titleScale(settledZoom) * 20) / 20);
+	const controlScale = $derived(unzoom(settledZoom));
 </script>
 
-<div class="graph-canvas sb-flow" class:framed class:compact class:unfitted={!fitted && nodes.length > 0} style:--sb-title-scale={scale} bind:this={element}>
+<div class="graph-canvas sb-flow" class:framed class:compact class:moving class:unfitted={!fitted && nodes.length > 0} style:--sb-title-scale={scale} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
 	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
 		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
-		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
+		<!-- The dot grid lives in the viewport, so it moves and scales with the graph's layer. -->
+		<ViewportPortal target="back">
+			<div class="grid" style:transform="translate({gridArea.x}px, {gridArea.y}px)" style:width="{gridArea.width}px" style:height="{gridArea.height}px"></div>
+		</ViewportPortal>
 		{#if controls === 'fit'}<FitControls onfit={() => fit?.()} {showLock} />{:else if controls === 'full'}<Controls {showLock} />{/if}
 		{@render children?.()}
 	</SvelteFlow>
@@ -94,14 +160,30 @@
 		fill: var(--muted-foreground);
 	}
 	/* Compact cards: the header alone, scaled up over the hidden lines below it. */
-	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.head)),
-	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-member) .head :is(.kind, .open)) {
+	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.head)) {
 		visibility: hidden;
+	}
+	/* The header keeps its title and a folder's count; the rest gives its room to the title. The header
+	   stays one line, so the card keeps its size. */
+	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) .head :is(.kind, .open, .hit)) {
+		display: none;
 	}
 	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) .head) {
 		width: calc(100% / var(--sb-title-scale));
 		transform: scale(var(--sb-title-scale));
 		transform-origin: top left;
+	}
+	.moving :global(.svelte-flow__viewport) {
+		will-change: transform;
+	}
+	.grid {
+		position: absolute;
+		top: 0;
+		left: 0;
+		background-image: radial-gradient(circle, var(--sb-grid) 1.2px, transparent 1.6px);
+		background-position: 32px 32px;
+		background-size: 64px 64px;
+		pointer-events: none;
 	}
 	.unfitted :global(.svelte-flow__viewport),
 	.unfitted :global(.svelte-flow__controls) {
