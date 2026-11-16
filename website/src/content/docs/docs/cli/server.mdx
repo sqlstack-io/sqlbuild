@@ -384,7 +384,7 @@ overlap = "skip"
 schedule = { cron = "0 2 * * *", timezone = "UTC" }
 
 [retry]
-attempts = 2
+attempts = 3
 delay_seconds = 600
 ```
 
@@ -392,7 +392,7 @@ delay_seconds = 600
 | --- | --- | --- | --- |
 | `owner` | Any non-blank text | None | Shown on the job's page and in the job list |
 | `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
-| `retry` | `attempts` from 1 to 10, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, up to `attempts` more times, until it succeeds |
+| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or has run `attempts` times in all |
 
 A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
 creates no run. A sensor check lists the requests it skipped the same way.
@@ -420,8 +420,9 @@ Details:
 - Sensors and alerts see a member's final attempt only. The group run's timeline shows each retry,
   such as `orders_job failed, retrying in 15 min (attempt 2 of 3)`, the member's row shows its
   attempt, and the run's header counts the members it retried.
-- `[retry]` was called `[on_failure]`, with `retries` and `retry_delay_seconds`. The old names still
-  load, with a deprecation warning.
+- `[retry]` was called `[on_failure]`, with `retries` and `retry_delay_seconds`. `retries` counted
+  reruns, so `retries = 2` reads as `attempts = 3`. The old names still load, with a deprecation
+  warning.
 - An invalid value is a `D017` error at its line, such as
   ``orchestration/jobs/nightly_orders_job.toml:6:11: unknown variant `coalesce`, expected `queue` or `skip` ``.
 

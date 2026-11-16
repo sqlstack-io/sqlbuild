@@ -38,7 +38,9 @@ pub(crate) const WAIT_FOR_VALUES: [&str; 2] = ["job", "node"];
 /// The `[dependencies]` setting for a failed dependency, and its values.
 pub(crate) const DEPENDENCY_FAILURE_KEY: &str = "on_failure";
 pub(crate) const DEPENDENCY_FAILURE_VALUES: [&str; 3] = ["partial", "skip", "run"];
-/// The fewest and most reruns `retry.attempts` allows.
+/// The fewest and most runs `retry.attempts` allows, the first run included.
+pub const ATTEMPTS_RANGE: (u8, u8) = (2, 11);
+/// The fewest and most reruns the deprecated `on_failure.retries` allows; `attempts` is one more.
 pub const RETRIES_RANGE: (u8, u8) = (1, 10);
 /// The shortest and longest `retry.delay_seconds`, a day.
 pub const RETRY_DELAY_RANGE: (u32, u32) = (0, 86_400);

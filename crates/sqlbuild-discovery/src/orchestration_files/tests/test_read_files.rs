@@ -44,7 +44,7 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_exclude: Some("tag:slow"),
             expected_overlap: Overlap::Skip,
             expected_retry: Some(RetryPolicy {
-                attempts: 2,
+                attempts: 3,
                 delay_seconds: 0,
             }),
             expected_deprecations: vec![
@@ -106,7 +106,7 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_exclude: None,
             expected_overlap: Overlap::Queue,
             expected_retry: Some(RetryPolicy {
-                attempts: 1,
+                attempts: 2,
                 delay_seconds: 60,
             }),
             expected_deprecations: vec![
@@ -229,8 +229,15 @@ fn given_invalid_job_files_when_reading_then_reports_message_position_and_help()
         },
         FileErrorTestCase {
             description: "attempts out of range",
-            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\n[retry]\nattempts = 11\n",
-            expected_message: "retry attempts must be a whole number from 1 to 10",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\n[retry]\nattempts = 12\n",
+            expected_message: "retry attempts must be a whole number from 2 to 11",
+            expected_position: at(5, 12),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "a single attempt never retries",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\n[retry]\nattempts = 1\n",
+            expected_message: "retry attempts must be a whole number from 2 to 11",
             expected_position: at(5, 12),
             expected_help: None,
         },

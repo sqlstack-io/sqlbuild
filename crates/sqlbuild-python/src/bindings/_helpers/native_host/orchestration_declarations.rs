@@ -125,8 +125,9 @@ pub(crate) fn run_controls(run: &RunFile) -> RunControls {
             files::Overlap::Queue => Overlap::Queue,
             files::Overlap::Skip => Overlap::Skip,
         },
+        // The published policy counts reruns: every attempt after the first.
         on_failure: run.retry.map(|policy| OnFailure {
-            retries: policy.attempts,
+            retries: policy.attempts.saturating_sub(1),
             retry_delay_seconds: policy.delay_seconds,
         }),
     }

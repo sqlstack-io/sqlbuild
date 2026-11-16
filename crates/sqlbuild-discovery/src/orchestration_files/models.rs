@@ -27,7 +27,7 @@ pub enum InitialStatus {
     Paused,
 }
 
-/// A `[retry]` table: rerun from failure up to `attempts` times, `delay_seconds` apart.
+/// A `[retry]` table: run at most `attempts` times in all, each rerun from failure `delay_seconds` after the last.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RetryPolicy {
     pub attempts: u8,

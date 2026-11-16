@@ -68,7 +68,7 @@ concurrency_groups = ["warehouse_heavy"]
 schedule = { cron = "0 2 * * *", timezone = "Europe/London" }
 
 [retry]
-attempts = 2
+attempts = 3
 delay_seconds = 600
 
 [settings]
@@ -91,7 +91,7 @@ cpus = 2
 | `overlap` | No | `queue` (default) or `skip`; see [Skip overlapping runs](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
 | `concurrency_groups` | No | Server concurrency limits the job's runs share |
 | `schedule` | No | When the server starts the job; see below |
-| `[retry]` | No | `attempts` from 1 to 10, `delay_seconds` from 0 to 86400; see [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
+| `[retry]` | No | `attempts`, the most runs in all, from 2 to 11, and `delay_seconds` from 0 to 86400; see [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
 | `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh` or `changed` |
 | `[resources]` | No | Docker worker limits; see [Limit worker containers](../cli/server.md#limit-worker-containers) |
 
@@ -99,8 +99,8 @@ A job's `[settings]` cannot set `select` or `exclude`: the job's own selection i
 selection.
 
 `[retry]` was called `[on_failure]`, with `retries` and `retry_delay_seconds` for `attempts` and
-`delay_seconds`. The old names still load, and `sqb compile` prints a deprecation warning for each
-one a file uses.
+`delay_seconds`. `retries` counted reruns, so `retries = 2` reads as `attempts = 3`. The old names
+still load, and `sqb compile` prints a deprecation warning for each one a file uses.
 
 Select a pipeline by its folder or a tag rather than listing its nodes. Rule `SQBRORCHESTRATION101`
 reports a job or sensor `select` that names more than three nodes one by one; see

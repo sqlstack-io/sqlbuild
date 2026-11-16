@@ -659,7 +659,7 @@ export type RerunMode = 'all' | 'from_failure' | 'selected';
 
 /** What a schedule tick or sensor request does while a run of the job is active; people's runs always queue. */
 export type OverlapPolicy = 'queue' | 'skip';
-/** A job's `[retry]`: a failed or partial run reruns from failure up to `retries` (`attempts`) times, `retryDelaySeconds` (`delay_seconds`) after the last ended. */
+/** A job's `[retry]`: a failed or partial run reruns from failure up to `retries` times (`attempts` is one more, counting the first run), `retryDelaySeconds` (`delay_seconds`) after the last ended. */
 export type OnFailure = { retries: number; retryDelaySeconds: number };
 export type JobKind = 'job' | 'group';
 

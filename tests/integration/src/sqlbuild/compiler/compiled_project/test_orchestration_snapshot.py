@@ -961,7 +961,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         SnapshotRetryTestCase(
             description="current retry names",
             tables="[retry]\nattempts = 3\ndelay_seconds = 900\n",
-            expected_on_failure={"retries": 3, "retry_delay_seconds": 900},
+            expected_on_failure={"retries": 2, "retry_delay_seconds": 900},
             expected_warnings=(),
         ),
         SnapshotRetryTestCase(

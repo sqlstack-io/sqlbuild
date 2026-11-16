@@ -140,7 +140,7 @@
 						</td>
 					{/if}
 					<td class="num muted">{j.nodeCount}</td>
-					{#if showPolicy}<td class="muted nowrap" title={[j.overlap ? `overlap = ${j.overlap}: ${overlapHelp[j.overlap]}` : '', j.onFailure ? `[retry] attempts = ${j.onFailure.retries}, delay_seconds = ${j.onFailure.retryDelaySeconds}` : '', j.priority ? 'Higher priority runs go first when they wait for the same slot' : ''].filter(Boolean).join('\n') || undefined}>{jobPolicyText(j) || '—'}</td>{/if}
+					{#if showPolicy}<td class="muted nowrap" title={[j.overlap ? `overlap = ${j.overlap}: ${overlapHelp[j.overlap]}` : '', j.onFailure ? `[retry] attempts = ${j.onFailure.retries + 1}, delay_seconds = ${j.onFailure.retryDelaySeconds}` : '', j.priority ? 'Higher priority runs go first when they wait for the same slot' : ''].filter(Boolean).join('\n') || undefined}>{jobPolicyText(j) || '—'}</td>{/if}
 					<td>
 						{#if jobTriggers.length === 0}
 							<span class="muted" title="No schedule or sensor starts it; start it from its page">Only by hand</span>
