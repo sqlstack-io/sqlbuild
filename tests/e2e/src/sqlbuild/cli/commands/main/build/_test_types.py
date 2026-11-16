@@ -1646,6 +1646,16 @@ class PythonTargetConfigBuildE2ETestCase:
 
 
 @dataclass(frozen=True)
+class UnresolvedTargetSinkE2ETestCase:
+    """Test case for a sink provider under a target the project can't resolve."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_success: bool
+    expected_setups: list[object]
+
+
+@dataclass(frozen=True)
 class CtxTargetSchemaE2ETestCase:
     """Test case for commands under a target schema that resolves only inside a model."""
 

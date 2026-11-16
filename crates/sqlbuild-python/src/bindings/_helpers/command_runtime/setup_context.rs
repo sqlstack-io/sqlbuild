@@ -10,10 +10,11 @@ use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
 
-/// The settings of `target` (the default target when `None`) for the project at `project_dir`, as a provider setup context, such as for an event exporter or a sensor, or `None` when the project can't resolve them.
+/// The settings of `target` (the default target when `None`) for the project at `project_dir`, as a provider setup context, such as for an event exporter or a sensor. When the project can't resolve them, the error propagates if the target is `required`, and the context is `None` otherwise.
 pub(crate) fn project_setup_context<'py>(
     project_dir: &Bound<'py, PyAny>,
     (target, cli_vars): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    required: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project_dir.py();
     let resolved = || -> PyResult<Bound<'py, PyAny>> {
@@ -43,7 +44,9 @@ pub(crate) fn project_setup_context<'py>(
         .setup_context(py)
     };
     match resolved() {
-        Err(error) if error.is_instance_of::<PyException>(py) => Ok(py.None().into_bound(py)),
+        Err(error) if !required && error.is_instance_of::<PyException>(py) => {
+            Ok(py.None().into_bound(py))
+        }
         context => context,
     }
 }

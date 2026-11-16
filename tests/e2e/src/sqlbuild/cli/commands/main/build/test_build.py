@@ -24,6 +24,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     PythonTargetConfigBuildE2ETestCase,
     PythonTargetIsolationBuildE2ETestCase,
     SelectionAwareStalenessBuildE2ETestCase,
+    UnresolvedTargetSinkE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     assert_defer_clone_build_case,
@@ -1973,6 +1974,81 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
         "check",
     ]
     assert all(line == test_case.expected_settings for line in recorded), recorded
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UnresolvedTargetSinkE2ETestCase(
+            description="build fails before any sink provider is set up",
+            command=("build",),
+            expected_success=False,
+            expected_setups=[],
+        ),
+        UnresolvedTargetSinkE2ETestCase(
+            description="format needs no target and sets the provider up with None",
+            command=("format", "--check"),
+            expected_success=True,
+            expected_setups=[None],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_free_commands_run(
+    test_case: UnresolvedTargetSinkE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="unresolved_target_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "unresolved_target_project"\n'
+                'adapter = "duckdb"\n'
+                'default_target = "dev"\n\n'
+                "[targets.dev]\n"
+                'connection = "warehouse"\n'
+                'schema = "dev"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Test model orders.', materialized table);\n\n"
+                "SELECT 1 AS order_id\n"
+            ),
+            "providers/target_probe.py": (
+                "import json\n"
+                "from pathlib import Path\n"
+                "from sqlbuild.providers import Provider\n\n"
+                "class TargetProbe(Provider):\n"
+                '    """Test provider TargetProbe."""\n\n'
+                "    def setup(self, ctx):\n"
+                "        line = None if ctx is None else ctx.target_config.name\n"
+                "        with Path(__file__).parents[1].joinpath('setups.jsonl').open('a') as out:\n"
+                "            out.write(json.dumps(line) + '\\n')\n"
+            ),
+            "sinks/events.py": (
+                "from providers.target_probe import TargetProbe\n"
+                "from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink\n\n"
+                "@lifecycle_event_sink\n"
+                "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
+                "    del event, target_probe\n"
+            ),
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project_dir
+    )
+
+    assert (result.returncode == 0) == test_case.expected_success, result.stdout + result.stderr
+    if not test_case.expected_success:
+        assert "Unknown connection 'warehouse'" in result.stdout + result.stderr
+    setups_path: Path = project_dir / "setups.jsonl"
+    setups: list[object] = (
+        [json.loads(line) for line in setups_path.read_text(encoding="utf-8").splitlines()]
+        if setups_path.exists()
+        else []
+    )
+    assert setups == test_case.expected_setups
 
 
 @pytest.mark.parametrize(

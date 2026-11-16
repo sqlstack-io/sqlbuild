@@ -39,6 +39,8 @@ const DEBUG_COMMAND: &str = "debug";
 const LINEAGE_COMMAND: &str = "lineage";
 /// Compile's phase operations stay out of project lifecycle sinks; its invocation events do not.
 const COMPILE_COMMAND: &str = "compile";
+/// Commands whose own provider sessions get the target: their exporter and sink providers fail startup, rather than get `ctx` set to `None`, when the target can't be resolved.
+const TARGET_COMMANDS: [&str; 3] = ["build", "check", "load"];
 const COMPILE_WITHHELD_KINDS: &[&str] = &["operation"];
 const INVOCATION_COMPLETED: &str = "invocation_completed";
 const INVOCATION_FAILED: &str = "invocation_failed";
@@ -410,17 +412,28 @@ impl Observed {
                 self.exporter_scope = Some(scope.clone().unbind());
                 let providers: Bound<'_, PyAny> = native_field(&extensions, "providers")?;
                 let setup_context: Bound<'_, PyAny> = if providers.is_truthy()? {
-                    project_setup_context(
-                        project_dir,
-                        (
-                            &args
-                                .getattr("target")
-                                .unwrap_or_else(|_| py.None().into_bound(py)),
-                            &args
-                                .getattr("vars")
-                                .unwrap_or_else(|_| py.None().into_bound(py)),
-                        ),
-                    )?
+                    let command: Option<String> = native_field(args, "command")?.extract()?;
+                    let resolve = || {
+                        project_setup_context(
+                            project_dir,
+                            (
+                                &args
+                                    .getattr("target")
+                                    .unwrap_or_else(|_| py.None().into_bound(py)),
+                                &args
+                                    .getattr("vars")
+                                    .unwrap_or_else(|_| py.None().into_bound(py)),
+                            ),
+                            command
+                                .is_some_and(|command| TARGET_COMMANDS.contains(&command.as_str())),
+                        )
+                    };
+                    // Resolving the target imports project adapters, which must not write to JSON stdout.
+                    if machine_output_mode(args)? {
+                        within(&redirect_stdout_to_stderr(py)?, |_| resolve())?
+                    } else {
+                        resolve()?
+                    }
                 } else {
                     py.None().into_bound(py)
                 };

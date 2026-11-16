@@ -95,6 +95,7 @@ pub(crate) fn evaluate_sensor(
                 &evaluation.target.as_str().into_pyobject(py)?.into_any(),
                 &py.None().into_bound(py),
             ),
+            true,
         )?
     };
     let session = call_with(
