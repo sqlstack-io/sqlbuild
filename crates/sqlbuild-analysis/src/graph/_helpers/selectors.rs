@@ -1,6 +1,7 @@
 //! Python's planner selector grammar and resolution over the project graph.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use std::convert::Infallible;
 
 use crate::assembly::project::types::ObjectKey;
 use crate::graph::constants::{
@@ -17,6 +18,7 @@ use crate::graph::errors::SelectorError;
 use crate::graph::models::{
     BuildResources, EdgeDirection as Direction, ParsedSelector, ProjectGraph,
 };
+use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::text::main::close_matches::close_matches;
 use sqlbuild_core::text::main::glob_match::glob_match;
 
@@ -52,21 +54,27 @@ pub(crate) fn resolve(
         .collect())
 }
 
-/// Python's `expand_required_build_resources`: functions and seeds a selected scope needs.
+/// Python's `expand_required_build_resources`: functions and seeds a selected scope needs; one walk from every selected key reaches the union of their upstream closures.
 pub(crate) fn build_resources(
     graph: &ProjectGraph,
     selected: &Keys,
     include: BuildResources,
 ) -> Keys {
     let mut expanded: Keys = selected.clone();
-    for key in selected {
-        for upstream in graph.closure(key, Direction::Upstream) {
-            let wanted: bool = (include.upstream_functions && is_function(&upstream))
-                || (include.upstream_seeds && upstream.0 == SEED_RESOURCE);
-            if wanted {
-                expanded.insert(upstream);
-            }
-        }
+    if include.upstream_functions || include.upstream_seeds {
+        let mut reached: HashSet<&ObjectKey> = HashSet::new();
+        let Ok(()) = breadth_first_reach(selected, None, &mut reached, |current| {
+            Ok::<_, Infallible>(graph.edges(current, Direction::Upstream))
+        });
+        expanded.extend(
+            reached
+                .into_iter()
+                .filter(|upstream| {
+                    (include.upstream_functions && is_function(upstream))
+                        || (include.upstream_seeds && upstream.0 == SEED_RESOURCE)
+                })
+                .cloned(),
+        );
     }
     if include.downstream_functions {
         for key in selected.iter().filter(|key| key.0 == MODEL_RESOURCE) {
