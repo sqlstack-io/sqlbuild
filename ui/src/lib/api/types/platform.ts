@@ -235,6 +235,8 @@ export type WarehouseTableSync = {
 	elapsedMs: number;
 	/** What the newest sync was doing when it failed, or what it is waiting for; null when it succeeded. */
 	failure: string | null;
+	/** The warehouse error of the newest sync's failed read, redacted. */
+	error: string | null;
 	/** The newest sync is waiting for a build that holds the warehouse file, which is not a failure. */
 	waiting: boolean;
 	/** The newest sync of the table that succeeded. */

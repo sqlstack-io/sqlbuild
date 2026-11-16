@@ -1914,7 +1914,7 @@ export interface components {
             name: string;
             target: string;
         };
-        /** @description Locations report bounded facts, never connection strings or user exception text. */
+        /** @description Locations report bounded facts, never connection strings; a failed warehouse read carries only its redacted error text. */
         LocationHealth: {
             /** @enum {string} */
             kind: "heartbeat";
@@ -1939,6 +1939,8 @@ export interface components {
         } | {
             /** Format: int64 */
             elapsed_millis: number;
+            /** @description A failed read's warehouse error, redacted and bounded; absent otherwise. */
+            error?: string | null;
             failure?: null | components["schemas"]["WarehouseSyncFailure"];
             /** Format: int64 */
             generation: number;
@@ -3587,7 +3589,7 @@ export interface components {
             session_id: string;
         };
         /**
-         * @description Closed failure stages keep warehouse errors and credentials out of health observations.
+         * @description The stage a warehouse sync failed at; only a failed read also reports its redacted error.
          * @enum {string}
          */
         WarehouseSyncFailure: "watermark" | "read" | "delivery" | "busy";

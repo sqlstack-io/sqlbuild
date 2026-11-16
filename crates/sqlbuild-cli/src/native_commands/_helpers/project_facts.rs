@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use sqlbuild_config::models::ConfigValue;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::models::{Built, ConfigPaths};
@@ -67,4 +68,25 @@ pub(crate) fn development_target(
         .ok_or_else(|| {
             ControlError::Invalid("sqb dev requires --target or a configured default target".into())
         })
+}
+
+/// The project's configured name, or its directory's name when the configuration has none.
+pub(crate) fn project_name(project_dir: &Path) -> String {
+    let paths = project_config_paths(project_dir);
+    let configured: Option<String> = match load_project_config(&paths) {
+        Ok(config) => match object_field(&config, "name") {
+            Some(Built::Value(ConfigValue::String(name))) => Some(name.clone()),
+            _ => None,
+        },
+        Err(_) => None,
+    };
+    configured.unwrap_or_else(|| project_directory_name(project_dir))
+}
+
+/// The last component of the project directory.
+pub(crate) fn project_directory_name(project_dir: &Path) -> String {
+    project_dir
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
