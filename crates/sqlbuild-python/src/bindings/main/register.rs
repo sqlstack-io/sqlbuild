@@ -1,6 +1,6 @@
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::pymodule;
-use sqlbuild_rules::constants::{API_VERSION, NATIVE_BUILD_IDENTITY};
+use sqlbuild_rules::constants::API_VERSION;
 
 use crate::bindings::_helpers::{
     analysis, analysis_session, attachments, auditing, authored_values, cache, cli,
@@ -45,7 +45,6 @@ pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     register_project_stages(module)?;
     register_analysis_stages(module)?;
     module.add("API_VERSION", API_VERSION)?;
-    module.add("BUILD_IDENTITY", NATIVE_BUILD_IDENTITY)?;
     verify_attributes(module)
 }
 

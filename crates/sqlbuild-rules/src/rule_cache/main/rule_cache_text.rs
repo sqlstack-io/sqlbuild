@@ -1,8 +1,8 @@
 //! `rule_cache_text`: the stored form of the SQL rule cache.
 
+use crate::build_identity::main::native_build_identity::native_build_identity;
 use serde_json::{Map, Value, json};
 
-use crate::constants::NATIVE_BUILD_IDENTITY;
 use crate::rule_cache::constants::{
     BUILD_IDENTITY_KEY, CACHE_VERSION, ENTRIES_KEY, FINDINGS_KEY, IDENTITY_KEY, VERSION_KEY,
 };
@@ -20,7 +20,7 @@ pub fn rule_cache_text(entries: &CachedEntries) -> String {
         .collect();
     json!({
         VERSION_KEY: CACHE_VERSION,
-        BUILD_IDENTITY_KEY: NATIVE_BUILD_IDENTITY,
+        BUILD_IDENTITY_KEY: native_build_identity(),
         ENTRIES_KEY: stored,
     })
     .to_string()

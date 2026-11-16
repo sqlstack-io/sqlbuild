@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::python_rules::tests::helpers::{owned_faults, python_rule_faults};
@@ -6,6 +7,7 @@ use crate::python_rules::tests::test_types::{PythonParseFailureTestCase, PythonR
 #[test]
 fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings_in_sqlbuild_terms()
 {
+    install_test_identity();
     let test_cases = [
         PythonRunTestCase {
             description: "a file outside python/ reports at a character column after non-ASCII text",
@@ -235,6 +237,7 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
 
 #[test]
 fn given_python_the_parser_rejects_when_evaluating_python_rules_then_the_run_fails_at_the_file() {
+    install_test_identity();
     let test_cases = [PythonParseFailureTestCase {
         description: "a parameter list cut short",
         files: &[("python/orders/main/bad.py", "def broken(:\n")],

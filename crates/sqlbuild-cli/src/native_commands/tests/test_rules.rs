@@ -1,3 +1,4 @@
+use crate::launcher::main::install_native_build_identity::install_native_build_identity;
 use crate::native_commands::_helpers::rules::run_rules;
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{RulesAction, RulesOptions};
@@ -9,6 +10,7 @@ const OPTIONS_PROJECT: &str = "name = \"shop\"\nadapter = \"duckdb\"\n\n[rules.r
 
 #[test]
 fn given_project_when_inspecting_rules_then_builtin_catalogue_prints_unless_python_owns_it() {
+    install_native_build_identity().expect("the build identity installs once");
     let test_cases = [
         RulesTestCase {
             description: "list prints code and message lines",

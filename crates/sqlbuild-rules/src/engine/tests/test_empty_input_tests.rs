@@ -1,4 +1,5 @@
 use crate::engine::tests::{helpers, test_types};
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 use tempfile::TempDir;
 
@@ -20,6 +21,7 @@ const FLAGGED_MESSAGE: &str = "SQBRTEST203 tests/unit/test_orders__empty_inputs_
 #[test]
 fn given_sql_test_shapes_when_evaluating_empty_input_rule_then_flags_only_filler_tests()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [
         test_types::EmptyInputTestRuleTestCase {
@@ -320,6 +322,7 @@ fn given_sql_test_shapes_when_evaluating_empty_input_rule_then_flags_only_filler
 #[test]
 fn given_empty_input_only_tests_when_evaluating_minimum_tests_then_they_do_not_count()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let real_test = helpers::empty_input_test_fact(
         "orders__doubles_amounts",
@@ -376,6 +379,7 @@ fn given_empty_input_only_tests_when_evaluating_minimum_tests_then_they_do_not_c
 #[test]
 fn given_cached_minimum_tests_when_filler_becomes_real_test_then_model_cache_is_invalidated()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let real_test = helpers::empty_input_test_fact(
         "orders__empty_inputs_produce_no_rows",
@@ -422,6 +426,7 @@ fn given_cached_minimum_tests_when_filler_becomes_real_test_then_model_cache_is_
 #[test]
 fn given_sql_server_conversions_when_evaluating_empty_input_rule_then_reports_the_dialect_unavailable()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let empty_orders = (
         "__source__raw_orders",

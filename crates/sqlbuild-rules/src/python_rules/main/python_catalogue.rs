@@ -1,6 +1,6 @@
 //! The Python rules as catalogue entries.
 
-use crate::constants::NATIVE_BUILD_IDENTITY;
+use crate::build_identity::main::native_build_identity::native_build_identity;
 use crate::models::{RuleMetadata, RuleScope};
 use crate::python_rules::constants::PYTHON_RULES;
 use crate::python_rules::models::PythonRuleSpec;
@@ -19,7 +19,7 @@ fn metadata(rule: &PythonRuleSpec) -> RuleMetadata {
         message: rule.message.into(),
         remediation: rule.remediation.into(),
         guidance: None,
-        implementation_fingerprint: NATIVE_BUILD_IDENTITY.into(),
+        implementation_fingerprint: native_build_identity().into(),
         enabled_by_default: rule.enabled_by_default,
         project_wide: true,
         custom: false,

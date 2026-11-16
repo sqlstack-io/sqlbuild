@@ -4248,6 +4248,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlbuild-build-identity"
+version = "0.0.0"
+dependencies = [
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "sqlbuild-cache"
 version = "0.0.0"
 dependencies = [
@@ -4262,7 +4269,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.232.1"
+version = "0.233.0"
 dependencies = [
  "blake3",
  "chrono",
@@ -4278,6 +4285,7 @@ dependencies = [
  "serde_json",
  "sqlbuild-analysis",
  "sqlbuild-build-features",
+ "sqlbuild-build-identity",
  "sqlbuild-cache",
  "sqlbuild-config",
  "sqlbuild-core",
@@ -4425,7 +4433,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.232.1"
+version = "0.233.0"
 dependencies = [
  "chrono",
  "chrono-tz",
