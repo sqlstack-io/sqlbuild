@@ -11900,6 +11900,25 @@ class TargetDiffConfig(NativeRecord):
         max_full_rows: int | Literal["unlimited"] | None = ...,
     ) -> None: ...
 
+class TargetSettings(NativeRecord):
+    """The active target's database and schemas, resolved as SQLBuild uses them."""
+
+    name: str | None
+    database: str | None
+    schema: str | None
+    loader_schema: str | None
+    database_preserved: bool
+    schema_preserved: bool
+    def __init__(
+        self,
+        name: str | None = ...,
+        database: str | None = ...,
+        schema: str | None = ...,
+        loader_schema: str | None = ...,
+        database_preserved: bool = ...,
+        schema_preserved: bool = ...,
+    ) -> None: ...
+
 class TargetWarehousesConfig(NativeRecord):
     """Optional per-command-group default warehouses for one target."""
 

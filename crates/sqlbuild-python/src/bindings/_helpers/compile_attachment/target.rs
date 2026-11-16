@@ -13,8 +13,8 @@ use crate::bindings::_helpers::frontier::constants::{
 };
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::compile_attachment::main::project_vars::project_vars;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
@@ -23,6 +23,8 @@ use sqlbuild_python_front::model_config::main::config::run_id::run_id;
 
 const DATABASE_KEY: &str = "database";
 const SCHEMA_KEY: &str = "schema";
+/// Adapters whose database is a file, so a connection `database` is not a target location.
+pub(crate) const NAMESPACELESS_ADAPTERS: [&str; 2] = ["duckdb", "motherduck"];
 
 /// The selected target's name and merged config, or `(None, None)`.
 pub(crate) fn resolved_target<'py>(
@@ -150,35 +152,20 @@ pub(crate) fn connection_is_default_target(discovered: &Bound<'_, PyAny>) -> PyR
     Ok(true)
 }
 
-/// Resolve the target and its effective database/schema without compiling resources.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn build_effective_target_namespace<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
+/// The selected target's name, record, database and schema, resolved from `connection` and the adapter's defaults without compiling resources.
+pub(crate) fn effective_target_namespace<'py>(
+    (discovered_inputs, selected_target): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (adapter_name, connection, adapter): (&str, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "build_effective_target_namespace",
-        options,
-        (
-            &[
-                "discovered_inputs",
-                "selected_target",
-                "connection_database",
-                "connection_schema",
-                "default_database",
-                "default_schema",
-            ],
-            &[],
-        ),
-    )?;
-    let discovered_inputs: &Bound<'py, PyAny> = &arguments.value("discovered_inputs")?;
-    let selected_target: &Bound<'py, PyAny> = &arguments.value("selected_target")?;
-    let connection_database: Bound<'py, PyAny> = arguments.value("connection_database")?;
-    let connection_schema: Bound<'py, PyAny> = arguments.value("connection_schema")?;
-    let default_database: Bound<'py, PyAny> = arguments.value("default_database")?;
-    let default_schema: Bound<'py, PyAny> = arguments.value("default_schema")?;
+    let py: Python<'py> = adapter.py();
+    let connection_database: Bound<'py, PyAny> = if NAMESPACELESS_ADAPTERS.contains(&adapter_name) {
+        py.None().into_bound(py)
+    } else {
+        mapping_get(connection, DATABASE_KEY)?
+    };
+    let connection_schema: Bound<'py, PyAny> = mapping_get(connection, SCHEMA_KEY)?;
+    let default_database: Bound<'py, PyAny> = adapter.call_method0("default_database")?;
+    let default_schema: Bound<'py, PyAny> = adapter.call_method0("default_schema")?;
     let (target_name, target_config) = resolved_target(discovered_inputs, selected_target)?;
     let effective_vars: Bound<'py, PyAny> = project_vars(discovered_inputs, &target_config)?;
     let target_value = |key: &str| -> PyResult<Bound<'py, PyAny>> {

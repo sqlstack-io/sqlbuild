@@ -18,6 +18,7 @@ from sqlbuild._native import (
     SnapshotsConfig,
     SourceLoadPlanEntry,
     SqlTestPlanEntry,
+    TargetSettings,
 )
 from sqlbuild.adapter.contract.models import LifeCycleEvent, RelationInfo
 from sqlbuild.adapter.contract.types import TablePromotionMode
@@ -78,6 +79,7 @@ class BuildRuntimeParams:
     start_cursor_int: int | None = None
     end_cursor_int: int | None = None
     target: str = ""
+    target_config: TargetSettings | None = None
     effective_vars: dict[str, object] | None = None
     use_color: bool = False
     providers: ProviderContainer | None = None

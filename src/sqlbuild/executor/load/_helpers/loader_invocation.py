@@ -94,6 +94,7 @@ def build_loader_context(
         run_id=runtime.run_id,
         runtime_dir=runtime.runtime_dir,
         target=runtime.target,
+        target_config=runtime.target_config,
         vars=runtime.vars,
         is_reload=runtime.is_reload,
         use_color=runtime.use_color,

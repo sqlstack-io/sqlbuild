@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from sqlbuild._native import TargetSettings
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
@@ -134,6 +135,7 @@ class PythonNodeRuntime:
     target: str | None
     vars: dict[str, object]
     is_reload: bool
+    target_config: TargetSettings | None = None
     default_database: str | None = None
     default_schema: str | None = None
     relation_targets: dict[SqlResourceRef, str] | None = None
@@ -178,6 +180,7 @@ class BasePythonNodeContext(DependencyResultReader):
     statement_recorder: StatementRecorder
     run_state: PythonNodeRunState | None = None
     result_store: Any | None = None
+    target_config: TargetSettings | None = None
     default_database: str | None = None
     default_schema: str | None = None
     relation_targets: dict[SqlResourceRef, str] = field(default_factory=dict)
