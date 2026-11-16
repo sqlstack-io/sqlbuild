@@ -17,7 +17,7 @@ export function nodeHref(change: NodeChange, catalogDetail: boolean): string | n
 	if (change.op === 'removed') return null;
 	if (catalogDetail) return `/catalog/${change.key}${change.op === 'changed' ? '?tab=drift' : ''}`;
 	const graphNode = change.kind !== null || change.key.startsWith('model:') || !change.key.includes(':');
-	return graphNode ? `/lineage?select=${encodeURIComponent(change.key)}` : null;
+	return graphNode ? `/lineage?focus=${encodeURIComponent(change.key)}` : null;
 }
 
 /** A commit hash as its first 7 characters; anything that isn't a full-length hash, such as a tag, as it is. */

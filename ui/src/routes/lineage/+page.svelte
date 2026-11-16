@@ -2,7 +2,10 @@
 	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
 	import GraphToolbar from '$lib/components/graph/graph-toolbar.svelte';
 	import { countBy } from '$lib/list/count-by';
-	import { matchesAny } from '$lib/list/choice';
+	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
+	import { createSelection } from '$lib/state/selection.svelte';
+	import { readSelectionParams } from '$lib/selection/command';
+	import { isKnownType } from '$lib/selection/syntax';
 	import { plural } from '$lib/format/plural';
 	import Loading from '$lib/components/loading.svelte';
 	import PlayIcon from '@lucide/svelte/icons/play';
@@ -22,7 +25,6 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
 	import PanelLeftIcon from '@lucide/svelte/icons/panel-left';
-	import SearchIcon from '@lucide/svelte/icons/search';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { layoutGraph } from '$lib/lineage/layout';
 	import { nodeFields } from '$lib/lineage/node-fields.svelte';
@@ -58,7 +60,7 @@
 	import { catalogNodes as sharedCatalog, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
+	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
 	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
 	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
@@ -69,7 +71,6 @@
 	const details = createDetailsPanel('lineage', () => selectedNodes.length > 0);
 	const inspectorOpen = $derived(details.open);
 	let neighbourhoodOnly = $state(false);
-	let modelQuery = $state('');
 
 	const nodeTypes = { asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode, stub: StubNode };
 	const edgeTypes = { count: CountEdge };
@@ -81,7 +82,15 @@
 	// selection and focus survive.
 	const catalog = useCatalogNodes();
 	const catalogByKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
-	const initialFocus = page.url.searchParams.get('select');
+	// `?focus=key` opens on one node. Older links put the node's key in `select`: a key such as
+	// `model:orders` is no selector, so it is read as the focus rather than as a selection.
+	const linked = readSelectionParams(page.url.searchParams);
+	const legacyFocus = /^[a-z_]+:\S+$/.test(linked.select) && !isKnownType(linked.select.slice(0, linked.select.indexOf(':'))) ? linked.select : null;
+	const initialFocus = page.url.searchParams.get('focus') ?? legacyFocus ?? (/^[^\s,~+*:/]+$/.test(linked.select) ? linked.select : null);
+	// The selection bar: what `sqb build -s … --exclude …` selects; the rest of the graph is dimmed.
+	const selection = createSelection({ url: true, initial: legacyFocus ? { ...linked, select: '' } : linked });
+	/** Node names for the selection bar, as a bare name selects them, with their folder. */
+	const selectionNames = $derived((catalog.data ?? []).map((n) => ({ value: shortName(n.key), hint: folderOf(n) })));
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
 	// The first graph is built a frame after the listing arrives, so the page and its loading state
@@ -273,7 +282,6 @@
 	}
 	function pickFolders() {
 		browserOpen = true;
-		modelQuery = '';
 		pickHighlight = true;
 	}
 
@@ -469,20 +477,16 @@
 
 	// ---- toolbar filters: non-matching nodes are dimmed ----
 	type StatusFilter = 'stale' | 'changed' | 'behind' | 'failed';
-	let kindFilter = $state<string[]>([]);
-	let groupFilter = $state<string[]>([]);
+	// Kind and folder are part of the selection (`kind:`, `path:`); Status only changes the view.
 	let statusFilter = $state<StatusFilter[]>([]);
-	const kindSet = $derived(new Set(kindFilter));
-	const groupSet = $derived(new Set(groupFilter));
-	const filterActive = $derived(!!(kindFilter.length || groupFilter.length || statusFilter.length));
+	const filterActive = $derived(!!(statusFilter.length || selection.active));
 	function matchesFilter(n: Node): boolean {
 		if (n.type === 'folder') return catalogNodes.some((c) => `${folderOf(c)}/`.startsWith(`${n.data.group}/`) && matchesCatalog(c));
 		const c = catalogByKey.get(n.id);
 		return c ? matchesCatalog(c) : !filterActive;
 	}
 	function matchesCatalog(c: CatalogNode): boolean {
-		if (!matchesAny(kindSet, c.kind)) return false;
-		if (!matchesAny(groupSet, c.group)) return false;
+		if (!selection.has(c.key)) return false;
 		return !statusFilter.length || statusFilter.some((f) => matchesFilterStatus(c, f));
 	}
 	function matchesFilterStatus(c: CatalogNode, f: StatusFilter): boolean {
@@ -507,11 +511,6 @@
 	});
 	/** Whether a tree folder is drawn because a folder around it is selected. */
 	const inSelectedFolder = (folder: string) => selectedFolders.some((s) => folder.startsWith(`${s}/`));
-	// Option counts in one pass each: the group options grow with the project.
-	const byKind = $derived(countBy(catalogNodes, (n) => n.kind));
-	const byGroup = $derived(countBy(catalogNodes, (n) => n.group));
-	const kindOptions = $derived(NODE_KINDS.filter((k) => byKind.has(k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: byKind.get(k) ?? 0 })));
-	const groupOptions = $derived([...byGroup].map(([g, count]) => ({ value: g, label: g, count })));
 	const statusOptions: { value: StatusFilter; label: string }[] = [
 		{ value: 'stale', label: 'Stale' },
 		{ value: 'changed', label: 'Stale · changed' },
@@ -526,8 +525,7 @@
 			pickedNodes.length ? plural(pickedNodes.length, 'picked node') : '',
 			!pickedNodes.length && selectedFolders.length ? `Folders: ${selectedFolders.join(', ')}` : '',
 			staleOnly ? 'Only nodes out of date' : '',
-			kindFilter.length ? `Kind: ${kindFilter.map((k) => nodeKindPlural[k as keyof typeof nodeKindPlural] ?? k).join(', ')} (others dimmed)` : '',
-			groupFilter.length ? `Group: ${groupFilter.join(', ')} (others dimmed)` : '',
+			selection.active ? `Selection: ${selection.select || 'every node'}${selection.exclude ? ` except ${selection.exclude}` : ''} (others dimmed)` : '',
 			statusFilter.length ? `Status: ${statusFilter.map((f) => statusOptions.find((o) => o.value === f)?.label ?? f).join(', ')} (others dimmed)` : ''
 		].filter(Boolean)
 	);
@@ -536,12 +534,12 @@
 	const listNodes = $derived<Pick<Node, 'id' | 'data'>[]>(scaleMode ? nodes : catalogNodes.map((n) => ({ id: n.key, data: cardData(n) })));
 	const browserNodes = $derived(
 		[...listNodes]
-			.filter((node) => String(node.data.name ?? '').toLowerCase().includes(modelQuery.trim().toLowerCase()))
+			.filter((node) => selection.has(node.id))
 			.sort((left, right) => String(left.data.name).localeCompare(String(right.data.name)))
 	);
 
-	// The side list is the folder tree, opened and closed together with the graph's folders; a search
-	// lists matches flat, up to a limit, as a project can hold thousands of nodes.
+	// The side list is the folder tree, opened and closed together with the graph's folders; with a
+	// selection it lists the selected nodes flat, up to a limit, as a project can hold thousands.
 	const LIST_LIMIT = 500;
 	type BrowserRow =
 		| { type: 'folder'; id: string; label: string; depth: number; count: number; open: boolean }
@@ -558,7 +556,7 @@
 		return counts;
 	});
 	const browserRows = $derived.by<BrowserRow[]>(() => {
-		if (scaleMode || modelQuery.trim()) return browserNodes.slice(0, LIST_LIMIT).map((node) => ({ type: 'node' as const, id: node.id, depth: 0, node }));
+		if (scaleMode || selection.active) return browserNodes.slice(0, LIST_LIMIT).map((node) => ({ type: 'node' as const, id: node.id, depth: 0, node }));
 		const rows: BrowserRow[] = [];
 		const visit = (id: string, depth: number) => {
 			const f = tree.folders.get(id)!;
@@ -836,6 +834,14 @@
 <!-- filter toolbar -->
 <div class="lineage-page">
 	<section class="lineage-workbench">
+<SelectionBar {selection} names={selectionNames} total={catalogNodes.length}>
+	{#snippet leading()}
+		<Button variant="ghost" size="icon-bar" aria-pressed={browserOpen} onclick={() => (browserOpen = !browserOpen)} title={browserOpen ? 'Hide model list' : 'Show model list'} aria-label="Toggle model list"><PanelLeftIcon /></Button>
+	{/snippet}
+	{#snippet view()}
+		{#if !scaleMode}<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />{/if}
+	{/snippet}
+</SelectionBar>
 <GraphToolbar
 	folders={scaleMode ? undefined : { on: grouped, toggle: () => regroup({ grouped: !grouped, expanded: new Set(), fit: true }) }}
 	expand={!scaleMode && grouped && !tooMany
@@ -845,36 +851,6 @@
 	onreset={resetLayout}
 	details={{ open: inspectorOpen, toggle: details.toggle }}
 >
-	{#snippet start()}
-		<Button variant="ghost" size="icon-bar" aria-pressed={browserOpen} onclick={() => (browserOpen = !browserOpen)} title={browserOpen ? 'Hide model list' : 'Show model list'} aria-label="Toggle model list"><PanelLeftIcon /></Button>
-		<div class="search-wrap">
-			<label class="model-search">
-				<SearchIcon size={14} />
-				<input bind:value={modelQuery} placeholder="Search models" />
-			</label>
-			{#if modelQuery.trim() && !browserOpen}
-				<div class="search-results">
-					{#each browserNodes.slice(0, 8) as node (node.id)}
-						<!-- raw-button: a result in the search's dropdown list -->
-						<button onclick={() => { selectModel(node.id); modelQuery = ''; }}>
-							<i class="browser-status {String(node.data.status)}"></i>
-							<span title={String(node.data.name)}>{node.data.label ?? node.data.name}</span>
-							<small>{String(node.data.kind).split(' · ')[0]}</small>
-						</button>
-					{:else}
-						<div class="browser-empty">No matching models</div>
-					{/each}
-				</div>
-			{/if}
-		</div>
-		{#if !scaleMode}
-			<div class="toolbar-group">
-				<ChoiceFilter multiple label="Kind" bind:values={kindFilter} options={kindOptions} />
-				{#if groupOptions.length}<ChoiceFilter multiple label="Group" bind:values={groupFilter} options={groupOptions} />{/if}
-				<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />
-			</div>
-		{/if}
-	{/snippet}
 	{#snippet middle()}
 		{#if !scaleMode}
 			{#if selectionLabel}
@@ -929,8 +905,8 @@
 					{/if}
 				{/each}
 				{#if browserNodes.length === 0}
-					<div class="browser-empty">No models match “{modelQuery}”.</div>
-				{:else if modelQuery.trim() && browserNodes.length > LIST_LIMIT}
+					<div class="browser-empty">{selection.active ? 'No nodes in the selection.' : 'No nodes.'}</div>
+				{:else if selection.active && browserNodes.length > LIST_LIMIT}
 					<div class="browser-empty">First {LIST_LIMIT} of {browserNodes.length} matches</div>
 				{/if}
 			</div>
@@ -1233,30 +1209,6 @@
 		flex: 1;
 		overflow: hidden;
 	}
-	.model-search {
-		display: flex;
-		width: 230px;
-		height: 31px;
-		align-items: center;
-		gap: 7px;
-		padding: 0 10px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--background);
-		color: var(--sb-text-faint);
-	}
-	.model-search input {
-		min-width: 0;
-		flex: 1;
-		border: 0;
-		outline: 0;
-		background: transparent;
-		color: var(--foreground);
-		font-size: 12px;
-	}
-	.model-search input::placeholder {
-		color: var(--sb-text-faint);
-	}
 	.panel-toggle {
 		display: flex;
 		height: 31px;
@@ -1455,56 +1407,6 @@
 		--sb-edge: color-mix(in srgb, var(--foreground) 30%, transparent);
 		--sb-edge-dim: color-mix(in srgb, var(--foreground) 9%, transparent);
 		font-family: var(--font-sans);
-	}
-	.search-wrap {
-		position: relative;
-		margin: 0 6px 0 2px;
-	}
-	.model-search {
-		width: 260px;
-		height: 30px;
-		border-radius: 2px;
-		background: var(--background);
-	}
-	.model-search input {
-		font-size: 12.5px;
-	}
-	.search-results {
-		position: absolute;
-		z-index: 40;
-		top: calc(100% + 4px);
-		left: 0;
-		width: 320px;
-		padding: 4px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--popover, var(--card));
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-	}
-	.search-results button {
-		display: flex;
-		width: 100%;
-		align-items: center;
-		gap: 8px;
-		padding: 6px 8px;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--foreground);
-		font-size: 12.5px;
-		text-align: left;
-	}
-	.search-results button:hover {
-		background: var(--sb-hover);
-	}
-	.search-results small {
-		margin-left: auto;
-		color: var(--sb-text-faint);
-		font-size: 11px;
-	}
-	.toolbar-group {
-		display: flex;
-		gap: 2px;
 	}
 	/* Toolbar buttons match the top bar's: 30 px high, 13 px medium text, 14 px icons. */
 	.toolbar-filter {
@@ -1995,10 +1897,5 @@
 		color: var(--primary);
 		font-style: normal;
 		white-space: nowrap;
-	}
-	@media (max-width: 1450px) {
-		.model-search {
-			width: 200px;
-		}
 	}
 </style>

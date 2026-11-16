@@ -60,10 +60,10 @@ export type SelectionState = ReturnType<typeof createSelection>;
 
 /**
  * A selection bar's state. Must be created during component initialisation. With `url`, the
- * selection starts from and is kept in the page's `?select=…&exclude=…`.
+ * selection starts from (unless `initial` is given) and is kept in the page's `?select=…&exclude=…`.
  */
-export function createSelection(options: { url?: boolean } = {}) {
-	const start = options.url ? readSelectionParams(page.url.searchParams) : { select: '', exclude: '' };
+export function createSelection(options: { url?: boolean; initial?: Selection } = {}) {
+	const start = options.initial ?? (options.url ? readSelectionParams(page.url.searchParams) : { select: '', exclude: '' });
 	let select = $state(start.select);
 	let exclude = $state(start.exclude);
 	let evaluation = $state.raw<SelectionEvaluation | null>(null);
