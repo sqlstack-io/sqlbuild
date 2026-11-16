@@ -126,7 +126,7 @@
 </script>
 
 <div class="graph-canvas sb-flow" class:framed class:compact class:far class:moving class:unfitted={!fitted && nodes.length > 0} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
-	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
+	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} elevateEdgesOnSelect={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
 		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
 		<!-- The dot grid lives in the viewport, so it moves and scales with the graph's layer. -->
 		<ViewportPortal target="back">
@@ -162,6 +162,21 @@
 	/* Compact cards: the card's lines keep their room, hidden, under its compact face. */
 	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.cface)) {
 		visibility: hidden;
+	}
+	/* Edges, plain, highlighted or selected, are drawn beneath every card, so they never take a card's
+	   click. The library raises edges from inside an open box to the box's contents' level, above the
+	   cards outside it; cards are put above every edge (and selected nodes are raised by at most about
+	   1000 per level of boxes). Open boxes (`parent`) keep the library's order, beneath the edges inside
+	   them. An edge is hit only on its stroke. */
+	.graph-canvas :global(.svelte-flow__node:not(.parent)) {
+		z-index: 100000 !important;
+	}
+	.graph-canvas :global(.svelte-flow__edges svg) {
+		pointer-events: none;
+	}
+	.graph-canvas :global(.svelte-flow__edge),
+	.graph-canvas :global(.svelte-flow__edge path) {
+		pointer-events: visibleStroke;
 	}
 	.moving :global(.svelte-flow__viewport) {
 		will-change: transform;
