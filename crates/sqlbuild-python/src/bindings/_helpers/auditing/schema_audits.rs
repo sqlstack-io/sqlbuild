@@ -9,12 +9,13 @@ use sqlbuild_model_config::errors::{ConfigError, ErrorClass};
 use sqlbuild_model_config::header_metadata::main::parse_audit_list::parse_audit_list;
 use sqlbuild_model_config::header_metadata::models::ParsedAudit;
 
-use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
-use crate::bindings::_helpers::model_config::contract_classes::contract_classes;
-use crate::bindings::_helpers::model_config::header_metadata::{ContractClasses, audit_tuple};
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::model_config::main::headers::audit_tuple::audit_tuple;
+use sqlbuild_python_front::model_config::main::model_nodes::contract_classes::contract_classes;
+use sqlbuild_python_front::model_config::models::ContractClasses;
+use sqlbuild_python_front::model_config::models::PyNode;
 
 /// A resource identity error as `ResourceIdentityError`, anything else as `fallback_class(message)`.
 fn raised(

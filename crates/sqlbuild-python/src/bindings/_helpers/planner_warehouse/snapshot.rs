@@ -8,7 +8,6 @@ use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::fingerprints::latest_rows::select_latest_fingerprints;
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
-use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
 use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
 use crate::bindings::_helpers::planner_phases::objects::object;
@@ -42,6 +41,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use std::collections::{BTreeSet, HashSet};
 
 /// Everything one snapshot gather needs.

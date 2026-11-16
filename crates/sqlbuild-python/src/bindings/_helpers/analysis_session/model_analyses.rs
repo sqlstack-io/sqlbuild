@@ -17,7 +17,6 @@ use crate::bindings::_helpers::analysis_session::session::{
     CacheStatsRow, FamilyRow, ModelRow, NativeModelAnalysisSession, RequestRow,
     start_model_analysis_session,
 };
-use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_sql;
 use crate::bindings::_helpers::compile_driver::analysis_cache::{
     AnalysisCacheCounts, record_analysis_cache_metrics,
 };
@@ -36,6 +35,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
 
 const LOGGING_MODULE: &str = "logging";
 const DEBUG_LOGGER: &str = "sqlbuild.compile";

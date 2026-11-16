@@ -6,11 +6,10 @@ use pyo3::types::{PyDict, PyList, PyTuple, PyTupleMethods};
 
 use crate::bindings::_helpers::graph::project_graph::{ResourceRow, project_graph};
 use crate::bindings::_helpers::record_behaviours::compiled::compile_input_error;
-use crate::bindings::_helpers::render::declaration_values::{
-    constant_declaration_sql, render_enum_member_value,
-};
 use sqlbuild_python_base::boundary::main::call_argument::call_argument;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::render::main::declarations::constant_declaration_sql::constant_declaration_sql;
+use sqlbuild_python_front::render::main::declarations::render_enum_member_value::render_enum_member_value;
 
 /// The parameter name through which a macro receives its context.
 const MACRO_CONTEXT_PARAMETER_NAME: &str = "ctx";

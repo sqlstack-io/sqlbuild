@@ -2,7 +2,6 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
 use crate::bindings::_helpers::planner_phases::objects::{text, tuple};
 use crate::bindings::_helpers::planner_warehouse::constants::ACTIVE_CATALOG;
 use crate::bindings::_helpers::planner_warehouse::snapshot::{columns_for, list_relations};
@@ -16,6 +15,8 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use std::collections::BTreeSet;
 
 const SQL_ANALYSIS_KEY: &str = "sql_analysis";

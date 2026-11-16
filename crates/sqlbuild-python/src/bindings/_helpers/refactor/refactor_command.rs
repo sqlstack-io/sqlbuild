@@ -38,9 +38,6 @@ use sqlbuild_refactor::refactoring::types::Originals;
 
 use crate::bindings::_helpers::lineage::lineage_index::lineage_key;
 use crate::bindings::_helpers::refactor::offline_compile::{OfflineCompile, compile_for_refactor};
-use crate::bindings::_helpers::refactor::refactor_facts::{
-    declaration_placement, model_facts, refactor_facts, unit_test_rebindings,
-};
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
@@ -49,6 +46,10 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::refactor::main::declaration_placement::declaration_placement;
+use sqlbuild_python_front::refactor::main::model_facts::model_facts;
+use sqlbuild_python_front::refactor::main::refactor_facts::refactor_facts;
+use sqlbuild_python_front::refactor::main::unit_test_rebindings::unit_test_rebindings;
 
 const STAGING_PREFIX: &str = "sqb-refactor-";
 const MOVE_COMMAND: &str = "mv";

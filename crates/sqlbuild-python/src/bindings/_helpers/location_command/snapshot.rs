@@ -22,9 +22,6 @@ use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_roles::compile_project_roles;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
-use crate::bindings::_helpers::discovery::project_facts::{named_node_rows, project_facts};
-use crate::bindings::_helpers::discovery::project_validation::validation_error;
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
 use crate::bindings::_helpers::location_command::snapshot_providers::providers_document;
@@ -35,6 +32,10 @@ use crate::bindings::_helpers::planner_scope::values::project_graph;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::orchestration_reads::main::environment_hash::environment_hash;
 use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_front::discovery::main::project::named_node_rows::named_node_rows;
+use sqlbuild_python_front::discovery::main::project::project_facts::project_facts;
+use sqlbuild_python_front::discovery::main::project::validation_error::validation_error;
+use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
 
 /// The Python node kind whose functions load sources.
 const LOADER_KIND: &str = "loader";

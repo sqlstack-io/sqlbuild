@@ -8,7 +8,6 @@ use sqlbuild_analysis::review_command::main::review_schema_name::review_schema_n
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_target_connection_config;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::janitor::janitor_keys::utc_datetime;
 use crate::bindings::_helpers::review_command::planning::{ReviewProject, ReviewSettings};
 use crate::bindings::_helpers::review_command::support::review_error;
@@ -23,6 +22,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 
 /// Where the review builds and where its ownership marker goes.
 pub(crate) struct ReviewSchema {

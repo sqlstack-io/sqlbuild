@@ -27,12 +27,6 @@ use crate::bindings::_helpers::compile_driver::project::build_project_graph;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::contracts::spec_resolution::{
-    resolve_effective_adapter_name, resolve_target_name,
-};
-use crate::bindings::_helpers::discovery::project_config::{
-    configured_git_base_ref, configured_review,
-};
 use crate::bindings::_helpers::execution_history::conversion::optional_text;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
@@ -43,6 +37,10 @@ use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
+use sqlbuild_python_front::discovery::main::project::configured_git_base_ref::configured_git_base_ref;
+use sqlbuild_python_front::discovery::main::project::configured_review::configured_review;
 
 const BASE_REF_ALIAS: &str = "@base";
 const UDF_KIND: &str = "udf";

@@ -4460,6 +4460,7 @@ dependencies = [
  "sqlbuild-project",
  "sqlbuild-pysource",
  "sqlbuild-python-base",
+ "sqlbuild-python-front",
  "sqlbuild-recall",
  "sqlbuild-refactor",
  "sqlbuild-render",
@@ -4468,7 +4469,6 @@ dependencies = [
  "sqlbuild-sqltext",
  "sqlbuild-state",
  "sqlclean",
- "stacker",
  "tokio",
  "uuid",
 ]
@@ -4495,6 +4495,36 @@ dependencies = [
  "sqlbuild-orchestration",
  "sqlbuild-rules",
  "sqlbuild-state",
+]
+
+[[package]]
+name = "sqlbuild-python-front"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "pyo3",
+ "serde_json",
+ "sqlbuild-analysis",
+ "sqlbuild-attachments",
+ "sqlbuild-cache",
+ "sqlbuild-cli",
+ "sqlbuild-config",
+ "sqlbuild-core",
+ "sqlbuild-cursor",
+ "sqlbuild-discovery",
+ "sqlbuild-host",
+ "sqlbuild-model-config",
+ "sqlbuild-orchestration",
+ "sqlbuild-pysource",
+ "sqlbuild-python-base",
+ "sqlbuild-refactor",
+ "sqlbuild-render",
+ "sqlbuild-scopes",
+ "sqlbuild-sqltext",
+ "sqlbuild-state",
+ "stacker",
+ "uuid",
 ]
 
 [[package]]
