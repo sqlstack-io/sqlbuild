@@ -5,7 +5,9 @@ use crate::templates::errors::TemplateError;
 use crate::templates::main::expand_template_string::expand_template_string;
 use crate::templates::models::{StringExpansion, TemplateFailure, TemplateOptions};
 use crate::templates::tests::helpers::{text, value};
-use crate::templates::tests::test_types::{TemplateTestCase, TestHost, Value};
+use crate::templates::tests::test_types::{
+    TemplateScanTestCase, TemplateTestCase, TestHost, Value,
+};
 
 #[test]
 fn given_template_strings_when_expanding_then_values_and_reads_match_python() {
@@ -297,27 +299,30 @@ fn given_template_strings_when_expanding_then_values_and_reads_match_python() {
 
 #[test]
 fn given_malformed_nested_templates_when_finding_templates_then_the_scan_stays_linear() {
-    let test_cases: [(&str, String); 3] = [
-        (
-            "an unclosed chain of nested templates with alternating quotes",
-            format!("${{'{}", "${\"${'".repeat(4_000)),
-        ),
-        (
-            "many unclosed templates that each open a quote",
-            "${'a ".repeat(20_000),
-        ),
-        (
-            "many sibling templates inside one quoted argument",
-            format!("${{coalesce('{}')}}", "${env}".repeat(20_000)),
-        ),
+    let test_cases: [TemplateScanTestCase; 3] = [
+        TemplateScanTestCase {
+            description: "an unclosed chain of nested templates with alternating quotes",
+            text: format!("${{'{}", "${\"${'".repeat(4_000)),
+            expected_max_steps_per_character: 20,
+        },
+        TemplateScanTestCase {
+            description: "many unclosed templates that each open a quote",
+            text: "${'a ".repeat(20_000),
+            expected_max_steps_per_character: 20,
+        },
+        TemplateScanTestCase {
+            description: "many sibling templates inside one quoted argument",
+            text: format!("${{coalesce('{}')}}", "${env}".repeat(20_000)),
+            expected_max_steps_per_character: 20,
+        },
     ];
-    for (description, text) in test_cases {
-        let (_, steps) = counted_template_spans(&text);
-        let limit: usize = 20 * text.len();
+    for test_case in test_cases {
+        let (_, steps) = counted_template_spans(&test_case.text);
         assert!(
-            steps <= limit,
-            "{description}: {steps} steps over {} characters",
-            text.len()
+            steps <= test_case.expected_max_steps_per_character * test_case.text.len(),
+            "{}: {steps} steps over {} characters",
+            test_case.description,
+            test_case.text.len()
         );
     }
 }

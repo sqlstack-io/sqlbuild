@@ -95,3 +95,10 @@ pub(super) struct TemplateTestCase {
     pub(super) expected: Result<StringExpansion<Value>, TemplateFailure>,
     pub(super) expected_reads: &'static [&'static str],
 }
+
+/// A malformed template string and the most characters per input character its scan may visit.
+pub(super) struct TemplateScanTestCase {
+    pub(super) description: &'static str,
+    pub(super) text: String,
+    pub(super) expected_max_steps_per_character: usize,
+}
