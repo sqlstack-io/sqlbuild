@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import type { Capability, EffectiveAccess, EffectiveAccessCell } from '$lib/api';
 	import type { CheckInput } from '$lib/platform/access';
 	import { locationName } from '$lib/platform/labels';
@@ -40,14 +41,16 @@
 							{@const cell = cellOf(action, id)}
 							<td>
 								{#if cell && cell.coverage !== 'none'}
+									<!-- raw-button: a cell of the access grid, clickable to explain it -->
 									<button
 										class="mark {cell.coverage}"
 										title="{cell.coverage === 'all' ? 'Every node' : `Only ${cell.selectors.join(', ')}`} · through {cell.roles.join(', ')}. Click to see why."
 										onclick={() => why(cell)}
 									>
-										{#if cell.coverage === 'all'}✓{:else}✓ <code>{cell.selectors.join(', ')}</code>{/if}
+										<CheckIcon size={13} />{#if cell.coverage !== 'all'}<code>{cell.selectors.join(', ')}</code>{/if}
 									</button>
 								{:else if cell}
+									<!-- raw-button: a cell of the access grid, clickable to explain it -->
 									<button class="mark none" title="Not allowed. Click to see the nearest miss." onclick={() => why(cell)}>—</button>
 								{/if}
 							</td>
@@ -93,6 +96,9 @@
 		font-size: 11.5px;
 	}
 	.mark {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 		padding: 1px 6px;
 		border-radius: 2px;
 		font-size: 12px;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import type { RunCostBreakdown } from '$lib/api';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import { CREDIT_PRICE_HINT } from '$lib/operate/cost';
@@ -34,7 +35,7 @@
 			<tbody>
 				{#each shown as r (r.nodeKey)}
 					<tr>
-						<td class="mono">{#if runStatements(r.nodeKey)}<span class="faint" title="Statements outside any node, such as creating schemas">Run statements</span>{:else if onnode}<button class="node" onclick={() => onnode(r.nodeKey)}>{r.nodeKey}</button>{:else}{r.nodeKey}{/if}</td>
+						<td class="mono">{#if runStatements(r.nodeKey)}<span class="faint" title="Statements outside any node, such as creating schemas">Run statements</span>{:else if onnode}<Button variant="link" size="inline" class="font-mono" onclick={() => onnode(r.nodeKey)}>{r.nodeKey}</Button>{:else}{r.nodeKey}{/if}</td>
 						<td class="num">{formatQueryCost(r)}</td>
 						<td class="num faint">{share(r.credits)}</td>
 						<td class="num faint">{formatSpan(r.seconds)}</td>
@@ -143,10 +144,5 @@
 	}
 	.faint {
 		color: var(--muted-foreground);
-	}
-	.node {
-		color: var(--foreground);
-		text-decoration: underline dotted;
-		text-underline-offset: 2px;
 	}
 </style>

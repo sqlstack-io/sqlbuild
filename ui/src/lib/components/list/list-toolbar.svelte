@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 	import type { Snippet } from 'svelte';
@@ -32,7 +33,7 @@
 		<SearchIcon size={14} />
 		<input bind:value={query} {placeholder} />
 		{#if query}
-			<button onclick={() => (query = '')} aria-label="Clear search"><XIcon size={13} /></button>
+			<Button variant="ghost" size="icon-xs" onclick={() => (query = '')} aria-label="Clear search"><XIcon /></Button>
 		{/if}
 	</label>
 	{#if filters}<div class="list-filters">{@render filters()}</div>{/if}
@@ -84,13 +85,6 @@
 		font-size: 12.5px;
 	}
 	.list-search input::placeholder {
-		color: var(--sb-text-faint);
-	}
-	.list-search button {
-		display: grid;
-		place-items: center;
-		border: 0;
-		background: transparent;
 		color: var(--sb-text-faint);
 	}
 	.list-filters {

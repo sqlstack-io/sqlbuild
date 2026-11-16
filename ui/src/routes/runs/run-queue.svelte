@@ -70,7 +70,7 @@
 						<!-- svelte-ignore a11y_click_events_have_key_events -->
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<span onclick={(e) => e.stopPropagation()}>
-							<GatedButton requires="run.cancel" size="xs" busy={cancelling.has(q.run.id)} onclick={() => cancel(q.run.id)}>Cancel</GatedButton>
+							<GatedButton requires="run.cancel" size="sm" busy={cancelling.has(q.run.id)} onclick={() => cancel(q.run.id)}>Cancel</GatedButton>
 						</span>
 					</td>
 				</tr>

@@ -3,38 +3,47 @@
 	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
 	import { type VariantProps, tv } from "tailwind-variants";
 
+	// The UI's one button. A small fixed set of types and sizes, so pages never style buttons by hand
+	// (ui/src/lib/components/ui/button/no-adhoc-buttons.test.ts fails on a raw <button> elsewhere):
+	//   default        solid blue primary; one per bar
+	//   outline        quiet secondary action, transparent with a border
+	//   stale          tinted purple: "needs building" (Build N changed, Build what changed)
+	//   stale-outline  outlined lighter purple: nodes only behind an upstream rebuild (Rebuild N)
+	//   destructive    tinted red, built like `stale`: remove, revoke, disable
+	//   ghost          no border or fill until hovered: icon-only and low-key actions
+	//   link           a text action in running text or a list (Show all, Retry, reset); no box
+	// Sizes: `bar` (30 px, 13 px medium text, 14 px icons) in top bars, toolbars and card headers;
+	// `sm` (26 px) inside rows and tables; `icon-bar`/`icon-sm` for icon-only buttons, `icon-xs`
+	// inside a chip or a field; `inline` for links.
+	// Corners are the UI's square --radius (2 px); icons are Lucide, never typed symbols.
 	export const buttonVariants = tv({
-		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-md border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 active:not-aria-[haspopup]:translate-y-px aria-invalid:ring-3 [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-(--radius) border border-transparent bg-clip-padding font-medium focus-visible:ring-3 aria-invalid:ring-3 [&_svg:not([class*='size-'])]:size-3.5 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-colors outline-none select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 		variants: {
 			variant: {
-				default: "bg-primary text-primary-foreground hover:bg-primary/80",
-				outline: "border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground shadow-xs",
-				secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-				ghost: "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground",
-				destructive: "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30",
-				link: "text-primary underline-offset-4 hover:underline",
+				default: "bg-primary text-primary-foreground hover:brightness-108",
+				outline: "border-input bg-transparent text-foreground hover:bg-(--sb-hover) aria-expanded:bg-(--sb-hover) aria-pressed:bg-(--sb-hover)",
 				// Purple means "needs building": tinted for building changed nodes, outlined for nodes only behind.
 				// Execute's solid blue stays the bar's one solid button.
 				stale: "border-(--sb-stale)/45 bg-(--sb-stale)/14 text-(--sb-stale) hover:bg-(--sb-stale)/22",
-				"stale-outline": "border-(--sb-stale) bg-background text-(--sb-stale) hover:bg-(--sb-stale)/10",
+				"stale-outline": "border-(--sb-stale) bg-transparent text-(--sb-stale) hover:bg-(--sb-stale)/10",
+				destructive: "border-(--sb-error)/45 bg-(--sb-error)/10 text-(--sb-error) hover:bg-(--sb-error)/18",
+				ghost: "bg-transparent text-muted-foreground hover:bg-(--sb-hover) hover:text-foreground aria-expanded:text-foreground aria-pressed:bg-(--sb-hover) aria-pressed:text-foreground",
+				link: "border-0 bg-transparent text-primary hover:underline underline-offset-2",
 			},
 			size: {
-				default: "h-9 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-				xs: "h-6 gap-1 rounded-[min(var(--radius-md),8px)] px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-				sm: "h-8 gap-1 rounded-[min(var(--radius-md),10px)] px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-				lg: "h-10 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-				icon: "size-9",
-				"icon-xs": "size-6 rounded-[min(var(--radius-md),8px)] in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
-				"icon-sm": "size-8 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-md",
-				"icon-lg": "size-10",
-				// Top-bar and toolbar buttons: 30 px high, 13 px medium text and 14 px icons, square 2 px corners.
-				bar: "h-[30px] gap-1.5 rounded-(--radius) px-[11px] text-[13px] font-medium tracking-[.005em] [&_svg:not([class*='size-'])]:size-3.5",
-				"icon-bar": "size-[30px] rounded-(--radius) [&_svg:not([class*='size-'])]:size-3.5",
+				bar: "h-[30px] gap-1.5 px-[11px] text-[13px] tracking-[.005em]",
+				sm: "h-[26px] gap-1.5 px-2 text-[12.5px]",
+				"icon-bar": "size-[30px]",
+				"icon-sm": "size-[26px]",
+				// Inside a chip or a search field: removing a filter, clearing the text.
+				"icon-xs": "size-5 [&_svg:not([class*='size-'])]:size-3",
+				// A link sized by the text around it.
+				inline: "h-auto gap-1 p-0 text-[length:inherit] font-normal",
 			},
 		},
 		defaultVariants: {
-			variant: "default",
-			size: "default",
+			variant: "outline",
+			size: "bar",
 		},
 	});
 
@@ -51,8 +60,8 @@
 <script lang="ts">
 	let {
 		class: className,
-		variant = "default",
-		size = "default",
+		variant = "outline",
+		size = "bar",
 		ref = $bindable(null),
 		href = undefined,
 		type = "button",

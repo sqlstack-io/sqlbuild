@@ -56,7 +56,7 @@
 			</label>{/if}
 		{/snippet}
 		{#snippet actions()}
-			{#if app.client.supports('explainAccess')}<Button variant="outline" size="sm" href={to(`/admin/check-access`)}><ShieldQuestionIcon size={14} /> Check access</Button>{/if}
+			{#if app.client.supports('explainAccess')}<Button variant="outline" size="bar" href={to(`/admin/check-access`)}><ShieldQuestionIcon size={14} /> Check access</Button>{/if}
 		{/snippet}
 	</ListToolbar>
 	<div class="sb-list-wrap">

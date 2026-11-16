@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -78,10 +79,7 @@
 					<span class="label">Nodes over time</span>
 					{#if detail.children.length}<span class="faint">{detail.children.length} job runs · nodes from all of them</span>{/if}
 					{#if hasGraph}
-					<div class="seg" role="tablist">
-						<button role="tab" aria-selected={topView === 'timeline'} class:on={topView === 'timeline'} onclick={() => (topView = 'timeline')}>Timeline</button>
-						<button role="tab" aria-selected={topView === 'graph'} class:on={topView === 'graph'} onclick={() => (topView = 'graph')}>Graph</button>
-					</div>
+					<div class="seg"><SegmentedFilter label="View" bind:value={topView} options={[{ value: 'timeline', label: 'Timeline' }, { value: 'graph', label: 'Graph' }]} /></div>
 					{/if}
 				</div>
 				<div class="flex min-h-0 flex-1">
@@ -150,21 +148,7 @@
 		color: var(--sb-text-faint);
 	}
 	.seg {
-		display: flex;
-		overflow: hidden;
 		margin-left: auto;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-	}
-	.seg button {
-		padding: 3px 12px;
-		color: var(--muted-foreground);
-		font-size: 11px;
-		font-weight: 500;
-	}
-	.seg button.on {
-		background: var(--sidebar-accent);
-		color: var(--foreground);
 	}
 	.splitter {
 		position: relative;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { openRow, to } from '$lib/paths';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import CalendarIcon from '@lucide/svelte/icons/calendar-days';
@@ -133,8 +134,8 @@
 		{#if selected.size}
 			<span class="bulk">{selected.size} selected</span>
 			<input class="reason" bind:value={reason} placeholder="Why? (saved in the history)" aria-label="Reason" />
-			<button class="bulk-btn" disabled={!canToggle || busy} onclick={() => bulk('running')}>Turn on</button>
-			<button class="bulk-btn" disabled={!canToggle || busy} onclick={() => bulk('paused')}>Pause</button>
+			<Button disabled={!canToggle || busy} onclick={() => bulk('running')}>Turn on</Button>
+			<Button disabled={!canToggle || busy} onclick={() => bulk('paused')}>Pause</Button>
 		{/if}
 		{#if actionError}<span class="bulk error">{actionError}</span>{/if}
 	{/snippet}
@@ -200,7 +201,7 @@
 							<div class="cell-desc override" title="Someone switched it here; the code says {t.defaultState}">
 								code says {t.defaultState === 'running' ? 'on' : 'paused'} ·
 								{#if canToggle}
-									<button class="reset" onclick={(e) => (e.stopPropagation(), resetDefault(t))}>reset</button>
+									<Button variant="link" size="inline" onclick={(e: MouseEvent) => (e.stopPropagation(), resetDefault(t))}>reset</Button>
 								{:else}
 									<span title="You don't have permission to pause or turn on schedules and sensors (trigger.toggle)">reset</span>
 								{/if}
@@ -212,7 +213,7 @@
 					<td class="muted next-col" title={t.nextDueAt ? formatStamp(t.nextDueAt) : undefined}>{nextDue(t)}</td>
 					<td class="muted" title={t.lastTick ? `${tickOutcomeHelp[t.lastTick.outcome]}${t.lastTick.reason ? `\n${t.lastTick.reason}` : ''}` : undefined}>
 						{#if t.lastTick}
-							<span class="tick" style:--c={tickOutcomeTone[t.lastTick.outcome]}>{tickOutcomeText[t.lastTick.outcome]}</span>
+							<StatusLabel muted tone={tickOutcomeTone[t.lastTick.outcome]} label={tickOutcomeText[t.lastTick.outcome]} />
 							{#if t.lastTick.coveredByRunId}into run <a class="link code" href={to(`/runs/${t.lastTick.coveredByRunId}`)}>{shortRunId(t.lastTick.coveredByRunId)}</a>{/if}
 							<div class="cell-desc">{formatAgo(t.lastTick.scheduledFor, app.now)}</div>
 						{:else}
@@ -268,27 +269,8 @@
 	.override {
 		color: var(--sb-warning) !important;
 	}
-	.reset {
-		color: var(--primary);
-	}
-	.reset:hover {
-		text-decoration: underline;
-	}
 	.warn-icon {
 		color: var(--sb-warning);
-	}
-	.tick {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-	}
-	/* Only the dot carries the outcome's colour; a column of the usual outcome stays calm. */
-	.tick::before {
-		content: '';
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--c);
 	}
 	.bulk {
 		margin-left: 8px;
@@ -306,19 +288,5 @@
 		border-radius: 2px;
 		background: var(--background);
 		font-size: 12.5px;
-	}
-	.bulk-btn {
-		height: 28px;
-		padding: 0 10px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: transparent;
-		font-size: 12.5px;
-	}
-	.bulk-btn:hover:not(:disabled) {
-		background: var(--sb-hover);
-	}
-	.bulk-btn:disabled {
-		opacity: 0.5;
 	}
 </style>

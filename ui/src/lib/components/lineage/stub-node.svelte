@@ -8,6 +8,7 @@
 </script>
 
 <!-- Lineage outside the selected folders, e.g. "+12 upstream in customers"; clicking it adds that folder. -->
+<!-- raw-button: a node on the lineage canvas, clickable as a whole -->
 <button class="stub nodrag" class:dimmed={d.dimmed} title="Add {d.folder} to the folders shown" onclick={() => d.onadd?.(d.folder)}>
 	{#if d.direction === 'downstream'}<Handle type="target" position={Position.Left} class="stub-handle" />{/if}
 	<PlusIcon size={12} />

@@ -9,7 +9,7 @@
 	let {
 		requires,
 		variant = 'outline',
-		size = 'sm',
+		size = 'bar',
 		disabled = false,
 		reason,
 		busy = false,

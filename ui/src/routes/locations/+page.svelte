@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { openRow, to } from '$lib/paths';
 	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -122,7 +123,7 @@
 						{/if}
 						{#if testFailures[l.id]}<div class="cell-desc err" title={testFailures[l.id]}>{testFailures[l.id]}</div>{/if}
 						{#if mayTest(l.id)}
-							<button class="test" disabled={testing[l.id]} onclick={(e) => (e.stopPropagation(), testConnection(l.id))} title="Ask the location to connect to its warehouse, as sqb debug does">Test connection</button>
+							<Button variant="link" size="inline" class="mt-1 flex text-[12px]" disabled={testing[l.id]} onclick={(e: MouseEvent) => (e.stopPropagation(), testConnection(l.id))} title="Ask the location to connect to its warehouse, as sqb debug does">Test connection</Button>
 						{/if}
 					</td>
 					<td>
@@ -142,8 +143,5 @@
 	tr.static {
 		cursor: default;
 	}
-	.test { display: block; margin-top: 4px; color: var(--primary); font-size: 12px; }
-	.test:hover:not(:disabled) { text-decoration: underline; }
-	.test:disabled { color: var(--sb-text-faint); }
 	.err { color: var(--sb-error) !important; }
 </style>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	// A plan in the order and words of `sqb plan`: what runs first, each change with its detail and diff,
 	// then the routine models.
 	import { to } from '$lib/paths';
@@ -21,9 +23,9 @@
 <div class="report">
 	{#each sections as s (s.title)}
 		{#if s.collapsed && !expanded[s.title]}
-			<button class="collapsed" aria-expanded="false" onclick={() => (expanded[s.title] = true)}>
-				<i></i>{s.entries.length} {s.title.toLowerCase()}, {s.entries[0].value} <span>Show</span>
-			</button>
+			<div class="collapsed">
+				<DisclosureButton open={false} onclick={() => (expanded[s.title] = true)} class="w-full py-1 text-[12.5px]"><i></i>{s.entries.length} {s.title.toLowerCase()}, {s.entries[0].value}</DisclosureButton>
+			</div>
 		{:else}
 		{@const shown = expanded[s.title] ? s.entries : s.entries.slice(0, limit)}
 		<section>
@@ -55,7 +57,7 @@
 				</div>
 			{/each}
 			{#if s.entries.length > shown.length}
-				<button class="more" onclick={() => (expanded[s.title] = true)}>… and {s.entries.length - shown.length} more</button>
+				<Button variant="link" size="inline" class="mt-1 self-start text-[11.5px]" onclick={() => (expanded[s.title] = true)}>Show {s.entries.length - shown.length} more</Button>
 			{/if}
 		</section>
 		{/if}
@@ -81,21 +83,7 @@
 		font-size: 12.5px;
 	}
 	.collapsed {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 4px 0;
 		border-bottom: 1px solid var(--border);
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-		text-align: left;
-	}
-	.collapsed span {
-		color: var(--primary);
-		font-size: 11.5px;
-	}
-	.collapsed:hover span {
-		text-decoration: underline;
 	}
 	.entry-warning {
 		margin: 4px 0 2px 16px;
@@ -194,12 +182,6 @@
 	}
 	.diff .hunk {
 		color: var(--sb-text-faint);
-	}
-	.more {
-		color: var(--primary);
-		font-size: 11.5px;
-		align-self: flex-start;
-		padding-top: 4px;
 	}
 	.warning {
 		display: flex;

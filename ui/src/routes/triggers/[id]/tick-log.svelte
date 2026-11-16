@@ -1,4 +1,6 @@
 <script lang="ts">
+	import StatusLabel from '$lib/components/list/status-label.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import { TICK_OUTCOMES, type Tick, type TickOutcome } from '$lib/api';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
@@ -37,7 +39,7 @@
 			<tr>
 				<td class="nowrap">{formatStamp(t.scheduledFor)}</td>
 				<td class="nowrap faint">{t.evaluatedAt ? formatStamp(t.evaluatedAt) : 'not yet'}</td>
-				<td title={tickOutcomeHelp[t.outcome]}><span class="outcome" style:--c={tickOutcomeTone[t.outcome]}>{tickOutcomeText[t.outcome]}</span>{#if t.catchUp}<span class="tag" title="Made up after the scheduler was down (catch-up)">made up</span>{/if}</td>
+				<td title={tickOutcomeHelp[t.outcome]}><StatusLabel muted tone={tickOutcomeTone[t.outcome]} label={tickOutcomeText[t.outcome]} />{#if t.catchUp}<span class="sb-tag warn ml-1.5" title="Made up after the scheduler was down (catch-up)">made up</span>{/if}</td>
 				<td class="mono">
 					{#if t.runId}<a href={to(`/runs/${t.runId}`)} title={t.runId}>{shortRunId(t.runId)}</a>
 					{:else if t.coveredByRunId}<span class="sans">Merged into run <a href={to(`/runs/${t.coveredByRunId}`)} title={t.coveredByRunId}>{shortRunId(t.coveredByRunId)}</a> (already waiting)</span>
@@ -53,7 +55,7 @@
 	</tbody>
 </table>
 {#if filtered.length > shown}
-	<button class="more" onclick={() => (shown += 100)}>Show {Math.min(100, filtered.length - shown)} more</button>
+	<Button variant="link" size="inline" class="mt-2 text-[12px]" onclick={() => (shown += 100)}>Show {Math.min(100, filtered.length - shown)} more</Button>
 {/if}
 
 <style>
@@ -85,27 +87,7 @@
 		border-bottom: 1px solid var(--border-subtle);
 		vertical-align: top;
 	}
-	.outcome {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-	}
 	/* Only the dot carries the outcome's colour; a column of the usual outcome stays calm. */
-	.outcome::before {
-		content: '';
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--c);
-	}
-	.tag {
-		margin-left: 6px;
-		padding: 0 5px;
-		border-radius: 2px;
-		background: color-mix(in srgb, var(--sb-warning) 14%, transparent);
-		color: var(--sb-warning);
-		font-size: 11px;
-	}
 	.mono {
 		font-family: var(--font-mono);
 		font-size: 11.5px;
@@ -123,10 +105,5 @@
 		padding: 24px;
 		color: var(--sb-text-faint);
 		text-align: center;
-	}
-	.more {
-		margin-top: 8px;
-		color: var(--primary);
-		font-size: 12px;
 	}
 </style>

@@ -1,8 +1,9 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import DatabaseIcon from '@lucide/svelte/icons/database';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ConnectionTest from '$lib/components/platform/connection-test.svelte';
@@ -29,7 +30,7 @@
 
 <div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-12">
 	{#if connections.error}
-		<p class="err">Couldn't load connections: {connections.error} <button class="retry" onclick={() => connections.refresh()}>Retry</button></p>
+		<p class="err">Couldn't load connections: {connections.error} <Button variant="link" size="inline" class="ml-2" onclick={() => connections.refresh()}>Retry</Button></p>
 	{/if}
 
 	{#each groups as g (g.key)}
@@ -72,11 +73,10 @@
 			<Panel title="State history sync" note={g.users.length > 1 ? `${c.location} · ${c.target}` : undefined}>
 				<div class="card">
 					{#if c.tables.length}
-						<button class="summary" aria-expanded={!!openSyncs[c.id]} onclick={() => (openSyncs[c.id] = !openSyncs[c.id])}>
-							<ChevronRightIcon size={14} class={openSyncs[c.id] ? 'rotate-90' : ''} />
+						<DisclosureButton tone="default" open={!!openSyncs[c.id]} onclick={() => (openSyncs[c.id] = !openSyncs[c.id])} class="w-full gap-2 text-[12.5px]">
 							<span>{syncSummary(c, app.now)}</span>
 							{#if failing}<StatusLabel tone="var(--sb-error)" label="{failing} failing" />{/if}
-						</button>
+						</DisclosureButton>
 						{#if openSyncs[c.id]}
 							<table class="sb-list">
 								<thead><tr><th>Table</th><th>Newest sync</th><th class="num">Mirrored total</th><th class="num">Last sync added</th><th class="num">Took</th><th>Last clean sync</th></tr></thead>
@@ -114,10 +114,6 @@
 		margin-bottom: 16px;
 		color: var(--sb-error);
 		font-size: 12.5px;
-	}
-	.retry {
-		margin-left: 8px;
-		color: var(--primary);
 	}
 	.muted {
 		color: var(--muted-foreground);
@@ -179,20 +175,6 @@
 	.users .test {
 		width: 1%;
 		white-space: nowrap;
-	}
-	.summary {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
-		color: var(--foreground);
-		font-size: 12.5px;
-		text-align: left;
-	}
-	.summary :global(svg) {
-		flex: 0 0 auto;
-		color: var(--muted-foreground);
-		transition: transform 0.15s;
 	}
 	.num {
 		text-align: right;

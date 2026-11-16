@@ -103,16 +103,16 @@
 			<span>Denial ID <i>(optional; from a “permission denied” message)</i></span>
 			<input bind:value={decisionId} placeholder="e.g. dec-4k7q2m" spellcheck="false" onkeydown={(e) => e.key === 'Enter' && lookup()} />
 		</label>
-		<Button size="sm" variant="outline" disabled={running || !decisionId.trim()} onclick={lookup}>Look up</Button>
+		<Button size="bar" variant="outline" disabled={running || !decisionId.trim()} onclick={lookup}>Look up</Button>
 		{#if sampleDecision && !decisionId}
-			<button class="link" onclick={() => ((decisionId = sampleDecision ?? ''), lookup())}>Try {sampleDecision}</button>
+			<Button variant="link" size="inline" class="text-[12px]" onclick={() => ((decisionId = sampleDecision ?? ''), lookup())}>Try {sampleDecision}</Button>
 		{/if}
 	</div>
 	{#if decision}
 		<p class="decision">
 			<b>{decision.decisionId}</b>: {whoName(decision.query.principal)} was denied <PermissionName action={decision.query.action} /> {formatAgo(decision.at, app.now)}
 			<span class="faint" title={formatStamp(decision.at)}>· “{decision.summary}”</span>. Checked again below with their access today.
-			<button class="link" onclick={clearDecision}>Clear</button>
+			<Button variant="link" size="inline" class="text-[12px]" onclick={clearDecision}>Clear</Button>
 		</p>
 	{/if}
 
@@ -150,7 +150,7 @@
 			<span>On <i>(optional)</i></span>
 			<input bind:value={subject} placeholder="Job, group, node or selector, e.g. daily_revenue, tag:finance" onkeydown={(e) => e.key === 'Enter' && check()} />
 		</label>
-		<Button size="sm" disabled={running || !who} onclick={check}>{running ? 'Checking…' : 'Check'}</Button>
+		<Button size="bar" variant="default" disabled={running || !who} onclick={check}>{running ? 'Checking…' : 'Check'}</Button>
 	</div>
 
 	{#if failure}<p class="err">{failure}</p>{/if}
@@ -308,12 +308,8 @@
 	.chains :global(svg) {
 		color: var(--sb-text-faint);
 	}
-	a,
-	.link {
+	a {
 		color: var(--primary);
-	}
-	.link {
-		font-size: 12px;
 	}
 	b {
 		font-weight: 600;

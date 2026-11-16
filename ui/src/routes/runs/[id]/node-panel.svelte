@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import type { RunNode } from '$lib/api';
 	import { shortRunId } from '$lib/operate/labels';
@@ -36,16 +38,18 @@
 <div class="panel sb-scroll" aria-label="Nodes by outcome">
 	{#each groups as g (g.key)}
 		<section>
+			<!-- raw-button: the sticky header of an outcome group, clickable as a whole to fold it -->
 			<button class="group" onclick={() => toggle(g.key)} aria-expanded={!closed.has(g.key)}>
-				<i style:background={g.tone}></i>{g.label}<b>{g.nodes.length}</b><span class="caret">{closed.has(g.key) ? '▸' : '▾'}</span>
+				<i style:background={g.tone}></i>{g.label}<b>{g.nodes.length}</b><ChevronRightIcon size={13} class="caret {closed.has(g.key) ? '' : 'open'}" />
 			</button>
 			{#if !closed.has(g.key)}
 				<ul>
 					{#each g.nodes as n (`${n.runId}/${n.nodeKey}`)}
 						<li class:sel={view.selected.includes(n.nodeKey)}>
+							<!-- raw-button: a row of the node list; it filters the tabs below to that node -->
 							<button class="node" onclick={(e) => pick(e, n)} title="Click to filter below; Ctrl- or Cmd-click to add to the selection">
 								<span class="mono">{n.nodeKey}</span>
-								{#if n.status === 'warn'}<span class="tag warn">warnings</span>{/if}
+								{#if n.status === 'warn'}<span class="sb-tag warn">warnings</span>{/if}
 								{#if took(n)}<span class="took">{took(n)}</span>{/if}
 							</button>
 							{#if n.skippedBecauseOf}
@@ -53,7 +57,7 @@
 								<div class="why">
 									skipped:
 									{#if why.runId === ownRun || view.nodes.some((x) => x.nodeKey === why.nodeKey)}
-										<button class="link mono" onclick={() => view.selectNode(why.nodeKey)}>{why.nodeKey}</button>
+										<Button variant="link" size="inline" class="font-mono text-[11.5px]" onclick={() => view.selectNode(why.nodeKey)}>{why.nodeKey}</Button>
 									{:else}
 										<a class="link mono" href={to(`/runs/${why.runId}`)}>{why.nodeKey}</a>
 									{/if}
@@ -110,9 +114,13 @@
 		color: var(--muted-foreground);
 		font-weight: 500;
 	}
-	.caret {
-		width: 10px;
+	.group :global(.caret) {
+		flex: 0 0 auto;
 		color: var(--sb-text-faint);
+		transition: transform 120ms;
+	}
+	.group :global(.caret.open) {
+		transform: rotate(90deg);
 	}
 	li {
 		padding: 4px 14px 4px 30px;
@@ -138,15 +146,6 @@
 		font-size: 12px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-	.tag {
-		padding: 0 4px;
-		border-radius: 2px;
-		font-size: 10.5px;
-	}
-	.tag.warn {
-		background: color-mix(in srgb, var(--sb-warning) 14%, transparent);
-		color: var(--sb-warning);
 	}
 	.why {
 		color: var(--muted-foreground);

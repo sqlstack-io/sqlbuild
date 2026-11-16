@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	// Every rerun opens here first, like every Run button opens the plan page: it shows what the rerun repeats
@@ -106,16 +107,17 @@
 				<span class="faint">Rerun</span><span>{remaining.length} runs</span>
 			{/if}
 		</span>
-		<div class="verbs" role="group" aria-label="What to rerun">
-			{#if single}
-				{#each choices as c (c.mode)}
-					<button class:on={mode === c.mode} disabled={!!c.disabledReason} title={c.disabledReason ?? c.help} onclick={() => choose(c.mode)}>{c.label}</button>
-				{/each}
-			{:else}
-				<button class:on={mode === 'all'} onclick={() => choose('all')}>Rerun all</button>
-				<button class:on={mode === 'from_failure'} onclick={() => choose('from_failure')}>Rerun from failure</button>
-			{/if}
-		</div>
+		<SegmentedFilter
+			label="What to rerun"
+			value={mode}
+			options={single
+				? choices.map((c) => ({ value: c.mode, label: c.label, title: c.disabledReason ?? c.help, disabled: !!c.disabledReason }))
+				: [
+						{ value: 'all' as RerunMode, label: 'Rerun all' },
+						{ value: 'from_failure' as RerunMode, label: 'Rerun from failure' }
+					]}
+			onselect={choose}
+		/>
 		<span class="faint note">Repeats each run's own version and settings, as frozen when it started</span>
 	</div>
 
@@ -128,10 +130,7 @@
 			{:else if single && first}
 				<div class="summary">
 					<b>{nodes.length}</b> node{nodes.length === 1 ? '' : 's'}<span>·</span>{runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)}
-					<div class="tabs" role="tablist">
-						<button role="tab" aria-selected={view === 'nodes'} onclick={() => (view = 'nodes')}>Nodes</button>
-						<button role="tab" aria-selected={view === 'graph'} onclick={() => (view = 'graph')}>Graph</button>
-					</div>
+					<div class="tabs"><SegmentedFilter label="View" bind:value={view} options={[{ value: 'nodes', label: 'Nodes' }, { value: 'graph', label: 'Graph' }]} /></div>
 				</div>
 				{#if view === 'graph' && catalog.data}
 					{#if drawable.length}<div class="graph"><ScopeGraph keys={drawable} catalog={catalog.data} onselect={() => {}} /></div>{/if}
@@ -207,29 +206,6 @@
 		font-family: var(--font-mono);
 		color: var(--foreground);
 	}
-	.verbs {
-		display: flex;
-		flex-shrink: 0;
-		overflow: hidden;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-	}
-	.verbs button {
-		padding: 4px 11px;
-		border-right: 1px solid var(--border);
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.verbs button:last-child {
-		border-right: 0;
-	}
-	.verbs button.on {
-		background: var(--sidebar-accent);
-		color: var(--foreground);
-	}
-	.verbs button:disabled {
-		opacity: 0.45;
-	}
 	.note {
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -280,19 +256,7 @@
 		color: var(--sb-text-faint);
 	}
 	.tabs {
-		display: flex;
-		gap: 14px;
-		margin-left: 18px;
-	}
-	.tabs button {
-		padding: 2px 0;
-		border-bottom: 1px solid transparent;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.tabs button[aria-selected='true'] {
-		border-bottom-color: var(--foreground);
-		color: var(--foreground);
+		margin-left: 12px;
 	}
 	.graph {
 		min-height: 320px;

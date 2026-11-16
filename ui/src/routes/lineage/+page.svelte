@@ -740,13 +740,7 @@
 <div class="lineage-page">
 	<section class="lineage-workbench">
 <div class="lineage-toolbar">
-	<button
-		class="icon-toggle"
-		class:active={browserOpen}
-		onclick={() => (browserOpen = !browserOpen)}
-		title={browserOpen ? 'Hide model list' : 'Show model list'}
-		aria-label="Toggle model list"
-	><PanelLeftIcon size={15} /></button>
+	<Button variant="ghost" size="icon-bar" aria-pressed={browserOpen} onclick={() => (browserOpen = !browserOpen)} title={browserOpen ? 'Hide model list' : 'Show model list'} aria-label="Toggle model list"><PanelLeftIcon /></Button>
 	<div class="search-wrap">
 		<label class="model-search">
 			<SearchIcon size={14} />
@@ -755,6 +749,7 @@
 		{#if modelQuery.trim() && !browserOpen}
 			<div class="search-results">
 				{#each browserNodes.slice(0, 8) as node (node.id)}
+					<!-- raw-button: a result in the search's dropdown list -->
 					<button onclick={() => { selectModel(node.id); modelQuery = ''; }}>
 						<i class="browser-status {String(node.data.status)}"></i>
 						<span title={String(node.data.name)}>{node.data.label ?? node.data.name}</span>
@@ -775,45 +770,39 @@
 	{/if}
 	<span class="toolbar-sep"></span>
 	{#if !scaleMode}
-		<button
+		<Button
+			variant="ghost"
+			aria-pressed={grouped}
 			onclick={() => regroup({ grouped: !grouped, expanded: new Set(foldersToOpen(tree, selectedFolders)) })}
-			class="toolbar-action"
-			class:focus-active={grouped}
 			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
 		>
-			<FolderIcon size={14} /> Folders
-		</button>
+			<FolderIcon />Folders
+		</Button>
 		{#if selectionLabel}
 			<span class="selection-chip" title="Showing {selectionLabel}">
 				<span>Showing: {selectionLabel}</span>
-				<button onclick={clearSelection} aria-label="Show every folder" title="Show every folder"><XIcon size={12} /></button>
+				<Button variant="ghost" size="icon-xs" class="rounded-full" onclick={clearSelection} aria-label="Show every folder" title="Show every folder"><XIcon /></Button>
 			</span>
 		{/if}
 	{/if}
 	<NodeFieldsPopover />
-	<button
+	<Button
+		variant="ghost"
+		aria-pressed={neighbourhoodOnly}
 		onclick={toggleNeighbourhood}
-		class="toolbar-action"
-		class:focus-active={neighbourhoodOnly}
 		disabled={!neighbourhoodOnly && selectedNodes.length === 0}
 		title={!neighbourhoodOnly && selectedNodes.length === 0 ? 'Select a model to focus on it' : 'Show only the selected model and its immediate dependencies'}
 	>
-		<FocusIcon size={14} /> {neighbourhoodOnly ? 'Show all' : 'Focus'}
-	</button>
-	<button onclick={resetLayout} class="toolbar-action" title="Reset layout"><RotateCcwIcon size={14} /> Reset</button>
+		<FocusIcon />{neighbourhoodOnly ? 'Show all' : 'Focus'}
+	</Button>
+	<Button variant="ghost" onclick={resetLayout} title="Reset layout"><RotateCcwIcon />Reset</Button>
 	<div class="status-summary ml-auto">
 		{#each [['ok', 'var(--sb-success)', 'last build succeeded'], ['warn', 'var(--sb-warning)', 'last build warned'], ['stale', 'var(--sb-stale)', 'stale'], ['fail', 'var(--sb-error)', 'last build failed']] as [st, c, label] (st)}
 			{@const n = scaleMode ? nodes.filter((x) => (st === 'stale' ? !!x.data.stale : x.data.status === st)).length : catalogNodes.filter((c) => (st === 'stale' ? !!c.stale?.length : cardStatus(c) === st)).length}
 			{#if n}<span title="{n} {label}"><i style:background={c}></i>{n}</span>{/if}
 		{/each}
 	</div>
-	<button
-		class="icon-toggle"
-		class:active={inspectorOpen}
-		onclick={() => (inspectorOpen = !inspectorOpen)}
-		title={inspectorOpen ? 'Hide details' : 'Show details'}
-		aria-label="Toggle details"
-	><PanelRightIcon size={15} /></button>
+	<Button variant="ghost" size="icon-bar" aria-pressed={inspectorOpen} onclick={() => (inspectorOpen = !inspectorOpen)} title={inspectorOpen ? 'Hide details' : 'Show details'} aria-label="Toggle details"><PanelRightIcon /></Button>
 </div>
 
 <div class="lineage-stage relative flex min-h-0 flex-1">
@@ -828,11 +817,14 @@
 					{#if row.type === 'folder'}
 						{@const picked = selectedFolders.includes(row.id)}
 						<div class="browser-group" class:picked class:shown={!picked && inSelectedFolder(row.id)} style:padding-left="{2 + row.depth * 14}px">
+							<!-- raw-button: the tree's expand control; it only opens or closes the folder -->
 							<button class="tree-chevron" onclick={() => toggleTreeFolder(row.id)} aria-expanded={row.open} aria-label="{row.open ? 'Collapse' : 'Expand'} {row.id}"><ChevronRightIcon size={13} class={row.open ? 'rotate-90' : ''} /></button>
+							<!-- raw-button: a folder's row in the tree, clickable as a whole to show that folder -->
 							<button class="tree-label" onclick={(event) => pickFolder(row.id, event)} title="Show only {row.id}; Ctrl/⌘-click to add it"><span>{row.label}</span><b>{row.count}</b></button>
 							<input type="checkbox" class="sb-check tree-check" checked={picked} onchange={() => setFolderSelection(withFolderToggled(selectedFolders, row.id))} aria-label="Add {row.id} to the folders shown" />
 						</div>
 					{:else}
+						<!-- raw-button: a node's row in the tree, clickable as a whole to select it -->
 						<button
 							class="browser-row"
 							style:padding-left="{24 + row.depth * 14}px"
@@ -883,9 +875,9 @@
 					<strong>Too many nodes to draw at once</strong>
 					<p>This view has {tooManyCount.toLocaleString('en')} cards; the graph draws at most {MAX_DRAWN.toLocaleString('en')}.</p>
 					<div class="too-many-actions">
-						{#if !grouped}<Button variant="outline" size="sm" onclick={() => regroup({ grouped: true, expanded: new Set(foldersToOpen(tree, selectedFolders)) })}><FolderIcon size={13} />Show folders</Button>{/if}
-						{#if !staleOnly && outOfDateCount > 0 && outOfDateCount <= MAX_DRAWN}<Button variant="outline" size="sm" onclick={showOutOfDate}>Show the {outOfDateCount.toLocaleString('en')} out of date</Button>{/if}
-						<Button variant="outline" size="sm" onclick={pickFolders}>Pick folders</Button>
+						{#if !grouped}<Button variant="outline" size="bar" onclick={() => regroup({ grouped: true, expanded: new Set(foldersToOpen(tree, selectedFolders)) })}><FolderIcon size={13} />Show folders</Button>{/if}
+						{#if !staleOnly && outOfDateCount > 0 && outOfDateCount <= MAX_DRAWN}<Button variant="outline" size="bar" onclick={showOutOfDate}>Show the {outOfDateCount.toLocaleString('en')} out of date</Button>{/if}
+						<Button variant="outline" size="bar" onclick={pickFolders}>Pick folders</Button>
 					</div>
 				</div>
 			</div>
@@ -1000,6 +992,7 @@
 						<div class="strip-wrap"><OutcomeStrip outcomes={d.recentOutcomes} tones={nodeOutcomeTone} caption="Last {d.recentOutcomes.length} builds" /></div>
 					{/if}
 					{#each d.stale as r, i (i)}
+						<!-- raw-button: a stale notice that is clickable as a whole, opening its drift -->
 						<button class="drift-hint {r.reason === 'changed_upstream' ? 'upstream' : r.reason}" onclick={() => (r.reason === 'behind' ? undefined : openSql('drift'))} disabled={r.reason === 'behind' || !hasDrift}>
 							<GitCompareIcon size={14} />
 							<span><b>Stale · {staleReasonLabel(r)}</b> · {staleReasonDetail(r)}</span>
@@ -1023,7 +1016,7 @@
 
 			{#if d?.sql}
 				<InspectorSection title="SQL">
-					{#snippet meta()}<span>{sqlRaw.split('\n').length} lines</span><button class="section-link" onclick={() => openSql()}>Open →</button>{/snippet}
+					{#snippet meta()}<span>{sqlRaw.split('\n').length} lines</span><Button variant="link" size="inline" class="ml-auto text-[12px]" onclick={() => openSql()}>Open →</Button>{/snippet}
 					<CodePreview file="{shortName(d.key)}.sql" code={d.sql.raw} compiled={d.sql.compiled} bind:mode={sqlMode} maxLines={14} onOpen={() => openSql()} />
 				</InspectorSection>
 			{:else if d?.code}
@@ -1079,12 +1072,14 @@
 					<div>
 						<div class="dep-head">Upstream</div>
 						{#each upstream as model (model)}
+							<!-- raw-button: a row of the dependency list, clickable as a whole to select that node -->
 							<button class="dependency-row" onclick={() => selectByName(String(model))}>{model}</button>
 						{:else}<span class="section-meta">None</span>{/each}
 					</div>
 					<div>
 						<div class="dep-head">Downstream</div>
 						{#each downstream as model (model)}
+							<!-- raw-button: a row of the dependency list, clickable as a whole to select that node -->
 							<button class="dependency-row" onclick={() => selectByName(String(model))}>{model}</button>
 						{:else}<span class="section-meta">None</span>{/each}
 					</div>
@@ -1193,14 +1188,12 @@
 		background: var(--sb-hover);
 		color: var(--foreground);
 	}
-	.panel-toggle.active,
-	.focus-active {
+	.panel-toggle.active {
 		border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
 		background: var(--sidebar-accent);
 		color: var(--primary);
 	}
-	.toolbar-filter,
-	.toolbar-action {
+	.toolbar-filter {
 		display: flex;
 		height: 29px;
 		align-items: center;
@@ -1212,8 +1205,7 @@
 		color: var(--muted-foreground);
 		font-size: 12px;
 	}
-	.toolbar-filter:hover,
-	.toolbar-action:hover {
+	.toolbar-filter:hover {
 		background: var(--sb-hover);
 		color: var(--foreground);
 	}
@@ -1411,24 +1403,6 @@
 		border-bottom: 1px solid var(--border);
 		background: var(--card);
 	}
-	.icon-toggle {
-		display: grid;
-		width: 30px;
-		height: 30px;
-		place-items: center;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-	}
-	.icon-toggle:hover {
-		background: var(--sb-hover);
-		color: var(--foreground);
-	}
-	.icon-toggle.active {
-		background: var(--sb-hover);
-		color: var(--foreground);
-	}
 	.search-wrap {
 		position: relative;
 		margin: 0 6px 0 2px;
@@ -1486,8 +1460,7 @@
 		background: var(--border);
 	}
 	/* Toolbar buttons match the top bar's: 30 px high, 13 px medium text, 14 px icons. */
-	.toolbar-filter,
-	.toolbar-action {
+	.toolbar-filter {
 		height: 30px;
 		gap: 6px;
 		padding: 0 9px;
@@ -1498,11 +1471,6 @@
 	}
 	.toolbar-filter :global(svg) {
 		color: var(--sb-text-faint);
-	}
-	.focus-active {
-		border: 0;
-		background: var(--sb-hover);
-		color: var(--foreground);
 	}
 	.status-summary {
 		gap: 14px;
@@ -1882,17 +1850,6 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.selection-chip button {
-		display: grid;
-		width: 18px;
-		height: 18px;
-		flex: 0 0 18px;
-		place-items: center;
-		border-radius: 50%;
-	}
-	.selection-chip button:hover {
-		background: color-mix(in srgb, var(--primary) 15%, transparent);
-	}
 	.too-many-card {
 		max-width: 420px;
 		padding: 20px 22px;
@@ -2021,10 +1978,6 @@
 		color: var(--primary);
 		font-style: normal;
 		white-space: nowrap;
-	}
-	.toolbar-action:disabled {
-		opacity: 0.45;
-		pointer-events: none;
 	}
 	@media (max-width: 1450px) {
 		.model-search {

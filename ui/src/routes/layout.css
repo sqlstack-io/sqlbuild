@@ -348,6 +348,11 @@
 .sb-tag .sb-tag-ico {
 	color: var(--sb-text-faint);
 }
+/* A tag that flags something to look at, e.g. "warnings". */
+.sb-tag.warn {
+	background: color-mix(in srgb, var(--sb-warning) 14%, transparent);
+	color: var(--sb-warning);
+}
 /* status label: coloured dot + plain label (no tinted pill) */
 .sb-status {
 	display: inline-flex;

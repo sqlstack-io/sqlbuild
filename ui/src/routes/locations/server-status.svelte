@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import ProblemList from '$lib/components/platform/problem-list.svelte';
 	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
@@ -51,7 +52,7 @@
 		{/if}
 		{#if openServerProblems}<span class="sep">·</span><span class="warn">{openServerProblems} open server problem{openServerProblems === 1 ? '' : 's'}</span>{/if}
 	{/if}
-	<button class="toggle" onclick={() => (open = !open)} aria-expanded={open}>{open ? 'Hide details' : 'Details'}</button>
+	<Button variant="link" size="inline" class="ml-auto" onclick={() => (open = !open)} aria-expanded={open}>{open ? 'Hide details' : 'Details'}</Button>
 </section>
 
 {#if open && h}
@@ -140,11 +141,6 @@
 	}
 	.sep {
 		color: var(--sb-text-faint);
-	}
-	.toggle {
-		margin-left: auto;
-		color: var(--primary);
-		font-size: 12.5px;
 	}
 	.details {
 		flex: 0 0 auto;

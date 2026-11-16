@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import { goto } from '$app/navigation';
@@ -111,7 +112,7 @@
 									</td>
 									<td>
 										{#if e.evidenceCount}
-											<GatedButton requires="view.evidence" size="xs" busy={evidenceBusy === e.id} onclick={() => showEvidence(e.id)}>{e.evidenceCount}{e.evidenceTruncated ? '+' : ''} rows</GatedButton>
+											<GatedButton requires="view.evidence" size="sm" busy={evidenceBusy === e.id} onclick={() => showEvidence(e.id)}>{e.evidenceCount}{e.evidenceTruncated ? '+' : ''} rows</GatedButton>
 										{:else}<span class="faint">—</span>{/if}
 									</td>
 								</tr>
@@ -123,7 +124,7 @@
 				{#if evidenceError}<div class="msg err">{evidenceError}</div>{/if}
 				{#if evidence}
 					<Panel title="Evidence" note="Sample rows stored with the result · this read is recorded in the audit log">
-						{#snippet actions()}<button class="link" onclick={() => { evidence = null; evidenceFor = null; }}>Close</button>{/snippet}
+						{#snippet actions()}<Button variant="link" size="inline" onclick={() => { evidence = null; evidenceFor = null; }}>Close</Button>{/snippet}
 						<table class="sb-list evidence">
 							<thead><tr>{#each evidence.columns as col (col)}<th>{col}</th>{/each}</tr></thead>
 							<tbody>
@@ -150,7 +151,7 @@
 					{:else if !app.can('view.sql')}
 						<p class="faint locked"><LockIcon size={13} /> You don't have permission to see SQL (view.sql)</p>
 					{:else}
-						<GatedButton requires="view.sql" size="xs" busy={sqlBusy} onclick={showSql}>Show SQL and errors</GatedButton>
+						<GatedButton requires="view.sql" size="sm" busy={sqlBusy} onclick={showSql}>Show SQL and errors</GatedButton>
 						{#if sqlError}<div class="msg err">{sqlError}</div>{/if}
 					{/if}
 				</Panel>
@@ -249,10 +250,7 @@
 		font-size: 11.5px;
 	}
 	.link {
-		border: 0;
-		background: transparent;
 		color: var(--primary);
-		font-size: 12.5px;
 	}
 	tr.selected td {
 		background: var(--sb-hover);

@@ -107,7 +107,7 @@
 					</td>
 					<td class="num">
 						{#if a.source === 'manual'}
-							<GatedButton requires="role.assign" size="xs" variant="destructive" busy={busy === a.id} onclick={() => remove(a)}>Remove</GatedButton>
+							<GatedButton requires="role.assign" size="sm" variant="destructive" busy={busy === a.id} onclick={() => remove(a)}>Remove</GatedButton>
 						{:else if a.source === 'sso'}
 							<a class="locked" href={to(`/admin/roles?tab=sso`)} title={hint}>See SSO mapping</a>
 						{:else}

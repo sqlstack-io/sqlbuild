@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
 	import type { CatalogNodeDetail } from '$lib/api';
@@ -58,6 +59,7 @@
 					<div class="strip"><OutcomeStrip outcomes={node.recentOutcomes} tones={nodeOutcomeTone} caption="Last {node.recentOutcomes.length} builds" /></div>
 				{/if}
 				{#each node.stale as r, i (i)}
+					<!-- raw-button: a stale notice that is clickable as a whole, opening its lineage or drift -->
 					<button class="drift-hint {r.reason}" onclick={() => (r.reason === 'behind' ? onTab('lineage') : onSql('drift'))} disabled={r.reason !== 'behind' && !hasDrift}>
 						<GitCompareIcon size={14} />
 						<span><b>Stale · {staleReasonLabel(r)}</b> · {staleReasonDetail(r)}</span>
@@ -86,7 +88,7 @@
 
 		{#if node.checkResults.length}
 			<section class="section">
-				<div class="section-head"><h3>Checks</h3><button class="link" onclick={() => onTab('checks')}>{node.checks.passing} of {node.checks.total} passing →</button></div>
+				<div class="section-head"><h3>Checks</h3><Button variant="link" size="inline" class="ml-auto text-[12.5px]" onclick={() => onTab('checks')}>{node.checks.passing} of {node.checks.total} passing →</Button></div>
 				<div class="rows">
 					{#each node.checkResults as c (c.id)}
 						{@const o = c.latest?.outcome ?? 'skipped'}
@@ -98,7 +100,7 @@
 
 		{#if node.columns.length}
 			<section class="section">
-				<div class="section-head"><h3>Columns</h3><button class="link" onclick={() => onTab('columns')}>All {node.columns.length} →</button></div>
+				<div class="section-head"><h3>Columns</h3><Button variant="link" size="inline" class="ml-auto text-[12.5px]" onclick={() => onTab('columns')}>All {node.columns.length} →</Button></div>
 				<div class="rows">
 					{#each node.columns.slice(0, 5) as c (c.name)}
 						<div class="row"><code>{c.name}</code><span class="muted">{c.description}</span><code class="muted ml-auto">{c.type}</code></div>
@@ -168,8 +170,6 @@
 	.section h3 span { color: var(--muted-foreground); font-weight: 400; }
 	.section-head { display: flex; align-items: baseline; margin-bottom: 8px; }
 	.section-head h3 { margin: 0; }
-	.section-head .link { margin-left: auto; font-size: 12.5px; }
-	.link { border: 0; background: transparent; color: var(--primary); }
 	.description { max-width: 88ch; margin: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
 	.rows { border: 1px solid var(--border); border-radius: 2px; }
 	.row { display: flex; align-items: center; gap: 14px; padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; }

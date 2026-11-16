@@ -10,6 +10,7 @@
 {#if statements.length}
 	<div class="live" role="status" aria-live="polite">
 		{#each statements.slice(0, 3) as st (st.id)}
+			<!-- raw-button: a live statement card, clickable as a whole to show it below -->
 			<button class="card" onclick={() => onpick(st.nodeKey)} title="Show this statement below">
 				<LoaderIcon size={14} class="spin" />
 				<span class="what">Running statement {st.sequence} · <b>{st.nodeKey}</b></span>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import StatusLabel from '$lib/components/list/status-label.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import type { TriggerDetail } from '$lib/api';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
@@ -59,7 +61,7 @@
 			<code>{sensor.cursor ?? '(the start: nothing handled yet)'}</code>
 			{#if sensor.cursorUpdatedAt}<span class="faint updated" title={formatStamp(sensor.cursorUpdatedAt)}>updated {formatAgo(sensor.cursorUpdatedAt, app.now)}</span>{/if}
 		{/if}
-		<GatedButton requires="sensor.reset_cursor" size="xs" disabled={sensor.cursorKnown && sensor.cursor === null} reason="It's already at the start" onclick={() => (confirmReset = !confirmReset)}>Start over</GatedButton>
+		<GatedButton requires="sensor.reset_cursor" size="sm" disabled={sensor.cursorKnown && sensor.cursor === null} reason="It's already at the start" onclick={() => (confirmReset = !confirmReset)}>Start over</GatedButton>
 	</div>
 	{#if confirmReset}
 		<div class="confirm">
@@ -67,7 +69,7 @@
 			<input bind:value={reason} placeholder="Why? (saved in the history)" />
 			<div class="row">
 				<GatedButton requires="sensor.reset_cursor" variant="default" size="sm" {busy} onclick={resetCursor}>Start over</GatedButton>
-				<button class="ghost" onclick={() => (confirmReset = false)}>Cancel</button>
+				<Button variant="ghost" size="sm" onclick={() => (confirmReset = false)}>Cancel</Button>
 			</div>
 		</div>
 	{/if}
@@ -83,13 +85,13 @@
 			{#each trigger.evaluations.slice(0, shown) as e (e.id)}
 				<tr>
 					<td class="nowrap" title={formatStamp(e.requestedAt)}>{formatAgo(e.requestedAt, app.now)}</td>
-					<td><span class="outcome" style:--c={evaluationTone[e.outcome]} title="{e.outcome} · {e.id}">{outcomeText[e.outcome] ?? e.outcome}</span></td>
+					<td title="{e.outcome} · {e.id}"><StatusLabel tone={evaluationTone[e.outcome]} label={outcomeText[e.outcome] ?? e.outcome} /></td>
 					<td class="mono faint">{e.cursorBefore ?? '∅'}{#if e.cursorAfter && e.cursorAfter !== e.cursorBefore} → {e.cursorAfter}{/if}</td>
 					<td class="num">{e.runRequests}</td>
 					<td class:err={!!e.error} class:faint={!e.error}>
 						{e.error ?? e.skipReason ?? ''}
 						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped while {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each} ran</span>{/if}
-						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="tag" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
+						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="sb-tag ml-1.5" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
 					</td>
 				</tr>
 			{:else}
@@ -97,7 +99,7 @@
 			{/each}
 		</tbody>
 	</table>
-	{#if trigger.evaluations.length > shown}<button class="more" onclick={() => (shown += 50)}>Show more</button>{/if}
+	{#if trigger.evaluations.length > shown}<Button variant="link" size="inline" class="mt-2 text-[12px]" onclick={() => (shown += 50)}>Show more</Button>{/if}
 </section>
 {/if}
 
@@ -186,10 +188,6 @@
 		display: flex;
 		gap: 8px;
 	}
-	.ghost {
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
 	table {
 		width: 100%;
 		border-collapse: collapse;
@@ -214,18 +212,6 @@
 	.nowrap {
 		white-space: nowrap;
 	}
-	.outcome {
-		color: var(--c);
-		font-weight: 500;
-	}
-	.tag {
-		margin-left: 6px;
-		padding: 0 5px;
-		border-radius: 2px;
-		background: var(--sb-hover);
-		color: var(--sb-text-faint);
-		font-size: 11px;
-	}
 	.dot {
 		display: inline-block;
 		width: 7px;
@@ -240,10 +226,5 @@
 		padding: 24px;
 		color: var(--sb-text-faint);
 		text-align: center;
-	}
-	.more {
-		margin-top: 8px;
-		color: var(--primary);
-		font-size: 12px;
 	}
 </style>

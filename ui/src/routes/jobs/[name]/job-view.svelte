@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
+	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import { openRow, to } from '$lib/paths';
@@ -90,11 +92,11 @@
 
 <AppTopbar title="Jobs">
 	{#if picked.length && def?.kind === 'job'}
-		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
+		<Button variant="ghost" onclick={() => graph?.clear()}>Clear selection</Button>
 		<GatedButton size="bar" requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run all but {picked.length}</GatedButton>
 		<GatedButton size="bar" requires="job.run" variant="default" onclick={() => run(picked)}><PlayIcon class="size-3.5 fill-current stroke-none" />Run {picked.length} selected</GatedButton>
 	{:else if picked.length && canRunPicked}
-		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
+		<Button variant="ghost" onclick={() => graph?.clear()}>Clear selection</Button>
 		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run {picked.length} selected</GatedButton>
 	{:else}
 		<GatedButton
@@ -143,11 +145,7 @@
 	{#if actionError}<div class="msg err">{actionError}</div>{/if}
 
 	{#if def}
-		<nav class="tabs">
-			<button class:on={tab === 'overview'} onclick={() => (tab = 'overview')}>Overview</button>
-			<button class:on={tab === 'runs'} onclick={() => (tab = 'runs')}>Runs{runs.length ? ` · ${runs.length}` : ''}</button>
-			{#if def.declaration}<button class:on={tab === 'code'} onclick={() => (tab = 'code')}>Code</button>{/if}
-		</nav>
+		<PageTabs bind:value={tab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'runs', label: 'Runs', count: runs.length || undefined }, ...(def.declaration ? [{ value: 'code' as const, label: 'Code' }] : [])]} />
 
 		{#if tab === 'overview'}
 			<div class="flex min-h-0 flex-1">
@@ -179,7 +177,7 @@
 					{:else}
 						{#if def.description}<p class="about">{def.description}</p>{/if}
 						<InspectorSection title="Recent runs">
-							{#snippet meta()}{#if runs.length}<button class="section-link" onclick={() => (tab = 'runs')}>All runs →</button>{/if}{/snippet}
+							{#snippet meta()}{#if runs.length}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (tab = 'runs')}>All runs →</Button>{/if}{/snippet}
 							{#if finished.length}
 								<OutcomeStrip outcomes={finished.map((r) => r.status)} tones={runStatusTone} caption="Last {finished.length} runs" />
 								<dl class="spaced">
@@ -334,29 +332,6 @@
 	.chip i {
 		margin-right: 0;
 	}
-	.tabs {
-		display: flex;
-		gap: 18px;
-		padding: 0 24px;
-		border-bottom: 1px solid var(--border);
-	}
-	.tabs button {
-		padding: 8px 0 7px;
-		border-bottom: 2px solid transparent;
-		color: var(--muted-foreground);
-		font-size: 13px;
-	}
-	.tabs button.on {
-		border-color: var(--primary);
-		color: var(--foreground);
-	}
-	.clear {
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
-	.clear:hover {
-		color: var(--foreground);
-	}
 	.faint {
 		color: var(--muted-foreground);
 		font-size: 12px;
@@ -418,10 +393,6 @@
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 		overflow-wrap: anywhere;
-	}
-	.section-link {
-		color: var(--primary);
-		font-size: 12px;
 	}
 
 	.runs th {

@@ -2,7 +2,7 @@
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
@@ -141,11 +141,10 @@
 									<ul class="selectors">
 										{#each r.selectors as s (s.selector)}
 											<li>
-												<button class="sel" onclick={() => (open = { ...open, [s.selector]: !open[s.selector] })} aria-expanded={!!open[s.selector]}>
-													<ChevronRightIcon size={13} class={open[s.selector] ? 'rotate-90' : ''} />
+												<DisclosureButton tone="default" open={!!open[s.selector]} onclick={() => (open = { ...open, [s.selector]: !open[s.selector] })}>
 													<code>{s.selector}</code> → {plural(s.nodes.length, 'node')}
 													{#if s.newSinceLastWeek.length}<span class="growth">+{s.newSinceLastWeek.length} since last week</span>{/if}
-												</button>
+												</DisclosureButton>
 												{#if open[s.selector]}
 													<div class="nodes">
 														{#each s.nodes as n (n)}
@@ -273,15 +272,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-	}
-	.sel {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-	}
-	.sel :global(svg) {
-		color: var(--sb-text-faint);
-		transition: transform 0.1s;
 	}
 	.nodes {
 		display: flex;

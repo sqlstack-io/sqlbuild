@@ -22,6 +22,7 @@
 <div class="box" class:collapsed={!folder && d.collapsed}>
 	<Handle type="target" position={Position.Left} class="box-handle" />
 	{#if folder}
+		<!-- raw-button: the header of a box on the lineage canvas, clickable as a whole to close it -->
 		<button class="head folder-head nodrag" title="Close {folder.folder}" aria-expanded="true" onclick={() => folder.ontoggle?.(folder.folder)}>
 			<ChevronDownIcon size={14} class="chevron" />
 			<span class="name" title={folder.folder}>{folder.label}</span>
@@ -30,6 +31,7 @@
 	{:else}
 	<div class="head">
 		{#if d.ontoggle}
+			<!-- raw-button: the expand control inside a box on the lineage canvas; it must not start a drag -->
 			<button class="toggle nodrag" aria-expanded={!d.collapsed} aria-label="{d.collapsed ? 'Expand' : 'Collapse'} {d.jobKey}" onclick={() => d.ontoggle?.(d.jobKey)}>
 				{#if d.collapsed}<ChevronRightIcon size={14} />{:else}<ChevronDownIcon size={14} />{/if}
 			</button>

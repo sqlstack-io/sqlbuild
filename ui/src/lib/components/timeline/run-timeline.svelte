@@ -1,5 +1,7 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
@@ -182,15 +184,11 @@
 				<input bind:value={query} placeholder="Search jobs" />
 			</label>
 		{/if}
-		<div class="seg">
-			{#each Object.keys(WINDOWS) as w (w)}
-				<button class:on={windowKey === w} onclick={() => ((windowKey = w as WindowKey), (pan = 0))}>{w}</button>
-			{/each}
-		</div>
-		<div class="seg">
-			<button onclick={() => pan++} aria-label="Earlier"><ChevronLeftIcon size={14} /></button>
-			<button class:on={pan === 0} onclick={() => (pan = 0)}>Now</button>
-			<button onclick={() => (pan = Math.max(0, pan - 1))} disabled={pan === 0} aria-label="Later"><ChevronRightIcon size={14} /></button>
+		<SegmentedFilter label="Window" bind:value={windowKey} options={(Object.keys(WINDOWS) as WindowKey[]).map((w) => ({ value: w, label: w }))} onselect={() => (pan = 0)} />
+		<div class="flex items-center gap-0.5">
+			<Button variant="ghost" size="icon-sm" onclick={() => pan++} aria-label="Earlier" title="Earlier"><ChevronLeftIcon /></Button>
+			<Button variant="ghost" size="sm" aria-pressed={pan === 0} onclick={() => (pan = 0)}>Now</Button>
+			<Button variant="ghost" size="icon-sm" onclick={() => (pan = Math.max(0, pan - 1))} disabled={pan === 0} aria-label="Later" title="Later"><ChevronRightIcon /></Button>
 		</div>
 		{#if actions}<div class="tl-actions">{@render actions()}</div>{/if}
 	</div>
@@ -333,37 +331,6 @@
 		background: transparent;
 		color: var(--foreground);
 		font-size: 12.5px;
-	}
-	.seg {
-		display: flex;
-		gap: 2px;
-		padding: 2px;
-		border-radius: 2px;
-		background: var(--sb-hover);
-	}
-	.seg button {
-		display: inline-flex;
-		height: 24px;
-		min-width: 28px;
-		align-items: center;
-		justify-content: center;
-		padding: 0 8px;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.seg button:hover:not(:disabled) {
-		color: var(--foreground);
-	}
-	.seg button:disabled {
-		opacity: 0.4;
-	}
-	.seg button.on {
-		background: var(--card);
-		color: var(--foreground);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 	}
 	.tl-actions {
 		display: flex;

@@ -1,11 +1,12 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import AlertCircleIcon from '@lucide/svelte/icons/circle-alert';
 	import HistoryIcon from '@lucide/svelte/icons/history';
 	import InfoIcon from '@lucide/svelte/icons/info';
@@ -159,15 +160,15 @@
 								<small>{view.since}</small>
 								<span class="issue-ack">
 									{#if 'acknowledged' in item && canAcknowledge}
-										<button class="ack" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
-											<BellOffIcon size={13} />Acknowledge
-										</button>
+										<Button variant="ghost" size="sm" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
+											<BellOffIcon />Acknowledge
+										</Button>
 									{/if}
 								</span>
 								<span class="issue-actions">
 									{#if view.build}
 										{@const build = view.build}
-										<GatedButton requires="run.adhoc" size="xs" variant={build.variant} onclick={() => goto(to(build.href))}>{#if build.variant === 'stale'}<HammerIcon class="size-3.5" />{/if}{build.label}</GatedButton>
+										<GatedButton requires="run.adhoc" size="sm" variant={build.variant} onclick={() => goto(to(build.href))}>{#if build.variant === 'stale'}<HammerIcon class="size-3.5" />{/if}{build.label}</GatedButton>
 									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>
@@ -177,9 +178,7 @@
 				{/if}
 				{#if handled.length}
 					<div class="handled">
-						<button class="handled-toggle" aria-expanded={showHandled} onclick={() => (showHandled = !showHandled)}>
-							<ChevronRightIcon size={13} class={showHandled ? 'open' : ''} />Acknowledged · {handled.length}
-						</button>
+						<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[34px] pr-3.5 pl-[17px] text-[12px]">Acknowledged · {handled.length}</DisclosureButton>
 						{#if showHandled}
 							<div class="handled-rows">
 							{#each handled as { item, view } (view.key)}
@@ -193,7 +192,7 @@
 									<small>{view.since}</small>
 									<span class="issue-ack">
 										{#if 'acknowledged' in item && canAcknowledge}
-											<button class="undo" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, false)}>Undo</button>
+											<Button variant="ghost" size="sm" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, false)}>Undo</Button>
 										{/if}
 									</span>
 									<span class="issue-actions"><a href={to(view.href)}>{view.action} →</a></span>
@@ -265,7 +264,7 @@
 							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet. Deploy the project to see its models here.{/if}</div>
 						{/each}
 						{#if collapsedHidden}
-							<button class="folders-toggle" aria-expanded={showAllFolders} onclick={() => (showAllFolders = !showAllFolders)}>{showAllFolders ? 'Show fewer' : `Show all ${groups.length} folders`}</button>
+							<Button variant="link" size="inline" class="mx-4 mt-1 self-start text-[12px]" aria-expanded={showAllFolders} onclick={() => (showAllFolders = !showAllFolders)}>{showAllFolders ? 'Show fewer' : `Show all ${groups.length} folders`}</Button>
 						{/if}
 					</div>
 				</section>{/if}
@@ -335,17 +334,8 @@
 	.issue-ack { justify-content: flex-end; }
 	.issue-actions { justify-content: flex-end; gap: 10px; }
 	.issue-actions a { color: var(--primary); font-weight: 500; white-space: nowrap; }
-	.ack { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 2px; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
-	.ack:hover:not(:disabled) { border-color: var(--border-strong); color: var(--foreground); }
-	.ack:disabled, .undo:disabled { opacity: 0.5; }
 	.handled { border-top: 1px solid var(--inner-line); }
-	.handled-toggle { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px 0 17px; color: var(--muted-foreground); font-size: 12px; }
-	.handled-toggle:hover { color: var(--foreground); }
-	.handled-toggle :global(svg) { transition: transform 120ms; }
-	.handled-toggle :global(svg.open) { transform: rotate(90deg); }
 	.issue.muted .issue-title { color: var(--muted-foreground); font-weight: 500; }
-	.undo { color: var(--muted-foreground); font-size: 12px; }
-	.undo:hover:not(:disabled) { color: var(--foreground); }
 	.ack-error { margin: 0; padding: 8px 17px; border-top: 1px solid var(--inner-line); color: var(--sb-error); font-size: 12px; }
 	.issue-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 2px; }
 	.issue-icon.error { color: var(--sb-error); background: color-mix(in srgb, var(--sb-error) 12%, transparent); }
@@ -402,8 +392,6 @@
 	.group-row > span:first-child { color: var(--muted-foreground); }
 	.group-row b { color: var(--foreground); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
 	.group-row.head span:not(:first-child) { text-align: right; }
-	.folders-toggle { display: block; margin: 4px 16px 0; color: var(--primary); font: 500 12px var(--font-sans); }
-	.folders-toggle:hover { text-decoration: underline; }
 	.group-bar { display: flex; height: 7px; overflow: hidden; border-radius: 2px; background: var(--sb-hover); }
 	.group-bar .fresh { background: var(--sb-success); }
 	.stale-segment { background: var(--sb-stale); }

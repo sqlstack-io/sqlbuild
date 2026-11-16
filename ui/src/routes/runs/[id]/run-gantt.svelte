@@ -1,4 +1,7 @@
 <script lang="ts">
+	import MinusIcon from '@lucide/svelte/icons/minus';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { onMount } from 'svelte';
@@ -114,11 +117,11 @@
 <div class="gantt-head">
 	<span class="count">{nodes.length} node{nodes.length === 1 ? '' : 's'}</span>
 	<div class="zoom">
-		<button onclick={() => zoomBy(1 / 1.5)} disabled={zoom <= ZOOM_MIN} title="Zoom out">−</button>
+		<Button variant="ghost" size="icon-sm" onclick={() => zoomBy(1 / 1.5)} disabled={zoom <= ZOOM_MIN} title="Zoom out" aria-label="Zoom out"><MinusIcon /></Button>
 		<input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.1" bind:value={zoom} title="Zoom" />
-		<button onclick={() => zoomBy(1.5)} disabled={zoom >= ZOOM_MAX} title="Zoom in">+</button>
+		<Button variant="ghost" size="icon-sm" onclick={() => zoomBy(1.5)} disabled={zoom >= ZOOM_MAX} title="Zoom in" aria-label="Zoom in"><PlusIcon /></Button>
 	</div>
-	<button class="fit" onclick={() => ((zoom = 1), ganttEl && (ganttEl.scrollLeft = 0))} disabled={zoom === 1}>Fit</button>
+	<Button size="sm" onclick={() => ((zoom = 1), ganttEl && (ganttEl.scrollLeft = 0))} disabled={zoom === 1}>Fit</Button>
 </div>
 
 <div class="pane">
@@ -152,6 +155,7 @@
 				{#if row.type === 'group'}
 					<div class="row group-row">
 						<div class="gutter cell" class:shadow={scrolledX} style:width="{gutterW}px">
+							<!-- raw-button: the fold control in a group row of the chart's name column -->
 							<button
 								class="fold"
 								class:open={!collapsed.has(row.group.runId)}
@@ -170,6 +174,7 @@
 					{@const n = row.node}
 					{@const s = startOf(n)}
 					{@const e = endOf(n)}
+					<!-- raw-button: a row of the chart, clickable as a whole to select its node -->
 					<button class="row" class:sel={selected.includes(n.nodeKey)} onclick={(ev) => onselect(n.nodeKey, ev.metaKey || ev.ctrlKey || ev.shiftKey)}>
 						<span
 							class="gutter cell"
@@ -220,27 +225,8 @@
 	.zoom {
 		display: flex;
 		align-items: center;
-		overflow: hidden;
-		border: 1px solid var(--border);
+		border: 1px solid var(--input);
 		border-radius: 2px;
-		background: var(--secondary);
-	}
-	.zoom button,
-	.fit {
-		height: 24px;
-		padding: 0 8px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.fit {
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--secondary);
-		font-size: 11px;
-	}
-	.zoom button:disabled,
-	.fit:disabled {
-		opacity: 0.4;
 	}
 	.zoom input {
 		width: 84px;

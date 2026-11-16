@@ -4,7 +4,7 @@
 	// truth), with inline defaults, descriptions, required markers and live
 	// validation. Opt-in raw YAML escape hatch, two-way bound. Reused by the
 	// Providers page (durable config) and the plan page (per-run overrides).
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import LockIcon from '@lucide/svelte/icons/lock';
 
 	export type Field = {
@@ -109,15 +109,7 @@
 				<!-- control -->
 				<div class="min-w-0 flex-1">
 					{#if f.type === 'bool'}
-						<button
-							class="relative h-[18px] w-[32px] rounded-full transition-colors disabled:opacity-50"
-							style:background={eff(f) ? 'var(--sb-success)' : 'var(--border-strong)'}
-							onclick={() => set(f, !eff(f))}
-							disabled={readOnly}
-							aria-label="Toggle {f.key}"
-						>
-							<span class="absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-all" style:left={eff(f) ? '16px' : '2px'}></span>
-						</button>
+						<button class="sb-toggle" class:on={!!eff(f)} onclick={() => set(f, !eff(f))} disabled={readOnly} aria-pressed={!!eff(f)} aria-label="Toggle {f.key}"></button>
 					{:else if f.type === 'enum'}
 						<select
 							class="bg-secondary w-full max-w-[280px] rounded-[2px] border px-2 py-1.5 text-[12px] outline-none disabled:opacity-60"
@@ -167,10 +159,7 @@
 
 	<!-- raw escape hatch -->
 	<div class="mt-3 flex items-center">
-		<button class="text-muted-foreground hover:text-foreground ml-auto flex items-center gap-1 text-[11px]" onclick={() => (rawOpen = !rawOpen)}>
-			<ChevronRight size={12} style="transform: rotate({rawOpen ? 90 : 0}deg); transition: transform 0.12s;" />
-			raw YAML
-		</button>
+		<DisclosureButton open={rawOpen} onclick={() => (rawOpen = !rawOpen)} class="ml-auto text-[11.5px]">raw YAML</DisclosureButton>
 	</div>
 	{#if rawOpen}
 		<pre class="bg-[var(--sb-inset)] mt-2 overflow-auto rounded-[2px] border border-[var(--border-subtle)] px-3 py-2.5 font-mono text-[11.5px] leading-[1.7]" style="color:var(--sb-mono)">{yaml}</pre>

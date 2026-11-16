@@ -1,7 +1,8 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import GitCommitIcon from '@lucide/svelte/icons/git-commit-horizontal';
 	import PackageIcon from '@lucide/svelte/icons/package';
 	import type { SnapshotChange } from '$lib/api';
@@ -98,14 +99,14 @@
 									<span>{g.count.toLocaleString('en')} {g.noun}</span>
 								</div>
 							{/each}
-							<button class="more" onclick={() => (listed[c.snapshotId] = true)}>Show all {c.nodes.length.toLocaleString('en')} nodes</button>
+							<Button variant="link" size="inline" class="mt-1" onclick={() => (listed[c.snapshotId] = true)}>Show all {c.nodes.length.toLocaleString('en')} nodes</Button>
 						{/if}
 						{#each grouped ? [] : c.nodes as n (n.key + n.op)}
 							{@const href = nodeHref(n, app.client.supports('getCatalogNode'))}
 							<div class="row">
 								<span class="op" style:--tone={changeOpTone[n.op]}>{changeOpLabel[n.op]}</span>
 								{#if href}<a class="key" {href}>{n.key}</a>{:else}<code class:gone={n.op === 'removed'}>{n.key}</code>{/if}
-								<span class="detail">{n.detail}{#if n.compiledOnly}<span class="tag">compiled only</span>{/if}</span>
+								<span class="detail">{n.detail}{#if n.compiledOnly}<span class="sb-tag ml-2">compiled only</span>{/if}</span>
 							</div>
 							{#each n.columns as col (col.name)}
 								<div class="row sub">
@@ -202,9 +203,7 @@
 			{#each row.changes as c (c.snapshotId)}{@render deploy(c)}{/each}
 		{:else}
 			{@const open = !!openQuiet[row.key]}
-			<button class="quiet" class:open aria-expanded={open} onclick={() => (openQuiet[row.key] = !open)}>
-				<ChevronRightIcon size={14} />{quietDeployLine(row, app.now)}
-			</button>
+			<div class="quiet"><DisclosureButton {open} onclick={() => (openQuiet[row.key] = !open)} class="w-full px-4 py-2 text-[12px]">{quietDeployLine(row, app.now)}</DisclosureButton></div>
 			{#if open}
 				{#each row.changes as c (c.snapshotId)}{@render deploy(c)}{/each}
 			{/if}
@@ -268,27 +267,12 @@
 	}
 	/* A run of deploys that changed nothing, as one line; it expands to list them. */
 	.quiet {
-		display: flex;
-		width: 100%;
-		align-items: center;
-		gap: 8px;
 		margin-bottom: 12px;
-		padding: 8px 16px;
 		border: 1px dashed var(--panel-border);
 		border-radius: 2px;
-		color: var(--sb-text-faint);
-		font-size: 12px;
-		text-align: left;
 	}
 	.quiet:hover {
-		color: var(--foreground);
 		background: var(--sb-hover);
-	}
-	.quiet :global(svg) {
-		transition: transform 0.12s;
-	}
-	.quiet.open :global(svg) {
-		transform: rotate(90deg);
 	}
 	.title code {
 		color: var(--primary);
@@ -326,14 +310,6 @@
 		gap: 10px;
 		padding: 3px 0;
 		font-size: 12.5px;
-	}
-	.more {
-		margin-top: 4px;
-		color: var(--primary);
-		font-size: 12.5px;
-	}
-	.more:hover {
-		text-decoration: underline;
 	}
 	.row.sub {
 		padding-left: 22px;
@@ -380,14 +356,6 @@
 	}
 	.detail b.down {
 		color: var(--sb-success);
-	}
-	.tag {
-		margin-left: 8px;
-		padding: 0 6px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 11px;
 	}
 	.icon-inline {
 		color: var(--muted-foreground);

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { appPath, to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import HelpTip from '$lib/components/help-tip.svelte';
@@ -10,6 +11,9 @@
 	import { page } from '$app/state';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import XIcon from '@lucide/svelte/icons/x';
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument, PlatformEvent } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
@@ -285,14 +289,10 @@
 		{#if job}
 			<span class="jobchip" data-testid="plan-job">
 				<span class="faint">Job</span><a href={to(`/jobs/${encodeURIComponent(job)}`)}>{job}</a>
-				<button onclick={detachJob} title="Run the command on its own, not as part of {job}" aria-label="Remove the job">×</button>
+				<Button variant="ghost" size="icon-xs" onclick={detachJob} title="Run the command on its own, not as part of {job}" aria-label="Remove the job"><XIcon /></Button>
 			</span>
 		{:else}
-			<div class="verbs" role="group" aria-label="Command">
-				{#each VERBS as v (v.name)}
-					<button class:on={verb === v.name} onclick={() => setVerb(v.name)} title={v.description}>{v.name}</button>
-				{/each}
-			</div>
+			<SegmentedFilter label="Command" value={verb} options={VERBS.map((v) => ({ value: v.name, label: v.name, title: v.description }))} onselect={setVerb} />
 		{/if}
 		<div class="line">
 			<span class="faint">$</span>
@@ -308,11 +308,12 @@
 				aria-label="Command"
 				placeholder={job ? 'sqb build --exclude orders' : 'sqb build --select +orders'}
 			/>
-			<button class="copy" onclick={() => insertFlag('--')} title="Add an option to the command">＋ Option</button>
-			<button class="copy" onclick={copy} title="Copy the command, to run it with sqb yourself"><CopyIcon size={12} /> {copied ? 'Copied' : 'Copy'}</button>
+			<Button variant="ghost" size="sm" onclick={() => insertFlag('--')} title="Add an option to the command"><PlusIcon />Option</Button>
+			<Button variant="ghost" size="sm" onclick={copy} title="Copy the command, to run it with sqb yourself"><CopyIcon />{copied ? 'Copied' : 'Copy'}</Button>
 			{#if acOpen && suggestions.length}
 				<div class="ac">
 					{#each suggestions as s, i (s.value)}
+						<!-- raw-button: an option in the command's autocomplete list -->
 						<button class:on={i === acIndex} onmouseenter={() => (acIndex = i)} onmousedown={(e) => (e.preventDefault(), pick(s))}>
 							<code>{s.label}</code><span>{s.hint}</span>
 						</button>
@@ -337,13 +338,11 @@
 						<b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
 					{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code" title="Option">{value === true ? name : `${name}=${value}`}</span>{/each}
-					<div class="tabs" role="tablist">
-						<button role="tab" aria-selected={tab === 'plan'} onclick={() => (view = 'plan')}>{shown.verb === 'build' ? 'Plan' : 'Nodes'}</button>
-						<button role="tab" aria-selected={tab === 'graph'} onclick={() => (view = 'graph')}>Graph</button>
-						{#if shown.verb === 'build' && planChecks.length}<button role="tab" aria-selected={tab === 'checks'} onclick={() => (view = 'checks')}>Checks · {planChecks.length}</button>{/if}
+					<div class="tabs">
+						<SegmentedFilter label="View" value={tab} options={[{ value: 'plan' as const, label: shown.verb === 'build' ? 'Plan' : 'Nodes' }, { value: 'graph' as const, label: 'Graph' }, ...(shown.verb === 'build' && planChecks.length ? [{ value: 'checks' as const, label: 'Checks', count: planChecks.length }] : [])]} onselect={(v) => (view = v)} />
 					</div>
 					{#if shown.verb === 'build' && plan}
-						<button class="replan" onclick={replan} disabled={planning}><RotateCwIcon size={11} class={planning ? 'animate-spin' : ''} /> {planning ? 'Planning…' : 'Plan again'}</button>
+						<Button variant="ghost" size="sm" class="ml-auto" onclick={replan} disabled={planning}><RotateCwIcon class={planning ? 'animate-spin' : ''} />{planning ? 'Planning…' : 'Plan again'}</Button>
 					{/if}
 				</div>
 			{/if}
@@ -432,33 +431,6 @@
 		font-family: var(--font-mono);
 		color: var(--foreground);
 	}
-	.jobchip button {
-		padding: 0 5px;
-		color: var(--muted-foreground);
-	}
-	.jobchip button:hover {
-		color: var(--foreground);
-	}
-	.verbs {
-		display: flex;
-		flex-shrink: 0;
-		overflow: hidden;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-	}
-	.verbs button {
-		padding: 4px 11px;
-		border-right: 1px solid var(--border);
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.verbs button:last-child {
-		border-right: 0;
-	}
-	.verbs button.on {
-		background: var(--sidebar-accent);
-		color: var(--foreground);
-	}
 	.line {
 		position: relative;
 		display: flex;
@@ -466,7 +438,7 @@
 		flex: 1;
 		align-items: center;
 		gap: 10px;
-		padding: 5px 10px;
+		padding: 1px 2px 1px 10px;
 		border: 1px solid var(--border);
 		border-radius: 2px;
 		background: var(--sb-inset);
@@ -482,16 +454,6 @@
 		font-family: var(--font-mono);
 		font-size: 12.5px;
 		outline: none;
-	}
-	.copy {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.copy:hover {
-		color: var(--foreground);
 	}
 	.ac {
 		position: absolute;
@@ -578,17 +540,6 @@
 		box-shadow: var(--sb-elev);
 		font-size: 12.5px;
 	}
-	.replan {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		margin-left: auto;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.replan:hover:not(:disabled) {
-		color: var(--foreground);
-	}
 	.summary {
 		display: flex;
 		flex-wrap: wrap;
@@ -616,22 +567,10 @@
 		padding-top: 3px;
 	}
 	.tabs {
-		display: flex;
-		gap: 14px;
-		margin-left: 18px;
+		margin-left: 12px;
 	}
 	.tabs:first-child {
 		margin-left: 0;
-	}
-	.tabs button {
-		padding: 2px 0;
-		border-bottom: 1px solid transparent;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.tabs button[aria-selected='true'] {
-		border-bottom-color: var(--foreground);
-		color: var(--foreground);
 	}
 	.graph {
 		min-height: 320px;

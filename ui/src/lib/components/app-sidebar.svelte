@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { appPath, to } from '$lib/paths';
 	import logoForDark from '$website/src/assets/logo-dark.png';
 	import logoForLight from '$website/src/assets/logo-light.png';
@@ -87,7 +88,7 @@
 				<span class="bg-primary grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[2px] text-[10px] font-semibold text-white">{initials}</span>
 				<span class="truncate">{app.user.displayName}{#if app.user.role} · <span class="text-muted-foreground">{app.user.role}</span>{/if}</span>
 				{#if app.signOut && app.bootstrap?.authMode !== 'disabled'}
-					<button class="text-muted-foreground hover:text-foreground ml-auto text-[12px]" onclick={() => app.signOut?.()}>Sign out</button>
+					<Button variant="ghost" size="sm" class="ml-auto" onclick={() => app.signOut?.()}>Sign out</Button>
 				{/if}
 			</div>
 		{/if}

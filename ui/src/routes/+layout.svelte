@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import './layout.css';
 	import { onMount } from 'svelte';
@@ -35,7 +36,7 @@
 			{#if app.bootError.configuration}
 				<a class="link mt-4 inline-block text-[13px]" href={SERVER_DOCS} target="_blank" rel="noreferrer">Set up sign-in</a>
 			{:else}
-				<button class="mt-4 rounded-md border border-border px-3 py-1.5 text-[13px]" onclick={() => location.reload()}>Retry</button>
+				<Button class="mt-4" onclick={() => location.reload()}>Retry</Button>
 			{/if}
 		</div>
 	</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import { to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import { page } from '$app/state';
@@ -121,11 +122,7 @@
 				{:else}<span>{n.lastBuild ? `Last built ${formatAgo(n.lastBuild.builtAt, app.now)}` : 'Never built'}</span>{/if}
 			</div>
 		{/if}
-		<div class="tabs" role="tablist">
-			{#each tabs as [t, label] (t)}
-				<button role="tab" aria-selected={tab === t} class:on={tab === t} onclick={() => setTab(t)}>{label}</button>
-			{/each}
-		</div>
+		<div class="mt-2.5"><PageTabs flush value={tab} tabs={tabs.map(([value, label]) => ({ value, label }))} onselect={setTab} /></div>
 	</header>
 
 	{#if res.error}<div class="msg err">Couldn't load {name}: {res.error}</div>{:else if res.data === null}<div class="msg">There's no node <code>{name}</code> in the version deployed to {app.location?.name}.</div>{/if}
@@ -242,36 +239,6 @@
 		content: '·';
 		margin-right: 12px;
 		color: var(--sb-text-faint);
-	}
-	.tabs {
-		display: flex;
-		gap: 4px;
-		margin-top: 14px;
-	}
-	.tabs button {
-		position: relative;
-		height: 38px;
-		padding: 0 10px;
-		border: 0;
-		background: transparent;
-		color: var(--muted-foreground);
-		font-size: 13px;
-	}
-	.tabs button:hover {
-		color: var(--foreground);
-	}
-	.tabs button.on {
-		color: var(--foreground);
-		font-weight: 500;
-	}
-	.tabs button.on::after {
-		content: '';
-		position: absolute;
-		right: 6px;
-		bottom: -1px;
-		left: 6px;
-		height: 2px;
-		background: var(--primary);
 	}
 	.asset-body {
 		min-height: 0;

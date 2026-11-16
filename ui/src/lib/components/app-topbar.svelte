@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import SunIcon from '@lucide/svelte/icons/sun';
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import type { Snippet } from 'svelte';
@@ -61,17 +62,9 @@
 			<WarehouseSyncStatus />
 		{/if}
 		{#if children}<span class="ml-1 flex items-center gap-2.5">{@render children()}</span>{/if}
-		<button
-			class="bg-card text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] grid size-[30px] place-items-center rounded-(--radius) border border-border"
-			aria-label="Toggle theme"
-			onclick={toggleTheme}
-		>
-			{#if theme.value === 'dark'}
-				<SunIcon size={14} />
-			{:else}
-				<MoonIcon size={14} />
-			{/if}
-		</button>
+		<Button size="icon-bar" class="text-muted-foreground hover:text-foreground" aria-label="Toggle theme" title="Toggle theme" onclick={toggleTheme}>
+			{#if theme.value === 'dark'}<SunIcon />{:else}<MoonIcon />{/if}
+		</Button>
 	</div>
 </div>
 <PlatformEventBanner only={events} />

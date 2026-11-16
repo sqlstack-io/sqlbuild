@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import CircleXIcon from '@lucide/svelte/icons/circle-x';
 	import CircleSlashIcon from '@lucide/svelte/icons/circle-slash';
@@ -77,7 +79,7 @@
 		<tbody>
 			{#each statements as st (st.id)}
 				<tr class="row" class:open={open.has(st.id)} onclick={() => toggle(st)}>
-					<td class="caret-col"><button class="caret" aria-expanded={open.has(st.id)} aria-label="{open.has(st.id) ? 'Hide' : 'Show'} statement {st.sequence}">{open.has(st.id) ? '▾' : '▸'}</button></td>
+					<td class="caret-col"><DisclosureButton open={open.has(st.id)}><span class="sr-only">{open.has(st.id) ? 'Hide' : 'Show'} statement {st.sequence}</span></DisclosureButton></td>
 					<td class="num faint">{st.sequence}</td>
 					<td class="faint nowrap" title={formatStamp(st.startedAt)}>{clockTime(st.startedAt)}</td>
 					{#if grouped}<td class="mono faint">{shortRunId(st.runId)}</td>{/if}
@@ -103,6 +105,7 @@
 				{#if st.error}
 					<tr class="err-row">
 						<td colspan={grouped ? 10 : 9}>
+							<!-- raw-button: a failed statement's error text, clickable to show it in full -->
 							<button class="err" class:clamp={!fullError.has(st.id)} onclick={() => toggleError(st.id)} title={fullError.has(st.id) ? 'Show less' : 'Show the full error'}>{st.error}</button>
 						</td>
 					</tr>
@@ -118,7 +121,7 @@
 							{:else if loaded?.state === 'ok' && loaded.sql !== null}
 								<SqlBlock sql={loaded.sql} caption="statement {st.sequence} · {st.nodeKey}" />
 							{:else if loaded?.state === 'error'}
-								<p class="note err-text">Couldn't load the SQL: {loaded.message} <button class="retry" onclick={() => retry(st)}>Retry</button></p>
+								<p class="note err-text">Couldn't load the SQL: {loaded.message} <Button variant="link" size="inline" onclick={() => retry(st)}>Retry</Button></p>
 							{:else}
 								<p class="note">Loading SQL…</p>
 							{/if}
@@ -166,9 +169,6 @@
 		width: 28px;
 		padding-right: 0;
 		padding-left: 14px;
-	}
-	.caret {
-		color: var(--sb-text-faint);
 	}
 	.num {
 		text-align: right;
@@ -241,9 +241,6 @@
 	}
 	.err-text {
 		color: var(--sb-error);
-	}
-	.retry {
-		color: var(--primary);
 	}
 	.empty {
 		padding: 32px;

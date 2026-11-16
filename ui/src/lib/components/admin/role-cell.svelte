@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
+	import { cn } from '$lib/utils';
 	import { to } from '$lib/paths';
 	import * as Popover from '$lib/components/ui/popover';
 	import type { RoleAssignment, RoleDefinition } from '$lib/api';
@@ -23,7 +25,7 @@
 		{#if !locationId}<span class="where">{top.scope.locationId === null ? 'everywhere' : `in ${scopeWords(top.scope.locationId, locations)}`}</span>{/if}
 		{#if rest > 0}
 			<Popover.Root bind:open>
-				<Popover.Trigger class="more" onclick={(e: MouseEvent) => e.stopPropagation()}>+{rest} more</Popover.Trigger>
+				<Popover.Trigger class={cn(buttonVariants({ variant: 'link', size: 'inline' }), 'text-[12px]')} onclick={(e: MouseEvent) => e.stopPropagation()}>+{rest} more</Popover.Trigger>
 				<Popover.Content class="w-[340px] p-0" align="start">
 					<div class="border-b border-border px-3 py-2 text-[12px] font-semibold">
 						{locationId ? `Roles in ${scopeWords(locationId, locations)}` : 'All roles'}
@@ -63,10 +65,6 @@
 	}
 	.none {
 		color: var(--sb-text-faint);
-	}
-	.cell :global(.more) {
-		color: var(--primary);
-		font-size: 12px;
 	}
 	.list {
 		display: flex;

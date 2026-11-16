@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
 	import { ApiError, DEMO } from '$lib/api';
 	import { app } from '$lib/state/app.svelte';
@@ -53,11 +54,7 @@
 				<h2>Estimated query cost</h2>
 				<span>Warehouse time the runs' queries used, not billed warehouse time</span>
 			</div>
-			<div class="windows" role="group" aria-label="Window">
-				{#each WINDOWS as w (w)}
-					<button class:on={days === w} aria-pressed={days === w} onclick={() => (days = w)}>{w} days</button>
-				{/each}
-			</div>
+			<SegmentedFilter label="Window" value={String(days)} options={WINDOWS.map((w) => ({ value: String(w), label: `${w} days` }))} onselect={(v) => (days = Number(v) as (typeof WINDOWS)[number])} />
 		</div>
 		{#if summary.error && !cost}
 			<p class="note err">Couldn't load cost: {summary.error}</p>
@@ -94,10 +91,6 @@
 	.panel-heading h2 { margin: 0; font-size: 13px; font-weight: 600; }
 	.panel-heading span { color: var(--muted-foreground); font-size: 12px; }
 	.panel-heading > div:first-child { display: flex; align-items: baseline; gap: 10px; }
-	.windows { display: flex; border: 1px solid var(--border); border-radius: 2px; }
-	.windows button { height: 24px; padding: 0 9px; color: var(--muted-foreground); font-size: 12px; }
-	.windows button + button { border-left: 1px solid var(--border); }
-	.windows button.on { background: var(--sb-hover); color: var(--foreground); font-weight: 600; }
 	.total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 14px 4px; }
 	.total strong { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
 	.total span { color: var(--muted-foreground); font-size: 12px; }

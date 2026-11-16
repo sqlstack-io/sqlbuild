@@ -73,8 +73,8 @@
 				</span>
 				{#if t.state === 'active'}
 					<span class="actions">
-						<GatedButton requires="location.manage" size="xs" busy={busy === t.id} onclick={() => rotate(t)}>Rotate</GatedButton>
-						<GatedButton requires="location.manage" size="xs" variant="destructive" busy={busy === t.id} onclick={() => revoke(t)}>Revoke</GatedButton>
+						<GatedButton requires="location.manage" size="sm" busy={busy === t.id} onclick={() => rotate(t)}>Rotate</GatedButton>
+						<GatedButton requires="location.manage" size="sm" variant="destructive" busy={busy === t.id} onclick={() => revoke(t)}>Revoke</GatedButton>
 					</span>
 				{/if}
 			</li>

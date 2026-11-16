@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { openRow, to } from '$lib/paths';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
@@ -36,6 +38,7 @@
 </script>
 
 {#snippet chip(key: TokenKey, value: string, label: string, title: string)}
+	<!-- raw-button: a value chip in a run row; clicking it filters the list by that value -->
 	<button type="button" class="chip" onclick={() => onfilter(key, value)} {title}>{label}</button>
 {/snippet}
 
@@ -78,9 +81,7 @@
 							<a class="mono" href={to(`/runs/${r.id}`)} title={r.id}>{shortRunId(r.id)}</a>
 							<CopyButton value={r.id} label="Copy run ID" />
 							{#if r.childRunCount && !d.child && !list.params.children}
-								<button type="button" class="expand" onclick={() => list.toggleExpanded(r.id)} aria-expanded={list.expanded.has(r.id)} title="{list.expanded.has(r.id) ? 'Hide' : 'Show'} the {r.childRunCount} job runs in this group">
-									{list.expanded.has(r.id) ? '▾' : '▸'} {r.childRunCount}
-								</button>
+								<DisclosureButton open={list.expanded.has(r.id)} onclick={() => list.toggleExpanded(r.id)} title="{list.expanded.has(r.id) ? 'Hide' : 'Show'} the {r.childRunCount} job runs in this group" class="ml-0.5 gap-0.5 text-[11.5px]">{r.childRunCount}</DisclosureButton>
 							{/if}
 						</div>
 						{#if d.child || (list.params.children && r.parentRunId)}
@@ -142,7 +143,7 @@
 				<tr class="load-row">
 					<td colspan="7" class="empty">
 						{#if list.error}
-							<span class="err">Couldn't load runs: {list.error}</span> <button class="retry" onclick={() => list.refresh()}>Retry</button>
+							<span class="err">Couldn't load runs: {list.error}</span> <Button variant="link" size="inline" onclick={() => list.refresh()}>Retry</Button>
 						{:else if list.resetting}
 							<Loading lines={4} />
 						{:else}
@@ -219,18 +220,6 @@
 		color: var(--primary);
 		text-decoration: underline;
 	}
-	.expand {
-		margin-left: 2px;
-		padding: 0 6px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-		line-height: 18px;
-	}
-	.expand:hover {
-		color: var(--foreground);
-	}
 	tr.child td:nth-child(2) {
 		padding-left: 28px;
 	}
@@ -304,8 +293,5 @@
 	}
 	.err {
 		color: var(--sb-error);
-	}
-	.retry {
-		color: var(--primary);
 	}
 </style>
