@@ -30,6 +30,7 @@ from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
 from sqlbuild.provider.main.runtime import ProviderContainer, _empty_provider_container
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import PythonCheckSeverity
+from sqlbuild.runtime.contracts.models import TargetSettings
 from sqlbuild.runtime.contracts.types import NodeStartCallback
 
 
@@ -134,6 +135,7 @@ class PythonNodeRuntime:
     target: str | None
     vars: dict[str, object]
     is_reload: bool
+    target_config: TargetSettings | None = None
     default_database: str | None = None
     default_schema: str | None = None
     relation_targets: dict[SqlResourceRef, str] | None = None
@@ -178,6 +180,7 @@ class BasePythonNodeContext(DependencyResultReader):
     statement_recorder: StatementRecorder
     run_state: PythonNodeRunState | None = None
     result_store: Any | None = None
+    target_config: TargetSettings | None = None
     default_database: str | None = None
     default_schema: str | None = None
     relation_targets: dict[SqlResourceRef, str] = field(default_factory=dict)

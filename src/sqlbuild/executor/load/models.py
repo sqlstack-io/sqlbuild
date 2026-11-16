@@ -27,6 +27,7 @@ from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.provider.main.runtime import ProviderContainer, _empty_provider_container
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import SqlResourceRefKind
+from sqlbuild.runtime.contracts.models import TargetSettings
 from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback, ExecutionResourceKind
 
 
@@ -149,6 +150,7 @@ class LoaderContext(DependencyResultReader):
     runtime_dir: Path = Path("target")
     on_progress: Callable[[str], None] | None = None
     relation_guard: RuntimeRelationGuard | None = field(default=None, repr=False)
+    target_config: TargetSettings | None = None
 
     def execute_sql(self, sql: str) -> Any:
         if self.relation_guard is not None:
@@ -281,6 +283,7 @@ class LoadRuntimeParams:
     target: str | None
     vars: dict[str, object]
     is_reload: bool
+    target_config: TargetSettings | None = None
     runtime_dir: Path = Path("target")
     start_cursor_ts: datetime | None = None
     end_cursor_ts: datetime | None = None

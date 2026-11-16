@@ -518,6 +518,7 @@ from sqlbuild.runtime.compute_logs.models import FinalCaptureMetadata as FinalCa
 from sqlbuild.runtime.compute_logs.models import PruneResult as PruneResult
 from sqlbuild.runtime.compute_logs.types import ComputeLogStream as ComputeLogStream
 from sqlbuild.runtime.contracts.models import ConnectionHooks as ConnectionHooks
+from sqlbuild.runtime.contracts.models import TargetSettings as TargetSettings
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind as ExecutionResourceKind
 from sqlbuild.runtime.event_exporting.exceptions import (
     EventExporterInputError as EventExporterInputError,

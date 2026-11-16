@@ -466,6 +466,7 @@ def build_hook_context(  # noqa: PLR0913
         hook_index=invocation.index,
         run_id=hook_run.run_id,
         target=hook_run.target,
+        target_config=hook_run.target_config,
         vars=hook_run.effective_vars if hook_run.effective_vars is not None else {},
         destination=relation,
         adapter_name=adapter.adapter_name,

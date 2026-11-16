@@ -625,6 +625,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
+        name: "TargetSettings",
+        kind: HostKind::Class,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
         name: "ExecutionResourceKind",
         kind: HostKind::Class,
         edge: HostEdge::Executor,

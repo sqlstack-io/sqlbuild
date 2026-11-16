@@ -34,6 +34,7 @@ from sqlbuild.microbatches.models import MicrobatchScope
 from sqlbuild.microbatches.types import MicrobatchEventStore
 from sqlbuild.provider.main.runtime import ProviderContainer
 from sqlbuild.python_nodes.models import SqlResourceRef
+from sqlbuild.runtime.contracts.models import TargetSettings
 from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback, NodeStartCallback
 from sqlbuild.runtime.execution_limits.models import RunItemTimeouts
 
@@ -78,6 +79,7 @@ class BuildRuntimeParams:
     start_cursor_int: int | None = None
     end_cursor_int: int | None = None
     target: str = ""
+    target_config: TargetSettings | None = None
     effective_vars: dict[str, object] | None = None
     use_color: bool = False
     providers: ProviderContainer | None = None

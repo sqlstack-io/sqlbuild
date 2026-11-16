@@ -1210,6 +1210,7 @@ class BuildScheduler:
                             hook_functions=self._plan.hook_functions,
                             enforce_explicit_references=self._plan.enforce_explicit_references,
                             effective_target_name=self._target,
+                            target_config=self._runtime.target_config,
                             effective_vars=self._effective_vars,
                             providers=self._providers,
                             python_identity_recorder=self._python_identity_recorder,
