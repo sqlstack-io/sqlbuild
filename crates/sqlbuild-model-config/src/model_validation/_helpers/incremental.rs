@@ -14,9 +14,9 @@ use crate::model_validation::constants::{
     APPEND_STRATEGY, BOUNDED_REPLAY_PREFIX, CURSOR_GRAIN_BATCH_SIZES, CURSOR_INPUT_KEYS,
     CURSOR_POLICY_DISABLED, CURSOR_TYPES, DELETE_INSERT_STRATEGY, EFFECTIVE_BATCH_SIZE,
     ENFORCED_CONTRACT, FUTURE_CURSOR_ACTIONS, INCREMENTAL_MATERIALIZATION, INCREMENTAL_STRATEGIES,
-    MERGE_STRATEGY, ON_SCHEMA_CHANGE_EXAMPLE, ON_SCHEMA_CHANGE_POLICIES, REPLAY_ON_CHANGE_ACTIONS,
-    REPLAY_ON_CHANGE_EXAMPLE, REPLAY_ON_CHANGE_VALID_VALUES, TABLE_MATERIALIZATION,
-    TIMESTAMP_CURSOR, VIEW_MATERIALIZATION,
+    MERGE_STRATEGY, MICROBATCH_MODE, ON_SCHEMA_CHANGE_EXAMPLE, ON_SCHEMA_CHANGE_POLICIES,
+    REPLAY_ON_CHANGE_ACTIONS, REPLAY_ON_CHANGE_EXAMPLE, REPLAY_ON_CHANGE_VALID_VALUES,
+    TABLE_MATERIALIZATION, TIMESTAMP_CURSOR, VIEW_MATERIALIZATION,
 };
 use crate::model_validation::models::{ModelValidationFacts, ValidationStop};
 use crate::model_validation::types::Check;
@@ -381,6 +381,11 @@ fn check_write_strategy<N: AuthoredNode>(
         }
         if strategy != Some(DELETE_INSERT_STRATEGY) {
             return Err(config.error("replace_key requires incremental_strategy=delete_insert"));
+        }
+        if values.incremental_mode.as_deref() == Some(MICROBATCH_MODE) {
+            return Err(config.error(
+                "replace_key is not supported with incremental_mode=microbatch; each batch only replaces its own window",
+            ));
         }
         if has_unique_key {
             return Err(config.error(
