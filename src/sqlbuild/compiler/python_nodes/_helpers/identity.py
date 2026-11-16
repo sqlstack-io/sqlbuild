@@ -13,7 +13,7 @@ from types import ModuleType
 from typing import Any, cast
 
 from sqlbuild._native import PythonIdentityDependency, PythonNodeIdentity
-from sqlbuild.compiler.python_nodes._helpers.object_source import hash_text
+from sqlbuild.compiler.python_nodes._helpers.object_source import class_anchor, hash_text
 from sqlbuild.compiler.python_nodes.classes.identity_pass import IdentityPass
 
 _IGNORED_PATH_PARTS: frozenset[str] = frozenset(
@@ -182,8 +182,9 @@ def _visit_object(
             collected_dependencies: dict[tuple[str, str], PythonIdentityDependency] = dependencies
             collected_dependencies[key] = dependency
 
+    unwrapped: object = inspect.unwrap(cast(Any, obj))
     globals_map: Mapping[str, object] | None = getattr(
-        inspect.unwrap(cast(Any, obj)), "__globals__", None
+        class_anchor(unwrapped) or unwrapped, "__globals__", None
     )
     if globals_map is None:
         module: ModuleType | None = memo.module(obj)

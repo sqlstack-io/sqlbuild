@@ -51,7 +51,7 @@ pub(crate) struct UnwritableTestCase {
 pub(crate) struct HeldLockTestCase {
     pub(crate) description: &'static str,
     pub(crate) shutdown_ms: u64,
-    pub(crate) expected_degraded: bool,
+    pub(crate) expected_degraded_reason: Option<&'static str>,
 }
 
 pub(crate) struct CorruptStoreTestCase {
