@@ -230,8 +230,8 @@ max_ranking_order_by = 5   # default
   Keys come from `unique` column audits and model-level `unique` audits naming a column, when the
   column is also non-null (a `not_null` audit or `nullable false`), and from the `unique_key` of
   incremental `merge` models and of `delete_insert` models matched by key without a cursor.
-  Snapshot, append, microbatch and cursor-ranged `delete_insert` `unique_key`s do not prove one
-  row per key. Keys are followed through projections, renames, filters, one-to-one joins,
+  Snapshot, append, microbatch and cursor-ranged `delete_insert` `unique_key`s, and every
+  `replace_key`, do not prove one row per key. Keys are followed through projections, renames, filters, one-to-one joins,
   `GROUP BY` grains (named or positional), `SELECT DISTINCT`, `UNION`, and
   `ROW_NUMBER() ... = 1` deduplication in `QUALIFY` or a later `WHERE`; a `QUALIFY` key holds for
   later steps, never for the window that defines it. A join that can match a row more than once,

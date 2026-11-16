@@ -1,10 +1,11 @@
 //! The Python template evaluator: references, `if`, `eq`, `ne` and `coalesce`.
 
 use crate::templates::_helpers::missing_values::is_missing_value_message;
+use crate::templates::_helpers::substitution::rendered;
 use crate::templates::errors::TemplateError;
 use crate::templates::main::template_error_message::template_error_message;
 use crate::templates::models::{
-    ContextValue, Expression, Scalar, TemplateFailure, TemplateOptions,
+    ContextValue, Expression, Scalar, TemplateFailure, TemplateOptions, TextPart,
 };
 use crate::templates::types::TemplateHost;
 
@@ -30,6 +31,18 @@ pub(crate) fn evaluate<H: TemplateHost>(
 ) -> Result<H::Value, TemplateFailure> {
     match expression {
         Expression::Text(text) => host.text(text),
+        Expression::Interpolated(parts) => {
+            let mut joined = String::new();
+            for part in parts {
+                match part {
+                    TextPart::Text(text) => joined.push_str(text),
+                    TextPart::Template { body, expression } => {
+                        joined.push_str(&rendered(host, body, expression, options)?);
+                    }
+                }
+            }
+            host.text(&joined)
+        }
         Expression::Reference(reference) => evaluate_reference(host, reference, options),
         Expression::Function { name, arguments } => {
             evaluate_function(host, name, arguments, options)

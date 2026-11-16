@@ -1,10 +1,13 @@
 use std::cell::RefCell;
 
+use crate::templates::_helpers::pattern::counted_template_spans;
 use crate::templates::errors::TemplateError;
 use crate::templates::main::expand_template_string::expand_template_string;
 use crate::templates::models::{StringExpansion, TemplateFailure, TemplateOptions};
 use crate::templates::tests::helpers::{text, value};
-use crate::templates::tests::test_types::{TemplateTestCase, TestHost, Value};
+use crate::templates::tests::test_types::{
+    TemplateScanTestCase, TemplateTestCase, TestHost, Value,
+};
 
 #[test]
 fn given_template_strings_when_expanding_then_values_and_reads_match_python() {
@@ -190,6 +193,75 @@ fn given_template_strings_when_expanding_then_values_and_reads_match_python() {
             expected: value(Value::Text("prod".to_owned())),
             expected_reads: &[],
         },
+        TemplateTestCase {
+            description: "a quoted argument interpolates templates, so coalesce builds a fallback",
+            text: "${coalesce(ENV:MISSING, 'dev_${ENV:SCHEMA_NAME}')}",
+            expected: value(Value::Text("dev_analytics".to_owned())),
+            expected_reads: &["ENV:MISSING", "ENV:SCHEMA_NAME"],
+        },
+        TemplateTestCase {
+            description: "a set first argument wins before the quoted fallback is read",
+            text: "${coalesce(ENV:SCHEMA_NAME, 'dev_${ENV:MISSING}')}",
+            expected: value(Value::Text("analytics".to_owned())),
+            expected_reads: &["ENV:SCHEMA_NAME"],
+        },
+        TemplateTestCase {
+            description: "a missing variable inside the last quoted argument names itself",
+            text: "${coalesce(ENV:MISSING, 'dev_${ENV:UNSET}')}",
+            expected: Err(TemplateFailure::Missing(TemplateError::MissingEnvironment(
+                "UNSET".to_owned(),
+            ))),
+            expected_reads: &["ENV:MISSING", "ENV:UNSET", "ENV:UNSET"],
+        },
+        TemplateTestCase {
+            description: "nested templates in if arguments may reuse the outer quote",
+            text: "${if(eq(env, 'prod'), 'p_${coalesce(ENV:MISSING, 'x')}', 'n')}",
+            expected: value(Value::Text("p_x".to_owned())),
+            expected_reads: &["ENV:MISSING"],
+        },
+        TemplateTestCase {
+            description: "an interpolated argument inside text renders into it",
+            text: "schema_${coalesce(ENV:EMPTY, 'dev_${env}_${flag}')}_x",
+            expected: text("schema_dev_prod_true_x"),
+            expected_reads: &["ENV:EMPTY"],
+        },
+        TemplateTestCase {
+            description: "a backslash keeps a literal template in a quoted argument",
+            text: r"${coalesce('\${ENV:SCHEMA_NAME}')}",
+            expected: value(Value::Text("${ENV:SCHEMA_NAME}".to_owned())),
+            expected_reads: &[],
+        },
+        TemplateTestCase {
+            description: "an unclosed template in a quoted argument keeps the outer one from closing",
+            text: "${coalesce('a${b')}",
+            expected: Err(TemplateFailure::Invalid(
+                TemplateError::UnterminatedString {
+                    quote: "single",
+                    position: 1,
+                },
+            )),
+            expected_reads: &[],
+        },
+        TemplateTestCase {
+            description: "templates nested more than eight deep do not close",
+            text: "${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${env}')}')}')}')}')}')}')}')}')}",
+            expected: text("${coalesce('prod')}"),
+            expected_reads: &[],
+        },
+        TemplateTestCase {
+            description: "a brace inside a quoted argument is text",
+            text: "${coalesce('a}b')}",
+            expected: value(Value::Text("a}b".to_owned())),
+            expected_reads: &[],
+        },
+        TemplateTestCase {
+            description: "an object cannot be interpolated into a quoted argument",
+            text: "${coalesce('x_${opaque}')}",
+            expected: Err(TemplateFailure::Invalid(TemplateError::Message(
+                "model config variable 'opaque' is an object".to_owned(),
+            ))),
+            expected_reads: &[],
+        },
     ];
 
     for test_case in test_cases {
@@ -221,6 +293,36 @@ fn given_template_strings_when_expanding_then_values_and_reads_match_python() {
             ),
             "{}",
             test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_malformed_nested_templates_when_finding_templates_then_the_scan_stays_linear() {
+    let test_cases: [TemplateScanTestCase; 3] = [
+        TemplateScanTestCase {
+            description: "an unclosed chain of nested templates with alternating quotes",
+            text: format!("${{'{}", "${\"${'".repeat(4_000)),
+            expected_max_steps_per_character: 20,
+        },
+        TemplateScanTestCase {
+            description: "many unclosed templates that each open a quote",
+            text: "${'a ".repeat(20_000),
+            expected_max_steps_per_character: 20,
+        },
+        TemplateScanTestCase {
+            description: "many sibling templates inside one quoted argument",
+            text: format!("${{coalesce('{}')}}", "${env}".repeat(20_000)),
+            expected_max_steps_per_character: 20,
+        },
+    ];
+    for test_case in test_cases {
+        let (_, steps) = counted_template_spans(&test_case.text);
+        assert!(
+            steps <= test_case.expected_max_steps_per_character * test_case.text.len(),
+            "{}: {steps} steps over {} characters",
+            test_case.description,
+            test_case.text.len()
         );
     }
 }

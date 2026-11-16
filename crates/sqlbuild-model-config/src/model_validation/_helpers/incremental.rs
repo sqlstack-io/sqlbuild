@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use crate::model_validation::_helpers::config::{
-    ConfigView, has_config_value, one_of, sorted_values, string_sequence,
+    ConfigView, has_config_value, non_blank_string_check, one_of, sorted_values, string_sequence,
 };
 use crate::model_validation::_helpers::config::{model_header_help, python_lower};
 use crate::model_validation::_helpers::cursor_bounds::{
@@ -14,9 +14,9 @@ use crate::model_validation::constants::{
     APPEND_STRATEGY, BOUNDED_REPLAY_PREFIX, CURSOR_GRAIN_BATCH_SIZES, CURSOR_INPUT_KEYS,
     CURSOR_POLICY_DISABLED, CURSOR_TYPES, DELETE_INSERT_STRATEGY, EFFECTIVE_BATCH_SIZE,
     ENFORCED_CONTRACT, FUTURE_CURSOR_ACTIONS, INCREMENTAL_MATERIALIZATION, INCREMENTAL_STRATEGIES,
-    MERGE_STRATEGY, ON_SCHEMA_CHANGE_EXAMPLE, ON_SCHEMA_CHANGE_POLICIES, REPLAY_ON_CHANGE_ACTIONS,
-    REPLAY_ON_CHANGE_EXAMPLE, REPLAY_ON_CHANGE_VALID_VALUES, TABLE_MATERIALIZATION,
-    TIMESTAMP_CURSOR, VIEW_MATERIALIZATION,
+    MERGE_STRATEGY, MICROBATCH_MODE, ON_SCHEMA_CHANGE_EXAMPLE, ON_SCHEMA_CHANGE_POLICIES,
+    REPLAY_ON_CHANGE_ACTIONS, REPLAY_ON_CHANGE_EXAMPLE, REPLAY_ON_CHANGE_VALID_VALUES,
+    TABLE_MATERIALIZATION, TIMESTAMP_CURSOR, VIEW_MATERIALIZATION,
 };
 use crate::model_validation::models::{ModelValidationFacts, ValidationStop};
 use crate::model_validation::types::Check;
@@ -43,6 +43,7 @@ pub(crate) struct IncrementalValues<N> {
     pub(crate) cursor_start: Option<N>,
     pub(crate) cursor_end: Option<N>,
     pub(crate) unique_key: Option<N>,
+    pub(crate) replace_key: Option<N>,
     pub(crate) cursor_inputs: Option<N>,
     pub(crate) max_microbatches: Option<N>,
     pub(crate) microbatch_limit: Option<N>,
@@ -79,6 +80,7 @@ impl<N: AuthoredNode> IncrementalValues<N> {
             cursor_start: node("cursor_start"),
             cursor_end: node("cursor_end"),
             unique_key: node("unique_key"),
+            replace_key: node("replace_key"),
             cursor_inputs: node("cursor_inputs"),
             max_microbatches: node("max_microbatches"),
             microbatch_limit: node("microbatch_limit"),
@@ -368,8 +370,36 @@ fn check_write_strategy<N: AuthoredNode>(
 ) -> Check {
     let strategy = values.strategy.as_deref();
     let has_unique_key = has_config_value(values.unique_key.as_ref());
-    if strategy == Some(DELETE_INSERT_STRATEGY) && values.cursor.is_none() && !has_unique_key {
-        return Err(config.error("delete_insert without cursor requires unique_key"));
+    if let Some(replace_key) = &values.replace_key {
+        let valid: bool = if replace_key.kind() == NodeKind::Str {
+            non_blank_string_check(replace_key)
+        } else {
+            is_non_empty_string_list(replace_key) && !replace_key.items().is_empty()
+        };
+        if !valid {
+            return Err(config.error("replace_key must be a column name or a list of column names"));
+        }
+        if strategy != Some(DELETE_INSERT_STRATEGY) {
+            return Err(config.error("replace_key requires incremental_strategy=delete_insert"));
+        }
+        if values.incremental_mode.as_deref() == Some(MICROBATCH_MODE) {
+            return Err(config.error(
+                "replace_key is not supported with incremental_mode=microbatch; each batch only replaces its own window",
+            ));
+        }
+        if has_unique_key {
+            return Err(config.error(
+                "set either unique_key (one row per key) or replace_key (groups of rows), not both",
+            ));
+        }
+    }
+    let has_replace_key = values.replace_key.is_some();
+    if strategy == Some(DELETE_INSERT_STRATEGY)
+        && values.cursor.is_none()
+        && !has_unique_key
+        && !has_replace_key
+    {
+        return Err(config.error("delete_insert without cursor requires unique_key or replace_key"));
     }
     if strategy == Some(MERGE_STRATEGY) && !has_unique_key {
         return Err(config.error("merge strategy requires unique_key"));
@@ -433,6 +463,12 @@ fn check_contract_columns<N: AuthoredNode>(
         config,
         "unique_key",
         &string_sequence(values.unique_key.as_ref()),
+        &declared,
+    )?;
+    require_declared(
+        config,
+        "replace_key",
+        &string_sequence(values.replace_key.as_ref()),
         &declared,
     )?;
     require_declared(

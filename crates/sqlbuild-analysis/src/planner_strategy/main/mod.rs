@@ -7,6 +7,7 @@ pub mod count_timeline_batches;
 pub mod cursor_input_column;
 pub mod cursor_type_warning;
 pub mod effective_run_scope;
+pub mod group_replacement_refusal;
 pub mod lineage_reference;
 pub mod materialization_type;
 pub mod microbatch_limit_warning;

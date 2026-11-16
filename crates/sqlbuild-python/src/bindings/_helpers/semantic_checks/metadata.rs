@@ -35,8 +35,9 @@ use sqlbuild_python_front::model_config::types::PyConfigNode;
 
 /// `SqlReferenceKind.UDF` and `SqlReferenceKind.TABLE_FUNCTION` values.
 const FUNCTION_REFERENCE_KINDS: [&str; 2] = ["udf", "table_fn"];
-const METADATA_CONFIG_KEYS: [&str; 4] = [
+const METADATA_CONFIG_KEYS: [&str; 5] = [
     "unique_key",
+    "replace_key",
     "cursor",
     "partition_column",
     "row_diff_exclude_columns",

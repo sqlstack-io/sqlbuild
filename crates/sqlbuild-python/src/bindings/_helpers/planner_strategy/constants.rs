@@ -25,5 +25,7 @@ pub(crate) const SEED_REFERENCE_KIND: &str = "seed";
 pub(crate) const PHYSICAL_STORAGE_DIALECT: &str = "clickhouse";
 /// The error code for physical storage keys on an adapter without them.
 pub(crate) const PHYSICAL_STORAGE_UNSUPPORTED_CODE: &str = "A011";
+/// The error code for `replace_key` on an adapter that cannot replace groups of rows.
+pub(crate) const GROUP_REPLACEMENT_UNSUPPORTED_CODE: &str = "A012";
 /// Plan action values that create the model's table anew or leave it untouched.
 pub(crate) const TABLE_RECREATING_ACTIONS: [&str; 2] = ["create_table", "skip"];

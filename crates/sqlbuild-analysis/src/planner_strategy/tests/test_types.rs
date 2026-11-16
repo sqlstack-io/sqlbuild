@@ -104,6 +104,13 @@ pub(super) struct TableTypeDdlTestCase {
     pub(super) expected_ddl: &'static str,
 }
 
+pub(super) struct GroupReplacementRefusalTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: Option<&'static str>,
+    pub(super) has_replace_key: bool,
+    pub(super) expected_refused: bool,
+}
+
 pub(super) struct PhysicalLayoutWarningTestCase {
     pub(super) description: &'static str,
     pub(super) materialization: MaterializationType,

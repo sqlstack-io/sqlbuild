@@ -121,12 +121,13 @@ pub const SQL_WILDCARD: &str = "*";
 pub const PLACEHOLDER_SIGIL: &str = "@@@";
 
 /// Keys that only incremental models may set.
-pub const INCREMENTAL_ONLY_KEYS: [&str; 5] = [
+pub const INCREMENTAL_ONLY_KEYS: [&str; 6] = [
     "on_schema_change",
     "replay_on_change",
     "append_cursor_inclusive",
     "merge_exclude_columns",
     "full_refresh",
+    "replace_key",
 ];
 /// Cursor input keys that require a cursor-based incremental model.
 pub const CURSOR_INPUT_KEYS: [&str; 3] = [
