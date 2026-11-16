@@ -1430,6 +1430,10 @@ jobs:
         run: npm test
       - name: Build the static bundle sqb server embeds
         run: npm run build
+      - name: Install the layout test's browser
+        run: npx playwright install --with-deps chromium
+      - name: Layout test (every page with awkward mock data at 1440 and 1920 px)
+        run: npm run test:e2e
 
   verify:
     # The required Verify of a Release Please pull request is the commit status that the trusted
