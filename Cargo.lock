@@ -4450,7 +4450,6 @@ dependencies = [
  "sqlbuild-cli",
  "sqlbuild-config",
  "sqlbuild-core",
- "sqlbuild-cursor",
  "sqlbuild-discovery",
  "sqlbuild-host",
  "sqlbuild-model-config",
@@ -4459,6 +4458,7 @@ dependencies = [
  "sqlbuild-pysource",
  "sqlbuild-python-base",
  "sqlbuild-python-front",
+ "sqlbuild-python-planner",
  "sqlbuild-python-project",
  "sqlbuild-recall",
  "sqlbuild-refactor",
@@ -4468,7 +4468,6 @@ dependencies = [
  "sqlbuild-sqltext",
  "sqlbuild-state",
  "sqlclean",
- "uuid",
 ]
 
 [[package]]
@@ -4522,6 +4521,29 @@ dependencies = [
  "sqlbuild-sqltext",
  "sqlbuild-state",
  "stacker",
+ "uuid",
+]
+
+[[package]]
+name = "sqlbuild-python-planner"
+version = "0.0.0"
+dependencies = [
+ "pyo3",
+ "serde_json",
+ "sqlbuild-analysis",
+ "sqlbuild-cache",
+ "sqlbuild-core",
+ "sqlbuild-cursor",
+ "sqlbuild-discovery",
+ "sqlbuild-host",
+ "sqlbuild-model-config",
+ "sqlbuild-project",
+ "sqlbuild-python-base",
+ "sqlbuild-python-front",
+ "sqlbuild-python-project",
+ "sqlbuild-rules",
+ "sqlbuild-sqltext",
+ "sqlbuild-state",
  "uuid",
 ]
 

@@ -15,7 +15,6 @@ use crate::bindings::_helpers::compile_driver::discovery::discover_project_input
 use crate::bindings::_helpers::cost_report::functions::read_cost_run;
 use crate::bindings::_helpers::cost_report::functions::resolve_cost_run;
 use crate::bindings::_helpers::cost_report::functions::write_cost_run;
-use crate::bindings::_helpers::cost_telemetry::values::cost_aware;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -26,6 +25,7 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_front::compile_attachment::main::build_effective_target_config::build_effective_target_config;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::cost_context::main::cost_aware::cost_aware;
 
 /// Collection budget of an explicit `sqb cost` refresh, which a user waits for on purpose.
 const REFRESH_BUDGET_SECONDS: f64 = 300.0;

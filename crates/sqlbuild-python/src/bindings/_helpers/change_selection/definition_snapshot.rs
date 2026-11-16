@@ -21,8 +21,9 @@ use sqlbuild_analysis::definition_changes::models::{DefinitionSnapshot, NodeDefi
 use crate::bindings::_helpers::change_selection::fingerprints::{
     Fingerprinting, directory_digest, file_digest, text_of,
 };
-use crate::bindings::_helpers::planner_identity::metadata::{function_local_hashes, seed_identity};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_planner::planner_identity::main::function_local_hashes::function_local_hashes;
+use sqlbuild_python_planner::planner_identity::main::seed_identity::seed_identity;
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;

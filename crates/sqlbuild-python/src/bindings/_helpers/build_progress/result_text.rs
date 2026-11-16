@@ -25,10 +25,11 @@ use sqlbuild_host::models::{
 };
 use sqlbuild_host::types::ResultEnum;
 
-use crate::bindings::_helpers::plan_output::display::{cursor_bound_display, inclusive_cursor_end};
 use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::result_output::main::json_value::json_value;
+use sqlbuild_python_planner::plan_output::main::cursor_bound_display::cursor_bound_display;
+use sqlbuild_python_planner::plan_output::main::inclusive_cursor_end::inclusive_cursor_end;
 
 const DECIMAL_KIND: &str = "decimal";
 

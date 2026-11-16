@@ -14,7 +14,7 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_base::build_progress::main::progress::current_projector::current_projector;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
-use crate::bindings::_helpers::cost_telemetry::values::cost_aware;
+use sqlbuild_python_front::cost_context::main::cost_aware::cost_aware;
 
 /// The JSON document section the report adds.
 const STATEMENTS_SECTION: &str = "statements";

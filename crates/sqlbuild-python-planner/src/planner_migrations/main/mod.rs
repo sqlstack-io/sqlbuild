@@ -1,0 +1,10 @@
+pub mod fingerprint;
+pub mod migration_fingerprint_ref_names;
+pub mod plan_column_migrations;
+pub mod plan_model_migrations;
+pub mod plan_old_name_views;
+pub mod register_column_planning;
+pub mod register_columns;
+pub mod register_fingerprint;
+pub mod register_projections;
+pub mod with_migration_fingerprints;
