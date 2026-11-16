@@ -810,7 +810,7 @@ Compilation rejects Python anywhere else with `D016`, so indirectly importable m
 an unofficial project structure.
 
 The project's `tests/` directory holds SQL tests and scenarios, and pytest tests of project Python
-under `tests/python/` and `tests/providers/`, which `sqb test` runs; see
+under `tests/python/`, `tests/providers/` and `tests/orchestration/`, which `sqb test` runs; see
 [Python tests](../cli/test.md#python-tests). Orchestrator code such as Dagster or Rivers definitions
 lives outside the SQLBuild project directory and points at it; see
 [Dagster](../integrations/dagster.md) and [Rivers](../integrations/rivers.md).

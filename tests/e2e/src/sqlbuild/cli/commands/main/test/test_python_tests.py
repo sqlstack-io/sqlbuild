@@ -60,6 +60,17 @@ PASSING_PYTHON_TEST: dict[str, str] = {
     ),
 }
 
+ORCHESTRATION_PYTHON_TEST: dict[str, str] = {
+    "orchestration/sensors/orders/_helpers/restock_window.py": (
+        "def restock_due(hours_since_publish):\n    return hours_since_publish >= 6\n"
+    ),
+    "tests/orchestration/sensors/orders/_helpers/test_restock_window.py": (
+        "from orchestration.sensors.orders._helpers.restock_window import restock_due\n\n\n"
+        "def test_given_six_hours_when_checking_then_restock_is_due():\n"
+        "    assert restock_due(6)\n"
+    ),
+}
+
 FAILING_PYTHON_TEST: dict[str, str] = {
     "tests/python/inventory/stock_sync/test_node.py": (
         "def test_given_stock_when_syncing_then_fails():\n    assert False\n"
@@ -117,6 +128,14 @@ sys.meta_path[:] = [_HidePytest(finder) for finder in sys.meta_path]
             expected_exit_code=0,
             expected_output_fragments=(SQL_PASSED, PYTHON_PASSED, "1 passed"),
             expected_absent_fragments=(),
+        ),
+        PythonTestsE2ETestCase(
+            description="an orchestration test mirroring its sensor code runs",
+            command=("--no-color", "test", "--python"),
+            extra_repo_files=ORCHESTRATION_PYTHON_TEST,
+            expected_exit_code=0,
+            expected_output_fragments=(PYTHON_PASSED, "1 passed"),
+            expected_absent_fragments=(SQL_PASSED,),
         ),
         PythonTestsE2ETestCase(
             description="a failing Python test fails the command after the SQL tests",
