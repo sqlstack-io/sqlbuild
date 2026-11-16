@@ -1,15 +1,15 @@
 //! Resolve explicit or default lookback for one microbatch model.
 
-use crate::planner_strategy::_helpers::model_entries;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::planner_strategy::_helpers::model_entries::lookback_of;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use pyo3::pyfunction;
 
 /// Resolve explicit or default lookback for one microbatch model.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, model, effective_grain = None))]
 pub fn resolve_microbatch_lookback(
     model: &Bound<'_, PyAny>,
     effective_grain: Option<String>,
 ) -> PyResult<Option<String>> {
-    model_entries::resolve_microbatch_lookback(model, effective_grain)
+    lookback_of(model, effective_grain)
 }

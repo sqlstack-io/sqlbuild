@@ -2,8 +2,7 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::planner_migrations::_helpers::column::column_objects::config;
-use crate::planner_migrations::_helpers::column::column_objects::model;
+use crate::planner_migrations::_helpers::column::column_objects::{config, model};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

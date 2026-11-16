@@ -1,10 +1,8 @@
 //! Reuse collected columns and inspect only selected, unresolved table sources.
 
 use crate::planner_warehouse::_helpers::sources::semantic_sources;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyResult;
-use pyo3::types::PyDict;
-use pyo3::types::PyDict as KeywordDict;
+use pyo3::prelude::{Bound, PyResult};
+use pyo3::types::{PyDict, PyDict as KeywordDict};
 
 /// Reuse collected columns and inspect only selected, unresolved table sources.
 #[inline]

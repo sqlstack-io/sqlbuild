@@ -1,7 +1,6 @@
 //! Public constants of planner warehouse.
 
-use sqlbuild_host::entries::models::AdapterHost;
-use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 use sqlbuild_python_base::records::types::RecordId;
 
 pub(crate) const RELATIONS_MAIN_LIST: AdapterHost = AdapterHost::ListRelationsForInspection;

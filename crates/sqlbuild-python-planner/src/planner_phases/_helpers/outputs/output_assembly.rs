@@ -7,20 +7,16 @@ use crate::planner_migrations::main::with_migration_fingerprints::with_migration
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
-use crate::planner_phases::_helpers::rebuilds::retention::plan_retention;
-use crate::planner_phases::_helpers::rebuilds::retention::plan_table_types;
-use crate::planner_phases::models::PlanOutputContext;
-use crate::planner_phases::models::PlanOutputFields;
-use crate::planner_phases::models::PlanWarningContext;
-use crate::planner_phases::models::PlannedModelEntries;
+use crate::planner_phases::_helpers::rebuilds::retention::{plan_retention, plan_table_types};
 use crate::planner_phases::models::PlannerIdentityContext;
-use crate::planner_phases::models::StoragePolicyContext;
+use crate::planner_phases::models::{
+    PlanOutputContext, PlanOutputFields, PlanWarningContext, PlannedModelEntries,
+    StoragePolicyContext,
+};
 use crate::planner_warehouse::main::sources::source_freshness_unknown_warnings::source_freshness_unknown_warnings;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
-use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
@@ -31,12 +27,14 @@ use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_phases::main::replace::replace;
 use sqlbuild_python_project::planner_phases::main::sorted_names::sorted_names;
 use sqlbuild_python_project::planner_phases::main::strings::strings;
-use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 
-fn concat<'py>(py: Python<'py>, parts: &[Bound<'py, PyAny>]) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn concat<'py>(
+    py: Python<'py>,
+    parts: &[Bound<'py, PyAny>],
+) -> PyResult<Bound<'py, PyAny>> {
     let mut items: Vec<_> = Vec::new();
     for part in parts {
         for item in part.try_iter()? {
@@ -47,7 +45,7 @@ fn concat<'py>(py: Python<'py>, parts: &[Bound<'py, PyAny>]) -> PyResult<Bound<'
 }
 
 impl<'py> PlanOutputFields<'py> {
-    fn field(&self, name: &str) -> PyResult<Bound<'py, PyAny>> {
+    pub(crate) fn field(&self, name: &str) -> PyResult<Bound<'py, PyAny>> {
         self.fields
             .iter()
             .find(|(field, _)| *field == name)
@@ -55,7 +53,7 @@ impl<'py> PlanOutputFields<'py> {
             .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(name.to_owned()))
     }
 
-    fn set(&mut self, name: &'static str, value: Bound<'py, PyAny>) {
+    pub(crate) fn set(&mut self, name: &'static str, value: Bound<'py, PyAny>) {
         match self.fields.iter_mut().find(|(field, _)| *field == name) {
             Some(existing) => existing.1 = value,
             None => self.fields.push((name, value)),
@@ -287,85 +285,6 @@ pub(crate) fn add_plan_warnings<'py>(
     Ok(output)
 }
 
-/// The unselected models the selected scope reads, sorted.
-pub(crate) fn unselected_upstream_models(scopes: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let selected = class_field(scopes, |s: &PlannerScopeResolution| &s.selected_scope)?;
-    let selected = sqlbuild_python_project::planner_scope::main::scope_data::scope_data(&selected)?;
-    let mut names: Vec<String> = Vec::new();
-    for (key, deps) in &selected.upstream {
-        if !selected.selected.contains(key) {
-            continue;
-        }
-        for dep in deps {
-            if dep.0 == MODEL && !selected.selected.contains(dep) {
-                names.push(dep.1.clone());
-            }
-        }
-    }
-    names.sort();
-    names.dedup();
-    Ok(names)
-}
-
-/// Note unselected upstreams deferred to pre-migration names, and each lookup in `failures`.
-pub(crate) fn add_deferred_origin_notes<'py>(
-    mut output: PlanOutputFields<'py>,
-    (project, scopes): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    (deferral, failures): (&Bound<'py, PyAny>, &[(String, String)]),
-) -> PyResult<PlanOutputFields<'py>> {
-    let py = project.py();
-    let locations = native_field(deferral, "deferred_locations")?;
-    if locations.is_none() {
-        return Ok(output);
-    }
-    let names: Vec<String> = unselected_upstream_models(scopes)?;
-    let warning = |name: &str, message: &str| -> PyResult<Bound<'py, PyAny>> {
-        native(
-            py,
-            RecordId::PlanWarning,
-            &[
-                ("model_name", text(py, name)),
-                (
-                    "severity",
-                    enum_member(py, RecordId::WarningSeverity, "WARNING")?,
-                ),
-                ("message", text(py, message)),
-            ],
-        )
-    };
-    let mut notes: Vec<Bound<'py, PyAny>> = Vec::new();
-    for model in native_field(project, "models")?.try_iter()? {
-        let model = model?;
-        let name: String = native_field(&model, "name")?.extract()?;
-        if names.binary_search(&name).is_err() {
-            continue;
-        }
-        let Some(location) = locations.downcast::<PyDict>()?.get_item(&name)? else {
-            continue;
-        };
-        if native_field(&location, "name")?
-            .eq(native_field(&native_field(&model, "destination")?, "name")?)?
-        {
-            continue;
-        }
-        notes.push(warning(
-            &name,
-            &format!(
-                "deferred to pre-migration name {}: the deferred target has not built model '{name}' under its current name yet",
-                native_field(&location, "qualified_name")?
-            ),
-        )?);
-    }
-    for (name, message) in failures {
-        notes.push(warning(name, message)?);
-    }
-    if !notes.is_empty() {
-        let warnings = concat(py, &[output.field("warnings")?, tuple(py, notes)?])?;
-        output.set("warnings", warnings);
-    }
-    Ok(output)
-}
-
 fn source_names<'py>(items: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let mut names: Vec<_> = Vec::new();
     for item in items.try_iter()? {
@@ -385,7 +304,9 @@ fn age_names<'py>(statuses: &Bound<'py, PyAny>, wanted: &str) -> PyResult<Bound<
     sorted_names(statuses.py(), names)
 }
 
-fn freshness_metadata<'py>(source_freshness: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn freshness_metadata<'py>(
+    source_freshness: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
     let py = source_freshness.py();
     let propagation = native_field(source_freshness, "propagation")?;
     let propagated = |field: &str| -> PyResult<Bound<'py, PyAny>> {
@@ -436,28 +357,4 @@ fn freshness_metadata<'py>(source_freshness: &Bound<'py, PyAny>) -> PyResult<Bou
     metadata.set_item("stale_model_names", propagated("stale_model_names")?)?;
     metadata.set_item("blocked_model_names", propagated("blocked_model_names")?)?;
     Ok(metadata.into_any())
-}
-
-/// Add the direct-mode source freshness, remaining stale models and selection diagnostics metadata.
-pub(crate) fn add_plan_metadata<'py>(
-    mut output: PlanOutputFields<'py>,
-    source_freshness: &Bound<'py, PyAny>,
-    policies: &Bound<'py, PyAny>,
-) -> PyResult<PlanOutputFields<'py>> {
-    let py = source_freshness.py();
-    let diagnostics = PyDict::new(py);
-    diagnostics.set_item("mode", text(py, "direct"))?;
-    diagnostics.set_item("enabled", native_field(policies, "selection_diagnostics")?)?;
-    output.metadata.push((
-        "direct_source_freshness",
-        freshness_metadata(source_freshness)?,
-    ));
-    output.metadata.push((
-        "direct_remaining_stale_model_names",
-        sorted_names(py, Vec::new())?,
-    ));
-    output
-        .metadata
-        .push(("selection_diagnostics", diagnostics.into_any()));
-    Ok(output)
 }

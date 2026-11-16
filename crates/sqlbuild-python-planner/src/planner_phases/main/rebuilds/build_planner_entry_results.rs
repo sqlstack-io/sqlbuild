@@ -1,11 +1,8 @@
 //! Model plan entries for the pruned execution scope, with the freshness and override inputs they need.
 
 use crate::planner_phases::_helpers::rebuilds::execution_changes;
-use crate::planner_phases::models::ChangeReconciliation;
-use crate::planner_phases::models::ModelEntryResults;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::planner_phases::models::{ChangeReconciliation, ModelEntryResults};
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Model plan entries for the pruned execution scope, with the freshness and override inputs they need.
 #[inline]

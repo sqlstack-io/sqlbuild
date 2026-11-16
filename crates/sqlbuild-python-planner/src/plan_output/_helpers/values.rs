@@ -1,14 +1,10 @@
 //! Reading planner values by attribute and building the JSON documents' dictionaries.
 
-use pyo3::IntoPyObjectExt;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyList};
+use crate::plan_output::main::items::items;
+use crate::plan_output::main::text::text;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::types::PyList;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-
-/// `str(value)`.
-pub(crate) fn text(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    Ok(value.str()?.to_string())
-}
 
 /// `str(value)`, or `None`.
 pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
@@ -21,11 +17,6 @@ pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>
 /// `str(item)` of every item.
 pub(crate) fn texts(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     value.try_iter()?.map(|item| text(&item?)).collect()
-}
-
-/// Every item of an iterable.
-pub(crate) fn items<'py>(value: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    value.try_iter()?.collect()
 }
 
 /// `value.<name>.value`, the value of an enum attribute.
@@ -42,26 +33,6 @@ pub(crate) fn optional_enum_value<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bo
         return Ok(value.clone());
     }
     native_field(value, "value")
-}
-
-/// A dictionary of the entries, in order.
-pub(crate) fn dict<'py>(
-    py: Python<'py>,
-    entries: Vec<(&str, Bound<'py, PyAny>)>,
-) -> PyResult<Bound<'py, PyDict>> {
-    let built: Bound<'py, PyDict> = PyDict::new(py);
-    for (key, value) in entries {
-        built.set_item(key, value)?;
-    }
-    Ok(built)
-}
-
-/// Any Rust value as a Python object.
-pub(crate) fn any<'py, T: IntoPyObjectExt<'py>>(
-    py: Python<'py>,
-    value: T,
-) -> PyResult<Bound<'py, PyAny>> {
-    value.into_bound_py_any(py)
 }
 
 /// `list(value)`.

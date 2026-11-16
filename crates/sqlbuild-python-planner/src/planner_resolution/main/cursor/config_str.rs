@@ -1,12 +1,12 @@
 //! One string-valued model configuration entry.
 
-use crate::planner_resolution::_helpers::cursor::cursor_ranges;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 /// One string-valued model configuration entry.
-#[inline]
 pub fn config_str<'py>(model: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAny>> {
-    cursor_ranges::config_str(model, key)
+    let py: Python<'py> = model.py();
+    Ok(config_text_object(py, &model_values(model)?, key)?
+        .unwrap_or_else(|| py.None().into_bound(py)))
 }

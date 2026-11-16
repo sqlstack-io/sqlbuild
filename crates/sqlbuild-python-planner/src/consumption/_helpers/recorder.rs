@@ -14,15 +14,12 @@ use sqlbuild_state::consumption::main::consumption_history::consumption_history;
 use sqlbuild_state::consumption::main::read_back_history::read_back_history;
 use sqlbuild_state::consumption::main::started_append::started_append;
 use sqlbuild_state::consumption::models::{
-    ChangedOutcome, ChangedPolicy, ConsumptionAppend, ConsumptionHistory, ConsumptionRow,
-    ForcedRun, HeldBack, InputFact, NodeFacts, NodeKey, Reach, RelationKey, RunReason,
+    ChangedOutcome, ChangedPolicy, ConsumptionAppend, ConsumptionHistory, ConsumptionRow, HeldBack,
+    InputFact, NodeFacts, NodeKey, Reach, RelationKey, RunReason,
 };
 use uuid::Uuid;
 
-use crate::consumption::_helpers::facts::BuildFacts;
-use crate::consumption::_helpers::facts::MODEL;
-use crate::consumption::_helpers::facts::SEED;
-use crate::consumption::_helpers::facts::build_facts;
+use crate::consumption::_helpers::facts::{BuildFacts, MODEL, SEED, build_facts};
 use sqlbuild_python_front::native_host::models::{
     ConsumptionConnection, Location, NodeCompleteHook,
 };
@@ -167,23 +164,8 @@ pub(crate) fn prepare<'py>(
     })
 }
 
-/// What `plan --changed` previews: what a build would run now, read without recording anything.
-pub(crate) fn preview_changed(
-    (plan, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    (adapter, connection_config): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    (policy, full_refresh): (&ChangedPolicy, bool),
-) -> PyResult<(ChangedDecision, Vec<String>)> {
-    let py: Python<'_> = plan.py();
-    let facts: BuildFacts = build_facts((plan, project), (true, full_refresh))?;
-    let connection = ConsumptionConnection::new(adapter, connection_config);
-    let (history, warnings): (ConsumptionHistory, Vec<String>) =
-        read_history(py, &connection, (&facts, Some(policy)));
-    connection.close(py)?;
-    Ok((changed_decision(&facts, &history, policy), warnings))
-}
-
 /// Recent executions the build reads, with older ones read back when deciding needs them.
-fn read_history(
+pub(crate) fn read_history(
     py: Python<'_>,
     connection: &ConsumptionConnection,
     (facts, policy): (&BuildFacts, Option<&ChangedPolicy>),
@@ -210,7 +192,7 @@ fn read_history(
 }
 
 /// What `--changed` does with each runnable node.
-fn changed_decision(
+pub(crate) fn changed_decision(
     facts: &BuildFacts,
     history: &ConsumptionHistory,
     policy: &ChangedPolicy,
@@ -283,39 +265,4 @@ fn read_references(
         }
     }
     (rows, warnings)
-}
-
-/// Why `--changed` holds a node back, as one line for verbose output.
-pub(crate) fn held_back_text(why: &HeldBack) -> String {
-    match why {
-        HeldBack::RefreshedBy(jobs) => format!(
-            "job {} refreshes it, and the change is not in that job",
-            jobs.join(", ")
-        ),
-        HeldBack::ReadsHeldBack(key) => format!("reads held-back {} {}", key.kind, key.name),
-    }
-}
-
-/// Why `--changed` runs a node, as one line for verbose output.
-pub(crate) fn run_reason_text(reason: &RunReason) -> String {
-    match reason {
-        RunReason::Forced(ForcedRun::PlannerChange(kind)) => format!("planner change ({kind})"),
-        RunReason::Forced(ForcedRun::FullRefresh) => "full refresh".to_owned(),
-        RunReason::Forced(ForcedRun::RelationMissing) => "relation missing".to_owned(),
-        RunReason::Forced(ForcedRun::CursorInterval) => "cursor interval requested".to_owned(),
-        RunReason::Forced(ForcedRun::InputsNotEnumerable) => {
-            "inputs cannot be enumerated".to_owned()
-        }
-        RunReason::NoRecord => "no completed record".to_owned(),
-        RunReason::Unfinished => "last execution did not finish".to_owned(),
-        RunReason::AmbiguousOrder => "record order is ambiguous".to_owned(),
-        RunReason::DefinitionChanged => "definition changed".to_owned(),
-        RunReason::InputsChanged => "inputs changed".to_owned(),
-        RunReason::InputChanged(input) => format!("input {input} changed"),
-        RunReason::UpstreamDefinitionChanged(input) => {
-            format!("upstream {input} was rebuilt with a definition change")
-        }
-        RunReason::InputUnknown(input) => format!("input {input} has no known version"),
-        RunReason::UpstreamRuns(key) => format!("upstream {} {} runs", key.kind, key.name),
-    }
 }

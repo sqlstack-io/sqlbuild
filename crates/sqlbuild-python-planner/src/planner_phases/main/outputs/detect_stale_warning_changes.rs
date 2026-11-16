@@ -1,9 +1,7 @@
 //! Changes of stale-warning models whose identities differ from the execution identities.
 
 use crate::planner_phases::_helpers::outputs::identities;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Changes of stale-warning models whose identities differ from the execution identities.
 #[inline]

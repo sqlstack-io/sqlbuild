@@ -1,9 +1,7 @@
 //! Gather planner warehouse state.
 
 use crate::planner_phases::_helpers::inputs::warehouse_state;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Gather planner warehouse state.
 #[inline]

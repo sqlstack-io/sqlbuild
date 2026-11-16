@@ -1,7 +1,6 @@
 //! Public records of planner scenario.
 
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
+use pyo3::prelude::{Bound, PyAny};
 
 #[derive(Debug)]
 pub(crate) struct SqlContext<'py> {

@@ -1,10 +1,10 @@
 //! Scenario artifact dataclasses and adapter identifier callbacks.
 
-use crate::planner_scenario::_helpers::values::error;
-use crate::planner_scenario::_helpers::values::string;
-use crate::planner_scenario::constants::SCENARIO_PLAN_HASH_COLLISION;
-use crate::planner_scenario::constants::SCENARIO_PLAN_INVALID_HASH_PREFIX;
-use crate::planner_scenario::constants::SCENARIO_PLAN_RELATION_COLLISION;
+use crate::planner_scenario::_helpers::values::{error, string};
+use crate::planner_scenario::constants::{
+    SCENARIO_PLAN_HASH_COLLISION, SCENARIO_PLAN_INVALID_HASH_PREFIX,
+    SCENARIO_PLAN_RELATION_COLLISION,
+};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_scenario::main::{hash_prefix, parse_artifact_name};
@@ -177,11 +177,6 @@ pub(crate) fn parse_scenario_artifact_physical_name<'py>(
 }
 
 #[pyfunction]
-pub(crate) fn is_scenario_artifact_physical_name(name: &str) -> bool {
-    parse_artifact_name::parse_artifact_name(name).is_some()
-}
-
-#[pyfunction]
 #[pyo3(signature = (**kwargs))]
 pub(crate) fn build_scenario_relation_map<'py>(
     py: Python<'py>,
@@ -265,46 +260,4 @@ pub(crate) fn build_scenario_relation_map<'py>(
             ("artifacts", PyTuple::new(py, artifacts)?.into_any()),
         ],
     )
-}
-
-/// `build_scenario_artifact_name` as a function of `module`.
-pub(crate) fn build_scenario_artifact_name_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(build_scenario_artifact_name, module)
-}
-
-/// `build_scenario_hash_index` as a function of `module`.
-pub(crate) fn build_scenario_hash_index_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(build_scenario_hash_index, module)
-}
-
-/// `build_scenario_relation_map` as a function of `module`.
-pub(crate) fn build_scenario_relation_map_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(build_scenario_relation_map, module)
-}
-
-/// `compute_scenario_hash_prefix` as a function of `module`.
-pub(crate) fn compute_scenario_hash_prefix_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(compute_scenario_hash_prefix, module)
-}
-
-/// `is_scenario_artifact_physical_name` as a function of `module`.
-pub(crate) fn scenario_artifact_physical_name_check_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(is_scenario_artifact_physical_name, module)
-}
-
-/// `parse_scenario_artifact_physical_name` as a function of `module`.
-pub(crate) fn parse_scenario_artifact_physical_name_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(parse_scenario_artifact_physical_name, module)
 }

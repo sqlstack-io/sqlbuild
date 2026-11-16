@@ -2,9 +2,7 @@
 
 use crate::planner_changes::_helpers::detect;
 use crate::planner_changes::models::ModelPass;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Model change.
 #[inline]

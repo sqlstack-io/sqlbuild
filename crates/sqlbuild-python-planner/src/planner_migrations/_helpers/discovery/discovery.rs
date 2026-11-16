@@ -3,11 +3,12 @@
 use crate::planner_migrations::_helpers::discovery::discovery_events::renames;
 use crate::planner_migrations::_helpers::discovery::discovery_models::ordered;
 use crate::planner_migrations::_helpers::discovery::discovery_requests::automatic;
-use crate::planner_migrations::_helpers::planning::matching::match_migration_fingerprints;
-use crate::planner_migrations::_helpers::planning::matching::migration_destination_fingerprints;
-use crate::planner_migrations::models::DiscoveryRequest;
-use crate::planner_migrations::models::FingerprintInputs;
-use crate::planner_migrations::models::ModelMigrationDiscovery;
+use crate::planner_migrations::_helpers::planning::matching::{
+    match_migration_fingerprints, migration_destination_fingerprints,
+};
+use crate::planner_migrations::models::{
+    DiscoveryRequest, FingerprintInputs, ModelMigrationDiscovery,
+};
 use pyo3::prelude::{PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple, PyTupleMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;

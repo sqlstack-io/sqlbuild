@@ -1,30 +1,26 @@
 //! Warehouse cursor column type checks.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::planner_strategy::main::values::text::text;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString};
-use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_analysis::planner_strategy::errors::TypeParseFailure;
-use sqlbuild_analysis::planner_strategy::main::classify_cursor_sql_type::classify_cursor_sql_type as classify;
 use sqlbuild_analysis::planner_strategy::main::cursor_type_warning::cursor_type_warning;
-use sqlbuild_analysis::planner_strategy::models::{CursorType, CursorTypeCheck};
+use sqlbuild_analysis::planner_strategy::models::CursorTypeCheck;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::planner_changes::main::planner_enum::planner_enum;
-use crate::planner_strategy::_helpers::values::optional_string;
-use crate::planner_strategy::_helpers::values::plan_warning;
-use crate::planner_strategy::_helpers::values::text;
+use crate::planner_strategy::_helpers::values::{optional_string, plan_warning};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::RecordId;
 
 const PLANNER_LOGGER: &str = "sqlbuild.planner";
 
 /// Log the Polyglot parse error that left a warehouse type unclassified.
-fn log_parse_failure(py: Python<'_>, failure: &TypeParseFailure) -> PyResult<()> {
+pub(crate) fn log_parse_failure(py: Python<'_>, failure: &TypeParseFailure) -> PyResult<()> {
     let text = |value: &str| PyString::new(py, value).into_any();
     call_with(
         &host_entry(py, ExecutorHost::LogDebugEvent)?,
@@ -44,33 +40,10 @@ fn log_parse_failure(py: Python<'_>, failure: &TypeParseFailure) -> PyResult<()>
     .map(|_| ())
 }
 
-/// The `CursorType` a supported cross-adapter SQL type holds, or `None`.
-pub(crate) fn classify_cursor_sql_type<'py>(
-    py: Python<'py>,
-    sql_type: &str,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let detected: Option<CursorType> = match classify(sql_type) {
-        Ok(detected) => detected,
-        Err(failure) => {
-            log_parse_failure(py, &failure)?;
-            None
-        }
-    };
-    detected
-        .map(|cursor_type| {
-            let value: &str = match cursor_type {
-                CursorType::Timestamp => "timestamp",
-                CursorType::Integer => "integer",
-            };
-            planner_enum(py, RecordId::CursorType, value)
-        })
-        .transpose()
-}
-
 /// A `PlanWarning` when the warehouse cursor column type contradicts `cursor_type`.
 #[pyfunction]
 #[pyo3(signature = (**options))]
-fn check_cursor_type_consistency<'py>(
+pub(crate) fn check_cursor_type_consistency<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -125,8 +98,4 @@ pub(crate) fn cursor_type_warning_record<'py>(
         log_parse_failure(model_name.py(), &failure)?;
     }
     warning.map(|row| plan_warning(model_name, row)).transpose()
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(check_cursor_type_consistency, module)?)
 }

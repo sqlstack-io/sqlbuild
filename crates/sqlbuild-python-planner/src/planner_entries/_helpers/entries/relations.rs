@@ -1,8 +1,7 @@
 //! Relation locations and source metadata for plan entry construction.
 
 use crate::planner_entries::_helpers::entries::values::planner_model;
-use crate::planner_entries::models::PlannerRelationsContext;
-use crate::planner_entries::models::RelationsRequest;
+use crate::planner_entries::models::{PlannerRelationsContext, RelationsRequest};
 use crate::planner_resolution::main::references::apply_deferred_locations::apply_deferred_locations;
 use crate::planner_resolution::main::references::build_function_locations::build_function_locations;
 use crate::planner_resolution::main::references::build_model_locations::build_model_locations;
@@ -12,9 +11,9 @@ use crate::planner_warehouse::main::sources::build_source_read_map::build_source
 use crate::planner_warehouse::main::sources::gather_source_inspection::gather_source_inspection;
 use crate::planner_warehouse::main::sources::semantic_source_columns::semantic_source_columns;
 use crate::planner_warehouse::main::sources::with_declared_source_reads::with_declared_source_reads;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -218,7 +217,7 @@ pub(crate) fn planner_relations_context<'py>(
 /// Resolve relation locations and source metadata for plan entry construction.
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
-fn build_planner_relations_context<'py>(
+pub(crate) fn build_planner_relations_context<'py>(
     py: Python<'py>,
     kwargs: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -248,8 +247,4 @@ fn build_planner_relations_context<'py>(
         known_source_columns: args.value("known_source_columns")?,
         relation_keys: args.value("relation_keys")?,
     })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(build_planner_relations_context, module)?)
 }

@@ -14,14 +14,11 @@ use crate::planner_scenario::_helpers::sql::resolve_sql;
 use crate::planner_scenario::_helpers::sql::source_label;
 use crate::planner_scenario::_helpers::values::error;
 use crate::planner_scenario::_helpers::values::string;
-use crate::planner_scenario::constants::CURSOR_INTRINSIC_NAMES;
-use crate::planner_scenario::constants::CURSOR_TYPE_KEY;
-use crate::planner_scenario::constants::INCREMENTAL_MODE_KEY;
-use crate::planner_scenario::constants::INTEGER_CURSOR_TYPE;
-use crate::planner_scenario::constants::MICROBATCH_INCREMENTAL_MODE;
-use crate::planner_scenario::constants::SCENARIO_EXPECTED_COLUMNS_HELP;
-use crate::planner_scenario::constants::SCENARIO_PLAN_EXPECTED_COLUMNS;
-use crate::planner_scenario::constants::SCENARIO_PLAN_INVALID_FIXTURE;
+use crate::planner_scenario::constants::{
+    CURSOR_INTRINSIC_NAMES, CURSOR_TYPE_KEY, INCREMENTAL_MODE_KEY, INTEGER_CURSOR_TYPE,
+    MICROBATCH_INCREMENTAL_MODE, SCENARIO_EXPECTED_COLUMNS_HELP, SCENARIO_PLAN_EXPECTED_COLUMNS,
+    SCENARIO_PLAN_INVALID_FIXTURE,
+};
 use crate::planner_scenario::models::SqlContext;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFrozenSet, PyTuple};
@@ -446,11 +443,4 @@ fn scenario_cursor_window<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py,
             ("end_cursor_override", string(py, end)),
         ],
     )
-}
-
-/// `build_scenario_execution_plan` as a function of `module`.
-pub(crate) fn build_scenario_execution_plan_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(build_scenario_execution_plan, module)
 }

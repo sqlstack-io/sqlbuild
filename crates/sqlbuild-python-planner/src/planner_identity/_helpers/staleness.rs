@@ -4,13 +4,10 @@ use crate::planner_changes::main::native_enum::native_enum;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use std::collections::{HashMap, HashSet};
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::{PyString, PyTuple};
 
-use sqlbuild_analysis::planner_identity::constants::{
-    MODEL_RESOURCE, SEED_RESOURCE, SOURCE_RESOURCE,
-};
 use sqlbuild_analysis::planner_identity::main::classify_selection_staleness::classify_selection_staleness;
 use sqlbuild_analysis::planner_identity::main::stale_upstream_warning_message::stale_upstream_warning_message;
 use sqlbuild_analysis::planner_identity::models::{
@@ -19,7 +16,6 @@ use sqlbuild_analysis::planner_identity::models::{
 
 use crate::planner_changes::main::model_change::model_change;
 use crate::planner_changes::models::ModelPass;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
@@ -55,15 +51,15 @@ fn upstream_graph(upstream_deps: &Bound<'_, PyAny>) -> PyResult<HashMap<GraphKey
 }
 
 /// Inputs of one stale-warning pass.
-struct StalenessInputs<'py> {
-    original_scope: Bound<'py, PyAny>,
-    changes: Bound<'py, PyAny>,
-    snapshot: Bound<'py, PyAny>,
-    identities: Bound<'py, PyAny>,
-    model_changes_complete: bool,
+pub(crate) struct StalenessInputs<'py> {
+    pub(crate) original_scope: Bound<'py, PyAny>,
+    pub(crate) changes: Bound<'py, PyAny>,
+    pub(crate) snapshot: Bound<'py, PyAny>,
+    pub(crate) identities: Bound<'py, PyAny>,
+    pub(crate) model_changes_complete: bool,
 }
 
-fn changed_model_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>> {
+pub(crate) fn changed_model_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>> {
     let py: Python<'_> = inputs.snapshot.py();
     let models: Bound<'_, PyAny> = native_field(&inputs.changes, "models")?;
     let mut changed: HashSet<String> = HashSet::new();
@@ -114,7 +110,7 @@ fn changed_model_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>
     Ok(changed)
 }
 
-fn changed_seed_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>> {
+pub(crate) fn changed_seed_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>> {
     let recorded: Bound<'_, PyAny> =
         native_field(&native_field(&inputs.snapshot, "fingerprints")?, "seeds")?;
     let mut changed: HashSet<String> = HashSet::new();
@@ -134,7 +130,7 @@ fn changed_seed_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>>
     Ok(changed)
 }
 
-fn plan_warnings<'py>(
+pub(crate) fn plan_warnings<'py>(
     py: Python<'py>,
     warnings: Vec<StaleWarning>,
 ) -> PyResult<Bound<'py, PyTuple>> {
@@ -162,92 +158,13 @@ fn plan_warnings<'py>(
     PyTuple::new(py, rendered)
 }
 
-/// Warn for selected models stale through changed upstreams outside the run set.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn build_stale_out_of_selection_warnings<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "build_stale_out_of_selection_warnings",
-        options,
-        (
-            &[
-                "original_scope",
-                "execution_scope",
-                "changes",
-                "snapshot",
-                "version_identities",
-                "source_freshness",
-            ],
-            &["include_sources", "model_changes_complete"],
-        ),
-    )?;
-    let include_sources: bool =
-        !arguments.passed("include_sources")? || arguments.flag("include_sources")?;
-    let inputs = StalenessInputs {
-        original_scope: arguments.value("original_scope")?,
-        changes: arguments.value("changes")?,
-        snapshot: arguments.value("snapshot")?,
-        identities: arguments.value("version_identities")?,
-        model_changes_complete: arguments.flag("model_changes_complete")?,
-    };
-    let run = scope_data(&arguments.value("execution_scope")?)?;
-    let original = scope_data(&inputs.original_scope)?;
-    let names = |kind: &str| -> HashSet<String> {
-        run.selected
-            .iter()
-            .filter(|key| key.0 == kind)
-            .map(|key| key.1.clone())
-            .collect()
-    };
-    let source_freshness: Bound<'py, PyAny> = arguments.value("source_freshness")?;
-    let mut changed_sources: HashSet<String> = HashSet::new();
-    if include_sources && !source_freshness.is_none() {
-        for identity in native_field(&source_freshness, "changed_identities")?.try_iter()? {
-            changed_sources.insert(native_field(&identity?, "source_name")?.extract()?);
-        }
-    }
-    let graph = StalenessGraph {
-        upstream_deps: original
-            .upstream
-            .iter()
-            .map(|(key, deps)| {
-                (
-                    GraphKey::from(key),
-                    deps.iter().map(GraphKey::from).collect(),
-                )
-            })
-            .collect(),
-        selected_model_names: original
-            .selected
-            .iter()
-            .filter(|key| key.0 == MODEL_RESOURCE)
-            .map(|key| key.1.clone())
-            .collect(),
-        run: StalenessNames {
-            models: names(MODEL_RESOURCE),
-            seeds: names(SEED_RESOURCE),
-            sources: names(SOURCE_RESOURCE),
-        },
-        changed: StalenessNames {
-            models: changed_model_names(&inputs)?,
-            seeds: changed_seed_names(&inputs)?,
-            sources: changed_sources,
-        },
-    };
-    plan_warnings(py, classify_selection_staleness(&graph))
-}
-
 fn name_set(values: &Bound<'_, PyAny>) -> PyResult<HashSet<String>> {
     values.try_iter()?.map(|value| value?.extract()).collect()
 }
 
 /// Stale warnings for selected models with changed upstreams outside the run set.
 #[pyfunction]
-fn classify_selection_staleness_warnings<'py>(
+pub(crate) fn classify_selection_staleness_warnings<'py>(
     graph: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = graph.py();
@@ -285,15 +202,4 @@ fn classify_selection_staleness_warnings<'py>(
         )?);
     }
     PyTuple::new(py, warnings)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        build_stale_out_of_selection_warnings,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        classify_selection_staleness_warnings,
-        module
-    )?)
 }

@@ -1,14 +1,11 @@
 //! Gather a frozen point-in-time warehouse snapshot for planning.
 
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
-use crate::planner_warehouse::_helpers::inspection::cursors::CursorInputs;
-use crate::planner_warehouse::_helpers::inspection::cursors::cursor_snapshots;
-use crate::planner_warehouse::constants::ACTIVE_CATALOG;
-use crate::planner_warehouse::constants::FUNCTION_NODE_TYPES;
-use crate::planner_warehouse::constants::METADATA_NAME_FILTER_LIMIT;
-use crate::planner_warehouse::constants::MIGRATE_FROM_CONFIG_KEY;
-use crate::planner_warehouse::constants::RELATIONS_MAIN_COLUMNS;
-use crate::planner_warehouse::constants::RELATIONS_MAIN_LIST;
+use crate::planner_warehouse::_helpers::inspection::cursors::{CursorInputs, cursor_snapshots};
+use crate::planner_warehouse::constants::{
+    ACTIVE_CATALOG, FUNCTION_NODE_TYPES, METADATA_NAME_FILTER_LIMIT, MIGRATE_FROM_CONFIG_KEY,
+    RELATIONS_MAIN_COLUMNS, RELATIONS_MAIN_LIST,
+};
 use crate::planner_warehouse::models::SnapshotRequest;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -888,18 +885,4 @@ pub(crate) fn planner_metadata_name_filter<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let selected = selected_keys.unwrap_or_else(|| py.None().into_bound(py));
     optional_names(py, metadata_name_filter(project, &selected)?.as_ref())
-}
-
-/// `gather_warehouse_snapshot` as a function of `module`.
-pub(crate) fn gather_warehouse_snapshot_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(gather_warehouse_snapshot, module)
-}
-
-/// `planner_metadata_name_filter` as a function of `module`.
-pub(crate) fn planner_metadata_name_filter_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(planner_metadata_name_filter, module)
 }

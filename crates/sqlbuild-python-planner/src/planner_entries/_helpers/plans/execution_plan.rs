@@ -5,11 +5,8 @@ use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::planner_changes::main::detect_changes::detect_changes;
 use crate::planner_changes::main::resolve_model_actions::resolve_model_actions;
-use crate::planner_entries::_helpers::entries::values::native;
-use crate::planner_entries::_helpers::entries::values::replaced;
-use crate::planner_entries::_helpers::plans::test_planning::PlanningRequest;
+use crate::planner_entries::_helpers::entries::values::{native, replaced};
 use crate::planner_entries::_helpers::plans::test_planning::SqlTestPlanning;
-use crate::planner_entries::_helpers::plans::test_planning::start_planning;
 use crate::planner_phases::main::inputs::class_field::class_field;
 use crate::planner_phases::main::inputs::gather_planner_warehouse_state::gather_planner_warehouse_state;
 use crate::planner_phases::main::inputs::warehouse_field::warehouse_field;
@@ -25,22 +22,15 @@ use crate::planner_phases::main::outputs::unselected_upstream_models::unselected
 use crate::planner_phases::main::rebuilds::build_planner_entry_results::build_planner_entry_results;
 use crate::planner_phases::main::rebuilds::defer_to_migration_origins::defer_to_migration_origins;
 use crate::planner_phases::main::rebuilds::reconcile_execution_changes::reconcile_execution_changes;
-use crate::planner_phases::models::PlanOutputContext;
-use crate::planner_phases::models::PlanWarningContext;
-use crate::planner_phases::models::PlannedModelEntries;
 use crate::planner_phases::models::PlannerIdentityContext;
-use crate::planner_phases::models::PlannerRuntime;
-use crate::planner_phases::models::StoragePolicyContext;
+use crate::planner_phases::models::{
+    PlanOutputContext, PlanWarningContext, PlannedModelEntries, StoragePolicyContext,
+};
 use crate::planner_resolution::main::cursor::type_cursor_overrides::type_cursor_overrides;
 use crate::planner_warehouse::main::sources::build_planner_source_freshness_result::build_planner_source_freshness_result;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyDict;
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::build_command::main::utc_now::utc_now;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::planner_scope::main::resolve_planner_scopes::resolve_planner_scopes;
@@ -48,9 +38,9 @@ use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use std::time::Instant;
 
-const INSPECTION_CATALOG: AdapterHost = AdapterHost::OpenInspectionCatalog;
+pub(crate) const INSPECTION_CATALOG: AdapterHost = AdapterHost::OpenInspectionCatalog;
 /// Selected scopes, and the overrides with cursor overrides typed for the selected models.
-fn scopes_and_cursor_overrides<'py>(
+pub(crate) fn scopes_and_cursor_overrides<'py>(
     args: &KeywordArguments<'py>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let project = args.value("project")?;
@@ -142,7 +132,7 @@ fn deferred_migration_origins<'py>(
 }
 
 /// The plan phases after warehouse inspection, run inside the inspection catalog.
-fn planned_output<'py>(
+pub(crate) fn planned_output<'py>(
     args: &KeywordArguments<'py>,
     runtime: &Bound<'py, PyAny>,
     (scopes, overrides): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -234,76 +224,4 @@ fn planned_output<'py>(
         ),))?;
     }
     Ok(plan_output)
-}
-
-/// Build the execution plan for one selection against live warehouse state.
-#[pyfunction]
-#[pyo3(signature = (**kwargs))]
-pub(crate) fn build_execution_plan<'py>(
-    py: Python<'py>,
-    kwargs: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let args = KeywordArguments::read(
-        py,
-        "build_execution_plan",
-        kwargs,
-        (
-            &[
-                "project",
-                "adapter",
-                "connection",
-                "selection",
-                "overrides",
-                "deferral",
-                "policies",
-            ],
-            &["on_progress", "project_config", "local_config"],
-        ),
-    )?;
-    let project = args.value("project")?;
-    let adapter = args.value("adapter")?;
-    let connection = args.value("connection")?;
-    let runtime = Bound::new(
-        py,
-        PlannerRuntime {
-            project: project.clone().unbind(),
-            adapter: adapter.clone().unbind(),
-            connection: connection.clone().unbind(),
-            project_config: args.value("project_config")?.unbind(),
-            local_config: args.value("local_config")?.unbind(),
-            on_progress: args.value("on_progress")?.unbind(),
-            invocation_time: utc_now(py)?.unbind(),
-        },
-    )?
-    .into_any();
-    let (scopes, overrides) = scopes_and_cursor_overrides(&args)?;
-    let inspection = class_field(&scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?;
-    let test_planning = start_planning(
-        py,
-        PlanningRequest {
-            project: project.clone().unbind(),
-            adapter: adapter.clone().unbind(),
-            selected_keys: native_field(&inspection, "selected_keys")?.unbind(),
-            sql_test_selection: native_field(&inspection, "sql_test_selection")?.unbind(),
-        },
-        native_field(&args.value("policies")?, "plan_sql_tests")?.is_truthy()?,
-    )?;
-    let planned = (|| {
-        let catalog = call_with(
-            &host_entry(py, INSPECTION_CATALOG)?,
-            &[("adapter", adapter), ("connection", connection)],
-        )?;
-        within(&catalog, |_| {
-            planned_output(&args, &runtime, (&scopes, &overrides), test_planning.get())
-        })
-    })();
-    let joined = test_planning.get().result(py);
-    let planned = planned?;
-    joined?;
-    Ok(planned)
-}
-
-/// Add the execution plan entry point.
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(build_execution_plan, module)?)
 }

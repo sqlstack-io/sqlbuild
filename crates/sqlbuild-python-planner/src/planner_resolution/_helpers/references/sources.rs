@@ -1,17 +1,14 @@
 //! Source contract validation and adapter-controlled projection rendering.
 
-use crate::planner_resolution::_helpers::references::values::cursor_wrap;
-use crate::planner_resolution::_helpers::references::values::filtering_of;
-use crate::planner_resolution::_helpers::references::values::method;
-use crate::planner_resolution::_helpers::references::values::string;
+use crate::planner_resolution::_helpers::references::values::{
+    cursor_wrap, filtering_of, method, string,
+};
 use crate::planner_resolution::models::CursorFiltering;
 use crate::planner_strategy::main::values::input_error::input_error;
 use pyo3::IntoPyObject;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
@@ -287,7 +284,7 @@ fn resolve_one(
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
-fn resolve_source_references(
+pub(crate) fn resolve_source_references(
     py: Python<'_>,
     kwargs: Option<Bound<'_, PyDict>>,
 ) -> PyResult<String> {
@@ -351,10 +348,4 @@ pub(crate) fn resolve_sources(
     }
     output.push_str(&sql[last..]);
     Ok(output)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(resolve_source_references, module)?)?;
-    module.add_function(wrap_pyfunction!(render_source_read_relation, module)?)?;
-    Ok(())
 }

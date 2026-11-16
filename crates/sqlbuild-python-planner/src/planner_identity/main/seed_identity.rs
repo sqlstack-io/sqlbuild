@@ -1,9 +1,7 @@
 //! `(identity_hash, metadata_json)` of one compiled seed from its content and load-affecting config.
 
 use crate::planner_identity::_helpers::metadata;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// `(identity_hash, metadata_json)` of one compiled seed from its content and load-affecting config.
 #[inline]

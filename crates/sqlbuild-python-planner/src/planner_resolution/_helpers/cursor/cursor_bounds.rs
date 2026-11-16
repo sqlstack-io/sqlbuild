@@ -4,9 +4,9 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::planner_resolution::_helpers::references::values::string;
 use crate::planner_resolution::_helpers::safety::maximum_safety::apply_maximum_start_policy;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyDict;
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 use sqlbuild_cursor::algebra::main::inclusive_to_exclusive::inclusive_to_exclusive;
 use sqlbuild_cursor::algebra::models::{DurationSpan, Grain, Scalar};
 use sqlbuild_cursor::planner::main::raw_bounds::raw_bounds;
@@ -298,9 +298,4 @@ pub(crate) fn compute_cursor_bounds<'py>(
         policy_args.push((key, args.value(key)?));
     }
     apply_maximum_start_policy(py, Some(keywords(py, &policy_args)?))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(compute_cursor_bounds, module)?)?;
-    module.add_function(wrap_pyfunction!(apply_typed_cursor_replay_policy, module)?)
 }

@@ -1,16 +1,12 @@
 //! Assemble new and resumed old-name view steps from recorded facts.
 
-use crate::planner_migrations::_helpers::column::column_objects::model;
-use crate::planner_migrations::_helpers::column::column_objects::text;
-use crate::planner_migrations::_helpers::old_name::old_name_objects::expires;
-use crate::planner_migrations::_helpers::old_name::old_name_objects::location;
-use crate::planner_migrations::_helpers::old_name::old_name_objects::relation;
-use crate::planner_migrations::_helpers::old_name::old_name_objects::retention;
-use crate::planner_migrations::_helpers::old_name::old_name_objects::stores_history;
+use crate::planner_migrations::_helpers::column::column_objects::{model, text};
+use crate::planner_migrations::_helpers::old_name::old_name_objects::{
+    expires, location, relation, retention, stores_history,
+};
 use crate::planner_migrations::_helpers::old_name::old_names::declared_column_aliases;
 use crate::planner_migrations::_helpers::old_name::old_names::old_name_view_skip_reason;
-use crate::planner_migrations::constants::PENDING_ARCHIVE;
-use crate::planner_migrations::constants::PENDING_VIEW;
+use crate::planner_migrations::constants::{PENDING_ARCHIVE, PENDING_VIEW};
 use crate::planner_migrations::models::OldNamePlanner;
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};

@@ -1,12 +1,10 @@
 //! Register the safety functions and classes.
 
-use crate::plan_output::_helpers::safety;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::plan_output::_helpers::safety::serialize_maximum_start_safety;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the safety functions and classes.
-#[inline]
 pub fn register_safety(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    safety::register(module)
+    module.add_function(wrap_pyfunction!(serialize_maximum_start_safety, module)?)
 }

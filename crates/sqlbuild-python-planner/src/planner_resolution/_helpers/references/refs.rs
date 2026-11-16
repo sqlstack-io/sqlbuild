@@ -2,15 +2,14 @@
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::planner_resolution::_helpers::references::values::cursor_wrap;
-use crate::planner_resolution::_helpers::references::values::filtering_of;
-use crate::planner_resolution::_helpers::references::values::method;
-use crate::planner_resolution::_helpers::references::values::string;
+use crate::planner_resolution::_helpers::references::values::{
+    cursor_wrap, filtering_of, method, string,
+};
 use crate::planner_resolution::models::CursorFiltering;
 use pyo3::IntoPyObject;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::PyDict;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -21,7 +20,10 @@ use sqlbuild_sqltext::resolution::main::{ref_alias::ref_alias, reference_spans::
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
-fn resolve_ref_references(py: Python<'_>, kwargs: Option<Bound<'_, PyDict>>) -> PyResult<String> {
+pub(crate) fn resolve_ref_references(
+    py: Python<'_>,
+    kwargs: Option<Bound<'_, PyDict>>,
+) -> PyResult<String> {
     let args = KeywordArguments::read(
         py,
         "resolve_ref_references",
@@ -228,41 +230,4 @@ pub(crate) fn resolve_table_function_references(
     adapter: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
     resolve_function_calls(query_sql, function_locations, adapter, true)
-}
-
-#[pyfunction]
-#[pyo3(signature = (*, model_locations, seed_locations, deferred_locations, selected_keys))]
-pub(crate) fn apply_deferred_locations<'py>(
-    model_locations: &Bound<'py, PyDict>,
-    seed_locations: &Bound<'py, PyDict>,
-    deferred_locations: &Bound<'py, PyDict>,
-    selected_keys: &Bound<'py, PyAny>,
-) -> PyResult<(Bound<'py, PyDict>, Bound<'py, PyDict>)> {
-    let selected = selected_keys
-        .try_iter()?
-        .map(|key| native_field(&key?, "name")?.extract::<String>())
-        .collect::<PyResult<std::collections::HashSet<_>>>()?;
-    let models = model_locations.copy()?;
-    let seeds = seed_locations.copy()?;
-    for (name, target) in deferred_locations.iter() {
-        if selected.contains(&name.extract::<String>()?) {
-            continue;
-        }
-        if models.contains(&name)? {
-            models.set_item(&name, &target)?;
-        }
-        if seeds.contains(&name)? {
-            seeds.set_item(&name, &target)?;
-        }
-    }
-    Ok((models, seeds))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(resolve_ref_references, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_dbt_ref_references, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_udf_references, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_table_function_references, module)?)?;
-    module.add_function(wrap_pyfunction!(apply_deferred_locations, module)?)?;
-    Ok(())
 }

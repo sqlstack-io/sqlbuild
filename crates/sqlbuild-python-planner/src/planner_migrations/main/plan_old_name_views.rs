@@ -1,11 +1,8 @@
 //! Old-name compatibility views to create, resume or retire for the planned model and column migrations.
 
 use crate::planner_migrations::_helpers::old_name::old_name_planning;
-use crate::planner_migrations::models::MigrationPhase;
-use crate::planner_migrations::models::OldNameViewPlanning;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::planner_migrations::models::{MigrationPhase, OldNameViewPlanning};
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Old-name compatibility views to create, resume or retire for the planned model and column migrations.
 #[inline]

@@ -1,12 +1,8 @@
 //! The plan output's base fields from the planned entries, relations and source freshness.
 
 use crate::planner_phases::_helpers::outputs::output_assembly;
-use crate::planner_phases::models::PlanOutputContext;
-use crate::planner_phases::models::PlanOutputFields;
-use crate::planner_phases::models::PlannedModelEntries;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::planner_phases::models::{PlanOutputContext, PlanOutputFields, PlannedModelEntries};
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// The plan output's base fields from the planned entries, relations and source freshness.
 #[inline]

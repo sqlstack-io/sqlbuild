@@ -2,13 +2,13 @@
 
 use crate::planner_migrations::_helpers::column::column_objects::replace;
 use crate::planner_migrations::_helpers::column::known_input_columns::KnownInputColumns;
-use crate::planner_migrations::models::ColumnMigrationInputs;
-use crate::planner_migrations::models::ColumnMigrationPlanning;
-use crate::planner_migrations::models::MigrationPhase;
+use crate::planner_migrations::models::{
+    ColumnMigrationInputs, ColumnMigrationPlanning, MigrationPhase,
+};
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PySet, PySetMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -19,7 +19,7 @@ use sqlbuild_python_project::compiled_views::main::compiled_models::name_object:
 /// Decide column renames and return the existing planning result model.
 #[pyfunction(name = "plan_column_migrations")]
 #[pyo3(signature = (**options))]
-fn plan_column_migrations_of<'py>(
+pub(crate) fn plan_column_migrations_of<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<()> {
@@ -155,8 +155,4 @@ pub(crate) fn plan_column_migrations<'py>(
         hints,
         warnings,
     })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(plan_column_migrations_of, module)?)
 }

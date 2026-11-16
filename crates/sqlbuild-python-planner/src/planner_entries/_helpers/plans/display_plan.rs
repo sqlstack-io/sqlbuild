@@ -1,17 +1,11 @@
 //! Display-only plans for external plan surfaces when warehouse planning cannot resolve.
 
-use crate::planner_entries::_helpers::entries::values::boolean;
-use crate::planner_entries::_helpers::entries::values::native;
-use crate::planner_entries::_helpers::entries::values::none;
-use crate::planner_entries::_helpers::entries::values::planner_model;
-use crate::planner_entries::_helpers::entries::values::planner_type;
-use crate::planner_entries::_helpers::entries::values::string;
+use crate::planner_entries::_helpers::entries::values::{
+    boolean, native, none, planner_model, planner_type, string,
+};
 use crate::planner_phases::main::rebuilds::resolve_model_full_refresh::resolve_model_full_refresh;
 use crate::planner_strategy::main::strategy::materialization_of::materialization_of;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyFrozenSet, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_analysis::graph::main::downstream_edges::downstream_edges;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
@@ -19,10 +13,6 @@ use sqlbuild_python_front::model_config::main::config::model_values::model_value
 use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
-use sqlbuild_python_project::graph::main::project::edge_dict::edge_dict;
-use sqlbuild_python_project::graph::models::KeyCache;
-use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
 use sqlbuild_python_project::planner_phases::main::object::object;
 
 const VIEW: &str = "view";
@@ -54,7 +44,7 @@ fn config<'py>(model: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAn
         .unwrap_or_else(|| py.None().into_bound(py)))
 }
 
-fn display_entry<'py>(
+pub(crate) fn display_entry<'py>(
     model: &Bound<'py, PyAny>,
     full_refresh: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -131,51 +121,4 @@ fn display_entry<'py>(
             ("custom_materialization_name", custom_name),
         ],
     )
-}
-
-/// Build a display-only plan when warehouse planning cannot fully resolve.
-#[pyfunction]
-#[pyo3(signature = (*, project, selected_model_names, full_refresh))]
-pub(crate) fn build_display_only_sqlbuild_plan<'py>(
-    project: &Bound<'py, PyAny>,
-    selected_model_names: &Bound<'py, PyAny>,
-    full_refresh: bool,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = project.py();
-    let selected = PyFrozenSet::new(
-        py,
-        selected_model_names
-            .try_iter()?
-            .collect::<PyResult<Vec<_>>>()?,
-    )?;
-    let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for model in compiled_models(project)?.try_iter()? {
-        let model = model?;
-        if selected.contains(name_object(&model)?)? {
-            entries.push(display_entry(&model, full_refresh)?);
-        }
-    }
-    let keys: Vec<Bound<'py, PyAny>> = entries
-        .iter()
-        .map(|entry| native_field(entry, "key"))
-        .collect::<PyResult<_>>()?;
-    let upstream = execution_deps(project)?;
-    let cache = KeyCache::new(py)?;
-    let downstream = edge_dict(&cache, &downstream_edges(&upstream))?.into_any();
-    let upstream = edge_dict(&cache, &upstream)?.into_any();
-    planner_model(
-        py,
-        RecordId::PlanOutput,
-        &[
-            ("execution_order", PyTuple::new(py, &keys)?.into_any()),
-            ("model_entries", PyTuple::new(py, entries)?.into_any()),
-            ("selected_keys", PyFrozenSet::new(py, keys)?.into_any()),
-            ("upstream_deps", upstream),
-            ("downstream_deps", downstream),
-        ],
-    )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(build_display_only_sqlbuild_plan, module)?)
 }

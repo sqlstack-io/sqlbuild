@@ -1,10 +1,11 @@
 //! The text plan: planner objects read by attribute into the native plan report.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::plan_output::main::cursor_bound_display::cursor_bound_display;
+use crate::plan_output::main::inclusive_cursor_end::inclusive_cursor_end;
+use crate::plan_output::main::items::items;
+use crate::plan_output::main::text::text;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_core::cli_text::main::format_plan_completion::format_plan_completion;
-use sqlbuild_core::cli_text::main::format_plan_text::format_plan_text;
 use sqlbuild_core::cli_text::models::{
     CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, ModelPlanText, PlanTextReport,
     PlanWarningText, ProviderUsageText, PythonPlanText, RenameHintText, SchemaFindingText,
@@ -12,24 +13,18 @@ use sqlbuild_core::cli_text::models::{
 };
 use sqlbuild_core::plan_display::main::format_query_diff::format_query_diff;
 
-use crate::plan_output::_helpers::cursor_details::CursorDetails;
-use crate::plan_output::_helpers::cursor_details::DEFERRED;
-use crate::plan_output::_helpers::cursor_details::RESOLVED;
-use crate::plan_output::_helpers::cursor_details::cursor_details;
-use crate::plan_output::_helpers::cursor_details::runtime_inputs_clause;
-use crate::plan_output::_helpers::display::cursor_bound_display;
-use crate::plan_output::_helpers::display::format_no_input_rows;
-use crate::plan_output::_helpers::display::format_waiting_on_empty_inputs;
-use crate::plan_output::_helpers::display::inclusive_cursor_end;
-use crate::plan_output::_helpers::display::model_materialization_label;
+use crate::plan_output::_helpers::cursor_details::{
+    CursorDetails, DEFERRED, RESOLVED, cursor_details, runtime_inputs_clause,
+};
+use crate::plan_output::_helpers::display::{
+    format_no_input_rows, format_waiting_on_empty_inputs, model_materialization_label,
+};
 use crate::plan_output::_helpers::migrations::pre_build_lines;
 use crate::plan_output::_helpers::plan_json::unified_diff;
-use crate::plan_output::_helpers::python_identity::definition_source_text;
-use crate::plan_output::_helpers::python_identity::dependency_source_text;
-use crate::plan_output::_helpers::values::items;
-use crate::plan_output::_helpers::values::optional_text;
-use crate::plan_output::_helpers::values::text;
-use crate::plan_output::_helpers::values::texts;
+use crate::plan_output::_helpers::python_identity::{
+    definition_source_text, dependency_source_text,
+};
+use crate::plan_output::_helpers::values::{optional_text, texts};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -42,7 +37,7 @@ const QUERY_CHANGED: &str = "query_changed";
 const CONFIG_CHANGED: &str = "config_changed";
 const MICROBATCH_MODE: &str = "microbatch";
 const CHANGED_IDENTITY: &str = "changed";
-const PLAN_OPTIONS: (&[&str], &[&str]) = (
+pub(crate) const PLAN_OPTIONS: (&[&str], &[&str]) = (
     &["plan"],
     &[
         "full_refresh",
@@ -444,7 +439,7 @@ pub(crate) fn display_limit(options: &Bound<'_, PyAny>) -> PyResult<DisplayLimit
     })
 }
 
-fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextReport> {
+pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextReport> {
     let py: Python<'_> = arguments.value("plan")?.py();
     let plan: Bound<'_, PyAny> = arguments.value("plan")?;
     let display_options: Bound<'_, PyAny> = {
@@ -521,26 +516,4 @@ fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextReport> {
         pruned_models: pruned_models(&metadata)?,
         pre_build_lines: pre_build,
     })
-}
-
-/// The text plan grouped by reason with inline detail, optionally closed by its completion line.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn format_plan(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> PyResult<String> {
-    let arguments: KeywordArguments<'_> =
-        KeywordArguments::read(py, "format_plan", options, PLAN_OPTIONS)?;
-    let report: PlanTextReport = report(&arguments)?;
-    let mut text: String = format_plan_text(&report);
-    if arguments.passed("changed_sections")? {
-        let sections: String = arguments.value("changed_sections")?.extract()?;
-        text = format!("{text}\n\n{sections}");
-    }
-    if !arguments.flag("include_completion")? {
-        return Ok(text);
-    }
-    Ok(format!("{text}\n\n{}", format_plan_completion(&report)))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(format_plan, module)?)
 }

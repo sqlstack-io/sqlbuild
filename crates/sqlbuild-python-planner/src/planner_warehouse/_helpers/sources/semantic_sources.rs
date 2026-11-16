@@ -1,7 +1,6 @@
 //! Complete missing source metadata in bounded, database-grouped batches.
 
-use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
-use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
+use crate::planner_warehouse::_helpers::inspection::snapshot::{columns_for, list_relations};
 use crate::planner_warehouse::constants::ACTIVE_CATALOG;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -294,18 +293,4 @@ pub(crate) fn semantic_source_columns<'py>(
         }
     }
     Ok(result)
-}
-
-/// `list_source_candidates` as a function of `module`.
-pub(crate) fn list_source_candidates_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(list_source_candidates, module)
-}
-
-/// `semantic_source_columns` as a function of `module`.
-pub(crate) fn semantic_source_columns_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(semantic_source_columns, module)
 }

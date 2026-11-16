@@ -1,12 +1,18 @@
 //! Register the exception types functions and classes.
 
-use crate::freshness::_helpers::exception_types;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::freshness::_helpers::exception_types::SourceFreshnessInputError;
+use crate::freshness::_helpers::exception_types::SourceFreshnessObservationError;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 
 /// Register the exception types functions and classes.
-#[inline]
 pub fn register_exception_types(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    exception_types::register(module)
+    let py = module.py();
+    module.add(
+        "SourceFreshnessInputError",
+        py.get_type::<SourceFreshnessInputError>(),
+    )?;
+    module.add(
+        "SourceFreshnessObservationError",
+        py.get_type::<SourceFreshnessObservationError>(),
+    )
 }

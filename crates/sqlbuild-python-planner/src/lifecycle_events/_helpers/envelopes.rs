@@ -1,11 +1,11 @@
 //! Lifecycle event and diagnostic log envelopes, run bounds and operation field rules.
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyDict, PyDictMethods, PyInt, PyString, PyTypeMethods,
 };
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::lifecycle_events::constants::INVOCATION_SEQUENCE_PROBLEM;
 use sqlbuild_core::lifecycle_events::main::diagnostic_severity_problem::diagnostic_severity_problem;
 use sqlbuild_core::lifecycle_events::main::diagnostic_version_problem::diagnostic_version_problem;
@@ -18,12 +18,10 @@ use sqlbuild_core::lifecycle_events::main::run_bounds_problem::run_bounds_proble
 use sqlbuild_core::lifecycle_events::models::{HookFacts, SequenceFact};
 
 use crate::lifecycle_events::_helpers::payloads::validation_error;
-use crate::lifecycle_events::_helpers::validation::frozen_json;
-use crate::lifecycle_events::_helpers::validation::known_event_check;
-use crate::lifecycle_events::_helpers::validation::optional_text_check;
-use crate::lifecycle_events::_helpers::validation::required_text_check;
-use crate::lifecycle_events::_helpers::validation::schema_version_check;
-use crate::lifecycle_events::_helpers::validation::timestamp_check;
+use crate::lifecycle_events::_helpers::validation::{
+    frozen_json, known_event_check, optional_text_check, required_text_check, schema_version_check,
+    timestamp_check,
+};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
@@ -106,7 +104,7 @@ fn freeze_object_field(owner: &Bound<'_, PyAny>, field: &str, path: &str) -> PyR
 /// Validate and freeze one lifecycle event envelope in place.
 #[pyfunction(name = "validate_lifecycle_event")]
 #[pyo3(signature = (*, event))]
-fn lifecycle_event_check(event: &Bound<'_, PyAny>) -> PyResult<()> {
+pub(crate) fn lifecycle_event_check(event: &Bound<'_, PyAny>) -> PyResult<()> {
     let py: Python<'_> = event.py();
     for field in EVENT_REQUIRED_TEXT {
         required_text_check(&native_field(event, field)?, field)?;
@@ -139,7 +137,7 @@ fn lifecycle_event_check(event: &Bound<'_, PyAny>) -> PyResult<()> {
 /// Validate a dispatcher-assigned invocation sequence.
 #[pyfunction(name = "validate_lifecycle_invocation_sequence")]
 #[pyo3(signature = (*, value))]
-fn invocation_sequence_check(value: &Bound<'_, PyAny>) -> PyResult<()> {
+pub(crate) fn invocation_sequence_check(value: &Bound<'_, PyAny>) -> PyResult<()> {
     if !nonnegative_int(value)? {
         return Err(validation_error(value.py(), INVOCATION_SEQUENCE_PROBLEM));
     }
@@ -149,7 +147,7 @@ fn invocation_sequence_check(value: &Bound<'_, PyAny>) -> PyResult<()> {
 /// Validate and freeze one diagnostic log record in place.
 #[pyfunction(name = "validate_diagnostic_log")]
 #[pyo3(signature = (*, record))]
-fn diagnostic_log_check(record: &Bound<'_, PyAny>) -> PyResult<()> {
+pub(crate) fn diagnostic_log_check(record: &Bound<'_, PyAny>) -> PyResult<()> {
     let py: Python<'_> = record.py();
     let schema_version: Bound<'_, PyAny> = native_field(record, "schema_version")?;
     schema_version_check(&schema_version)?;
@@ -173,7 +171,7 @@ fn diagnostic_log_check(record: &Bound<'_, PyAny>) -> PyResult<()> {
 /// Validate a run's selection, concurrency and worker counts.
 #[pyfunction(name = "validate_run_bounds")]
 #[pyo3(signature = (*, selected_count, configured_concurrency, worker_count))]
-fn run_bounds_check(
+pub(crate) fn run_bounds_check(
     selected_count: &Bound<'_, PyAny>,
     configured_concurrency: &Bound<'_, PyAny>,
     worker_count: &Bound<'_, PyAny>,
@@ -205,7 +203,7 @@ fn run_bounds_check(
 /// The allow-listed, non-negative operation metadata counts.
 #[pyfunction]
 #[pyo3(signature = (*, metadata))]
-fn validated_operation_metadata<'py>(
+pub(crate) fn validated_operation_metadata<'py>(
     py: Python<'py>,
     metadata: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
@@ -253,7 +251,7 @@ fn hook_name_publishable(name: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// The validated hook fields of an operation, empty when none are supplied.
 #[pyfunction]
 #[pyo3(signature = (*, hook_phase, hook_index, hook_type, hook_name))]
-fn validated_operation_hook_fields<'py>(
+pub(crate) fn validated_operation_hook_fields<'py>(
     hook_phase: &Bound<'py, PyAny>,
     hook_index: &Bound<'py, PyAny>,
     hook_type: &Bound<'py, PyAny>,
@@ -289,7 +287,7 @@ fn validated_operation_hook_fields<'py>(
 /// Validate that a producer other than SQLBuild names its version.
 #[pyfunction(name = "validate_lifecycle_producer")]
 #[pyo3(signature = (*, producer, producer_version))]
-fn producer_check(
+pub(crate) fn producer_check(
     producer: &Bound<'_, PyAny>,
     producer_version: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
@@ -297,14 +295,4 @@ fn producer_check(
         Some(problem) => Err(validation_error(producer.py(), problem)),
         None => Ok(()),
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(lifecycle_event_check, module)?)?;
-    module.add_function(wrap_pyfunction!(invocation_sequence_check, module)?)?;
-    module.add_function(wrap_pyfunction!(diagnostic_log_check, module)?)?;
-    module.add_function(wrap_pyfunction!(run_bounds_check, module)?)?;
-    module.add_function(wrap_pyfunction!(validated_operation_metadata, module)?)?;
-    module.add_function(wrap_pyfunction!(validated_operation_hook_fields, module)?)?;
-    module.add_function(wrap_pyfunction!(producer_check, module)?)
 }

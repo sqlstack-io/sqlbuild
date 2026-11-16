@@ -1,31 +1,25 @@
 //! Assemble audit plan dataclasses using native rendering and scheduling.
 
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::GraphIndexes;
-use std::collections::HashSet;
 
-use crate::planner_strategy::_helpers::audits::attachment;
-use crate::planner_strategy::_helpers::audits::outside_target_lineage;
-use crate::planner_strategy::_helpers::audits::resolve_effective_run_scope;
+use crate::planner_strategy::_helpers::audits::{
+    attachment, outside_target_lineage, resolve_effective_run_scope,
+};
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
-use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyListMethods, PyString};
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::assert_no_unresolved_sql_markers;
 use sqlbuild_python_project::auditing::main::render_audit_sql::render_audit_sql;
-use sqlbuild_python_project::compiled_views::main::project::audits::audits;
-use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::models::NativeProjectGraph;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::edges::edges;
-use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::resource_views::main::audit_reads::always_run::always_run;
 use sqlbuild_python_project::resource_views::main::audit_reads::attached_column_name::attached_column_name;
 use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_kind::attached_target_kind;
-use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_name::attached_target_name;
 use sqlbuild_python_project::resource_views::main::audit_reads::definition_name::definition_name;
 use sqlbuild_python_project::resource_views::main::audit_reads::description::description;
 use sqlbuild_python_project::resource_views::main::audit_reads::evaluation_mode::evaluation_mode;
@@ -122,7 +116,7 @@ pub(crate) fn plan_audit_of<'py>(
 }
 
 /// One audit's plan entry, rendered against the planning relations.
-fn plan_audit<'py>(
+pub(crate) fn plan_audit<'py>(
     audit: &Bound<'py, PyAny>,
     request: &AuditPlanning<'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -227,69 +221,4 @@ fn plan_audit<'py>(
         values.set_item(field, value)?;
     }
     new_record(py, RecordId::AuditPlanEntry, (), Some(&values))
-}
-
-/// Select attached audits by their logical target and singular audits by dependency overlap.
-pub(crate) fn audit_is_selected(
-    audit: &Bound<'_, PyAny>,
-    selected_keys: &HashSet<ObjectKey>,
-) -> PyResult<bool> {
-    let py = audit.py();
-    let kind = attached_target_kind(audit)?;
-    let name = attached_target_name(audit)?;
-    if !kind.is_none() && !name.is_none() {
-        let target_value = native_field(
-            &imported(py, COMPILE_TYPES_MODULE, "AttachedAuditTargetKind")?.call1((kind,))?,
-            "value",
-        )?;
-        let key = (target_value.extract()?, name.extract()?);
-        return Ok(selected_keys.contains(&key));
-    }
-    for dependency in scope_deps(audit)?.try_iter()? {
-        if selected_keys.contains(&native_key(&dependency?)?) {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-/// Assemble selected audits in compiled-project order without querying lineage for an empty selection.
-pub(crate) fn build_selected_audit_entries<'py>(
-    request: Option<&Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyList>> {
-    let request = Request::new("build_selected_audit_entries", request)?;
-    let py = request.py();
-    let project = request.get("project")?;
-    let scope = scope_data(&request.get("scope")?)?;
-    let mut selected: Vec<Bound<'py, PyAny>> = Vec::new();
-    for audit in audits(&project)?.try_iter()? {
-        let audit = audit?;
-        if audit_is_selected(&audit, &scope.selected)? {
-            selected.push(audit);
-        }
-    }
-    let entries = PyList::empty(py);
-    if selected.is_empty() {
-        return Ok(entries);
-    }
-    let relations = request.get("relations")?;
-    let planning = AuditPlanning {
-        model_locations: native_field(&relations, "model_locations")?,
-        seed_locations: native_field(&relations, "seed_locations")?,
-        source_map: native_field(&relations, "source_read_map")?,
-        adapter: request.get("adapter")?,
-        model_materializations: request.get("model_materializations")?,
-        lineage: native_field(&project, "lineage_graph")?.extract()?,
-    };
-    for audit in selected {
-        entries.append(plan_audit(&audit, &planning)?)?;
-    }
-    Ok(entries)
-}
-
-/// `plan_audit_of` as a function of `module`.
-pub(crate) fn plan_audit_of_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(plan_audit_of, module)
 }

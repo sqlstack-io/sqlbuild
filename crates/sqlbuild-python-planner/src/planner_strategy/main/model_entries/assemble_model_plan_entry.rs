@@ -1,9 +1,7 @@
 //! Build a model plan entry and its warnings from resolved plan decisions.
 
 use crate::planner_strategy::_helpers::model_entries;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyTuple;
 use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
 

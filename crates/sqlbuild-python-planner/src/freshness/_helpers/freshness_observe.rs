@@ -4,20 +4,16 @@ use crate::freshness::models::PreviousState;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::{PyException, PyValueError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::freshness_text::main::freshness_json::freshness_json;
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::freshness::_helpers::observation::observation_record;
-use crate::freshness::_helpers::observation::observation_source;
-use crate::freshness::_helpers::observation::observe_adapter_batch;
-use crate::freshness::_helpers::observation::observe_configured;
-use crate::freshness::_helpers::observation::strategy;
+use crate::freshness::_helpers::observation::{
+    observation_record, observation_source, observe_adapter_batch, observe_configured, strategy,
+};
 use crate::freshness::models::Observer;
 use sqlbuild_core::freshness_text::main::freshness_status::freshness_status;
 use sqlbuild_core::freshness_text::models::{
@@ -298,7 +294,7 @@ pub(crate) fn observe_freshness(
 /// Observe source freshness and return the `sqb freshness --json` payload.
 #[pyfunction]
 #[pyo3(signature = (**options))]
-fn observe_source_freshness_json(
+pub(crate) fn observe_source_freshness_json(
     py: Python<'_>,
     options: Option<Bound<'_, PyDict>>,
 ) -> PyResult<String> {
@@ -337,9 +333,4 @@ fn observe_source_freshness_json(
         (arguments.value("run_id")?.extract()?, &state),
     )?;
     freshness_json(&results).map_err(|error| PyValueError::new_err(format!("{error:?}")))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(observe_source_freshness_json, module)?)?;
-    Ok(())
 }

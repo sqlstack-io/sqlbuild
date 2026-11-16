@@ -1,24 +1,20 @@
 //! Observe configured and adapter-metadata source freshness through adapter callbacks.
 
+use crate::freshness::main::presumed_utc_datetime::presumed_utc_datetime;
 use crate::freshness::models::Observer;
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyDateTime, PyDict, PyDictMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 use sqlbuild_state::freshness::main::single_value_problem::single_value_problem;
 use sqlbuild_state::freshness::models::QueryShape;
 
-use crate::freshness::_helpers::support::OBSERVATION_ERROR;
-use crate::freshness::_helpers::support::exception_text;
-use crate::freshness::_helpers::support::freshness_error;
-use crate::freshness::_helpers::support::presumed_utc_datetime;
-use crate::freshness::_helpers::support::presumed_utc_value;
-use crate::freshness::_helpers::support::text;
+use crate::freshness::_helpers::support::{
+    OBSERVATION_ERROR, exception_text, freshness_error, presumed_utc_value, text,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::constants::DATA_VERSION_FIELD;
-use sqlbuild_python_base::records::constants::OBSERVED_AT_FIELD;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
@@ -27,9 +23,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_front::state_rows::main::event_rows::in_utc::in_utc;
 use sqlbuild_python_front::state_rows::main::event_rows::normalize::normalize;
-use sqlbuild_python_front::state_rows::main::event_rows::offset_aware::offset_aware;
 use sqlbuild_python_front::state_rows::main::event_rows::version_hash::version_hash;
 use sqlbuild_python_project::references::main::render_source_read::render_source_read;
 
@@ -39,7 +33,7 @@ const DEFAULT_STRATEGY: &str = "sql";
 const METADATA_OPERATION: &str = "source_freshness_metadata_observation";
 const QUERY_OPERATION: &str = "source_freshness_query_observation";
 
-fn observation_error(py: Python<'_>, message: &str) -> pyo3::PyErr {
+pub(crate) fn observation_error(py: Python<'_>, message: &str) -> pyo3::PyErr {
     freshness_error(py, (OBSERVATION_ERROR, message), None)
 }
 
@@ -555,7 +549,7 @@ pub(crate) fn observation_record<'py>(
 /// Observe one source freshness config and return a comparable data version.
 #[pyfunction]
 #[pyo3(signature = (*, adapter, connection, source, observed_at))]
-fn observe_configured_source_freshness<'py>(
+pub(crate) fn observe_configured_source_freshness<'py>(
     adapter: Bound<'py, PyAny>,
     connection: Bound<'py, PyAny>,
     source: &Bound<'py, PyAny>,
@@ -572,7 +566,7 @@ fn observe_configured_source_freshness<'py>(
 /// Observe adapter metadata freshness per source, batching the warehouse lookups.
 #[pyfunction]
 #[pyo3(signature = (*, adapter, connection, sources, observed_at))]
-fn observe_adapter_sources_freshness<'py>(
+pub(crate) fn observe_adapter_sources_freshness<'py>(
     adapter: Bound<'py, PyAny>,
     connection: Bound<'py, PyAny>,
     sources: &Bound<'py, PyAny>,
@@ -585,44 +579,4 @@ fn observe_adapter_sources_freshness<'py>(
     };
     let sources: Vec<Bound<'py, PyAny>> = sources.try_iter()?.collect::<PyResult<_>>()?;
     observe_adapter_batch(&observer, &sources)
-}
-
-/// An aware freshness `datetime` in UTC; a naive value is an observation error.
-pub(crate) fn require_aware_utc_datetime<'py>(
-    value: &Bound<'py, PyAny>,
-    field_name: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    if !offset_aware(value)? {
-        return Err(observation_error(
-            value.py(),
-            &format!("source freshness {field_name} must be timezone-aware"),
-        ));
-    }
-    in_utc(value)
-}
-
-/// Hold an observation's `observed_at` and datetime `data_version` as aware UTC values.
-pub(crate) fn normalize_observation(
-    py: Python<'_>,
-    mut values: Vec<Py<PyAny>>,
-) -> PyResult<Vec<Py<PyAny>>> {
-    let observed_at: Bound<'_, PyAny> =
-        require_aware_utc_datetime(values[OBSERVED_AT_FIELD].bind(py), "observed_at")?;
-    values[OBSERVED_AT_FIELD] = observed_at.unbind();
-    let data_version: &Bound<'_, PyAny> = values[DATA_VERSION_FIELD].bind(py);
-    if data_version.is_instance_of::<PyDateTime>() {
-        let data_version: Bound<'_, PyAny> =
-            require_aware_utc_datetime(data_version, "data_version")?;
-        values[DATA_VERSION_FIELD] = data_version.unbind();
-    }
-    Ok(values)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        observe_configured_source_freshness,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(observe_adapter_sources_freshness, module)?)?;
-    Ok(())
 }

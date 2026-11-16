@@ -1,11 +1,8 @@
 //! This plan's renames plus recorded renames, read only when a selected query that references models changed.
 
 use crate::planner_changes::_helpers::renames;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
-use pyo3::types::PyDict;
-use pyo3::types::PyTuple;
+use pyo3::prelude::{Bound, PyResult, Python};
+use pyo3::types::{PyDict, PyTuple};
 
 /// This plan's renames plus recorded renames, read only when a selected query that references models changed.
 #[inline]

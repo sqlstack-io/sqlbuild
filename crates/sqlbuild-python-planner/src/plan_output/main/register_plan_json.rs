@@ -1,12 +1,10 @@
 //! Register the plan json functions and classes.
 
-use crate::plan_output::_helpers::plan_json;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::plan_output::main::format_plan_json::format_plan_json;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the plan json functions and classes.
-#[inline]
 pub fn register_plan_json(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    plan_json::register(module)
+    module.add_function(wrap_pyfunction!(format_plan_json, module)?)
 }

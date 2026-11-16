@@ -1,9 +1,7 @@
 //! Cursor snapshots of models whose history lives in another relation or column.
 
 use crate::planner_warehouse::_helpers::inspection::snapshot;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyDict as KeywordDict;
 
 /// Cursor snapshots of models whose history lives in another relation or column.

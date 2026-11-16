@@ -1,9 +1,8 @@
 //! Clone planning: destination and origin entries, and deferred-clone graph traversal.
 
-use crate::planner_entries::_helpers::entries::values::native;
-use crate::planner_entries::_helpers::entries::values::planner_model;
-use crate::planner_entries::_helpers::entries::values::planner_type;
-use crate::planner_entries::_helpers::entries::values::string;
+use crate::planner_entries::_helpers::entries::values::{
+    native, planner_model, planner_type, string,
+};
 use crate::planner_entries::models::ModelPlanContext;
 use crate::planner_entries::types::PhaseTimings;
 use crate::planner_identity::main::build_compiled_function_fingerprint_sql::build_compiled_function_fingerprint_sql;
@@ -17,9 +16,9 @@ use crate::planner_resolution::models::Resolution;
 use crate::planner_strategy::main::strategy::materialization_of::materialization_of;
 use crate::planner_warehouse::main::sources::gather_source_columns::gather_source_columns;
 use pyo3::PyRef;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::graph::main::downstream_edges::downstream_edges;
 use sqlbuild_core::graph_walk::main::clone_ancestors::clone_ancestors;
 use sqlbuild_core::graph_walk::models::ClonePolicy;
@@ -754,9 +753,4 @@ pub(crate) fn resolve_skipped_view_chain<'py>(
         (&GRAPH_ARGUMENTS, &[]),
     )?;
     CloneGraph::read(&args)?.walk(true)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(resolve_clone_boundary, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_skipped_view_chain, module)?)
 }

@@ -1,9 +1,7 @@
 //! Normalize cursor snapshot grain.
 
 use crate::planner_resolution::_helpers::cursor::cursor_windows;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Normalize cursor snapshot grain.
 #[inline]

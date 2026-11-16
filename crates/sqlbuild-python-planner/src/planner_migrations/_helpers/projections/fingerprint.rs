@@ -1,15 +1,10 @@
 //! Migration identity binding with unchanged metadata and hash format.
 
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_analysis::planner_migrations::main::{migration_fingerprint, migration_ref_names};
+use crate::planner_migrations::main::fingerprint::fingerprint;
+use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::PyDict;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
-use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
-use sqlbuild_python_project::native_host::models::ModelLookup;
 use std::collections::BTreeMap;
 
 /// Hash normalized SQL and non-storage metadata through rename identities.
@@ -44,75 +39,4 @@ pub(crate) fn build_migration_fingerprint(
         &identities,
         dialect.as_deref(),
     )
-}
-
-/// The migration fingerprint of SQL and metadata through rename identities, `generic` by default.
-pub(crate) fn fingerprint(
-    sql: &str,
-    metadata: &str,
-    identities: &BTreeMap<String, String>,
-    dialect: Option<&str>,
-) -> PyResult<Option<String>> {
-    migration_fingerprint::migration_fingerprint(
-        sql,
-        metadata,
-        identities,
-        dialect
-            .filter(|value| !value.is_empty())
-            .unwrap_or("generic"),
-    )
-    .map_err(PyValueError::new_err)
-}
-
-/// Every name whose rename identity can change the migration fingerprint.
-pub(crate) fn migration_fingerprint_ref_names<'py>(
-    py: Python<'py>,
-    query_sql: &str,
-    metadata_json: &str,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    PyFrozenSet::new(
-        py,
-        migration_ref_names::migration_ref_names(query_sql, metadata_json)
-            .map_err(PyValueError::new_err)?,
-    )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(build_migration_fingerprint, module)?)?;
-    Ok(())
-}
-
-/// Attach persisted migration identities through the existing cache boundary.
-pub(crate) fn with_migration_fingerprints<'py>(
-    entries: &Bound<'py, PyAny>,
-    models: &ModelLookup,
-    cache: &Bound<'py, PyAny>,
-    dialect: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    use sqlbuild_python_base::boundary::main::call_with::call_with;
-    let py = entries.py();
-    let mut attached: Vec<Bound<'py, pyo3::PyAny>> = Vec::new();
-    for entry in entries.try_iter()? {
-        let entry = entry?;
-        let model = models.get(py, &native_field(&entry, "name")?.extract::<String>()?)?;
-        let metadata = native_field(&entry, "fingerprint_metadata_json")?;
-        if model.is_none() || metadata.is_none() || native_field(&entry, "action")?.eq("skip")? {
-            attached.push(entry);
-            continue;
-        }
-        let fingerprint = call_with(
-            &native_field(cache, "fingerprint")?,
-            &[
-                ("query_sql", query_sql(&model)?),
-                ("metadata_json", metadata),
-                ("ref_identities", PyDict::new(py).into_any()),
-                ("dialect", dialect.clone()),
-            ],
-        )?;
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("migration_fingerprint", fingerprint)?;
-        attached.push(replaced_keywords(&entry, &kwargs)?);
-    }
-    cache.call_method0("persist")?;
-    PyTuple::new(py, attached)
 }

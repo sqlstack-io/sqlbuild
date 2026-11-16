@@ -2,11 +2,8 @@
 
 use crate::planner_entries::_helpers::plans::clone_plans;
 use crate::planner_entries::types::PhaseTimings;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
-use pyo3::types::PyDict;
-use pyo3::types::PyTuple;
+use pyo3::prelude::{Bound, PyResult, Python};
+use pyo3::types::{PyDict, PyTuple};
 
 /// Plan a clone, with the seconds spent inspecting sources and planning.
 #[inline]

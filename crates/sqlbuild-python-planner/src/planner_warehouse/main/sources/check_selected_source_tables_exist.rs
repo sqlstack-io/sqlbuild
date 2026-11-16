@@ -1,9 +1,7 @@
 //! Raise S405 when a selected resource reads an external source table that does not exist.
 
 use crate::planner_warehouse::_helpers::sources::source_tables;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Raise S405 when a selected resource reads an external source table that does not exist.
 #[inline]

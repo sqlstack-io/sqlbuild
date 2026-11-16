@@ -1,13 +1,14 @@
 //! Model, function and SQL-hook orchestration through adapter-owned rendering.
 
-use crate::planner_resolution::_helpers::cursor::cursor_model::compute_model_cursor_bounds;
-use crate::planner_resolution::_helpers::cursor::cursor_model::unbounded;
-use crate::planner_resolution::models::CursorFiltering;
-use crate::planner_resolution::models::ModelSqlRequest;
+use crate::planner_resolution::_helpers::cursor::cursor_model::{
+    compute_model_cursor_bounds, unbounded,
+};
+use crate::planner_resolution::main::references::model_hook_entries::model_hook_entries;
 use crate::planner_resolution::models::Resolution;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::planner_resolution::models::{CursorFiltering, ModelSqlRequest};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
-use pyo3::{PyErr, pyfunction, wrap_pyfunction};
+use pyo3::{PyErr, pyfunction};
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -20,18 +21,16 @@ use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
 use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
-use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
-use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
 
 const APPEND_STRATEGY: &str = "append";
 
 #[pyfunction(name = "resolve_model_sql")]
 #[pyo3(signature = (**kwargs))]
-fn resolve_model_sql_of<'py>(
+pub(crate) fn resolve_model_sql_of<'py>(
     py: Python<'py>,
     kwargs: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -181,49 +180,8 @@ fn unresolved_bounds_error(py: Python<'_>, name: &str, cause: Option<&str>) -> P
 }
 
 #[pyfunction]
-#[pyo3(signature = (**kwargs))]
-pub(crate) fn resolve_function_sql<'py>(
-    py: Python<'py>,
-    kwargs: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let args = KeywordArguments::read(
-        py,
-        "resolve_function_sql",
-        kwargs,
-        (
-            &[
-                "adapter",
-                "function",
-                "model_locations",
-                "seed_locations",
-                "function_locations",
-                "source_map",
-                "source_warehouse_columns",
-                "star_exclude_keyword",
-            ],
-            &[],
-        ),
-    )?;
-    let resolution = Resolution {
-        adapter: args.value("adapter")?,
-        external: py.None().into_bound(py),
-        source_map: args.value("source_map")?,
-        source_warehouse_columns: args.value("source_warehouse_columns")?,
-        model_locations: args.value("model_locations")?,
-        seed_locations: args.value("seed_locations")?,
-        function_locations: args.value("function_locations")?,
-    };
-    let function = args.value("function")?;
-    let name: String =
-        sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
-            .extract()?;
-    let sql: String = resolution.unbounded(body_sql(&function)?, &format!("Function '{name}'"))?;
-    Ok(PyString::new(py, &sql).into_any())
-}
-
-#[pyfunction]
 #[pyo3(signature = (*, model, adapter, context, external_sql_reference_resolver))]
-fn resolve_model_hook_entries<'py>(
+pub(crate) fn resolve_model_hook_entries<'py>(
     model: &Bound<'py, PyAny>,
     adapter: Bound<'py, PyAny>,
     context: Bound<'py, PyAny>,
@@ -231,28 +189,4 @@ fn resolve_model_hook_entries<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let resolution = Resolution::of_context(adapter, &context, external_sql_reference_resolver)?;
     model_hook_entries(model, &resolution)
-}
-
-/// One model's pre and post hooks with their SQL resolved.
-pub(crate) fn model_hook_entries<'py>(
-    model: &Bound<'py, PyAny>,
-    resolution: &Resolution<'py>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = model.py();
-    let values = model_values(model)?;
-    let name: String = model_name(model)?;
-    let mut hooks: Vec<Bound<'py, PyAny>> = Vec::new();
-    for key in ["pre_hooks", "post_hooks"] {
-        hooks.push(resolution.hook(
-            config_value(py, &values, key)?,
-            &format!("Model '{name}' {key}"),
-        )?);
-    }
-    PyTuple::new(model.py(), hooks)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(resolve_model_sql_of, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_function_sql, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_model_hook_entries, module)?)
 }

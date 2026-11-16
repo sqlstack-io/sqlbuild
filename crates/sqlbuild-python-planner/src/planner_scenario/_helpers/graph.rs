@@ -116,10 +116,3 @@ pub(crate) fn plan_scenario_graph<'py>(
     }
     Ok((plan, PyTuple::new(py, warnings)?))
 }
-
-/// `plan_scenario_graph` as a function of `module`.
-pub(crate) fn plan_scenario_graph_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(plan_scenario_graph, module)
-}

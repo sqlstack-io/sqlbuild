@@ -1,12 +1,9 @@
 //! Selected-model inspection and untyped override conversion.
 
-use crate::planner_resolution::_helpers::references::values::method;
-use crate::planner_resolution::_helpers::references::values::string;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use crate::planner_resolution::_helpers::references::values::{method, string};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::PyDict;
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cursor::planner::main::override_kind::override_kind;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -29,7 +26,7 @@ const TIMESTAMP_CURSOR: &str = "timestamp";
 
 #[pyfunction(name = "type_cursor_overrides")]
 #[pyo3(signature = (**kwargs))]
-fn type_cursor_overrides_of<'py>(
+pub(crate) fn type_cursor_overrides_of<'py>(
     py: Python<'py>,
     kwargs: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -95,8 +92,4 @@ pub(crate) fn type_cursor_overrides<'py>(
     })?;
     let kind = enum_from_value(py, RecordId::CursorType, kind)?;
     method(overrides, "typed_as", &[("cursor_type", kind)])
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(type_cursor_overrides_of, module)?)
 }

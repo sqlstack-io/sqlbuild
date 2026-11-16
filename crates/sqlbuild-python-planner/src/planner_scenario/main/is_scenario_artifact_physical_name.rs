@@ -1,9 +1,9 @@
 //! Is scenario artifact physical name.
 
-use crate::planner_scenario::_helpers::artifacts;
+use pyo3::prelude::pyfunction;
+use sqlbuild_analysis::planner_scenario::main::parse_artifact_name;
 
-/// Is scenario artifact physical name.
-#[inline]
+#[pyfunction]
 pub fn is_scenario_artifact_physical_name(name: &str) -> bool {
-    artifacts::is_scenario_artifact_physical_name(name)
+    parse_artifact_name::parse_artifact_name(name).is_some()
 }

@@ -2,9 +2,9 @@
 
 use std::collections::BTreeSet;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 
 use sqlbuild_analysis::planner_migrations::main::{
     identical_renames as native_renames, rename_hints as native_hints,
@@ -140,9 +140,4 @@ pub(crate) fn rename_hints<'py>(
         )?);
     }
     PyTuple::new(py, result)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(identical_renames, module)?)?;
-    module.add_function(wrap_pyfunction!(rename_hints, module)?)
 }

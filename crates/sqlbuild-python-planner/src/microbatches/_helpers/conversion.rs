@@ -32,11 +32,6 @@ pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>
     Ok(Some(value.extract()?))
 }
 
-/// `value.timestamp()` of a `datetime`.
-pub(crate) fn timestamp(value: &Bound<'_, PyAny>) -> PyResult<f64> {
-    value.call_method0("timestamp")?.extract()
-}
-
 /// Raw cursor bounds of one cursor type, parsed once per distinct text.
 pub(crate) struct BoundParser<'py> {
     session: CursorSession<'py>,

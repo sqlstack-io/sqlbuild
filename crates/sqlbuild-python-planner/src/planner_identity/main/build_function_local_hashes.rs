@@ -1,16 +1,20 @@
 //! Local-only semantic hashes of functions by name.
 
-use crate::planner_identity::_helpers::metadata;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::planner_identity::_helpers::metadata::function_local_hashes;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::PyDict;
 
 /// Local-only semantic hashes of functions by name.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, functions, dialect))]
 pub fn build_function_local_hashes<'py>(
     functions: &Bound<'py, PyAny>,
     dialect: Option<&str>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    metadata::build_function_local_hashes(functions, dialect)
+    function_local_hashes(
+        functions,
+        dialect,
+        &functions.py().None().into_bound(functions.py()),
+    )
 }

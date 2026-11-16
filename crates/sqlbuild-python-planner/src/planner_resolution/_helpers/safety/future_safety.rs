@@ -1,14 +1,11 @@
 //! Future cursor safety evidence and exception boundary.
 
-use crate::planner_resolution::_helpers::cursor::cursor_safety::horizon;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::replace;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::safety_duration;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::safety_error;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::timestamp_bound;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::utc_clock;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::planner_resolution::_helpers::cursor::cursor_safety::{
+    horizon, replace, safety_duration, safety_error, timestamp_bound, utc_clock,
+};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 use sqlbuild_cursor::algebra::main::compare::compare;
 use sqlbuild_cursor::algebra::main::next_boundary::next_boundary;
 use sqlbuild_cursor::algebra::main::render::render;
@@ -165,8 +162,4 @@ pub(crate) fn resolve_future_cursor_safety<'py>(
         ],
     )?;
     replace(&bounds, &[("end", applied_end), ("future_safety", safety)])
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(resolve_future_cursor_safety, module)?)
 }

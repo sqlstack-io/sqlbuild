@@ -1,9 +1,11 @@
 //! Assemble model plan dataclasses from resolved plan decisions and authored model config.
 
+use crate::planner_strategy::main::values::input_error::input_error;
+use crate::planner_strategy::main::values::text::text;
+use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};
-use pyo3::{IntoPyObject, pyfunction};
 
 use sqlbuild_analysis::planner_strategy::main::group_replacement_refusal::group_replacement_refusal;
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
@@ -17,18 +19,15 @@ use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_
 use sqlbuild_model_config::execution_limits::models::ExecutionLimit;
 use sqlbuild_model_config::model_validation::constants::PHYSICAL_STORAGE_KEYS;
 
-use crate::planner_strategy::_helpers::cursor_types::cursor_type_warning_record;
-use crate::planner_strategy::_helpers::cursor_types::warehouse_column_types;
-use crate::planner_strategy::_helpers::microbatch_limits::replay_grain;
-use crate::planner_strategy::_helpers::microbatch_limits::unknown_grain;
+use crate::planner_strategy::_helpers::cursor_types::{
+    cursor_type_warning_record, warehouse_column_types,
+};
+use crate::planner_strategy::_helpers::microbatch_limits::{replay_grain, unknown_grain};
 use crate::planner_strategy::_helpers::microbatches::microbatch_limit_config;
-use crate::planner_strategy::_helpers::strategy::model_warning_records;
-use crate::planner_strategy::_helpers::strategy::resolve_schema_actions;
-use crate::planner_strategy::_helpers::strategy::warning_inputs;
-use crate::planner_strategy::_helpers::values::input_error;
-use crate::planner_strategy::_helpers::values::optional_string;
-use crate::planner_strategy::_helpers::values::plan_warning;
-use crate::planner_strategy::_helpers::values::text;
+use crate::planner_strategy::_helpers::strategy::{
+    model_warning_records, resolve_schema_actions, warning_inputs,
+};
+use crate::planner_strategy::_helpers::values::{optional_string, plan_warning};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
@@ -113,7 +112,7 @@ fn column_info<'py>(
 }
 
 /// Declared schema columns as `ColumnInfo`: typed columns only, or every column with an empty default type.
-fn schema_columns<'py>(
+pub(crate) fn schema_columns<'py>(
     model: &Bound<'py, PyAny>,
     typed_only: bool,
 ) -> PyResult<Bound<'py, PyTuple>> {
@@ -228,7 +227,7 @@ fn type_enforcement<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny
 }
 
 /// The explicit or default lookback of a microbatch model at the effective grain.
-fn lookback_of(
+pub(crate) fn lookback_of(
     model: &Bound<'_, PyAny>,
     effective_grain: Option<String>,
 ) -> PyResult<Option<String>> {
@@ -248,21 +247,6 @@ fn lookback_of(
         },
     };
     microbatch_lookback(&config).map_err(|error| unknown_grain(model.py(), error))
-}
-
-/// Resolve explicit or default lookback for one microbatch model.
-#[pyfunction]
-#[pyo3(signature = (*, model, effective_grain = None))]
-pub(crate) fn resolve_microbatch_lookback(
-    model: &Bound<'_, PyAny>,
-    effective_grain: Option<String>,
-) -> PyResult<Option<String>> {
-    lookback_of(model, effective_grain)
-}
-
-/// Declared seed columns with types, as `ColumnInfo`.
-pub(crate) fn extract_seed_columns<'py>(seed: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
-    schema_columns(seed, true)
 }
 
 /// The adapter-rendered logical DDL of one plan action.
@@ -783,11 +767,4 @@ pub(crate) fn assemble_model_plan_entry<'py>(
     )?;
     let plan_entry: Bound<'py, PyAny> = new_record(py, RecordId::ModelPlanEntry, (), Some(&entry))?;
     Ok((plan_entry, warnings))
-}
-
-/// `resolve_microbatch_lookback` as a function of `module`.
-pub(crate) fn resolve_microbatch_lookback_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(resolve_microbatch_lookback, module)
 }

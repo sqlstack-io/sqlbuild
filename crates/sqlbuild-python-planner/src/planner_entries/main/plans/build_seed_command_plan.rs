@@ -1,9 +1,7 @@
 //! Project selected direct seed work and canonical identities.
 
 use crate::planner_entries::_helpers::plans::command_plans;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Project selected direct seed work and canonical identities.
 #[inline]

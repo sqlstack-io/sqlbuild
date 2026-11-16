@@ -1,37 +1,28 @@
 //! Plan and progress display fragments over planner entries and cursor values.
 
+use crate::plan_output::main::text::text;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
-use pyo3::types::{PyDict, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::{PyDict, PyString};
 use sqlbuild_core::plan_display::constants::{
     DEFAULT_CURSOR_GRAIN, INTEGER_CURSOR, TIMESTAMP_CURSOR,
 };
-use sqlbuild_core::plan_display::main::cursor_bound_display::cursor_bound_display as bound_display;
-use sqlbuild_core::plan_display::main::effective_microbatch_batch_size::effective_microbatch_batch_size;
 use sqlbuild_core::plan_display::main::format_no_input_rows::format_no_input_rows as no_input_rows;
 use sqlbuild_core::plan_display::main::format_waiting_on_empty_inputs::format_waiting_on_empty_inputs as waiting_on_empty_inputs;
 use sqlbuild_core::plan_display::main::model_materialization_label::model_materialization_label as materialization_label;
 use sqlbuild_core::plan_display::models::{ModelLabelFacts, ParsedBound};
 
 use crate::plan_output::_helpers::values::optional_text;
-use crate::plan_output::_helpers::values::text;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
-use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
-use sqlbuild_python_front::cursor::main::scalars::to_exclusive::to_exclusive;
-use sqlbuild_python_front::cursor::main::scalars::to_inclusive::to_inclusive;
-use sqlbuild_python_front::cursor::main::scalars::try_parse::try_parse;
 
 const DATETIME_MODULE: &str = "datetime";
 
-fn label_facts(entry: &Bound<'_, PyAny>) -> PyResult<ModelLabelFacts> {
+pub(crate) fn label_facts(entry: &Bound<'_, PyAny>) -> PyResult<ModelLabelFacts> {
     let field =
         |name: &str| -> PyResult<Option<String>> { optional_text(&native_field(entry, name)?) };
     Ok(ModelLabelFacts {
@@ -47,15 +38,8 @@ fn label_facts(entry: &Bound<'_, PyAny>) -> PyResult<ModelLabelFacts> {
     })
 }
 
-pub(crate) fn optional_facts(entry: &Bound<'_, PyAny>) -> PyResult<Option<ModelLabelFacts>> {
-    if entry.is_none() {
-        return Ok(None);
-    }
-    label_facts(entry).map(Some)
-}
-
 /// The cursor type, defaulting to timestamp, and its grain object (`None` for integers).
-fn cursor_typing<'py>(
+pub(crate) fn cursor_typing<'py>(
     cursor_type: &Bound<'py, PyAny>,
     cursor_grain: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
@@ -77,48 +61,7 @@ fn cursor_typing<'py>(
     Ok((effective, grain))
 }
 
-/// The last cursor value included by an exclusive end bound.
-#[pyfunction]
-#[pyo3(signature = (*, end, cursor_type, cursor_grain))]
-pub(crate) fn inclusive_cursor_end(
-    end: &Bound<'_, PyAny>,
-    cursor_type: &Bound<'_, PyAny>,
-    cursor_grain: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let (effective, grain) = cursor_typing(cursor_type, cursor_grain)?;
-    let Some(parsed) = try_parse(end, &effective)? else {
-        return end.extract();
-    };
-    render_value(&to_inclusive(&parsed, &grain)?)
-}
-
-/// A fully bounded inclusive operator override as an executable interval.
-pub(crate) fn resolve_bounded_cursor_override<'py>(
-    start_cursor_override: &Bound<'py, PyAny>,
-    end_cursor_override: &Bound<'py, PyAny>,
-    cursor_type: &Bound<'py, PyAny>,
-    cursor_grain: &Bound<'py, PyAny>,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let py: Python<'py> = start_cursor_override.py();
-    if start_cursor_override.is_none() || end_cursor_override.is_none() {
-        return Ok(None);
-    }
-    let (effective, grain) = cursor_typing(cursor_type, cursor_grain)?;
-    let (Some(start), Some(end)) = (
-        try_parse(start_cursor_override, &effective)?,
-        try_parse(end_cursor_override, &effective)?,
-    ) else {
-        return Ok(None);
-    };
-    new_record_with(
-        py,
-        RecordId::CursorBounds,
-        &[("start", start), ("end", to_exclusive(&end, &grain)?)],
-    )
-    .map(Some)
-}
-
-fn parsed_bound(value: &Bound<'_, PyAny>) -> PyResult<Option<ParsedBound>> {
+pub(crate) fn parsed_bound(value: &Bound<'_, PyAny>) -> PyResult<Option<ParsedBound>> {
     let py: Python<'_> = value.py();
     let parsed: Bound<'_, PyAny> =
         match imported(py, DATETIME_MODULE, "datetime")?.call_method1("fromisoformat", (value,)) {
@@ -137,31 +80,6 @@ fn parsed_bound(value: &Bound<'_, PyAny>) -> PyResult<Option<ParsedBound>> {
             .extract()?,
         midnight,
     }))
-}
-
-/// A cursor bound for display, collapsing a whole-day midnight timestamp to a date.
-#[pyfunction]
-#[pyo3(signature = (*, value, cursor_type, cursor_grain))]
-pub(crate) fn cursor_bound_display(
-    value: &Bound<'_, PyAny>,
-    cursor_type: &Bound<'_, PyAny>,
-    cursor_grain: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let cursor_type: Option<String> = optional_text(cursor_type)?;
-    let raw: String = value.extract()?;
-    let parsed: Option<ParsedBound> = if cursor_type.as_deref() == Some(INTEGER_CURSOR) {
-        None
-    } else {
-        parsed_bound(value)?
-    };
-    Ok(bound_display(
-        &raw,
-        (
-            cursor_type.as_deref(),
-            optional_text(cursor_grain)?.as_deref(),
-        ),
-        parsed.as_ref(),
-    ))
 }
 
 /// The full materialization label used in plan summaries.
@@ -187,23 +105,7 @@ pub(crate) fn format_waiting_on_empty_inputs(input_names: &Bound<'_, PyAny>) -> 
     Ok(waiting_on_empty_inputs(&names(input_names)?))
 }
 
-/// The explicit effective batch-size token resolved against the replay grain.
-#[pyfunction]
-#[pyo3(signature = (*, batch_size, effective_grain))]
-pub(crate) fn resolve_effective_microbatch_batch_size(
-    py: Python<'_>,
-    batch_size: &str,
-    effective_grain: &str,
-) -> Result<String, PyErr> {
-    effective_microbatch_batch_size(batch_size, effective_grain).map_err(|error| {
-        record_class(py, RecordId::CursorGrain)
-            .and_then(|grain| grain.call1((error.0,)))
-            .err()
-            .unwrap_or_else(|| PyValueError::new_err("unknown cursor grain"))
-    })
-}
-
-fn as_datetime<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn as_datetime<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = value.py();
     let inner: Bound<'py, PyAny> = native_field(value, "value")?;
     if value.is_instance(&record_class(py, RecordId::TimestampValue)?)? {
@@ -214,7 +116,7 @@ fn as_datetime<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     datetime.call_method1("combine", (inner, midnight))
 }
 
-fn presume_utc<'py>(value: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn presume_utc<'py>(value: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = value.py();
     if !native_field(&value, "tzinfo")?.is_none() {
         return Ok(value);
@@ -226,33 +128,4 @@ fn presume_utc<'py>(value: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
         imported(py, DATETIME_MODULE, "UTC")?,
     )?;
     value.call_method("replace", (), Some(&options))
-}
-
-/// Comparable bounds, presuming a naive side UTC when the other is aware.
-#[pyfunction]
-#[pyo3(signature = (*, start, end))]
-pub(crate) fn aligned_timestamp_bounds<'py>(
-    start: &Bound<'py, PyAny>,
-    end: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = start.py();
-    let mut start_at: Bound<'py, PyAny> = as_datetime(start)?;
-    let mut end_at: Bound<'py, PyAny> = as_datetime(end)?;
-    if native_field(&start_at, "tzinfo")?.is_none() != native_field(&end_at, "tzinfo")?.is_none() {
-        start_at = presume_utc(start_at)?;
-        end_at = presume_utc(end_at)?;
-    }
-    PyTuple::new(py, [start_at, end_at])
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(inclusive_cursor_end, module)?)?;
-    module.add_function(wrap_pyfunction!(cursor_bound_display, module)?)?;
-    module.add_function(wrap_pyfunction!(format_waiting_on_empty_inputs, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        resolve_effective_microbatch_batch_size,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(aligned_timestamp_bounds, module)?)?;
-    Ok(())
 }

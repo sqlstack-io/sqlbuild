@@ -1,9 +1,9 @@
 //! Empty-window decisions and snapshot grain conversion.
 
 use crate::planner_resolution::_helpers::references::values::string;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 use sqlbuild_cursor::algebra::main::floor_to_grain::floor_to_grain;
 use sqlbuild_cursor::planner::main::empty_inputs::empty_inputs;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -19,7 +19,7 @@ use sqlbuild_python_front::cursor::models::CursorSession;
 
 #[pyfunction]
 #[pyo3(signature = (*, empty_input_names, waits_for_every_input, inputs_with_rows, has_window_start))]
-fn decide_empty_cursor_inputs<'py>(
+pub(crate) fn decide_empty_cursor_inputs<'py>(
     empty_input_names: &Bound<'py, PyAny>,
     waits_for_every_input: bool,
     inputs_with_rows: bool,
@@ -105,7 +105,7 @@ pub(crate) fn empty_cursor_window<'py>(
 
 #[pyfunction]
 #[pyo3(signature = (*, cursor_type))]
-fn cursor_window_override_flags(cursor_type: Option<&str>) -> String {
+pub(crate) fn cursor_window_override_flags(cursor_type: Option<&str>) -> String {
     let suffix = if cursor_type == Some("integer") {
         "int"
     } else {
@@ -179,41 +179,6 @@ pub(crate) fn without_destination_cursor<'py>(
 }
 
 #[pyfunction]
-#[pyo3(signature = (*, cursor_type, downstream_grain, cursor_input_grains, microbatch_strategy=None))]
-pub(crate) fn resolve_effective_timestamp_grain<'py>(
-    cursor_type: &Bound<'py, PyAny>,
-    downstream_grain: &Bound<'py, PyAny>,
-    cursor_input_grains: &Bound<'py, PyAny>,
-    microbatch_strategy: Option<&str>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = cursor_type.py();
-    if !cursor_type.eq("timestamp")? {
-        return Ok(py.None().into_bound(py));
-    }
-    let mut effective = if downstream_grain.is_truthy()? {
-        downstream_grain.clone()
-    } else {
-        string(py, "second")
-    };
-    if microbatch_strategy == Some("watermark") {
-        return Ok(effective);
-    }
-    let session = CursorSession::new(py)?;
-    for value in cursor_input_grains.try_iter()? {
-        let value = value?;
-        let candidate = if value.is_truthy()? {
-            value
-        } else {
-            string(py, "second")
-        };
-        if session.grain(&candidate)? > session.grain(&effective)? {
-            effective = candidate;
-        }
-    }
-    Ok(effective)
-}
-
-#[pyfunction]
 #[pyo3(signature = (*, cursor_snapshot, cursor_type, effective_grain))]
 pub(crate) fn normalize_cursor_snapshot_grain<'py>(
     cursor_snapshot: &Bound<'py, PyAny>,
@@ -260,13 +225,4 @@ pub(crate) fn normalize_cursor_snapshot_grain<'py>(
     }
     kwargs.set_item("upstream_end_inputs", PyTuple::new(py, ends)?)?;
     replaced_keywords(cursor_snapshot, &kwargs)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(decide_empty_cursor_inputs, module)?)?;
-    module.add_function(wrap_pyfunction!(empty_cursor_window, module)?)?;
-    module.add_function(wrap_pyfunction!(cursor_window_override_flags, module)?)?;
-    module.add_function(wrap_pyfunction!(empty_input_rebuild_refusal, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_effective_timestamp_grain, module)?)?;
-    module.add_function(wrap_pyfunction!(normalize_cursor_snapshot_grain, module)?)
 }

@@ -1,15 +1,14 @@
 //! Relation, model-plan and entry-build contexts: built from keyword arguments and read by plan entry construction.
 
+use crate::planner_entries::main::entries::default_microbatch_limit_action::default_microbatch_limit_action;
 use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::pymethods;
 use pyo3::types::{PyDict, PyFrozenSet};
 
-use crate::planner_entries::models::ModelPlanContext;
-use crate::planner_entries::models::PlanEntryBuildInputs;
-use crate::planner_entries::models::PlannerRelationsContext;
+use crate::planner_entries::models::{
+    ModelPlanContext, PlanEntryBuildInputs, PlannerRelationsContext,
+};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::types::RecordId;
 
 /// The argument `name`, or `default()` when it was not passed.
 fn value_or<'py>(
@@ -163,9 +162,4 @@ impl PlanEntryBuildInputs {
             })?,
         })
     }
-}
-
-/// The microbatch limit action used when a project configures none.
-pub(crate) fn default_microbatch_limit_action(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    enum_member(py, RecordId::MicrobatchLimitAction, "ERROR")
 }

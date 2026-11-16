@@ -1,8 +1,8 @@
 //! Selected-scope validation that external source tables exist in the warehouse.
 
-use crate::planner_warehouse::constants::MISSING_SOURCE_TABLE_CODE;
-use crate::planner_warehouse::constants::RUN_BOUNDED;
-use crate::planner_warehouse::constants::WILDCARD_TABLE_CHARACTER;
+use crate::planner_warehouse::constants::{
+    MISSING_SOURCE_TABLE_CODE, RUN_BOUNDED, WILDCARD_TABLE_CHARACTER,
+};
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
@@ -237,11 +237,4 @@ pub(crate) fn check_selected_source_tables_exist_binding<'py>(
     let relations = &args.value("relations")?;
 
     check_selected_source_tables_exist(project, (adapter, connection), scope, relations)
-}
-
-/// `check_selected_source_tables_exist_binding` as a function of `module`.
-pub(crate) fn check_selected_source_tables_exist_binding_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(check_selected_source_tables_exist_binding, module)
 }

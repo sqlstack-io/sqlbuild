@@ -1,9 +1,7 @@
 //! Reject authored cursor input columns a contract or the source warehouse metadata does not expose.
 
 use crate::planner_strategy::_helpers::cursor_inputs;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
 
 /// Reject authored cursor input columns a contract or the source warehouse metadata does not expose.

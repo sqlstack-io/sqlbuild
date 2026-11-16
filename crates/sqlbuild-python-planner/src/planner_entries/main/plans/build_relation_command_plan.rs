@@ -1,16 +1,14 @@
 //! Project static relation data for Python checks.
 
-use crate::planner_entries::_helpers::plans::command_plans;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::planner_entries::_helpers::plans::command_plans::StaticPlanParts;
+use crate::planner_entries::_helpers::plans::command_plans::base_plan_output;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Project static relation data for Python checks.
-#[inline]
 pub fn build_relation_command_plan<'py>(
     project: &Bound<'py, PyAny>,
     scope: &Bound<'py, PyAny>,
     relations: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    command_plans::build_relation_command_plan(project, scope, relations)
+    base_plan_output(project, scope, relations, StaticPlanParts::default())
 }

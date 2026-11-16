@@ -3,11 +3,9 @@
 use crate::freshness::constants::PREVIEW_MESSAGE;
 use std::collections::{HashMap, HashSet};
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::planner_identity::constants::{MODEL_RESOURCE, SOURCE_RESOURCE};
 use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
@@ -15,12 +13,10 @@ use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_state::freshness::main::configuration_error::configuration_error;
 
 use crate::freshness::_helpers::exception_types::SourceFreshnessObservationError;
-use crate::freshness::_helpers::observation::observation_record;
-use crate::freshness::_helpers::observation::observation_source;
-use crate::freshness::_helpers::observation::observe_adapter_batch;
-use crate::freshness::_helpers::observation::observe_configured;
-use crate::freshness::_helpers::observation::strategy;
-use crate::freshness::_helpers::observation::unknown;
+use crate::freshness::_helpers::observation::{
+    observation_record, observation_source, observe_adapter_batch, observe_configured, strategy,
+    unknown,
+};
 use crate::freshness::_helpers::state_io::read_latest;
 use crate::freshness::_helpers::support::text;
 use crate::freshness::models::Observer;
@@ -393,16 +389,4 @@ pub(crate) fn build_direct_source_freshness_propagation_result<'py>(
             ),
         ],
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        build_direct_source_freshness_planning_result,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        build_direct_source_freshness_propagation_result,
-        module
-    )?)?;
-    Ok(())
 }

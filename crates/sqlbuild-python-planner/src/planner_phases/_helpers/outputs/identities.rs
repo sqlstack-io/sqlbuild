@@ -47,7 +47,7 @@ pub(crate) fn planner_identity_work_info(
     Ok(info)
 }
 
-fn version_identities<'py>(
+pub(crate) fn version_identities<'py>(
     project: &Bound<'py, PyAny>,
     scope: Bound<'py, PyAny>,
     recorded_fingerprints: &Bound<'py, PyAny>,
@@ -63,36 +63,6 @@ fn version_identities<'py>(
         ),
         recorded_fingerprints,
     )
-}
-
-pub(crate) fn build_planner_identity_context<'py>(
-    project: &Bound<'py, PyAny>,
-    (scopes, snapshot): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    include_stale_warning_identities: bool,
-) -> PyResult<Bound<'py, PyAny>> {
-    let recorded_fingerprints: Bound<'py, PyAny> = native_field(snapshot, "fingerprints")?;
-    let identities = version_identities(
-        project,
-        class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?,
-        &recorded_fingerprints,
-    )?;
-    let stale = if include_stale_warning_identities {
-        version_identities(
-            project,
-            class_field(scopes, |s: &PlannerScopeResolution| &s.stale_warning_scope)?,
-            &recorded_fingerprints,
-        )?
-    } else {
-        identities.clone()
-    };
-    Ok(Bound::new(
-        project.py(),
-        PlannerIdentityContext {
-            version_identities: identities.unbind(),
-            stale_warning_identities: stale.unbind(),
-        },
-    )?
-    .into_any())
 }
 
 fn reusable_model_names(
@@ -216,18 +186,4 @@ pub(crate) fn detect_stale_warning_changes<'py>(
             ("functions", PyDict::new(py).into_any()),
         ],
     )
-}
-
-/// `detect_stale_warning_changes_of` as a function of `module`.
-pub(crate) fn detect_stale_warning_changes_of_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(detect_stale_warning_changes_of, module)
-}
-
-/// `planner_identity_work_info` as a function of `module`.
-pub(crate) fn planner_identity_work_info_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(planner_identity_work_info, module)
 }

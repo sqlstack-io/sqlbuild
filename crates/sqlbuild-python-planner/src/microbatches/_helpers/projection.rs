@@ -1,8 +1,9 @@
 //! Coverage, replay-requirement and latest-requirement projections over append-only events.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::microbatches::main::timestamp::timestamp;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyString, PyTuple};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_state::microbatches::main::latest_requirement::latest_requirement;
 use sqlbuild_state::microbatches::main::project_coverage::project_coverage;
@@ -12,10 +13,7 @@ use sqlbuild_state::microbatches::models::{
     ReplayState, ReplayVersions, RequirementFact, TextInterval,
 };
 
-use crate::microbatches::_helpers::conversion::BoundParser;
-use crate::microbatches::_helpers::conversion::enum_text;
-use crate::microbatches::_helpers::conversion::optional_text;
-use crate::microbatches::_helpers::conversion::timestamp;
+use crate::microbatches::_helpers::conversion::{BoundParser, enum_text, optional_text};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -108,7 +106,7 @@ fn python_coverage<'py>(
 /// Fold completion facts and classify uncovered expected intervals.
 #[pyfunction(name = "project_microbatch_coverage")]
 #[pyo3(signature = (*, events, expected_intervals, cursor_type))]
-fn coverage<'py>(
+pub(crate) fn coverage<'py>(
     events: &Bound<'py, PyAny>,
     expected_intervals: &Bound<'py, PyAny>,
     cursor_type: &Bound<'py, PyAny>,
@@ -166,7 +164,7 @@ fn replay_state_member(state: ReplayState) -> &'static str {
 /// Derive replay completion without writing mutable requirement status.
 #[pyfunction(name = "project_replay_requirement")]
 #[pyo3(signature = (**request))]
-fn replay<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn replay<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
     let request = Request::new("project_replay_requirement", request)?;
     let py: Python<'py> = request.py();
     let requirement: Bound<'py, PyAny> = request.get("requirement")?;
@@ -226,7 +224,7 @@ fn replay<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAn
 /// Return only the latest requirement created for the currently compiled version.
 #[pyfunction(name = "latest_active_replay_requirement")]
 #[pyo3(signature = (*, events, current_model_version_hash))]
-fn latest<'py>(
+pub(crate) fn latest<'py>(
     events: &Bound<'py, PyAny>,
     current_model_version_hash: &str,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -251,10 +249,4 @@ fn latest<'py>(
         });
     }
     Ok(latest_requirement(&facts, current_model_version_hash).map(|index| objects[index].clone()))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(coverage, module)?)?;
-    module.add_function(wrap_pyfunction!(replay, module)?)?;
-    module.add_function(wrap_pyfunction!(latest, module)?)
 }

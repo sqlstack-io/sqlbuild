@@ -1,8 +1,6 @@
 //! Public records of planner phases.
 
-use pyo3::prelude::Bound;
-use pyo3::prelude::Py;
-use pyo3::prelude::PyAny;
+use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
 use std::collections::BTreeMap;
 

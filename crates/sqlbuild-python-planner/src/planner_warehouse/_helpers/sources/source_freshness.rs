@@ -1,75 +1,26 @@
 //! Direct planner source freshness observation and the warnings for unknown freshness.
 
-use crate::freshness::constants::PREVIEW_MESSAGE;
 use crate::freshness::main::build_direct_source_freshness_planning_result_function::build_direct_source_freshness_planning_result_function;
 use crate::freshness::main::build_direct_source_freshness_propagation_result_function::build_direct_source_freshness_propagation_result_function;
-use crate::planner_warehouse::_helpers::inspection::snapshot::destination_nodes;
-use crate::planner_warehouse::_helpers::inspection::snapshot::lower;
+use crate::planner_warehouse::_helpers::inspection::snapshot::{destination_nodes, lower};
 use crate::planner_warehouse::constants::RUN_SCOPE;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
 use sqlbuild_analysis::planner_scope::constants::MODEL;
-use sqlbuild_analysis::planner_warehouse::main::freshness_unknown_message::freshness_unknown_message;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
-use sqlbuild_python_project::planner_phases::main::native::native;
 use sqlbuild_python_project::planner_phases::main::replace::replace;
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::BTreeSet;
-
-/// One warning per reason that left configured source freshness unknown.
-pub(crate) fn source_freshness_unknown_warnings<'py>(
-    source_freshness: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = source_freshness.py();
-    let mut reasons: Vec<(String, Vec<String>)> = Vec::new();
-    for unknown in native_field(source_freshness, "unknown_sources")?
-        .call_method0("values")?
-        .try_iter()?
-    {
-        let unknown = unknown?;
-        let reason: String = native_field(&unknown, "reason")?.str()?.extract()?;
-        if freshness_unknown_message(&reason, &[]).is_none()
-            || native_field(&unknown, "message")?.eq(PREVIEW_MESSAGE)?
-        {
-            continue;
-        }
-        let name: String = native_field(&unknown, "source_name")?.extract()?;
-        match reasons.iter_mut().find(|(existing, _)| *existing == reason) {
-            Some((_, names)) => names.push(name),
-            None => reasons.push((reason, vec![name])),
-        }
-    }
-    let mut warnings: Vec<_> = Vec::new();
-    for (reason, names) in reasons {
-        if let Some(message) = freshness_unknown_message(&reason, &names) {
-            warnings.push(native(
-                py,
-                RecordId::PlanWarning,
-                &[
-                    ("model_name", py.None().into_bound(py)),
-                    (
-                        "severity",
-                        enum_member(py, RecordId::WarningSeverity, "WARNING")?,
-                    ),
-                    ("message", text(py, &message)),
-                ],
-            )?);
-        }
-    }
-    tuple(py, warnings)
-}
 
 fn state_database<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     for node in destination_nodes(project)? {
@@ -206,11 +157,4 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
         ],
     )?;
     replace(&result, &[("propagation", propagation)])
-}
-
-/// `build_planner_source_freshness_result_of` as a function of `module`.
-pub(crate) fn build_planner_source_freshness_result_of_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(build_planner_source_freshness_result_of, module)
 }

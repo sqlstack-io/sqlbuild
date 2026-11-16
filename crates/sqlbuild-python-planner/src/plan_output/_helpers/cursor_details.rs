@@ -1,12 +1,12 @@
 //! One planned model's requested, resolved and deferred cursor state, for text and JSON plans.
 
+use crate::plan_output::main::aligned_timestamp_bounds::aligned_timestamp_bounds;
+use crate::plan_output::main::resolve_effective_microbatch_batch_size::resolve_effective_microbatch_batch_size;
+use crate::plan_output::main::text::text;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::plan_output::_helpers::display::aligned_timestamp_bounds;
-use crate::plan_output::_helpers::display::resolve_effective_microbatch_batch_size;
 use crate::plan_output::_helpers::values::optional_text;
-use crate::plan_output::_helpers::values::text;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

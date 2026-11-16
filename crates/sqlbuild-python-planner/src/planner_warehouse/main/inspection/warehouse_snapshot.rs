@@ -2,9 +2,7 @@
 
 use crate::planner_warehouse::_helpers::inspection::snapshot;
 use crate::planner_warehouse::models::SnapshotRequest;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Gather relations, columns, fingerprints and cursor bounds of the planned target schemas.
 #[inline]

@@ -2,9 +2,7 @@
 
 use crate::planner_entries::_helpers::plans::plan_output;
 use crate::planner_entries::models::PlanOutputInputs;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// The plan output's fields from planned entries and resolved relation inputs.
 #[inline]

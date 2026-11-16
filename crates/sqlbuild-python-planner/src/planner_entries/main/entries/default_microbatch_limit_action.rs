@@ -1,13 +1,10 @@
 //! The microbatch limit action used when a project configures none.
 
-use crate::planner_entries::_helpers::entries::contexts;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The microbatch limit action used when a project configures none.
-#[inline]
 pub fn default_microbatch_limit_action(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    contexts::default_microbatch_limit_action(py)
+    enum_member(py, RecordId::MicrobatchLimitAction, "ERROR")
 }

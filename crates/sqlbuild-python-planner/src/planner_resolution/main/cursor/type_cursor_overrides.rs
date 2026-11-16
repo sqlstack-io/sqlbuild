@@ -1,9 +1,7 @@
 //! Untyped cursor overrides typed by the cursor type of the selected incremental models.
 
 use crate::planner_resolution::_helpers::cursor::cursor_overrides;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Untyped cursor overrides typed by the cursor type of the selected incremental models.
 #[inline]

@@ -1,5 +1,6 @@
 //! The facts `--changed` and the consumption recorder read from the plan and compiled project.
 
+use crate::consumption::main::relation::relation;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -7,9 +8,7 @@ use pyo3::types::PyDict;
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_state::consumption::models::{ForcedRun, InputFact, NodeFacts, NodeKey, RelationKey};
 
-use crate::consumption::_helpers::relation_reads::Locations;
-use crate::consumption::_helpers::relation_reads::relation;
-use crate::consumption::_helpers::relation_reads::sql_reads_undeclared;
+use crate::consumption::_helpers::relation_reads::{Locations, sql_reads_undeclared};
 use crate::planner_identity::main::function_local_hashes::function_local_hashes;
 use crate::planner_identity::main::hook_version_hashes::hook_version_hashes;
 use crate::planner_identity::main::model_version_identity_metadata_json::model_version_identity_metadata_json;

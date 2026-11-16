@@ -1,13 +1,14 @@
 //! Detect how each selected model and function changed since its recorded build.
 
+use crate::planner_changes::main::native_enum::native_enum;
+use crate::planner_changes::main::planner_enum::planner_enum;
 use crate::planner_changes::models::ModelPass;
 use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::planner_changes::_helpers::results::native_enum;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_front::contracts::main::matching_dynamic_families::matching_dynamic_families;
 use sqlbuild_python_front::model_config::main::config::config_text::config_text;
@@ -33,11 +34,9 @@ use sqlbuild_analysis::planner_changes::models::{
 };
 
 use crate::planner_changes::_helpers::renames::origin_names;
-use crate::planner_changes::_helpers::results::backfill_result;
-use crate::planner_changes::_helpers::results::change_kind;
-use crate::planner_changes::_helpers::results::planner_enum;
-use crate::planner_changes::_helpers::results::replay_policy_error;
-use crate::planner_changes::_helpers::results::schema_findings;
+use crate::planner_changes::_helpers::results::{
+    backfill_result, change_kind, replay_policy_error, schema_findings,
+};
 use crate::planner_identity::main::compiled_function_fingerprint_sql::compiled_function_fingerprint_sql;
 use crate::planner_identity::main::function_local_hashes::function_local_hashes;
 use crate::planner_identity::main::model_declared_columns_hash::model_declared_columns_hash;
@@ -66,7 +65,7 @@ const REPLAY_CONFIG_KEY: &str = "replay_on_change";
 /// Selected model and function changes.
 #[pyfunction(name = "detect_changes")]
 #[pyo3(signature = (**options))]
-fn detect_changes_of<'py>(
+pub(crate) fn detect_changes_of<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -161,50 +160,6 @@ pub(crate) fn detect_changes<'py>(
             ("models", models.into_any()),
             ("functions", functions.into_any()),
         ],
-    )
-}
-
-/// One model's change and backfill.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn detect_model_changes<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "detect_model_changes",
-        options,
-        (
-            &[
-                "model",
-                "snapshot",
-                "sql_analysis_enabled",
-                "query_change_tracking",
-                "full_refresh",
-            ],
-            &[
-                "function_local_hashes",
-                "hook_version_hashes",
-                "expected_version_hash",
-                "expected_metadata_json",
-            ],
-        ),
-    )?;
-    let pass = ModelPass {
-        snapshot: arguments.value("snapshot")?,
-        query_change_tracking: arguments.flag("query_change_tracking")?,
-        full_refresh: arguments.flag("full_refresh")?,
-        function_local_hashes: arguments.value("function_local_hashes")?,
-        hook_version_hashes: arguments.value("hook_version_hashes")?,
-    };
-    model_change(
-        &pass,
-        &arguments.value("model")?,
-        (
-            arguments.value("expected_version_hash")?.extract()?,
-            arguments.value("expected_metadata_json")?.extract()?,
-        ),
     )
 }
 
@@ -593,7 +548,7 @@ fn schema_findings_of<'py>(
 /// Schema findings between declared or inferred columns and warehouse columns.
 #[pyfunction(name = "detect_schema_changes")]
 #[pyo3(signature = (**options))]
-fn schema_changes<'py>(
+pub(crate) fn schema_changes<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
@@ -759,10 +714,4 @@ impl<'py> ChangeResult<'py> {
             ],
         )
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(detect_changes_of, module)?)?;
-    module.add_function(wrap_pyfunction!(detect_model_changes, module)?)?;
-    module.add_function(wrap_pyfunction!(schema_changes, module)?)
 }

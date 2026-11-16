@@ -1,5 +1,8 @@
 //! Cursor input relations and authored cursor input column checks of model plan entries.
 
+use crate::planner_strategy::main::lineage::resolve_lineage_reference::resolve_lineage_reference;
+use crate::planner_strategy::main::values::input_error::input_error;
+use crate::planner_strategy::main::values::text::text;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyTuple};
@@ -8,9 +11,6 @@ use sqlbuild_analysis::planner_strategy::main::cursor_input_column::cursor_input
 use sqlbuild_analysis::planner_strategy::models::{CursorInputColumnCheck, CursorInputColumnOwner};
 
 use crate::planner_identity::main::or_empty::or_empty;
-use crate::planner_strategy::_helpers::lineage::resolve_lineage_reference;
-use crate::planner_strategy::_helpers::values::input_error;
-use crate::planner_strategy::_helpers::values::text;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -25,7 +25,6 @@ use sqlbuild_python_front::model_config::main::config::config_text_object::confi
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
-use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_strategy::constants::{
     ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
     SOURCE_REFERENCE, TIMESTAMP_CURSOR,
@@ -48,7 +47,7 @@ fn incremental_cursor_flag(
 }
 
 /// The names of a sequence of objects with a `name`.
-fn names(items: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+pub(crate) fn names(items: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     items
         .try_iter()?
         .map(|item| text(&native_field(&item?, "name")?))
@@ -333,50 +332,4 @@ pub(crate) fn build_cursor_input_relations<'py>(
         )?);
     }
     PyTuple::new(py, relations)
-}
-
-/// Selected models and seeds, and selected sources with loaders, whose relations this invocation produces.
-#[pyfunction]
-#[pyo3(signature = (*, scope, source_map))]
-pub(crate) fn runtime_cursor_producer_names<'py>(
-    scope: &Bound<'py, PyAny>,
-    source_map: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let py: Python<'py> = scope.py();
-    let data = scope_data(scope)?;
-    let mut names: Vec<&str> = Vec::new();
-    for (kind, name) in &data.selected {
-        match kind.as_str() {
-            "model" | "seed" => names.push(name),
-            "source" => {
-                let source: Bound<'py, PyAny> = mapping_get(source_map, name)?;
-                if !source.is_none() && !native_field(&source, "loader")?.is_none() {
-                    names.push(name);
-                }
-            }
-            _ => {}
-        }
-    }
-    PyFrozenSet::new(py, names)
-}
-
-/// `cursor_input_columns_of` as a function of `module`.
-pub(crate) fn cursor_input_columns_of_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(cursor_input_columns_of, module)
-}
-
-/// `cursor_input_relations_of` as a function of `module`.
-pub(crate) fn cursor_input_relations_of_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(cursor_input_relations_of, module)
-}
-
-/// `runtime_cursor_producer_names` as a function of `module`.
-pub(crate) fn runtime_cursor_producer_names_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(runtime_cursor_producer_names, module)
 }

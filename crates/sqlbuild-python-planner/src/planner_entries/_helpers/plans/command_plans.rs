@@ -1,25 +1,20 @@
 //! Static plans for commands that do not build models, and direct seed identity reads.
 
-use crate::planner_entries::_helpers::entries::relations::planner_relations_context;
-use crate::planner_entries::_helpers::entries::values::boolean;
-use crate::planner_entries::_helpers::entries::values::none;
-use crate::planner_entries::_helpers::entries::values::planner_model;
-use crate::planner_entries::_helpers::entries::values::planner_type;
-use crate::planner_entries::_helpers::plans::plan_output::function_entry;
-use crate::planner_entries::_helpers::plans::plan_output::selected_test_entries;
-use crate::planner_entries::_helpers::plans::plan_output::test_selected;
-use crate::planner_entries::models::RelationsRequest;
+use crate::planner_entries::_helpers::entries::values::{
+    boolean, none, planner_model, planner_type,
+};
+use crate::planner_entries::_helpers::plans::plan_output::{
+    function_entry, selected_test_entries, test_selected,
+};
 use crate::planner_identity::main::build_compiled_function_fingerprint_sql::build_compiled_function_fingerprint_sql;
 use crate::planner_identity::main::build_seed_identity::build_seed_identity;
-use crate::planner_strategy::main::audit_entries::build_selected_audit_entries::build_selected_audit_entries;
 use crate::planner_strategy::main::model_entries::extract_seed_columns::extract_seed_columns;
-use crate::planner_strategy::main::strategy::materialization_of::materialization_of;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{
     PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyString,
     PyTuple,
 };
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_SEED;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -27,13 +22,10 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
 use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use sqlbuild_python_project::planner_phases::main::object::object;
-use sqlbuild_python_project::planner_scope::main::resolve_planner_scopes::resolve_planner_scopes;
 use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
 use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
@@ -41,12 +33,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// Optional fields of a static command plan; absent ones take `PlanOutput` defaults.
 #[derive(Default)]
-struct StaticPlanParts<'py> {
-    execution_order: Option<Bound<'py, PyAny>>,
-    fields: Vec<(&'static str, Bound<'py, PyAny>)>,
+pub(crate) struct StaticPlanParts<'py> {
+    pub(crate) execution_order: Option<Bound<'py, PyAny>>,
+    pub(crate) fields: Vec<(&'static str, Bound<'py, PyAny>)>,
 }
 
-fn base_plan_output<'py>(
+pub(crate) fn base_plan_output<'py>(
     project: &Bound<'py, PyAny>,
     scope: &Bound<'py, PyAny>,
     relations: &Bound<'py, PyAny>,
@@ -98,106 +90,6 @@ fn base_plan_output<'py>(
         ),
     ]);
     planner_model(py, RecordId::PlanOutput, &fields)
-}
-
-/// Resolve command selection through the canonical build selector phase.
-#[pyfunction]
-#[pyo3(signature = (*, project, selection, auto_load_sources = false))]
-pub(crate) fn resolve_static_command_scope<'py>(
-    project: &Bound<'py, PyAny>,
-    selection: &Bound<'py, PyAny>,
-    auto_load_sources: bool,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = project.py();
-    resolve_planner_scopes(
-        project,
-        selection,
-        &planner_model(
-            py,
-            RecordId::PlannerPolicies,
-            &[("auto_load_sources", boolean(py, auto_load_sources)?)],
-        )?,
-    )?
-    .getattr("selected_scope")
-}
-
-/// Resolve canonical locations and source routing without warehouse inventory.
-#[pyfunction]
-#[pyo3(signature = (**kwargs))]
-pub(crate) fn resolve_static_relation_context<'py>(
-    py: Python<'py>,
-    kwargs: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let args = KeywordArguments::read(
-        py,
-        "resolve_static_relation_context",
-        kwargs,
-        (
-            &["project", "adapter", "scope"],
-            &[
-                "deferral",
-                "project_config",
-                "local_config",
-                "relation_keys",
-            ],
-        ),
-    )?;
-    planner_relations_context(RelationsRequest {
-        project: args.value("project")?,
-        adapter: args.value("adapter")?,
-        connection: none(py),
-        scope: args.value("scope")?,
-        deferral: args.value("deferral")?,
-        project_config: args.value("project_config")?,
-        local_config: args.value("local_config")?,
-        known_source_columns: PyDict::new(py).into_any(),
-        relation_keys: args.value("relation_keys")?,
-    })
-}
-
-/// Project selected audits from canonical static state.
-#[pyfunction]
-#[pyo3(signature = (*, project, adapter, scope, relations))]
-pub(crate) fn build_audit_command_plan<'py>(
-    project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    scope: &Bound<'py, PyAny>,
-    relations: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = project.py();
-    let materializations = PyDict::new(py);
-    for model in compiled_models(project)?.try_iter()? {
-        let model = model?;
-        materializations.set_item(
-            name_object(&model)?,
-            native_field(&materialization_of(&model)?, "value")?,
-        )?;
-    }
-    let audits = object(
-        py,
-        build_selected_audit_entries(Some(&keywords(
-            py,
-            &[
-                ("project", project.clone()),
-                ("adapter", adapter.clone()),
-                ("scope", scope.clone()),
-                ("relations", relations.clone()),
-                ("model_materializations", materializations.into_any()),
-            ],
-        )?))?,
-    )?;
-    base_plan_output(
-        project,
-        scope,
-        relations,
-        StaticPlanParts {
-            execution_order: None,
-            fields: vec![(
-                "audit_entries",
-                PyTuple::new(py, audits.try_iter()?.collect::<PyResult<Vec<_>>>()?)?.into_any(),
-            )],
-        },
-    )
 }
 
 /// The tests' direct function dependencies and every project function those call.
@@ -403,15 +295,6 @@ pub(crate) fn build_seed_command_plan<'py>(
     )
 }
 
-/// Project static relation data for Python checks.
-pub(crate) fn build_relation_command_plan<'py>(
-    project: &Bound<'py, PyAny>,
-    scope: &Bound<'py, PyAny>,
-    relations: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    base_plan_output(project, scope, relations, StaticPlanParts::default())
-}
-
 /// A schema target's sort key: the database with `None` first as an empty name, then the schema.
 type Target = (Option<String>, String);
 
@@ -513,13 +396,4 @@ pub(crate) fn read_selected_seed_fingerprints<'py>(
         }
     }
     Ok(fingerprints)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(resolve_static_command_scope, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_static_relation_context, module)?)?;
-    module.add_function(wrap_pyfunction!(build_audit_command_plan, module)?)?;
-    module.add_function(wrap_pyfunction!(build_test_command_plan, module)?)?;
-    module.add_function(wrap_pyfunction!(build_seed_command_plan, module)?)?;
-    module.add_function(wrap_pyfunction!(read_selected_seed_fingerprints, module)?)
 }

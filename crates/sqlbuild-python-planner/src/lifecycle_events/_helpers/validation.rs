@@ -1,15 +1,14 @@
 //! Envelope field validation, JSON freezing and catalogued event validation.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyInt, PyString};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::lifecycle_events::main::validate_known_event::validate_known_event;
 use sqlbuild_core::lifecycle_events::models::KnownEventFacts;
 
-use crate::lifecycle_events::_helpers::payloads::PathSegment;
-use crate::lifecycle_events::_helpers::payloads::frozen;
-use crate::lifecycle_events::_helpers::payloads::object_entries;
-use crate::lifecycle_events::_helpers::payloads::validation_error;
+use crate::lifecycle_events::_helpers::payloads::{
+    PathSegment, frozen, object_entries, validation_error,
+};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
@@ -101,12 +100,4 @@ pub(crate) fn known_event_check(event: &Bound<'_, PyAny>) -> PyResult<()> {
         payload: object_entries(&native_field(event, "payload")?)?,
     };
     validate_known_event(&facts).map_err(|message| validation_error(event.py(), &message))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(schema_version_check, module)?)?;
-    module.add_function(wrap_pyfunction!(frozen_json, module)?)?;
-    module.add_function(wrap_pyfunction!(required_text_check, module)?)?;
-    module.add_function(wrap_pyfunction!(optional_text_check, module)?)?;
-    Ok(())
 }

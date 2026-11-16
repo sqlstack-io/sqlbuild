@@ -1,12 +1,18 @@
 //! A `datetime` in UTC, a naive or offset-less value read as UTC.
 
-use crate::freshness::_helpers::support;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::types::PyDict;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_front::cursor::constants::DATETIME_MODULE;
+use sqlbuild_python_front::state_rows::main::event_rows::in_utc::in_utc;
+use sqlbuild_python_front::state_rows::main::event_rows::offset_aware::offset_aware;
 
 /// A `datetime` in UTC, a naive or offset-less value read as UTC.
-#[inline]
 pub fn presumed_utc_datetime<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    support::presumed_utc_datetime(value)
+    if offset_aware(value)? {
+        return in_utc(value);
+    }
+    let changes: Bound<'py, PyDict> = PyDict::new(value.py());
+    changes.set_item("tzinfo", imported(value.py(), DATETIME_MODULE, "UTC")?)?;
+    value.call_method("replace", (), Some(&changes))
 }

@@ -1,9 +1,7 @@
 //! Check selected scope buildability.
 
 use crate::planner_phases::_helpers::outputs::buildability;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Check selected scope buildability.
 #[inline]

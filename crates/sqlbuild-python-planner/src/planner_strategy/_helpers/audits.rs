@@ -1,11 +1,13 @@
 //! Audit attachment, target lineage and run scope.
 
+use crate::planner_strategy::main::values::input_error::input_error;
+use crate::planner_strategy::main::values::text::text;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyTuple;
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::main::reachable_graph_keys::reachable_graph_keys;
@@ -15,9 +17,7 @@ use sqlbuild_analysis::planner_strategy::main::effective_run_scope::effective_ru
 use sqlbuild_analysis::planner_strategy::main::singular_attachment::singular_attachment;
 use sqlbuild_analysis::planner_strategy::models::{AuditAttachmentKind, AuditRunScope};
 
-use crate::planner_strategy::_helpers::values::input_error;
 use crate::planner_strategy::_helpers::values::optional_string;
-use crate::planner_strategy::_helpers::values::text;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -186,10 +186,4 @@ pub(crate) fn resolve_effective_run_scope<'py>(
         AuditRunScope::DeltaAndFinal => "delta_and_final",
     };
     imported(py, AUDITING_TYPES_MODULE, "AuditRunScope")?.call1((scope,))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(resolve_attachment_kind, module)?)?;
-    module.add_function(wrap_pyfunction!(reads_outside_target_lineage, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_effective_run_scope, module)?)
 }

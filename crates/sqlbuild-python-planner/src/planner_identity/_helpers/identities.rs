@@ -1,10 +1,12 @@
 //! Direct model version identities and honest write hashes over the planner scope.
 
+use crate::planner_identity::main::hook_version_hashes::hook_version_hashes;
+use crate::planner_identity::main::model_version_identity_metadata_json::model_version_identity_metadata_json;
 use std::collections::{HashMap, HashSet};
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyString};
-use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_analysis::planner_identity::constants::{
     MODEL_RESOURCE, SEED_RESOURCE, SOURCE_RESOURCE, TABLE_FN_RESOURCE, UDF_RESOURCE,
@@ -13,13 +15,9 @@ use sqlbuild_analysis::planner_identity::main::expected_graph_identity_hashes::e
 use sqlbuild_analysis::planner_identity::main::graph_write_identity_hashes::graph_write_identity_hashes;
 use sqlbuild_analysis::planner_identity::models::{GraphKey, IdentityGraph, IdentityNode};
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
-use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::planner_identity::_helpers::metadata::function_local_hashes;
-use crate::planner_identity::_helpers::metadata::model_version_identity_metadata_json;
-use crate::planner_identity::_helpers::metadata::seed_identity;
+use crate::planner_identity::_helpers::metadata::{function_local_hashes, seed_identity};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
@@ -49,21 +47,6 @@ fn string_pairs(mapping: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
         .try_iter()?
         .map(|item| item?.extract::<(String, String)>())
         .collect()
-}
-
-/// `{name: identity.version_hash}` of the discovered Python hooks.
-pub(crate) fn hook_version_hashes<'py>(
-    hook_functions: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = hook_functions.py();
-    let hashes: Bound<'py, PyDict> = PyDict::new(py);
-    let identities: Bound<'py, PyAny> =
-        host_entry(py, UserCodeHost::BuildHookIdentities)?.call1((hook_functions,))?;
-    for item in mapping_items(&identities)?.try_iter()? {
-        let (name, identity): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
-        hashes.set_item(name, native_field(&identity, "version_hash")?)?;
-    }
-    Ok(hashes)
 }
 
 /// Current direct model identities from code and upstream identities.
@@ -382,41 +365,9 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
     replace_with(&changes, ("models", model_changes.into_any()))
 }
 
-/// Resolved actions with recomputed model changes patched in where available.
-#[pyfunction]
-#[pyo3(signature = (*, resolved_actions, changes))]
-pub(crate) fn merge_recomputed_model_changes<'py>(
-    resolved_actions: &Bound<'py, PyAny>,
-    changes: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = resolved_actions.py();
-    let recomputed: Bound<'py, PyAny> = native_field(changes, "models")?;
-    let merged: Bound<'py, PyDict> = PyDict::new(py);
-    for item in native_field(resolved_actions, "models")?
-        .call_method0("items")?
-        .try_iter()?
-    {
-        let (name, resolved): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
-        let mut change: Bound<'py, PyAny> = mapping_get(&recomputed, &name)?;
-        if change.is_none() {
-            change = native_field(&resolved, "change")?;
-        }
-        merged.set_item(name, replace_with(&resolved, ("change", change))?)?;
-    }
-    replace_with(resolved_actions, ("models", merged.into_any()))
-}
-
-fn replace_with<'py>(
+pub(crate) fn replace_with<'py>(
     instance: &Bound<'py, PyAny>,
     (field, value): (&str, Bound<'py, PyAny>),
 ) -> PyResult<Bound<'py, PyAny>> {
     replaced(instance, &[(field, value)])
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        build_direct_model_version_identities,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(merge_recomputed_model_changes, module)?)
 }

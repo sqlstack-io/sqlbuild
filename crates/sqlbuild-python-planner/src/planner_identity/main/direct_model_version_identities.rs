@@ -1,9 +1,7 @@
 //! Direct model identities of `(functions, scope)`; unchanged nodes keep their `recorded` fingerprints.
 
 use crate::planner_identity::_helpers::identities;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Direct model identities of `(functions, scope)`; unchanged nodes keep their `recorded` fingerprints.
 #[inline]

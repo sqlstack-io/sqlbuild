@@ -190,10 +190,3 @@ fn raise_for_warnings(warnings: &Bound<'_, PyAny>) -> PyResult<()> {
     }
     Ok(())
 }
-
-/// `build_cli_scenario_plan` as a function of `module`.
-pub(crate) fn build_cli_scenario_plan_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(build_cli_scenario_plan, module)
-}

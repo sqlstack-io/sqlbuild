@@ -191,10 +191,3 @@ pub(crate) fn build_scenario_fixture_plans<'py>(
         &args.value("fixture_sql_overrides")?,
     )
 }
-
-/// `build_scenario_fixture_plans` as a function of `module`.
-pub(crate) fn build_scenario_fixture_plans_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(build_scenario_fixture_plans, module)
-}

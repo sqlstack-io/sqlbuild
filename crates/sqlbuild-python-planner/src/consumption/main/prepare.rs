@@ -2,9 +2,7 @@
 
 use crate::consumption::_helpers::recorder;
 use crate::consumption::models::Prepared;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_state::consumption::models::ChangedPolicy;
 
 /// Read records, decide `--changed` skips, mint execution IDs and append `started` rows.

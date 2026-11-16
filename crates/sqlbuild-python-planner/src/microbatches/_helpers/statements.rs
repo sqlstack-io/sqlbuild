@@ -1,8 +1,8 @@
 //! Direct-mode microbatch state DDL, idempotent inserts, reads and event IDs.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::MICROBATCH_TABLE_NAME;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 use sqlbuild_state::events::main::microbatch_event_id::microbatch_event_id;
@@ -14,8 +14,7 @@ use sqlbuild_state::microbatches::models::{MicrobatchEventIdentity, ScopeRead};
 use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql;
 use sqlbuild_state::state_tables::models::TableColumn;
 
-use crate::microbatches::_helpers::conversion::optional_text;
-use crate::microbatches::_helpers::conversion::state_error;
+use crate::microbatches::_helpers::conversion::{optional_text, state_error};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;
@@ -128,7 +127,7 @@ fn events_table<'py>(
 /// Build one guarded set-based insert for events in the same state table.
 #[pyfunction(name = "build_microbatch_insert_many_sql")]
 #[pyo3(signature = (*, events, render_qualified_name, timestamp_type = None))]
-fn insert_many(
+pub(crate) fn insert_many(
     events: &Bound<'_, PyAny>,
     render_qualified_name: &Bound<'_, PyAny>,
     timestamp_type: Option<&str>,
@@ -145,7 +144,7 @@ fn insert_many(
 /// Build one lookup for event IDs already present before a bulk insert.
 #[pyfunction(name = "build_microbatch_existing_event_ids_sql")]
 #[pyo3(signature = (*, events, render_qualified_name))]
-fn existing_ids(
+pub(crate) fn existing_ids(
     events: &Bound<'_, PyAny>,
     render_qualified_name: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
@@ -161,7 +160,7 @@ fn existing_ids(
 /// Build the ordered read of one scope's events, every generation for the wildcard.
 #[pyfunction(name = "build_microbatch_read_scope_sql")]
 #[pyo3(signature = (*, scope, render_qualified_name))]
-fn read_scope(
+pub(crate) fn read_scope(
     scope: &Bound<'_, PyAny>,
     render_qualified_name: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
@@ -191,7 +190,7 @@ fn read_scope(
 /// Build direct microbatch-state DDL with the adapter's text and timestamp types.
 #[pyfunction(name = "build_microbatch_create_table_sql")]
 #[pyo3(signature = (**request))]
-fn create_table(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
+pub(crate) fn create_table(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
     let request = Request::new("build_microbatch_create_table_sql", request)?;
     let py: Python<'_> = request.py();
     let table: String = qualified_table(
@@ -228,7 +227,9 @@ fn create_table(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
 /// Build non-unique scope and provenance indexes for indexed warehouses.
 #[pyfunction(name = "build_microbatch_create_index_sqls")]
 #[pyo3(signature = (**request))]
-fn create_indexes<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn create_indexes<'py>(
+    request: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyTuple>> {
     let request = Request::new("build_microbatch_create_index_sqls", request)?;
     let py: Python<'_> = request.py();
     let schema: Bound<'_, PyAny> = request.get("schema")?;
@@ -265,7 +266,7 @@ fn create_indexes<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'
 /// Return the content-addressed ID for one logical event.
 #[pyfunction(name = "deterministic_microbatch_event_id")]
 #[pyo3(signature = (**request))]
-fn deterministic_event_id(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
+pub(crate) fn deterministic_event_id(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
     let request = Request::new("deterministic_microbatch_event_id", request)?;
     let scope: Bound<'_, PyAny> = request.get("scope")?;
     let field = |name: &str| -> PyResult<String> { native_field(&scope, name)?.extract() };
@@ -285,13 +286,4 @@ fn deterministic_event_id(request: Option<&Bound<'_, PyDict>>) -> PyResult<Strin
         completion_reason: request.get("completion_reason")?.extract()?,
     };
     microbatch_event_id(&identity).map_err(emit_error)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(insert_many, module)?)?;
-    module.add_function(wrap_pyfunction!(existing_ids, module)?)?;
-    module.add_function(wrap_pyfunction!(read_scope, module)?)?;
-    module.add_function(wrap_pyfunction!(create_table, module)?)?;
-    module.add_function(wrap_pyfunction!(create_indexes, module)?)?;
-    module.add_function(wrap_pyfunction!(deterministic_event_id, module)?)
 }

@@ -1,12 +1,11 @@
 //! Microbatch counts, capped ranges and batch-limit configuration.
 
+use crate::planner_strategy::main::values::text::text;
 use std::marker::PhantomData;
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyInt, PyString, PyTuple, PyTupleMethods};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 
 use sqlbuild_analysis::planner_strategy::main::cap_integer_bounds::cap_integer_bounds;
 use sqlbuild_analysis::planner_strategy::main::cap_timeline_bounds::cap_timeline_bounds;
@@ -19,7 +18,6 @@ use sqlbuild_cursor::algebra::main::parse_duration::parse_duration;
 use sqlbuild_cursor::algebra::models::{DurationDigits, DurationSpan};
 
 use crate::plan_output::main::aligned_timestamp_bounds::aligned_timestamp_bounds;
-use crate::planner_strategy::_helpers::values::text;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
@@ -236,7 +234,7 @@ pub(crate) fn capped_microbatch_bounds<'py>(
 /// The prominent warning or error message when one model exceeds its batch limit.
 #[pyfunction]
 #[pyo3(signature = (*, model_name, max_batches, batch_count, action))]
-fn microbatch_limit_warning(
+pub(crate) fn microbatch_limit_warning(
     model_name: &str,
     max_batches: Option<i128>,
     batch_count: i128,
@@ -282,9 +280,4 @@ pub(crate) fn microbatch_limit_config<'py>(
     }
     let legacy: Bound<'py, PyAny> = mapping_get(values, "max_microbatches")?;
     Ok((positive_integer(Some(legacy))?, None))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(microbatch_limit_warning, module)?)?;
-    Ok(())
 }

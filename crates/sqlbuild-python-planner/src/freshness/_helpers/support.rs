@@ -1,16 +1,14 @@
 //! Python objects, exceptions and datetimes the source freshness glue shares.
 
+use crate::freshness::main::presumed_utc_datetime::presumed_utc_datetime;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::PyString;
 
-use crate::freshness::_helpers::exception_types::SourceFreshnessInputError;
-use crate::freshness::_helpers::exception_types::SourceFreshnessObservationError;
-use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_front::cursor::constants::DATETIME_MODULE;
+use crate::freshness::_helpers::exception_types::{
+    SourceFreshnessInputError, SourceFreshnessObservationError,
+};
 use sqlbuild_python_front::state_rows::main::event_rows::date_time_typed::date_time_typed;
-use sqlbuild_python_front::state_rows::main::event_rows::in_utc::in_utc;
-use sqlbuild_python_front::state_rows::main::event_rows::offset_aware::offset_aware;
 
 pub(crate) const OBSERVATION_ERROR: fn(String) -> PyErr = SourceFreshnessObservationError::new_err;
 pub(crate) const INPUT_ERROR: fn(String) -> PyErr = SourceFreshnessInputError::new_err;
@@ -42,16 +40,6 @@ pub(crate) fn presumed_utc_value<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bou
         return Ok(value.clone());
     }
     presumed_utc_datetime(value)
-}
-
-/// A `datetime` in UTC, a naive or offset-less value read as UTC.
-pub(crate) fn presumed_utc_datetime<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    if offset_aware(value)? {
-        return in_utc(value);
-    }
-    let changes: Bound<'py, PyDict> = PyDict::new(value.py());
-    changes.set_item("tzinfo", imported(value.py(), DATETIME_MODULE, "UTC")?)?;
-    value.call_method("replace", (), Some(&changes))
 }
 
 pub(crate) fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {

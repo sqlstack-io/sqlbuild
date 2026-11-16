@@ -1,9 +1,9 @@
 //! Decide column renames for the selected incremental and snapshot models.
 
 use crate::planner_migrations::_helpers::column::column_planning;
-use crate::planner_migrations::models::ColumnMigrationInputs;
-use crate::planner_migrations::models::ColumnMigrationPlanning;
-use crate::planner_migrations::models::MigrationPhase;
+use crate::planner_migrations::models::{
+    ColumnMigrationInputs, ColumnMigrationPlanning, MigrationPhase,
+};
 use pyo3::prelude::PyResult;
 
 /// Decide column renames for the selected incremental and snapshot models.

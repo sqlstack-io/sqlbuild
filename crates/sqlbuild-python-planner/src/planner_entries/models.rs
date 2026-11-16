@@ -1,8 +1,6 @@
 //! Public records of planner entries.
 
-use pyo3::prelude::Bound;
-use pyo3::prelude::Py;
-use pyo3::prelude::PyAny;
+use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
 use sqlbuild_python_project::native_host::models::ModelLookup;
 

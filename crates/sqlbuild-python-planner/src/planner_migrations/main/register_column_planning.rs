@@ -1,12 +1,10 @@
 //! Register the column planning functions and classes.
 
-use crate::planner_migrations::_helpers::column::column_planning;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::planner_migrations::_helpers::column::column_planning::plan_column_migrations_of;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the column planning functions and classes.
-#[inline]
 pub fn register_column_planning(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    column_planning::register(module)
+    module.add_function(wrap_pyfunction!(plan_column_migrations_of, module)?)
 }

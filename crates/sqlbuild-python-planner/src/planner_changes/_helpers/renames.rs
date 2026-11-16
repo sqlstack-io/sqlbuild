@@ -5,9 +5,9 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_project::fingerprints::main::compute_query_hash::compute_query_hash;
 use std::collections::BTreeSet;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PySet, PySetMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_analysis::planner_changes::main::origin_reference_names::origin_reference_names;
 use sqlbuild_analysis::planner_changes::models::{NameSpan, RenameCandidate};
@@ -123,7 +123,7 @@ fn utc<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
 /// The rename mapping under which `query_sql` hashes to the recorded definition, or `None`.
 #[pyfunction(name = "origin_reference_names")]
 #[pyo3(signature = (*, query_sql, recorded, renames, dialect))]
-fn origin_reference_names_of<'py>(
+pub(crate) fn origin_reference_names_of<'py>(
     query_sql: String,
     recorded: &Bound<'py, PyAny>,
     renames: &Bound<'py, PyAny>,
@@ -261,8 +261,4 @@ fn changed_referencing_query(
         }
     }
     Ok(false)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(origin_reference_names_of, module)?)
 }

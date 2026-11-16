@@ -82,11 +82,3 @@ pub(crate) fn start_cursor_config<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     resolve_policy(model, project_config, &START_POLICY)
 }
-
-/// Resolve automatic-start policy with model config taking precedence.
-pub(crate) fn resolve_start_cursor_config<'py>(
-    model: &Bound<'py, PyAny>,
-    project_config: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    start_cursor_config(model, project_config)
-}

@@ -9,9 +9,7 @@ use crate::planner_migrations::_helpers::discovery::state_inspection::schema_or_
 use crate::planner_migrations::_helpers::discovery::state_inspection::tuple_of;
 use crate::planner_migrations::constants::GET_COLUMNS_FOR_INSPECTION;
 use crate::planner_migrations::constants::LIST_RELATIONS_FOR_INSPECTION;
-use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
-use pyo3::prelude::PyAny;
 use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::PyRef;
 use pyo3::prelude::PyRefMut;
@@ -19,6 +17,7 @@ use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use pyo3::prelude::pyclass;
 use pyo3::prelude::pymethods;
+use pyo3::prelude::{Bound, PyAny};
 use pyo3::types::PyBool;
 use pyo3::types::PyDict;
 use pyo3::types::PyString;

@@ -1,9 +1,9 @@
 //! Validate reliable watermark column contracts before warehouse inspection.
 
 use crate::planner_strategy::main::cursor_types::classify_cursor_sql_type::classify_cursor_sql_type;
-use crate::planner_warehouse::constants::CURSOR_TYPE_INTEGER;
-use crate::planner_warehouse::constants::CURSOR_TYPE_TIMESTAMP;
-use crate::planner_warehouse::constants::WATERMARK_CONTRACT_CODE;
+use crate::planner_warehouse::constants::{
+    CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, WATERMARK_CONTRACT_CODE,
+};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};
@@ -162,11 +162,4 @@ pub(crate) fn validate_watermark_column<'py>(
         ),
         (Some(WATERMARK_CONTRACT_CODE), None),
     ))
-}
-
-/// `watermark_type_is_compatible` as a function of `module`.
-pub(crate) fn watermark_type_is_compatible_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(watermark_type_is_compatible, module)
 }

@@ -1,23 +1,17 @@
 //! Maximum automatic-start recovery and evidence boundary.
 
 use crate::planner_resolution::_helpers::cursor::cursor_bounds::apply_typed_cursor_replay_policy;
-use crate::planner_resolution::_helpers::cursor::cursor_bounds::optional_scalar;
-use crate::planner_resolution::_helpers::cursor::cursor_bounds::required_scalar;
-use crate::planner_resolution::_helpers::cursor::cursor_bounds::scalars;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::horizon;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::replace;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::safety_duration;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::safety_error;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::timestamp_bound;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::utc_clock;
-use crate::planner_resolution::_helpers::references::values::string;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
+use crate::planner_resolution::_helpers::cursor::cursor_bounds::{
+    optional_scalar, required_scalar, scalars,
 };
+use crate::planner_resolution::_helpers::cursor::cursor_safety::{
+    horizon, replace, safety_duration, safety_error, timestamp_bound, utc_clock,
+};
+use crate::planner_resolution::_helpers::references::values::string;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::PyDict;
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 use sqlbuild_cursor::algebra::main::compare::compare;
-use sqlbuild_cursor::algebra::main::render::render;
 use sqlbuild_cursor::planner::main::eligible_start::eligible_start;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -32,47 +26,6 @@ use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
 use sqlbuild_python_front::cursor::models::CursorSession;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use std::cmp::Ordering;
-
-#[pyfunction]
-#[pyo3(signature = (**kwargs))]
-pub(crate) fn maximum_allowed_start<'py>(
-    py: Python<'py>,
-    kwargs: Option<Bound<'py, PyDict>>,
-) -> PyResult<String> {
-    let args = KeywordArguments::read(
-        py,
-        "maximum_allowed_start",
-        kwargs,
-        (
-            &[
-                "discovered_value",
-                "cursor_grain",
-                "invocation_time",
-                "max_ahead",
-            ],
-            &[],
-        ),
-    )?;
-    let session = CursorSession::new(py)?;
-    let discovered = required_scalar(
-        &session,
-        &args.value("discovered_value")?,
-        &string(py, "timestamp"),
-    )?;
-    let duration = safety_duration(&args.value("max_ahead")?, false)?;
-    session.checked(render(
-        &horizon(
-            &session,
-            &session.python_scalar(&discovered)?,
-            (
-                &args.value("invocation_time")?,
-                &args.value("cursor_grain")?,
-            ),
-            &duration,
-        )?,
-        &session,
-    ))
-}
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
@@ -286,9 +239,4 @@ fn exceeded_message(evidence: &Bound<'_, PyAny>, non_idempotent: bool) -> PyResu
         native_field(evidence, "target_relation")?.str()?,
         native_field(evidence, "cursor_column")?.str()?,
     ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(maximum_allowed_start, module)?)?;
-    module.add_function(wrap_pyfunction!(apply_maximum_start_policy, module)?)
 }

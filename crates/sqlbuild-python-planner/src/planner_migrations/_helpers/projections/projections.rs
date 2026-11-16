@@ -2,9 +2,9 @@
 
 use crate::planner_migrations::errors::ProofError;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 use sqlbuild_analysis::planner_migrations::main::{query_shape, renames_explain_change as proof};
 use sqlbuild_analysis::planner_migrations::models::{QueryProjection, QueryShape};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -145,9 +145,4 @@ pub(crate) fn renames_explain_change(
         &arguments.value("renames")?,
         &arguments.value("input_columns")?,
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(parse_query_shape, module)?)?;
-    module.add_function(wrap_pyfunction!(renames_explain_change, module)?)
 }

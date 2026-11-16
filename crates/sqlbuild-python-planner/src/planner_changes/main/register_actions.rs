@@ -1,12 +1,10 @@
 //! Register the actions functions and classes.
 
-use crate::planner_changes::_helpers::actions;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::planner_changes::main::replaces_incremental_relation::replaces_incremental_relation;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the actions functions and classes.
-#[inline]
 pub fn register_actions(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    actions::register(module)
+    module.add_function(wrap_pyfunction!(replaces_incremental_relation, module)?)
 }

@@ -23,15 +23,6 @@ pub(crate) struct Locations {
     by_name: HashMap<String, BTreeSet<RelationKey>>,
 }
 
-/// The relation a model or seed destination names; a destination without a schema has an empty one.
-pub(crate) fn relation(destination: &Bound<'_, PyAny>) -> PyResult<RelationKey> {
-    Ok(RelationKey {
-        database: optional_text(&native_field(destination, "database")?)?,
-        schema: optional_text(&native_field(destination, "schema")?)?.unwrap_or_default(),
-        name: native_field(destination, "name")?.extract()?,
-    })
-}
-
 impl Locations {
     /// `nodes` holds every model and seed relation of the project.
     pub(crate) fn read(

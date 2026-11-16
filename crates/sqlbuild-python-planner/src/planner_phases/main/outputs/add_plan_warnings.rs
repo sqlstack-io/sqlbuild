@@ -1,11 +1,8 @@
 //! Add unknown source freshness warnings and, with selection diagnostics, stale-selection warnings.
 
 use crate::planner_phases::_helpers::outputs::output_assembly;
-use crate::planner_phases::models::PlanOutputFields;
-use crate::planner_phases::models::PlanWarningContext;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::planner_phases::models::{PlanOutputFields, PlanWarningContext};
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Add unknown source freshness warnings and, with selection diagnostics, stale-selection warnings.
 #[inline]

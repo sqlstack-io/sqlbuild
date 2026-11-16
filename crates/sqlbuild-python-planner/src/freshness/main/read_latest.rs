@@ -2,9 +2,7 @@
 
 use crate::freshness::_helpers::state_io;
 use crate::freshness::models::StateRead;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Latest records of one schema, trusting the caller-resolved table existence.
 #[inline]

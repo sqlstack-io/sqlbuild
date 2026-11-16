@@ -1,12 +1,13 @@
 //! Register the publication functions and classes.
 
-use crate::freshness::_helpers::publication;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::freshness::_helpers::publication::append_eligible_direct_source_freshness_records;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the publication functions and classes.
-#[inline]
 pub fn register_publication(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    publication::register(module)
+    module.add_function(wrap_pyfunction!(
+        append_eligible_direct_source_freshness_records,
+        module
+    )?)
 }

@@ -1,9 +1,10 @@
 //! Conversions between the planner's Python models and the native strategy rows.
 
 use crate::planner_changes::main::native_enum::native_enum;
+use crate::planner_strategy::main::values::text::text;
 use pyo3::IntoPyObject;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyString};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::PyString;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value as typed_config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
@@ -16,19 +17,12 @@ use sqlbuild_analysis::planner_strategy::models::{
     ChangeFacts, MaterializationType, PlanChangeKind, WarningRow, WarningSeverity,
 };
 
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 
 const YML_SOURCE: &str = "yml";
 const FULL_BACKFILL: &str = "full";
 const FORWARD_ONLY_BACKFILL: &str = "forward";
-
-/// `str(value)` of a Python string or string enum.
-pub(crate) fn text(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    value.extract()
-}
 
 /// A string value, or `None` for `None` and anything that is not a string.
 pub(crate) fn optional_string(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
@@ -148,24 +142,4 @@ pub(crate) fn plan_warning<'py>(
             ("code", row.code.into_pyobject(py)?.into_any()),
         ],
     )
-}
-
-/// The native error `class(message, code=code)`.
-pub(crate) fn input_error(
-    py: Python<'_>,
-    class: ErrorId,
-    message: &str,
-    code: Option<&str>,
-) -> PyErr {
-    let raised: PyResult<Bound<'_, PyAny>> = error_class(py, class).and_then(|class| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        if let Some(code) = code {
-            options.set_item("code", code)?;
-        }
-        class.call((message,), Some(&options))
-    });
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
 }

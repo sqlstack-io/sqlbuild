@@ -1,18 +1,12 @@
 //! Per-model plan entries from resolved change results and warehouse snapshot facts.
 
-use crate::planner_changes::main::detect_model_changes::detect_model_changes;
 use crate::planner_changes::main::replaces_incremental_relation::replaces_incremental_relation;
-use crate::planner_entries::_helpers::entries::values::MICROBATCH_CONCURRENCY_MESSAGE;
-use crate::planner_entries::_helpers::entries::values::error_of;
-use crate::planner_entries::_helpers::entries::values::native;
-use crate::planner_entries::_helpers::entries::values::none;
-use crate::planner_entries::_helpers::entries::values::planner_type;
-use crate::planner_entries::_helpers::entries::values::replaced;
-use crate::planner_entries::_helpers::entries::values::string;
-use crate::planner_entries::models::ModelPlanContext;
-use crate::planner_entries::models::PlanEntriesRequest;
-use crate::planner_entries::models::PlanEntryBuildInputs;
-use crate::planner_entries::models::PlannerRelationsContext;
+use crate::planner_entries::_helpers::entries::values::{
+    MICROBATCH_CONCURRENCY_MESSAGE, error_of, native, none, planner_type, replaced, string,
+};
+use crate::planner_entries::models::{
+    ModelPlanContext, PlanEntriesRequest, PlanEntryBuildInputs, PlannerRelationsContext,
+};
 use crate::planner_phases::main::inputs::class_field::class_field;
 use crate::planner_phases::main::rebuilds::check_full_rebuild_allowed::check_full_rebuild_allowed;
 use crate::planner_phases::main::rebuilds::describe_full_rebuild_cause::describe_full_rebuild_cause;
@@ -39,11 +33,10 @@ use crate::planner_strategy::main::model_entries::assemble_model_plan_entry::ass
 use crate::planner_strategy::main::strategy::materialization_of::materialization_of;
 use crate::planner_strategy::main::strategy::resolve_model_plan_action::resolve_model_plan_action;
 use crate::planner_strategy::main::values::text::text;
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -58,7 +51,7 @@ use sqlbuild_python_project::semantic_shapes::main::source_binding_diagnostics::
 const MICROBATCH_COMPLEXITY_CODE: &str = "MICROBATCH_CONCURRENCY_COMPLEXITY";
 
 /// The `ModelPlanContext` fields every model's planning reads, read once per plan.
-struct ContextReads<'py> {
+pub(crate) struct ContextReads<'py> {
     context: Bound<'py, PyAny>,
     lookups: CursorInputLookups<'py>,
     resolution: Resolution<'py>,
@@ -66,7 +59,7 @@ struct ContextReads<'py> {
 }
 
 impl<'py> ContextReads<'py> {
-    fn of(
+    pub(crate) fn of(
         context: Bound<'py, PyAny>,
         adapter: Bound<'py, PyAny>,
         external_resolver: Bound<'py, PyAny>,
@@ -92,19 +85,19 @@ impl<'py> ContextReads<'py> {
 }
 
 /// One model's planning request after change detection.
-struct ModelPlanRequest<'a, 'py> {
-    model: Bound<'py, PyAny>,
-    snapshot: Bound<'py, PyAny>,
-    context: &'a ContextReads<'py>,
-    sql_analysis_enabled: bool,
-    full_refresh: bool,
-    overrides: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-    change_result: Bound<'py, PyAny>,
-    protect_full_refresh: bool,
+pub(crate) struct ModelPlanRequest<'a, 'py> {
+    pub(crate) model: Bound<'py, PyAny>,
+    pub(crate) snapshot: Bound<'py, PyAny>,
+    pub(crate) context: &'a ContextReads<'py>,
+    pub(crate) sql_analysis_enabled: bool,
+    pub(crate) full_refresh: bool,
+    pub(crate) overrides: (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    pub(crate) change_result: Bound<'py, PyAny>,
+    pub(crate) protect_full_refresh: bool,
 }
 
 /// Build a model plan entry and its warnings from a resolved change result.
-fn plan_model_from_change<'py>(
+pub(crate) fn plan_model_from_change<'py>(
     request: &ModelPlanRequest<'_, 'py>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let model = &request.model;
@@ -546,69 +539,6 @@ pub(crate) fn plan_entries<'py>(
     Ok(ModelEntryResults { entries, warnings })
 }
 
-/// Detect changes and build a plan entry and warnings for a single model.
-#[pyfunction]
-#[pyo3(signature = (**kwargs))]
-pub(crate) fn plan_model<'py>(
-    py: Python<'py>,
-    kwargs: Option<Bound<'py, PyDict>>,
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-    let args = KeywordArguments::read(
-        py,
-        "plan_model",
-        kwargs,
-        (
-            &[
-                "model",
-                "snapshot",
-                "adapter",
-                "context",
-                "sql_analysis_enabled",
-                "query_change_tracking",
-                "full_refresh",
-                "cursor_overrides",
-            ],
-            &["external_sql_reference_resolver"],
-        ),
-    )?;
-    let model = args.value("model")?;
-    let snapshot = args.value("snapshot")?;
-    let change_result = detect_model_changes(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("model", model.clone()),
-                ("snapshot", snapshot.clone()),
-                ("sql_analysis_enabled", args.value("sql_analysis_enabled")?),
-                (
-                    "query_change_tracking",
-                    args.value("query_change_tracking")?,
-                ),
-                ("full_refresh", args.value("full_refresh")?),
-            ],
-        )?),
-    )?;
-    let overrides = args.value("cursor_overrides")?;
-    plan_model_from_change(&ModelPlanRequest {
-        model,
-        snapshot,
-        context: &ContextReads::of(
-            args.value("context")?,
-            args.value("adapter")?,
-            args.value("external_sql_reference_resolver")?,
-        )?,
-        sql_analysis_enabled: args.flag("sql_analysis_enabled")?,
-        full_refresh: args.flag("full_refresh")?,
-        overrides: (
-            native_field(&overrides, "start_cursor_override")?,
-            native_field(&overrides, "end_cursor_override")?,
-        ),
-        change_result,
-        protect_full_refresh: true,
-    })
-}
-
 /// Check if any scope dependency is in the selected keys.
 #[pyfunction]
 #[pyo3(signature = (*, scope_deps, selected_keys))]
@@ -622,9 +552,4 @@ pub(crate) fn scope_overlaps(
         }
     }
     Ok(false)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(plan_model, module)?)?;
-    module.add_function(wrap_pyfunction!(scope_overlaps, module)?)
 }

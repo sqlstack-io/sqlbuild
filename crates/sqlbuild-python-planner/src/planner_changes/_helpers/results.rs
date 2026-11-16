@@ -1,5 +1,7 @@
 //! The planner's Python change-detection result models.
 
+use crate::planner_changes::main::native_enum::native_enum;
+use crate::planner_changes::main::planner_enum::planner_enum;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::types::PyTuple;
 use pyo3::{IntoPyObject, PyErr};
@@ -10,7 +12,6 @@ use sqlbuild_analysis::planner_changes::models::{
     Backfill, BackfillAction, ChangeKind, SchemaChangeKind, SchemaColumnSource, SchemaFindingRow,
 };
 
-use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
@@ -18,24 +19,6 @@ use sqlbuild_python_base::records::types::RecordId;
 /// `PlannerInputError(message)` for an unknown replay policy.
 pub(crate) fn replay_policy_error(py: Python<'_>, error: UnknownReplayPolicy) -> PyErr {
     new_plain_error(py, ErrorId::PlannerInput, &error.message())
-}
-
-/// `TYPES_MODULE.<enum>(value)`.
-pub(crate) fn planner_enum<'py>(
-    py: Python<'py>,
-    name: RecordId,
-    value: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    new_record(py, name, (value,), None)
-}
-
-/// A member of a natively declared planner enumeration, from its value.
-pub(crate) fn native_enum<'py>(
-    py: Python<'py>,
-    name: RecordId,
-    value: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    new_record(py, name, (value,), None)
 }
 
 /// `BackfillResult(action=..., duration=...)`.

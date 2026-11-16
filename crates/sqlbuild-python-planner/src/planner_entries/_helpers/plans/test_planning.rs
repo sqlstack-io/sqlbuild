@@ -6,16 +6,13 @@ use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use pyo3::exceptions::PyRuntimeError;
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, Py, PyAny, PyErr, PyResult, Python};
 use pyo3::sync::PyOnceLock;
 use pyo3::types::PyDict;
-use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
+use pyo3::{pyclass, pyfunction, pymethods};
 
 use crate::planner_entries::_helpers::plans::plan_output::plan_selected_sql_tests;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
-use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_threads::main::signal_interpreter_exit::signal_interpreter_exit;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -215,7 +212,7 @@ pub(crate) fn start_planning(
 
 /// Join SQL test planning threads at exit: finalization ending one inside native planning aborts.
 #[pyfunction]
-fn join_sql_test_planning_threads(py: Python<'_>) -> PyResult<()> {
+pub(crate) fn join_sql_test_planning_threads(py: Python<'_>) -> PyResult<()> {
     signal_interpreter_exit();
     let threads: &PlanningThreads = planning_threads(py)?.get();
     py.detach(|| threads.wait(PLANNING_EXIT_JOIN));
@@ -225,7 +222,7 @@ fn join_sql_test_planning_threads(py: Python<'_>) -> PyResult<()> {
 /// Start SQL test planning on a native thread, or resolve to no tests when disabled.
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
-fn start_sql_test_planning<'py>(
+pub(crate) fn start_sql_test_planning<'py>(
     py: Python<'py>,
     kwargs: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Py<SqlTestPlanning>> {
@@ -254,14 +251,4 @@ fn start_sql_test_planning<'py>(
         },
         args.flag("enabled")?,
     )
-}
-
-/// Add the planning handle and entry points, and join planning threads at interpreter exit.
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<SqlTestPlanning>()?;
-    module.add_function(wrap_pyfunction!(start_sql_test_planning, module)?)?;
-    let hook = wrap_pyfunction!(join_sql_test_planning_threads, module)?;
-    module.add_function(hook.clone())?;
-    imported(module.py(), "atexit", "register")?.call1((hook,))?;
-    Ok(())
 }

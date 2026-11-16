@@ -1,32 +1,22 @@
 //! The JSON plan document, read from the planner's output by attribute.
 
-use crate::plan_output::constants::CHANGED_KEY;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::plan_output::main::any::any;
+use crate::plan_output::main::dict::dict;
+use crate::plan_output::main::future_cursor_safety::future_cursor_safety;
+use crate::plan_output::main::items::items;
+use crate::plan_output::main::maximum_start_safety::maximum_start_safety;
+use crate::plan_output::main::text::text;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_core::plan_display::constants::SYNCED_COPY_KEY;
 
-use crate::plan_output::_helpers::cursor_details::CursorDetails;
-use crate::plan_output::_helpers::cursor_details::cursor_details;
-use crate::plan_output::_helpers::cursor_details::owner;
-use crate::plan_output::_helpers::plan_text::model_config_diff;
-use crate::plan_output::_helpers::plan_text::model_query_diff;
-use crate::plan_output::_helpers::python_identity::definition_source_text;
-use crate::plan_output::_helpers::python_identity::dependency_source_text;
-use crate::plan_output::_helpers::safety::future_cursor_safety;
-use crate::plan_output::_helpers::safety::maximum_start_safety;
-use crate::plan_output::_helpers::values::any;
-use crate::plan_output::_helpers::values::dict;
-use crate::plan_output::_helpers::values::enum_value;
-use crate::plan_output::_helpers::values::iso;
-use crate::plan_output::_helpers::values::items;
-use crate::plan_output::_helpers::values::list;
-use crate::plan_output::_helpers::values::mapped;
-use crate::plan_output::_helpers::values::optional_enum_value;
-use crate::plan_output::_helpers::values::relation_name;
-use crate::plan_output::_helpers::values::text;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
+use crate::plan_output::_helpers::cursor_details::{CursorDetails, cursor_details, owner};
+use crate::plan_output::_helpers::plan_text::{model_config_diff, model_query_diff};
+use crate::plan_output::_helpers::python_identity::{
+    definition_source_text, dependency_source_text,
+};
+use crate::plan_output::_helpers::values::{
+    enum_value, iso, list, mapped, optional_enum_value, relation_name,
+};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
 
@@ -155,7 +145,7 @@ fn microbatch_state<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny
     Ok(state.into_any())
 }
 
-fn model_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn model_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = entry.py();
     let model: Bound<'py, PyDict> = dict(
         py,
@@ -303,7 +293,7 @@ fn with_qualified_name<'py>(
     Ok(item.into_any())
 }
 
-fn seed_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn seed_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = entry.py();
     with_qualified_name(
         dict(
@@ -317,7 +307,7 @@ fn seed_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     )
 }
 
-fn source_load_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn source_load_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = entry.py();
     let load: Bound<'py, PyDict> = dict(
         py,
@@ -344,7 +334,7 @@ fn source_load_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny
     Ok(load.into_any())
 }
 
-fn function_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn function_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = entry.py();
     let columns: Bound<'py, PyAny> = native_field(entry, "return_columns")?;
     with_qualified_name(
@@ -388,7 +378,7 @@ fn function_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> 
     )
 }
 
-fn warning_json<'py>(warning: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn warning_json<'py>(warning: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = warning.py();
     let item: Bound<'py, PyDict> = dict(
         py,
@@ -461,7 +451,7 @@ fn identity_diff<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>>
     Ok(result)
 }
 
-fn python_entry_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn python_entry_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = entry.py();
     let item: Bound<'py, PyDict> = dict(
         py,
@@ -487,7 +477,7 @@ struct Usage<'py> {
     module: Bound<'py, PyAny>,
 }
 
-fn providers_json<'py>(
+pub(crate) fn providers_json<'py>(
     plan: &Bound<'py, PyAny>,
     python_entries: &[Bound<'py, PyAny>],
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -565,7 +555,7 @@ fn providers_json<'py>(
     Ok(providers.into_any())
 }
 
-fn old_name_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn old_name_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = entry.py();
     Ok(dict(
         py,
@@ -591,7 +581,7 @@ fn old_name_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> 
     .into_any())
 }
 
-fn migrations_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn migrations_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = plan.py();
     let old_names: Bound<'py, PyDict> = PyDict::new(py);
     for entry in items(&native_field(plan, "old_name_view_entries")?)? {
@@ -667,7 +657,7 @@ fn migrations_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>
     })
 }
 
-fn column_migrations_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn column_migrations_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = plan.py();
     mapped(&native_field(plan, "column_migration_entries")?, |entry| {
         Ok(dict(
@@ -694,7 +684,7 @@ fn column_migrations_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, 
     })
 }
 
-fn retention_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn retention_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = plan.py();
     mapped(&native_field(plan, "retention_entries")?, |entry| {
         let request: Bound<'py, PyAny> = native_field(entry, "request")?;
@@ -724,7 +714,7 @@ fn retention_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> 
     })
 }
 
-fn table_type_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn table_type_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = plan.py();
     mapped(&native_field(plan, "table_type_entries")?, |entry| {
         Ok(dict(
@@ -745,104 +735,4 @@ fn table_type_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>
         )?
         .into_any())
     })
-}
-
-/// The plan as one JSON document, `json.dumps(indent=2)`.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn format_plan_json(
-    py: Python<'_>,
-    options: Option<Bound<'_, PyDict>>,
-) -> PyResult<String> {
-    let arguments: KeywordArguments<'_> = KeywordArguments::read(
-        py,
-        "format_plan_json",
-        options,
-        (
-            &["plan"],
-            &["python_plan_entries", SYNCED_COPY_KEY, CHANGED_KEY],
-        ),
-    )?;
-    let plan: Bound<'_, PyAny> = arguments.value("plan")?;
-    let python_entries: Vec<Bound<'_, PyAny>> = if arguments.passed("python_plan_entries")? {
-        items(&arguments.value("python_plan_entries")?)?
-    } else {
-        Vec::new()
-    };
-    let length = |field: &str| -> PyResult<usize> { native_field(&plan, field)?.len() };
-    let python_nodes: Vec<Bound<'_, PyAny>> = python_entries
-        .iter()
-        .map(python_entry_json)
-        .collect::<PyResult<_>>()?;
-    let result: Bound<'_, PyDict> = dict(
-        py,
-        vec![
-            (
-                "selected_count",
-                any(
-                    py,
-                    length("model_entries")?
-                        + length("seed_entries")?
-                        + length("function_entries")?,
-                )?,
-            ),
-            (
-                "source_load_count",
-                any(py, length("source_load_entries")?)?,
-            ),
-            ("python_node_count", any(py, python_nodes.len())?),
-            (
-                "models",
-                mapped(&native_field(&plan, "model_entries")?, model_json)?,
-            ),
-            (
-                "seeds",
-                mapped(&native_field(&plan, "seed_entries")?, seed_json)?,
-            ),
-            (
-                "source_loads",
-                mapped(
-                    &native_field(&plan, "source_load_entries")?,
-                    source_load_json,
-                )?,
-            ),
-            (
-                "functions",
-                mapped(&native_field(&plan, "function_entries")?, function_json)?,
-            ),
-            ("python_nodes", PyList::new(py, python_nodes)?.into_any()),
-            ("providers", providers_json(&plan, &python_entries)?),
-            (
-                "warnings",
-                mapped(&native_field(&plan, "warnings")?, warning_json)?,
-            ),
-            ("retention", retention_json(&plan)?),
-            ("table_type_conversions", table_type_json(&plan)?),
-            ("migrations", migrations_json(&plan)?),
-            ("column_migrations", column_migrations_json(&plan)?),
-            (
-                "old_names",
-                mapped(
-                    &native_field(&plan, "old_name_view_entries")?,
-                    old_name_json,
-                )?,
-            ),
-        ],
-    )?;
-    let metadata: Bound<'_, PyAny> = native_field(&plan, "metadata")?;
-    if metadata.is_truthy()? {
-        result.set_item("metadata", metadata)?;
-    }
-    let synced_copy: Bound<'_, PyAny> = arguments.value(SYNCED_COPY_KEY)?;
-    if !synced_copy.is_none() {
-        result.set_item(SYNCED_COPY_KEY, synced_copy)?;
-    }
-    if arguments.passed(CHANGED_KEY)? {
-        result.set_item(CHANGED_KEY, arguments.value(CHANGED_KEY)?)?;
-    }
-    indented_json(result.as_any())
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(format_plan_json, module)?)
 }

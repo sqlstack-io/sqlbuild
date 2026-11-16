@@ -1,17 +1,13 @@
 //! Prominent warnings for applied future-end and automatic-start cursor safety.
 
-use crate::planner_resolution::_helpers::references::values::string;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
-use pyo3::types::{PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
+use pyo3::types::PyString;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
 
-const FUTURE_CAPPED_CODE: &str = "FUTURE_CURSOR_CAPPED";
-const START_CAPPED_CODE: &str = "AUTOMATIC_START_CAPPED";
+pub(crate) const FUTURE_CAPPED_CODE: &str = "FUTURE_CURSOR_CAPPED";
+pub(crate) const START_CAPPED_CODE: &str = "AUTOMATIC_START_CAPPED";
 
 fn rendered(evidence: &Bound<'_, PyAny>, field: &str) -> PyResult<String> {
     render_value(&native_field(evidence, field)?)
@@ -65,53 +61,16 @@ pub(crate) fn maximum_start_message(bounds: &Bound<'_, PyAny>) -> PyResult<Optio
     )))
 }
 
-/// `warnings` followed by the future-end and automatic-start warnings `bounds` carries.
-pub(crate) fn with_cursor_safety_warnings<'py>(
-    warnings: &Bound<'py, PyAny>,
-    model_name: &Bound<'py, PyAny>,
-    bounds: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = warnings.py();
-    let mut all: Vec<Bound<'py, PyAny>> = warnings
-        .try_iter()?
-        .collect::<PyResult<Vec<Bound<'py, PyAny>>>>()?;
-    for (message, code) in [
-        (future_cap_message(bounds)?, FUTURE_CAPPED_CODE),
-        (maximum_start_message(bounds)?, START_CAPPED_CODE),
-    ] {
-        let Some(message) = message else { continue };
-        all.push(new_record_with(
-            py,
-            RecordId::PlanWarning,
-            &[
-                ("model_name", model_name.clone()),
-                (
-                    "severity",
-                    enum_member(py, RecordId::WarningSeverity, "WARNING")?,
-                ),
-                ("code", string(py, code)),
-                ("message", string(py, &message)),
-            ],
-        )?);
-    }
-    Ok(PyTuple::new(py, all)?.into_any())
-}
-
 /// Render a prominent warning for applied future cursor policy.
 #[pyfunction]
 #[pyo3(signature = (bounds, /))]
-fn future_cursor_cap_warning(bounds: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+pub(crate) fn future_cursor_cap_warning(bounds: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     future_cap_message(bounds)
 }
 
 /// Render a warning that distinguishes start recovery from future-end capping.
 #[pyfunction]
 #[pyo3(signature = (bounds, /))]
-fn maximum_start_cap_warning(bounds: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+pub(crate) fn maximum_start_cap_warning(bounds: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     maximum_start_message(bounds)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(future_cursor_cap_warning, module)?)?;
-    module.add_function(wrap_pyfunction!(maximum_start_cap_warning, module)?)
 }

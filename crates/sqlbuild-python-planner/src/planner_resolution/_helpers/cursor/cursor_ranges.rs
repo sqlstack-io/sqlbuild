@@ -1,28 +1,25 @@
 //! Plan-entry cursor windows: overrides, planner-owned bounds and microbatch ranges.
 
+use crate::planner_resolution::main::cursor::config_str::config_str;
+use crate::planner_resolution::main::cursor::model_cursor_overrides::model_cursor_overrides;
+use crate::planner_resolution::main::cursor::plan_cursor_bounds::plan_cursor_bounds;
+use crate::planner_resolution::main::cursor::resolve_effective_timestamp_grain::resolve_effective_timestamp_grain;
 use crate::planner_resolution::models::CursorWindowInputs;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 
 use crate::plan_output::main::resolve_bounded_cursor_override::resolve_bounded_cursor_override;
-use crate::planner_entries::models::ModelPlanContext;
-use crate::planner_phases::main::inputs::class_field::class_field;
 use crate::planner_resolution::_helpers::cursor::cursor_bounds::compute_cursor_bounds;
 use crate::planner_resolution::_helpers::cursor::cursor_bounds::duration;
-use crate::planner_resolution::_helpers::cursor::cursor_policies::future_cursor_config;
-use crate::planner_resolution::_helpers::cursor::cursor_policies::start_cursor_config;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::replace;
-use crate::planner_resolution::_helpers::cursor::cursor_safety::utc_clock;
-use crate::planner_resolution::_helpers::cursor::cursor_windows::cursor_inputs_without_rows;
+use crate::planner_resolution::_helpers::cursor::cursor_safety::{replace, utc_clock};
 use crate::planner_resolution::_helpers::cursor::cursor_windows::normalize_cursor_snapshot_grain;
-use crate::planner_resolution::_helpers::cursor::cursor_windows::resolve_effective_timestamp_grain;
 use crate::planner_resolution::_helpers::cursor::cursor_windows::without_destination_cursor;
 use crate::planner_resolution::_helpers::references::values::string;
 use crate::planner_resolution::_helpers::safety::future_safety::resolve_future_cursor_safety;
 use crate::planner_strategy::main::model_entries::resolve_microbatch_lookback::resolve_microbatch_lookback;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyString, PyTuple};
-use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, PyErr, pyfunction};
 use sqlbuild_cursor::algebra::main::compare::compare;
 use sqlbuild_cursor::algebra::models::{Scalar, ScalarValue, Timestamp, ZoneOffset};
 use sqlbuild_cursor::planner::main::cursor_end_clamp::cursor_end_clamp;
@@ -43,19 +40,18 @@ use sqlbuild_python_front::cursor::main::values::local_date_time::local_date_tim
 use sqlbuild_python_front::cursor::main::values::replaced::replaced;
 use sqlbuild_python_front::cursor::models::CursorSession;
 use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound as typed_cursor_bound;
-use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use std::cmp::Ordering;
 
-const INCREMENTAL: &str = "incremental";
-const MICROBATCH: &str = "microbatch";
-const ROLLING_WINDOW: &str = "rolling_window";
-const TIMESTAMP: &str = "timestamp";
-const INTEGER: &str = "integer";
+pub(crate) const INCREMENTAL: &str = "incremental";
+pub(crate) const MICROBATCH: &str = "microbatch";
+pub(crate) const ROLLING_WINDOW: &str = "rolling_window";
+pub(crate) const TIMESTAMP: &str = "timestamp";
+pub(crate) const INTEGER: &str = "integer";
 const BOUNDED_BACKFILL: &str = "bounded";
-const FULL_BACKFILL: &str = "full";
+pub(crate) const FULL_BACKFILL: &str = "full";
 const WINDOW_REQUIRED: [&str; 7] = [
     "model",
     "snapshot",
@@ -72,13 +68,6 @@ const WINDOW_OPTIONAL: [&str; 5] = [
     "replaces_relation",
     "cursor_input_relations",
 ];
-
-/// One string-valued model configuration entry.
-pub(crate) fn config_str<'py>(model: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = model.py();
-    Ok(config_text_object(py, &model_values(model)?, key)?
-        .unwrap_or_else(|| py.None().into_bound(py)))
-}
 
 /// One cursor-bound model configuration entry as its token text.
 pub(crate) fn config_bound<'py>(
@@ -108,7 +97,7 @@ fn order_scalar<'py>(
     session.scalar(&parse_value(token, &string(py, kind))?)
 }
 
-fn order<'py>(
+pub(crate) fn order<'py>(
     session: &CursorSession<'py>,
     tokens: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     cursor_type: &Bound<'py, PyAny>,
@@ -118,7 +107,10 @@ fn order<'py>(
     session.checked(compare(&left, &right, session))
 }
 
-fn token<'py>(py: Python<'py>, bound: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn token<'py>(
+    py: Python<'py>,
+    bound: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
     Ok(PyString::new(py, &sentinel_to_token(bound)?).into_any())
 }
 
@@ -127,7 +119,7 @@ fn sentinel<'py>(py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
 }
 
 /// `bounds` clamped so a concrete window never reaches the exclusive configured `cursor_end`.
-fn clamp_cursor_end<'py>(
+pub(crate) fn clamp_cursor_end<'py>(
     bounds: Bound<'py, PyAny>,
     model: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -270,7 +262,7 @@ fn apply_future_safety<'py>(
     )
 }
 
-fn bounded_override<'py>(
+pub(crate) fn bounded_override<'py>(
     model: &Bound<'py, PyAny>,
     inputs: &CursorWindowInputs<'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -293,14 +285,14 @@ fn backfill_duration<'py>(backfill: &Bound<'py, PyAny>) -> PyResult<Bound<'py, P
 }
 
 /// Cursor bounds and the maximum-start policy inputs, shared by both window computations.
-struct BoundsRequest<'py> {
-    cursor_snapshot: Bound<'py, PyAny>,
-    typing: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-    lookback: Bound<'py, PyAny>,
-    is_microbatch: bool,
+pub(crate) struct BoundsRequest<'py> {
+    pub(crate) cursor_snapshot: Bound<'py, PyAny>,
+    pub(crate) typing: (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    pub(crate) lookback: Bound<'py, PyAny>,
+    pub(crate) is_microbatch: bool,
 }
 
-fn snapshot_bounds<'py>(
+pub(crate) fn snapshot_bounds<'py>(
     model: &Bound<'py, PyAny>,
     inputs: &CursorWindowInputs<'py>,
     request: BoundsRequest<'py>,
@@ -346,55 +338,17 @@ fn snapshot_bounds<'py>(
     clamp_cursor_end(bounds, model)
 }
 
-fn model_cursor_snapshot<'py>(
+pub(crate) fn model_cursor_snapshot<'py>(
     model: &Bound<'py, PyAny>,
     snapshot: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     native_field(snapshot, "cursor_snapshots")?.call_method1("get", (name_object(model)?,))
 }
 
-fn without_destination<'py>(cursor_snapshot: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    without_destination_cursor(&cursor_snapshot)
-}
-
-/// Compute cursor bounds for inclusion on the plan entry.
-pub(crate) fn plan_cursor_bounds<'py>(
-    model: &Bound<'py, PyAny>,
-    inputs: &CursorWindowInputs<'py>,
+pub(crate) fn without_destination<'py>(
+    cursor_snapshot: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let py = model.py();
-    if !config_str(model, "materialized")?.eq(INCREMENTAL)?
-        || config_str(model, "cursor")?.is_none()
-    {
-        return Ok(py.None().into_bound(py));
-    }
-    let bounded = bounded_override(model, inputs)?;
-    if !bounded.is_none() {
-        return clamp_cursor_end(bounded, model);
-    }
-    if inputs.runtime_owned || inputs.full_refresh {
-        return Ok(py.None().into_bound(py));
-    }
-    let mut cursor_snapshot = model_cursor_snapshot(model, &inputs.snapshot)?;
-    if cursor_snapshot.is_none() {
-        return Ok(cursor_snapshot);
-    }
-    if native_field(&inputs.backfill, "action")?.eq(FULL_BACKFILL)? {
-        cursor_snapshot = without_destination(cursor_snapshot)?;
-    }
-    snapshot_bounds(
-        model,
-        inputs,
-        BoundsRequest {
-            cursor_snapshot,
-            typing: (
-                config_str(model, "cursor_type")?,
-                config_str(model, "cursor_grain")?,
-            ),
-            lookback: config_str(model, "lookback")?,
-            is_microbatch: config_str(model, "incremental_mode")?.eq(MICROBATCH)?,
-        },
-    )
+    without_destination_cursor(&cursor_snapshot)
 }
 
 /// Compute the real overall cursor range for microbatch batch splitting.
@@ -465,117 +419,8 @@ pub(crate) fn microbatch_range<'py>(
     )
 }
 
-/// Empty inputs that leave a planner-owned window empty, and whether others have rows.
-pub(crate) fn empty_cursor_inputs<'py>(
-    model: &Bound<'py, PyAny>,
-    inputs: &CursorWindowInputs<'py>,
-) -> PyResult<(Bound<'py, PyAny>, bool)> {
-    let py = model.py();
-    let nothing =
-        || -> PyResult<(Bound<'py, PyAny>, bool)> { Ok((PyTuple::empty(py).into_any(), false)) };
-    if inputs.full_refresh
-        || inputs.runtime_owned
-        || !config_str(model, "materialized")?.eq(INCREMENTAL)?
-        || config_str(model, "cursor")?.is_none()
-        || config_str(model, "microbatch_strategy")?.eq(ROLLING_WINDOW)?
-        || (!inputs.overrides.0.is_none() && !inputs.overrides.1.is_none())
-    {
-        return nothing();
-    }
-    let cursor_snapshot = model_cursor_snapshot(model, &inputs.snapshot)?;
-    if cursor_snapshot.is_none() {
-        return nothing();
-    }
-    let decision = cursor_inputs_without_rows(&cursor_snapshot)?;
-    Ok((
-        native_field(&decision, "input_names")?,
-        native_field(&decision, "waiting_on_empty_inputs")?.is_truthy()?,
-    ))
-}
-
-/// The future-end and automatic-start policies effective for one model.
-pub(crate) fn cursor_safety_configs<'py>(
-    model: &Bound<'py, PyAny>,
-    context: &Bound<'py, PyAny>,
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-    Ok((
-        future_cursor_config(
-            model,
-            &class_field(context, |c: &ModelPlanContext| &c.future_cursor_config)?,
-        )?,
-        start_cursor_config(
-            model,
-            &class_field(context, |c: &ModelPlanContext| &c.start_cursor_config)?,
-        )?,
-    ))
-}
-
-fn compile_input_error(py: Python<'_>, message: String) -> PyErr {
+pub(crate) fn compile_input_error(py: Python<'_>, message: String) -> PyErr {
     new_plain_error(py, ErrorId::CompileInput, &message)
-}
-
-/// Resolve typed cursor overrides to generic start/end for one model.
-pub(crate) fn model_cursor_overrides<'py>(
-    model: &Bound<'py, PyAny>,
-    cursor_overrides: &Bound<'py, PyAny>,
-    (start, end): (Bound<'py, PyAny>, Bound<'py, PyAny>),
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-    let py = model.py();
-    let cursor_type = config_str(model, "cursor_type")?;
-    let (mut resolved_start, mut resolved_end) = (start, end);
-    let typed_fields = if cursor_overrides.is_none() {
-        None
-    } else if cursor_type.eq(TIMESTAMP)? {
-        Some(("start_ts", "end_ts"))
-    } else if cursor_type.eq(INTEGER)? {
-        Some(("start_int", "end_int"))
-    } else {
-        None
-    };
-    if let Some((start_field, end_field)) = typed_fields {
-        let typed_start = native_field(cursor_overrides, start_field)?;
-        if !typed_start.is_none() {
-            resolved_start = token(py, &typed_start)?;
-        }
-        let typed_end = native_field(cursor_overrides, end_field)?;
-        if !typed_end.is_none() {
-            resolved_end = token(py, &typed_end)?;
-        }
-    }
-    let session = CursorSession::new(py)?;
-    let name = name_object(model)?.str()?;
-    let cursor_start = config_bound(model, "cursor_start")?;
-    let cursor_end = config_bound(model, "cursor_end")?;
-    if !resolved_start.is_none()
-        && !cursor_start.is_none()
-        && order(&session, (&resolved_start, &cursor_start), &cursor_type)? == Ordering::Less
-    {
-        return Err(compile_input_error(
-            py,
-            format!(
-                "model '{name}': explicit start {} is before cursor_start {}",
-                resolved_start.str()?,
-                cursor_start.str()?
-            ),
-        ));
-    }
-    if !cursor_end.is_none() {
-        for (value, label) in [(&resolved_start, "start"), (&resolved_end, "end")] {
-            if !value.is_none()
-                && order(&session, (value, &cursor_end), &cursor_type)? != Ordering::Less
-            {
-                return Err(compile_input_error(
-                    py,
-                    format!(
-                        "model '{name}': explicit {label} {} is at or beyond exclusive cursor_end {}",
-                        value.str()?,
-                        cursor_end.str()?
-                    ),
-                ));
-            }
-        }
-    }
-    Ok((resolved_start, resolved_end))
 }
 
 fn window_inputs<'py>(args: &KeywordArguments<'py>) -> PyResult<CursorWindowInputs<'py>> {
@@ -605,7 +450,7 @@ fn window_inputs<'py>(args: &KeywordArguments<'py>) -> PyResult<CursorWindowInpu
 /// Compute cursor bounds for inclusion on the plan entry.
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
-fn compute_plan_cursor_bounds<'py>(
+pub(crate) fn compute_plan_cursor_bounds<'py>(
     py: Python<'py>,
     kwargs: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -621,7 +466,7 @@ fn compute_plan_cursor_bounds<'py>(
 /// Compute the real overall cursor range for microbatch batch splitting.
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
-fn compute_microbatch_range<'py>(
+pub(crate) fn compute_microbatch_range<'py>(
     py: Python<'py>,
     kwargs: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -637,7 +482,7 @@ fn compute_microbatch_range<'py>(
 /// Resolve typed cursor overrides to generic start/end for one model.
 #[pyfunction]
 #[pyo3(signature = (*, model, cursor_overrides, start_cursor_override, end_cursor_override))]
-fn resolve_cursor_overrides<'py>(
+pub(crate) fn resolve_cursor_overrides<'py>(
     model: &Bound<'py, PyAny>,
     cursor_overrides: &Bound<'py, PyAny>,
     start_cursor_override: Bound<'py, PyAny>,
@@ -648,10 +493,4 @@ fn resolve_cursor_overrides<'py>(
         cursor_overrides,
         (start_cursor_override, end_cursor_override),
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(compute_plan_cursor_bounds, module)?)?;
-    module.add_function(wrap_pyfunction!(compute_microbatch_range, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_cursor_overrides, module)?)
 }

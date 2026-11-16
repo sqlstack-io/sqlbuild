@@ -7,16 +7,12 @@ use crate::planner_resolution::main::safety::maximum_allowed_start::maximum_allo
 use crate::planner_strategy::main::lineage::resolve_lineage_reference::resolve_lineage_reference;
 use crate::planner_warehouse::_helpers::inspection::snapshot::inspection_concurrency;
 use crate::planner_warehouse::_helpers::inspection::watermarks::validate_watermark_column;
-use crate::planner_warehouse::constants::CURSOR_ALGEBRA_ERROR;
-use crate::planner_warehouse::constants::CURSOR_TYPE_INTEGER;
-use crate::planner_warehouse::constants::CURSOR_TYPE_TIMESTAMP;
-use crate::planner_warehouse::constants::DATE_VALUE;
-use crate::planner_warehouse::constants::LOG_DEBUG_EVENT;
-use crate::planner_warehouse::constants::PLANNER_LOGGER;
-use crate::planner_warehouse::constants::QUERY_RECORD;
-use crate::planner_warehouse::constants::RECORD_QUERY;
-use crate::planner_warehouse::constants::RUN_BOUNDED;
-use crate::planner_warehouse::constants::RUN_RECORDED_QUERY;
+use crate::planner_warehouse::constants::{
+    CURSOR_ALGEBRA_ERROR, CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, DATE_VALUE, LOG_DEBUG_EVENT,
+    PLANNER_LOGGER, QUERY_RECORD, RECORD_QUERY, RUN_BOUNDED, RUN_RECORDED_QUERY,
+};
+use crate::planner_warehouse::main::inspection::adapter_cursor_sql::adapter_cursor_sql;
+use crate::planner_warehouse::main::inspection::bound_task::bound_task;
 use crate::planner_warehouse::models::SnapshotRequest;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyException;
@@ -26,7 +22,6 @@ use sqlbuild_analysis::planner_changes::constants::FORWARD_ONLY_POLICY;
 use sqlbuild_analysis::planner_warehouse::main::cursor_bounds::cursor_bounds;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_query_groups;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_identity::cursor_query_identity;
-use sqlbuild_analysis::planner_warehouse::main::cursor_query_sql::cursor_query_sql;
 use sqlbuild_analysis::planner_warehouse::models::{CursorTagRequest, PhysicalCursorQuery};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -60,14 +55,13 @@ use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 /// The adapter method that renders one cursor bound expression as text.
-const CURSOR_TEXT_METHOD: &str = "render_cursor_text";
+pub(crate) const CURSOR_TEXT_METHOD: &str = "render_cursor_text";
 
 /// Selection and policy inputs for cursor warehouse inspection.
 pub(crate) struct CursorInputs<'py> {
@@ -140,7 +134,7 @@ fn parse<'py>(
     sqlbuild_python_front::cursor::main::scalars::parse::parse(raw, &text(py, cursor_type))
 }
 
-fn render<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn render<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     object(value.py(), render_value(value)?)
 }
 
@@ -584,7 +578,7 @@ fn physical_queries(models: &[CursorModel<'_>]) -> Vec<PhysicalCursorQuery> {
 }
 
 /// Run one physical cursor statement; a failure leaves only that relation unavailable.
-fn read_cursor_query<'py>(
+pub(crate) fn read_cursor_query<'py>(
     py: Python<'py>,
     sql: &str,
     (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -672,27 +666,6 @@ fn report_cursor_query(
     )
 }
 
-pub(crate) fn bound_task<'py>(
-    py: Python<'py>,
-    sql: String,
-    (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-) -> PyResult<Bound<'py, PyAny>> {
-    let connection: Py<PyAny> = connection.clone().unbind();
-    let execute: Py<PyAny> = execute.clone().unbind();
-    Ok(PyCFunction::new_closure(
-        py,
-        None,
-        None,
-        move |args: &Bound<'_, PyTuple>,
-              _kwargs: Option<&Bound<'_, PyDict>>|
-              -> PyResult<Py<PyAny>> {
-            let py = args.py();
-            Ok(read_cursor_query(py, &sql, (connection.bind(py), execute.bind(py)))?.unbind())
-        },
-    )?
-    .into_any())
-}
-
 fn completion_reporter<'py>(
     py: Python<'py>,
     queries: Vec<PhysicalCursorQuery>,
@@ -746,34 +719,6 @@ fn fan_out<'py>(query: &PhysicalCursorQuery, row: &Bound<'py, PyAny>) -> PyResul
         }
     }
     Ok(values)
-}
-
-/// The query's MIN/MAX statement, each bound read as text the way the adapter renders it.
-pub(crate) fn adapter_cursor_sql(
-    adapter: &Bound<'_, PyAny>,
-    query: &PhysicalCursorQuery,
-) -> PyResult<String> {
-    let py = adapter.py();
-    let render = native_field(adapter, CURSOR_TEXT_METHOD)?;
-    let failure: RefCell<Option<PyErr>> = RefCell::new(None);
-    let sql: String = cursor_query_sql(query, &|expression: &str| {
-        call_with(
-            &render,
-            &[
-                ("expression", text(py, expression)),
-                ("cursor_type", text(py, &query.cursor_type)),
-            ],
-        )
-        .and_then(|rendered| rendered.extract::<String>())
-        .unwrap_or_else(|error| {
-            failure.replace(Some(error));
-            String::new()
-        })
-    });
-    match failure.into_inner() {
-        Some(error) => Err(error),
-        None => Ok(sql),
-    }
 }
 
 fn execute_queries<'py>(

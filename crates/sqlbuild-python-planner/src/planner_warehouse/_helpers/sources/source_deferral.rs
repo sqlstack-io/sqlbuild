@@ -2,8 +2,7 @@
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::planner_warehouse::constants::MODEL_HOOK_CONFIG_KEYS;
-use crate::planner_warehouse::constants::SQL_HOOK_ENTRY;
+use crate::planner_warehouse::constants::{MODEL_HOOK_CONFIG_KEYS, SQL_HOOK_ENTRY};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
@@ -322,33 +321,6 @@ pub(crate) fn build_source_read_map<'py>(
             name,
             entry_for_environment(&entry, &target, &effective_vars)?,
         )?;
-    }
-    Ok(result)
-}
-
-/// Add declared project sources that no selected SQL resource reads to a source map.
-pub(crate) fn with_declared_source_reads<'py>(
-    project: &Bound<'py, PyAny>,
-    source_map: &Bound<'py, PyDict>,
-    source_names: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyDict>> {
-    let mut missing: BTreeSet<_> = BTreeSet::new();
-    for name in source_names.try_iter()? {
-        let name: String = name?.extract()?;
-        if !source_map.contains(&name)? {
-            missing.insert(name);
-        }
-    }
-    if missing.is_empty() {
-        return Ok(source_map.clone());
-    }
-    let result = source_map.copy()?;
-    for source in sources(project)?.try_iter()? {
-        let entry = source_entry(&source?)?;
-        let name: String = native_field(&entry, "name")?.extract()?;
-        if missing.contains(&name) {
-            result.set_item(name, entry)?;
-        }
     }
     Ok(result)
 }

@@ -1,34 +1,24 @@
 //! Per-model plan actions, schema actions and plan warnings.
 
 use crate::planner_changes::main::native_enum::native_enum;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyString, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use crate::planner_strategy::main::values::text::text;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::{PyDict, PyString, PyTuple};
+use pyo3::{IntoPyObject, pyfunction};
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
-use sqlbuild_analysis::planner_strategy::main::model_plan_action::model_plan_action;
 use sqlbuild_analysis::planner_strategy::main::model_warnings::model_warnings;
 use sqlbuild_analysis::planner_strategy::main::schema_actions::schema_actions;
 use sqlbuild_analysis::planner_strategy::models::{
-    ModelStrategy, PlanAction, PlanReason, SchemaActionKind, WarningInputs,
+    PlanAction, PlanReason, SchemaActionKind, WarningInputs,
 };
 
-use crate::planner_changes::main::planner_enum::planner_enum;
-use crate::planner_strategy::_helpers::values::change_facts;
-use crate::planner_strategy::_helpers::values::config_value;
-use crate::planner_strategy::_helpers::values::finding_rows;
-use crate::planner_strategy::_helpers::values::input_error;
-use crate::planner_strategy::_helpers::values::materialization_value;
-use crate::planner_strategy::_helpers::values::model_materialization;
-use crate::planner_strategy::_helpers::values::optional_string;
-use crate::planner_strategy::_helpers::values::plan_warning;
-use crate::planner_strategy::_helpers::values::text;
+use crate::planner_strategy::_helpers::values::{change_facts, finding_rows, plan_warning};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 
-fn action_value(action: PlanAction) -> &'static str {
+pub(crate) fn action_value(action: PlanAction) -> &'static str {
     match action {
         PlanAction::CreateView => "create_view",
         PlanAction::CreateTable => "create_table",
@@ -41,7 +31,7 @@ fn action_value(action: PlanAction) -> &'static str {
     }
 }
 
-fn reason_value(reason: PlanReason) -> &'static str {
+pub(crate) fn reason_value(reason: PlanReason) -> &'static str {
     match reason {
         PlanReason::FirstRun => "first_run",
         PlanReason::Renamed => "renamed",
@@ -62,56 +52,6 @@ fn schema_policy(on_schema_change: &Bound<'_, PyAny>) -> PyResult<Option<String>
         return Ok(None);
     }
     text(on_schema_change).map(Some)
-}
-
-/// The `MaterializationType` of a model's `materialized` config: table when unset, custom when unknown.
-#[pyfunction(name = "get_materialization_type")]
-#[pyo3(signature = (model))]
-pub(crate) fn materialization_of<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    planner_enum(
-        model.py(),
-        RecordId::MaterializationType,
-        materialization_value(model_materialization(model)?),
-    )
-}
-
-/// The plan action and reason for one model.
-#[pyfunction]
-#[pyo3(signature = (*, model, change_result, full_refresh))]
-pub(crate) fn resolve_model_plan_action<'py>(
-    model: &Bound<'py, PyAny>,
-    change_result: &Bound<'py, PyAny>,
-    full_refresh: bool,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = model.py();
-    let enabled: Bound<'py, PyAny> = config_value(model, "enabled")?;
-    let strategy = ModelStrategy {
-        name:
-            sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name(
-                model,
-            )?,
-        disabled: enabled.is_instance_of::<PyBool>() && !enabled.is_truthy()?,
-        materialization: model_materialization(model)?,
-        incremental_strategy: optional_string(&config_value(model, "incremental_strategy")?)?,
-    };
-    let (action, reason) =
-        model_plan_action(&strategy, &change_facts(change_result)?, full_refresh).map_err(
-            |error| {
-                input_error(
-                    py,
-                    ErrorId::PlannerInput,
-                    &error.message(),
-                    Some(error.code()),
-                )
-            },
-        )?;
-    PyTuple::new(
-        py,
-        [
-            planner_enum(py, RecordId::PlanAction, action_value(action))?,
-            planner_enum(py, RecordId::PlanReason, reason_value(reason))?,
-        ],
-    )
 }
 
 /// Concrete schema change actions from findings and `on_schema_change`.
@@ -180,7 +120,7 @@ pub(crate) fn model_warning_records<'py>(
 /// Warnings for one model from its change detection and plan decisions.
 #[pyfunction]
 #[pyo3(signature = (**options))]
-fn build_model_warnings<'py>(
+pub(crate) fn build_model_warnings<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
@@ -214,11 +154,4 @@ fn build_model_warnings<'py>(
         py,
         model_warning_records(&model_name, &inputs, &arguments.value("change_result")?)?,
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(materialization_of, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_model_plan_action, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_schema_actions, module)?)?;
-    module.add_function(wrap_pyfunction!(build_model_warnings, module)?)
 }

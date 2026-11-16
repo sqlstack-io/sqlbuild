@@ -1,10 +1,11 @@
 //! Microbatch limits applied to planned model entries in CLI, project and model precedence.
 
 use crate::planner_changes::main::native_enum::native_enum;
+use crate::planner_strategy::main::values::input_error::input_error;
+use crate::planner_strategy::main::values::text::text;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 
@@ -15,12 +16,10 @@ use sqlbuild_core::plan_display::main::effective_timestamp_grain::effective_time
 use sqlbuild_core::plan_display::models::TimestampGrainFacts;
 
 use crate::plan_output::main::resolve_effective_microbatch_batch_size::resolve_effective_microbatch_batch_size;
-use crate::planner_strategy::_helpers::microbatches::CAP_ACTIONS;
-use crate::planner_strategy::_helpers::microbatches::capped_microbatch_bounds;
-use crate::planner_strategy::_helpers::microbatches::count_microbatches;
-use crate::planner_strategy::_helpers::values::input_error;
+use crate::planner_strategy::_helpers::microbatches::{
+    CAP_ACTIONS, capped_microbatch_bounds, count_microbatches,
+};
 use crate::planner_strategy::_helpers::values::optional_string;
-use crate::planner_strategy::_helpers::values::text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
@@ -93,7 +92,7 @@ fn batch_count(entry: &Bound<'_, PyAny>) -> PyResult<Option<(String, i128)>> {
 }
 
 /// The entry with one batch limit applied, and the warning when a non-error limit is exceeded.
-fn limited<'py>(
+pub(crate) fn limited<'py>(
     entry: &Bound<'py, PyAny>,
     max_batches: Bound<'py, PyAny>,
     action: Bound<'py, PyAny>,
@@ -194,7 +193,7 @@ pub(crate) fn apply_microbatch_limit<'py>(
 }
 
 /// `(entry, warnings)` with the limit outcome's warning, if any.
-fn with_warnings<'py>(
+pub(crate) fn with_warnings<'py>(
     (entry, warning): LimitedEntry<'py>,
     mut warnings: Vec<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
@@ -204,7 +203,7 @@ fn with_warnings<'py>(
 }
 
 /// The default limit: none for an incremental rolling window, else the model's limit or the configured ceiling.
-fn default_limit<'py>(
+pub(crate) fn default_limit<'py>(
     entry: &Bound<'py, PyAny>,
     configured: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -222,54 +221,4 @@ fn default_limit<'py>(
     } else {
         configured
     })
-}
-
-/// Apply CLI, project, and model batch limits in their documented precedence order.
-#[pyfunction]
-#[pyo3(signature = (*, entry, inputs))]
-pub(crate) fn apply_configured_microbatch_limits<'py>(
-    entry: &Bound<'py, PyAny>,
-    inputs: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = entry.py();
-    let configured: Bound<'py, PyAny> = native_field(inputs, "max_microbatches")?;
-    let configured_action: Bound<'py, PyAny> = native_field(inputs, "microbatch_limit_action")?;
-    if native_field(inputs, "max_microbatches_is_override")?.is_truthy()? {
-        let error: Bound<'py, PyAny> = enum_member(py, RecordId::MicrobatchLimitAction, "ERROR")?;
-        return with_warnings(limited(entry, configured, error)?, Vec::new());
-    }
-    let declared: Bound<'py, PyAny> = native_field(entry, "declared_microbatch_limit_action")?;
-    if declared.is_none() {
-        let maximum: Bound<'py, PyAny> = default_limit(entry, configured)?;
-        return with_warnings(limited(entry, maximum, configured_action)?, Vec::new());
-    }
-    let mut warnings: Vec<Bound<'py, PyAny>> = Vec::new();
-    let mut entry: Bound<'py, PyAny> = entry.clone();
-    if !configured.is_none() {
-        let (_, safety_warning) = limited(&entry, configured.clone(), configured_action.clone())?;
-        entry = replace(
-            &entry,
-            &[
-                ("microbatch_safety_limit", configured),
-                ("microbatch_safety_limit_action", configured_action),
-            ],
-        )?;
-        warnings.extend(safety_warning);
-    }
-    let model_limit: Bound<'py, PyAny> = native_field(&entry, "microbatch_limit")?;
-    with_warnings(limited(&entry, model_limit, declared)?, warnings)
-}
-
-/// `apply_configured_microbatch_limits` as a function of `module`.
-pub(crate) fn apply_configured_microbatch_limits_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(apply_configured_microbatch_limits, module)
-}
-
-/// `apply_microbatch_limit` as a function of `module`.
-pub(crate) fn apply_microbatch_limit_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(apply_microbatch_limit, module)
 }

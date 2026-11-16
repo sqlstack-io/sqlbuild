@@ -1,19 +1,16 @@
 //! `PlanOutput` assembly from planned model entries, seeds, sources, functions, audits and tests.
 
 use crate::planner_entries::_helpers::entries::model_entries::scope_overlaps;
-use crate::planner_entries::_helpers::entries::values::error_of;
-use crate::planner_entries::_helpers::entries::values::native;
-use crate::planner_entries::_helpers::entries::values::none;
-use crate::planner_entries::_helpers::entries::values::planner_model;
-use crate::planner_entries::_helpers::entries::values::planner_type;
-use crate::planner_entries::_helpers::entries::values::string;
+use crate::planner_entries::_helpers::entries::values::{
+    error_of, native, none, planner_model, planner_type, string,
+};
 use crate::planner_entries::models::PlanOutputInputs;
 use crate::planner_resolution::main::references::resolve_function_sql::resolve_function_sql;
 use crate::planner_strategy::main::audit_entries::build_selected_audit_entries::build_selected_audit_entries;
 use crate::planner_strategy::main::model_entries::extract_seed_columns::extract_seed_columns;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
@@ -39,7 +36,6 @@ use sqlbuild_python_project::resource_views::main::function_reads::source_file_p
 use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 use sqlbuild_python_project::sql_test_glue::main::assemble_sql_test_plans::assemble_sql_test_plans;
-use sqlbuild_python_project::sql_test_glue::main::sql_test_model_chain_names_by_key_function::sql_test_model_chain_names_by_key_function;
 use sqlbuild_python_project::sql_test_glue::models::SqlTestAssembly;
 
 const LOADER_CONSUMER: &str = "loader";
@@ -775,7 +771,7 @@ pub(crate) fn plan_selected_sql_tests<'py>(
 /// Selected SQL test entries and warnings, optionally narrowed to one parameterized case.
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
-fn build_selected_test_entries<'py>(
+pub(crate) fn build_selected_test_entries<'py>(
     py: Python<'py>,
     kwargs: Option<Bound<'py, PyDict>>,
 ) -> PyResult<(Bound<'py, PyList>, Bound<'py, PyList>)> {
@@ -798,9 +794,4 @@ fn build_selected_test_entries<'py>(
         PyList::new(py, selected.entries)?,
         PyList::new(py, selected.warnings)?,
     ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(sql_test_model_chain_names_by_key_function(module)?)?;
-    module.add_function(wrap_pyfunction!(build_selected_test_entries, module)?)
 }

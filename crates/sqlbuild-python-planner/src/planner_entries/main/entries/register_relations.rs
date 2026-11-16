@@ -1,12 +1,10 @@
 //! Register the relations functions and classes.
 
-use crate::planner_entries::_helpers::entries::relations;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::planner_entries::_helpers::entries::relations::build_planner_relations_context;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the relations functions and classes.
-#[inline]
 pub fn register_relations(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    relations::register(module)
+    module.add_function(wrap_pyfunction!(build_planner_relations_context, module)?)
 }

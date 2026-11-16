@@ -1,18 +1,15 @@
 //! Model migration orchestration over Python-owned live inspection.
 
 use crate::planner_changes::main::plan_reference_renames::plan_reference_renames;
-use crate::planner_migrations::_helpers::column::column_objects::config;
-use crate::planner_migrations::_helpers::column::column_objects::replace;
+use crate::planner_migrations::_helpers::column::column_objects::{config, replace};
 use crate::planner_migrations::_helpers::discovery::discovery::discover_model_migrations;
-use crate::planner_migrations::_helpers::planning::planning_origin::require_same_database;
-use crate::planner_migrations::_helpers::planning::planning_origin::resolve_origin;
-use crate::planner_migrations::models::DiscoveryRequest;
-use crate::planner_migrations::models::MigrationDecisionRequest;
-use crate::planner_migrations::models::MigrationPhase;
-use crate::planner_migrations::models::ModelMigrationDeclaration;
-use crate::planner_migrations::models::ModelMigrationDiscovery;
-use crate::planner_migrations::models::ModelMigrationPlanning;
-use crate::planner_migrations::models::ModelMigrationRequest;
+use crate::planner_migrations::_helpers::planning::planning_origin::{
+    require_same_database, resolve_origin,
+};
+use crate::planner_migrations::models::{
+    DiscoveryRequest, MigrationDecisionRequest, MigrationPhase, ModelMigrationDeclaration,
+    ModelMigrationDiscovery, ModelMigrationPlanning, ModelMigrationRequest,
+};
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyString, PyTuple};
@@ -80,24 +77,7 @@ fn manual_migration_requests<'py>(
     Ok(requests)
 }
 
-/// Model migrations of the selected scope: discovered and declared moves, decided against live state.
-pub(crate) fn plan_model_migrations<'py>(
-    phase: &MigrationPhase<'py>,
-    fingerprints: &Bound<'py, PyAny>,
-) -> PyResult<ModelMigrationPlanning<'py>> {
-    let runtime = phase.runtime.clone();
-    let snapshot = phase.snapshot.clone();
-    let schemas =
-        crate::planner_migrations::_helpers::planning::planning_origin::project_schemas(&runtime)?;
-    let state = crate::planner_migrations::_helpers::discovery::state_inspection::inspection(
-        &runtime,
-        Some(&native_field(&snapshot, "fingerprints")?),
-    )?;
-    let discovery = discover((phase, fingerprints), &state, &schemas)?;
-    finish(phase, &state, &schemas, &discovery)
-}
-
-fn discover<'py>(
+pub(crate) fn discover<'py>(
     (phase, fingerprints): (&MigrationPhase<'py>, &Bound<'py, PyAny>),
     state: &Bound<'py, PyAny>,
     schemas: &Bound<'py, PyAny>,
@@ -140,7 +120,7 @@ fn discover<'py>(
     })
 }
 
-fn finish<'py>(
+pub(crate) fn finish<'py>(
     phase: &MigrationPhase<'py>,
     state: &Bound<'py, PyAny>,
     schemas: &Bound<'py, PyAny>,

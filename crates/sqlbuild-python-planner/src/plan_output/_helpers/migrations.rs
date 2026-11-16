@@ -1,14 +1,11 @@
 //! Convert public migration models at the Python boundary for native presentation.
 
 use crate::plan_output::_helpers::plan_text::display_limit;
-use crate::plan_output::_helpers::values::iso;
-use crate::plan_output::_helpers::values::items;
-use crate::plan_output::_helpers::values::optional_text;
-use crate::plan_output::_helpers::values::relation_name;
-use crate::plan_output::_helpers::values::text;
-use crate::plan_output::_helpers::values::texts;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
-use pyo3::{pyfunction, wrap_pyfunction};
+use crate::plan_output::_helpers::values::{iso, optional_text, relation_name, texts};
+use crate::plan_output::main::items::items;
+use crate::plan_output::main::text::text;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
 use sqlbuild_core::cli_text::models::{
     CliStyle, ColumnMigrationText, MigrationDecisionText, MigrationText, MigrationTextReport,
     OldNameText, PreBuildWorkText, RetentionText, TableTypeText,
@@ -188,7 +185,7 @@ pub(crate) fn pre_build_lines(
 
 /// Format retention, table-type, and migration work that runs before model builds.
 #[pyfunction(name = "format_pre_build_work", signature = (*, lines, plan, display_options))]
-fn format_pre_build(
+pub(crate) fn format_pre_build(
     lines: Vec<String>,
     plan: &Bound<'_, PyAny>,
     display_options: &Bound<'_, PyAny>,
@@ -197,16 +194,14 @@ fn format_pre_build(
 }
 
 #[pyfunction(name = "old_name_rows", signature = (*, entry, style))]
-fn render_old_name(entry: &Bound<'_, PyAny>, style: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+pub(crate) fn render_old_name(
+    entry: &Bound<'_, PyAny>,
+    style: &Bound<'_, PyAny>,
+) -> PyResult<Vec<String>> {
     Ok(old_name_rows::old_name_rows(
         &old_name(entry)?,
         CliStyle {
             use_color: native_field(style, "use_color")?.extract()?,
         },
     ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(format_pre_build, module)?)?;
-    module.add_function(wrap_pyfunction!(render_old_name, module)?)
 }

@@ -1,9 +1,7 @@
 //! Selected model and function changes against expected version hashes and metadata JSON.
 
 use crate::planner_changes::_helpers::detect;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Selected model and function changes against expected version hashes and metadata JSON.
 #[inline]

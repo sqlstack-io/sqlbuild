@@ -1,12 +1,12 @@
 //! Append observed source freshness to state once the models it affected have built.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::freshness::main::append_freshness_records::append_freshness_records;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::freshness::_helpers::state_io::write_source_freshness_records;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -20,7 +20,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cost_context::models::CostContext;
 
 /// Observed records grouped by `(database, schema)` in first-seen order.
-type RecordsByLocation<'py> = Vec<(
+pub(crate) type RecordsByLocation<'py> = Vec<(
     (Bound<'py, PyAny>, Bound<'py, PyAny>),
     Vec<Bound<'py, PyAny>>,
 )>;
@@ -103,7 +103,7 @@ fn contains_location(
 }
 
 /// The observed records to publish, keyed by the schema of each affected model.
-fn eligible_records<'py>(
+pub(crate) fn eligible_records<'py>(
     plan: &Bound<'py, PyAny>,
     successful_models: &[String],
     run_id: &Bound<'py, PyAny>,
@@ -188,7 +188,7 @@ fn renderers<'py>(adapter: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
 }
 
 /// Write each location's records, one cost scope per source.
-fn write_records<'py>(
+pub(crate) fn write_records<'py>(
     adapter: &Bound<'py, PyAny>,
     connection: &Bound<'py, PyAny>,
     grouped: &RecordsByLocation<'py>,
@@ -251,57 +251,9 @@ fn write_records<'py>(
 }
 
 /// Append observed source freshness only after the affected selected models succeed.
-pub(crate) fn append_freshness_records<'py>(
-    (plan, successful_models): (&Bound<'py, PyAny>, &[String]),
-    adapter: &Bound<'py, PyAny>,
-    connection_config: &Bound<'py, PyAny>,
-    run_id: &Bound<'py, PyAny>,
-) -> PyResult<()> {
-    let py: Python<'py> = plan.py();
-    let grouped: RecordsByLocation<'py> = eligible_records(plan, successful_models, run_id)?;
-    let record_count: usize = grouped.iter().map(|(_, records)| records.len()).sum();
-    if record_count == 0 {
-        return Ok(());
-    }
-    let run_scope: Bound<'py, PyAny> = host_entry(py, ExecutorHost::RunScope)?.call1((run_id,))?;
-    within(&run_scope, |_| {
-        let metadata: Bound<'py, PyDict> = PyDict::new(py);
-        metadata.set_item("item_count", record_count)?;
-        let attributes: Bound<'py, PyAny> = call_with(
-            &host_entry(py, ExecutorHost::OperationAttributes)?,
-            &[
-                ("phase", PyString::new(py, "publish").into_any()),
-                ("target_kind", PyString::new(py, "state_batch").into_any()),
-            ],
-        )?;
-        let lifecycle: Bound<'py, PyAny> = call_with(
-            &host_entry(py, ExecutorHost::OperationLifecycle)?,
-            &[
-                ("operation_kind", PyString::new(py, "freshness").into_any()),
-                (
-                    "operation_name",
-                    PyString::new(py, "source_freshness_publication").into_any(),
-                ),
-                ("metadata", metadata.into_any()),
-                ("attributes", attributes),
-            ],
-        )?;
-        within(&lifecycle, |_| {
-            let connection: Bound<'py, PyAny> =
-                adapter.call_method1("connect", (connection_config,))?;
-            let written: PyResult<()> = write_records(adapter, &connection, &grouped);
-            let closed: PyResult<Bound<'py, PyAny>> = adapter.call_method1("close", (&connection,));
-            written?;
-            closed?;
-            Ok(())
-        })
-    })
-}
-
-/// Append observed source freshness only after the affected selected models succeed.
 #[pyfunction]
 #[pyo3(signature = (**options))]
-fn append_eligible_direct_source_freshness_records<'py>(
+pub(crate) fn append_eligible_direct_source_freshness_records<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<()> {
@@ -323,11 +275,4 @@ fn append_eligible_direct_source_freshness_records<'py>(
         &arguments.value("connection_config")?,
         &arguments.value("run_id")?,
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        append_eligible_direct_source_freshness_records,
-        module
-    )?)
 }

@@ -103,10 +103,3 @@ pub(crate) fn package_version(py: Python<'_>, package: &str) -> PyResult<String>
         Err(error) => Err(error),
     }
 }
-
-/// `migration_fingerprint_work_info` as a function of `module`.
-pub(crate) fn migration_fingerprint_work_info_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(migration_fingerprint_work_info, module)
-}

@@ -1,14 +1,12 @@
 //! Warehouse source relation listing and column gathering for planning.
 
 use crate::observations::main::capture_source_columns::capture_source_columns;
-use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
-use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
-use crate::planner_warehouse::constants::COLUMN_INFO;
-use crate::planner_warehouse::constants::METADATA_NAME_FILTER_LIMIT;
-use crate::planner_warehouse::constants::RELATION_LOOKUP;
+use crate::planner_warehouse::_helpers::inspection::snapshot::{columns_for, list_relations};
+use crate::planner_warehouse::constants::{
+    COLUMN_INFO, METADATA_NAME_FILTER_LIMIT, RELATION_LOOKUP,
+};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::pyfunction;
-use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -227,32 +225,4 @@ pub(crate) fn source_inspection<'py>(
         }
     }
     Ok((result, frozenset(py, &listed)?))
-}
-
-pub(crate) fn gather_source_inspection<'py>(
-    project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
-    source_entries: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let (columns, listed) = source_inspection(project, (adapter, connection), source_entries)?;
-    Ok(PyTuple::new(project.py(), [columns.into_any(), listed])?.into_any())
-}
-
-#[pyfunction]
-#[pyo3(signature = (*, project, adapter, connection, source_entries=None))]
-pub(crate) fn gather_source_columns<'py>(
-    project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
-    source_entries: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyDict>> {
-    Ok(source_inspection(project, (adapter, connection), source_entries)?.0)
-}
-
-/// `gather_source_columns` as a function of `module`.
-pub(crate) fn gather_source_columns_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(gather_source_columns, module)
 }

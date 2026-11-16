@@ -3,9 +3,7 @@
 use crate::planner_resolution::_helpers::references::orchestration;
 use crate::planner_resolution::models::ModelSqlRequest;
 use crate::planner_resolution::models::Resolution;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// One model's planned SQL: references resolved, cursor inputs filtered and intrinsics bound.
 #[inline]

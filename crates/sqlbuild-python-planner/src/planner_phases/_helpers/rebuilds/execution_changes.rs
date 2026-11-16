@@ -3,54 +3,14 @@
 use crate::planner_entries::main::entries::default_microbatch_limit_action::default_microbatch_limit_action;
 use crate::planner_entries::main::entries::plan_entries::plan_entries;
 use crate::planner_entries::main::entries::planner_relations_context::planner_relations_context;
-use crate::planner_entries::models::PlanEntriesRequest;
-use crate::planner_entries::models::PlanEntryBuildInputs;
-use crate::planner_entries::models::RelationsRequest;
-use crate::planner_identity::main::merge_recomputed_model_changes::merge_recomputed_model_changes;
-use crate::planner_identity::main::with_honest_model_write_hashes::with_honest_model_write_hashes;
-use crate::planner_phases::_helpers::inputs::contexts::class_field;
+use crate::planner_entries::models::{PlanEntriesRequest, PlanEntryBuildInputs, RelationsRequest};
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
-use crate::planner_phases::models::ChangeReconciliation;
-use crate::planner_phases::models::ModelEntryResults;
-use crate::planner_phases::models::PlannerIdentityContext;
+use crate::planner_phases::models::{ChangeReconciliation, ModelEntryResults};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyFrozenSet;
-use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::command_runtime::main::resolve_configured_concurrency::resolve_configured_concurrency;
-
-/// The execution scope's changes with honest write hashes, and the actions merged from them.
-pub(crate) fn reconcile_execution_changes<'py>(
-    (execution_scope, snapshot): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    identities: &Bound<'py, PyAny>,
-    resolved_actions: &Bound<'py, PyAny>,
-    changes: &Bound<'py, PyAny>,
-) -> PyResult<ChangeReconciliation<'py>> {
-    let py = execution_scope.py();
-    let honest = with_honest_model_write_hashes(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("scope", execution_scope.clone()),
-                ("snapshot", snapshot.clone()),
-                ("changes", changes.clone()),
-                (
-                    "version_identities",
-                    class_field(identities, |i: &PlannerIdentityContext| {
-                        &i.version_identities
-                    })?,
-                ),
-            ],
-        )?),
-    )?;
-    let resolved = merge_recomputed_model_changes(resolved_actions, &honest)?;
-    Ok(ChangeReconciliation {
-        changes: honest,
-        resolved_actions: resolved,
-    })
-}
 
 fn config_or<'py>(
     config: &Bound<'py, PyAny>,

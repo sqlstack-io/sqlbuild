@@ -9,7 +9,6 @@ use sqlbuild_analysis::planner_warehouse::models::CursorTagRequest;
 use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 
 use crate::consumption::main::relation::relation;
-use crate::observations::_helpers::source_capture::take_source_capture;
 use crate::planner_warehouse::constants::RUN_BOUNDED;
 use crate::planner_warehouse::main::inspection::adapter_cursor_sql::adapter_cursor_sql;
 use crate::planner_warehouse::main::inspection::bound_task::bound_task;
@@ -17,8 +16,8 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::native_host::main::append_observations::append_observations;
+use sqlbuild_python_front::native_host::models::Location;
 use sqlbuild_python_front::native_host::models::ObservationAppend;
-use sqlbuild_python_front::native_host::models::{ConsumptionConnection, Location};
 use sqlbuild_python_project::compiled_views::main::compiled_models::dep_rows::dep_rows;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
@@ -30,7 +29,7 @@ const SOURCE_DEPENDENCY: &str = "source";
 const MAX_OBSERVATION_READS: i64 = 4;
 
 /// One successful incremental model's cursor read: its name, state location, cursor type and SQL.
-struct CursorRead {
+pub(crate) struct CursorRead {
     model: String,
     location: Location,
     cursor_type: String,
@@ -38,7 +37,7 @@ struct CursorRead {
 }
 
 /// The cursor read of every successful incremental model, rendered as the planner renders it.
-fn cursor_reads(
+pub(crate) fn cursor_reads(
     project: &Bound<'_, PyAny>,
     adapter: &Bound<'_, PyAny>,
     successful_models: &[String],
@@ -83,7 +82,7 @@ fn cursor_reads(
 }
 
 /// One `source_columns` row per described source, in the state schema of each model reading it.
-fn source_column_rows(
+pub(crate) fn source_column_rows(
     project: &Bound<'_, PyAny>,
     described: &BTreeMap<String, String>,
     run_id: &str,
@@ -127,7 +126,7 @@ fn source_column_rows(
 }
 
 /// Read each cursor `MAX`, then append it with `rows`, by state location; one warning per failure.
-fn observe<'py>(
+pub(crate) fn observe<'py>(
     reads: &[CursorRead],
     mut rows: BTreeMap<Location, Vec<ObservationAppend>>,
     (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -185,35 +184,4 @@ fn observe<'py>(
         }
     }
     Ok(warnings)
-}
-
-/// Record successful incremental models' cursor `MAX` and the source columns planning described; failures only warn.
-pub(crate) fn append_build_observations(
-    (project, successful_models): (&Bound<'_, PyAny>, &[String]),
-    (adapter, connection_config): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    run_id: &str,
-) -> Vec<String> {
-    let described: BTreeMap<String, String> = take_source_capture().into_iter().collect();
-    let recorded: PyResult<Vec<String>> = (|| {
-        let reads: Vec<CursorRead> = cursor_reads(project, adapter, successful_models)?;
-        let sources: BTreeMap<Location, Vec<ObservationAppend>> =
-            source_column_rows(project, &described, run_id)?;
-        if reads.is_empty() && sources.is_empty() {
-            return Ok(Vec::new());
-        }
-        let py: Python<'_> = adapter.py();
-        let connection = ConsumptionConnection::new(adapter, connection_config);
-        let observed: PyResult<Vec<String>> = connection
-            .connected(py)
-            .and_then(|handle| observe(&reads, sources, (adapter, &handle), run_id));
-        let closed: PyResult<()> = connection.close(py);
-        let warnings: Vec<String> = observed?;
-        closed?;
-        Ok(warnings)
-    })();
-    recorded.unwrap_or_else(|error| {
-        vec![format!(
-            "could not record observations: {error}; plan previews show them as unknown"
-        )]
-    })
 }

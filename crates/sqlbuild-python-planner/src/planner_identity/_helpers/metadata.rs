@@ -1,19 +1,19 @@
 //! Version identity metadata JSON and hashes of models, functions and seeds, byte-identical to the recorded fingerprints.
 
+use crate::planner_identity::main::compiled_function_fingerprint_sql::compiled_function_fingerprint_sql;
+use crate::planner_identity::main::model_declared_columns_hash::model_declared_columns_hash;
+use crate::planner_identity::main::or_empty::or_empty;
 use std::collections::HashMap;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_analysis::planner_identity::constants::{
     CONTRACT_CONFIG_KEY, CURSOR_INPUTS_CONFIG_KEY, ENFORCED_CONTRACT_POLICY,
     MODEL_CUSTOM_CONFIG_KEY, MODEL_PLACEHOLDERS_CONFIG_KEY, MODEL_POST_HOOKS_CONFIG_KEY,
-    MODEL_PRE_HOOKS_CONFIG_KEY, SQL_HOOK_IDENTITY_FIELDS, TABLE_FN_RESOURCE, UDF_RESOURCE,
-    VERSION_IDENTITY_CONFIG_KEYS,
+    MODEL_PRE_HOOKS_CONFIG_KEY, SQL_HOOK_IDENTITY_FIELDS, VERSION_IDENTITY_CONFIG_KEYS,
 };
-use sqlbuild_analysis::planner_identity::main::function_fingerprint_sql::function_fingerprint_sql;
-use sqlbuild_analysis::planner_identity::models::FunctionFingerprintFields;
 use sqlbuild_core::fingerprint_identity::main::stable_identity_hash::stable_identity_hash;
 
 use crate::microbatches::main::timestamp::timestamp;
@@ -27,11 +27,6 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_front::discovery::main::headers::hook_entries::hook_entries;
-use sqlbuild_python_front::model_config::main::config::config_value::config_value;
-use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::compiled_models::config::config;
-use sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps;
-use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_identity::main::baselined_function_definition_hash::baselined_function_definition_hash;
 use sqlbuild_python_project::planner_identity::main::function_definition_hash::function_definition_hash;
 use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
@@ -69,17 +64,6 @@ fn version_identity_config<'py>(config_values: &Bound<'py, PyAny>) -> PyResult<B
     Ok(identity)
 }
 
-/// `value or {}`.
-pub(crate) fn or_empty<'py>(
-    value: Option<Bound<'py, PyAny>>,
-    py: Python<'py>,
-) -> PyResult<Bound<'py, PyAny>> {
-    match value {
-        Some(value) if value.is_truthy()? => Ok(value),
-        _ => Ok(PyDict::new(py).into_any()),
-    }
-}
-
 /// Deterministic metadata JSON for model version identity.
 pub(crate) fn version_identity_metadata_json(
     model_name: &Bound<'_, PyAny>,
@@ -101,44 +85,7 @@ pub(crate) fn version_identity_metadata_json(
     sorted_dumps(payload.as_any(), COMPACT, true)
 }
 
-/// Deterministic non-query model fingerprint metadata JSON.
-pub(crate) fn model_version_identity_metadata_json<'py>(
-    model: &Bound<'py, PyAny>,
-    function_local_hashes: Option<&Bound<'py, PyAny>>,
-    hook_version_hashes: Option<&Bound<'py, PyAny>>,
-) -> PyResult<String> {
-    let py: Python<'py> = model.py();
-    let local_function_hashes: Bound<'py, PyDict> = PyDict::new(py);
-    if let Some(function_hashes) = function_local_hashes.filter(|hashes| !hashes.is_none()) {
-        for upstream_key in deps(model)?.try_iter()? {
-            let upstream_key: Bound<'py, PyAny> = upstream_key?;
-            let kind: String = native_field(&upstream_key, "resource_type")?
-                .str()?
-                .extract()?;
-            if kind != UDF_RESOURCE && kind != TABLE_FN_RESOURCE {
-                continue;
-            }
-            let name: Bound<'py, PyAny> = native_field(&upstream_key, "name")?;
-            let upstream_hash: Bound<'py, PyAny> = mapping_get(function_hashes, &name)?;
-            if !upstream_hash.is_none() {
-                local_function_hashes.set_item(name, upstream_hash)?;
-            }
-        }
-    }
-    let config_values: Bound<'py, PyAny> = native_field(&config(model)?, "values")?;
-    let signature: Bound<'py, PyDict> =
-        execution_signature(model, &config_values, hook_version_hashes)?;
-    version_identity_metadata_json(
-        &name_object(model)?,
-        &config_values,
-        (
-            Some(local_function_hashes.into_any()),
-            Some(signature.into_any()),
-        ),
-    )
-}
-
-fn execution_signature<'py>(
+pub(crate) fn execution_signature<'py>(
     model: &Bound<'py, PyAny>,
     config_values: &Bound<'py, PyAny>,
     hook_version_hashes: Option<&Bound<'py, PyAny>>,
@@ -242,7 +189,7 @@ fn contract_output_signature<'py>(
     Ok(Some(signature))
 }
 
-fn column_signature<'py>(column: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+pub(crate) fn column_signature<'py>(column: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
     let entry: Bound<'py, PyDict> = PyDict::new(column.py());
     for field in ["name", "type", "nullable"] {
         entry.set_item(field, native_field(column, field)?)?;
@@ -250,7 +197,7 @@ fn column_signature<'py>(column: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDi
     Ok(entry)
 }
 
-fn family_signatures<'py>(families: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyList>> {
+pub(crate) fn family_signatures<'py>(families: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyList>> {
     let rendered: Bound<'py, PyList> = PyList::empty(families.py());
     for family in families.try_iter()? {
         let family: Bound<'py, PyAny> = family?;
@@ -268,38 +215,6 @@ fn family_signatures<'py>(families: &Bound<'py, PyAny>) -> PyResult<Bound<'py, P
         rendered.append(entry)?;
     }
     Ok(rendered)
-}
-
-/// The hash of a model's own declared columns, column families and contract setting.
-pub(crate) fn model_declared_columns_hash(model: &Bound<'_, PyAny>) -> PyResult<String> {
-    let py: Python<'_> = model.py();
-    let schema_entry: Bound<'_, PyAny> =
-        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
-            model,
-        )?;
-    let payload: Bound<'_, PyDict> = PyDict::new(py);
-    payload.set_item(
-        "contract",
-        config_value(py, &model_values(model)?, CONTRACT_CONFIG_KEY)?,
-    )?;
-    let columns: Bound<'_, PyList> = PyList::empty(py);
-    let mut families: Bound<'_, PyList> = PyList::empty(py);
-    let mut type_enforcement: Bound<'_, PyAny> = py.None().into_bound(py);
-    if !schema_entry.is_none() {
-        for column in native_field(&schema_entry, "columns")?.try_iter()? {
-            columns.append(column_signature(&column?)?)?;
-        }
-        families = family_signatures(&native_field(&schema_entry, "dynamic_columns")?)?;
-        type_enforcement = native_field(&schema_entry, "type_enforcement")?;
-    }
-    payload.set_item("columns", columns)?;
-    payload.set_item("dynamic_columns", families)?;
-    payload.set_item("type_enforcement", type_enforcement)?;
-    Ok(stable_identity_hash(&sorted_dumps(
-        payload.as_any(),
-        COMPACT,
-        true,
-    )?))
 }
 
 /// Whether the function's recorded fingerprint came from an older scheme for the same definition.
@@ -438,7 +353,7 @@ fn text_or_empty(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
 }
 
 /// `f"{value or ''}"` of an attribute read, empty when the read failed.
-fn text_of(read: PyResult<Bound<'_, PyAny>>) -> PyResult<String> {
+pub(crate) fn text_of(read: PyResult<Bound<'_, PyAny>>) -> PyResult<String> {
     let value: Bound<'_, PyAny> = match read {
         Ok(value) => value,
         Err(_) => return Ok(String::new()),
@@ -450,7 +365,7 @@ fn text_of(read: PyResult<Bound<'_, PyAny>>) -> PyResult<String> {
     }
 }
 
-fn rendered_pairs(items: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
+pub(crate) fn rendered_pairs(items: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
     items
         .try_iter()?
         .map(|item| {
@@ -458,28 +373,6 @@ fn rendered_pairs(items: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
             Ok((text_or_empty(&item, "name")?, text_or_empty(&item, "type")?))
         })
         .collect()
-}
-
-/// Stable function definition text used for change fingerprints.
-pub(crate) fn compiled_function_fingerprint_sql(function: &Bound<'_, PyAny>) -> PyResult<String> {
-    Ok(function_fingerprint_sql(&FunctionFingerprintFields {
-        language:
-            sqlbuild_python_project::resource_views::main::function_reads::language::language(
-                function,
-            )?
-            .str()?
-            .extract()?,
-        arguments: rendered_pairs(&arguments(function)?)?,
-        returns: returns(function)?.str()?.extract()?,
-        return_columns: rendered_pairs(&return_columns(function)?)?,
-        runtime_version: text_of(runtime_version(function))?,
-        entry_point: text_of(entry_point(function))?,
-        packages: packages(function)?
-            .try_iter()?
-            .map(|package| package?.extract::<String>())
-            .collect::<PyResult<_>>()?,
-        body_sql: body_sql(function)?.extract()?,
-    }))
 }
 
 /// `(identity_hash, metadata_json)` of one compiled seed from its content and load-affecting config.
@@ -561,7 +454,7 @@ fn seed_rows<'py>(
 /// Deterministic metadata JSON for model version identity.
 #[pyfunction]
 #[pyo3(signature = (*, model_name, config_values, local_function_hashes = None, execution_signature = None))]
-fn build_version_identity_metadata_json<'py>(
+pub(crate) fn build_version_identity_metadata_json<'py>(
     model_name: &Bound<'py, PyAny>,
     config_values: &Bound<'py, PyAny>,
     local_function_hashes: Option<Bound<'py, PyAny>>,
@@ -574,70 +467,9 @@ fn build_version_identity_metadata_json<'py>(
     )
 }
 
-/// Deterministic non-query model fingerprint metadata JSON.
-#[pyfunction]
-#[pyo3(signature = (*, model, function_local_hashes = None, hook_version_hashes = None))]
-pub(crate) fn build_model_version_identity_metadata_json<'py>(
-    model: &Bound<'py, PyAny>,
-    function_local_hashes: Option<Bound<'py, PyAny>>,
-    hook_version_hashes: Option<Bound<'py, PyAny>>,
-) -> PyResult<String> {
-    model_version_identity_metadata_json(
-        model,
-        function_local_hashes.as_ref(),
-        hook_version_hashes.as_ref(),
-    )
-}
-
 /// Hash the model's own declared columns, column families and contract setting.
 #[pyfunction]
 #[pyo3(signature = (*, model))]
-fn declared_columns_hash(model: &Bound<'_, PyAny>) -> PyResult<String> {
+pub(crate) fn declared_columns_hash(model: &Bound<'_, PyAny>) -> PyResult<String> {
     model_declared_columns_hash(model)
-}
-
-/// Local-only semantic hashes of functions by name.
-#[pyfunction]
-#[pyo3(signature = (*, functions, dialect))]
-pub(crate) fn build_function_local_hashes<'py>(
-    functions: &Bound<'py, PyAny>,
-    dialect: Option<&str>,
-) -> PyResult<Bound<'py, PyDict>> {
-    function_local_hashes(
-        functions,
-        dialect,
-        &functions.py().None().into_bound(functions.py()),
-    )
-}
-
-/// Stable function definition text used for change fingerprints.
-#[pyfunction]
-pub(crate) fn build_compiled_function_fingerprint_sql(
-    function: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    compiled_function_fingerprint_sql(function)
-}
-
-/// `(identity_hash, metadata_json)` for one compiled seed.
-#[pyfunction]
-pub(crate) fn build_seed_identity(seed: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
-    seed_identity(seed)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        build_version_identity_metadata_json,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        build_model_version_identity_metadata_json,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(declared_columns_hash, module)?)?;
-    module.add_function(wrap_pyfunction!(build_function_local_hashes, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        build_compiled_function_fingerprint_sql,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(build_seed_identity, module)?)
 }
