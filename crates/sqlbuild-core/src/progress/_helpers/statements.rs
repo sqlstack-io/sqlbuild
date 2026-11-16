@@ -142,3 +142,14 @@ pub(crate) fn consume_statement_terminal(
     projection.statement_query_ids.remove(statement_id);
     (projection, line)
 }
+
+/// Count a finished statement by kind, keeping its query identifier.
+pub(crate) fn count_statement(projection: &mut ProgressProjection, event: &ProgressEvent) {
+    let query_id: Option<String> = statement_query_id(projection, event);
+    let statements = &mut projection.statements;
+    *statements
+        .by_kind
+        .entry(event.payload.statement_kind.clone())
+        .or_default() += 1;
+    statements.query_ids.extend(query_id);
+}

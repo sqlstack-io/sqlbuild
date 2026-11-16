@@ -26,6 +26,7 @@ use crate::bindings::_helpers::change_selection::selection::{
 };
 use crate::bindings::_helpers::result_output::documents::format_scenario_execution_json_with;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
+use crate::bindings::_helpers::result_output::statements::{StatementReport, StatementSource};
 use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
 use crate::bindings::_helpers::scenario_command::presentation::{
     CompletionKind, RelayContext, SectionStatus, activity, begin_section, connection_hooks,
@@ -168,6 +169,18 @@ fn finish(
     if !failures.is_empty() {
         write(&run.stream, &format!("{failures}\n"))?;
     }
+    let report: Option<StatementReport> = StatementReport::read(
+        py,
+        &StatementSource {
+            adapter_name: &run.adapter_name,
+            adapter: &run.adapter,
+            connection_config: &run.connection_config,
+            started,
+        },
+    )?;
+    if let Some(line) = report.as_ref().and_then(StatementReport::line) {
+        write(&run.stream, &format!("{line}\n"))?;
+    }
     flush(&run.stream)?;
     write_completion(&run.stream, (&run.project.namespace, succeeded))?;
     let namespace: &ScenarioNamespace = &run.project.namespace;
@@ -194,7 +207,11 @@ fn finish(
                 )?),
             )?,
             run.since_json.as_deref(),
-        )?,
+        )
+        .and_then(|payload| match &report {
+            Some(report) => report.with_section(&payload),
+            None => Ok(payload),
+        })?,
     )
     .into_any();
     write_execution_json_output(

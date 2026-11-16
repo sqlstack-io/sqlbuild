@@ -10,6 +10,7 @@ Online: https://sqlbuild.com/docs/cli/test/
 
 - Usage
 - Flags
+- Statement summary
 - Python tests
 - Run only affected tests
 - Examples
@@ -63,6 +64,30 @@ counted under `TIMEOUT=` and excluded from `FAIL=` in the summary line
 (`PASS=4  FAIL=0  TIMEOUT=1  TOTAL=5`), and the run continues with the remaining tests. In `--json`
 output, `summary.fail_count` still includes timed-out tests, and `summary.timeout_count` reports how
 many of them timed out. A timeout still fails the run: `sqb test` exits non-zero.
+
+## Statement summary
+
+After the pass/fail summary, `sqb test` and `sqb scenario test` print how many warehouse statements
+the run sent, by leading keyword, and how long the warehouse spent compiling and executing them:
+
+```
+Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s
+```
+
+With `--json`, the document gains a `statements` section with `total`, `by_kind` and
+`compile_time`.
+
+| Adapter | Compile and execution time |
+| --- | --- |
+| Snowflake | Read from `INFORMATION_SCHEMA.QUERY_HISTORY` after the run; `compile_time` has `compile_ms`, `execution_ms`, `timed_statements` and `identified_statements` |
+| Other adapters | Not reported; the line says `compile time not reported by <adapter>` and `compile_time` is `null` |
+
+Details:
+
+- On Snowflake, statements that query history does not return yet are left out of the times, and
+  the line says how many were found, such as `(10 of 12 statements in query history)`.
+- When the query-history read fails, the counts still print and the line says
+  `compile time unavailable (...)`; the run's exit code does not change.
 
 ## Python tests
 

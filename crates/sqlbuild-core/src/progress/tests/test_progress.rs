@@ -1,4 +1,12 @@
-use crate::progress::models::{ProgressEvent, ProgressPayload, ProgressSettings};
+use std::collections::BTreeMap;
+
+use crate::progress::main::consume_progress_event::consume_progress_event;
+use crate::progress::main::format_statement_summary::format_statement_summary;
+use crate::progress::main::statement_summary_json::statement_summary_json;
+use crate::progress::models::{
+    ProgressEvent, ProgressPayload, ProgressProjection, ProgressSettings, StatementSummary,
+    StatementTiming, StatementTimings,
+};
 use crate::progress::tests::helpers::{
     attempt_event, audit_rows, operation_event, orders_claim, plain, project_case,
 };
@@ -264,4 +272,153 @@ fn given_standalone_audit_when_projecting_then_row_names_target_and_outcome() {
             test_case.description
         );
     }
+}
+
+/// A statement event of `kind`, inside the `orders` attempt when `known` and outside any resource otherwise.
+fn statement_event(
+    (event_id, event_type): (&str, &str),
+    (statement_id, kind, query_id): (&str, &str, Option<&str>),
+    known: bool,
+) -> ProgressEvent {
+    let base: ProgressEvent = if known {
+        attempt_event(event_id, event_type, ("a1", None))
+    } else {
+        ProgressEvent {
+            event_id: event_id.to_owned(),
+            event_type: event_type.to_owned(),
+            ..ProgressEvent::default()
+        }
+    };
+    ProgressEvent {
+        statement_id: Some(statement_id.to_owned()),
+        payload: ProgressPayload {
+            statement_kind: kind.to_owned(),
+            query_id: query_id.map(str::to_owned),
+            ..base.payload
+        },
+        ..base
+    }
+}
+
+#[test]
+fn given_statement_terminals_when_projecting_then_every_finished_statement_is_counted_once() {
+    let events: Vec<ProgressEvent> = vec![
+        attempt_event("r1", "resource_attempt_started", ("a1", None)),
+        statement_event(("s1", "statement_started"), ("st1", "CREATE", None), true),
+        statement_event(("s2", "statement_submitted"), ("st1", "CREATE", Some("q1")), true),
+        // The terminal omits the query identifier its submission reported.
+        statement_event(("s3", "statement_completed"), ("st1", "CREATE", None), true),
+        // A redelivered terminal is not counted again.
+        statement_event(("s3", "statement_completed"), ("st1", "CREATE", None), true),
+        // Statements outside any known resource, with and without a start, still count.
+        statement_event(("s4", "statement_completed"), ("st2", "WITH", Some("q2")), false),
+        statement_event(("s5", "statement_failed"), ("st3", "DROP", None), false),
+        statement_event(("s6", "statement_completed"), ("st4", "WITH", Some("q3")), false),
+        // Starts, submissions and heartbeats alone are not finished statements.
+        statement_event(("s7", "statement_started"), ("st5", "SELECT", None), false),
+        statement_event(("s8", "statement_heartbeat"), ("st5", "SELECT", Some("q5")), false),
+    ];
+    let mut projection: ProgressProjection = ProgressProjection::new(plain());
+    for event in &events {
+        projection = consume_progress_event(projection, event).0;
+    }
+    let summary: &StatementSummary = projection.statement_summary();
+    assert_eq!(
+        summary.by_kind,
+        BTreeMap::from([
+            ("CREATE".to_owned(), 1),
+            ("DROP".to_owned(), 1),
+            ("WITH".to_owned(), 2),
+        ])
+    );
+    assert_eq!(summary.query_ids, ["q1", "q2", "q3"]);
+}
+
+#[test]
+fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_timing() {
+    let summary: StatementSummary = StatementSummary {
+        by_kind: BTreeMap::from([
+            ("CREATE".to_owned(), 2),
+            ("DROP".to_owned(), 2),
+            ("SELECT".to_owned(), 7),
+            ("ALTER".to_owned(), 1),
+        ]),
+        query_ids: (0..12).map(|index| format!("q{index}")).collect(),
+    };
+    let complete: StatementTiming = StatementTiming::Reported(StatementTimings {
+        compile_ms: 1540.0,
+        execution_ms: 260.0,
+        timed_statements: 12,
+    });
+    let partial: StatementTiming = StatementTiming::Reported(StatementTimings {
+        compile_ms: 1000.0,
+        execution_ms: 0.0,
+        timed_statements: 10,
+    });
+    let cases: [(&str, &StatementSummary, StatementTiming, Option<&str>); 5] = [
+        (
+            "kinds run from most to least frequent, ties by name",
+            &summary,
+            complete.clone(),
+            Some(
+                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s",
+            ),
+        ),
+        (
+            "statements missing from query history are called out",
+            &summary,
+            partial,
+            Some(
+                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.0s, execution 0.0s (10 of 12 statements in query history)",
+            ),
+        ),
+        (
+            "an adapter without query history says so",
+            &summary,
+            StatementTiming::NotReported("duckdb".to_owned()),
+            Some(
+                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time not reported by duckdb",
+            ),
+        ),
+        (
+            "a failed read says why",
+            &summary,
+            StatementTiming::Failed("query history read failed".to_owned()),
+            Some(
+                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time unavailable (query history read failed)",
+            ),
+        ),
+        (
+            "a run without statements has no line",
+            &StatementSummary::default(),
+            complete.clone(),
+            None,
+        ),
+    ];
+    for (description, summary, timing, expected) in cases {
+        assert_eq!(
+            format_statement_summary(summary, &timing).as_deref(),
+            expected,
+            "{description}"
+        );
+    }
+    assert_eq!(
+        statement_summary_json(&summary, &complete),
+        serde_json::json!({
+            "total": 12,
+            "by_kind": {"ALTER": 1, "CREATE": 2, "DROP": 2, "SELECT": 7},
+            "compile_time": {
+                "source": "snowflake_query_history",
+                "compile_ms": 1540.0,
+                "execution_ms": 260.0,
+                "timed_statements": 12,
+                "identified_statements": 12,
+            },
+        })
+    );
+    assert_eq!(
+        statement_summary_json(&summary, &StatementTiming::NotReported("duckdb".to_owned()))
+            ["compile_time"],
+        serde_json::Value::Null
+    );
 }

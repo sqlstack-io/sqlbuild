@@ -47,6 +47,7 @@ use sqlbuild_core::progress::main::progress_terminal_duration::progress_terminal
 use sqlbuild_core::progress::models::ProgressEvent;
 use sqlbuild_core::progress::models::ProgressProjection;
 use sqlbuild_core::progress::models::ProgressSettings;
+use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::terminal_events::models::TerminalRequest;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
@@ -129,6 +130,11 @@ impl NativeProgressProjector {
         })();
         lock.call_method0("release")?;
         result
+    }
+
+    /// The warehouse statements this invocation finished so far.
+    pub fn statement_summary(&self) -> PyResult<StatementSummary> {
+        Ok(self.locked()?.statement_summary().clone())
     }
 }
 

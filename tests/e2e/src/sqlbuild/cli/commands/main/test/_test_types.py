@@ -638,3 +638,14 @@ class PythonTestsJsonE2ETestCase:
     expected_status: str
     expected_python_status: str
     expected_python_files: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class StatementSummaryE2ETestCase:
+    """A `sqb test` run whose statement summary must count each finished statement once."""
+
+    description: str
+    expected_doubled: tuple[int, ...]
+    expected_exit_code: int
+    expected_by_kind: Mapping[str, int]
+    expected_line: str

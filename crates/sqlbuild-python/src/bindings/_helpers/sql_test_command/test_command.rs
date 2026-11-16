@@ -3,6 +3,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -45,6 +46,7 @@ use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external
 use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
+use crate::bindings::_helpers::result_output::statements::{StatementReport, StatementSource};
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use crate::bindings::_helpers::result_output::resource_ids::sql_test_identity;
 use crate::bindings::_helpers::sql_test_command::python_tests::{
@@ -656,6 +658,7 @@ pub(crate) fn timeout_record<'py>(
 fn complete(
     invocation: &Bound<'_, PyAny>,
     (results, since_json): (&[SqlTestExecutionResult<Bound<'_, PyAny>>], Option<&str>),
+    started: Instant,
 ) -> PyResult<(i32, String)> {
     let py: Python<'_> = invocation.py();
     let mut failures: Vec<TestFailure> = Vec::new();
@@ -683,10 +686,26 @@ fn complete(
             style,
         ),),
     )?;
+    let report: Option<StatementReport> = StatementReport::read(
+        py,
+        &StatementSource {
+            adapter_name: &invocation.getattr("adapter_name")?.extract::<String>()?,
+            adapter: &invocation.getattr("adapter")?,
+            connection_config: &invocation.getattr("connection_config")?,
+            started,
+        },
+    )?;
+    if let Some(line) = report.as_ref().and_then(StatementReport::line) {
+        stream.call_method1("write", (format!("\n{line}\n"),))?;
+    }
     stream.call_method0("flush")?;
+    let payload: String = with_since_section(test_execution_json(py, results)?, since_json)?;
     Ok((
         test_exit_code(passed, results.len()),
-        with_since_section(test_execution_json(py, results)?, since_json)?,
+        match report {
+            Some(report) => report.with_section(&payload)?,
+            None => payload,
+        },
     ))
 }
 
@@ -800,6 +819,7 @@ fn run_sql_tests<'py>(
     (modules, resolve): (Option<Vec<String>>, bool),
 ) -> PyResult<(i32, Vec<String>, Option<String>)> {
     let py: Python<'py> = request.py();
+    let started: Instant = Instant::now();
     let inspect_only: bool = native_field(request, "inspect")?.is_truthy()?;
     let stream: Bound<'_, PyAny> = invocation.getattr("progress_stream")?;
     let project_dir: Bound<'_, PyAny> = native_field(invocation, "effective_project_dir")?;
@@ -894,7 +914,7 @@ fn run_sql_tests<'py>(
         &pipeline.getattr("plan_output")?,
         &results,
     )?;
-    let (code, payload): (i32, String) = complete(invocation, (&results, since_json.as_deref()))?;
+    let (code, payload): (i32, String) = complete(invocation, (&results, since_json.as_deref()), started)?;
     Ok((code, python_tests, Some(payload)))
 }
 
