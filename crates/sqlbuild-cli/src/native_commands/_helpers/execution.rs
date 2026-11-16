@@ -18,6 +18,7 @@ use sqlbuild_config::project::main::load_control_config::load_control_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
 use sqlbuild_config::project::models::ControlConfig;
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
@@ -80,8 +81,8 @@ use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
     METADATA_PAGE_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
     METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
-    METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, STATISTICS_RELATION_SECONDS,
-    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    METADATA_SYNC_CHECK_SECONDS, PLAN_NOT_PRODUCED, SAFETY_SYNC_ENV, SCHEDULER_COMMAND,
+    STATISTICS_RELATION_SECONDS, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -1327,6 +1328,16 @@ pub(crate) fn run_command(
 /// The `{"error": ...}` report a location sends when it has no plan to show.
 pub(crate) fn plan_failure(message: &str) -> serde_json::Value {
     json!({"error": {"code": "plan_failed", "message": message, "help": null}})
+}
+
+/// The plan document of a plan that failed with its own coded error, its texts redacted and bounded.
+pub(crate) fn plan_error(failed: &serde_json::Value) -> serde_json::Value {
+    let text = |name: &str| failed[name].as_str().map(redact_error_text);
+    json!({"error": {
+        "code": text("code").unwrap_or_else(|| "plan_failed".to_owned()),
+        "message": text("message").unwrap_or_else(|| PLAN_NOT_PRODUCED.to_owned()),
+        "help": text("help"),
+    }})
 }
 
 pub(crate) fn open_location_runtime(

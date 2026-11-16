@@ -1652,6 +1652,8 @@ export interface components {
             changed: string[];
             /** @description Nodes that run only because an upstream they read runs. */
             downstream: string[];
+            /** @description Why the location's plan failed, with both lists empty; absent when it planned. */
+            failing?: string | null;
             /**
              * Format: int64
              * @description The publication generation it was planned for.
@@ -1667,6 +1669,8 @@ export interface components {
         ChangedBuildReport: {
             changed: string[];
             downstream: string[];
+            /** @description Why the plan failed, sent with empty lists; only newer servers accept it. */
+            failing?: string | null;
             /** Format: int64 */
             generation: number;
             /** Format: uuid */

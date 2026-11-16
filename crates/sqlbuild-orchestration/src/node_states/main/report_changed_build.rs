@@ -3,6 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::node_states::constants::MAX_FAILING_REASON_CHARS;
 use crate::node_states::models::{ChangedBuildNodes, ChangedBuildReport};
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
@@ -25,6 +26,16 @@ pub async fn report_changed_build(
             "changed build nodes must be kind:name keys".into(),
         ));
     }
+    if report.failing.as_ref().is_some_and(|reason| {
+        reason.trim().is_empty()
+            || reason.chars().count() > MAX_FAILING_REASON_CHARS
+            || !report.changed.is_empty()
+            || !report.downstream.is_empty()
+    }) {
+        return Err(ControlError::Invalid(
+            "a failing changed build carries a bounded reason and no nodes".into(),
+        ));
+    }
     let mut transaction = begin_ingestion(
         store,
         (location_id, target),
@@ -34,6 +45,7 @@ pub async fn report_changed_build(
     let nodes = ChangedBuildNodes {
         changed: report.changed.clone(),
         downstream: report.downstream.clone(),
+        failing: report.failing.clone(),
     };
     let now = transaction.now;
     (transaction, _) = query(

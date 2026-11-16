@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 
 use serde_json::Value;
+use sqlbuild_orchestration::node_states::constants::MAX_FAILING_REASON_CHARS;
 use sqlbuild_orchestration::node_states::models::ChangedBuildReport;
 use sqlbuild_orchestration::platform::models::LocationWorkClient;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -89,6 +90,20 @@ pub(super) async fn report_changed_build(
         report("Project files changed while planning what changed; not reported.\n");
         return Ok(Some(false));
     }
+    if let Some(reason) = document["error"]["message"].as_str() {
+        report(&format!("Could not plan what changed: {reason}\n"));
+        let request = ChangedBuildReport {
+            session_id,
+            generation,
+            changed: Vec::new(),
+            downstream: Vec::new(),
+            failing: Some(reason.chars().take(MAX_FAILING_REASON_CHARS).collect()),
+        };
+        if let Err(error) = client.report_changed_build(&options.target, &request).await {
+            report(&format!("Reporting the failed plan failed: {error}\n"));
+        }
+        return Ok(Some(false));
+    }
     let (changed, downstream) = match changed_build_nodes(&document) {
         Ok(nodes) => nodes,
         Err(error) => {
@@ -102,6 +117,7 @@ pub(super) async fn report_changed_build(
         generation,
         changed,
         downstream,
+        failing: None,
     };
     Ok(Some(
         match client.report_changed_build(&options.target, &request).await {

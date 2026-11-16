@@ -107,10 +107,12 @@ export const CHANGED_PLAN_HREF = planHref([], 'build', { flags: { '--changed': t
 
 /**
  * The counts the "Build N changed" button shows: the location's plan of `CHANGED_PLAN_HREF` when it
- * names a change, else the nodes whose definitions changed, with the downstream count unknown.
+ * names a change, else the nodes whose definitions changed, with the downstream count unknown, and
+ * why that plan is failing, if it is.
  */
-export function changedBuildCounts(definitionChanged: number, build: ChangedBuild | null): { changed: number; downstream: number | null } {
-	return build?.changed.length ? { changed: build.changed.length, downstream: build.downstream.length } : { changed: definitionChanged, downstream: null };
+export function changedBuildCounts(definitionChanged: number, build: ChangedBuild | null): { changed: number; downstream: number | null; failing: string | null } {
+	const failing = build?.failing ?? null;
+	return build?.changed.length && !failing ? { changed: build.changed.length, downstream: build.downstream.length, failing } : { changed: definitionChanged, downstream: null, failing };
 }
 
 /** The "Build N changed" button's main label, its lighter bracketed part (null without one), and its tooltip. */
@@ -120,8 +122,10 @@ export type ChangedBuildLabel = { label: string; extra: string | null; tooltip: 
  * The label of the button that opens `CHANGED_PLAN_HREF`: `Build 30 changed (+65)` in a top bar,
  * `Build 30 changed (+65 downstream)` in the overview banner. `downstream` is how many more nodes the
  * plan runs beyond the changed ones; the brackets are left out at 0 and when it is unknown (null).
+ * While the location's plan is failing, the tooltip gives its reason instead.
  */
-export function changedBuildLabel(changed: number, downstream: number | null, place: 'bar' | 'banner'): ChangedBuildLabel {
+export function changedBuildLabel(changed: number, downstream: number | null, place: 'bar' | 'banner', failing: string | null = null): ChangedBuildLabel {
+	if (failing) return { label: `Build ${changed} changed`, extra: null, tooltip: `Plan failing: ${failing}` };
 	const nodes = changed === 1 ? '1 changed node' : `${changed} changed nodes`;
 	const reaches = changed === 1 ? 'it reaches' : 'they reach';
 	const reach = downstream === null ? ` and the downstream nodes ${reaches}` : downstream === 0 ? '' : ` and the ${downstream} downstream ${downstream === 1 ? 'node' : 'nodes'} ${reaches}`;

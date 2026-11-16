@@ -496,7 +496,7 @@
 	const changedCount = $derived(catalogNodes.filter((c) => c.stale?.some((r) => r.reason === 'changed')).length);
 	/** The location's plan of what changed when it has one, else the definition changes with the downstream count unknown. */
 	const changedCounts = $derived(changedBuildCounts(changedCount, sharedCatalog.view.changedBuild));
-	const changedLabel = $derived(changedBuildLabel(changedCounts.changed, changedCounts.downstream, 'bar'));
+	const changedLabel = $derived(changedBuildLabel(changedCounts.changed, changedCounts.downstream, 'bar', changedCounts.failing));
 	const outOfDateCount = $derived(catalogNodes.filter((c) => (c.stale?.length ?? 0) > 0).length);
 	/** The toolbar chip's text, e.g. "orders, inventory"; empty when every folder is drawn. */
 	const selectionLabel = $derived.by(() => {

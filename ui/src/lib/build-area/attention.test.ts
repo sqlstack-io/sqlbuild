@@ -82,7 +82,7 @@ describe('overview alerts', () => {
 	});
 
 	it('labels the build with the location\'s plan of what changed and how much it reaches downstream', () => {
-		const [{ view }] = attentionViews([{ kind: 'stale_models', changed: ['model:a'], behind: ['model:b'] }], now, { generation: 2, changed: ['model:a', 'model:c'], downstream: ['model:b'] });
+		const [{ view }] = attentionViews([{ kind: 'stale_models', changed: ['model:a'], behind: ['model:b'] }], now, { generation: 2, changed: ['model:a', 'model:c'], downstream: ['model:b'], failing: null });
 		expect([view.build?.label, view.build?.extra]).toEqual(['Build 2 changed', ' (+1 downstream)']);
 	});
 

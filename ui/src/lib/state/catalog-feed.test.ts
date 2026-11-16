@@ -122,10 +122,10 @@ describe('CatalogFeed', () => {
 		feed.ensure(SCOPE);
 		await settle();
 		expect(feed.view.changedBuild).toBeNull();
-		s.set({ version: 2, changedBuild: { generation: 1, changed: ['model:orders'], downstream: ['model:order_items'] } });
+		s.set({ version: 2, changedBuild: { generation: 1, changed: ['model:orders'], downstream: ['model:order_items'], failing: null } });
 		feed.handle(signal(`node_status:${SCOPE.locationId}`, { previousVersion: 1, version: 2, full: true }));
 		await settle();
-		expect(feed.view.changedBuild).toEqual({ generation: 1, changed: ['model:orders'], downstream: ['model:order_items'] });
+		expect(feed.view.changedBuild).toEqual({ generation: 1, changed: ['model:orders'], downstream: ['model:order_items'], failing: null });
 	});
 
 	it('reads the states again after a version gap or a full change, and applies the answer', async () => {

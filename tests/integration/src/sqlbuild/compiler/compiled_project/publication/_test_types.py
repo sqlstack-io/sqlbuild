@@ -520,3 +520,14 @@ class SyncedFreshnessTestCase:
     files: dict[str, str]
     expected_absent: str
     expected_line: str
+
+
+@dataclass(frozen=True)
+class FailedPlanTestCase:
+    description: str
+    files: dict[str, str]
+    edited_file: str
+    edit: tuple[str, str]
+    selection: list[str]
+    expected_code: str
+    expected_reason: str

@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::argv::main::accepted_settings_arguments::accepted_settings_arguments;
 use crate::argv::models::Stream;
-use crate::native_commands::_helpers::execution::plan_failure;
+use crate::native_commands::_helpers::execution::{plan_error, plan_failure};
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::constants::{PLAN_COMMAND, PLAN_NOT_PRODUCED};
 use crate::native_commands::main::_plan_document::plan_document;
@@ -116,6 +116,7 @@ async fn run_plan(
     Ok(Some(
         match (reply["output"].as_str(), reply["exit_code"].as_i64()) {
             (Some(output), Some(code)) => plan_document(output.as_bytes(), matches!(code, 0 | 1)),
+            _ if reply["failed"].is_object() => plan_error(&reply["failed"]),
             _ => plan_failure(PLAN_NOT_PRODUCED),
         },
     ))

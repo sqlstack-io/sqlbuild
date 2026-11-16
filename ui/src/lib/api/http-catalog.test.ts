@@ -256,7 +256,9 @@ describe('node states mapping', () => {
 	it('carries the changed build planned for the current snapshot, and none from an older server', () => {
 		const record = { snapshot_id: 'snap-1', version: 3, states: {} };
 		const build = { generation: 2, reported_at: '2026-11-08T12:00:00Z', changed: ['model:orders'], downstream: ['model:customers'] };
-		expect(toNodeStates({ ...record, changed_build: build }).changedBuild).toEqual({ generation: 2, changed: ['model:orders'], downstream: ['model:customers'] });
+		expect(toNodeStates({ ...record, changed_build: build }).changedBuild).toEqual({ generation: 2, changed: ['model:orders'], downstream: ['model:customers'], failing: null });
+		const failed = { ...build, changed: [], downstream: [], failing: 'Model orders cannot plan a full rebuild' };
+		expect(toNodeStates({ ...record, changed_build: failed }).changedBuild?.failing).toBe('Model orders cannot plan a full rebuild');
 		expect(toNodeStates(record).changedBuild).toBeNull();
 	});
 });
