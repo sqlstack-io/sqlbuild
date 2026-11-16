@@ -338,6 +338,101 @@ fn given_effective_configs_when_validating_natively_then_python_outcomes_result(
             expected_outcome: "model 'orders_daily': merge_exclude_columns cannot include unique_key column(s): order_id",
         },
         ValidateTestCase {
+            description: "delete_insert replacing groups of rows by replace_key",
+            config: vec![
+                ("materialized", Value::Str("incremental")),
+                ("incremental_strategy", Value::Str("delete_insert")),
+                ("replace_key", strings(&["forecast_version"])),
+            ],
+            references: &["ref:orders"],
+            query_sql: "select 1",
+            expected_outcome: "accepted",
+        },
+        ValidateTestCase {
+            description: "delete_insert without a cursor or a key",
+            config: vec![
+                ("materialized", Value::Str("incremental")),
+                ("incremental_strategy", Value::Str("delete_insert")),
+            ],
+            references: &["ref:orders"],
+            query_sql: "select 1",
+            expected_outcome: "model 'orders_daily': delete_insert without cursor requires unique_key or replace_key",
+        },
+        ValidateTestCase {
+            description: "replace_key beside unique_key",
+            config: incremental(vec![
+                ("incremental_strategy", Value::Str("delete_insert")),
+                ("unique_key", Value::Str("order_id")),
+                ("replace_key", Value::Str("forecast_version")),
+            ]),
+            references: &["ref:orders"],
+            query_sql: "select 1",
+            expected_outcome: "model 'orders_daily': set either unique_key (one row per key) or replace_key (groups of rows), not both",
+        },
+        ValidateTestCase {
+            description: "replace_key on a merge",
+            config: incremental(vec![
+                ("incremental_strategy", Value::Str("merge")),
+                ("unique_key", Value::Str("order_id")),
+                ("replace_key", Value::Str("forecast_version")),
+            ]),
+            references: &["ref:orders"],
+            query_sql: "select 1",
+            expected_outcome: "model 'orders_daily': replace_key requires incremental_strategy=delete_insert",
+        },
+        ValidateTestCase {
+            description: "replace_key on a microbatch",
+            config: incremental(vec![
+                ("incremental_strategy", Value::Str("delete_insert")),
+                ("incremental_mode", Value::Str("microbatch")),
+                ("replace_key", Value::Str("forecast_version")),
+                ("microbatch_strategy", Value::Str("watermark")),
+                ("cursor_watermark_mode", Value::Str("all")),
+                ("batch_size", Value::Str("1d")),
+                ("lookback", Value::Str("3d")),
+                (
+                    "cursor_inputs",
+                    map(vec![(
+                        "orders",
+                        map(vec![
+                            ("column", Value::Str("updated_at")),
+                            ("roles", strings(&["filter", "watermark"])),
+                        ]),
+                    )]),
+                ),
+                (
+                    "microbatch_limit",
+                    map(vec![
+                        ("max_batches", Value::Int(5)),
+                        ("action", Value::Str("cap_from_start")),
+                    ]),
+                ),
+            ]),
+            references: &["ref:orders"],
+            query_sql: "select 1",
+            expected_outcome: "model 'orders_daily': replace_key is not supported with incremental_mode=microbatch; each batch only replaces its own window",
+        },
+        ValidateTestCase {
+            description: "replace_key on a table",
+            config: vec![
+                ("materialized", Value::Str("table")),
+                ("replace_key", Value::Str("forecast_version")),
+            ],
+            references: &["ref:orders"],
+            query_sql: "select 1",
+            expected_outcome: "model 'orders_daily': replace_key is only valid for incremental models",
+        },
+        ValidateTestCase {
+            description: "an empty replace_key",
+            config: incremental(vec![
+                ("incremental_strategy", Value::Str("delete_insert")),
+                ("replace_key", strings(&[])),
+            ]),
+            references: &["ref:orders"],
+            query_sql: "select 1",
+            expected_outcome: "model 'orders_daily': replace_key must be a column name or a list of column names",
+        },
+        ValidateTestCase {
             description: "a bounded replay policy",
             config: incremental(vec![("replay_on_change", Value::Str("bounded- 14d"))]),
             references: &["ref:orders"],

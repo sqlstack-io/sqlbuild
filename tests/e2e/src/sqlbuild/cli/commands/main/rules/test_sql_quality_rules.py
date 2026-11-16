@@ -223,6 +223,15 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
             expected_codes=(),
         ),
         RankingKeyProofCase(
+            description="a delete_insert replace_key names groups of rows, not a key",
+            upstream_header=_INCREMENTAL_HEADER_TEMPLATE.format(
+                strategy="delete_insert", cursor=""
+            ).replace("unique_key order_id", "replace_key order_id"),
+            upstream_sql=_INCREMENTAL_SQL,
+            query_sql=_RENAMED_CHAIN_SQL,
+            expected_codes=("SQLCLEAN018",),
+        ),
+        RankingKeyProofCase(
             description="a cursor-ranged delete_insert unique_key is not a key",
             upstream_header=_INCREMENTAL_HEADER_TEMPLATE.format(
                 strategy="delete_insert", cursor=_CURSOR_CONFIG

@@ -1676,8 +1676,8 @@ select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078", "X
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 169863 }
-reason = "The Python bindings crate is above the code-line limit; this caps it at its current size until it is split into crates by area. Lower the cap as code moves out."
+thresholds = { max_crate_code_lines = 169893 }
+reason = "The Python bindings crate is above the code-line limit; this caps it at its current size until it is split into crates by area. Lower the cap as code moves out. Raised from 169863: replace_key plan-entry plumbing and the A012 refusal, +31 with sqlbuild-python-base."
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers"]

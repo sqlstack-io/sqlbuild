@@ -1,7 +1,7 @@
 //! Planner identity constants shared with the Python planner.
 
 /// Model config keys whose values participate in version identity, in Python's insertion order after `cursor_inputs`.
-pub const VERSION_IDENTITY_CONFIG_KEYS: [&str; 39] = [
+pub const VERSION_IDENTITY_CONFIG_KEYS: [&str; 40] = [
     "append_cursor_inclusive",
     "batch_size",
     "check_columns",
@@ -33,6 +33,7 @@ pub const VERSION_IDENTITY_CONFIG_KEYS: [&str; 39] = [
     "snapshot_schema_change",
     "snapshot_strategy",
     "unique_key",
+    "replace_key",
     "updated_at",
     "valid_from_column",
     "valid_to_column",

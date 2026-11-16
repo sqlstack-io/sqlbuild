@@ -619,6 +619,7 @@ const R_MODEL_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("start_cursor_config", FieldDefault::None),
         FieldSpec::new("invocation_time", FieldDefault::None),
         FieldSpec::new("unique_key", FieldDefault::EmptyTuple),
+        FieldSpec::new("replace_key", FieldDefault::EmptyTuple),
         FieldSpec::new("merge_exclude_columns", FieldDefault::EmptyTuple),
         FieldSpec::new("snapshot_strategy", FieldDefault::None),
         FieldSpec::new("updated_at_column", FieldDefault::None),

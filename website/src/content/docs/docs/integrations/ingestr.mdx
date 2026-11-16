@@ -92,7 +92,7 @@ The `ingestr` block on a source supports the following fields:
 | `replace` | Drop and recreate the destination table (default when no strategy is set) |
 | `append` | Insert all rows without deduplication |
 | `merge` | Upsert based on `primary_key`, using `incremental_key` for change detection |
-| `delete+insert` | Delete matching rows by `incremental_key` range, then insert replacements |
+| `delete+insert` | Delete matching rows by `incremental_key` range, then insert replacements. A SQL model does the same with `delete_insert` and a `cursor`; use [`replace_key`](/docs/concepts/incremental#delete_insert) to replace groups of rows by key value instead |
 | `truncate+insert` | Truncate destination table, then insert all rows |
 
 ## Template variables

@@ -1,3 +1,5 @@
+#[path = "tests/test_group_replacement_refusal.rs"]
+mod group_replacement_refusal;
 #[path = "tests/helpers.rs"]
 mod helpers;
 #[path = "tests/test_model_entry.rs"]

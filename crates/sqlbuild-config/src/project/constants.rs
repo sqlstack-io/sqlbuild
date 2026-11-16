@@ -104,7 +104,7 @@ pub(crate) const DEFAULTS_KEYS: [&str; 33] = [
     "unaccounted_partition_policy",
 ];
 /// The MODEL header keys, which `[path_defaults]` entries may set.
-pub(crate) const MODEL_HEADER_KEYS: [&str; 73] = [
+pub(crate) const MODEL_HEADER_KEYS: [&str; 74] = [
     "alias",
     "append_cursor_inclusive",
     "audit_factories",
@@ -158,6 +158,7 @@ pub(crate) const MODEL_HEADER_KEYS: [&str; 73] = [
     "post_hooks",
     "pre_hooks",
     "primary_key",
+    "replace_key",
     "replay_on_change",
     "row_diff_exclude_columns",
     "row_diff_sample_rows",
