@@ -3,6 +3,8 @@
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import PlayIcon from '@lucide/svelte/icons/play';
+	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
+	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
 	import { openRow, to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { Trigger } from '$lib/api';
@@ -63,6 +65,9 @@
 		graph?.clear();
 		memberSelection = null;
 	}
+	// A group's sidebar works as Lineage's: closed until something is selected, then as the person last left it.
+	const details = createDetailsPanel('job-group', () => !!memberSelection);
+	const railOpen = $derived(def?.kind !== 'group' || details.open);
 	const selectedMember = $derived(memberSelection && !memberSelection.node ? memberSelection.member : null);
 	const memberFacts = $derived(selectedMember ? (memberJobs.data?.get(selectedMember) ?? null) : null);
 	const memberWaits = $derived(selectedMember && def?.groupMembers ? waitReasons(selectedMember, def.groupMembers, links) : []);
@@ -95,6 +100,9 @@
 </script>
 
 <AppTopbar title="Jobs">
+	{#if def?.kind === 'group'}
+		<Button variant="ghost" size="icon-bar" aria-pressed={details.open} onclick={details.toggle} title={details.open ? 'Hide details' : 'Show details'} aria-label="Toggle details"><PanelRightIcon /></Button>
+	{/if}
 	{#if picked.length && def?.kind === 'job'}
 		<Button variant="ghost" onclick={clearSelection}>Clear selection</Button>
 		<GatedButton size="bar" requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run all but {picked.length}</GatedButton>
@@ -166,6 +174,7 @@
 					{/if}
 				</div>
 
+				{#if railOpen}
 				<aside class="rail sb-scroll" class:sections={!pickedNodes.length}>
 					{#if selectedMember}
 						<InspectorHead title={selectedMember} href={to(`/jobs/${selectedMember}`)} linkLabel="Open job ↗" linkTitle="Open the page of {selectedMember}">
@@ -296,6 +305,7 @@
 						{/if}
 					{/if}
 				</aside>
+				{/if}
 			</div>
 		{:else if tab === 'runs'}
 			<div class="main sb-scroll">

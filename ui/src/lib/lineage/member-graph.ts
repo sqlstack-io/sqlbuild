@@ -6,6 +6,9 @@ import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode, JobGroupMember, RunRef } from '$lib/api';
 import { GROUPED_ABOVE, cardData } from './catalog-graph';
 import { folderGraph, folderTree, standInOf, type FolderTree } from './folder-graph';
+import { needsBuilding, type NeedsBuilding } from './view-summary';
+
+export { needsBuilding };
 
 export const MEMBER_WIDTH = 236;
 export const MEMBER_HEIGHT = 82;
@@ -18,9 +21,6 @@ export type MemberInfo = {
 	/** The member's nodes, by catalog key. */
 	nodes?: string[] | null;
 };
-
-/** How many of a member's nodes need building: changed since their last build, and only behind (or downstream of) a change. */
-export type NeedsBuilding = { changed: number; behind: number };
 
 export type MemberCardData = {
 	jobKey: string;
@@ -64,18 +64,6 @@ export const pairKey = (upstream: string, member: string) => `${upstream}>${memb
 function waitsWithin(members: readonly JobGroupMember[]): Map<string, string[]> {
 	const known = new Set(members.map((m) => m.jobKey));
 	return new Map(members.map((m) => [m.jobKey, [...new Set(m.upstream.map((u) => u.jobKey))].filter((k) => known.has(k) && k !== m.jobKey)]));
-}
-
-/** Counts of a member's nodes that need building, from the catalog's stale reasons. */
-export function needsBuilding(keys: readonly string[], byKey: ReadonlyMap<string, CatalogNode>): NeedsBuilding {
-	let changed = 0;
-	let behind = 0;
-	for (const key of new Set(keys)) {
-		const reasons = byKey.get(key)?.stale ?? [];
-		if (reasons.some((r) => r.reason === 'changed')) changed++;
-		else if (reasons.length) behind++;
-	}
-	return { changed, behind };
 }
 
 /**

@@ -31,6 +31,9 @@
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
+	import ViewSummaryPanel from '$lib/components/lineage/view-summary.svelte';
+	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
+	import { viewSummary } from '$lib/lineage/view-summary';
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
@@ -54,11 +57,13 @@
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
 	import { MAX_DRAWN, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
-	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
+	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
 	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
 
 	let browserOpen = $state(false);
-	let inspectorOpen = $state(true);
+	// Closed until something is selected, then as the person last left it (remembered in this browser).
+	const details = createDetailsPanel('lineage', () => selectedNodes.length > 0);
+	const inspectorOpen = $derived(details.open);
 	let neighbourhoodOnly = $state(false);
 	let modelQuery = $state('');
 
@@ -469,6 +474,18 @@
 		{ value: 'behind' as const, label: 'Stale · behind' },
 		{ value: 'failed' as const, label: 'Last build failed' }
 	];
+	// The sidebar's summary with nothing selected: the nodes drawn, and what narrows or dims them.
+	const inView = $derived(viewSummary(shownNodes(catalogNodes, { selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree })));
+	const activeFilters = $derived(
+		[
+			pickedNodes.length ? `${pickedNodes.length.toLocaleString('en')} picked node${pickedNodes.length === 1 ? '' : 's'}` : '',
+			!pickedNodes.length && selectedFolders.length ? `Folders: ${selectedFolders.join(', ')}` : '',
+			staleOnly ? 'Only nodes out of date' : '',
+			kindFilter ? `Kind: ${nodeKindPlural[kindFilter as keyof typeof nodeKindPlural] ?? kindFilter} (others dimmed)` : '',
+			groupFilter ? `Group: ${groupFilter} (others dimmed)` : '',
+			statusFilter ? `Status: ${statusOptions.find((o) => o.value === statusFilter)?.label ?? statusFilter} (others dimmed)` : ''
+		].filter(Boolean)
+	);
 
 	// The list names every node, including those inside closed folders.
 	const listNodes = $derived<Pick<Node, 'id' | 'data'>[]>(scaleMode ? nodes : catalogNodes.map((n) => ({ id: n.key, data: cardData(n) })));
@@ -829,7 +846,7 @@
 			{#if n}<span title="{n} {label}"><i style:background={c}></i>{n}</span>{/if}
 		{/each}
 	</div>
-	<Button variant="ghost" size="icon-bar" aria-pressed={inspectorOpen} onclick={() => (inspectorOpen = !inspectorOpen)} title={inspectorOpen ? 'Hide details' : 'Show details'} aria-label="Toggle details"><PanelRightIcon /></Button>
+	<Button variant="ghost" size="icon-bar" aria-pressed={inspectorOpen} onclick={details.toggle} title={inspectorOpen ? 'Hide details' : 'Show details'} aria-label="Toggle details"><PanelRightIcon /></Button>
 </div>
 
 <div class="lineage-stage relative flex min-h-0 flex-1">
@@ -945,7 +962,7 @@
 					{selectedNodes.map((n) => n.data.name).slice(0, 3).join(', ')}{selectedNodes.length > 3 ? '…' : ''}
 				</div>
 			</div>
-		{:else}
+		{:else if primary}
 			<InspectorHead title={String(primary?.data.label ?? primary?.data.name ?? '')} hint={String(primary?.data.name ?? '')} href={d ? to(`/catalog/${primarySlug}`) : undefined} linkLabel="Catalog ↗" linkTitle="Open in Catalog">
 				{#snippet meta()}
 					<!-- From the selected card, so the header names the node at once, before its detail arrives. -->
@@ -956,7 +973,7 @@
 		{/if}
 		<div class="insp-body">
 			{#if !scaleMode && !primary}
-				<InspectorSection title="Details"><p class="insp-description">Select a node to see its details.</p></InspectorSection>
+				<ViewSummaryPanel summary={inView} filters={activeFilters} />
 			{:else}
 			{#if scaleMode}
 				<InspectorSection title="Scale test">

@@ -133,17 +133,26 @@ export type LineageGraphOptions = {
 	onadd?: (folder: string) => void;
 };
 
+/** The nodes the lineage draws: the picked nodes, or those in the selected folders (every node when none), only those out of date with `staleOnly`. */
+export function shownNodes(
+	data: CatalogNode[],
+	{ selected, picked, staleOnly = false, tree = folderTree(data) }: Pick<LineageGraphOptions, 'selected' | 'picked' | 'staleOnly' | 'tree'>
+): CatalogNode[] {
+	let shown = data;
+	if (picked?.size) shown = shown.filter((n) => picked.has(n.key));
+	else if (selected.length) shown = shown.filter((n) => inSelection(tree, n.key, selected));
+	if (staleOnly) shown = shown.filter((n) => (n.stale?.length ?? 0) > 0);
+	return shown;
+}
+
 /**
  * The lineage to draw: every node, or the nodes in the selected folders with a stub per folder and
  * direction for lineage outside them; by folder or node by node. `staleOnly` narrows to nodes that
  * are out of date, without stubs.
  */
 export function lineageGraph(data: CatalogNode[], { grouped, open, selected, picked, staleOnly = false, tree = folderTree(data), onclose, onadd }: LineageGraphOptions): { nodes: Node[]; edges: Edge[] } {
-	let shown = data;
+	const shown = shownNodes(data, { selected, picked, staleOnly, tree });
 	const picking = !!picked?.size;
-	if (picking) shown = shown.filter((n) => picked!.has(n.key));
-	else if (selected.length) shown = shown.filter((n) => inSelection(tree, n.key, selected));
-	if (staleOnly) shown = shown.filter((n) => (n.stale?.length ?? 0) > 0);
 	const narrowed = shown.length !== data.length;
 	const shownTree = narrowed ? folderTree(shown) : tree;
 	let graph: { nodes: Node[]; edges: Edge[] };
