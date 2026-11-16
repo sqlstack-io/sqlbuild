@@ -39,6 +39,7 @@ use sqlbuild_orchestration::api::models::{
 use sqlbuild_orchestration::dev_events::constants::{DEV_EVENTS_ON, DEV_EVENTS_VARIABLE};
 use sqlbuild_orchestration::dev_events::main::dev_event_line::dev_event_line;
 use sqlbuild_orchestration::dev_events::main::dev_events_enabled::dev_events_enabled;
+use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
@@ -570,6 +571,10 @@ pub(crate) fn freeze_history_page(
                 Stream::Stderr,
                 "Warehouse history row exceeds the request bound; synchronization incomplete, no stale rows removed.\n",
             )]));
+            location_warning(
+                "warehouse sync incomplete",
+                "a history row exceeds the request bound".to_owned(),
+            );
         }
     } else {
         state.pending = Some(LocationMetadataPage {
@@ -702,6 +707,28 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
         )]));
     }
     state
+}
+
+/// Under `sqb dev`, a warning the location logs also becomes a screen line, so plain output shows it.
+pub(crate) fn location_warning(title: &str, detail: String) {
+    drop(emit_dev_event(&DevEvent::Warning {
+        title: title.to_owned(),
+        detail,
+    }));
+}
+
+/// A sync stopped by failed reads makes one attempt when its safety sync is due, and says so.
+pub(crate) fn retry_stopped_sync(state: &mut LocationMetadataSync) {
+    if state.resume_after_safety_wait() {
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Retrying the stopped warehouse history synchronization at its safety sync.\n",
+        )]));
+        location_warning(
+            "warehouse sync retrying",
+            "one attempt after the safety interval".to_owned(),
+        );
+    }
 }
 
 /// Operational cost is elapsed IO time, not an estimate of warehouse billing.
@@ -942,6 +969,10 @@ pub(crate) async fn check_published_location(
                 "{missing} provider secret(s) are unset in this location's environment; runs that use them fail. Run sqb debug for the list.\n"
             ),
         )]));
+        location_warning(
+            "provider secrets unset",
+            format!("{missing} unset; runs that use them fail; sqb debug lists them"),
+        );
     }
     drop(write_output(&[(
         Stream::Stderr,
@@ -1422,14 +1453,27 @@ pub(crate) async fn failed_read(
         () = metadata_health(&state, (client, poll), (started, read), Some(&failure.reason)) => {},
     }
     let message = match state.fail_read(failure.page_size) {
-        Some(wait) => format!(
-            "Warehouse history read failed; retaining mirror and retrying in {}s.\n",
-            wait.as_secs()
-        ),
+        Some(wait) => {
+            location_warning(
+                "warehouse read failed",
+                format!("retrying in {}s: {}", wait.as_secs(), failure.reason),
+            );
+            format!(
+                "Warehouse history read failed; retaining mirror and retrying in {}s.\n",
+                wait.as_secs()
+            )
+        }
         None => {
             state = close_metadata_reader(state).await?;
+            location_warning(
+                "warehouse sync stopped",
+                format!(
+                    "{METADATA_FAILURE_LIMIT} failed reads in a row: {}; it retries at the next safety sync, on request or after a publish",
+                    failure.reason
+                ),
+            );
             format!(
-                "Warehouse history synchronization stopped after {METADATA_FAILURE_LIMIT} failed reads in a row: {}. Request a sync or publish again to retry.\n",
+                "Warehouse history synchronization stopped after {METADATA_FAILURE_LIMIT} failed reads in a row: {}. It retries at the next safety sync, on request or after a publish.\n",
                 failure.reason
             )
         }

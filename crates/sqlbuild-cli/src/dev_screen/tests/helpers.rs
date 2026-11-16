@@ -123,7 +123,7 @@ pub(super) fn after_startup(messages: Vec<ScreenMessage>) -> Vec<ScreenMessage> 
     startup().into_iter().chain(messages).collect()
 }
 
-/// Two edits after ready: one publishes, the next fails at a source position.
+/// Two edits after ready: one publishes, the next fails at a source position; then a sync stops.
 pub(super) fn edits() -> Vec<ScreenMessage> {
     vec![
         ScreenMessage::Child(DevEvent::Changed {
@@ -149,6 +149,10 @@ pub(super) fn edits() -> Vec<ScreenMessage> {
                 line: 42,
                 column: 7,
             }),
+        }),
+        ScreenMessage::Child(DevEvent::Warning {
+            title: "warehouse sync stopped".to_owned(),
+            detail: "5 failed reads in a row: ProgrammingError: insufficient privileges".to_owned(),
         }),
     ]
 }

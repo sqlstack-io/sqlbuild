@@ -370,7 +370,9 @@ Details:
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
   or time retries a smaller page. Any other error, such as a missing permission or table, retries
   after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
-  the sync stops until you request one or the location publishes again.
+  the sync stops until you request one, the location publishes again, or the next safety sync is
+  due (`sync_at_least_every`). The safety sync tries once; another failure stops it until the
+  following one.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 
 ## Skip overlapping runs and retry failures

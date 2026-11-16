@@ -26,6 +26,8 @@ fn given_a_session_when_each_message_is_applied_then_the_terminal_shows_stable_u
             "  09:41:22  \u{2717} gen 3 failed \u{b7} still serving gen 2",
             "            models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd",
             "            r retry \u{b7} l full log",
+            "  09:41:23  \u{26a0} warehouse sync stopped",
+            "            5 failed reads in a row: ProgrammingError: insufficient privileges",
             "",
             HOTKEY_BAR,
         ]),
@@ -126,6 +128,7 @@ fn given_a_session_when_each_message_is_applied_then_the_terminal_shows_stable_u
                 "sqlbuild dev: changed models/finance/fct_revenue.sql",
                 "sqlbuild dev: changed 2 more files",
                 "sqlbuild dev: gen 3 failed \u{b7} still serving gen 2: models/finance/fct_revenue.sql:42:7 unknown column net_amount_usd",
+                "sqlbuild dev: warehouse sync stopped: 5 failed reads in a row: ProgrammingError: insufficient privileges",
             ]),
         },
     ];

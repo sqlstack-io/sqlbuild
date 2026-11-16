@@ -11,7 +11,7 @@ use tokio::time::Instant;
 use crate::native_commands::_helpers::execution::{metadata_sync, safety_sync_seconds};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
-    MetadataBackoffTestCase, MetadataRetryTestCase, SafetySyncIdleTestCase,
+    MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
     SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
 
@@ -137,6 +137,52 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
                 test_case.expected_halted,
                 test_case.expected_paging,
             ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_stopped_sync_when_its_safety_sync_is_due_then_it_makes_one_attempt() {
+    let test_cases = [
+        SafetyResumeTestCase {
+            description: "before the safety sync is due the sync stays stopped",
+            safety_seconds: 1800,
+            due_in: Duration::from_secs(600),
+            expected_outcome: (false, false, None, true),
+        },
+        SafetyResumeTestCase {
+            description: "a due safety sync resumes it, and one more failure stops it for another interval",
+            safety_seconds: 1800,
+            due_in: Duration::ZERO,
+            expected_outcome: (true, true, None, true),
+        },
+        SafetyResumeTestCase {
+            description: "with safety syncs off only a request or a publication resumes it",
+            safety_seconds: 0,
+            due_in: Duration::ZERO,
+            expected_outcome: (false, false, None, true),
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
+        state.begin_sync(Utc::now());
+        let stopped: Vec<Option<Duration>> = (0..5).map(|_| state.fail_read(false)).collect();
+        state.safety_at = Instant::now() + test_case.due_in;
+        let resumed: bool = state.resume_after_safety_wait();
+        let paging: bool = state.paging();
+        let wait: Option<Duration> = state.fail_read(false);
+        assert_eq!(
+            (
+                stopped[4],
+                (resumed, paging, wait, state.halted),
+                (state.safety_at.saturating_duration_since(Instant::now())
+                    + Duration::from_secs(1))
+                .as_secs()
+                    >= test_case.safety_seconds,
+            ),
+            (None, test_case.expected_outcome, true),
             "{}",
             test_case.description
         );

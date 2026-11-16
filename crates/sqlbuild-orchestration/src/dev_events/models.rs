@@ -53,6 +53,8 @@ pub enum DevEvent {
         message: String,
         position: Option<SourcePosition>,
     },
+    /// Something the location could not do, such as a warehouse sync that stopped; it keeps serving.
+    Warning { title: String, detail: String },
 }
 
 /// What `sqb dev` asks its location child to do, one JSON line each on the child's stdin.

@@ -289,6 +289,13 @@ class DevelopmentDiscoveryTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentWarningTestCase:
+    description: str
+    expected_line: str
+    hidden_line: str
+
+
+@dataclass(frozen=True)
 class DevelopmentTerminalTestCase:
     description: str
     environment: dict[str, str]

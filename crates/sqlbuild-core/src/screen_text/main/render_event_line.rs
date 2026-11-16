@@ -3,7 +3,7 @@
 use crate::screen_text::_helpers::rows::{column, elapsed_text, render_row, right, span};
 use crate::screen_text::constants::{
     CHANGED_GLYPH, EVENT_CLOCK_WIDTH, EVENT_DETAIL_WIDTH, EVENT_TITLE_WIDTH, FAIL_GLYPH, OK_GLYPH,
-    RESTARTED_GLYPH, STARTED_GLYPH, TIME_WIDTH,
+    RESTARTED_GLYPH, STARTED_GLYPH, TIME_WIDTH, WARN_GLYPH,
 };
 use crate::screen_text::models::{EventLine, EventMark, ScreenFacts, Segment, Tone};
 
@@ -16,6 +16,7 @@ pub fn render_event_line(event: &EventLine, facts: &ScreenFacts) -> Vec<String> 
         EventMark::Failed => (FAIL_GLYPH, Tone::Error),
         EventMark::Restarted => (RESTARTED_GLYPH, Tone::Warning),
         EventMark::Started => (STARTED_GLYPH, Tone::Link),
+        EventMark::Warning => (WARN_GLYPH, Tone::Warning),
     };
     let title_tone: Tone = if event.mark == EventMark::Failed {
         Tone::Error

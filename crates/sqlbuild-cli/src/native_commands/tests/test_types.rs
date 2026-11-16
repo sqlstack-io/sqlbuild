@@ -112,6 +112,15 @@ pub(super) struct MetadataBackoffTestCase {
     pub(super) expected_paging: (bool, bool),
 }
 
+/// A sync stopped by failed reads, its safety interval and how soon the safety sync is due.
+pub(super) struct SafetyResumeTestCase {
+    pub(super) description: &'static str,
+    pub(super) safety_seconds: u64,
+    pub(super) due_in: std::time::Duration,
+    /// Whether it resumed and pages, the next failure's wait, and whether that stopped it again.
+    pub(super) expected_outcome: (bool, bool, Option<std::time::Duration>, bool),
+}
+
 /// A completed state-table read, the later scan of the same table, and whether that scan may skip.
 pub(super) struct UnchangedScanTestCase {
     pub(super) description: &'static str,

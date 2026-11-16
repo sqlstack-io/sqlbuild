@@ -2,10 +2,12 @@
 
 import json
 import os
+import signal
 import sqlite3
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
 from itertools import islice
 from pathlib import Path
 from typing import Any
@@ -25,7 +27,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentDiscoveryTestCase,
     DevelopmentTestCase,
+    DevelopmentWarningTestCase,
     SnapshotApi,
+)
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
+    record_finished_run,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     current_snapshot,
@@ -34,7 +40,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_connection_health,
     wait_for_development_ready,
     wait_for_generation,
+    wait_for_log,
     wait_for_run,
+    wait_for_warehouse_sync_health,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
@@ -261,3 +269,55 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
         stop_location(process, int(interpreters[0]), log)
 
     assert len(interpreters) == test_case.expected_imports, log.read_text()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DevelopmentWarningTestCase(
+            "a failed warehouse read is a plain line, without the detailed log",
+            "sqlbuild dev: warehouse read failed: retrying in 30s: ",
+            "Warehouse history read failed; retaining mirror",
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_plain_development_when_a_warehouse_read_fails_then_a_warning_line_says_so(
+    test_case: DevelopmentWarningTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files=PYTHON_PIPELINE_FILES
+        | {
+            "sqlbuild_project.toml": 'default_target = "development"\n'
+            + PYTHON_PIPELINE_FILES["sqlbuild_project.toml"]
+            + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
+            + '[targets.development]\nschema = "main"\n',
+        },
+    )
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    log: Path = tmp_path / "development.log"
+    arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
+    environment: dict[str, str] = dict(os.environ)
+    _ = environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
+    with location_process(
+        arguments, log, tmp_path / "publications.jsonl", env=environment
+    ) as process:
+        url, identity = wait_for_development_ready(process, log)
+        api: SnapshotApi = SnapshotApi(url, identity, "local-development")
+        _ = wait_for_warehouse_sync_health(
+            api,
+            {"failure": None, "tables": ["fingerprints"]},
+            process,
+            log,
+            after=datetime(1970, 1, 1, tzinfo=UTC),
+        )
+        _ = (project / "warehouse.duckdb").rename(tmp_path / "retained.duckdb")
+        record_finished_run(project / ".sqlbuild/control.sqlite3")
+        wait_for_log(process, log, test_case.expected_line, timeout=45)
+        process.send_signal(signal.SIGTERM)
+        assert process.wait(timeout=15) == 0, log.read_text()
+
+    assert test_case.hidden_line not in log.read_text()

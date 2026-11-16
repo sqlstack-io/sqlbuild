@@ -18,7 +18,8 @@ use crate::native_commands::_helpers::execution::{
     metadata_health, next_scan, statistics_page,
 };
 use crate::native_commands::_helpers::execution::{
-    failed_read, finish_metadata_page, read_metadata_page, wait_for_file,
+    failed_read, finish_metadata_page, location_warning, read_metadata_page, retry_stopped_sync,
+    wait_for_file,
 };
 use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
@@ -34,6 +35,7 @@ pub(super) async fn sync_location_metadata(
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
+    retry_stopped_sync(&mut state);
     if state.halted
         || Instant::now() < state.next_at
         || state.locations.is_empty()
@@ -139,6 +141,10 @@ fn retry_metadata(
     }
     state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
     state.reader = None;
+    location_warning(
+        "warehouse sync failed",
+        format!("retrying in {METADATA_POLL_SECONDS}s: {error}"),
+    );
     drop(write_output(&[(
         Stream::Stderr,
         &format!(

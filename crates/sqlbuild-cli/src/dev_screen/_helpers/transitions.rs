@@ -187,6 +187,25 @@ pub(crate) fn child_event(
             now,
             clock,
         ),
+        DevEvent::Warning { title, detail } => {
+            let lines: Vec<String> = report_lines(
+                &screen,
+                Report {
+                    clock,
+                    mark: EventMark::Warning,
+                    plain: format!("{title}: {detail}"),
+                    title,
+                    detail: String::new(),
+                    elapsed: None,
+                    notes: vec![vec![Segment {
+                        text: detail,
+                        tone: Tone::Muted,
+                        link: None,
+                    }]],
+                },
+            );
+            (screen, lines)
+        }
     }
 }
 

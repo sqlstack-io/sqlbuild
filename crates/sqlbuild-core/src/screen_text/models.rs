@@ -141,6 +141,7 @@ pub enum EventMark {
     Failed,
     Restarted,
     Started,
+    Warning,
 }
 
 /// One timestamped event line of the `sqb dev` screen, with any indented notes below it.

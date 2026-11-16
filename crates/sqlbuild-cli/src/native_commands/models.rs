@@ -315,6 +315,8 @@ impl LocationMetadataSync {
             self.failed_reads += 1;
             if self.failed_reads >= METADATA_FAILURE_LIMIT {
                 self.halted = true;
+                self.safety_at = tokio::time::Instant::now()
+                    + std::time::Duration::from_secs(self.safety_seconds);
                 return None;
             }
             METADATA_POLL_SECONDS << (self.failed_reads - 1)
@@ -322,6 +324,18 @@ impl LocationMetadataSync {
         let wait = std::time::Duration::from_secs(seconds);
         self.next_at = tokio::time::Instant::now() + wait;
         Some(wait)
+    }
+
+    /// A stopped sync tries once more when its safety sync is due; one more failure stops it again.
+    pub(crate) fn resume_after_safety_wait(&mut self) -> bool {
+        let now = tokio::time::Instant::now();
+        let due: bool = self.halted && self.safety_seconds > 0 && now >= self.safety_at;
+        if due {
+            self.halted = false;
+            self.failed_reads = METADATA_FAILURE_LIMIT - 1;
+            self.next_at = now;
+        }
+        due
     }
 
     /// A synchronization is mid-flight and its next page is due, so the loop need not wait a tick.
