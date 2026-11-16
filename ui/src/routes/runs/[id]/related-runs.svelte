@@ -72,7 +72,7 @@
 		<div class="details">
 			<dl>
 				{#if p}
-				<div><dt>Project version</dt><dd>Version {p.snapshotGeneration}{#if p.gitRevision} · commit <code>{p.gitRevision}</code>{/if}{p.gitDirty ? ' (with uncommitted changes)' : ''} <span class="faint">· snapshot <code>{p.snapshotId}</code></span></dd></div>
+				<div><dt>Project version</dt><dd>Version {p.snapshotGeneration}{#if p.gitRevision} · commit <code>{p.gitRevision}</code>{/if}{#if p.gitDirty}<span title="Published with uncommitted changes"> · dirty</span>{/if} <span class="faint">· snapshot <code>{p.snapshotId}</code></span></dd></div>
 				{#if p.command}<div><dt>Command</dt><dd><code>{p.command}</code> <CopyButton value={p.command} label="Copy command" /></dd></div>{/if}
 				{#if p.selection.length || p.exclude.length}
 					<div><dt>Selection</dt><dd>{@render selection(p.selection)}{#if p.exclude.length} excluding <code>{p.exclude.join(' ')}</code>{/if}</dd></div>
@@ -81,7 +81,7 @@
 				{:else if d.selection.length}
 				<div><dt>Selection</dt><dd>{@render selection(d.selection)}</dd></div>
 				{/if}
-				<div><dt>Rebuilds history</dt><dd>{d.run.rewriteHistory ? 'Yes: a full refresh or a set time window, so it needs extra permission to rerun' : 'No'}</dd></div>
+				<div><dt>Rebuilds history</dt><dd title={d.run.rewriteHistory ? 'Full refresh or set window; rerun needs run.rewrite_history' : undefined}>{d.run.rewriteHistory ? 'Yes' : 'No'}</dd></div>
 				<div><dt>Priority</dt><dd>{d.run.priority}</dd></div>
 				<div><dt>Run ID</dt><dd><code>{d.run.id}</code> <CopyButton value={d.run.id} label="Copy run ID" /></dd></div>
 				{#if d.run.runKey}<div><dt>Sensor run key</dt><dd><code>{d.run.runKey}</code></dd></div>{/if}

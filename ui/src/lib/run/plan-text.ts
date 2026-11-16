@@ -204,8 +204,8 @@ export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | '
 	const mine = triggers.filter((t) => t.jobKey === job);
 	const live = mine.filter((t) => t.state === 'running');
 	if (mine.length && !live.length) return `job ${job} is paused`;
-	if (schedulerStopped && live.length) return `job ${job} · can’t start until the scheduler is running again`;
+	if (schedulerStopped && live.length) return `job ${job} · scheduler stopped`;
 	const next = live.flatMap((t) => (t.nextDueAt ? [t.nextDueAt] : [])).sort()[0];
 	if (next) return `job ${job} · next run ${formatIn(next, now)}`;
-	return live.some((t) => t.type === 'sensor') ? `job ${job} · when its sensor fires` : `job ${job}`;
+	return live.some((t) => t.type === 'sensor') ? `job ${job} · on sensor` : `job ${job}`;
 }

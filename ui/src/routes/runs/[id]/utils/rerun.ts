@@ -28,13 +28,13 @@ export function rerunChoices(detail: RunDetail, selected: readonly string[], can
 	choices.push({
 		mode: 'from_failure',
 		label: 'Rerun from failure',
-		help: failures ? `Runs the ${plural(failures, 'node')} that failed or were skipped because of a failure` : 'Nothing failed',
+		help: failures ? `${plural(failures, 'failed or skipped node')}` : 'Nothing failed',
 		disabledReason: common ?? (failures ? null : 'Nothing failed or was skipped in this run')
 	});
 	choices.push({
 		mode: 'all',
 		label: 'Rerun all',
-		help: `Runs the whole ${run.kind === 'group' ? 'group' : run.kind === 'adhoc' ? 'selection' : 'job'} again`,
+		help: `Whole ${run.kind === 'group' ? 'group' : run.kind === 'adhoc' ? 'selection' : 'job'}`,
 		disabledReason: common
 	});
 	return choices;

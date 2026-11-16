@@ -74,7 +74,7 @@
 	]);
 </script>
 
-<DataTable class="compact statements" embedded columns={statementColumns} rows={statements} key={(st) => st.id} empty={total ? 'No queries match the filter.' : 'No queries yet. They appear here as the run sends them to the warehouse.'}>
+<DataTable class="compact statements" embedded columns={statementColumns} rows={statements} key={(st) => st.id} empty={total ? 'No queries match the filter.' : 'No queries yet.'}>
 	{#snippet row(st)}
 				<tr class="row" class:open={open.has(st.id)} onclick={() => toggle(st)}>
 					<td class="caret-col"><DisclosureButton open={open.has(st.id)}><span class="sr-only">{open.has(st.id) ? 'Hide' : 'Show'} statement {st.sequence}</span></DisclosureButton></td>

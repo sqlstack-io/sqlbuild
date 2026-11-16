@@ -57,7 +57,7 @@
 	]);
 
 	// Only a problem gets a word; the dot and its title cover the usual states, as the top bar already says Live.
-	const freshnessText = { reconnecting: 'Reconnecting', stale: 'Stale' } as const;
+	const freshnessText = { reconnecting: 'Reconnecting', stale: 'Paused · refresh' } as const;
 	const freshnessTitle = {
 		connecting: 'Connecting for live updates…',
 		live: 'Updates arrive as runs change',

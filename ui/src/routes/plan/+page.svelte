@@ -403,7 +403,6 @@
 					<RotateCwIcon size={16} class="animate-spin" />
 					<div>
 						<div>{waiting === 'plan' ? 'Planning on the location…' : 'Checking the command…'}</div>
-						<div class="faint">{waiting === 'plan' ? 'Reading the current warehouse state' : 'Resolving what it selects'}</div>
 					</div>
 				</div>
 			</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -131,7 +132,7 @@
 					]}
 			onselect={choose}
 		/>
-		<span class="faint note">Repeats each run's own version and settings, as frozen when it started</span>
+		<HelpTip text="Repeats each run's own version and settings, as frozen when it started" label="About rerunning" />
 	</div>
 
 	{#if loadError}<p class="problem-bar">{loadError}</p>{/if}
@@ -214,11 +215,6 @@
 	.jobchip a {
 		font-family: var(--font-mono);
 		color: var(--foreground);
-	}
-	.note {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 	.problem-bar {
 		margin: 0;

@@ -64,7 +64,7 @@
 									failed{#if why.runId !== n.runId}&nbsp;in {why.jobKey ?? shortRunId(why.runId)}{/if}
 								</div>
 							{:else if notRunReason(n)}
-								<div class="why">{notRunReason(n)}</div>
+								<div class="why" title={n.status === 'not_run' ? 'The run ended before this node started' : undefined}>{notRunReason(n)}</div>
 							{/if}
 						</li>
 					{/each}

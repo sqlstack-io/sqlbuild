@@ -106,9 +106,9 @@
 			const across = n.skippedBecauseOf.runId !== n.runId;
 			return `skipped: ${n.skippedBecauseOf.nodeKey} failed${across ? ` in ${n.skippedBecauseOf.jobKey ?? n.skippedBecauseOf.runId}` : ''}`;
 		}
-		if (n.status === 'pending') return 'not started yet';
-		if (n.status === 'not_run') return 'not run: the run ended first';
-		if (n.status === 'cancelled') return 'not run: cancelled';
+		if (n.status === 'pending') return 'Pending';
+		if (n.status === 'not_run') return 'Not run';
+		if (n.status === 'cancelled') return 'Cancelled';
 		return n.status;
 	}
 </script>
