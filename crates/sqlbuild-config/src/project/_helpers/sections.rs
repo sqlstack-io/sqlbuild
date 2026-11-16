@@ -11,9 +11,9 @@ use crate::project::_helpers::keys::{Place, reject_removed_virtual_keys, validat
 use crate::project::_helpers::targets::seconds_value;
 use crate::project::_helpers::values::{int_below, python_equal};
 use crate::project::constants::{
-    ALLOW_MISSING_SECRETS_KEY, DEFAULT_TEST_TIMEOUT, DEFAULT_UNIT_TEST_MAX_REAL_MODELS,
-    DELTA_COMPILE_KEY, DISABLED_VALUE, SCENARIO_TIMEOUT_KEY, TEST_TIMEOUT_KEY,
-    UNIT_TEST_MAX_REAL_MODELS_KEY,
+    ALLOW_MISSING_SECRETS_KEY, ALLOW_WAREHOUSE_ROUND_TRIPS_KEY, DEFAULT_TEST_TIMEOUT,
+    DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE, SCENARIO_TIMEOUT_KEY,
+    TEST_TIMEOUT_KEY, UNIT_TEST_MAX_REAL_MODELS_KEY,
 };
 use crate::project::constants::{
     AUDIT_SEVERITIES, CHECK_DECLARED_COLUMNS_KEY, COLLECTION_RENDERINGS, COLUMN_CONTRACT_MODES,
@@ -282,6 +282,14 @@ pub(crate) fn load_settings(payload: Option<&ConfigValue>, file: ConfigFile) -> 
             Built::Value(ConfigValue::Bool(optional_bool(
                 mapping,
                 ALLOW_MISSING_SECRETS_KEY,
+                false,
+            )?)),
+        ),
+        (
+            ALLOW_WAREHOUSE_ROUND_TRIPS_KEY,
+            Built::Value(ConfigValue::Bool(optional_bool(
+                mapping,
+                ALLOW_WAREHOUSE_ROUND_TRIPS_KEY,
                 false,
             )?)),
         ),
