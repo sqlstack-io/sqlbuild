@@ -902,7 +902,7 @@ def _execute_dml(
     """Execute the incremental DML strategy from delta into target."""
 
     strategy: str | None = entry.incremental_strategy
-    unique_key: tuple[str, ...] = entry.unique_key
+    unique_key: tuple[str, ...] = entry.replace_key or entry.unique_key
 
     target_col_set: frozenset[str] = frozenset(column_name_key(col.name) for col in target_columns)
     intersection_names: tuple[str, ...] = tuple(
@@ -923,7 +923,6 @@ def _execute_dml(
         )
 
     if strategy == IncrementalStrategy.DELETE_INSERT:
-        unique_key = entry.replace_key or unique_key
         cursor_column: str | None = entry.cursor_column
         if cursor_column is not None:
             if cursor_start is None or cursor_end is None:

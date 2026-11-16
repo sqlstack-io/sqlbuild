@@ -690,7 +690,6 @@ pub(crate) fn assemble_model_plan_entry<'py>(
         )?,
         "value",
     )?;
-    // Only delete_insert accepts replace_key, and then it is the key whose rows are replaced.
     let delete_key: &Bound<'py, PyTuple> = if replace_key.is_empty()? {
         &unique_key
     } else {
