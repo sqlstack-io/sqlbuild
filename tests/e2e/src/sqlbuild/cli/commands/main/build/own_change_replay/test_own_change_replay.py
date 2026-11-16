@@ -368,6 +368,7 @@ def test_given_full_refresh_flag_on_cursor_intrinsic_merge_when_planning_then_na
     refused: subprocess.CompletedProcess[str] = plan(
         project_dir=project_dir, args=("--json", "--full-refresh", "--select", "downstream")
     )
+    assert refused.returncode != 0, refused.stdout + refused.stderr
     assert json.loads(refused.stdout)["error"]["code"] == "S204", refused.stdout + refused.stderr
 
 
