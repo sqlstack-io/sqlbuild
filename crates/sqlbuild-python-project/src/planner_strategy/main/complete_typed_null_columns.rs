@@ -1,6 +1,6 @@
 //! Fixture SQL with its untyped null columns cast to the expected types.
 
-use crate::planner_strategy::_helpers::fixture_sql;
+use crate::planner_strategy::_helpers::fixtures::fixture_sql;
 use pyo3::prelude::Bound;
 use pyo3::prelude::PyAny;
 use pyo3::prelude::PyResult;

@@ -4,6 +4,7 @@ use crate::analysis::models::Positional;
 use crate::analysis_session::_helpers::fixture_columns::infer_fixture_column_facts;
 use crate::analysis_session::_helpers::nullability_rules::RuleFailure;
 use crate::analysis_session::_helpers::nullability_rules::raised;
+use crate::analysis_session::_helpers::session::ColumnRow;
 use crate::analysis_session::_helpers::session::ContractRow;
 use crate::analysis_session::_helpers::session::FinishRow;
 use crate::analysis_session::_helpers::session::OutcomeRow;
@@ -207,6 +208,38 @@ pub struct RequestRow {
     pub catalog_schemas: Shapes,
     pub dynamic_families_by_table: Vec<(String, Vec<FamilyRow>)>,
     pub models: Vec<ModelRow>,
+}
+
+/// One dynamic pivot proof.
+#[derive(Debug)]
+pub struct ProofRow {
+    pub output_proven: bool,
+    pub fixed_columns: Vec<ColumnRow>,
+    /// `(family, inferred type)` of each family.
+    pub families: Vec<(String, Option<String>)>,
+    pub input_relations: Vec<String>,
+    pub failure_reason: Option<String>,
+    pub bare_dynamic_pivot: bool,
+}
+
+impl<'py> pyo3::IntoPyObject<'py> for ProofRow {
+    type Target = pyo3::types::PyTuple;
+    type Output = pyo3::Bound<'py, pyo3::types::PyTuple>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        pyo3::IntoPyObject::into_pyobject(
+            (
+                self.output_proven,
+                self.fixed_columns,
+                self.families,
+                self.input_relations,
+                self.failure_reason,
+                self.bare_dynamic_pivot,
+            ),
+            py,
+        )
+    }
 }
 
 /// The dialect, relation facts and families by table every proof reads, and the models.

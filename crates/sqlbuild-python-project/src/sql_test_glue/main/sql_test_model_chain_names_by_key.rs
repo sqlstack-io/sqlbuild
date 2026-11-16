@@ -1,6 +1,6 @@
 //! Return model closures resolved natively in one project batch, keyed by SQL test key.
 
-use crate::sql_test_glue::_helpers::plan_driver;
+use crate::sql_test_glue::_helpers::plan::plan_driver;
 use pyo3::prelude::Bound;
 use pyo3::prelude::PyAny;
 use pyo3::prelude::PyResult;

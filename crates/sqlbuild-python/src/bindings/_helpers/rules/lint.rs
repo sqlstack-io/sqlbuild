@@ -8,7 +8,7 @@ use sqlbuild_rules::lint_text::types::PreparedSql;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_project::analysis::models::Positional;
-use sqlbuild_python_project::compiled_views::main::relation_keys::register_relation_keys::register_relation_keys;
+use sqlbuild_python_project::compiled_views::main::compiled_models::register_relation_keys::register_relation_keys;
 
 #[pyfunction]
 fn lint_sql_json(py: Python<'_>, request_json: &str) -> PyResult<String> {

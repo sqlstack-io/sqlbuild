@@ -10,12 +10,12 @@ use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::seed_reads::schema_entry::schema_entry;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_entry::source_entry;
 use sqlbuild_python_project::planner_phases::main::config_str::config_str;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 use std::collections::HashMap;
 
 const CONTRACT_KEY: &str = "contract";
@@ -77,7 +77,9 @@ pub(crate) fn validate_watermark_column<'py>(
     let kind = native_field(reference, "ref_kind")?;
     let ref_name: String = native_field(reference, "ref_name")?.extract()?;
     let model_name: String =
-        sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name(model)?;
+        sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name(
+            model,
+        )?;
     let lowered =
         |value: &str| -> PyResult<String> { text(py, value).call_method0("lower")?.extract() };
     let (names, types) = if kind.eq("ref")? {

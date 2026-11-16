@@ -4,7 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
 
-use crate::compiled_views::main::model_input_view::input_reference_rows::input_reference_rows;
+use crate::compiled_views::main::model_inputs::input_reference_rows::input_reference_rows;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

@@ -12,11 +12,11 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
-use sqlbuild_python_project::compiled_views::main::project_reads::sources::sources;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_entry::source_entry;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
 use sqlbuild_python_project::planner_phases::main::frozenset::frozenset;
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 use std::collections::{BTreeSet, HashSet};
 
 fn entries_of<'py>(

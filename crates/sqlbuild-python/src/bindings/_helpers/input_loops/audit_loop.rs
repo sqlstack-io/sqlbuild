@@ -46,8 +46,8 @@ use sqlbuild_python_front::model_config::models::PyNode;
 use sqlbuild_python_project::compiled_project::models::AuditBlockRow;
 use sqlbuild_python_project::compiled_project::models::AuditFileRow;
 use sqlbuild_python_project::compiled_project::models::AuditSettings;
-use sqlbuild_python_project::compiled_views::models::AuditHandles;
-use sqlbuild_python_project::compiled_views::types::AttachedAudit;
+use sqlbuild_python_project::resource_views::models::AuditHandles;
+use sqlbuild_python_project::resource_views::types::AttachedAudit;
 
 const THRESHOLDS_KEY: &str = "thresholds";
 const MINIMUM_SAMPLES_KEY: &str = "minimum_samples";

@@ -19,8 +19,8 @@ use sqlbuild_core::constants::STAGED_PROMOTION_MODE;
 use sqlbuild_sqltext::compiler::main::model_output_columns::model_output_columns;
 
 use crate::compiled_project::models::NativeCompiledProject;
-use crate::compiled_views::main::model_reads::enum_columns::enum_columns;
-use crate::compiled_views::main::records::compiled_project_facts::compiled_project_facts;
+use crate::compiled_views::main::compiled_models::enum_columns::enum_columns;
+use crate::compiled_views::main::project::compiled_project_facts::compiled_project_facts;
 use crate::contracts::_helpers::model_contracts::ConflictRow;
 use crate::contracts::_helpers::model_contracts::DiagnosticRow;
 use crate::contracts::_helpers::model_contracts::evaluate_project_model_contracts;

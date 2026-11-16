@@ -32,6 +32,7 @@ use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_base::types::FromPositional;
 use sqlbuild_python_base::types::IntoPositional;
+use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
@@ -293,6 +294,15 @@ pub struct SchemaRequestParts<'py> {
     pub quoted_identifiers_ignore_case: bool,
 }
 
+#[derive(FromPyObject, Debug)]
+#[pyo3(from_item_all)]
+pub struct NormalizationInput {
+    pub sql: String,
+    pub dialect: String,
+    pub stubs: HashMap<String, String>,
+    pub placeholders: HashMap<String, String>,
+}
+
 #[pyclass(module = "sqlbuild._native")]
 #[derive(Debug)]
 pub struct ProjectCatalog {
@@ -317,6 +327,17 @@ impl std::fmt::Debug for CompactAnalysisJob {
 #[derive(Debug)]
 pub struct BindingPositions {
     pub inner: validation::BindingPositions,
+}
+
+impl From<NormalizationInput> for validation::NormalizationInput {
+    fn from(input: NormalizationInput) -> Self {
+        Self {
+            sql: input.sql,
+            dialect: input.dialect,
+            stubs: input.stubs,
+            placeholders: input.placeholders,
+        }
+    }
 }
 
 /// A record of another crate exchanged with Python as its positional tuple.

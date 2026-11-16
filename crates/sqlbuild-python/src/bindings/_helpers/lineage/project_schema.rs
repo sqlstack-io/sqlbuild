@@ -6,8 +6,8 @@ use sqlbuild_analysis::lineage::models::{
 };
 
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_views::main::model_reads::declared_rows::declared_rows;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::declared_rows::declared_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
 
 type TypedColumns = Vec<(String, Option<String>)>;
 

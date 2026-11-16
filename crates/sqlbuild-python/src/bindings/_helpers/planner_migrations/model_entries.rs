@@ -22,7 +22,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::state_rows::main::migrations::newest_move::newest_move;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 pub(super) fn relation<'py>(location: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?.call1((location,))
@@ -77,7 +77,7 @@ pub(super) fn decide<'py>(
     let request = decision_request.request;
     let item = request.model.clone();
     let destination =
-        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             &item,
         )?;
     let origin = decision_request.origin.clone();

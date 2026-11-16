@@ -18,7 +18,7 @@ use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::graph::main::python_node_graph::run_selection_from_inputs::run_selection_from_inputs;
+use sqlbuild_python_project::graph::main::python_nodes::run_selection_from_inputs::run_selection_from_inputs;
 
 /// Locations of the deferred target's relations, when the options defer to one.
 fn deferred_locations<'py>(

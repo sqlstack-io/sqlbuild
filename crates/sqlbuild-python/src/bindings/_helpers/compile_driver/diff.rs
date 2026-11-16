@@ -21,9 +21,9 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_key::model_key;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::graph::main::views::project_lineage_views::project_lineage_views;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::graph::main::project::project_lineage_views::project_lineage_views;
 
 /// Indexes of the `CompiledObjectKey`s a diff graph names, assigned on first sight.
 struct KeyIndexes<'py> {

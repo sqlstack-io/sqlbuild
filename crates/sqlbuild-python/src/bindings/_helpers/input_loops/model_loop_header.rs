@@ -45,7 +45,7 @@ use sqlbuild_python_front::model_config::models::HeaderColumns;
 use sqlbuild_python_front::model_config::models::HeaderFamilies;
 use sqlbuild_python_front::model_config::models::NativeColumnSpec;
 use sqlbuild_python_front::model_config::types::HeaderValue;
-use sqlbuild_python_project::compiled_project::main::schema_facts::family_fact::family_fact;
+use sqlbuild_python_project::compiled_project::main::family_fact::family_fact;
 
 const DESCRIPTION_KEY: &str = "description";
 const COLUMNS_KEY: &str = "columns";

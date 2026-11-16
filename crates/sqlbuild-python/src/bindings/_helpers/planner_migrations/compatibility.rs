@@ -18,8 +18,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_rows::inferred_rows;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 fn config(model: &Bound<'_, PyAny>, key: &str) -> PyResult<Option<String>> {
     config_value(model.py(), &model_values(model)?, key)?.extract()

@@ -11,9 +11,9 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_front::contracts::main::matching_dynamic_families::matching_dynamic_families;
 use sqlbuild_python_front::model_config::main::config::config_text::config_text;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::function_reads::language::language;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::language::language;
 
 use sqlbuild_analysis::planner_changes::constants::{
     CASE_FOLDING_DIALECT, EMPTY_FINGERPRINT_METADATA_JSON,
@@ -49,11 +49,12 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::type_system::main::types_equal::types_equal as native_types_equal;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_rows::inferred_rows;
-use sqlbuild_python_project::compiled_views::main::model_reads::star_flags::star_flags;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::star_flags::star_flags;
 use sqlbuild_python_project::planner_identity::main::baselined_function_definition_hash::baselined_function_definition_hash;
 use sqlbuild_python_project::planner_identity::main::baselined_model_query_hash::baselined_model_query_hash;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::resource_views::main::function_reads::key::key;
 use sqlbuild_python_project::semantic_shapes::main::snapshot_validity_columns::snapshot_validity_columns;
 
 const CHANGES_LOGGER: &str = "sqlbuild.planner.changes";
@@ -115,23 +116,19 @@ pub(crate) fn detect_changes<'py>(
         native_field(&native_field(project, "settings")?, "query_change_tracking")?.is_truthy()?;
     let dialect: Option<String> = native_field(snapshot, "column_dialect")?.extract()?;
     for function in
-        sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(project)?
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?
             .try_iter()?
     {
         let function: Bound<'py, PyAny> = function?;
         let name: Bound<'py, PyAny> =
-            sqlbuild_python_project::compiled_views::main::function_reads::name::name(&function)?;
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?;
         let fingerprint_sql: String = compiled_function_fingerprint_sql(&function)?;
         let mut arguments: Vec<(&str, Bound<'py, PyAny>)> = vec![(
             "fingerprint_sql",
             PyString::new(py, &fingerprint_sql).into_any(),
         )];
         if selected.selected.contains(
-            &sqlbuild_python_project::graph::main::keys::native_key::native_key(
-                &sqlbuild_python_project::compiled_views::main::function_reads::key::key(
-                    &function,
-                )?,
-            )?,
+            &sqlbuild_python_project::graph::main::nodes::native_key::native_key(&key(&function)?)?,
         ) {
             let reason: &str = if full_refresh {
                 "full_refresh"
@@ -230,9 +227,7 @@ pub(crate) fn scope_model_changes<'py>(
         }
     };
     let function_local_hashes: Bound<'py, PyAny> = function_local_hashes(
-        &sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(
-            project,
-        )?,
+        &sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?,
         native_field(project, "sql_analysis_dialect")?
             .extract::<Option<String>>()?
             .as_deref(),
@@ -514,7 +509,7 @@ fn model_schema_findings<'py>(
         warehouse.retain(|(name, _)| !column.eq_ignore_ascii_case(name));
     }
     let schema_entry: Bound<'py, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
             model,
         )?;
     let mut yml: Vec<(String, String)> = Vec::new();

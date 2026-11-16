@@ -9,10 +9,10 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::records::project_with::project_with;
-use sqlbuild_python_project::compiled_views::models::NativeCompiledFunction;
+use sqlbuild_python_project::compiled_views::main::project::project_with::project_with;
 use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
-use sqlbuild_python_project::compiled_views::models::NativeCompiledSeed;
+use sqlbuild_python_project::resource_views::models::NativeCompiledFunction;
+use sqlbuild_python_project::resource_views::models::NativeCompiledSeed;
 
 /// The adapter defaults every compiled location falls back to.
 pub(crate) struct TargetDefaults<'py> {

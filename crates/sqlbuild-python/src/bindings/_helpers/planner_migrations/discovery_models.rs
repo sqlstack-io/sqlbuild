@@ -12,10 +12,11 @@ use sqlbuild_analysis::planner_migrations::main::discovery_order::discovery_orde
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
-use sqlbuild_python_project::compiled_views::main::model_reads::deps::deps;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_key::model_key;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::BTreeMap;
@@ -23,11 +24,7 @@ use std::collections::BTreeMap;
 pub(super) fn ordered<'py>(runtime: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let mut models: BTreeMap<String, Bound<'py, PyAny>> = BTreeMap::new();
     let mut dependencies: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for item in sqlbuild_python_project::compiled_views::main::project_reads::models::models(
-        &runtime_field(runtime, |runtime| &runtime.project)?,
-    )?
-    .try_iter()?
-    {
+    for item in compiled_models(&runtime_field(runtime, |runtime| &runtime.project)?)?.try_iter()? {
         let item = item?;
         let name: String = name_object(&item)?.extract()?;
         let mut upstream: Vec<String> = Vec::new();
@@ -77,7 +74,7 @@ pub(super) fn metadata<'py>(
     let functions = object(
         py,
         build_function_local_hashes(
-            &sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(
+            &sqlbuild_python_project::compiled_views::main::project::functions::functions(
                 &project,
             )?,
             native_field(&project, "sql_analysis_dialect")?

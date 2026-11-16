@@ -29,7 +29,7 @@ use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_front::model_config::models::AuditInstance;
 use sqlbuild_python_front::model_config::types::HeaderValue;
 use sqlbuild_python_front::model_config::types::PyConfigNode;
-use sqlbuild_python_project::compiled_views::main::model_reads::binding_validated::binding_validated;
+use sqlbuild_python_project::compiled_views::main::compiled_models::binding_validated::binding_validated;
 use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
 use sqlbuild_python_project::semantic_shapes::main::project_shapes::project_shapes;
 

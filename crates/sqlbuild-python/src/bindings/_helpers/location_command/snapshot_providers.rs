@@ -13,7 +13,7 @@ use sqlbuild_python_base::orchestration_reads::main::missing_secrets::missing_se
 use sqlbuild_python_base::orchestration_reads::main::provider_class_settings::provider_class_settings;
 use sqlbuild_python_base::orchestration_reads::main::setting_rows::setting_rows;
 use sqlbuild_python_base::records::main::fields::field::field;
-use sqlbuild_python_project::compiled_project::main::snapshot_boundary::relative_path::relative_path;
+use sqlbuild_python_project::project_snapshot::main::relative_path::relative_path;
 
 /// How a consumer's code runs inside other snapshot nodes, besides its own node.
 #[derive(Clone, Copy)]

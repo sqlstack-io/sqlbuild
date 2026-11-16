@@ -22,7 +22,7 @@ use crate::bindings::_helpers::planner_strategy::values::{input_error, optional_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::records::replace::replace;
+use sqlbuild_python_project::compiled_views::main::project::replace::replace;
 
 const ERROR_ACTION: &str = "error";
 const SKIP_ACTION: &str = "skip";

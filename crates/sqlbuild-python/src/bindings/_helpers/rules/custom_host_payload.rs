@@ -18,11 +18,11 @@ use crate::bindings::_helpers::rules::fact_replay::{
     ModelEntry, project_attribute, project_models,
 };
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_views::main::model_reads::enum_columns::enum_columns;
-use sqlbuild_python_project::compiled_views::main::records::compiled_audit_record::compiled_audit_record;
-use sqlbuild_python_project::compiled_views::main::records::compiled_function_record::compiled_function_record;
-use sqlbuild_python_project::compiled_views::main::records::compiled_seed_record::compiled_seed_record;
-use sqlbuild_python_project::compiled_views::main::records::compiled_source_record::compiled_source_record;
+use sqlbuild_python_project::compiled_views::main::compiled_models::enum_columns::enum_columns;
+use sqlbuild_python_project::compiled_views::main::project::compiled_audit_record::compiled_audit_record;
+use sqlbuild_python_project::compiled_views::main::project::compiled_function_record::compiled_function_record;
+use sqlbuild_python_project::compiled_views::main::project::compiled_seed_record::compiled_seed_record;
+use sqlbuild_python_project::compiled_views::main::project::compiled_source_record::compiled_source_record;
 use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
 
 /// The first bytes of every payload file; hosts reject any other.

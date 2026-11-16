@@ -19,8 +19,8 @@ use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
-use sqlbuild_python_project::compiled_views::main::model_reads::config::config;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::config::config;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::native_host::models::ModelLookup;
 
 const MICROBATCH_MODE: &str = "microbatch";
@@ -44,7 +44,7 @@ fn mapped_references<'py>(
 }
 
 fn references<'py>(owner: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    sqlbuild_python_project::compiled_views::main::resource_reads::references::references(owner)?
+    sqlbuild_python_project::resource_views::main::resource_reads::references::references(owner)?
         .try_iter()?
         .collect()
 }

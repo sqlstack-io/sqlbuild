@@ -10,11 +10,11 @@ use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
-use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
-use sqlbuild_python_project::compiled_views::main::project_reads::sources::sources;
-use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::models::KeyCache;
 
 #[pyfunction]
@@ -38,7 +38,7 @@ pub(crate) fn plan_scenario_graph<'py>(
         dbt_refs: native_field(scenario, "dbt_ref_fixture_names")?.extract()?,
         ..ScenarioGraphInput::default()
     };
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         let deps = native_field(&model, "deps")?
             .try_iter()?
@@ -48,13 +48,13 @@ pub(crate) fn plan_scenario_graph<'py>(
     }
     for source in sources(project)?.try_iter()? {
         input.project_sources.insert(
-            sqlbuild_python_project::compiled_views::main::source_reads::name::name(&source?)?
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source?)?
                 .extract()?,
         );
     }
     for seed in seeds(project)?.try_iter()? {
         input.project_seeds.insert(
-            sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed?)?
+            sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed?)?
                 .extract()?,
         );
     }

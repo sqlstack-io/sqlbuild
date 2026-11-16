@@ -1,6 +1,6 @@
 //! Loader dependency mapping and synthetic source boundary construction.
 
-use crate::graph::main::views::edge_dict::edge_dict;
+use crate::graph::main::project::edge_dict::edge_dict;
 use crate::graph::models::KeyCache;
 use crate::planner_scope::_helpers::values::dependency_names;
 use crate::planner_scope::_helpers::values::edges;

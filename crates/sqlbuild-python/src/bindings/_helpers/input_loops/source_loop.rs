@@ -37,9 +37,9 @@ use sqlbuild_python_front::sqltext::main::interpolated::interpolated;
 use sqlbuild_python_front::sqltext::models::InterpolationSources;
 use sqlbuild_python_project::compiled_project::types::SourceRow;
 use sqlbuild_python_project::compiled_project::types::SourceSettings;
-use sqlbuild_python_project::compiled_views::main::source_views::replaced::replaced;
-use sqlbuild_python_project::compiled_views::models::SourceHandles;
-use sqlbuild_python_project::compiled_views::types::AttachedSource;
+use sqlbuild_python_project::resource_views::main::source_views::replaced::replaced;
+use sqlbuild_python_project::resource_views::models::SourceHandles;
+use sqlbuild_python_project::resource_views::types::AttachedSource;
 
 const MACRO_TOKEN: char = '@';
 const NATIVE_CONTEXTS_ATTRIBUTE: &str = "native_contexts";

@@ -24,8 +24,9 @@ use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::typed_values::typed_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::planner_phases::main::construct::construct;
 use sqlbuild_python_project::planner_phases::main::member::member;
 use sqlbuild_python_project::planner_phases::main::native::native;
@@ -69,10 +70,8 @@ fn selected_models<'py>(
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let scope = scope_data(scope)?;
     let mut models: Vec<_> = Vec::new();
-    for model in sqlbuild_python_project::compiled_views::main::project_reads::models::models(
-        &runtime_field(runtime, |runtime| &runtime.project)?,
-    )?
-    .try_iter()?
+    for model in
+        compiled_models(&runtime_field(runtime, |runtime| &runtime.project)?)?.try_iter()?
     {
         let model = model?;
         if scope
@@ -104,7 +103,9 @@ pub(crate) fn plan_table_types<'py>(
     for model in &models {
         if native_field(
             &native_field(
-                &sqlbuild_python_project::compiled_views::main::model_reads::config::config(model)?,
+                &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(
+                    model,
+                )?,
                 "table_type",
             )?,
             "declared",
@@ -164,10 +165,7 @@ pub(crate) fn plan_table_types<'py>(
             continue;
         }
         let downgrade = actual == Some(false) && desired_transient;
-        let destination =
-            sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                &model,
-            )?;
+        let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
         let limit: i64 = adapter
             .call_method0("maximum_identifier_length")?
             .extract()?;
@@ -355,7 +353,7 @@ fn relation_retention<'py>(
     }
     let desired_days: i64 = native_field(&retention, "desired_days")?.extract()?;
     let destination =
-        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             model,
         )?;
     let schema = native_field(&destination, "schema")?;
@@ -495,10 +493,7 @@ fn bigquery_retention<'py>(
     {
         let model = model?;
         let retention = native_field(&native_field(&model, "config")?, "time_travel_retention")?;
-        let destination =
-            sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                &model,
-            )?;
+        let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
         if native_field(&retention, "unmanaged")?.is_truthy()?
             || native_field(&retention, "desired_days")?.is_none()
             || native_field(&destination, "schema")?.is_none()
@@ -515,10 +510,7 @@ fn bigquery_retention<'py>(
     }
     let mut scopes: BTreeSet<(String, String, Option<String>)> = BTreeSet::new();
     for model in models {
-        let destination =
-            sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                model,
-            )?;
+        let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(model)?;
         let database: Option<String> = native_field(&destination, "database")?.extract()?;
         let schema: String = native_field(&destination, "schema")?.str()?.extract()?;
         scopes.insert((database.clone().unwrap_or_default(), schema, database));
@@ -624,7 +616,9 @@ pub(crate) fn plan_retention<'py>(
     let mut models: Vec<_> = Vec::new();
     for model in selected_models(runtime, scope)? {
         let retention = native_field(
-            &sqlbuild_python_project::compiled_views::main::model_reads::config::config(&model)?,
+            &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(
+                &model,
+            )?,
             "time_travel_retention",
         )?;
         if !native_field(&retention, "unmanaged")?.is_truthy()?

@@ -18,7 +18,7 @@ use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_project::analysis::models::ProjectCatalog;
 use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
-use sqlbuild_python_project::compiled_views::main::model_reads::output_proven::output_proven;
+use sqlbuild_python_project::compiled_views::main::compiled_models::output_proven::output_proven;
 
 const NO_CATALOG_MESSAGE: &str =
     "NativeCompilerError: native semantic completion: the project has no analysis catalog";

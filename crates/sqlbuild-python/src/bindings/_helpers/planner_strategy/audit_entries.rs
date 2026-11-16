@@ -16,28 +16,28 @@ use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::assert_no_unresolved_sql_markers;
 use sqlbuild_python_project::auditing::main::render_audit_sql::render_audit_sql;
-use sqlbuild_python_project::compiled_views::main::audit_reads::always_run::always_run;
-use sqlbuild_python_project::compiled_views::main::audit_reads::attached_column_name::attached_column_name;
-use sqlbuild_python_project::compiled_views::main::audit_reads::attached_target_kind::attached_target_kind;
-use sqlbuild_python_project::compiled_views::main::audit_reads::attached_target_name::attached_target_name;
-use sqlbuild_python_project::compiled_views::main::audit_reads::definition_name::definition_name;
-use sqlbuild_python_project::compiled_views::main::audit_reads::description::description;
-use sqlbuild_python_project::compiled_views::main::audit_reads::evaluation_mode::evaluation_mode;
-use sqlbuild_python_project::compiled_views::main::audit_reads::evidence_limit::evidence_limit;
-use sqlbuild_python_project::compiled_views::main::audit_reads::evidence_sql::evidence_sql;
-use sqlbuild_python_project::compiled_views::main::audit_reads::measurement_contract::measurement_contract;
-use sqlbuild_python_project::compiled_views::main::audit_reads::meta::meta;
-use sqlbuild_python_project::compiled_views::main::audit_reads::minimum_samples::minimum_samples;
-use sqlbuild_python_project::compiled_views::main::audit_reads::run_scope::run_scope;
-use sqlbuild_python_project::compiled_views::main::audit_reads::scope_deps::scope_deps;
-use sqlbuild_python_project::compiled_views::main::audit_reads::sql_body::sql_body;
-use sqlbuild_python_project::compiled_views::main::audit_reads::thresholds::thresholds;
-use sqlbuild_python_project::compiled_views::main::project_reads::audits::audits;
-use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::compiled_views::main::project::audits::audits;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::models::NativeProjectGraph;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::edges::edges;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::resource_views::main::audit_reads::always_run::always_run;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_column_name::attached_column_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_kind::attached_target_kind;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_name::attached_target_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::definition_name::definition_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::description::description;
+use sqlbuild_python_project::resource_views::main::audit_reads::evaluation_mode::evaluation_mode;
+use sqlbuild_python_project::resource_views::main::audit_reads::evidence_limit::evidence_limit;
+use sqlbuild_python_project::resource_views::main::audit_reads::evidence_sql::evidence_sql;
+use sqlbuild_python_project::resource_views::main::audit_reads::measurement_contract::measurement_contract;
+use sqlbuild_python_project::resource_views::main::audit_reads::meta::meta;
+use sqlbuild_python_project::resource_views::main::audit_reads::minimum_samples::minimum_samples;
+use sqlbuild_python_project::resource_views::main::audit_reads::run_scope::run_scope;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
+use sqlbuild_python_project::resource_views::main::audit_reads::sql_body::sql_body;
+use sqlbuild_python_project::resource_views::main::audit_reads::thresholds::thresholds;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::Request;
@@ -130,7 +130,7 @@ fn plan_audit<'py>(
     let py = audit.py();
     let audit = audit.clone();
     let name: String =
-        sqlbuild_python_project::compiled_views::main::audit_reads::name::name(&audit)?
+        sqlbuild_python_project::resource_views::main::audit_reads::name::name(&audit)?
             .extract()?;
     let resolved = render_query(
         request,
@@ -162,7 +162,7 @@ fn plan_audit<'py>(
     };
     let requested = audit_enum(run_scope(&audit)?, "AuditRunScope", "final")?;
     let severity = audit_enum(
-        sqlbuild_python_project::compiled_views::main::audit_reads::severity::severity(&audit)?,
+        sqlbuild_python_project::resource_views::main::audit_reads::severity::severity(&audit)?,
         "AuditSeverity",
         "warn",
     )?;
@@ -176,11 +176,11 @@ fn plan_audit<'py>(
     let reads: [(&str, AuditRead<'py>); 12] = [
         (
             "key",
-            sqlbuild_python_project::compiled_views::main::audit_reads::key::key,
+            sqlbuild_python_project::resource_views::main::audit_reads::key::key,
         ),
         (
             "name",
-            sqlbuild_python_project::compiled_views::main::audit_reads::name::name,
+            sqlbuild_python_project::resource_views::main::audit_reads::name::name,
         ),
         ("definition_name", definition_name),
         ("evaluation_mode", evaluation_mode),

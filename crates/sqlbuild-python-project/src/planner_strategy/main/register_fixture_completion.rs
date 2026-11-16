@@ -1,6 +1,6 @@
 //! Register the fixture completion functions and classes.
 
-use crate::planner_strategy::_helpers::fixture_completion;
+use crate::planner_strategy::_helpers::fixtures::fixture_completion;
 use pyo3::prelude::Bound;
 use pyo3::prelude::PyModule;
 use pyo3::prelude::PyResult;

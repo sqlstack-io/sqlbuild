@@ -8,8 +8,8 @@ use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_key
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use sqlbuild_python_project::planner_identity::main::model_definition_hash::model_definition_hash;
 use sqlbuild_python_project::planner_phases::main::object::object;
 

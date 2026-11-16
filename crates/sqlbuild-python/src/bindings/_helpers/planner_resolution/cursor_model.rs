@@ -32,7 +32,7 @@ use sqlbuild_python_front::model_config::main::config::config_cursor_bound::conf
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_phases::main::object::object;
 
 fn config<'py>(model: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -66,7 +66,7 @@ fn destination_exists(model: &Bound<'_, PyAny>, snapshot: &Bound<'_, PyAny>) -> 
         return Ok(false);
     }
     let destination =
-        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             model,
         )?;
     let key = call_with(
@@ -84,9 +84,7 @@ fn history_redirected(model: &Bound<'_, PyAny>, snapshot: &Bound<'_, PyAny>) -> 
     let target = native_field(snapshot, "target_relation")?;
     Ok(!target.is_none()
         && target.ne(native_field(
-            &sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                model,
-            )?,
+            &sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(model)?,
             "qualified_name",
         )?)?)
 }

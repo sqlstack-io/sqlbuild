@@ -1,15 +1,15 @@
 //! Public records of graph.
 
-use crate::graph::_helpers::project_graph::IndexesRow;
-use crate::graph::_helpers::project_graph::KeysOutcome;
-use crate::graph::_helpers::project_graph::UniqueIdMap;
-use crate::graph::_helpers::project_graph::dependency_edges;
-use crate::graph::_helpers::project_graph::outcome;
-use crate::graph::_helpers::project_graph::project_graph;
-use crate::graph::_helpers::python_node_graph::python_node_graph;
-use crate::graph::_helpers::python_selection::project_sources;
-use crate::graph::_helpers::python_selection::selection_graph;
-use crate::graph::_helpers::views::lineage_graph_views;
+use crate::graph::_helpers::project::project_graph::IndexesRow;
+use crate::graph::_helpers::project::project_graph::KeysOutcome;
+use crate::graph::_helpers::project::project_graph::UniqueIdMap;
+use crate::graph::_helpers::project::project_graph::dependency_edges;
+use crate::graph::_helpers::project::project_graph::outcome;
+use crate::graph::_helpers::project::project_graph::project_graph;
+use crate::graph::_helpers::project::views::lineage_graph_views;
+use crate::graph::_helpers::python_nodes::python_node_graph::python_node_graph;
+use crate::graph::_helpers::python_nodes::python_selection::project_sources;
+use crate::graph::_helpers::python_nodes::python_selection::selection_graph;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;

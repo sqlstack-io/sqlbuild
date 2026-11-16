@@ -19,8 +19,8 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::model_reads::destination::destination;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_phases::main::object::object;
 
 impl<'py> OldNamePlanner<'py> {

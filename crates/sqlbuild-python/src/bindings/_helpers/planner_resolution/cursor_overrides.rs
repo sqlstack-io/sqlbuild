@@ -17,7 +17,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 const MATERIALIZED_KEY: &str = "materialized";
 const CURSOR_KEY: &str = "cursor";

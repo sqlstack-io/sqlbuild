@@ -1,8 +1,8 @@
 //! Planner scope assembly using native graph and selector operations.
 
-use crate::compiled_views::main::model_reads::name_object::name_object;
-use crate::compiled_views::main::project_reads::sources::sources;
-use crate::compiled_views::main::source_reads::source_entry::source_entry;
+use crate::compiled_views::main::compiled_models::name_object::name_object;
+use crate::compiled_views::main::project::compiled_models::compiled_models;
+use crate::compiled_views::main::project::sources::sources;
 use crate::graph::models::NativeProjectGraph;
 use crate::native_host::models::ModelHandle;
 use crate::planner_identity::main::execution_deps::execution_deps;
@@ -14,6 +14,7 @@ use crate::planner_scope::models::ScopeData;
 use crate::planner_selection::main::py_strings::py_strings;
 use crate::planner_selection::main::resolve_graph_keys::resolve_graph_keys;
 use crate::planner_selection::models::Carrier;
+use crate::resource_views::main::source_reads::source_entry::source_entry;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
@@ -84,7 +85,7 @@ pub(crate) fn build_planner_scope<'py>(
             let source = source?;
             if !native_field(&source_entry(&source)?, "loader")?.is_none() {
                 managed.insert(
-                    crate::compiled_views::main::source_reads::name::name(&source)?.extract()?,
+                    crate::resource_views::main::source_reads::name::name(&source)?.extract()?,
                 );
             }
         }
@@ -114,7 +115,7 @@ pub(crate) fn build_planner_scope<'py>(
     let mut models: std::collections::HashMap<String, ModelHandle> =
         std::collections::HashMap::new();
     let mut model_order: Vec<String> = Vec::new();
-    for model in crate::compiled_views::main::project_reads::models::models(&project)?.try_iter()? {
+    for model in compiled_models(&project)?.try_iter()? {
         let model = model?;
         let name: String = name_object(&model)?.extract()?;
         if !models.contains_key(&name) {

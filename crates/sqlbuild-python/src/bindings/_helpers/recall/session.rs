@@ -52,7 +52,7 @@ use crate::bindings::_helpers::recall::replacements::{RecallReplacements, in_rep
 use crate::bindings::_helpers::recall::sinks::InvocationEvents;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_project::models::WorkerBuild;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
 /// What the invocation records: its session, when enabled, and the resolved target and adapter.
 #[derive(Clone, Debug, Default)]

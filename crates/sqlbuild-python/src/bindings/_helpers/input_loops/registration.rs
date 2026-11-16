@@ -1,7 +1,7 @@
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
 use crate::bindings::_helpers::input_loops::resource_attachment::RESOURCE_ATTACHMENT;
-use sqlbuild_python_project::compiled_project::main::attachment_inputs::install::install;
+use sqlbuild_python_project::compiled_project::main::install::install;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     install(RESOURCE_ATTACHMENT);

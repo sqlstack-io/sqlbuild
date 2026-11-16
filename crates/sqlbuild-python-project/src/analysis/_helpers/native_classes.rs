@@ -6,8 +6,6 @@ use sqlbuild_analysis::semantic_validation::models as validation;
 use sqlbuild_analysis::semantic_validation::models::Expansion;
 use sqlbuild_analysis::semantic_validation::types::Relations;
 
-use std::collections::HashMap;
-
 #[derive(FromPyObject, Debug)]
 #[pyo3(from_item_all)]
 pub(crate) struct CatalogInput {
@@ -17,15 +15,6 @@ pub(crate) struct CatalogInput {
     pub(crate) known_types: Vec<String>,
     #[pyo3(from_py_with = crate::analysis::_helpers::conversions::relations)]
     pub(crate) relations: Relations,
-}
-
-#[derive(FromPyObject, Debug)]
-#[pyo3(from_item_all)]
-pub struct NormalizationInput {
-    pub(crate) sql: String,
-    pub(crate) dialect: String,
-    pub(crate) stubs: HashMap<String, String>,
-    pub(crate) placeholders: HashMap<String, String>,
 }
 
 #[derive(FromPyObject, Debug)]
@@ -46,17 +35,6 @@ impl From<CatalogInput> for validation::CatalogInput {
             known_functions: input.known_functions,
             known_types: input.known_types,
             relations: input.relations,
-        }
-    }
-}
-
-impl From<NormalizationInput> for validation::NormalizationInput {
-    fn from(input: NormalizationInput) -> Self {
-        Self {
-            sql: input.sql,
-            dialect: input.dialect,
-            stubs: input.stubs,
-            placeholders: input.placeholders,
         }
     }
 }

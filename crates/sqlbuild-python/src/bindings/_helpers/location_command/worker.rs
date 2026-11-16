@@ -48,11 +48,11 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
 use sqlbuild_python_project::compiled_project::constants::SQL_TEST_KEY_PREFIX;
-use sqlbuild_python_project::compiled_project::models::NativeOrchestrationSnapshot;
-use sqlbuild_python_project::compiled_project::models::NativeOrchestrationWorker;
-use sqlbuild_python_project::compiled_project::models::WorkerBuild;
-use sqlbuild_python_project::compiled_project::types::NodeKeys;
-use sqlbuild_python_project::compiled_views::main::project_reads::sql_tests::sql_tests;
+use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
+use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
+use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationWorker;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
+use sqlbuild_python_project::project_snapshot::types::NodeKeys;
 
 /// Each audit and SQL test the snapshot publishes, with the node keys it checks.
 fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Vec<String>> {

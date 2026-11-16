@@ -19,12 +19,12 @@ use crate::bindings::_helpers::planner_strategy::values::{input_error, optional_
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
-use sqlbuild_python_project::compiled_views::main::audit_reads::attached_target_kind::attached_target_kind;
-use sqlbuild_python_project::compiled_views::main::audit_reads::attached_target_name::attached_target_name;
-use sqlbuild_python_project::compiled_views::main::audit_reads::references::references;
-use sqlbuild_python_project::compiled_views::main::audit_reads::scope_deps::scope_deps;
-use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::planner_scope::main::edges::edges;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_kind::attached_target_kind;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_name::attached_target_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::references::references;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
 
 const AUDITING_TYPES_MODULE: &str = "sqlbuild.compiler.auditing.types";
 const COMPILE_TYPES_MODULE: &str = "sqlbuild.compiler.compile.types";
@@ -111,7 +111,7 @@ pub(crate) fn attachment(
                 &format!(
                     "audit '{}': attached audit is missing an attached target name",
                     text(
-                        &sqlbuild_python_project::compiled_views::main::audit_reads::name::name(
+                        &sqlbuild_python_project::resource_views::main::audit_reads::name::name(
                             audit
                         )?
                     )?

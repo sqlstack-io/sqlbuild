@@ -20,8 +20,8 @@ use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::state_rows::main::migrations::newest_column::newest_column;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_rows::inferred_rows;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_phases::main::object::object;
 
 pub(super) fn decide<'py>(
@@ -70,7 +70,7 @@ pub(super) fn decide<'py>(
         }
     }
     let relation = host_entry(py, ExecutorHost::MigrationRelationForLocation)?.call1((
-        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             &candidate.model,
         )?,
     ))?;
@@ -111,7 +111,7 @@ pub(super) fn decide<'py>(
             RecordId::ColumnMigrationPlanEntry,
             &[
                 ("model_name", name_object(&candidate.model)?),
-                ("destination", sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(&candidate.model)?),
+                ("destination", sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&candidate.model)?),
                 (
                     "origin_column",
                     if let Some(origin) = origin {
@@ -166,7 +166,7 @@ pub(super) fn checked<'py>(
         });
     }
     let destination =
-        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             &candidate.model,
         )?;
     let qualified = native_field(&destination, "qualified_name")?;

@@ -1,6 +1,6 @@
 //! Public records of planner scope.
 
-use crate::graph::main::views::edge_dict::edge_dict;
+use crate::graph::main::project::edge_dict::edge_dict;
 use crate::graph::models::KeyCache;
 use crate::native_host::models::ModelHandle;
 use pyo3::IntoPyObjectExt;

@@ -15,9 +15,9 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::by_attribute::by_attribute;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::seed_reads::key::key;
-use sqlbuild_python_project::compiled_views::main::seed_reads::schema_entry::schema_entry;
-use sqlbuild_python_project::compiled_views::main::seed_reads::seed_file::seed_file;
+use sqlbuild_python_project::resource_views::main::seed_reads::key::key;
+use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 
 pub(super) fn seed_entries<'py>(
     project: &Bound<'py, PyAny>,
@@ -26,7 +26,7 @@ pub(super) fn seed_entries<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py = project.py();
     let seeds = by_attribute(
-        &sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds(project)?,
+        &sqlbuild_python_project::compiled_views::main::project::seeds::seeds(project)?,
         "name",
     )?;
     let fixtures = native_field(graph, "seed_fixture_names")?;
@@ -59,7 +59,7 @@ pub(super) fn seed_entries<'py>(
                 ("key", key(&seed)?),
                 (
                     "name",
-                    sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?,
+                    sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?,
                 ),
                 ("destination", destination),
                 ("file_path", native_field(&seed_file(&seed)?, "file_path")?),

@@ -15,7 +15,7 @@ use crate::bindings::_helpers::query_command::project::{
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::graph::main::python_node_graph::python_node_graph::python_node_graph;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 
 fn array_length(document: &serde_json::Value, key: &str) -> PyResult<usize> {
     document

@@ -1,6 +1,6 @@
 //! Register the fixture reads functions and classes.
 
-use crate::planner_strategy::_helpers::fixture_reads;
+use crate::planner_strategy::_helpers::fixtures::fixture_reads;
 use pyo3::prelude::Bound;
 use pyo3::prelude::PyModule;
 use pyo3::prelude::PyResult;

@@ -33,9 +33,9 @@ use sqlbuild_python_front::model_config::main::config::config_text_object::confi
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
-use sqlbuild_python_project::compiled_views::main::function_reads::body_sql::body_sql;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
 
 const APPEND_STRATEGY: &str = "append";
 
@@ -330,7 +330,7 @@ pub(crate) fn resolve_function_sql<'py>(
     };
     let function = args.value("function")?;
     let name: String =
-        sqlbuild_python_project::compiled_views::main::function_reads::name::name(&function)?
+        sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
             .extract()?;
     let sql: String = resolution.unbounded(body_sql(&function)?, &format!("Function '{name}'"))?;
     Ok(PyString::new(py, &sql).into_any())

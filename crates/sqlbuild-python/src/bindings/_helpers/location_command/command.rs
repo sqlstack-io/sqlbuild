@@ -36,9 +36,9 @@ use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_project::models::NativeOrchestrationSnapshot;
-use sqlbuild_python_project::compiled_project::types::NodeKeys;
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
+use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
+use sqlbuild_python_project::project_snapshot::types::NodeKeys;
 
 fn status(py: Python<'_>, message: &str) -> PyResult<()> {
     write_stderr(py, &format!("{message}\n"))

@@ -20,7 +20,7 @@ use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_front::state_rows::main::migrations::read_histories::read_histories as read_view_histories;
 use sqlbuild_python_front::state_rows::main::migrations::stored_columns_binding::stored_columns_binding;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 const IS_COMPATIBILITY_VIEW: ExecutorHost = ExecutorHost::IsCompatibilityView;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
@@ -378,7 +378,7 @@ pub(crate) fn pending_migration_origins(
             continue;
         }
         let model_name: String =
-            sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name(
+            sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name(
                 &model,
             )?;
         for origin in migration_origin_keys(&raw, destination.database.as_deref(), &schemas) {

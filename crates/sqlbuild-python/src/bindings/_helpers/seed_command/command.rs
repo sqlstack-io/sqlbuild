@@ -38,8 +38,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
-use sqlbuild_python_project::compiled_project::models::WorkerBuild;
-use sqlbuild_python_project::compiled_project::types::VerifiedRun;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
+use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 
 const SUCCESS_STATUS: &str = "success";
 const FAILED_STATUS: &str = "failed";

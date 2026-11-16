@@ -22,16 +22,16 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::audit_reads::scope_deps::scope_deps;
-use sqlbuild_python_project::compiled_views::main::project_reads::audits::audits;
-use sqlbuild_python_project::compiled_views::main::project_reads::functions::functions;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
-use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
-use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::compiled_views::main::project::audits::audits;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::functions::functions;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::keys::keys;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::main::source_load_map::source_load_map;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
 use std::collections::HashSet;
 
 /// Relation keys needed to render selected audits without selecting those relations.
@@ -106,7 +106,7 @@ pub(crate) fn planner_relations_context<'py>(
         deferral
     };
     let selected_keys = native_field(&scope, "selected_keys")?;
-    let mut model_locations = object(py, build_model_locations(&models(&project)?)?)?;
+    let mut model_locations = object(py, build_model_locations(&compiled_models(&project)?)?)?;
     let mut seed_locations = object(py, build_seed_locations(&seeds(&project)?)?)?;
     let function_locations = object(py, build_function_locations(&functions(&project)?)?)?;
     let deferred_locations = native_field(&deferral, "deferred_locations")?;

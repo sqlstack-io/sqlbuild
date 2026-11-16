@@ -10,7 +10,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::records::project_with::project_with;
+use sqlbuild_python_project::compiled_views::main::project::project_with::project_with;
 
 const COMPILE_TYPES_MODULE: &str = "sqlbuild.compiler.compile.types";
 

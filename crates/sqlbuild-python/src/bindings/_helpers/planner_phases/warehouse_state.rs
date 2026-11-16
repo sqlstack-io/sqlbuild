@@ -19,7 +19,7 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::graph::main::views::compiled_graph_keys::compiled_graph_keys;
+use sqlbuild_python_project::graph::main::project::compiled_graph_keys::compiled_graph_keys;
 use sqlbuild_python_project::planner_phases::main::native::native;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::time::Instant;

@@ -29,20 +29,20 @@ use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_front::discovery::main::headers::hook_entries::hook_entries;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::function_reads::arguments::arguments;
-use sqlbuild_python_project::compiled_views::main::function_reads::body_sql::body_sql;
-use sqlbuild_python_project::compiled_views::main::function_reads::entry_point::entry_point;
-use sqlbuild_python_project::compiled_views::main::function_reads::packages::packages;
-use sqlbuild_python_project::compiled_views::main::function_reads::return_columns::return_columns;
-use sqlbuild_python_project::compiled_views::main::function_reads::returns::returns;
-use sqlbuild_python_project::compiled_views::main::function_reads::runtime_version::runtime_version;
-use sqlbuild_python_project::compiled_views::main::model_reads::config::config;
-use sqlbuild_python_project::compiled_views::main::model_reads::deps::deps;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::seed_reads::external::external;
-use sqlbuild_python_project::compiled_views::main::seed_reads::seed_file::seed_file;
+use sqlbuild_python_project::compiled_views::main::compiled_models::config::config;
+use sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_identity::main::baselined_function_definition_hash::baselined_function_definition_hash;
 use sqlbuild_python_project::planner_identity::main::function_definition_hash::function_definition_hash;
+use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::entry_point::entry_point;
+use sqlbuild_python_project::resource_views::main::function_reads::packages::packages;
+use sqlbuild_python_project::resource_views::main::function_reads::return_columns::return_columns;
+use sqlbuild_python_project::resource_views::main::function_reads::returns::returns;
+use sqlbuild_python_project::resource_views::main::function_reads::runtime_version::runtime_version;
+use sqlbuild_python_project::resource_views::main::seed_reads::external::external;
+use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 
 const LOCAL_FUNCTION_HASHES_KEY: &str = "local_function_hashes";
 const DATACLASSES_MODULE: &str = "dataclasses";
@@ -191,7 +191,7 @@ fn contract_output_signature<'py>(
 ) -> PyResult<Option<Bound<'py, PyDict>>> {
     let py: Python<'py> = model.py();
     let schema_entry: Bound<'py, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
             model,
         )?;
     if schema_entry.is_none() {
@@ -208,7 +208,7 @@ fn contract_output_signature<'py>(
         return Ok(None);
     }
     let enum_columns: Bound<'py, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::enum_columns::enum_columns(
+        sqlbuild_python_project::compiled_views::main::compiled_models::enum_columns::enum_columns(
             model,
         )?;
     let rendered: Bound<'py, PyList> = PyList::empty(py);
@@ -274,7 +274,7 @@ fn family_signatures<'py>(families: &Bound<'py, PyAny>) -> PyResult<Bound<'py, P
 pub(crate) fn model_declared_columns_hash(model: &Bound<'_, PyAny>) -> PyResult<String> {
     let py: Python<'_> = model.py();
     let schema_entry: Bound<'_, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
             model,
         )?;
     let payload: Bound<'_, PyDict> = PyDict::new(py);
@@ -317,7 +317,7 @@ fn recorded_function_unchanged(
     }
     let py: Python<'_> = function.py();
     let language: String =
-        sqlbuild_python_project::compiled_views::main::function_reads::language::language(
+        sqlbuild_python_project::resource_views::main::function_reads::language::language(
             function,
         )?
         .str()?
@@ -375,10 +375,10 @@ pub(crate) fn function_local_hashes<'py>(
     for function in functions.try_iter()? {
         let function: Bound<'py, PyAny> = function?;
         let name: String =
-            sqlbuild_python_project::compiled_views::main::function_reads::name::name(&function)?
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
                 .extract()?;
         let language: Bound<'py, PyAny> = native_field(
-            &sqlbuild_python_project::compiled_views::main::function_reads::language::language(
+            &sqlbuild_python_project::resource_views::main::function_reads::language::language(
                 &function,
             )?,
             "value",
@@ -464,7 +464,7 @@ fn rendered_pairs(items: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
 pub(crate) fn compiled_function_fingerprint_sql(function: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(function_fingerprint_sql(&FunctionFingerprintFields {
         language:
-            sqlbuild_python_project::compiled_views::main::function_reads::language::language(
+            sqlbuild_python_project::resource_views::main::function_reads::language::language(
                 function,
             )?
             .str()?
@@ -486,7 +486,7 @@ pub(crate) fn compiled_function_fingerprint_sql(function: &Bound<'_, PyAny>) -> 
 pub(crate) fn seed_identity(seed: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
     let py: Python<'_> = seed.py();
     let schema_entry: Bound<'_, PyAny> =
-        sqlbuild_python_project::compiled_views::main::seed_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry(
             seed,
         )?;
     let csv_settings: Bound<'_, PyAny> = native_field(&schema_entry, "csv_settings")?;
@@ -505,7 +505,7 @@ pub(crate) fn seed_identity(seed: &Bound<'_, PyAny>) -> PyResult<(String, String
     let payload: Bound<'_, PyDict> = PyDict::new(py);
     payload.set_item(
         "name",
-        sqlbuild_python_project::compiled_views::main::seed_reads::name::name(seed)?,
+        sqlbuild_python_project::resource_views::main::seed_reads::name::name(seed)?,
     )?;
     payload.set_item(
         "csv_settings",

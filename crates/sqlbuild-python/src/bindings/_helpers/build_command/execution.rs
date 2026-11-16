@@ -59,7 +59,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cursor::main::overrides::cursor_integer::cursor_integer;
 use sqlbuild_python_front::cursor::main::overrides::cursor_timestamp::cursor_timestamp;
 use sqlbuild_python_front::native_host::main::recorder_callbacks::recorder_callbacks;
-use sqlbuild_python_project::graph::main::python_node_graph::python_node_graph::python_node_graph;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_state::consumption::models::ChangedPolicy;
 
 const EXECUTION_COMMAND: &str = "sqb build";

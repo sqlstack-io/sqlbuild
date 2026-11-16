@@ -11,9 +11,9 @@ use sqlbuild_analysis::planner_migrations::models::MigrationCandidate;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn variants<'py>(

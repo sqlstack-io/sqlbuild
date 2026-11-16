@@ -11,9 +11,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
-use sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 pub(super) fn candidates<'py>(

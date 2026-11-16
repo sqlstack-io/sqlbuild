@@ -1,12 +1,2 @@
-pub(crate) mod cursor_window;
-pub(crate) mod fixture_validation;
-pub(crate) mod plan_assembly;
-pub(crate) mod plan_driver;
-pub(crate) mod plan_entries;
-pub(crate) mod plan_errors;
-pub(crate) mod plan_fixtures;
-pub(crate) mod plan_rendering;
-pub(crate) mod plan_rows;
-pub(crate) mod plan_values;
-pub(crate) mod planning;
-pub(crate) mod types;
+pub(crate) mod inputs;
+pub(crate) mod plan;

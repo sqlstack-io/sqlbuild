@@ -27,15 +27,15 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::function_reads::deps::deps;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
-use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
-use sqlbuild_python_project::compiled_views::main::project_reads::sql_tests::sql_tests;
-use sqlbuild_python_project::compiled_views::main::seed_reads::schema_entry::schema_entry;
-use sqlbuild_python_project::compiled_views::main::seed_reads::seed_file::seed_file;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
 use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
+use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Optional fields of a static command plan; absent ones take `PlanOutput` defaults.
@@ -165,7 +165,7 @@ pub(crate) fn build_audit_command_plan<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
     let materializations = PyDict::new(py);
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         materializations.set_item(
             name_object(&model)?,
@@ -207,12 +207,12 @@ fn called_function_keys<'py>(
     let py: Python<'py> = project.py();
     let functions: Bound<'py, PyDict> = PyDict::new(py);
     for function in
-        sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(project)?
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?
             .try_iter()?
     {
         let function = function?;
         functions.set_item(
-            sqlbuild_python_project::compiled_views::main::function_reads::key::key(&function)?,
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
             function,
         )?;
     }
@@ -284,14 +284,12 @@ pub(crate) fn build_test_command_plan<'py>(
     let function_keys = called_function_keys(&project, function_keys)?;
     let mut functions: Vec<Bound<'py, PyAny>> = Vec::new();
     for function in
-        sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(
-            &project,
-        )?
-        .try_iter()?
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(&project)?
+            .try_iter()?
     {
         let function = function?;
         if !function_keys.contains(
-            sqlbuild_python_project::compiled_views::main::function_reads::key::key(&function)?,
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
         )? {
             continue;
         }
@@ -353,7 +351,7 @@ pub(crate) fn build_seed_command_plan<'py>(
     for seed in seeds(project)?.try_iter()? {
         let seed = seed?;
         if !selected_keys
-            .contains(sqlbuild_python_project::compiled_views::main::seed_reads::key::key(&seed)?)?
+            .contains(sqlbuild_python_project::resource_views::main::seed_reads::key::key(&seed)?)?
         {
             continue;
         }
@@ -361,7 +359,7 @@ pub(crate) fn build_seed_command_plan<'py>(
         let (version_hash, metadata_json) = (identity.get_item(0)?, identity.get_item(1)?);
         let previous = mapping_get(
             &existing,
-            sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?,
+            sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?,
         )?;
         let reason = if previous.is_none() {
             "FIRST_RUN"
@@ -374,9 +372,9 @@ pub(crate) fn build_seed_command_plan<'py>(
             py,
             RecordId::SeedPlanEntry,
             &[
-                ("key", sqlbuild_python_project::compiled_views::main::seed_reads::key::key(&seed)?),
-                ("name", sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?),
-                ("destination", sqlbuild_python_project::compiled_views::main::seed_reads::destination::destination(&seed)?),
+                ("key", sqlbuild_python_project::resource_views::main::seed_reads::key::key(&seed)?),
+                ("name", sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?),
+                ("destination", sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(&seed)?),
                 (
                     "file_path",
                     native_field(&seed_file(&seed)?, "file_path")?,
@@ -431,7 +429,7 @@ pub(crate) fn read_selected_seed_fingerprints<'py>(
     for seed in seeds.try_iter()? {
         let seed = seed?;
         let destination =
-            sqlbuild_python_project::compiled_views::main::seed_reads::destination::destination(
+            sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(
                 &seed,
             )?;
         let schema = native_field(&destination, "schema")?;
@@ -445,7 +443,7 @@ pub(crate) fn read_selected_seed_fingerprints<'py>(
             .or_insert_with(|| ((database, schema), BTreeSet::new()))
             .1
             .insert(
-                sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?
+                sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?
                     .extract()?,
             );
     }

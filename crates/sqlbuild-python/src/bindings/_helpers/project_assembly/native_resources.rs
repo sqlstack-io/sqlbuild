@@ -33,7 +33,7 @@ use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_front::authored_values::main::project_var_text::project_var_text;
 use sqlbuild_python_front::model_config::main::config::record_reads::record_reads;
-use sqlbuild_python_project::compiled_views::main::model_input_view::input_reference_rows::input_reference_rows;
+use sqlbuild_python_project::compiled_views::main::model_inputs::input_reference_rows::input_reference_rows;
 
 const OS_MODULE: &str = "os";
 const PROJECT_ASSEMBLY_CONTEXT: &str = "native project assembly";

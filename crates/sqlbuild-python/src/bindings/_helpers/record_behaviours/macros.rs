@@ -9,7 +9,7 @@ use sqlbuild_python_base::boundary::main::call_argument::call_argument;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::render::main::declarations::constant_declaration_sql::constant_declaration_sql;
 use sqlbuild_python_front::render::main::declarations::render_enum_member_value::render_enum_member_value;
-use sqlbuild_python_project::graph::main::project_graph::project_graph::project_graph;
+use sqlbuild_python_project::graph::main::project::project_graph::project_graph;
 use sqlbuild_python_project::graph::models::ResourceRow;
 
 /// The parameter name through which a macro receives its context.

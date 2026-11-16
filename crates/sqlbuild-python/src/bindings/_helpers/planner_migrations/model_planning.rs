@@ -25,8 +25,8 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
@@ -102,7 +102,9 @@ fn discover<'py>(
     let scope = phase.scope.clone();
     let snapshot = phase.snapshot.clone();
     let mut declared_requests: Vec<ModelMigrationRequest<'py>> = Vec::new();
-    for item in models(&runtime_field(&runtime, |runtime| &runtime.project)?)?.try_iter()? {
+    for item in
+        compiled_models(&runtime_field(&runtime, |runtime| &runtime.project)?)?.try_iter()?
+    {
         if let Some(request) = declared(&item?)? {
             declared_requests.push(request);
         }

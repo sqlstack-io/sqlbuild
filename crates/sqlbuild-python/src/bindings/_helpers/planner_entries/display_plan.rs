@@ -13,11 +13,11 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::destination::destination;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_key::model_key;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
-use sqlbuild_python_project::graph::main::views::edge_dict::edge_dict;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::graph::main::project::edge_dict::edge_dict;
 use sqlbuild_python_project::graph::models::KeyCache;
 use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
 use sqlbuild_python_project::planner_phases::main::object::object;
@@ -63,7 +63,9 @@ fn display_entry<'py>(
     )?
     .is_truthy()?;
     let query_sql =
-        sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql(model)?;
+        sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql(
+            model,
+        )?;
     let custom_name = if materialization_type.eq(CUSTOM)? {
         config(model, "materialized")?
     } else {
@@ -144,7 +146,7 @@ pub(crate) fn build_display_only_sqlbuild_plan<'py>(
             .collect::<PyResult<Vec<_>>>()?,
     )?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         if selected.contains(name_object(&model)?)? {
             entries.push(display_entry(&model, full_refresh)?);

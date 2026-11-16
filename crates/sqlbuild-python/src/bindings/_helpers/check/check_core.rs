@@ -10,7 +10,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyFrozenSetMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_project::graph::main::python_selection::resolve_python_check_excludes::resolve_python_check_excludes;
+use sqlbuild_python_project::graph::main::python_nodes::resolve_python_check_excludes::resolve_python_check_excludes;
 use sqlbuild_python_project::planner_phases::main::object::object;
 
 use sqlbuild_core::build_command::errors::BuildCommandError;

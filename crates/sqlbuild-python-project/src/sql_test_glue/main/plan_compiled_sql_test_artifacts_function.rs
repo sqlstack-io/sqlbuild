@@ -1,6 +1,6 @@
 //! `plan_compiled_sql_test_artifacts` as a function of `module`.
 
-use crate::sql_test_glue::_helpers::plan_driver;
+use crate::sql_test_glue::_helpers::plan::plan_driver;
 
 /// `plan_compiled_sql_test_artifacts` as a function of `module`.
 #[inline]

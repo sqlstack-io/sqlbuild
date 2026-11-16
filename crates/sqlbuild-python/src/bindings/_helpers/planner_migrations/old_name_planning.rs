@@ -14,9 +14,10 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_views::main::model_reads::destination::destination;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::HashMap;
@@ -81,10 +82,9 @@ pub(crate) fn plan_old_name_views<'py>(
     let runtime = phase.runtime.clone();
     let scope = scope_data(&phase.scope)?;
     let project = runtime_field(&runtime, |runtime| &runtime.project)?;
-    let models: Vec<Bound<'py, PyAny>> =
-        sqlbuild_python_project::compiled_views::main::project_reads::models::models(&project)?
-            .try_iter()?
-            .collect::<PyResult<_>>()?;
+    let models: Vec<Bound<'py, PyAny>> = compiled_models(&project)?
+        .try_iter()?
+        .collect::<PyResult<_>>()?;
     let mut by_name: HashMap<String, Bound<'py, PyAny>> = HashMap::new();
     for item in &models {
         by_name.insert(model_name(item)?, item.clone());

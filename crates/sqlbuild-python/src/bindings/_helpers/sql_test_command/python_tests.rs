@@ -22,9 +22,9 @@ use sqlbuild_python_base::native_host::main::python_executable::python_executabl
 use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
-use sqlbuild_python_project::graph::main::python_node_graph::python_node_graph::python_node_graph;
-use sqlbuild_python_project::graph::main::python_node_graph::run_selection_from_inputs::run_selection_from_inputs;
-use sqlbuild_python_project::graph::main::python_selection::python_node_names::python_node_names;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_names::python_node_names;
+use sqlbuild_python_project::graph::main::python_nodes::run_selection_from_inputs::run_selection_from_inputs;
 use sqlbuild_python_project::planner_selection::main::split_project_unit_test_selectors::split_project_unit_test_selectors;
 
 /// The prefix of a Python test module's file name.

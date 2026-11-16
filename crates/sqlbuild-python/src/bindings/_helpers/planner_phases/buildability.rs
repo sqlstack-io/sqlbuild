@@ -11,13 +11,13 @@ use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing
 use sqlbuild_analysis::planner_identity::main::missing_upstreams::missing_upstreams;
 use sqlbuild_analysis::planner_identity::models::{AvailableUpstreams, GraphKey};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
-use sqlbuild_python_project::compiled_views::main::seed_reads::external::external;
-use sqlbuild_python_project::compiled_views::main::seed_reads::key::key;
-use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::planner_identity::main::execution_origins::execution_origins;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::resource_views::main::seed_reads::external::external;
+use sqlbuild_python_project::resource_views::main::seed_reads::key::key;
 
 pub(crate) fn check_selected_scope_buildability<'py>(
     runtime: &Bound<'py, PyAny>,

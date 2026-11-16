@@ -1,69 +1,62 @@
 //! Public records of compiled views.
 
-use crate::compiled_project::main::rows::reference_row_tuple::reference_row_tuple;
+use crate::compiled_project::main::reference_row_tuple::reference_row_tuple;
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_project::models::ReferenceTuple;
-use crate::compiled_views::_helpers::audit_views::AuditProjections;
-use crate::compiled_views::_helpers::compiled_model_analysis::AnalysisProjections;
-use crate::compiled_views::_helpers::compiled_model_analysis::AnalysisRecord;
-use crate::compiled_views::_helpers::compiled_model_analysis::AnalysisViews;
-use crate::compiled_views::_helpers::compiled_model_view::AuditedSchema;
-use crate::compiled_views::_helpers::compiled_model_view::CompiledArguments;
-use crate::compiled_views::_helpers::compiled_model_view::CompiledProjections;
-use crate::compiled_views::_helpers::compiled_model_view::CompiledRecord;
-use crate::compiled_views::_helpers::compiled_model_view::DestinationRow;
-use crate::compiled_views::_helpers::compiled_model_view::MODEL_RESOURCE;
-use crate::compiled_views::_helpers::compiled_model_view::ModelOverlay;
-use crate::compiled_views::_helpers::compiled_model_view::NULLABLE;
-use crate::compiled_views::_helpers::compiled_model_view::SQL_ANALYSIS_KEY;
-use crate::compiled_views::_helpers::compiled_model_view::ViewProjections;
-use crate::compiled_views::_helpers::compiled_model_view::casefolded_families;
-use crate::compiled_views::_helpers::compiled_model_view::compiled_of;
-use crate::compiled_views::_helpers::compiled_model_view::compiled_record;
-use crate::compiled_views::_helpers::compiled_model_view::defaulted_destination;
-use crate::compiled_views::_helpers::compiled_model_view::lineage_input;
-use crate::compiled_views::_helpers::compiled_model_view::model_graph_row;
-use crate::compiled_views::_helpers::compiled_model_view::model_name;
-use crate::compiled_views::_helpers::compiled_model_view::object_key;
-use crate::compiled_views::_helpers::compiled_model_view::relation_location;
-use crate::compiled_views::_helpers::function_views::FunctionProjections;
-use crate::compiled_views::_helpers::function_views::NOT_ASSEMBLED;
-use crate::compiled_views::_helpers::function_views::read_function;
-use crate::compiled_views::_helpers::inputs_view::InputsFields;
-use crate::compiled_views::_helpers::model_input_view::InputViewClasses;
-use crate::compiled_views::_helpers::model_input_view::attached_schema_name;
-use crate::compiled_views::_helpers::model_input_view::authored_expansion;
-use crate::compiled_views::_helpers::model_input_view::expansion_object;
-use crate::compiled_views::_helpers::model_input_view::model_relation_key_row;
-use crate::compiled_views::_helpers::model_input_view::query_sql_text;
-use crate::compiled_views::_helpers::model_input_view::read_input;
-use crate::compiled_views::_helpers::model_input_view::read_input_with_owner;
-use crate::compiled_views::_helpers::model_input_view::references;
-use crate::compiled_views::_helpers::model_input_view::rejected_opt_out;
-use crate::compiled_views::_helpers::model_input_view::schema_entry;
-use crate::compiled_views::_helpers::model_input_view::view_classes;
-use crate::compiled_views::_helpers::project_view::CompilerHandles;
-use crate::compiled_views::_helpers::project_view::ProjectFields;
-use crate::compiled_views::_helpers::project_view::SCHEMA_ENTRY_ATTRIBUTE;
-use crate::compiled_views::_helpers::project_view::resource_row;
-use crate::compiled_views::_helpers::seed_views::SEED_RESOURCE;
-use crate::compiled_views::_helpers::seed_views::SeedHandles;
-use crate::compiled_views::_helpers::seed_views::read_seed;
-use crate::compiled_views::_helpers::source_views::SOURCE_RESOURCE;
-use crate::compiled_views::_helpers::source_views::SourceAssemblyRow;
-use crate::compiled_views::_helpers::source_views::SourceProjections;
-use crate::compiled_views::_helpers::source_views::read_source;
-use crate::compiled_views::types::AttachedSource;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_analysis::AnalysisRecord;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_analysis::AnalysisViews;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::AuditedSchema;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::CompiledArguments;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::CompiledRecord;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::DestinationRow;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::MODEL_RESOURCE;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::ModelOverlay;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::NULLABLE;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::SQL_ANALYSIS_KEY;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::ViewProjections;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::casefolded_families;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::compiled_of;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::compiled_record;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::defaulted_destination;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::lineage_input;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::model_graph_row;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::model_name;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::object_key;
+use crate::compiled_views::_helpers::compiled_models::compiled_model_view::relation_location;
+use crate::compiled_views::_helpers::model_inputs::inputs_view::InputsFields;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::attached_schema_name;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::authored_expansion;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::expansion_object;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::model_relation_key_row;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::query_sql_text;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::read_input;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::read_input_with_owner;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::references;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::rejected_opt_out;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::schema_entry;
+use crate::compiled_views::_helpers::model_inputs::model_input_view::view_classes;
+use crate::compiled_views::_helpers::project::project_view::CompilerHandles;
+use crate::compiled_views::_helpers::project::project_view::ProjectFields;
+use crate::compiled_views::_helpers::project::project_view::SCHEMA_ENTRY_ATTRIBUTE;
+use crate::compiled_views::_helpers::project::project_view::TAGS_ATTRIBUTE;
+use crate::compiled_views::_helpers::project::project_view::resource_row;
 use crate::compiled_views::types::DeclaredRow;
 use crate::compiled_views::types::LineageInput;
 use crate::compiled_views::types::ModelInputRecord;
-use crate::compiled_views::types::SourceViews;
-use crate::graph::main::project_graph::project_graph::project_graph;
+use crate::graph::main::project::project_graph::project_graph;
 use crate::graph::models::NativeProjectGraph;
 use crate::graph::models::ResourceRow;
+use crate::resource_views::models::AuditHandles;
+use crate::resource_views::models::AuditProjections;
+use crate::resource_views::models::FunctionHandles;
+use crate::resource_views::models::FunctionProjections;
+use crate::resource_views::models::NativeCompiledFunction;
+use crate::resource_views::models::NativeCompiledSeed;
+use crate::resource_views::models::NativeCompiledSource;
+use crate::resource_views::models::SeedHandles;
+use crate::resource_views::models::SourceHandles;
+use crate::resource_views::models::SourceProjections;
 use pyo3::FromPyObject;
-use pyo3::IntoPyObjectExt;
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -91,7 +84,6 @@ use sqlbuild_project::models::DestinationFact;
 use sqlbuild_project::models::ExpansionRecord;
 use sqlbuild_project::models::ModelMetadataTexts;
 use sqlbuild_project::types::InferredRow;
-use sqlbuild_project::types::ObjectKeyRow;
 use sqlbuild_project::types::ProjectHost;
 use sqlbuild_python_base::compile_driver::constants::LINEAGE_GRAPH_BUILDS;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
@@ -105,77 +97,20 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// An attached audit's user values.
-pub struct AuditHandles {
-    /// The discovered (or built-in) audit file and block the SQL comes from.
-    pub audit_file: Py<PyAny>,
-    pub audit_block: Py<PyAny>,
-    /// The authored measurement policy specs, carrying user values.
-    pub thresholds: Py<PyAny>,
-    pub minimum_samples: Py<PyAny>,
-    pub evidence_limit: Py<PyAny>,
-    /// Usage records, the identities the scope index is built from.
-    pub usages: Py<PyTuple>,
+/// Python projections of the analysis, each built once on first access.
+pub struct AnalysisProjections {
+    pub(crate) lineage: PyOnceLock<Py<PyAny>>,
+    pub(crate) binding: PyOnceLock<Py<PyTuple>>,
+    pub(crate) proof: PyOnceLock<Py<PyAny>>,
 }
 
-/// One attached audit, read from the compiled project that owns it.
-#[pyclass(module = "sqlbuild._native", frozen)]
-#[derive(Debug)]
-pub struct NativeAuditInput {
-    pub(crate) owner: Py<NativeCompiledProject>,
-    pub(crate) index: usize,
-}
-
-impl NativeAuditInput {
-    pub fn new(owner: Py<NativeCompiledProject>, index: usize) -> Self {
-        Self { owner, index }
-    }
-}
-
-/// One assembled audit, read from the compiled project that owns it.
-#[pyclass(module = "sqlbuild._native", frozen)]
-#[derive(Debug)]
-pub struct NativeCompiledAudit {
-    pub(crate) owner: Py<NativeCompiledProject>,
-    pub(crate) index: usize,
-}
-
-impl NativeCompiledAudit {
-    pub fn new(owner: Py<NativeCompiledProject>, index: usize) -> Self {
-        Self { owner, index }
-    }
-}
-
-impl NativeCompiledAudit {
-    /// The `CompiledAudit` field values, in field order, without building the record.
-    pub fn record_values<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        Ok(vec![
-            self.key(py)?.into_bound(py),
-            self.scope_deps(py)?.into_any(),
-            self.name(py)?.into_bound_py_any(py)?,
-            self.definition_name(py)?.into_bound_py_any(py)?,
-            self.audit_file(py)?.into_bound(py),
-            self.audit_block(py)?.into_bound(py),
-            self.sql_body(py)?.into_bound_py_any(py)?,
-            self.evaluation_mode(py)?.into_bound(py),
-            self.measurement_contract(py)?.into_bound(py),
-            self.thresholds(py)?.into_bound(py),
-            self.minimum_samples(py)?.into_bound(py),
-            self.measure_sql(py)?.into_bound_py_any(py)?,
-            self.evidence_sql(py)?.into_bound_py_any(py)?,
-            self.evidence_limit(py)?.into_bound(py),
-            self.references(py)?.into_bound(py).into_any(),
-            self.attached_target_kind(py)?,
-            self.attached_target_name(py)?.into_bound_py_any(py)?,
-            self.attached_column_name(py)?.into_bound_py_any(py)?,
-            self.severity(py)?,
-            self.run_scope(py)?.into_bound_py_any(py)?,
-            pyo3::types::PyBool::new(py, self.always_run(py)?)
-                .to_owned()
-                .into_any(),
-            self.description(py)?.into_bound_py_any(py)?,
-            self.meta(py)?.into_bound(py),
-        ])
+impl Default for AnalysisProjections {
+    fn default() -> Self {
+        Self {
+            lineage: PyOnceLock::new(),
+            binding: PyOnceLock::new(),
+            proof: PyOnceLock::new(),
+        }
     }
 }
 
@@ -211,6 +146,21 @@ pub struct CompiledViewClasses<'py> {
     pub lineage_source_fact: Bound<'py, PyAny>,
     pub contract_proof: Bound<'py, PyAny>,
     pub family_proof: Bound<'py, PyAny>,
+}
+
+/// A compiled model's Python attribute projections, each built once on first access.
+pub struct CompiledProjections {
+    pub(crate) key: PyOnceLock<Py<PyAny>>,
+    pub(crate) deps: PyOnceLock<Py<PyTuple>>,
+}
+
+impl Default for CompiledProjections {
+    fn default() -> Self {
+        Self {
+            key: PyOnceLock::new(),
+            deps: PyOnceLock::new(),
+        }
+    }
 }
 
 /// One compiled model, projected from the owner on demand.
@@ -857,128 +807,6 @@ impl NativeCompiledModel {
     }
 }
 
-/// An attached function's user values.
-pub struct FunctionHandles {
-    /// The discovered function file.
-    pub function_file: Py<PyAny>,
-    /// Usage records, the identities the scope index is built from.
-    pub usages: Py<PyTuple>,
-}
-
-/// One attached function, read from the compiled project that owns it.
-#[pyclass(module = "sqlbuild._native", frozen)]
-#[derive(Debug)]
-pub struct NativeFunctionInput {
-    pub(crate) owner: Py<NativeCompiledProject>,
-    pub(crate) index: usize,
-}
-
-impl NativeFunctionInput {
-    pub fn new(owner: Py<NativeCompiledProject>, index: usize) -> Self {
-        Self { owner, index }
-    }
-}
-
-/// One assembled function, read from the compiled project that owns it.
-#[pyclass(module = "sqlbuild._native", frozen)]
-pub struct NativeCompiledFunction {
-    pub(crate) owner: Py<NativeCompiledProject>,
-    pub(crate) index: usize,
-    /// The destination and fingerprint destination with target defaults applied.
-    pub(crate) defaulted: Option<(DestinationFact, DestinationFact)>,
-    pub(crate) destination: PyOnceLock<Py<PyAny>>,
-    pub(crate) fingerprint_destination: PyOnceLock<Py<PyAny>>,
-}
-
-impl std::fmt::Debug for NativeCompiledFunction {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("NativeCompiledFunction")
-            .finish_non_exhaustive()
-    }
-}
-
-impl NativeCompiledFunction {
-    pub fn new(owner: Py<NativeCompiledProject>, index: usize) -> Self {
-        Self::defaulted(owner, index, None)
-    }
-
-    /// The function's project graph row: its key, the resources it reads and its tags.
-    pub fn graph_row(&self, py: Python<'_>) -> PyResult<ResourceRow> {
-        read_function(&self.owner, self.index, py, |function, _| {
-            let deps: &[ObjectKeyRow] = function
-                .deps
-                .as_deref()
-                .ok_or_else(|| PyRuntimeError::new_err(NOT_ASSEMBLED))?;
-            Ok(ResourceRow {
-                key: (
-                    function.attached.node_type().to_owned(),
-                    function.attached.name.clone(),
-                ),
-                deps: deps.to_vec(),
-                tags: function.attached.tags.clone(),
-                folder: None,
-            })
-        })
-    }
-
-    pub(crate) fn defaulted(
-        owner: Py<NativeCompiledProject>,
-        index: usize,
-        defaulted: Option<(DestinationFact, DestinationFact)>,
-    ) -> Self {
-        Self {
-            owner,
-            index,
-            defaulted,
-            destination: PyOnceLock::new(),
-            fingerprint_destination: PyOnceLock::new(),
-        }
-    }
-
-    /// The destination and fingerprint destination, with target defaults once applied.
-    pub fn current_destinations(
-        &self,
-        py: Python<'_>,
-    ) -> PyResult<(DestinationFact, DestinationFact)> {
-        if let Some(defaulted) = &self.defaulted {
-            return Ok(defaulted.clone());
-        }
-        read_function(&self.owner, self.index, py, |function, _| {
-            Ok((
-                function.attached.destination.clone(),
-                function.attached.fingerprint_destination.clone(),
-            ))
-        })
-    }
-}
-
-impl NativeCompiledFunction {
-    /// The `CompiledFunction` field values, in field order, without building the record.
-    pub fn record_values<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        Ok(vec![
-            self.key(py)?.into_bound(py),
-            self.deps(py)?.into_any(),
-            self.name(py)?.into_bound_py_any(py)?,
-            self.relative_path(py)?.into_bound(py),
-            self.arguments(py)?.into_bound(py).into_any(),
-            self.returns(py)?.into_bound_py_any(py)?,
-            self.body_sql(py)?.into_bound_py_any(py)?,
-            self.destination(py)?.into_bound(py),
-            self.fingerprint_destination(py)?.into_bound(py),
-            self.return_columns(py)?.into_bound(py).into_any(),
-            self.references(py)?.into_bound(py).into_any(),
-            self.language(py)?,
-            self.source_file_path(py)?.into_bound(py),
-            self.runtime_version(py)?.into_bound_py_any(py)?,
-            self.entry_point(py)?.into_bound_py_any(py)?,
-            self.packages(py)?.into_any(),
-            self.tags(py)?.into_any(),
-            self.description(py)?.into_bound_py_any(py)?,
-        ])
-    }
-}
-
 /// One compile's attached inputs, its model inputs projected from the owner.
 #[pyclass(module = "sqlbuild._native", frozen)]
 #[derive(Debug)]
@@ -1171,7 +999,20 @@ impl NativeInputsView {
     }
 }
 
+/// The Python classes a model input's projected attributes are built with.
+#[derive(Debug, FromPyObject)]
+#[pyo3(from_item_all)]
+pub struct InputViewClasses<'py> {
+    pub compiled: CompiledViewClasses<'py>,
+    pub(crate) sql_reference: Bound<'py, PyAny>,
+    pub(crate) reference_kind: Bound<'py, PyAny>,
+    pub(crate) schema_model_entry: Bound<'py, PyAny>,
+    pub(crate) sql_expansion: Bound<'py, PyAny>,
+    pub(crate) expansion_span: Bound<'py, PyAny>,
+}
+
 /// A model schema's header columns and specs, which carry user-authored audit arguments.
+#[derive(Debug)]
 pub struct SchemaHandles {
     pub columns: Arc<HeaderColumns>,
     pub audits: Arc<HeaderAudits>,
@@ -1776,7 +1617,7 @@ impl NativeProjectView {
                         Err(_) => {
                             let tags: Bound<'_, PyAny> = native_field(
                                 &native_field(&seed, SCHEMA_ENTRY_ATTRIBUTE)?,
-                                crate::compiled_views::_helpers::project_view::TAGS_ATTRIBUTE,
+                                TAGS_ATTRIBUTE,
                             )?;
                             resource_row(&seed, Some(&tags))?
                         }
@@ -1787,10 +1628,7 @@ impl NativeProjectView {
                     rows.push(match function.cast::<NativeCompiledFunction>() {
                         Ok(native) => native.get().graph_row(py)?,
                         Err(_) => {
-                            let tags: Bound<'_, PyAny> = native_field(
-                                &function,
-                                crate::compiled_views::_helpers::project_view::TAGS_ATTRIBUTE,
-                            )?;
+                            let tags: Bound<'_, PyAny> = native_field(&function, TAGS_ATTRIBUTE)?;
                             resource_row(&function, Some(&tags))?
                         }
                     });
@@ -1864,389 +1702,5 @@ impl<'py> pyo3::IntoPyObject<'py> for RelationKeyRow {
             ),
             py,
         )
-    }
-}
-
-/// `(database, schema, logical database, logical schema)` of a seed's destination.
-#[derive(Debug)]
-pub struct SeedNamespace {
-    pub database: Option<String>,
-    pub schema: Option<String>,
-    pub logical_database: Option<String>,
-    pub logical_schema: Option<String>,
-}
-
-impl<'py> pyo3::FromPyObject<'py> for SeedNamespace {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
-        let (database, schema, logical_database, logical_schema): (
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-        ) = pyo3::types::PyAnyMethods::extract(value)?;
-        Ok(Self {
-            database,
-            schema,
-            logical_database,
-            logical_schema,
-        })
-    }
-}
-
-/// A seed's name, CSV file, declaration and declaring schema file.
-#[derive(Debug)]
-pub struct SeedParts<'a> {
-    pub name: &'a str,
-    pub seed_file: &'a Py<PyAny>,
-    pub schema_entry: &'a Py<PyAny>,
-    pub schema_file: &'a Py<PyAny>,
-}
-
-/// One attached seed, read from the compiled project that owns it.
-#[pyclass(module = "sqlbuild._native", frozen)]
-#[derive(Debug)]
-pub struct NativeSeedInput {
-    pub(crate) owner: Py<NativeCompiledProject>,
-    pub(crate) index: usize,
-}
-
-impl NativeSeedInput {
-    pub fn new(owner: Py<NativeCompiledProject>, index: usize) -> Self {
-        Self { owner, index }
-    }
-}
-
-#[pymethods]
-impl NativeSeedInput {
-    #[getter]
-    pub fn seed_file(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_seed(&self.owner, self.index, py, |seed, py| {
-            Ok(seed.host.seed_file.clone_ref(py))
-        })
-    }
-
-    #[getter]
-    pub fn schema_entry(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_seed(&self.owner, self.index, py, |seed, py| {
-            Ok(seed.host.schema_entry.clone_ref(py))
-        })
-    }
-
-    #[getter]
-    pub fn schema_file(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_seed(&self.owner, self.index, py, |seed, py| {
-            Ok(seed.host.schema_file.clone_ref(py))
-        })
-    }
-}
-
-/// One assembled seed, read from the compiled project that owns it.
-#[pyclass(module = "sqlbuild._native", frozen)]
-pub struct NativeCompiledSeed {
-    pub(crate) owner: Py<NativeCompiledProject>,
-    pub(crate) index: usize,
-    /// The destination with target defaults applied, replacing the assembled one.
-    pub(crate) defaulted: Option<DestinationFact>,
-    pub(crate) destination: PyOnceLock<Py<PyAny>>,
-}
-
-impl std::fmt::Debug for NativeCompiledSeed {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("NativeCompiledSeed")
-            .finish_non_exhaustive()
-    }
-}
-
-impl NativeCompiledSeed {
-    pub fn new(owner: Py<NativeCompiledProject>, index: usize) -> Self {
-        Self {
-            owner,
-            index,
-            defaulted: None,
-            destination: PyOnceLock::new(),
-        }
-    }
-
-    /// The seed's project graph row: its key and its declared tags.
-    pub fn graph_row(&self, py: Python<'_>) -> PyResult<ResourceRow> {
-        read_seed(&self.owner, self.index, py, |seed, py| {
-            let mut tags: Vec<String> = Vec::new();
-            for tag in native_field(
-                seed.host.schema_entry.bind(py),
-                crate::compiled_views::_helpers::seed_views::TAGS_ATTRIBUTE,
-            )?
-            .try_iter()?
-            {
-                tags.push(tag?.str()?.extract()?);
-            }
-            Ok(ResourceRow {
-                key: (SEED_RESOURCE.to_owned(), seed.name.clone()),
-                deps: Vec::new(),
-                tags,
-                folder: None,
-            })
-        })
-    }
-
-    pub fn current_destination(&self, py: Python<'_>) -> PyResult<DestinationFact> {
-        if let Some(defaulted) = &self.defaulted {
-            return Ok(defaulted.clone());
-        }
-        read_seed(&self.owner, self.index, py, |seed, _| {
-            seed.destination
-                .clone()
-                .ok_or_else(|| PyRuntimeError::new_err("the seed was not assembled"))
-        })
-    }
-}
-
-#[pymethods]
-impl NativeCompiledSeed {
-    /// The seed's planner-facing `CompiledObjectKey`.
-    #[getter]
-    pub fn key(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let classes: InputViewClasses<'_> = view_classes(&self.owner, py)?;
-        read_seed(&self.owner, self.index, py, |seed, py| {
-            seed.host
-                .key
-                .get_or_try_init(py, || {
-                    object_key(&classes.compiled, SEED_RESOURCE, &seed.name)
-                })
-                .map(|key| key.clone_ref(py))
-        })
-    }
-
-    #[getter]
-    pub fn deps<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
-        PyTuple::empty(py)
-    }
-
-    #[getter]
-    pub fn name(&self, py: Python<'_>) -> PyResult<String> {
-        read_seed(&self.owner, self.index, py, |seed, _| Ok(seed.name.clone()))
-    }
-
-    #[getter]
-    pub fn seed_file(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_seed(&self.owner, self.index, py, |seed, py| {
-            Ok(seed.host.seed_file.clone_ref(py))
-        })
-    }
-
-    #[getter]
-    pub fn schema_entry(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_seed(&self.owner, self.index, py, |seed, py| {
-            Ok(seed.host.schema_entry.clone_ref(py))
-        })
-    }
-
-    #[getter]
-    pub fn schema_file(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_seed(&self.owner, self.index, py, |seed, py| {
-            Ok(seed.host.schema_file.clone_ref(py))
-        })
-    }
-
-    /// The seed's planner-facing `CompiledRelationLocation`.
-    #[getter]
-    pub fn destination(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let classes: InputViewClasses<'_> = view_classes(&self.owner, py)?;
-        self.destination
-            .get_or_try_init(py, || {
-                relation_location(&classes.compiled, &self.current_destination(py)?)
-            })
-            .map(|destination| destination.clone_ref(py))
-    }
-
-    /// This seed with the adapter's default schema and database filled into its destination.
-    pub fn with_target_defaults(
-        &self,
-        py: Python<'_>,
-        defaults: (Option<String>, Option<String>),
-        render: Bound<'_, PyAny>,
-    ) -> PyResult<Self> {
-        let defaulted: DestinationFact =
-            defaulted_destination(&self.current_destination(py)?, defaults, &render)?;
-        Ok(Self {
-            owner: self.owner.clone_ref(py),
-            index: self.index,
-            defaulted: Some(defaulted),
-            destination: PyOnceLock::new(),
-        })
-    }
-
-    #[getter(external)]
-    pub fn is_external(&self) -> bool {
-        false
-    }
-}
-
-impl NativeCompiledSeed {
-    /// The `CompiledSeed` field values, in field order, without building the record.
-    pub fn record_values<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        Ok(vec![
-            self.key(py)?.into_bound(py),
-            self.deps(py).into_any(),
-            self.name(py)?.into_bound_py_any(py)?,
-            self.seed_file(py)?.into_bound(py),
-            self.schema_entry(py)?.into_bound(py),
-            self.schema_file(py)?.into_bound(py),
-            self.destination(py)?.into_bound(py),
-            pyo3::types::PyBool::new(py, self.is_external())
-                .to_owned()
-                .into_any(),
-        ])
-    }
-}
-
-/// An attached source's user values.
-pub struct SourceHandles {
-    /// The discovered source file.
-    pub source_file: Py<PyAny>,
-    /// The discovered entry; its spec carries user-authored metadata.
-    pub entry: Py<PyAny>,
-    /// Template-expanded user metadata.
-    pub meta: Py<PyAny>,
-    /// Template-expanded column specs, which carry user metadata and audit arguments.
-    pub columns: Py<PyTuple>,
-    /// Template-expanded table audit specs, which carry user audit arguments.
-    pub audits: Py<PyTuple>,
-    /// Usage records, the identities the scope index is built from.
-    pub usages: Py<PyTuple>,
-}
-
-/// One attached source, read from the compiled project that owns it.
-#[pyclass(module = "sqlbuild._native", frozen)]
-#[derive(Debug)]
-pub struct NativeSourceInput {
-    pub(crate) owner: Py<NativeCompiledProject>,
-    pub(crate) index: usize,
-}
-
-impl NativeSourceInput {
-    pub fn new(owner: Py<NativeCompiledProject>, index: usize) -> Self {
-        Self { owner, index }
-    }
-}
-
-#[pymethods]
-impl NativeSourceInput {
-    #[getter]
-    pub fn source_entry(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_source(&self.owner, self.index, py, |source, py| {
-            source.attached_entry(py)
-        })
-    }
-
-    #[getter]
-    pub fn source_file(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_source(&self.owner, self.index, py, |source, py| {
-            Ok(source.attached.host.source_file.clone_ref(py))
-        })
-    }
-
-    #[getter]
-    pub fn declaration_usages(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
-        read_source(&self.owner, self.index, py, |source, py| {
-            Ok(source.attached.host.usages.clone_ref(py))
-        })
-    }
-
-    /// `(name, has a loader, database, schema)`, what project assembly resolves a namespace from.
-    #[getter]
-    pub(crate) fn assembly_row(&self, py: Python<'_>) -> PyResult<SourceAssemblyRow> {
-        read_source(&self.owner, self.index, py, |source, py| {
-            let attached: &AttachedSource = &source.attached;
-            Ok(SourceAssemblyRow {
-                name: attached.name.clone(),
-                managed: !native_field(attached.host.entry.bind(py), "loader")?.is_none(),
-                database: attached.database.clone(),
-                schema: attached.schema.clone(),
-            })
-        })
-    }
-}
-
-/// One assembled source, read from the compiled project that owns it.
-#[pyclass(module = "sqlbuild._native", frozen)]
-#[derive(Debug)]
-pub struct NativeCompiledSource {
-    pub(crate) owner: Py<NativeCompiledProject>,
-    pub(crate) index: usize,
-}
-
-impl NativeCompiledSource {
-    pub fn new(owner: Py<NativeCompiledProject>, index: usize) -> Self {
-        Self { owner, index }
-    }
-
-    /// The source's project graph row: its key, with no dependencies, tags or folder.
-    pub fn graph_row(&self, py: Python<'_>) -> PyResult<ResourceRow> {
-        read_source(&self.owner, self.index, py, |source, _| {
-            Ok(ResourceRow {
-                key: (SOURCE_RESOURCE.to_owned(), source.attached.name.clone()),
-                deps: Vec::new(),
-                tags: Vec::new(),
-                folder: None,
-            })
-        })
-    }
-}
-
-#[pymethods]
-impl NativeCompiledSource {
-    /// The source's planner-facing `CompiledObjectKey`.
-    #[getter]
-    pub fn key(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let classes: InputViewClasses<'_> = view_classes(&self.owner, py)?;
-        read_source(&self.owner, self.index, py, |source, py| {
-            source
-                .host
-                .key
-                .get_or_try_init(py, || {
-                    object_key(&classes.compiled, SOURCE_RESOURCE, &source.attached.name)
-                })
-                .map(|key| key.clone_ref(py))
-        })
-    }
-
-    #[getter]
-    pub fn deps<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
-        PyTuple::empty(py)
-    }
-
-    #[getter]
-    pub fn name(&self, py: Python<'_>) -> PyResult<String> {
-        read_source(&self.owner, self.index, py, |source, _| {
-            Ok(source.attached.name.clone())
-        })
-    }
-
-    #[getter]
-    pub fn source_entry(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_source(&self.owner, self.index, py, |source, py| {
-            source.assembled_entry(py)
-        })
-    }
-
-    #[getter]
-    pub fn source_file(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        read_source(&self.owner, self.index, py, |source, py| {
-            Ok(source.attached.host.source_file.clone_ref(py))
-        })
-    }
-}
-
-impl NativeCompiledSource {
-    /// The `CompiledSource` field values, in field order, without building the record.
-    pub fn record_values<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        Ok(vec![
-            self.key(py)?.into_bound(py),
-            self.deps(py).into_any(),
-            self.name(py)?.into_bound_py_any(py)?,
-            self.source_entry(py)?.into_bound(py),
-            self.source_file(py)?.into_bound(py),
-        ])
     }
 }

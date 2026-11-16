@@ -20,9 +20,9 @@ use crate::bindings::_helpers::semantic_checks::type_recovery::{
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::types::CompilerDetach;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_names::inferred_names;
-use sqlbuild_python_project::compiled_views::main::model_reads::lineage_inputs::lineage_inputs;
-use sqlbuild_python_project::compiled_views::main::records::with_binding_diagnostics::with_binding_diagnostics;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_names::inferred_names;
+use sqlbuild_python_project::compiled_views::main::compiled_models::lineage_inputs::lineage_inputs;
+use sqlbuild_python_project::compiled_views::main::project::with_binding_diagnostics::with_binding_diagnostics;
 use sqlbuild_python_project::compiled_views::types::LineageInput;
 use sqlbuild_python_project::semantic_shapes::main::project_shapes::project_shapes;
 

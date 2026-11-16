@@ -25,12 +25,12 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as record_field_or_attribute;
 use sqlbuild_python_base::records::main::fields::record_spec::record_spec;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::models::NativeCompiledAudit;
-use sqlbuild_python_project::compiled_views::models::NativeCompiledFunction;
 use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
-use sqlbuild_python_project::compiled_views::models::NativeCompiledSeed;
-use sqlbuild_python_project::compiled_views::models::NativeCompiledSource;
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
+use sqlbuild_python_project::resource_views::models::NativeCompiledAudit;
+use sqlbuild_python_project::resource_views::models::NativeCompiledFunction;
+use sqlbuild_python_project::resource_views::models::NativeCompiledSeed;
+use sqlbuild_python_project::resource_views::models::NativeCompiledSource;
 
 const MODEL_RECORD: &str = "sqlbuild._native.Model";
 const MATERIALIZED: &str = "materialized";

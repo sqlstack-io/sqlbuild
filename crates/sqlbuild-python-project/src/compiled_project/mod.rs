@@ -1,4 +1,4 @@
-//! The compiled project: its rows, schema facts, job catalog and the snapshot written and read across processes.
+//! The compiled project: its rows, attachment inputs, schema facts, values and job catalog.
 
 pub(crate) mod _helpers;
 pub mod constants;

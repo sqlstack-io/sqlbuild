@@ -36,8 +36,8 @@ use sqlbuild_python_project::compiled_project::models::PythonResourceRow;
 use sqlbuild_python_project::compiled_project::models::ScenarioDescriptionRow;
 use sqlbuild_python_project::compiled_project::types::LoaderRow;
 use sqlbuild_python_project::compiled_project::types::ResourceDiagnostics;
-use sqlbuild_python_project::compiled_views::models::SeedParts;
-use sqlbuild_python_project::compiled_views::types::SeedViews;
+use sqlbuild_python_project::resource_views::models::SeedParts;
+use sqlbuild_python_project::resource_views::types::SeedViews;
 
 const MISSING_DESCRIPTION_CODE: &str = "P010";
 const DESCRIPTION_LENGTH_CODE: &str = "P027";
@@ -405,7 +405,7 @@ fn docstring_text(description: &Bound<'_, PyString>) -> String {
 /// A source's P010, falling back to its loader's description and naming the loader in help.
 fn source_description<'py>(
     diagnostics: &Diagnostics<'_, 'py>,
-    source: &sqlbuild_python_project::compiled_views::types::SourceRecord,
+    source: &sqlbuild_python_project::resource_views::types::SourceRecord,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     let py: Python<'py> = diagnostics.py;
     let attached = source.attached();
@@ -452,7 +452,7 @@ fn source_description<'py>(
 /// A SQL or Python function's P010, located at its header or `@udf` decorator.
 fn function_description<'py>(
     diagnostics: &Diagnostics<'_, 'py>,
-    function: &sqlbuild_python_project::compiled_views::types::FunctionRecord,
+    function: &sqlbuild_python_project::resource_views::types::FunctionRecord,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     let py: Python<'py> = diagnostics.py;
     let attached = &function.attached;

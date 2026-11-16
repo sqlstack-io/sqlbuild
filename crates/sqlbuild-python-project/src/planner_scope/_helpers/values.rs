@@ -1,8 +1,8 @@
 //! Python function identity and compiled graph conversion.
 
-use crate::compiled_views::main::project_reads::sources::sources;
-use crate::compiled_views::main::source_reads::source_entry::source_entry;
-use crate::graph::main::keys::native_key::native_key;
+use crate::compiled_views::main::project::sources::sources;
+use crate::graph::main::nodes::native_key::native_key;
+use crate::resource_views::main::source_reads::source_entry::source_entry;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyDict;
 use pyo3::types::PyDictMethods;

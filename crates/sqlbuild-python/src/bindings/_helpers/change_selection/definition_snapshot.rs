@@ -23,14 +23,14 @@ use crate::bindings::_helpers::change_selection::fingerprints::{
 };
 use crate::bindings::_helpers::planner_identity::metadata::{function_local_hashes, seed_identity};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_views::main::function_reads::deps::deps;
-use sqlbuild_python_project::compiled_views::main::function_reads::source_file_path::source_file_path;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
-use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
-use sqlbuild_python_project::compiled_views::main::project_reads::sources::sources;
-use sqlbuild_python_project::compiled_views::main::project_reads::sql_tests::sql_tests;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_entry::source_entry;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
+use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
+use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
+use sqlbuild_python_project::resource_views::main::function_reads::source_file_path::source_file_path;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 
 /// Header values that rename rather than redefine a model.
 const RENAME_CONFIG_KEYS: [&str; 2] = ["migrate_from", "description"];
@@ -242,10 +242,10 @@ fn model_node(
 ) -> PyResult<(String, NodeDefinition)> {
     let name: String = model_name(model)?;
     let config: Bound<'_, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::config::config(model)?;
+        sqlbuild_python_project::compiled_views::main::compiled_models::config::config(model)?;
     let config_values: Bound<'_, PyAny> = native_field(&config, "values")?;
     let schema: Bound<'_, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
             model,
         )?;
     let contract: String = match config_values.cast::<PyDict>() {
@@ -304,7 +304,7 @@ fn source_node(
     fingerprints: &Fingerprinting,
 ) -> PyResult<(String, NodeDefinition)> {
     let name: String =
-        sqlbuild_python_project::compiled_views::main::source_reads::name::name(source)?
+        sqlbuild_python_project::resource_views::main::source_reads::name::name(source)?
             .extract()?;
     let mut encoded: Value = fingerprints.canonical(&source_entry(source)?, &[])?;
     let mut shape: Map<String, Value> = Map::new();
@@ -343,10 +343,10 @@ fn seed_node(
     fingerprints: &Fingerprinting,
 ) -> PyResult<(String, NodeDefinition)> {
     let name: String =
-        sqlbuild_python_project::compiled_views::main::seed_reads::name::name(seed)?.extract()?;
+        sqlbuild_python_project::resource_views::main::seed_reads::name::name(seed)?.extract()?;
     let (version_hash, _) = seed_identity(seed)?;
     let schema: Bound<'_, PyAny> =
-        sqlbuild_python_project::compiled_views::main::seed_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry(
             seed,
         )?;
     let columns: String = if schema.is_none() {
@@ -464,9 +464,7 @@ fn function_nodes(
 ) -> PyResult<Vec<(String, NodeDefinition)>> {
     let mut nodes: Vec<(String, NodeDefinition)> = Vec::new();
     let functions: Bound<'_, PyAny> =
-        sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(
-            project,
-        )?;
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?;
     let hashes: Bound<'_, PyDict> = function_local_hashes(
         &functions,
         None,
@@ -475,13 +473,13 @@ fn function_nodes(
     for function in functions.try_iter()? {
         let function: Bound<'_, PyAny> = function?;
         let key: Bound<'_, PyAny> =
-            sqlbuild_python_project::compiled_views::main::function_reads::key::key(&function)?;
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?;
         let kind: String = text_of(&native_field(
             &native_field(&key, "resource_type")?,
             "value",
         )?)?;
         let name: String =
-            sqlbuild_python_project::compiled_views::main::function_reads::name::name(&function)?
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
                 .extract()?;
         let Some(hash) = hashes.get_item(&name)? else {
             continue;
@@ -609,7 +607,7 @@ pub(crate) fn definition_snapshot(
     );
     let (connection_key, connection) = connection_node(project, discovered, &fingerprints)?;
     nodes.insert(connection_key, connection);
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let (key, definition) = model_node(&model?, &fingerprints, &uses)?;
         nodes.insert(key, definition);
     }

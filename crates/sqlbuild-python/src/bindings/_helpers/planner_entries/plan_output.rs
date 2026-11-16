@@ -18,24 +18,25 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::function_reads::arguments::arguments;
-use sqlbuild_python_project::compiled_views::main::function_reads::entry_point::entry_point;
-use sqlbuild_python_project::compiled_views::main::function_reads::fingerprint_destination::fingerprint_destination;
-use sqlbuild_python_project::compiled_views::main::function_reads::language::language;
-use sqlbuild_python_project::compiled_views::main::function_reads::packages::packages;
-use sqlbuild_python_project::compiled_views::main::function_reads::relative_path::relative_path;
-use sqlbuild_python_project::compiled_views::main::function_reads::return_columns::return_columns;
-use sqlbuild_python_project::compiled_views::main::function_reads::returns::returns;
-use sqlbuild_python_project::compiled_views::main::function_reads::runtime_version::runtime_version;
-use sqlbuild_python_project::compiled_views::main::function_reads::source_file_path::source_file_path;
-use sqlbuild_python_project::compiled_views::main::project_reads::sql_tests::sql_tests;
-use sqlbuild_python_project::compiled_views::main::seed_reads::schema_entry::schema_entry;
-use sqlbuild_python_project::compiled_views::main::seed_reads::seed_file::seed_file;
+use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::build_source_load_entries::build_source_load_entries;
 use sqlbuild_python_project::planner_scope::main::upstream_loader_dependency_names::upstream_loader_dependency_names;
 use sqlbuild_python_project::planner_strategy::main::planning_context::planning_context;
+use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
+use sqlbuild_python_project::resource_views::main::function_reads::entry_point::entry_point;
+use sqlbuild_python_project::resource_views::main::function_reads::fingerprint_destination::fingerprint_destination;
+use sqlbuild_python_project::resource_views::main::function_reads::language::language;
+use sqlbuild_python_project::resource_views::main::function_reads::packages::packages;
+use sqlbuild_python_project::resource_views::main::function_reads::relative_path::relative_path;
+use sqlbuild_python_project::resource_views::main::function_reads::return_columns::return_columns;
+use sqlbuild_python_project::resource_views::main::function_reads::returns::returns;
+use sqlbuild_python_project::resource_views::main::function_reads::runtime_version::runtime_version;
+use sqlbuild_python_project::resource_views::main::function_reads::source_file_path::source_file_path;
+use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 use sqlbuild_python_project::sql_test_glue::main::assemble_sql_test_plans::assemble_sql_test_plans;
+use sqlbuild_python_project::sql_test_glue::main::sql_test_model_chain_names_by_key_function::sql_test_model_chain_names_by_key_function;
 use sqlbuild_python_project::sql_test_glue::models::SqlTestAssembly;
 
 const LOADER_CONSUMER: &str = "loader";
@@ -117,23 +118,23 @@ fn seed_entries<'py>(
     let metadata_jsons = native_field(extras, "seed_metadata_jsons")?;
     let plan_reasons = native_field(extras, "seed_plan_reasons")?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for seed in sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds(project)?
-        .try_iter()?
+    for seed in
+        sqlbuild_python_project::compiled_views::main::project::seeds::seeds(project)?.try_iter()?
     {
         let seed = seed?;
         if !selected_keys
-            .contains(sqlbuild_python_project::compiled_views::main::seed_reads::key::key(&seed)?)?
+            .contains(sqlbuild_python_project::resource_views::main::seed_reads::key::key(&seed)?)?
         {
             continue;
         }
-        let name = sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?;
+        let name = sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?;
         entries.push(planner_model(
             py,
             RecordId::SeedPlanEntry,
             &[
-                ("key", sqlbuild_python_project::compiled_views::main::seed_reads::key::key(&seed)?),
+                ("key", sqlbuild_python_project::resource_views::main::seed_reads::key::key(&seed)?),
                 ("name", name.clone()),
-                ("destination", sqlbuild_python_project::compiled_views::main::seed_reads::destination::destination(&seed)?),
+                ("destination", sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(&seed)?),
                 (
                     "file_path",
                     native_field(&seed_file(&seed)?, "file_path")?,
@@ -389,10 +390,10 @@ pub(super) fn function_entry<'py>(
         py,
         RecordId::FunctionPlanEntry,
         &[
-            ("key", sqlbuild_python_project::compiled_views::main::function_reads::key::key(function)?),
-            ("name", sqlbuild_python_project::compiled_views::main::function_reads::name::name(function)?),
+            ("key", sqlbuild_python_project::resource_views::main::function_reads::key::key(function)?),
+            ("name", sqlbuild_python_project::resource_views::main::function_reads::name::name(function)?),
             ("relative_path", relative_path(function)?),
-            ("destination", sqlbuild_python_project::compiled_views::main::function_reads::destination::destination(function)?),
+            ("destination", sqlbuild_python_project::resource_views::main::function_reads::destination::destination(function)?),
             ("arguments", arguments(function)?),
             ("returns", returns(function)?),
             ("body_sql", body_sql),
@@ -430,17 +431,17 @@ fn function_entries<'py>(
     let previous = native_field(&native_field(snapshot, "fingerprints")?, "functions")?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
     for function in
-        sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(project)?
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?
             .try_iter()?
     {
         let function = function?;
         if !selected_keys.contains(
-            sqlbuild_python_project::compiled_views::main::function_reads::key::key(&function)?,
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
         )? {
             continue;
         }
         let name =
-            sqlbuild_python_project::compiled_views::main::function_reads::name::name(&function)?;
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?;
         let change = functions.get_item(&name)?;
         let previous_query_sql = if previous.contains(&name)? {
             native_field(&previous.get_item(&name)?, "definition")?
@@ -797,6 +798,6 @@ fn build_selected_test_entries<'py>(
 }
 
 pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(sqlbuild_python_project::sql_test_glue::main::sql_test_model_chain_names_by_key_function::sql_test_model_chain_names_by_key_function(module)?)?;
+    module.add_function(sql_test_model_chain_names_by_key_function(module)?)?;
     module.add_function(wrap_pyfunction!(build_selected_test_entries, module)?)
 }

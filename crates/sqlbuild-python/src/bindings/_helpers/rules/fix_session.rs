@@ -40,7 +40,7 @@ use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::discovery::models::NativeModelFile;
 use sqlbuild_python_front::render::models::SqlExpansionInputs;
-use sqlbuild_python_project::compiled_views::main::relation_keys::project_relation_keys::project_relation_keys;
+use sqlbuild_python_project::compiled_views::main::compiled_models::project_relation_keys::project_relation_keys;
 use sqlbuild_python_project::compiled_views::types::RelationKeys;
 
 const VERIFICATION_FAILURE: &str =

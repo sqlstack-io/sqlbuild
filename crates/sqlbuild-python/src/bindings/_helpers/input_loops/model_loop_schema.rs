@@ -9,7 +9,7 @@ use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, compile_er
 use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::models::HeaderColumn;
-use sqlbuild_python_project::compiled_project::main::schema_facts::python_column_fact::python_column_fact;
+use sqlbuild_python_project::compiled_project::main::python_column_fact::python_column_fact;
 
 const MODEL_SCHEMA_KEY: &str = "model_schema";
 const NAME_FIELD: &str = "name";

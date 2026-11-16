@@ -24,17 +24,17 @@ use sqlbuild_python_front::discovery::main::project::named_node_rows::named_node
 use sqlbuild_python_front::discovery::main::project::project_facts::project_facts;
 use sqlbuild_python_front::discovery::main::project::validation_error::validation_error;
 use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
-use sqlbuild_python_project::compiled_project::main::snapshot_declarations::compile_declarations::compile_declarations;
-use sqlbuild_python_project::compiled_project::main::snapshot_declarations::python_declarations::python_declarations;
-use sqlbuild_python_project::compiled_project::main::snapshot_models::model_nodes::model_nodes;
-use sqlbuild_python_project::compiled_project::main::snapshot_resources::resource_nodes::resource_nodes;
-use sqlbuild_python_project::compiled_project::main::snapshot_roles::compile_project_roles::compile_project_roles;
-use sqlbuild_python_project::compiled_project::models::NativeOrchestrationSnapshot;
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
 use sqlbuild_python_project::graph::models::ProjectSelection;
 use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
 use sqlbuild_python_project::planner_scope::main::build_planner_scope::build_planner_scope;
 use sqlbuild_python_project::planner_scope::main::project_graph::project_graph;
+use sqlbuild_python_project::project_snapshot::main::compile_declarations::compile_declarations;
+use sqlbuild_python_project::project_snapshot::main::compile_project_roles::compile_project_roles;
+use sqlbuild_python_project::project_snapshot::main::model_nodes::model_nodes;
+use sqlbuild_python_project::project_snapshot::main::python_declarations::python_declarations;
+use sqlbuild_python_project::project_snapshot::main::resource_nodes::resource_nodes;
+use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 
 /// The Python node kind whose functions load sources.
 const LOADER_KIND: &str = "loader";

@@ -40,9 +40,9 @@ use sqlbuild_python_front::cursor::main::scalars::try_parse::try_parse;
 use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project_reads::sources::sources;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_entry::source_entry;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
 use sqlbuild_python_project::planner_phases::main::by_name::by_name;
 use sqlbuild_python_project::planner_phases::main::config_str::config_str;
 use sqlbuild_python_project::planner_phases::main::model_key::model_key;
@@ -54,6 +54,7 @@ use sqlbuild_python_project::planner_phases::main::planner_model::planner_model;
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -218,7 +219,7 @@ fn runtime_producer_names(
         let source = source?;
         if !native_field(&source_entry(&source)?, "loader")?.is_none() {
             loaded.insert(
-                sqlbuild_python_project::compiled_views::main::source_reads::name::name(&source)?
+                sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?
                     .extract()?,
             );
         }
@@ -246,7 +247,7 @@ fn upstream_relation<'py>(
     let name_text: String = name.extract()?;
     let is_selected = selected.is_some_and(|names| names.contains(&name_text));
     let qualified = |node: Bound<'py, PyAny>| {
-        native_field(&sqlbuild_python_project::compiled_views::main::resource_reads::destination::destination(&node)?, "qualified_name")
+        native_field(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?, "qualified_name")
     };
     if (kind.eq("ref")? || kind.eq("seed")?)
         && !deferred.is_none()
@@ -387,10 +388,7 @@ fn collect_models<'py>(
     };
     let runtime_names = runtime_producer_names(project, &producers)?;
     let mut models: Vec<_> = Vec::new();
-    for model in
-        sqlbuild_python_project::compiled_views::main::project_reads::models::models(project)?
-            .try_iter()?
-    {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         let name_value = name_object(&model)?;
         let model_name: String = name_value.extract()?;
@@ -432,12 +430,7 @@ fn collect_models<'py>(
             None => None,
         };
         let target_info = existing_relations.get_item(&name_value)?;
-        let qualified = native_field(
-            &sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                &model,
-            )?,
-            "qualified_name",
-        )?;
+        let qualified = native_field(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?, "qualified_name")?;
         if let Some(redirected) = redirected.filter(|value| !value.is_none()) {
             target_tag = Some(format!("{model_name}__target__max"));
             target_relation = Some(redirected.extract::<String>()?);

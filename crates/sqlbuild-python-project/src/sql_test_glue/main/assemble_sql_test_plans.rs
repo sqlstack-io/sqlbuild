@@ -1,6 +1,6 @@
 //! Plan results of SQL tests, with fixture and expected-output diagnostics in place of failing plans.
 
-use crate::sql_test_glue::_helpers::plan_assembly;
+use crate::sql_test_glue::_helpers::plan::plan_assembly;
 use crate::sql_test_glue::models::SqlTestAssembly;
 use pyo3::prelude::Bound;
 use pyo3::prelude::PyAny;

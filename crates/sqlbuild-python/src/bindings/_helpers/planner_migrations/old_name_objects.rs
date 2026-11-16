@@ -11,7 +11,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_retention::old_name_retention;
-use sqlbuild_python_project::compiled_views::main::model_reads::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
 
 pub(super) fn relation<'py>(location: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?.call1((location,))
@@ -45,7 +45,7 @@ pub(super) fn retention<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     old_name_retention(
         &native_field(
-            &sqlbuild_python_project::compiled_views::main::model_reads::config::config(item)?,
+            &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(item)?,
             "values",
         )?,
         project,

@@ -25,8 +25,8 @@ use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
-use sqlbuild_python_project::compiled_views::main::records::compiled_project_facts::compiled_project_facts;
-use sqlbuild_python_project::compiled_views::main::records::record_model_analyses::record_model_analyses;
+use sqlbuild_python_project::compiled_views::main::project::compiled_project_facts::compiled_project_facts;
+use sqlbuild_python_project::compiled_views::main::project::record_model_analyses::record_model_analyses;
 
 const CANCELLED: &str = "native rules evaluation was cancelled";
 const BUILD_PHASE: &str = "early_rules_build_ms";

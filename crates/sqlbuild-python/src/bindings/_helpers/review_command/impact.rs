@@ -12,8 +12,9 @@ use crate::bindings::_helpers::lineage::project_lineage::build_project_column_li
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_names::inferred_names;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_names::inferred_names;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 
 /// The columns of a changed model a comparison proved changed, or `None` when every column may.
 fn changed_columns(comparison: Option<&NodeComparison>) -> Option<Vec<String>> {
@@ -45,10 +46,7 @@ pub(crate) fn affected_columns(
 ) -> PyResult<BTreeMap<String, Vec<String>>> {
     let py: Python<'_> = project.py();
     let mut models: BTreeMap<String, Bound<'_, PyAny>> = BTreeMap::new();
-    for model in
-        sqlbuild_python_project::compiled_views::main::project_reads::models::models(project)?
-            .try_iter()?
-    {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
         let name: String = model_name(&model)?;
         if affected.contains(&name) {

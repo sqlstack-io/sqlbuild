@@ -2,7 +2,7 @@
 
 use sqlbuild_host::entries::models::HostId;
 
-use crate::compiled_views::main::project_reads::collection::collection;
+use crate::compiled_views::main::project::collection::collection;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyFrozenSet, PyString, PyTuple};
 use pyo3::{BoundObject, IntoPyObject};
@@ -147,7 +147,7 @@ pub(crate) fn by_name<'py>(
         let node = node?;
         pyo3::types::PyDictMethods::set_item(
             &nodes,
-            crate::compiled_views::main::resource_reads::name::name(&node)?,
+            crate::resource_views::main::resource_reads::name::name(&node)?,
             node,
         )?;
     }

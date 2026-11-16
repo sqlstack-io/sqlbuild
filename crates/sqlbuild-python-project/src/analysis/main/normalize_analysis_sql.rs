@@ -8,7 +8,7 @@ use pyo3::prelude::Python;
 #[inline]
 pub fn normalize_analysis_sql(
     py: Python<'_>,
-    request: crate::analysis::_helpers::native_classes::NormalizationInput,
+    request: crate::analysis::models::NormalizationInput,
 ) -> PyResult<String> {
     normalization::normalize_analysis_sql(py, request)
 }

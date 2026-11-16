@@ -16,8 +16,8 @@ use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry;
 
 pub(crate) fn declared_column_aliases<'py>(
     py: Python<'py>,
@@ -102,11 +102,7 @@ pub(crate) fn old_name_claim_errors<'py>(
         if !kind.eq("view")? {
             continue;
         }
-        let destination = relation(
-            &sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                &model,
-            )?,
-        )?;
+        let destination = relation(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?)?;
         for view in arguments.value("views")?.try_iter()? {
             let view = view?;
             if native_field(&view, "destination_model")?.eq(&name)?
@@ -160,13 +156,9 @@ pub(crate) fn old_name_view_skip_reason<'py>(
     let mut reuser: Option<String> = None;
     for model in arguments.value("models")?.try_iter()? {
         let model = model?;
-        if relation(
-            &sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                &model,
-            )?,
-        )?
-        .call_method1("matches", (&old,))?
-        .is_truthy()?
+        if relation(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?)?
+            .call_method1("matches", (&old,))?
+            .is_truthy()?
         {
             reuser = Some(name_object(&model)?.extract()?);
             break;

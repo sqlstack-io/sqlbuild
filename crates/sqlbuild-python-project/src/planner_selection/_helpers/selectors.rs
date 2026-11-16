@@ -10,9 +10,9 @@ use sqlbuild_analysis::graph::main::resolve_selector_tokens::resolve_selector_to
 use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::models::{ParsedSelector, ProjectGraph};
 
-use crate::compiled_project::main::job_catalog::graph_with_jobs::graph_with_jobs;
-use crate::graph::main::algorithms::closure::closure;
-use crate::graph::main::views::graph_from_view_mappings::graph_from_view_mappings;
+use crate::compiled_project::main::graph_with_jobs::graph_with_jobs;
+use crate::graph::main::nodes::closure::closure;
+use crate::graph::main::project::graph_from_view_mappings::graph_from_view_mappings;
 use crate::graph::models::CompiledProjectGraph;
 use crate::graph::models::GraphViewMappings;
 use crate::graph::models::KeyCache;

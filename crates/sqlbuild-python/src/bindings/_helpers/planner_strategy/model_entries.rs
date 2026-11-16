@@ -45,12 +45,12 @@ use sqlbuild_python_front::model_config::main::config::config_text_tuple::config
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_front::model_config::types::ConfigValues;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_rows::inferred_rows;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_key::model_key;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
-use sqlbuild_python_project::compiled_views::main::model_reads::relative_path::relative_path;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::relative_path::relative_path;
 use sqlbuild_python_project::planner_strategy::constants::CUSTOM_MATERIALIZATION;
 use sqlbuild_python_project::planner_strategy::constants::DDL_SEPARATOR;
 use sqlbuild_python_project::planner_strategy::constants::ENFORCED_CONTRACT;
@@ -119,7 +119,7 @@ fn schema_columns<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = model.py();
     let entry: Bound<'py, PyAny> =
-        sqlbuild_python_project::compiled_views::main::resource_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::resource_views::main::resource_reads::schema_entry::schema_entry(
             model,
         )?;
     if entry.is_none() {
@@ -215,7 +215,7 @@ fn on_schema_change<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny
 fn type_enforcement<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = model.py();
     let entry: Bound<'py, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
             model,
         )?;
     if !entry.is_none() {
@@ -275,7 +275,7 @@ fn logical_ddl<'py>(
     let adapter: &Bound<'py, PyAny> = &request.adapter;
     let model: &Bound<'py, PyAny> = &request.model;
     let destination: Bound<'py, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             model,
         )?;
     let qualified: Bound<'py, PyAny> = native_field(&destination, "qualified_name")?;
@@ -340,7 +340,7 @@ fn logical_ddl<'py>(
 /// The output column names SQL analysis inferred for the model, when it inferred them.
 fn expected_output_columns<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = model.py();
-    let inferred: Bound<'py, PyAny> = sqlbuild_python_project::compiled_views::main::model_reads::inferred_columns::inferred_columns(model)?;
+    let inferred: Bound<'py, PyAny> = sqlbuild_python_project::compiled_views::main::compiled_models::inferred_columns::inferred_columns(model)?;
     if inferred.is_none() {
         return Ok(none(py));
     }
@@ -608,7 +608,7 @@ fn contract_fields<'py>(
     )?;
     entry.set_item("contract_columns", schema_columns(model, false)?)?;
     let schema_entry: Bound<'py, PyAny> =
-        sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry(
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
             model,
         )?;
     entry.set_item(
@@ -687,7 +687,9 @@ pub(crate) fn assemble_model_plan_entry<'py>(
     let table_type: Bound<'py, PyAny> = native_field(
         &native_field(
             &native_field(
-                &sqlbuild_python_project::compiled_views::main::model_reads::config::config(model)?,
+                &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(
+                    model,
+                )?,
                 "table_type",
             )?,
             "value",
@@ -705,7 +707,7 @@ pub(crate) fn assemble_model_plan_entry<'py>(
     entry.set_item("relative_path", relative_path(model)?)?;
     entry.set_item(
         "destination",
-        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             model,
         )?,
     )?;

@@ -1,6 +1,6 @@
 //! `sql_test_plan_error_messages` as a function of `module`.
 
-use crate::sql_test_glue::_helpers::plan_driver;
+use crate::sql_test_glue::_helpers::plan::plan_driver;
 
 /// `sql_test_plan_error_messages` as a function of `module`.
 #[inline]

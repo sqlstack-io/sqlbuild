@@ -25,7 +25,7 @@ use crate::bindings::_helpers::rules::findings::{FindingClasses, invalid_finding
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;
-use sqlbuild_python_project::compiled_project::main::values::plain_value::plain_value;
+use sqlbuild_python_project::compiled_project::main::plain_value::plain_value;
 
 /// One custom rule's cache identity from its metadata, source fingerprint and settings.
 #[pyfunction]

@@ -12,7 +12,7 @@ use sqlbuild_python_base::types::CompilerDetach;
 #[pyfunction]
 pub(crate) fn normalize_analysis_sql(
     py: Python<'_>,
-    request: crate::analysis::_helpers::native_classes::NormalizationInput,
+    request: crate::analysis::models::NormalizationInput,
 ) -> PyResult<String> {
     py.compiler_detach(|| {
         sqlbuild_analysis::semantic_validation::main::normalize::normalize_analysis_sql(

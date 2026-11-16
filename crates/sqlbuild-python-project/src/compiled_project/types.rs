@@ -1,11 +1,8 @@
 //! Public traits and type aliases of compiled project.
 
-use crate::compiled_project::models::WorkerBuild;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
-use std::collections::BTreeMap;
-use std::sync::Arc;
 
 /// One discovered source: its file's path, the discovered file and the entry.
 pub type SourceRow = (String, Py<PyAny>, Py<PyAny>);
@@ -28,9 +25,3 @@ pub type ResourceDiagnostics<'py> = (
     Vec<Bound<'py, PyAny>>,
     Vec<Bound<'py, PyAny>>,
 );
-
-/// Node keys by snapshot node key, such as the models each test checks.
-pub type NodeKeys = BTreeMap<String, Vec<String>>;
-
-/// A claimed run's worker build and the project inputs it verified against the frozen snapshot.
-pub type VerifiedRun<'a, 'py> = (Arc<WorkerBuild>, &'a Bound<'py, PyAny>);

@@ -110,12 +110,12 @@ use sqlbuild_python_project::compiled_project::models::TestFileRow;
 use sqlbuild_python_project::compiled_project::types::AttachedSqlTests;
 use sqlbuild_python_project::compiled_project::types::SourceRow;
 use sqlbuild_python_project::compiled_project::types::SourceSettings;
-use sqlbuild_python_project::compiled_views::main::source_views::retain_sources::retain_sources;
 use sqlbuild_python_project::compiled_views::models::NativeModelInput;
-use sqlbuild_python_project::compiled_views::models::NativeSourceInput;
-use sqlbuild_python_project::compiled_views::types::AttachedAudit;
-use sqlbuild_python_project::compiled_views::types::AttachedFunction;
-use sqlbuild_python_project::compiled_views::types::AttachedSource;
+use sqlbuild_python_project::resource_views::main::source_views::retain_sources::retain_sources;
+use sqlbuild_python_project::resource_views::models::NativeSourceInput;
+use sqlbuild_python_project::resource_views::types::AttachedAudit;
+use sqlbuild_python_project::resource_views::types::AttachedFunction;
+use sqlbuild_python_project::resource_views::types::AttachedSource;
 
 const MATERIALIZED_KEY: &str = "materialized";
 const CURSOR_KEY: &str = "cursor";

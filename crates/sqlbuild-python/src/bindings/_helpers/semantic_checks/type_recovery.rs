@@ -32,9 +32,9 @@ use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_project::analysis::main::schema_validations::schema_validations;
 use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_names::inferred_names;
-use sqlbuild_python_project::compiled_views::main::model_reads::lineage_inputs::lineage_inputs;
-use sqlbuild_python_project::compiled_views::main::records::with_type_recovery::with_type_recovery;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_names::inferred_names;
+use sqlbuild_python_project::compiled_views::main::compiled_models::lineage_inputs::lineage_inputs;
+use sqlbuild_python_project::compiled_views::main::project::with_type_recovery::with_type_recovery;
 use sqlbuild_python_project::compiled_views::types::LineageInput;
 use sqlbuild_python_project::semantic_shapes::main::project_shapes::project_shapes;
 

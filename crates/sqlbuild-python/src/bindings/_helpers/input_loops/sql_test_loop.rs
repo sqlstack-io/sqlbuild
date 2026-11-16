@@ -52,7 +52,7 @@ use sqlbuild_python_project::compiled_project::models::SqlTestSettings;
 use sqlbuild_python_project::compiled_project::models::TestBlockRow;
 use sqlbuild_python_project::compiled_project::models::TestFileRow;
 use sqlbuild_python_project::compiled_project::types::TestCaseRow;
-use sqlbuild_python_project::compiled_views::main::source_views::replaced::replaced;
+use sqlbuild_python_project::resource_views::main::source_views::replaced::replaced;
 
 const MODEL_MODE: &str = "model";
 const MACRO_MODE: &str = "macro";

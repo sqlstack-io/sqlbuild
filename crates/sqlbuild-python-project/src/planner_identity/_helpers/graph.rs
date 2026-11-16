@@ -21,22 +21,22 @@ use sqlbuild_analysis::planner_identity::models::{
     AvailableUpstreams, ExecutionTest, GraphKey, MissingUpstream,
 };
 
-use crate::compiled_views::main::project_reads::functions::functions;
-use crate::compiled_views::main::project_reads::models::models;
-use crate::compiled_views::main::project_reads::seeds::seeds;
-use crate::compiled_views::main::project_reads::sources::sources;
-use crate::compiled_views::main::project_reads::sql_tests::sql_tests;
-use crate::compiled_views::main::resource_reads::graph_row::graph_row;
-use crate::graph::main::algorithms::closure::closure;
-use crate::graph::main::algorithms::inverted::inverted;
-use crate::graph::main::keys::native_key::native_key;
-use crate::graph::main::views::edge_dict::edge_dict;
+use crate::compiled_views::main::project::compiled_models::compiled_models;
+use crate::compiled_views::main::project::functions::functions;
+use crate::compiled_views::main::project::seeds::seeds;
+use crate::compiled_views::main::project::sources::sources;
+use crate::compiled_views::main::project::sql_tests::sql_tests;
+use crate::graph::main::nodes::closure::closure;
+use crate::graph::main::nodes::inverted::inverted;
+use crate::graph::main::nodes::native_key::native_key;
+use crate::graph::main::project::edge_dict::edge_dict;
 use crate::graph::models::KeyCache;
 use crate::graph::models::NativeProjectGraph;
 use crate::planner_identity::_helpers::hashing::graph_key;
 use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
 use crate::references::models::GateRow;
 use crate::references::models::HookRow;
+use crate::resource_views::main::resource_reads::graph_row::graph_row;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -103,7 +103,7 @@ pub(crate) fn execution_deps(
 ) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
     let mut resources: Vec<(ObjectKey, Vec<ObjectKey>)> = Vec::new();
     let collections: [Bound<'_, PyAny>; 4] = [
-        models(project)?,
+        compiled_models(project)?,
         sources(project)?,
         seeds(project)?,
         functions(project)?,

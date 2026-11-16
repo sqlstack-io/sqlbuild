@@ -7,8 +7,8 @@ use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::state_rows::main::event_rows::presumed_utc::presumed_utc;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use sqlbuild_python_project::fingerprints::main::compute_query_hash::compute_query_hash;
 use sqlbuild_python_project::planner_phases::main::object::object;
 
@@ -54,7 +54,7 @@ pub(super) fn handover<'py>(
         metadata = native_field(&json, "dumps")?.call((payload,), Some(&kwargs))?;
     }
     let destination =
-        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             model,
         )?;
     replace(

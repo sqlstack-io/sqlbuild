@@ -22,12 +22,12 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::discovery::main::project::yaml_entry_line::yaml_entry_line;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_entry::source_entry;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_file::source_file;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
+use sqlbuild_python_project::resource_views::main::source_reads::source_file::source_file;
 use std::collections::HashMap;
 
 fn selected_source_readers(scope: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Vec<String>>> {
@@ -87,7 +87,7 @@ fn declaration_location(source: &Bound<'_, PyAny>) -> PyResult<String> {
         .extract()?;
     let line = yaml_entry_line(
         &native_field(&file, "contents")?.extract::<String>()?,
-        &sqlbuild_python_project::compiled_views::main::source_reads::name::name(source)?
+        &sqlbuild_python_project::resource_views::main::source_reads::name::name(source)?
             .extract::<String>()?,
     );
     Ok(match line {
@@ -108,13 +108,12 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     let read_map = native_field(relations, "source_read_map")?;
     let listed = native_field(relations, "listed_source_names")?;
     let mut unlisted: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>, Vec<String>)> = Vec::new();
-    for source in
-        sqlbuild_python_project::compiled_views::main::project_reads::sources::sources(project)?
-            .try_iter()?
+    for source in sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
+        .try_iter()?
     {
         let source = source?;
         let name: String =
-            sqlbuild_python_project::compiled_views::main::source_reads::name::name(&source)?
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?
                 .extract()?;
         let Some(source_readers) = readers.get(&name).filter(|readers| !readers.is_empty()) else {
             continue;
@@ -169,7 +168,7 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
         }
         let role = native_field(&probe, "role")?;
         missing.push(MissingSourceTable {
-            source_name: sqlbuild_python_project::compiled_views::main::source_reads::name::name(
+            source_name: sqlbuild_python_project::resource_views::main::source_reads::name::name(
                 &source,
             )?
             .extract()?,
@@ -193,13 +192,12 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     }
     let message = missing_source_tables_message(&missing);
     let sources = PyDict::new(py);
-    for source in
-        sqlbuild_python_project::compiled_views::main::project_reads::sources::sources(project)?
-            .try_iter()?
+    for source in sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
+        .try_iter()?
     {
         let source = source?;
         sources.set_item(
-            sqlbuild_python_project::compiled_views::main::source_reads::name::name(&source)?,
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?,
             source,
         )?;
     }

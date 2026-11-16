@@ -36,11 +36,11 @@ use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::reso
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_front::discovery::main::project::configured_git_base_ref::configured_git_base_ref;
 use sqlbuild_python_front::discovery::main::project::configured_review::configured_review;
-use sqlbuild_python_project::compiled_views::main::model_reads::dep_rows::dep_rows;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
-use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
-use sqlbuild_python_project::graph::main::python_node_graph::python_node_graph::python_node_graph;
+use sqlbuild_python_project::compiled_views::main::compiled_models::dep_rows::dep_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 
 const BASE_REF_ALIAS: &str = "@base";
@@ -215,7 +215,7 @@ fn key_columns(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
 /// One model as a review node, critical by its `critical` key or one of the critical tags.
 fn model_node(model: &Bound<'_, PyAny>, critical_tags: &[String]) -> PyResult<ReviewNode> {
     let values: Bound<'_, PyAny> = native_field(
-        &sqlbuild_python_project::compiled_views::main::model_reads::config::config(model)?,
+        &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(model)?,
         "values",
     )?;
     let tags: Vec<String> = strings(&config_value(&values, "tags")?)?;
@@ -384,10 +384,10 @@ fn review_graph(
     for seed in seeds(project)?.try_iter()? {
         let seed: Bound<'_, PyAny> = seed?;
         let name: String =
-            sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?
+            sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?
                 .extract()?;
         if let Some(database) = destination_database(
-            &sqlbuild_python_project::compiled_views::main::seed_reads::destination::destination(
+            &sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(
                 &seed,
             )?,
         )? {
@@ -407,7 +407,7 @@ fn review_graph(
         );
     }
     let mut dependencies: Vec<(String, Vec<(String, String)>)> = Vec::new();
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
         let node: ReviewNode = model_node(&model, critical_tags)?;
         if node.materialized == INCREMENTAL_MATERIALIZATION
@@ -415,11 +415,7 @@ fn review_graph(
         {
             project_graph.stateful.insert(node.name.clone());
         }
-        if let Some(database) = destination_database(
-            &sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                &model,
-            )?,
-        )? {
+        if let Some(database) = destination_database(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?)? {
             project_graph.databases.insert(node.name.clone(), database);
         }
         project_graph

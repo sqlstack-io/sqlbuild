@@ -47,7 +47,7 @@ use sqlbuild_python_base::build_progress::main::terminal::tty_flag::tty_flag;
 use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
-use sqlbuild_python_project::compiled_project::models::WorkerBuild;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
 const RUNTIME_LOGGER: &str = "sqlbuild.executor.runtime";
 const PASS_OUTCOME: &str = "pass";

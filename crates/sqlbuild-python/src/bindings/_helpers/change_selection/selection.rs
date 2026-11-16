@@ -29,9 +29,10 @@ use crate::bindings::_helpers::change_selection::environment_nodes::with_current
 use crate::bindings::_helpers::planner_scenario::graph::plan_scenario_graph;
 use crate::bindings::_helpers::scenario_command::setup::{flush, write};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_views::main::model_reads::deps::deps;
-use sqlbuild_python_project::compiled_views::main::project_reads::sql_tests::sql_tests;
-use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 
 const MACRO_TEST_MODE: &str = "macro";
 /// The JSON document key of the changes and selection of a `--since` run.
@@ -333,13 +334,10 @@ pub(crate) fn tests_and_models<'py>(
         tests.insert(native_field(&test, "name")?.extract()?, test);
     }
     let mut models: ByName<'py> = HashMap::new();
-    for model in
-        sqlbuild_python_project::compiled_views::main::project_reads::models::models(project)?
-            .try_iter()?
-    {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'py, PyAny> = model?;
         models.insert(
-            sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name(
+            sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name(
                 &model,
             )?,
             model,

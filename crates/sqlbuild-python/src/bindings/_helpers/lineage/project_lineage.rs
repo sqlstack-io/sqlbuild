@@ -34,7 +34,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_project::analysis::models::ProjectCatalog;
-use sqlbuild_python_project::compiled_views::main::model_reads::star_flags::star_flags;
+use sqlbuild_python_project::compiled_views::main::compiled_models::star_flags::star_flags;
 use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
 
 const FAST_MODE: &str = "fast";

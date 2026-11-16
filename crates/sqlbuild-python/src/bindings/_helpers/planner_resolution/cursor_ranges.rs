@@ -44,7 +44,7 @@ use sqlbuild_python_front::cursor::models::CursorSession;
 use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound as typed_cursor_bound;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use std::cmp::Ordering;
 

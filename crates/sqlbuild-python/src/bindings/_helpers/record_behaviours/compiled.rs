@@ -10,7 +10,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::relation_keys::entry_relation_key_row::entry_relation_key_row;
+use sqlbuild_python_project::compiled_views::main::compiled_models::entry_relation_key_row::entry_relation_key_row;
 
 /// `CompilerDiagnostic` positions.
 const DIAGNOSTIC_PHASE_FIELD: usize = 0;

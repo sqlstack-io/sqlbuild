@@ -26,7 +26,7 @@ use sqlbuild_python_front::render::main::calls::top_level_macro_call_names::top_
 use sqlbuild_python_project::analysis_session::main::profile_dialect::profile_dialect;
 use sqlbuild_python_project::analysis_session::main::query_column_rows::query_column_rows;
 use sqlbuild_python_project::analysis_session::types::ColumnsRow;
-use sqlbuild_python_project::compiled_views::main::model_input_view::input_analysis_sql::input_analysis_sql;
+use sqlbuild_python_project::compiled_views::main::model_inputs::input_analysis_sql::input_analysis_sql;
 use sqlbuild_python_project::compiled_views::models::NativeModelInput;
 
 const NATIVE_FAILURE_PREFIX: &str = "NativeCompilerError: ";

@@ -34,8 +34,8 @@ use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_use
 use sqlbuild_python_front::discovery::main::sources::provider_uses::provider_uses;
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
 use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
-use sqlbuild_python_project::compiled_project::models::WorkerBuild;
-use sqlbuild_python_project::graph::main::python_node_graph::python_node_graph::python_node_graph;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
 fn run_with_providers(context: &BuildContext<'_>) -> PyResult<i32> {
     let py: Python<'_> = context.py();

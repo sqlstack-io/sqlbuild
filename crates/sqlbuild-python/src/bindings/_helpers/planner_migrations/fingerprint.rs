@@ -8,7 +8,7 @@ use sqlbuild_analysis::planner_migrations::main::{migration_fingerprint, migrati
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use sqlbuild_python_project::native_host::models::ModelLookup;
 use std::collections::BTreeMap;
 

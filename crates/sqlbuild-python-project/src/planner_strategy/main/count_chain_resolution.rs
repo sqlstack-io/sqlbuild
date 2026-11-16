@@ -1,6 +1,6 @@
 //! Count one batch resolution of SQL-test model chains.
 
-use crate::planner_strategy::_helpers::fixture_context;
+use crate::planner_strategy::_helpers::fixtures::fixture_context;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 

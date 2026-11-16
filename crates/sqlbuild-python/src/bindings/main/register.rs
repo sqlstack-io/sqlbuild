@@ -18,6 +18,7 @@ use sqlbuild_python_base::records::main::registry::capture::capture;
 use sqlbuild_python_base::records::main::registry::register_records::register_records;
 use sqlbuild_python_base::records::main::registry::verify_attributes::verify_attributes;
 use sqlbuild_python_base::records::main::registry::verify_tables::verify_tables;
+use sqlbuild_python_project::analysis::main::register_normalization::register_normalization;
 use sqlbuild_python_project::analysis::models::BindingPositions;
 use sqlbuild_python_project::analysis::models::CompactAnalysisJob;
 use sqlbuild_python_project::analysis::models::ProjectCatalog;
@@ -34,9 +35,7 @@ pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     native_host::registration::register(module)?;
     rules::registration::register(module)?;
     cli::registration::register(module)?;
-    sqlbuild_python_project::analysis::main::register_normalization::register_normalization(
-        module,
-    )?;
+    register_normalization(module)?;
     analysis::queries::register(module)?;
     analysis::sql_tests::register(module)?;
     sqltext::registration::register(module)?;

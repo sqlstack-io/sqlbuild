@@ -12,6 +12,7 @@ use sqlbuild_analysis::planner_selection::models::{
     ModelSelectorNames, SelectableModel, SelectorExpansion,
 };
 
+use crate::compiled_views::main::project::compiled_models::compiled_models;
 use crate::planner_selection::models::Carrier;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -87,11 +88,10 @@ pub(crate) fn resolve_sqlbuild_model_selector_names<'py>(
     term: &Bound<'py, PyString>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = project.py();
-    let models: Vec<SelectableModel> =
-        crate::compiled_views::main::project_reads::models::models(project)?
-            .try_iter()?
-            .map(|model| selectable_model(&model?))
-            .collect::<PyResult<_>>()?;
+    let models: Vec<SelectableModel> = compiled_models(project)?
+        .try_iter()?
+        .map(|model| selectable_model(&model?))
+        .collect::<PyResult<_>>()?;
     let carrier: Carrier<'py> = Carrier::new(py, std::slice::from_ref(term), || {
         Ok(models
             .iter()

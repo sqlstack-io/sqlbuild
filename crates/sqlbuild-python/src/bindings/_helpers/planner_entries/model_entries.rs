@@ -43,8 +43,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::discovery::main::failures::microbatch_guidance::microbatch_guidance;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project_reads::functions::functions;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::functions::functions;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
 use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
@@ -426,7 +426,7 @@ pub(crate) fn plan_entries<'py>(
     for function in functions(&project)?.try_iter()? {
         let function = function?;
         functions_by_name.set_item(
-            sqlbuild_python_project::compiled_views::main::function_reads::name::name(&function)?,
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?,
             function,
         )?;
     }

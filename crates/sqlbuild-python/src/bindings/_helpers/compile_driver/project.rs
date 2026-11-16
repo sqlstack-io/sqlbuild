@@ -41,7 +41,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::contracts::main::resolve_effective_collection_rendering::resolve_effective_collection_rendering;
-use sqlbuild_python_project::compiled_views::main::records::project_with::project_with;
+use sqlbuild_python_project::compiled_views::main::project::project_with::project_with;
 use sqlbuild_python_project::contracts::main::promotion_conflict_diagnostics::promotion_conflict_diagnostics;
 const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
 /// Optional keywords of the project graph builders.

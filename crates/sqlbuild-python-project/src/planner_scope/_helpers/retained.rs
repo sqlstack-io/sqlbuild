@@ -38,7 +38,7 @@ pub(crate) fn scope_data(value: &Bound<'_, PyAny>) -> PyResult<Arc<ScopeData>> {
                 let item = item?;
                 Ok((
                     item.get_item(0)?.extract()?,
-                    crate::graph::main::keys::native_key::native_key(&item.get_item(1)?)?,
+                    crate::graph::main::nodes::native_key::native_key(&item.get_item(1)?)?,
                 ))
             })
             .collect::<PyResult<_>>()?,

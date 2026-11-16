@@ -56,7 +56,7 @@ use sqlbuild_python_base::cli::main::withhold_launch_record::withhold_launch_rec
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_front::discovery::models::MissingSecretsScope;
-use sqlbuild_python_project::compiled_project::main::job_catalog::with_job_scope::with_job_scope;
+use sqlbuild_python_project::compiled_project::main::with_job_scope::with_job_scope;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;

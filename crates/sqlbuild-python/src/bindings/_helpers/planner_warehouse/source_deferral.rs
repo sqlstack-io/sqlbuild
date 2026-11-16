@@ -18,23 +18,24 @@ use sqlbuild_python_front::authored_values::main::render_project_var_text::rende
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::audit_reads::references::references;
-use sqlbuild_python_project::compiled_views::main::audit_reads::scope_deps::scope_deps;
-use sqlbuild_python_project::compiled_views::main::audit_reads::sql_body::sql_body;
-use sqlbuild_python_project::compiled_views::main::function_reads::body_sql::body_sql;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_key::model_key;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
-use sqlbuild_python_project::compiled_views::main::project_reads::audits::audits;
-use sqlbuild_python_project::compiled_views::main::project_reads::functions::functions;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
-use sqlbuild_python_project::compiled_views::main::project_reads::sources::sources;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_entry::source_entry;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_file::source_file;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::project::audits::audits;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::functions::functions;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_python_project::planner_phases::main::replace::replace;
 use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::resource_views::main::audit_reads::references::references;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
+use sqlbuild_python_project::resource_views::main::audit_reads::sql_body::sql_body;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::key::key;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
+use sqlbuild_python_project::resource_views::main::source_reads::source_file::source_file;
 use std::collections::BTreeSet;
 
 fn managed_names(project: &Bound<'_, PyAny>) -> PyResult<BTreeSet<String>> {
@@ -99,7 +100,7 @@ fn selected_managed_refs(
     managed: &BTreeSet<String>,
 ) -> PyResult<BTreeSet<String>> {
     let mut names: BTreeSet<_> = BTreeSet::new();
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         if !selected.contains(model_key(&model)?)? {
             continue;
@@ -109,9 +110,7 @@ fn selected_managed_refs(
     }
     for function in functions(project)?.try_iter()? {
         let function = function?;
-        if selected.contains(
-            sqlbuild_python_project::compiled_views::main::function_reads::key::key(&function)?,
-        )? {
+        if selected.contains(key(&function)?)? {
             names.extend(sql_source_reads(&body_sql(&function)?, managed)?);
         }
     }

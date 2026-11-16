@@ -13,10 +13,10 @@ use crate::bindings::_helpers::planner_entries::execution_plan::build_execution_
 use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_entry::source_entry;
-use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::models::KeyCache;
 use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 use std::collections::HashSet;
 
 use pyo3::exceptions::PyException;
@@ -30,7 +30,7 @@ use sqlbuild_python_base::native_host::main::connection_failure::connection_fail
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::graph::main::python_node_graph::run_selection_from_inputs::run_selection_from_inputs;
+use sqlbuild_python_project::graph::main::python_nodes::run_selection_from_inputs::run_selection_from_inputs;
 
 const SINGLE_CONNECTION: i64 = 1;
 
@@ -68,16 +68,15 @@ fn without_loaders<'py>(
         }
     }
     let mut sources: Vec<(String, String)> = Vec::new();
-    for source in
-        sqlbuild_python_project::compiled_views::main::project_reads::sources::sources(project)?
-            .try_iter()?
+    for source in sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
+        .try_iter()?
     {
         let source = source?;
         let loader: Option<String> = native_field(&source_entry(&source)?, "loader")?.extract()?;
         if loader.is_some_and(|loader| dropped.contains(&loader)) {
             sources.push((
                 SOURCE.to_owned(),
-                sqlbuild_python_project::compiled_views::main::source_reads::name::name(&source)?
+                sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?
                     .extract()?,
             ));
         }

@@ -19,7 +19,8 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::planner_phases::main::object::object;
 
 #[pyfunction]
@@ -141,17 +142,14 @@ fn namespace<'py>(
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let py = project.py();
     let models = PyDict::new(py);
-    for model in
-        sqlbuild_python_project::compiled_views::main::project_reads::models::models(project)?
-            .try_iter()?
-    {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         models.set_item(name_object(&model)?, model)?;
     }
     for field in ["target_model_names", "model_names"] {
         for name in native_field(graph, field)?.try_iter()? {
             if let Some(model) = models.get_item(name?)? {
-                let destination = sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(&model)?;
+                let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
                 return Ok((
                     native_field(&destination, "database")?,
                     native_field(&destination, "schema")?,

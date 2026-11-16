@@ -1,6 +1,6 @@
 //! Native plans of one SQL-test batch, with adapter rendering and timing accounted for.
 
-use crate::sql_test_glue::_helpers::plan_driver;
+use crate::sql_test_glue::_helpers::plan::plan_driver;
 use crate::sql_test_glue::models::PlanRow;
 use crate::sql_test_glue::models::SqlTestPlanOptions;
 use pyo3::prelude::Bound;

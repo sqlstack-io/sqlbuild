@@ -30,9 +30,9 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
 use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
-use sqlbuild_python_project::graph::main::algorithms::transitive_closure_many::transitive_closure_many;
-use sqlbuild_python_project::graph::main::execution_gates::sql_ref_key::sql_ref_key;
-use sqlbuild_python_project::graph::main::python_lifecycle::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
+use sqlbuild_python_project::graph::main::nodes::sql_ref_key::sql_ref_key;
+use sqlbuild_python_project::graph::main::nodes::transitive_closure_many::transitive_closure_many;
+use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_selection::main::parse_project_selector::parse_project_selector;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
@@ -53,8 +53,8 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::graph::main::python_node_graph::python_node_graph::python_node_graph;
-use sqlbuild_python_project::graph::main::python_selection::python_node_names::python_node_names;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_names::python_node_names;
 
 const GRAPH_OPERATOR_CODE: &str = "C681";
 const GRAPH_OPERATOR_MESSAGE: &str = "sqb check selectors do not support graph operators; \

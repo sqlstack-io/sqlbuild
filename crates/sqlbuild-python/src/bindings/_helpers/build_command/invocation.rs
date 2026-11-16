@@ -31,7 +31,7 @@ use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::reso
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
-use sqlbuild_python_project::compiled_project::models::WorkerBuild;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
 const DEFER_CONFLICT_CODE: &str = "C408";
 

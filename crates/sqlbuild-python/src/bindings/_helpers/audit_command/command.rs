@@ -42,8 +42,8 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
-use sqlbuild_python_project::compiled_project::models::WorkerBuild;
-use sqlbuild_python_project::compiled_project::types::VerifiedRun;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
+use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 
 const EXECUTION_COMMAND: &str = "sqb audit";
 

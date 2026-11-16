@@ -1,6 +1,6 @@
 //! `plan_sql_tests` as a function of `module`.
 
-use crate::sql_test_glue::_helpers::plan_assembly;
+use crate::sql_test_glue::_helpers::plan::plan_assembly;
 
 /// `plan_sql_tests` as a function of `module`.
 #[inline]

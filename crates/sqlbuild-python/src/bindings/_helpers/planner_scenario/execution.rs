@@ -34,10 +34,11 @@ use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_key
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::inferred_names::inferred_names;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
-use sqlbuild_python_project::compiled_views::main::records::compiled_model_record::compiled_model_record;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_names::inferred_names;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::project::compiled_model_record::compiled_model_record;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::graph::models::KeyCache;
 use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
 use sqlbuild_python_project::planner_identity::main::execution_order::execution_order;
@@ -102,20 +103,13 @@ pub(crate) fn build_scenario_execution_plan<'py>(
     } else {
         analysis.is_truthy()?
     };
-    let models = by_attribute(
-        &sqlbuild_python_project::compiled_views::main::project_reads::models::models(&project)?,
-        "name",
-    )?;
+    let models = by_attribute(&compiled_models(&project)?, "name")?;
     let functions = by_attribute(
-        &sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(
-            &project,
-        )?,
+        &sqlbuild_python_project::compiled_views::main::project::functions::functions(&project)?,
         "key",
     )?;
     let locations = build_function_locations(
-        &sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(
-            &project,
-        )?,
+        &sqlbuild_python_project::compiled_views::main::project::functions::functions(&project)?,
     )?
     .into_any();
     let upstream = execution_deps(&project)?;
@@ -288,9 +282,14 @@ fn model_context<'py>(
         ModelPlanContext {
             model_locations: native_field(&context.relations, "model_locations")?.unbind(),
             models_by_name: models.clone().into_any().into(),
-            functions_by_name: by_attribute(&sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(project)?, "name")?
-                .into_any()
-                .unbind(),
+            functions_by_name: by_attribute(
+                &sqlbuild_python_project::compiled_views::main::project::functions::functions(
+                    project,
+                )?,
+                "name",
+            )?
+            .into_any()
+            .unbind(),
             seed_locations: native_field(&context.relations, "seed_locations")?.unbind(),
             function_locations: locations.clone().unbind(),
             source_map: native_field(&context.relations, "source_map")?.unbind(),

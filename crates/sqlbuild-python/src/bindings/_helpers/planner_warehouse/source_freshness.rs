@@ -73,7 +73,7 @@ pub(crate) fn source_freshness_unknown_warnings<'py>(
 
 fn state_database<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     for node in destination_nodes(project)? {
-        let database = native_field(&sqlbuild_python_project::compiled_views::main::resource_reads::destination::destination(&node)?, "database")?;
+        let database = native_field(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?, "database")?;
         if !database.is_none() {
             return Ok(database);
         }
@@ -87,7 +87,7 @@ fn state_schemas(
 ) -> PyResult<BTreeSet<String>> {
     let mut schemas: BTreeSet<_> = BTreeSet::new();
     for node in destination_nodes(project)? {
-        let schema = native_field(&sqlbuild_python_project::compiled_views::main::resource_reads::destination::destination(&node)?, "schema")?;
+        let schema = native_field(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?, "schema")?;
         if !schema.is_none() {
             schemas.insert(schema.extract()?);
         }
@@ -101,7 +101,7 @@ fn state_schemas(
             let Some(model) = data.model(scope.py(), name) else {
                 continue;
             };
-            let schema = native_field(&sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(&model)?, "schema")?;
+            let schema = native_field(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?, "schema")?;
             if !schema.is_none() {
                 schemas.insert(schema.extract()?);
             }

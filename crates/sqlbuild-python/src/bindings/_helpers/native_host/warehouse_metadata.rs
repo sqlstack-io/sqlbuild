@@ -49,7 +49,7 @@ use sqlbuild_python_base::warehouse_access::main::read_catalog::read_catalog;
 use sqlbuild_python_base::warehouse_access::main::read_statistics::read_statistics;
 use sqlbuild_python_front::authored_values::main::sql_value::sql_value;
 use sqlbuild_python_front::authored_values::models::SqlValueClasses;
-use sqlbuild_python_project::compiled_project::main::values::plain_value::plain_value;
+use sqlbuild_python_project::compiled_project::main::plain_value::plain_value;
 use sqlbuild_python_project::fingerprints::main::row_fingerprint::row_fingerprint;
 
 /// One read-only adapter session serves every page of one synchronization.

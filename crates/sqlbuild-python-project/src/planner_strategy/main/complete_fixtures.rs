@@ -1,7 +1,7 @@
 //! Complete the fixture groups of one chain against the planning context.
 
-use crate::planner_strategy::_helpers::fixture_completion;
-use crate::planner_strategy::_helpers::fixture_completion::FixtureCompletion;
+use crate::planner_strategy::_helpers::fixtures::fixture_completion;
+use crate::planner_strategy::models::FixtureCompletion;
 use crate::planner_strategy::models::RelationFixturePlanningContext;
 use pyo3::prelude::Bound;
 use pyo3::prelude::PyAny;

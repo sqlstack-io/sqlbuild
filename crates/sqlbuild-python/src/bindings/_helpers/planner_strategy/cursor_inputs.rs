@@ -111,7 +111,9 @@ pub(crate) fn reject_unexposed_cursor_input_columns<'py>(
     let source_map: &Bound<'py, PyAny> = &lookups.source_map;
     let warehouse_columns: &Bound<'py, PyAny> = &lookups.source_warehouse_columns;
     let model_name: String =
-        sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name(model)?;
+        sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name(
+            model,
+        )?;
     for role in ["filter_inputs", "watermark_inputs"] {
         for item in mapping_items(&native_field(&roles, role)?)?.try_iter()? {
             let (input_name, column): (String, String) = item?.extract()?;

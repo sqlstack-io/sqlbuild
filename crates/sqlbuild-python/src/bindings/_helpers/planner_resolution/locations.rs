@@ -3,8 +3,8 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_python_project::compiled_views::main::resource_reads::destination::destination;
-use sqlbuild_python_project::compiled_views::main::resource_reads::name::name;
+use sqlbuild_python_project::resource_views::main::resource_reads::destination::destination;
+use sqlbuild_python_project::resource_views::main::resource_reads::name::name;
 
 fn locations<'py>(items: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
     let result = PyDict::new(items.py());

@@ -24,8 +24,8 @@ use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_project::analysis::models::ProjectCatalog;
-use sqlbuild_python_project::compiled_views::main::audit_views::audit_reference_rows::audit_reference_rows;
 use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
+use sqlbuild_python_project::resource_views::main::audit_views::audit_reference_rows::audit_reference_rows;
 
 const SQL_ANALYSIS_CONFIG_KEY: &str = "sql_analysis";
 const MODEL_HOOK_KEYS: [&str; 2] = ["pre_hooks", "post_hooks"];

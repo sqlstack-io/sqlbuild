@@ -27,10 +27,10 @@ use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
-use sqlbuild_python_project::compiled_project::types::VerifiedRun;
 use sqlbuild_python_project::planner_selection::main::expand_project_upstream_keys::expand_project_upstream_keys;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
+use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME as STATE_TABLE_NAME;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

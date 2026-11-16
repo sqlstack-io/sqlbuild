@@ -1469,11 +1469,11 @@ paths = ["crates/sqlbuild-python-base/src/boundary/models.rs"]
 reason = "Each fills a missing keyword argument with its own default, None or False."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/inputs_view.rs", "crates/sqlbuild-python-project/src/compiled_views/_helpers/project_view.rs"]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/model_inputs/inputs_view.rs", "crates/sqlbuild-python-project/src/compiled_views/_helpers/project/project_view.rs"]
 reason = "Each compiled view reads its own field set from the Python boundary."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python/src/bindings/_helpers/build_progress/build_callbacks.rs", "crates/sqlbuild-python-project/src/compiled_project/_helpers/snapshot_execution.rs"]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/build_progress/build_callbacks.rs", "crates/sqlbuild-python-project/src/project_snapshot/_helpers/snapshot/snapshot_execution.rs"]
 reason = "Each callback or worker report forwards one distinct build or check event with its own payload."
 
 [[dupes.allowlist]]
@@ -1676,7 +1676,7 @@ select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078", "X
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 147515 }
+thresholds = { max_crate_code_lines = 147431 }
 reason = "The Python bindings crate is above the code-line limit; this caps it at its current size until it is split into crates by area. Lower the cap as code moves out."
 
 [[targets.rust.threshold_overrides]]
@@ -1793,6 +1793,66 @@ rule = "FPRSS012"
 path = "crates/sqlbuild-python-front/src/render/types.rs"
 symbols = ["StateTuple"]
 reason = "Python passes the expansion state as one five-item tuple; StateInput reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS012"
+path = "crates/sqlbuild-python-project/src/analysis_session/models.rs"
+symbols = ["FamilyRow::extract_bound", "PivotRequestRow::extract_bound"]
+reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS012"
+path = "crates/sqlbuild-python-project/src/compiled_project/models.rs"
+symbols = ["FunctionRow::extract_bound", "FunctionSettings::extract_bound", "TestBlockRow::extract_bound", "TestFileRow::extract_bound", "ScenarioRow::extract_bound", "AuditBlockRow::extract_bound", "AuditFileRow::extract_bound", "PythonResourceRow::extract_bound", "ScenarioDescriptionRow::extract_bound", "HookDescriptionRow::extract_bound", "ProofPy::extract_bound", "AnalysisPy::extract_bound"]
+reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
+path = "crates/sqlbuild-python-project/src/compiled_views/models.rs"
+symbols = ["AnalysisProjections", "CompiledProjections", "ModelInputHandles", "InputProjections", "NativeProjectView"]
+reason = "AnalysisProjections, CompiledProjections, ModelInputHandles, InputProjections, NativeProjectView implement Debug manually because they cache Python projections in PyOnceLocks, directly or through the projections they hold, which do not implement Debug; other models derive it."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS012"
+path = "crates/sqlbuild-python-project/src/compiled_views/models.rs"
+symbols = ["RelationKeyRow::extract_bound"]
+reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
+path = "crates/sqlbuild-python-project/src/graph/models.rs"
+symbols = ["CompiledProjectGraph"]
+reason = "CompiledProjectGraph implement Debug manually because they cache Python projections in PyOnceLocks, directly or through the projections they hold, which do not implement Debug; other models derive it."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS012"
+path = "crates/sqlbuild-python-project/src/graph/models.rs"
+symbols = ["ResourceRow::extract_bound"]
+reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
+path = "crates/sqlbuild-python-project/src/planner_scope/models.rs"
+symbols = ["RetainedScope"]
+reason = "RetainedScope implement Debug manually because they cache Python projections in PyOnceLocks, directly or through the projections they hold, which do not implement Debug; other models derive it."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
+path = "crates/sqlbuild-python-project/src/planner_selection/models.rs"
+symbols = ["Carrier"]
+reason = "Carrier implements Debug manually because it holds the interpreter token, which does not implement Debug; other models derive it."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
+path = "crates/sqlbuild-python-project/src/resource_views/models.rs"
+symbols = ["AuditProjections", "FunctionProjections", "NativeCompiledFunction", "SeedHandles", "NativeCompiledSeed", "SourceProjections"]
+reason = "AuditProjections, FunctionProjections, NativeCompiledFunction, SeedHandles, NativeCompiledSeed, SourceProjections implement Debug manually because they cache Python projections in PyOnceLocks, directly or through the projections they hold, which do not implement Debug; other models derive it."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS012"
+path = "crates/sqlbuild-python-project/src/resource_views/models.rs"
+symbols = ["SeedNamespace::extract_bound"]
+reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSR307"
@@ -2027,6 +2087,7 @@ edge_paths = [
     "crates/sqlbuild-python-base/src/records/main/registry/native_attr.rs",
     "crates/sqlbuild-python-base/src/warehouse_access",
     "crates/sqlbuild-python-front/src/native_host",
+    "crates/sqlbuild-python-project/src/native_host",
     "crates/sqlbuild-python/src/bindings/_helpers/native_host",
 ]
 pending_budgets = [
@@ -2166,26 +2227,22 @@ pending_budgets = [
     "crates/sqlbuild-python-project/src/compile_attachment/_helpers/cursor_roles.rs=1",
     "crates/sqlbuild-python-project/src/compiled_project/_helpers/values.rs=4",
     "crates/sqlbuild-python-project/src/compiled_project/models.rs=2",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/audit_views.rs=2",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_model_analysis.rs=9",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_model_view.rs=3",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/function_views.rs=2",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/model_input_view.rs=7",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/records.rs=14",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/seed_views.rs=1",
+    "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_models/compiled_model_analysis.rs=9",
+    "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_models/compiled_model_view.rs=3",
+    "crates/sqlbuild-python-project/src/compiled_views/_helpers/model_inputs/model_input_view.rs=7",
+    "crates/sqlbuild-python-project/src/compiled_views/_helpers/project/records.rs=14",
     "crates/sqlbuild-python-project/src/contracts/_helpers/contract_diagnostics.rs=6",
     "crates/sqlbuild-python-project/src/fingerprints/_helpers/latest_rows.rs=15",
     "crates/sqlbuild-python-project/src/fingerprints/_helpers/query_hashes.rs=1",
     "crates/sqlbuild-python-project/src/fingerprints/_helpers/storage_io.rs=16",
     "crates/sqlbuild-python-project/src/fingerprints/_helpers/storage_sql.rs=1",
-    "crates/sqlbuild-python-project/src/graph/_helpers/algorithms.rs=3",
-    "crates/sqlbuild-python-project/src/graph/_helpers/execution_gates.rs=3",
-    "crates/sqlbuild-python-project/src/graph/_helpers/python_lifecycle.rs=2",
-    "crates/sqlbuild-python-project/src/graph/_helpers/python_node_graph.rs=3",
-    "crates/sqlbuild-python-project/src/graph/_helpers/python_selection.rs=5",
+    "crates/sqlbuild-python-project/src/graph/_helpers/nodes/algorithms.rs=3",
+    "crates/sqlbuild-python-project/src/graph/_helpers/nodes/execution_gates.rs=3",
+    "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_lifecycle.rs=2",
+    "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_node_graph.rs=3",
+    "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_selection.rs=5",
     "crates/sqlbuild-python-project/src/graph/models.rs=2",
     "crates/sqlbuild-python-project/src/lineage/_helpers/lineage_facts.rs=3",
-    "crates/sqlbuild-python-project/src/native_host/_helpers/orchestration_triggers.rs=19",
     "crates/sqlbuild-python-project/src/planner_identity/_helpers/hashing.rs=1",
     "crates/sqlbuild-python-project/src/planner_phases/_helpers/objects.rs=2",
     "crates/sqlbuild-python-project/src/planner_scope/_helpers/sources.rs=2",
@@ -2193,23 +2250,26 @@ pending_budgets = [
     "crates/sqlbuild-python-project/src/planner_selection/_helpers/model_selectors.rs=3",
     "crates/sqlbuild-python-project/src/planner_selection/_helpers/unit_tests.rs=1",
     "crates/sqlbuild-python-project/src/planner_selection/models.rs=3",
-    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixture_preparation.rs=2",
-    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixture_reads.rs=4",
-    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixture_sql.rs=3",
+    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixtures/fixture_preparation.rs=2",
+    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixtures/fixture_reads.rs=4",
+    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixtures/fixture_sql.rs=3",
     "crates/sqlbuild-python-project/src/references/_helpers/explicit_references.rs=19",
     "crates/sqlbuild-python-project/src/references/_helpers/reference_facts.rs=5",
     "crates/sqlbuild-python-project/src/references/_helpers/relations.rs=2",
     "crates/sqlbuild-python-project/src/references/_helpers/source_relations.rs=2",
+    "crates/sqlbuild-python-project/src/resource_views/_helpers/audit_views.rs=2",
+    "crates/sqlbuild-python-project/src/resource_views/_helpers/function_views.rs=2",
+    "crates/sqlbuild-python-project/src/resource_views/_helpers/seed_views.rs=1",
     "crates/sqlbuild-python-project/src/semantic_shapes/_helpers/coverage.rs=1",
     "crates/sqlbuild-python-project/src/semantic_shapes/_helpers/shapes.rs=3",
     "crates/sqlbuild-python-project/src/semantic_shapes/_helpers/source_bindings.rs=13",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/cursor_window.rs=2",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/fixture_validation.rs=4",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan_driver.rs=8",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan_errors.rs=4",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan_rendering.rs=2",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan_values.rs=2",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/planning.rs=1",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/inputs/cursor_window.rs=2",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/inputs/fixture_validation.rs=4",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan/plan_driver.rs=8",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan/plan_errors.rs=4",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan/plan_rendering.rs=2",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan/plan_values.rs=2",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan/planning.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/analysis/sql_test_comparisons.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/analysis_session/model_analyses.rs=10",
     "crates/sqlbuild-python/src/bindings/_helpers/analysis_session/outcome_objects.rs=2",
@@ -2616,6 +2676,7 @@ edge_paths = [
     "crates/sqlbuild-python-base/src/records/_helpers/native_classes/registry.rs",
     "crates/sqlbuild-python-base/src/warehouse_access",
     "crates/sqlbuild-python-front/src/native_host",
+    "crates/sqlbuild-python-project/src/native_host",
     "crates/sqlbuild-python/src/bindings/_helpers/native_host",
 ]
 pending_budgets = [
@@ -2679,30 +2740,26 @@ pending_budgets = [
     "crates/sqlbuild-python-project/src/analysis/models.rs=9",
     "crates/sqlbuild-python-project/src/analysis_session/models.rs=1",
     "crates/sqlbuild-python-project/src/compiled_project/models.rs=36",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/audit_views.rs=4",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_model_analysis.rs=3",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_model_view.rs=5",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/function_views.rs=7",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/inputs_view.rs=24",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/model_input_view.rs=5",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/project_view.rs=26",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/seed_views.rs=4",
-    "crates/sqlbuild-python-project/src/compiled_views/_helpers/source_views.rs=3",
-    "crates/sqlbuild-python-project/src/compiled_views/models.rs=44",
+    "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_models/compiled_model_view.rs=3",
+    "crates/sqlbuild-python-project/src/compiled_views/_helpers/model_inputs/inputs_view.rs=24",
+    "crates/sqlbuild-python-project/src/compiled_views/_helpers/project/project_view.rs=26",
+    "crates/sqlbuild-python-project/src/compiled_views/models.rs=34",
     "crates/sqlbuild-python-project/src/fingerprints/_helpers/storage_io.rs=12",
-    "crates/sqlbuild-python-project/src/graph/_helpers/python_node_graph.rs=4",
+    "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_node_graph.rs=4",
     "crates/sqlbuild-python-project/src/graph/models.rs=10",
     "crates/sqlbuild-python-project/src/lineage/_helpers/lineage_facts.rs=2",
     "crates/sqlbuild-python-project/src/planner_identity/_helpers/graph.rs=1",
     "crates/sqlbuild-python-project/src/planner_selection/models.rs=1",
-    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixture_completion.rs=3",
-    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixture_preparation.rs=6",
-    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixture_sql.rs=3",
+    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixtures/fixture_preparation.rs=6",
+    "crates/sqlbuild-python-project/src/planner_strategy/_helpers/fixtures/fixture_sql.rs=3",
     "crates/sqlbuild-python-project/src/planner_strategy/models.rs=30",
     "crates/sqlbuild-python-project/src/references/_helpers/explicit_references.rs=2",
     "crates/sqlbuild-python-project/src/references/_helpers/reference_facts.rs=2",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/cursor_window.rs=2",
-    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/planning.rs=4",
+    "crates/sqlbuild-python-project/src/resource_views/_helpers/audit_views.rs=2",
+    "crates/sqlbuild-python-project/src/resource_views/_helpers/function_views.rs=3",
+    "crates/sqlbuild-python-project/src/resource_views/models.rs=33",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/inputs/cursor_window.rs=2",
+    "crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan/planning.rs=4",
     "crates/sqlbuild-python-project/src/sql_test_glue/models.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/analysis_session/model_analyses.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/audit_command/command.rs=5",

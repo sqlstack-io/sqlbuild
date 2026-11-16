@@ -13,8 +13,8 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
-use sqlbuild_python_project::compiled_views::main::model_reads::destination::destination;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 /// Decide column renames and return the existing planning result model.
 #[pyfunction(name = "plan_column_migrations")]

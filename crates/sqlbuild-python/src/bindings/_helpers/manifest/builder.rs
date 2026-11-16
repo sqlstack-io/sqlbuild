@@ -22,7 +22,7 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
-use sqlbuild_python_project::graph::main::views::native_graph_from_edges::native_graph_from_edges;
+use sqlbuild_python_project::graph::main::project::native_graph_from_edges::native_graph_from_edges;
 use sqlbuild_python_project::graph::models::NativeProjectGraph;
 
 const DATETIME_MODULE: &str = "datetime";

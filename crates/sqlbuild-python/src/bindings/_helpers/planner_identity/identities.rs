@@ -26,9 +26,9 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use sqlbuild_python_project::planner_identity::main::baselined_model_query_hash::baselined_model_query_hash;
 use sqlbuild_python_project::planner_identity::main::graph_key::graph_key;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
@@ -123,20 +123,20 @@ pub(crate) fn direct_model_version_identities<'py>(
     for function in functions.try_iter()? {
         let function: Bound<'py, PyAny> = function?;
         let name: String =
-            sqlbuild_python_project::compiled_views::main::function_reads::name::name(&function)?
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
                 .extract()?;
         let Some(function_hash) = function_hashes.get_item(&name)? else {
             continue;
         };
         graph.nodes.insert(
             graph_key(
-                &sqlbuild_python_project::compiled_views::main::function_reads::key::key(
+                &sqlbuild_python_project::resource_views::main::function_reads::key::key(
                     &function,
                 )?,
             )?,
             IdentityNode {
                 upstream_keys: graph_keys(
-                    &sqlbuild_python_project::compiled_views::main::function_reads::deps::deps(
+                    &sqlbuild_python_project::resource_views::main::function_reads::deps::deps(
                         &function,
                     )?,
                 )?,
@@ -151,7 +151,7 @@ pub(crate) fn direct_model_version_identities<'py>(
             let seed: Bound<'py, PyAny> = seed?;
             let (seed_hash, metadata_json): (String, String) = seed_identity(&seed)?;
             let name: Bound<'py, PyAny> =
-                sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?;
+                sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?;
             seed_hashes.set_item(&name, &seed_hash)?;
             seed_metadata.set_item(&name, metadata_json)?;
         }
@@ -208,7 +208,7 @@ pub(crate) fn direct_model_version_identities<'py>(
             key_of(MODEL_RESOURCE, &name),
             IdentityNode {
                 upstream_keys: graph_keys(
-                    &sqlbuild_python_project::compiled_views::main::model_reads::deps::deps(
+                    &sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps(
                         &model,
                     )?,
                 )?,
@@ -314,7 +314,7 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
             key_of(MODEL_RESOURCE, &name.extract::<String>()?),
             IdentityNode {
                 upstream_keys: graph_keys(
-                    &sqlbuild_python_project::compiled_views::main::model_reads::deps::deps(
+                    &sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps(
                         &model,
                     )?,
                 )?,

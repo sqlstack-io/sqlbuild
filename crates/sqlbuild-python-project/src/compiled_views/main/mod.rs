@@ -1,14 +1,3 @@
-pub mod audit_reads;
-pub mod audit_views;
-pub mod function_reads;
-pub mod function_views;
-pub mod model_input_view;
-pub mod model_reads;
-pub mod project_reads;
-pub mod records;
-pub mod relation_keys;
-pub mod resource_reads;
-pub mod seed_reads;
-pub mod seed_views;
-pub mod source_reads;
-pub mod source_views;
+pub mod compiled_models;
+pub mod model_inputs;
+pub mod project;

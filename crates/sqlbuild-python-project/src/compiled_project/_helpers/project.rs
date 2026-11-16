@@ -3,11 +3,11 @@
 use crate::compiled_project::constants::CONTRACT_KEY;
 use crate::compiled_project::constants::INCREMENTAL_MODE_KEY;
 use crate::compiled_project::models::DeclarationPy;
+use crate::compiled_project::models::ModelInputPy;
 use crate::compiled_project::models::NativeCompiledProject;
 use sqlbuild_python_base::positional_record;
 use std::collections::BTreeMap;
 
-use pyo3::FromPyObject;
 use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyString};
 use serde_json::Value;
@@ -17,18 +17,18 @@ use sqlbuild_analysis::compiled_project::models::{
 
 use crate::compiled_project::_helpers::values::object_value;
 use crate::compiled_project::_helpers::values::plain_value;
-use crate::compiled_views::models::NativeAuditInput;
-use crate::compiled_views::models::NativeCompiledAudit;
-use crate::compiled_views::models::NativeCompiledFunction;
 use crate::compiled_views::models::NativeCompiledModel;
-use crate::compiled_views::models::NativeCompiledSeed;
-use crate::compiled_views::models::NativeCompiledSource;
-use crate::compiled_views::models::NativeFunctionInput;
 use crate::compiled_views::models::NativeInputsView;
 use crate::compiled_views::models::NativeModelInput;
 use crate::compiled_views::models::NativeProjectView;
-use crate::compiled_views::models::NativeSeedInput;
-use crate::compiled_views::models::NativeSourceInput;
+use crate::resource_views::models::NativeAuditInput;
+use crate::resource_views::models::NativeCompiledAudit;
+use crate::resource_views::models::NativeCompiledFunction;
+use crate::resource_views::models::NativeCompiledSeed;
+use crate::resource_views::models::NativeCompiledSource;
+use crate::resource_views::models::NativeFunctionInput;
+use crate::resource_views::models::NativeSeedInput;
+use crate::resource_views::models::NativeSourceInput;
 
 pub(crate) const INPUT_CLASSES_UNSET: &str = "no model loop recorded inputs into this project";
 pub(crate) const ATTACHMENT_LOOP_UNSET: &str =
@@ -43,27 +43,18 @@ pub(crate) type NamedType = (String, Option<String>);
 positional_record! {
     extract;
     /// A model's name, relative path, compiled and authored queries, and authored SQL file.
+    #[derive(Debug)]
     pub(crate) struct ModelTextsPy {
-        name: String,
-        relative_path: String,
-        query_sql: String,
-        authored_query_sql: String,
-        authored_sql: String,
+        pub(crate) name: String,
+        pub(crate) relative_path: String,
+        pub(crate) query_sql: String,
+        pub(crate) authored_query_sql: String,
+        pub(crate) authored_sql: String,
     }
 }
 
 /// Encoded config values and the encoder's error, if any.
 pub(crate) type ConfigValues = (BTreeMap<String, Value>, Option<String>);
-
-/// One model as the compile-input stage produced it.
-#[derive(FromPyObject)]
-pub struct ModelInputPy<'py>(
-    ModelTextsPy,
-    (Bound<'py, PyDict>, Vec<String>, Option<String>),
-    Vec<(String, String, Option<String>)>,
-    Vec<String>,
-    (Vec<DeclarationPy<'py>>, Vec<DeclarationPy<'py>>),
-);
 
 pub(crate) fn model_facts(model: ModelInputPy<'_>) -> PyResult<CompiledModelFacts> {
     let ModelInputPy(

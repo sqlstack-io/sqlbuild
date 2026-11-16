@@ -1,6 +1,6 @@
 //! `sql_test_model_chain_names_by_key` as a function of `module`.
 
-use crate::sql_test_glue::_helpers::plan_driver;
+use crate::sql_test_glue::_helpers::plan::plan_driver;
 
 /// `sql_test_model_chain_names_by_key` as a function of `module`.
 #[inline]

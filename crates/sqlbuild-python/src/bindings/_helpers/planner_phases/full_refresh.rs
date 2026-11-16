@@ -9,9 +9,9 @@ use sqlbuild_analysis::planner_warehouse::models::FullRebuildFacts;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::planner_phases::main::frozenset::frozenset;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_python_project::planner_phases::main::strings::strings;
@@ -40,7 +40,7 @@ pub(crate) fn effectively_full_refreshed_model_names<'py>(
     cli_full_refresh: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let mut names: Vec<_> = Vec::new();
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         if resolve_model_full_refresh(&model, cli_full_refresh)? {
             names.push(name_object(&model)?);

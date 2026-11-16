@@ -19,9 +19,9 @@ use sqlbuild_python_front::native_host::main::append_observations::append_observ
 use sqlbuild_python_front::native_host::models::ConsumptionConnection;
 use sqlbuild_python_front::native_host::models::Location;
 use sqlbuild_python_front::native_host::models::ObservationAppend;
-use sqlbuild_python_project::compiled_views::main::model_reads::dep_rows::dep_rows;
-use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
+use sqlbuild_python_project::compiled_views::main::compiled_models::dep_rows::dep_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::planner_phases::main::config_str::config_str;
 
 /// Dependency kind of a source in a model's `dep_rows`.
@@ -45,7 +45,7 @@ fn cursor_reads(
 ) -> PyResult<Vec<CursorRead>> {
     let succeeded: HashSet<&str> = successful_models.iter().map(String::as_str).collect();
     let mut reads: Vec<CursorRead> = Vec::new();
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
         let name: String = name_object(&model)?.extract()?;
         if !succeeded.contains(name.as_str())
@@ -56,10 +56,7 @@ fn cursor_reads(
         let Some(cursor_column) = config_str(&model, "cursor")? else {
             continue;
         };
-        let destination: Bound<'_, PyAny> =
-            sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                &model,
-            )?;
+        let destination: Bound<'_, PyAny> = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
         let qualified: Bound<'_, PyAny> = native_field(&destination, "qualified_name")?;
         if qualified.is_none() || native_field(&destination, "schema")?.is_none() {
             continue;
@@ -95,12 +92,9 @@ fn source_column_rows(
     if described.is_empty() {
         return Ok(BTreeMap::new());
     }
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
-        let destination: Bound<'_, PyAny> =
-            sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                &model,
-            )?;
+        let destination: Bound<'_, PyAny> = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
         if native_field(&destination, "schema")?.is_none() {
             continue;
         }

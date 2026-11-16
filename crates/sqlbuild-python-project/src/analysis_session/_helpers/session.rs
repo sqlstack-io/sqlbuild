@@ -5,6 +5,7 @@ use crate::analysis_session::models::FamilyRow;
 use crate::analysis_session::models::ModelRow;
 use crate::analysis_session::models::NativeModelAnalysisSession;
 use crate::analysis_session::models::PivotRequestRow;
+use crate::analysis_session::models::ProofRow;
 use crate::analysis_session::models::RequestRow;
 use pyo3::prelude::{Bound, Py, PyAny, PyErr, PyModule, PyModuleMethods, PyRef, PyResult, Python};
 use pyo3::pyfunction;
@@ -40,7 +41,7 @@ use sqlbuild_python_base::cache::main::open_store::open_store;
 use sqlbuild_python_base::types::CompilerDetach;
 
 /// `(name, type, nullability)`.
-type ColumnRow = (String, Option<String>, String);
+pub(crate) type ColumnRow = (String, Option<String>, String);
 positional_record! {
     into;
     /// One lineage column: output column, transform and confidence codes and its sources.
@@ -69,20 +70,6 @@ positional_record! {
         pub(crate) binding_diagnostics: Vec<Positional<DiagnosticRow>>,
         pub(crate) binding_validated: bool,
         pub(crate) cleaned_sql: String,
-    }
-}
-
-positional_record! {
-    into;
-    /// One dynamic pivot proof.
-    pub struct ProofRow {
-        output_proven: bool,
-        fixed_columns: Vec<ColumnRow>,
-        /// `(family, inferred type)` of each family.
-        families: Vec<(String, Option<String>)>,
-        input_relations: Vec<String>,
-        failure_reason: Option<String>,
-        bare_dynamic_pivot: bool,
     }
 }
 

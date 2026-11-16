@@ -19,9 +19,9 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 use crate::compiled_project::models::NativeCompiledProject;
-use crate::compiled_views::models::NativeAuditInput;
-use crate::compiled_views::models::NativeFunctionInput;
-use crate::compiled_views::models::NativeSourceInput;
+use crate::resource_views::models::NativeAuditInput;
+use crate::resource_views::models::NativeFunctionInput;
+use crate::resource_views::models::NativeSourceInput;
 
 const ATTACHMENT_UNINSTALLED: &str = "the native module registered no resource attachment";
 

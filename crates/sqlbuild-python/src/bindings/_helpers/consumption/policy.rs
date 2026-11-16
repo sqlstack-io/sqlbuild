@@ -11,7 +11,7 @@ use sqlbuild_state::consumption::models::{
 
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
-use sqlbuild_python_project::compiled_project::main::job_catalog::triggered_jobs::triggered_jobs;
+use sqlbuild_python_project::compiled_project::main::triggered_jobs::triggered_jobs;
 use sqlbuild_python_project::graph::models::NativeProjectGraph;
 
 const DEFINITION: &str = "definition";

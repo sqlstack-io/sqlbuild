@@ -1,4 +1,4 @@
-//! Python views of the compiled project: models, inputs, audits, functions, seeds, sources and their reads.
+//! Python views of the compiled project: its models, model inputs, analysis, records and relation keys.
 
 pub(crate) mod _helpers;
 pub mod constants;

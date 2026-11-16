@@ -16,16 +16,16 @@ use crate::bindings::_helpers::planner_identity::metadata::{
 };
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
-use sqlbuild_python_project::compiled_views::main::function_reads::body_sql::body_sql;
-use sqlbuild_python_project::compiled_views::main::function_reads::deps::deps;
-use sqlbuild_python_project::compiled_views::main::function_reads::language::language;
-use sqlbuild_python_project::compiled_views::main::model_reads::dep_rows::dep_rows;
-use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
-use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
-use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
-use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
+use sqlbuild_python_project::compiled_views::main::compiled_models::dep_rows::dep_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
 use sqlbuild_python_project::planner_identity::main::baselined_model_query_hash::baselined_model_query_hash;
 use sqlbuild_python_project::planner_identity::main::graph_key::graph_key;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
+use sqlbuild_python_project::resource_views::main::function_reads::language::language;
 
 pub(crate) const MODEL: &str = "model";
 pub(crate) const SEED: &str = "seed";
@@ -54,16 +54,8 @@ enum Compiled<'py> {
 impl<'py> Compiled<'py> {
     fn destination(&self) -> PyResult<Bound<'py, PyAny>> {
         match self {
-            Self::Model(model) => {
-                sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
-                    model,
-                )
-            }
-            Self::Seed(seed) => {
-                sqlbuild_python_project::compiled_views::main::seed_reads::destination::destination(
-                    seed,
-                )
-            }
+            Self::Model(model) => sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(model),
+            Self::Seed(seed) => sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(seed),
         }
     }
 }
@@ -235,7 +227,7 @@ pub(crate) fn build_facts(
 ) -> PyResult<BuildFacts> {
     let py: Python<'_> = plan.py();
     let mut compiled: HashMap<NodeKey, Compiled<'_>> = HashMap::new();
-    for model in models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
         compiled.insert(
             node_key(MODEL, &model_name(&model)?),
@@ -247,7 +239,7 @@ pub(crate) fn build_facts(
         compiled.insert(
             node_key(
                 SEED,
-                &sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?
+                &sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?
                     .extract::<String>()?,
             ),
             Compiled::Seed(seed),
@@ -256,13 +248,11 @@ pub(crate) fn build_facts(
     let mut function_deps: HashMap<(String, String), Vec<(String, String)>> = HashMap::new();
     let mut function_bodies: HashMap<(String, String), Option<String>> = HashMap::new();
     let functions: Bound<'_, PyAny> =
-        sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(
-            project,
-        )?;
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?;
     for function in functions.try_iter()? {
         let function: Bound<'_, PyAny> = function?;
         let key = graph_key(
-            &sqlbuild_python_project::compiled_views::main::function_reads::key::key(&function)?,
+            &sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
         )?;
         function_deps.insert(
             (key.kind.clone(), key.name.clone()),

@@ -14,7 +14,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::compiled_views::main::source_reads::source_entry::source_entry;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 
 #[pyfunction(name = "build_scenario_relation_plan")]
 #[pyo3(signature = (**kwargs))]
@@ -65,14 +65,13 @@ pub(crate) fn build_scenario_relation_plan<'py>(
         )?;
     }
     let sources = PyDict::new(py);
-    for source in sqlbuild_python_project::compiled_views::main::project_reads::sources::sources(
-        &args.project,
-    )?
-    .try_iter()?
+    for source in
+        sqlbuild_python_project::compiled_views::main::project::sources::sources(&args.project)?
+            .try_iter()?
     {
         let source = source?;
         sources.set_item(
-            sqlbuild_python_project::compiled_views::main::source_reads::name::name(&source)?,
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?,
             source_entry(&source)?,
         )?;
     }

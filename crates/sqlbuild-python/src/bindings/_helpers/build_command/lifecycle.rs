@@ -29,8 +29,8 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::graph::main::python_lifecycle::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
-use sqlbuild_python_project::graph::main::python_node_graph::python_node_graph::python_node_graph;
+use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::planner_scope::main::build_intermediate_source_map::build_intermediate_source_map;
 
 const SUCCESS_STATUS: &str = "success";
