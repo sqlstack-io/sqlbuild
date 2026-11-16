@@ -1,8 +1,13 @@
+use chrono::Utc;
 use serde_json::json;
+use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
 
+use crate::native_commands::_helpers::execution::metadata_sync;
 use crate::native_commands::main::_location_changed_build::{
     changed_build_nodes, changed_build_settings,
 };
+use crate::native_commands::models::LocationMetadataSync;
+use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::ChangedBuildNodesTestCase;
 
 #[test]
@@ -65,4 +70,28 @@ fn given_a_changed_plan_document_when_read_then_runs_split_into_changed_and_down
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_completed_syncs_when_deciding_to_replan_then_only_a_new_publication_or_an_applied_change_replans()
+ {
+    let started = Utc::now();
+    let complete = |mut state: LocationMetadataSync, applied: bool| {
+        state.begin_sync(started);
+        state.applied |= applied;
+        let mut state = acknowledge_complete_pages(state, WarehouseHistoryKind::ALL.len());
+        assert!(state.idle, "the sync completed");
+        let replan = state.take_replan();
+        (state, replan)
+    };
+    let mut state = metadata_sync((one_location(), 1), (3600, 0));
+    state.applied = true;
+    let (state, after_publication) = complete(state, false);
+    let (state, unchanged) = complete(state, false);
+    let (_, changed) = complete(state, true);
+    assert_eq!(
+        [after_publication, unchanged, changed],
+        [true, false, true],
+        "the sync after a publication replans; a sync that applied nothing leaves the count; one that changed the copy replans"
+    );
 }

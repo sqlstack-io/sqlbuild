@@ -153,13 +153,18 @@ async fn watch_location(
             };
             checked = true;
             watch = exclude_location_databases(&options.project_dir, files, watch);
-            if report_changed_build(
-                (options, script, &watch),
-                (client, poll.session_id, generation),
-                stopped.as_mut(),
-            )
-            .await?
-            .is_none()
+            // The sync that follows a publication plans what changed once it completes; with no
+            // state locations no sync follows, so plan now.
+            if metadata
+                .as_ref()
+                .is_some_and(|sync| sync.locations.is_empty())
+                && report_changed_build(
+                    (options, script, &watch),
+                    (client, poll.session_id, generation),
+                    stopped.as_mut(),
+                )
+                .await?
+                .is_none()
             {
                 return Ok(());
             }
@@ -212,11 +217,12 @@ async fn poll_location(
                 stopped.as_mut(),
             )
             .await?;
-            let Some(state) = &metadata else {
+            let Some(state) = metadata.as_mut() else {
                 return Ok(None);
             };
             if syncing
                 && state.idle
+                && state.take_replan()
                 && report_changed_build(
                     (options, script, &watch),
                     (client, poll.session_id, state.generation),

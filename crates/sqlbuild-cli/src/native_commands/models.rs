@@ -242,6 +242,10 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) reads_wake_compute: bool,
     /// Someone set the safety interval, so it applies even where reads wake compute.
     pub(crate) safety_explicit: bool,
+    /// The server applied a delivered page of the current synchronization, so the synced copy changed.
+    pub(crate) applied: bool,
+    /// The generation was published after the last plan of what changed, which waits for this sync.
+    pub(crate) replan: bool,
 }
 
 /// Rows delivered and time taken by the current synchronization and its current table.
@@ -302,6 +306,15 @@ pub(crate) struct ScanToken {
 }
 
 impl LocationMetadataSync {
+    /// After a completed synchronization: whether what changed must be planned again, because the
+    /// generation is newly published or the sync changed the synced copy. Clears the reasons.
+    pub(crate) fn take_replan(&mut self) -> bool {
+        let replan = self.replan || self.applied;
+        self.replan = false;
+        self.applied = false;
+        replan
+    }
+
     /// A person asked for a sync: start one now when idle, or one more after the current one.
     pub(crate) fn request_sync(&mut self) {
         self.cycle_started_at = None;
@@ -333,6 +346,7 @@ impl LocationMetadataSync {
     /// Start the sync `sync_due` asked for, at server time `now`.
     pub(crate) fn begin_sync(&mut self, now: DateTime<Utc>) {
         self.idle = false;
+        self.applied = false;
         self.progress = SyncProgress::new();
         self.cycle_started_at = Some(now);
         self.next_at = tokio::time::Instant::now();

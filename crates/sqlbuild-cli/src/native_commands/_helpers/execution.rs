@@ -363,6 +363,8 @@ pub(crate) fn metadata_sync(
         pending: None,
         next_at: Instant::now(),
         idle: true,
+        applied: false,
+        replan: true,
         cycle_started_at: None,
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
