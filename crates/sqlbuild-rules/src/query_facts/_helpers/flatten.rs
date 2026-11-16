@@ -8,6 +8,25 @@ use crate::query_facts::models::{FlattenInput, WholeValue};
 
 const VALUE_COLUMN: &str = "value";
 
+/// Functions whose result embeds each argument whole.
+const EMBEDDING_FUNCTIONS: [&str; 5] = [
+    "object_construct",
+    "object_construct_keep_null",
+    "object_insert",
+    "array_construct",
+    "array_construct_compact",
+];
+
+/// Conversions whose result is their first argument whole, in another type.
+const CONVERSION_FUNCTIONS: [&str; 6] = [
+    "to_json",
+    "to_char",
+    "to_variant",
+    "to_object",
+    "to_array",
+    "to_varchar",
+];
+
 /// The `FLATTEN` call a FROM item runs, as `LATERAL FLATTEN(...)` or `TABLE(FLATTEN(...))`.
 pub(crate) fn flatten_call(expression: &Expression) -> Option<&Function> {
     match expression {
@@ -83,30 +102,7 @@ fn literal_key(expression: &Expression) -> Option<String> {
     (!key.is_empty()).then(|| key.trim_matches('"').to_ascii_lowercase())
 }
 
-/// Functions whose result embeds each argument whole.
-const EMBEDDING_FUNCTIONS: [&str; 5] = [
-    "object_construct",
-    "object_construct_keep_null",
-    "object_insert",
-    "array_construct",
-    "array_construct_compact",
-];
-
-/// Conversions whose result is their first argument whole, in another type.
-const CONVERSION_FUNCTIONS: [&str; 6] = [
-    "to_json",
-    "to_char",
-    "to_variant",
-    "to_object",
-    "to_array",
-    "to_varchar",
-];
-
-/// Every `<alias>.value` `expression` copies whole, with the keys `OBJECT_DELETE` removes from it.
-///
-/// Only the value itself, casts, conversions and parentheses around it, and the constructors that
-/// embed it count; any other function of the value, such as a hash or a path into it, does not
-/// copy it.
+/// Every `<alias>.value` that `expression` copies whole, with the keys `OBJECT_DELETE` removes.
 pub(crate) fn whole_values(expression: &Expression) -> Vec<WholeValue> {
     let mut found: Vec<WholeValue> = Vec::new();
     let mut pending: Vec<(&Expression, Vec<String>)> = vec![(expression, Vec::new())];

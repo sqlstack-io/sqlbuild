@@ -3,8 +3,10 @@ use std::collections::BTreeMap;
 use crate::constants::{ENFORCED_CONTRACT, SELECT_STAR_MODEL_RULE_CODE};
 use crate::models::{Fault, Model, RuleMetadata, RulesConfig};
 use crate::query_facts::models::{QueryFacts, RelationFacts, SelectFacts};
-use crate::rules::_helpers::evaluation::sole_table_name;
-use crate::rules::_helpers::{contract_name_types, explicit_output_types, typed_contract_columns};
+use crate::rules::_helpers::contracts::{
+    contract_name_types, explicit_output_types, typed_contract_columns,
+};
+use crate::rules::_helpers::dispatch::evaluation::sole_table_name;
 use crate::rules::models::FaultCollector;
 
 pub(crate) fn evaluate_without_query(

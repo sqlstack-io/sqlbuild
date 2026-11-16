@@ -5,5 +5,5 @@ pub(crate) fn select<'a>(
     selected: Option<&[String]>,
     ignored: &[String],
 ) -> Result<Vec<&'a RuleMetadata>, String> {
-    crate::rules::_helpers::catalogue::select(catalogue, selected, ignored)
+    crate::rules::_helpers::dispatch::catalogue::select(catalogue, selected, ignored)
 }

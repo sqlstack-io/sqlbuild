@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use pyo3::PyResult;
-use sqlbuild_rules::engine::main::json_grains::needs_json_grains;
+use sqlbuild_rules::engine::main::needs_json_grains::needs_json_grains;
 use sqlbuild_rules::models::{EvaluateRequest, Model, SqlTestFact};
 
 use crate::bindings::_helpers::compile_context::delta::BaseRules;

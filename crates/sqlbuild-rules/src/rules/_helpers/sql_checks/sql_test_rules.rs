@@ -7,7 +7,7 @@ use crate::query_facts::main::model_shape::model_shape;
 use crate::query_facts::main::parse_fixture::parse_fixture;
 use crate::query_facts::main::stub_call::stub_call;
 use crate::query_facts::models::{CallKind, ParsedFixture};
-use crate::rules::_helpers::evaluation::{path_fault, rules_unavailable};
+use crate::rules::_helpers::dispatch::evaluation::{path_fault, rules_unavailable};
 use crate::rules::models::ProjectEvaluationRequest;
 use serde::{Deserialize, Serialize};
 use sqlbuild_analysis::compiler::main::sql_test_fixture_facts::fixture_facts;

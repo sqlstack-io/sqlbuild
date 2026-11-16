@@ -1,5 +1,7 @@
 use serde_json::Value;
 
+use crate::models::JsonGrain;
+
 use sqlbuild_sqltext::sql_scan::models::Unclosed;
 
 pub(crate) struct NativeEvaluationTestCase {
@@ -290,6 +292,13 @@ pub(crate) struct JsonGrainTestCase {
     pub(crate) query_sql: &'static str,
     pub(crate) json_grain: Value,
     pub(crate) expected_faults: &'static [(&'static str, u64, u64, &'static str)],
+}
+
+/// One model's grain after `json_grains` builds the four order models.
+pub(crate) struct JsonGrainsBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) row_name: &'static str,
+    pub(crate) expected_grain: Option<JsonGrain>,
 }
 
 /// A retained request evaluated again without SQL, with or without the cached findings.

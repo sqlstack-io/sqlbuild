@@ -8,7 +8,7 @@ use crate::constants::{
     PUBLISHED_LAYERS_OPTION, REFERENCE_KIND, STAGING_LAYER_DIRECTORY,
 };
 use crate::models::{EvaluateRequest, Fault, Model, RuleMetadata, RulesConfig};
-use crate::rules::_helpers::evaluation::{parse_name, path_fault};
+use crate::rules::_helpers::dispatch::evaluation::{parse_name, path_fault};
 use crate::rules::models::{FaultCollector, ProjectEvaluationRequest};
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_core::text::main::glob_match::glob_match;

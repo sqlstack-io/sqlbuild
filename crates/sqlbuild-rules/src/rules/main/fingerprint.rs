@@ -5,5 +5,5 @@ pub(crate) fn fingerprint(
     config: &RulesConfig,
     dialect: &str,
 ) -> Result<String, String> {
-    crate::rules::_helpers::catalogue::fingerprint(rules, config, dialect)
+    crate::rules::_helpers::dispatch::catalogue::fingerprint(rules, config, dialect)
 }

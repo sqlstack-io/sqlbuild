@@ -425,15 +425,16 @@ fn compiled_with_status<'py>(
         }
     }
     close_status(status)?;
-    if let Some(skipped_note) = format_skipped_type_proof_rules(
-        native_field(&analysis, "skipped_type_proof_rules")?.extract()?,
-    ) {
-        output.call_method1("print_stderr_line", (format!("note: {skipped_note}"),))?;
-    }
-    if let Some(skipped_note) = format_skipped_models(
-        &native_field(&analysis, "skipped_models")?.extract::<Vec<_>>()?,
-        false,
-    ) {
+    let skipped_notes = [
+        format_skipped_type_proof_rules(
+            native_field(&analysis, "skipped_type_proof_rules")?.extract()?,
+        ),
+        format_skipped_models(
+            &native_field(&analysis, "skipped_models")?.extract::<Vec<_>>()?,
+            false,
+        ),
+    ];
+    for skipped_note in skipped_notes.into_iter().flatten() {
         output.call_method1("print_stderr_line", (format!("note: {skipped_note}"),))?;
     }
     let dag_artifact_path: Bound<'py, PyAny> =

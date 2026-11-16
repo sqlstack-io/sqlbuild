@@ -18,7 +18,9 @@ use sqlbuild_rules::constants::API_VERSION;
 use sqlbuild_rules::engine::main::build_models::build_models;
 use sqlbuild_rules::engine::main::evaluate_rows::evaluate_rows;
 use sqlbuild_rules::engine::main::finalize_rows::finalize_rows;
-use sqlbuild_rules::engine::main::json_grains::{json_grains, needs_json_grains, skipped_models};
+use sqlbuild_rules::engine::main::json_grain_skipped_models::json_grain_skipped_models;
+use sqlbuild_rules::engine::main::json_grains::json_grains;
+use sqlbuild_rules::engine::main::needs_json_grains::needs_json_grains;
 use sqlbuild_rules::engine::main::project_model_rows::project_model_rows;
 use sqlbuild_rules::errors::RowsError;
 use sqlbuild_rules::models::{
@@ -374,7 +376,7 @@ fn evaluated<'py>(
     early: Option<(EarlyBuiltinRules, &AtomicBool)>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let request: RowsRequest = taken_rows(request)?;
-    let skipped: Vec<(String, String)> = skipped_models(&request.request.models);
+    let skipped: Vec<(String, String)> = json_grain_skipped_models(&request.request.models);
     let evaluation: Result<RowsEvaluation, RowsError> = match early {
         None => py
             .compiler_detach(|| Ok(evaluate_rows(request)))
@@ -538,19 +540,23 @@ fn model_lineage(model: &Bound<'_, PyAny>) -> PyResult<Option<Vec<LineageColumn>
     let Some(view) = native_model(model)? else {
         return Ok(None);
     };
-    Ok(view.lineage_rows(model.py())?.map(|rows| {
-        rows.into_iter()
-            .map(|row| LineageColumn {
-                aggregated: row.aggregated(),
-                output: row.output_column,
-                sources: row
-                    .sources
-                    .into_iter()
-                    .map(|(resource, name, _)| (resource, name))
-                    .collect(),
-            })
-            .collect()
-    }))
+    let Some(rows) = view.lineage_rows(model.py())? else {
+        return Ok(None);
+    };
+    let mut columns: Vec<LineageColumn> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let aggregated: bool = row.aggregated();
+        let mut sources: Vec<(String, String)> = Vec::with_capacity(row.sources.len());
+        for (resource, name, _) in row.sources {
+            sources.push((resource, name));
+        }
+        columns.push(LineageColumn {
+            aggregated,
+            output: row.output_column,
+            sources,
+        });
+    }
+    Ok(Some(columns))
 }
 
 fn declarations(rows: Vec<DeclarationRowPy<'_>>) -> PyResult<Vec<Declaration>> {

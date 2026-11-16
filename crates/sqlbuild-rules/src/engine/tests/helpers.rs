@@ -12,14 +12,15 @@ use crate::engine::main::discard_speculative_rows::discard_speculative_rows;
 use crate::engine::main::retained_request::retained_request;
 use crate::models::{
     Column, Declaration, DeclarationMember, DynamicColumnFamily, EvaluateRequest, Fault,
-    GrainColumn, JsonGrain, Model, Reference, RetainedRows, RowsEvaluation, RowsRequest,
-    RulesConfig, SpeculativeAnswer, SpeculativeRows,
+    GrainColumn, JsonGrain, LineageColumn, Model, ModelRow, Reference, RetainedRows,
+    RowsEvaluation, RowsRequest, RulesConfig, SpeculativeAnswer, SpeculativeRows,
 };
 
 use crate::engine::_helpers::evaluation::evaluate_json;
 use crate::engine::_helpers::evaluation::evaluate_request as evaluate_parsed;
 use crate::engine::_helpers::evaluation::parse_parts;
 use crate::engine::main::finalize_rows::finalize_rows;
+use crate::engine::main::json_grains::json_grains;
 use crate::engine::tests::test_types;
 
 pub(crate) fn request(project_dir: &TempDir, config: &Value) -> String {
@@ -888,4 +889,117 @@ pub(crate) fn finalize_cross_joins(exceptions: Value) -> Result<Vec<Fault>, Stri
         &[CROSS_JOIN_CODE.to_owned()],
         findings,
     )
+}
+
+/// A `json_grain` fact for a payload copied from `orders` onto order lines.
+pub(crate) fn payload_grain(input_key: Value, readers: Value) -> Value {
+    json!({
+        "model_keys": [["order_id", "line_no"]],
+        "columns": [{"name": "payload", "data_type": "VARIANT", "inputs": ["ref:orders"]}],
+        "input_keys": {"ref:orders": [input_key]},
+        "readers": readers,
+    })
+}
+
+/// A model row with `references` to other models and `inferred` column types.
+pub(crate) fn grain_row(name: &str, references: &[&str], inferred: &[(&str, &str)]) -> ModelRow {
+    ModelRow {
+        name: name.to_owned(),
+        references: references
+            .iter()
+            .map(|name| Reference {
+                ref_kind: "ref".to_owned(),
+                ref_name: (*name).to_owned(),
+                ref_package: None,
+            })
+            .collect(),
+        inferred_columns: inferred
+            .iter()
+            .map(|(name, kind)| ((*name).to_owned(), Some((*kind).to_owned())))
+            .collect(),
+        ..ModelRow::default()
+    }
+}
+
+fn grain_lineage(output: &str, sources: &[(&str, &str)], aggregated: bool) -> LineageColumn {
+    LineageColumn {
+        output: output.to_owned(),
+        sources: sources
+            .iter()
+            .map(|(kind, name)| ((*kind).to_owned(), (*name).to_owned()))
+            .collect(),
+        aggregated,
+    }
+}
+
+/// One declared key of `key`'s columns.
+pub(crate) fn grain_keys(key: &[&str]) -> Vec<Vec<String>> {
+    vec![key.iter().map(|column| (*column).to_owned()).collect()]
+}
+
+pub(crate) fn grain_column(name: &str, data_type: &str, inputs: &[&str]) -> GrainColumn {
+    GrainColumn {
+        name: name.to_owned(),
+        data_type: Some(data_type.to_owned()),
+        inputs: inputs.iter().map(|input| (*input).to_owned()).collect(),
+    }
+}
+
+/// Grains `json_grains` builds for four order models, by model name.
+pub(crate) fn built_json_grains() -> BTreeMap<String, Option<JsonGrain>> {
+    let mut rows = vec![
+        grain_row(
+            "order_lines_enriched",
+            &["orders", "order_lines"],
+            &[
+                ("payload", "VARIANT"),
+                ("items", "ARRAY(VARCHAR)"),
+                ("region", "object"),
+                ("total", "NUMBER(38,0)"),
+                ("payloads", "ARRAY"),
+                ("arrayish", "ARRAYLIKE"),
+            ],
+        ),
+        grain_row("orders", &[], &[("payload", "VARIANT")]),
+        grain_row("unkeyed", &["orders"], &[("payload", "VARIANT")]),
+        grain_row("untyped", &[], &[]),
+    ];
+    let lineage = vec![
+        Some(vec![
+            grain_lineage(
+                "PAYLOAD",
+                &[("model", "orders"), ("table_fn", "explode")],
+                false,
+            ),
+            grain_lineage("items", &[("source", "shop.raw_orders")], false),
+            grain_lineage("region", &[("seed", "countries")], false),
+            grain_lineage("total", &[("model", "orders")], false),
+            grain_lineage("payloads", &[("model", "orders")], true),
+            grain_lineage("arrayish", &[("model", "orders")], false),
+        ]),
+        None,
+        Some(vec![grain_lineage(
+            "payload",
+            &[("model", "orders")],
+            false,
+        )]),
+        Some(vec![grain_lineage(
+            "payload",
+            &[("model", "orders")],
+            false,
+        )]),
+    ];
+    let declared: BTreeMap<String, Vec<Vec<String>>> = BTreeMap::from([
+        (
+            "ref:order_lines_enriched".to_owned(),
+            grain_keys(&["order_id", "line_no"]),
+        ),
+        ("ref:orders".to_owned(), grain_keys(&["order_id"])),
+        ("ref:untyped".to_owned(), grain_keys(&["id"])),
+        ("seed:countries".to_owned(), grain_keys(&["country_code"])),
+    ]);
+    json_grains(&mut rows, lineage, &declared);
+    rows.into_iter()
+        .map(|row| (row.name, row.json_grain))
+        .collect()
 }

@@ -4,7 +4,7 @@ use sqlbuild_analysis::type_system::main::normalize_type::normalize_type;
 use crate::constants::ENFORCED_CONTRACT;
 use crate::models::{Column, Fault, Model, RuleMetadata};
 use crate::query_facts::models::{ExpressionItem, ItemFacts, QueryFacts, SelectFacts, SetFacts};
-use crate::rules::_helpers::evaluation::{
+use crate::rules::_helpers::dispatch::evaluation::{
     ParsedModel, plain_select, reads_dependency, sole_table_name,
 };
 use crate::rules::models::FaultCollector;

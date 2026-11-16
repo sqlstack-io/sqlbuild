@@ -138,13 +138,12 @@ fn run_rules_gate<'py>(
     if !on_progress.is_none() {
         let elapsed: f64 = monotonic(py)? - started;
         let message: String = rules_progress(elapsed, &result, true)?;
-        on_progress.call1((message,))?;
-        let verbose: bool = native_field(options, "verbose")?.is_truthy()?;
-        if let Some(note) = format_skipped_models(
+        let note: Option<String> = format_skipped_models(
             &native_field(&result, "skipped_models")?.extract::<Vec<_>>()?,
-            verbose,
-        ) {
-            on_progress.call1((format!("note: {note}"),))?;
+            native_field(options, "verbose")?.is_truthy()?,
+        );
+        for line in std::iter::once(message).chain(note.map(|note| format!("note: {note}"))) {
+            on_progress.call1((line,))?;
         }
     }
     let mut failing: Vec<Bound<'py, PyAny>> = Vec::new();

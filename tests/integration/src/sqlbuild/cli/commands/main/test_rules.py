@@ -220,6 +220,15 @@ _EARLY_LINT_FINDINGS: tuple[tuple[str, str, int | None, int | None], ...] = (
 )
 
 
+_PERFORMANCE_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/performance_rules")
+_PERFORMANCE_EXPECTED: dict[str, Any] = json.loads(
+    (_PERFORMANCE_FIXTURE / "expected_findings.json").read_text(encoding="utf-8")
+)
+_PERFORMANCE_FINDINGS: tuple[tuple[str, str, int, int], ...] = tuple(
+    (code, path, line, column) for code, path, line, column in _PERFORMANCE_EXPECTED["findings"]
+)
+
+
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -3694,15 +3703,6 @@ def test_given_orchestration_selections_when_compiling_then_named_selector_limit
         == test_case.expected_findings
     )
     assert test_case.expected_text in json.dumps(diagnostics)
-
-
-_PERFORMANCE_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/performance_rules")
-_PERFORMANCE_EXPECTED: dict[str, Any] = json.loads(
-    (_PERFORMANCE_FIXTURE / "expected_findings.json").read_text(encoding="utf-8")
-)
-_PERFORMANCE_FINDINGS: tuple[tuple[str, str, int, int], ...] = tuple(
-    (code, path, line, column) for code, path, line, column in _PERFORMANCE_EXPECTED["findings"]
-)
 
 
 @pytest.mark.parametrize(

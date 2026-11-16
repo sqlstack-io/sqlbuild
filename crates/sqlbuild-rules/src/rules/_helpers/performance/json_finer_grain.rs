@@ -2,8 +2,8 @@
 
 use crate::models::{Fault, GrainColumn, JsonGrain, RuleMetadata, RulesConfig};
 use crate::query_facts::models::{ItemFacts, SetFacts};
-use crate::rules::_helpers::evaluation::ParsedModel;
-use crate::rules::_helpers::model_layers::backs_published_view;
+use crate::rules::_helpers::dispatch::evaluation::ParsedModel;
+use crate::rules::_helpers::layers::model_layers::backs_published_view;
 use crate::rules::models::FaultCollector;
 
 pub(crate) fn evaluate(
@@ -43,60 +43,74 @@ pub(crate) fn evaluate(
     }
 }
 
-/// An input of `column` whose key is a strict subset of one of the model's keys.
-///
-/// An input with any key that covers a model key does not count: that model key proves the
-/// model has one row per input row.
+/// An input whose key is a strict subset of a model key, unless another of its keys covers one.
 fn coarser_input<'a>(
     column: &'a GrainColumn,
     grain: &'a JsonGrain,
 ) -> Option<(&'a str, &'a [String], &'a [String])> {
-    column.inputs.iter().find_map(|input| {
-        let keys = grain.input_keys.get(input)?;
-        if keys.iter().any(|input_key| {
-            grain
-                .model_keys
-                .iter()
-                .any(|model_key| subset(model_key, input_key))
-        }) {
-            return None;
+    for input in &column.inputs {
+        let Some(keys) = grain.input_keys.get(input) else {
+            continue;
+        };
+        let one_model_row_per_input_row = keys
+            .iter()
+            .any(|input_key| covers_model_key(input_key, &grain.model_keys));
+        if one_model_row_per_input_row {
+            continue;
         }
-        keys.iter().find_map(|input_key| {
-            grain
-                .model_keys
-                .iter()
-                .find(|model_key| strict_subset(input_key, model_key))
-                .map(|model_key| (input.as_str(), input_key.as_slice(), model_key.as_slice()))
-        })
-    })
+        for input_key in keys {
+            if let Some(model_key) = finer_model_key(input_key, &grain.model_keys) {
+                return Some((input.as_str(), input_key.as_slice(), model_key));
+            }
+        }
+    }
+    None
 }
 
-fn strict_subset(smaller: &[String], larger: &[String]) -> bool {
-    smaller.len() < larger.len() && subset(smaller, larger)
+fn covers_model_key(input_key: &[String], model_keys: &[Vec<String>]) -> bool {
+    model_keys
+        .iter()
+        .any(|model_key| subset(model_key, input_key))
+}
+
+fn finer_model_key<'a>(
+    input_key: &[String],
+    model_keys: &'a [Vec<String>],
+) -> Option<&'a [String]> {
+    model_keys
+        .iter()
+        .find(|model_key| input_key.len() < model_key.len() && subset(input_key, model_key))
+        .map(Vec::as_slice)
 }
 
 fn subset(smaller: &[String], larger: &[String]) -> bool {
-    smaller.iter().all(|column| {
-        larger
-            .iter()
-            .any(|other| other.eq_ignore_ascii_case(column))
-    })
+    smaller
+        .iter()
+        .all(|column| contains_ignoring_case(larger, column))
+}
+
+fn contains_ignoring_case(columns: &[String], name: &str) -> bool {
+    columns
+        .iter()
+        .any(|column| column.eq_ignore_ascii_case(name))
 }
 
 /// Where the root select projects `name`, following the left branch of set operations.
 fn output_start(body: &SetFacts, name: &str) -> Option<usize> {
     match body {
-        SetFacts::Select(select) => select.items.iter().find_map(|item| match item {
-            ItemFacts::Expression(expression)
-                if expression
-                    .output_name
-                    .as_deref()
-                    .is_some_and(|output| output.eq_ignore_ascii_case(name)) =>
-            {
-                expression.start
+        SetFacts::Select(select) => {
+            for item in &select.items {
+                if let ItemFacts::Expression(expression) = item
+                    && expression
+                        .output_name
+                        .as_deref()
+                        .is_some_and(|output| output.eq_ignore_ascii_case(name))
+                {
+                    return expression.start;
+                }
             }
-            _ => None,
-        }),
+            None
+        }
         SetFacts::Query(query) => output_start(&query.body, name),
         SetFacts::SetOperation { left, .. } => output_start(left, name),
         SetFacts::Other => None,

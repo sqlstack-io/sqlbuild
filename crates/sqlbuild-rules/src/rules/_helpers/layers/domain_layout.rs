@@ -1,6 +1,6 @@
 use crate::configuration::main::setting_help::setting_help;
 use crate::models::{DeclarationKind, Fault, Model, RuleMetadata, ScopeDeclaration, ScopeKind};
-use crate::rules::_helpers::evaluation::path_fault;
+use crate::rules::_helpers::dispatch::evaluation::path_fault;
 use crate::rules::models::ProjectEvaluationRequest;
 use std::collections::{BTreeMap, BTreeSet};
 
