@@ -83,6 +83,12 @@
 	const tree = $derived(memberFolderTree(shownMembers.map((m) => m.jobKey), (k) => declarationFolder(info.get(k)?.sourceFile)));
 	const hasFolders = $derived(tree.folders.size > 0);
 	let foldersOn = $state(true);
+	/** Drawing by folder or not changes the whole graph, so the view fits it again, as Lineage's Folders does. */
+	let refitNext = false;
+	function toggleFolders() {
+		foldersOn = !foldersOn;
+		refitNext = true;
+	}
 	let openMemberFolders = $state<ReadonlySet<string>>(new Set());
 	let foldersReady = false;
 	const initialFolders = () => (members.length > MEMBER_FOLDERS_CLOSED_ABOVE ? new Set<string>() : new Set(tree.folders.keys()));
@@ -231,7 +237,10 @@
 			requestAnimationFrame(() => {
 				const after = held && positionOn(nodes, held.id);
 				if (held && after && setViewport && fitted) setViewport(anchoredViewport(held.view, held.before, after));
-				else if (!fitted) fit?.();
+				else if (!fitted || refitNext) {
+					refitNext = false;
+					fit?.();
+				}
 			})
 		);
 	});
@@ -250,7 +259,7 @@
 
 <div class="member-graph">
 	<GraphToolbar
-		folders={hasFolders ? { on: foldersOn, toggle: () => (foldersOn = !foldersOn) } : undefined}
+		folders={hasFolders ? { on: foldersOn, toggle: toggleFolders } : undefined}
 		expand={{ all: expandEverything, collapse: collapseEverything, canCollapse: expanded.size > 0 || (foldersOn && openMemberFolders.size > 0), allTitle: 'Open every job in place, up to the graph’s card limit', collapseTitle: 'Close every job', note: expandNote }}
 		focus={{ on: !!focusOn, can: !!selection, toggle: toggleFocus, title: 'Show only the selected job and the jobs it waits for or that wait for it' }}
 		onreset={reset}

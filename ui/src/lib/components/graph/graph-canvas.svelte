@@ -4,6 +4,7 @@
 	import type { ComponentProps, Snippet } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
+	import CountEdge from '$lib/lineage/count-edge.svelte';
 
 	// Every graph in the UI is drawn here, so they share one canvas: the same background, fit controls
 	// and readable fit (a large graph opens on its cards at a zoom where they read, never as dots), and
@@ -25,6 +26,7 @@
 		showLock = false,
 		framed = false,
 		element = $bindable(),
+		edgeTypes = {},
 		children,
 		...flow
 	}: FlowProps & {
@@ -50,10 +52,12 @@
 		/** Overlays drawn inside the canvas, such as a panel. */
 		children?: Snippet;
 	} = $props();
+	// Every graph's edges merge into a trunk before the card they enter, the library's curves included.
+	const allEdgeTypes = $derived({ bezier: CountEdge, count: CountEdge, ...edgeTypes });
 </script>
 
 <div class="graph-canvas sb-flow" class:framed class:unfitted={!fitted && nodes.length > 0} bind:this={element}>
-	<SvelteFlow bind:nodes bind:edges fitView={fitOnInit || undefined} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
+	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
 		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
 		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 		{#if controls === 'fit'}<FitControls onfit={() => fit?.()} {showLock} />{:else if controls === 'full'}<Controls {showLock} />{/if}
