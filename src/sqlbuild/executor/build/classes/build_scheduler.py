@@ -453,6 +453,7 @@ class BuildScheduler:
             self._connection_pool.put(connection)
 
     def _run_concurrent(self) -> None:
+        escaped: BaseException | None = None
         with ThreadPoolExecutor(max_workers=self._max_concurrency) as pool:
             self._report_scheduler_state()
             while self._ready or self._in_flight:
@@ -518,8 +519,17 @@ class BuildScheduler:
 
                 completion: NodeCompletion = self._completion_queue.get()
                 self._in_flight.discard(completion.key)
-                self._handle_completion(key=completion.key, result=completion.result)
+                # An error that escaped a node stops the run as it does at concurrency 1, once
+                # the nodes already running have finished.
+                if completion.error is not None:
+                    escaped = escaped or completion.error
+                    self._stop = True
+                    continue
+                if completion.result is not None:
+                    self._handle_completion(key=completion.key, result=completion.result)
             self._report_scheduler_state()
+        if escaped is not None:
+            raise escaped
 
     def _report_scheduler_state(self) -> None:
         callback: Callable[[SchedulerState], None] | None = self._callbacks.on_scheduler_state
