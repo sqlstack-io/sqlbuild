@@ -190,6 +190,24 @@ for (const width of WIDTHS) {
 			expect(found.inside, 'member cards wholly in view after load').toBeGreaterThan(0);
 		});
 
+		test('Checks opens again quickly from the sidebar with thousands of checks', async ({ page }) => {
+			const nav = (name: string) => page.locator('nav a', { hasText: name }).first();
+			const openChecks = async () => {
+				const started = Date.now();
+				await nav('Checks').click();
+				await page.locator('table.sb-table tbody tr:not(.spacer)').first().waitFor();
+				await page.waitForLoadState('networkidle');
+				return Date.now() - started;
+			};
+			await page.goto(awkward('/'));
+			await settle(page);
+			await openChecks();
+			await nav('Overview').click();
+			await settle(page);
+			// The first visit loads the list; the second used to take 12–19 s counting filter options.
+			expect(await openChecks(), 'ms for the second visit to Checks to settle').toBeLessThan(2000);
+		});
+
 		for (const { list, link } of ITEMS) {
 			test(`the first item of ${list} fits and lines up`, async ({ page }) => {
 				await page.goto(awkward(list));

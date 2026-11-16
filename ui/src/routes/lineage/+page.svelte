@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
+	import { matchesAny } from '$lib/list/choice';
 	import { plural } from '$lib/format/plural';
 	import Loading from '$lib/components/loading.svelte';
 	import PlayIcon from '@lucide/svelte/icons/play';
@@ -471,26 +473,28 @@
 	const hasDrift = $derived(hasSql && !!d?.builds.length);
 
 	// ---- toolbar filters: non-matching nodes are dimmed ----
-	let kindFilter = $state('');
-	let groupFilter = $state('');
-	let statusFilter = $state<'' | 'stale' | 'changed' | 'behind' | 'failed'>('');
-	const filterActive = $derived(!!(kindFilter || groupFilter || statusFilter));
+	type StatusFilter = 'stale' | 'changed' | 'behind' | 'failed';
+	let kindFilter = $state<string[]>([]);
+	let groupFilter = $state<string[]>([]);
+	let statusFilter = $state<StatusFilter[]>([]);
+	const kindSet = $derived(new Set(kindFilter));
+	const groupSet = $derived(new Set(groupFilter));
+	const filterActive = $derived(!!(kindFilter.length || groupFilter.length || statusFilter.length));
 	function matchesFilter(n: Node): boolean {
 		if (n.type === 'folder') return catalogNodes.some((c) => `${folderOf(c)}/`.startsWith(`${n.data.group}/`) && matchesCatalog(c));
 		const c = catalogByKey.get(n.id);
 		return c ? matchesCatalog(c) : !filterActive;
 	}
 	function matchesCatalog(c: CatalogNode): boolean {
-		if (kindFilter && c.kind !== kindFilter) return false;
-		if (groupFilter && c.group !== groupFilter) return false;
-		return matchesFilterStatus(c, statusFilter);
+		if (!matchesAny(kindSet, c.kind)) return false;
+		if (!matchesAny(groupSet, c.group)) return false;
+		return !statusFilter.length || statusFilter.some((f) => matchesFilterStatus(c, f));
 	}
-	function matchesFilterStatus(c: CatalogNode, f: typeof statusFilter): boolean {
+	function matchesFilterStatus(c: CatalogNode, f: StatusFilter): boolean {
 		if (f === 'stale') return (c.stale?.length ?? 0) > 0;
 		if (f === 'changed') return !!c.stale?.some((r) => r.reason !== 'behind');
 		if (f === 'behind') return !!c.stale?.some((r) => r.reason === 'behind');
-		if (f === 'failed') return c.lastOutcome === 'failed';
-		return true;
+		return c.lastOutcome === 'failed';
 	}
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
 	/** Nodes whose own definition changed, which `sqb build --changed` starts from. */
@@ -508,14 +512,18 @@
 	});
 	/** Whether a tree folder is drawn because a folder around it is selected. */
 	const inSelectedFolder = (folder: string) => selectedFolders.some((s) => folder.startsWith(`${s}/`));
-	const kindOptions = $derived(NODE_KINDS.filter((k) => catalogNodes.some((n) => n.kind === k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: catalogNodes.filter((n) => n.kind === k).length })));
-	const groupOptions = $derived([...new Set(catalogNodes.flatMap((n) => (n.group === null ? [] : [n.group])))].map((g) => ({ value: g, label: g, count: catalogNodes.filter((n) => n.group === g).length })));
-	const statusOptions = [
-		{ value: 'stale' as const, label: 'Stale' },
-		{ value: 'changed' as const, label: 'Stale · changed' },
-		{ value: 'behind' as const, label: 'Stale · behind' },
-		{ value: 'failed' as const, label: 'Last build failed' }
+	// Option counts in one pass each: the group options grow with the project.
+	const byKind = $derived(countBy(catalogNodes, (n) => n.kind));
+	const byGroup = $derived(countBy(catalogNodes, (n) => n.group));
+	const kindOptions = $derived(NODE_KINDS.filter((k) => byKind.has(k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: byKind.get(k) ?? 0 })));
+	const groupOptions = $derived([...byGroup].map(([g, count]) => ({ value: g, label: g, count })));
+	const statusOptions: { value: StatusFilter; label: string }[] = [
+		{ value: 'stale', label: 'Stale' },
+		{ value: 'changed', label: 'Stale · changed' },
+		{ value: 'behind', label: 'Stale · behind' },
+		{ value: 'failed', label: 'Last build failed' }
 	];
+	const byStatus = $derived(countBy(catalogNodes, (c) => statusOptions.filter((o) => matchesFilterStatus(c, o.value)).map((o) => o.value)));
 	// The sidebar's summary with nothing selected: the nodes drawn, and what narrows or dims them.
 	const inView = $derived(viewSummary(shownNodes(catalogNodes, { selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree })));
 	const activeFilters = $derived(
@@ -523,9 +531,9 @@
 			pickedNodes.length ? plural(pickedNodes.length, 'picked node') : '',
 			!pickedNodes.length && selectedFolders.length ? `Folders: ${selectedFolders.join(', ')}` : '',
 			staleOnly ? 'Only nodes out of date' : '',
-			kindFilter ? `Kind: ${nodeKindPlural[kindFilter as keyof typeof nodeKindPlural] ?? kindFilter} (others dimmed)` : '',
-			groupFilter ? `Group: ${groupFilter} (others dimmed)` : '',
-			statusFilter ? `Status: ${statusOptions.find((o) => o.value === statusFilter)?.label ?? statusFilter} (others dimmed)` : ''
+			kindFilter.length ? `Kind: ${kindFilter.map((k) => nodeKindPlural[k as keyof typeof nodeKindPlural] ?? k).join(', ')} (others dimmed)` : '',
+			groupFilter.length ? `Group: ${groupFilter.join(', ')} (others dimmed)` : '',
+			statusFilter.length ? `Status: ${statusFilter.map((f) => statusOptions.find((o) => o.value === f)?.label ?? f).join(', ')} (others dimmed)` : ''
 		].filter(Boolean)
 	);
 
@@ -857,9 +865,9 @@
 	</div>
 	{#if !scaleMode}
 		<div class="toolbar-group">
-			<ChoiceFilter label="Kind" bind:value={kindFilter} options={kindOptions} />
-			{#if groupOptions.length}<ChoiceFilter label="Group" bind:value={groupFilter} options={groupOptions} />{/if}
-			<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: catalogNodes.filter((c) => matchesFilterStatus(c, o.value)).length }))} />
+			<ChoiceFilter multiple label="Kind" bind:values={kindFilter} options={kindOptions} />
+			{#if groupOptions.length}<ChoiceFilter multiple label="Group" bind:values={groupFilter} options={groupOptions} />{/if}
+			<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />
 		</div>
 	{/if}
 	<span class="toolbar-sep"></span>
