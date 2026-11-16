@@ -42,6 +42,7 @@ def test_given_regular_primary_work_when_scheduler_submits_then_identity_is_prop
     scheduler: Any = object.__new__(BuildScheduler)
     scheduler._ready = deque((key,))
     scheduler._in_flight = set()
+    scheduler._blocked_keys = set()
     scheduler._max_concurrency = 1
     scheduler._stop = False
     scheduler._microbatch_coordinator_lock = threading.Lock()

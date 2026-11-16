@@ -8,9 +8,18 @@ import pytest
 
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import LifeCycleEvent
+from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.load.models import LoaderContext, LoaderRelationRef
-from tests.unit.src.sqlbuild.executor.load._test_types import LoaderContextHelperTestCase
-from tests.unit.src.sqlbuild.executor.load.helpers import LoaderContextTestAdapter
+from tests.unit.src.sqlbuild.executor.load._test_types import (
+    LoaderContextHelperTestCase,
+    LoaderReferenceRejectionTestCase,
+)
+from tests.unit.src.sqlbuild.executor.load.helpers import (
+    LoaderContextTestAdapter,
+    plain_function,
+    score_orders,
+    scored_orders_export,
+)
 
 
 @pytest.mark.parametrize(
@@ -154,3 +163,57 @@ def test_given_loader_context_when_resolving_relation_refs_then_returns_cursor_v
     assert context.source("raw_events").max("loaded_at") == test_case.expected_query_result
     events: tuple[LifeCycleEvent, ...] = statement_recorder.snapshot()
     assert tuple(event.content for event in events) == test_case.expected_recorded_events
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LoaderReferenceRejectionTestCase(
+            description="a task points to ctx.result_of",
+            reference=score_orders,
+            expected_message=(
+                "ctx.loader() takes a loader, not the task 'score_orders'; read its result with "
+                "ctx.result_of(node_function=score_orders) instead"
+            ),
+        ),
+        LoaderReferenceRejectionTestCase(
+            description="an asset points to ctx.result_of",
+            reference=scored_orders_export,
+            expected_message=(
+                "ctx.loader() takes a loader, not the asset 'scored_orders_export'; read its "
+                "result with ctx.result_of(node_function=scored_orders_export) instead"
+            ),
+        ),
+        LoaderReferenceRejectionTestCase(
+            description="an undecorated function stays an unknown loader reference",
+            reference=plain_function,
+            expected_message="Unknown loader reference passed to ctx.loader(...)",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_non_loader_when_passed_to_ctx_loader_then_the_error_names_what_to_use(
+    test_case: LoaderReferenceRejectionTestCase,
+) -> None:
+    context: LoaderContext = LoaderContext(
+        adapter=LoaderContextTestAdapter(),
+        connection_config={},
+        connection=object(),
+        destination="target_db.target_schema.partner_scores",
+        destination_database="target_db",
+        destination_schema="target_schema",
+        destination_name="partner_scores",
+        run_id="test_run",
+        target="dev",
+        vars={},
+        is_reload=False,
+        use_color=False,
+        current_cursor_value=None,
+        logger=logging.getLogger("sqlbuild.loader.partner_scores"),
+        statement_recorder=StatementRecorder(),
+    )
+
+    with pytest.raises(ExecutorInputError) as error_info:
+        context.loader(test_case.reference)
+
+    assert str(error_info.value) == test_case.expected_message
