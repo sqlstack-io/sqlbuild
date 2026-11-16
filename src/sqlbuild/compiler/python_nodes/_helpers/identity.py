@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import asdict
 from pathlib import Path
-from types import FunctionType, ModuleType
+from types import ModuleType
 from typing import Any, cast
 
 from sqlbuild._native import PythonIdentityDependency, PythonNodeIdentity
@@ -182,11 +182,10 @@ def _visit_object(
             collected_dependencies: dict[tuple[str, str], PythonIdentityDependency] = dependencies
             collected_dependencies[key] = dependency
 
-    target_object: object = inspect.unwrap(cast(Any, obj))
-    anchor: FunctionType | None = (
-        class_anchor(target_object) if inspect.isclass(target_object) else None
+    target: object = inspect.unwrap(cast(Any, obj))
+    globals_map: Mapping[str, object] | None = getattr(
+        class_anchor(target) or target, "__globals__", None
     )
-    globals_map: Mapping[str, object] | None = getattr(anchor or target_object, "__globals__", None)
     if globals_map is None:
         module: ModuleType | None = memo.module(obj)
         if module is None:

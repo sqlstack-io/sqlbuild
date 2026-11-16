@@ -29,9 +29,8 @@ def normalized_source(*, obj: object, class_starts: Callable[..., dict[str, int]
 def source_file(obj: object) -> Path | None:
     """The file `inspect` reads `obj`'s source from, or `None` when it has none."""
 
-    anchor: FunctionType | None = class_anchor(obj) if inspect.isclass(obj) else None
     try:
-        raw_path: str | None = inspect.getsourcefile(cast(Any, anchor or obj))
+        raw_path: str | None = inspect.getsourcefile(cast(Any, class_anchor(obj) or obj))
     except TypeError:
         return None
     if raw_path is None:
@@ -63,19 +62,18 @@ def called_references(source: str) -> tuple[tuple[str, ...], ...]:
     return tuple(sorted(refs))
 
 
-def class_anchor(cls: type) -> FunctionType | None:
-    """A method from `cls`'s body; its file and globals hold when the module leaves sys.modules."""
+def class_anchor(obj: object) -> FunctionType | None:
+    """A method of class `obj`; its file and globals outlive the module's sys.modules entry."""
 
-    prefix: str = f"{cls.__qualname__}."
+    if not inspect.isclass(obj):
+        return None
     value: object
-    for value in vars(cls).values():
-        function: object = inspect.unwrap(
-            cast(Any, value.__func__ if isinstance(value, staticmethod | classmethod) else value)
-        )
+    for value in vars(obj).values():
+        function: object = inspect.unwrap(getattr(value, "__func__", value))
         if (
             isinstance(function, FunctionType)
-            and function.__module__ == cls.__module__
-            and function.__qualname__.startswith(prefix)
+            and function.__qualname__.startswith(f"{obj.__qualname__}.")
+            and function.__module__ == obj.__module__
             and not function.__code__.co_filename.startswith("<")
         ):
             return function
@@ -116,11 +114,9 @@ def _class_location(
     if not lines:
         raise OSError("could not get source code")
     first_line: object = vars(cls).get("__firstlineno__")
-    start: int | None = (
-        first_line - 1
-        if isinstance(first_line, int)
-        else class_starts(file=file, lines=lines).get(cls.__qualname__)
-    )
+    if isinstance(first_line, int):
+        return lines, first_line - 1
+    start: int | None = class_starts(file=file, lines=lines).get(cls.__qualname__)
     if start is None:
         raise OSError("could not find class definition")
     return lines, start
