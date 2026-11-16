@@ -206,6 +206,8 @@ sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git"
 sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
 sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
 stacker = "0.1"
+# Counts heap allocations in growth tests, which measure work instead of time.
+stats_alloc = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 subtle = "2"
 tempfile = "3"
