@@ -1,4 +1,5 @@
 pub mod build_python_sql_run_lifecycle;
+pub mod native_run_lifecycle;
 pub mod python_node_graph;
 pub mod python_node_names;
 pub mod register_python_lifecycle;

@@ -13048,11 +13048,13 @@ class PythonSqlRunLifecyclePlan(NativeRecord):
     ingress_python_node_names: frozenset[str]
     ingress_loader_names: frozenset[str]
     read_side_python_node_names: frozenset[str]
+    round_trip_loader_names: frozenset[str]
     def __init__(
         self,
         ingress_python_node_names: frozenset[str],
         ingress_loader_names: frozenset[str],
         read_side_python_node_names: frozenset[str],
+        round_trip_loader_names: frozenset[str] = ...,
     ) -> None: ...
 
 class PythonIdentityDependency(NativeRecord):

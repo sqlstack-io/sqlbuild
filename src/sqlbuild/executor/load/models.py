@@ -17,7 +17,7 @@ from sqlbuild.adapter.contract.types import LoaderLogicalType
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
 )
-from sqlbuild.compiler.python_nodes.types import SkipMode
+from sqlbuild.compiler.python_nodes.types import PythonNodeKind, SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.load.constants import LOADER_RELATION_QUALIFIER_SEPARATOR
 from sqlbuild.executor.load.types import LoadProgressCallback
@@ -218,6 +218,13 @@ class LoaderContext(DependencyResultReader):
 
         relation_ref: LoaderRelationRef | None = self.loader_refs.get(loader_fn)
         if relation_ref is None:
+            identity: tuple[str, str] | None = self.result_node_identity(loader_fn)
+            if identity is not None and identity[0] != PythonNodeKind.LOADER.value:
+                kind, name = identity
+                raise ExecutorInputError(
+                    f"ctx.loader() takes a loader, not the {kind} '{name}'; read its result "
+                    f"with ctx.result_of(node_function={name}) instead"
+                )
             raise ExecutorInputError("Unknown loader reference passed to ctx.loader(...)")
         self._record_resolved(relation_ref)
         return relation_ref
