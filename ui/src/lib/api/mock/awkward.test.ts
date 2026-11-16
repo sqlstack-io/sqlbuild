@@ -11,6 +11,12 @@ describe('awkward mock data', () => {
 		expect(rows[3].description.length).toBeGreaterThan(80);
 	});
 
+	it('points copies at a bounded set of long names, shared by several rows', () => {
+		const rows = stretch([{ key: 'a', node: 'orders' }, { key: 'b', node: 'customers' }, { key: 'c', node: 'payments' }], 5000);
+		expect(new Set(rows.map((r) => r.node)).size).toBe(2000);
+		expect(rows[0].node).toBe('orders');
+	});
+
 	it('leaves lists of plain values alone', () => {
 		expect(stretch(['a', 'b'], 10)).toEqual(['a', 'b']);
 	});

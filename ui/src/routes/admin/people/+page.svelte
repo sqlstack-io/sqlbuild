@@ -55,9 +55,9 @@
 {:else}
 	<ListToolbar loading={d.accounts.data === undefined} bind:query={people.query} placeholder="Search people and roles" total="{people.shown.length} of {people.accounts.length} people">
 		{#snippet filters()}
-			<ChoiceFilter label="Role" bind:value={people.role} options={people.roleNames.map((r) => ({ value: r, label: r }))} all="Any role" />
+			<ChoiceFilter multiple label="Role" bind:values={people.role} options={people.roleNames.map((r) => ({ value: r, label: r }))} />
 			<ChoiceFilter label="Location" bind:value={people.locationId} options={locations.map((l) => ({ value: l.id, label: l.name }))} all="All locations" />
-			<ChoiceFilter label="Source" bind:value={people.source} options={sources.map((s) => ({ value: s, label: assignmentSourceLabel[s] }))} all="Any source" />
+			<ChoiceFilter multiple label="Source" bind:values={people.source} options={sources.map((s) => ({ value: s, label: assignmentSourceLabel[s] }))} />
 			{#if app.client.supports('listAccessOverview')}<label class="check" title="Can change warehouse data or administer access somewhere">
 				<input type="checkbox" class="sb-check" bind:checked={people.riskyOnly} />
 				Has risky actions
