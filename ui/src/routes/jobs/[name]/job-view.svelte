@@ -203,9 +203,12 @@
 						<InspectorSection title="Waits for">
 							{#if memberWaits.length}
 								{#each memberWaits as w (w.upstream)}
-									<div class="wait">
+									<div class="wait" class:implied={w.through !== undefined}>
+										{#if w.through !== undefined}<span class="faint">Also after</span>{/if}
 										<a class="mono" href={to(`/jobs/${w.upstream}`)}>{w.upstream}</a>
-										{#if w.reasons.length}
+										{#if w.through !== undefined}
+											{#if w.through}<span class="faint">(through <a class="mono" href={to(`/jobs/${w.through}`)}>{w.through}</a>)</span>{/if}
+										{:else if w.reasons.length}
 											<ul class="reasons">
 												{#each w.reasons as r (`${r.from}>${r.to}`)}
 													<li><a class="mono" href={to(`/catalog/${r.to}`)} title={r.to}>{shortName(r.to)}</a> reads <a class="mono" href={to(`/catalog/${r.from}`)} title={r.from}>{shortName(r.from)}</a></li>
@@ -441,6 +444,9 @@
 	}
 	.wait + .wait {
 		margin-top: 10px;
+	}
+	.wait.implied + .wait.implied {
+		margin-top: 3px;
 	}
 	.reasons {
 		margin-top: 4px;

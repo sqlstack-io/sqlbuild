@@ -11,8 +11,14 @@ type FitOptions = {
 	padding?: number;
 	maxZoom?: number;
 	minZoom?: number;
-	/** What to centre on when the graph doesn't fit at `minZoom`, such as its largest box; the graph's top-left otherwise. */
+	/** What to centre on when the graph doesn't fit at `minZoom`, such as its largest box. */
 	focus?: Rect | null;
+	/**
+	 * Without a focus, the card to start from, put at the view's top-left: the card nearest the
+	 * graph's top-left (see `firstCard`). The corner itself can be empty, as a layered layout
+	 * centres its columns, and a view on it shows only lines passing by.
+	 */
+	start?: Rect | null;
 };
 
 /**
@@ -21,16 +27,16 @@ type FitOptions = {
  * centred on `focus` when given, else from its top-left, and never panned past its own edges, so
  * the view always starts on cards and the person pans or zooms from there.
  */
-export function fitViewport(bounds: Rect, width: number, height: number, { padding = 0.08, maxZoom = 1, minZoom = READABLE_ZOOM, focus = null }: FitOptions = {}): Viewport {
+export function fitViewport(bounds: Rect, width: number, height: number, { padding = 0.08, maxZoom = 1, minZoom = READABLE_ZOOM, focus = null, start = null }: FitOptions = {}): Viewport {
 	const [padX, padY] = [width * padding, height * padding];
 	const whole = Math.min(maxZoom, (width - 2 * padX) / Math.max(1, bounds.width), (height - 2 * padY) / Math.max(1, bounds.height));
 	if (whole >= minZoom) {
 		return { zoom: whole, x: width / 2 - (bounds.x + bounds.width / 2) * whole, y: height / 2 - (bounds.y + bounds.height / 2) * whole };
 	}
 	const zoom = minZoom;
-	/** The offset along one axis: centred on the focus, kept within the graph's edges where the graph is larger than the view. */
-	const axis = (start: number, size: number, view: number, pad: number, centre: number | null) => {
-		const wanted = centre === null ? pad - start * zoom : view / 2 - centre * zoom;
+	/** The offset along one axis: centred on the focus, else the start card at the view's start, kept within the graph's edges where the graph is larger than the view. */
+	const axis = (start: number, size: number, view: number, pad: number, centre: number | null, first: number | null) => {
+		const wanted = centre !== null ? view / 2 - centre * zoom : pad - (first ?? start) * zoom;
 		if (size * zoom + 2 * pad <= view) return view / 2 - (start + size / 2) * zoom;
 		const most = pad - start * zoom; // the graph's start at the view's start
 		const least = view - pad - (start + size) * zoom; // the graph's end at the view's end
@@ -38,8 +44,8 @@ export function fitViewport(bounds: Rect, width: number, height: number, { paddi
 	};
 	return {
 		zoom,
-		x: axis(bounds.x, bounds.width, width, padX, focus ? focus.x + focus.width / 2 : null),
-		y: axis(bounds.y, bounds.height, height, padY, focus ? focus.y + focus.height / 2 : null)
+		x: axis(bounds.x, bounds.width, width, padX, focus ? focus.x + focus.width / 2 : null, start?.x ?? null),
+		y: axis(bounds.y, bounds.height, height, padY, focus ? focus.y + focus.height / 2 : null, start?.y ?? null)
 	};
 }
 
@@ -48,6 +54,16 @@ export function largestBox(items: readonly (Rect & { box: boolean })[]): Rect | 
 	let best: Rect | null = null;
 	for (const item of items) if (item.box && (!best || item.width * item.height > best.width * best.height)) best = item;
 	return best && { x: best.x, y: best.y, width: best.width, height: best.height };
+}
+
+/** The card nearest the top-left of `items`' bounds, where a large graph's view starts without a box to centre on. */
+export function firstCard(items: readonly Rect[]): Rect | null {
+	if (!items.length) return null;
+	const left = Math.min(...items.map((r) => r.x));
+	const top = Math.min(...items.map((r) => r.y));
+	let best = items[0];
+	for (const r of items) if (Math.hypot(r.x - left, r.y - top) < Math.hypot(best.x - left, best.y - top)) best = r;
+	return { x: best.x, y: best.y, width: best.width, height: best.height };
 }
 
 type Placed = { id: string; position: { x: number; y: number }; parentId?: string };

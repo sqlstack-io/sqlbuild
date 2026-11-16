@@ -39,6 +39,9 @@ const ITEMS = [
 	{ list: '/admin/roles', link: 'a[href*="/admin/roles/"]' }
 ];
 
+/** The mock's large job group (src/lib/api/mock/big-group.ts). */
+const BIG_GROUP = 'warehouse_nightly';
+
 const awkward = (path: string) => `${path}${path.includes('?') ? '&' : '?'}mock&awkward`;
 
 async function settle(page: Page) {
@@ -54,6 +57,8 @@ async function checkLayout(page: Page, label: string) {
 		if (document.documentElement.scrollWidth > width + 1) problems.push(`page is ${document.documentElement.scrollWidth}px wide in a ${width}px window`);
 		// Page headers and toolbars stay inside the window.
 		for (const el of document.querySelectorAll<HTMLElement>('.app-topbar, .list-toolbar, .head, .toolbar, article > header, .page-body-inner > header')) {
+			// Cards on a graph's canvas pan out of view by design; the canvas clips them.
+			if (el.closest('.svelte-flow')) continue;
 			const box = el.getBoundingClientRect();
 			if (box.width && box.right > width + 1) problems.push(`${el.className.split(' ')[0]} ends at ${Math.round(box.right)}px`);
 			for (const child of el.querySelectorAll<HTMLElement>('*')) {
@@ -159,6 +164,22 @@ for (const width of WIDTHS) {
 				await checkStickyHeaders(page, path);
 			});
 		}
+
+		test('the large mock group draws its direct waits only and opens on its cards', async ({ page }) => {
+			await page.goto(awkward(`/jobs/${BIG_GROUP}`));
+			await settle(page);
+			await checkLayout(page, BIG_GROUP);
+			const found = await page.evaluate(() => {
+				const pane = document.querySelector('.svelte-flow')!.getBoundingClientRect();
+				const cards = [...document.querySelectorAll<HTMLElement>('.svelte-flow__node[data-id^="member:"]')].map((n) => n.getBoundingClientRect());
+				const inside = cards.filter((c) => c.width && c.left >= pane.left && c.right <= pane.right && c.top >= pane.top && c.bottom <= pane.bottom);
+				return { members: cards.length, edges: document.querySelectorAll('.svelte-flow__edge').length, inside: inside.length };
+			});
+			expect(found.members, 'member cards drawn').toBeGreaterThanOrEqual(40);
+			// Waits implied by others aren't drawn: at most two lines per member.
+			expect(found.edges, 'lines drawn').toBeLessThanOrEqual(2 * found.members);
+			expect(found.inside, 'member cards wholly in view after load').toBeGreaterThan(0);
+		});
 
 		for (const { list, link } of ITEMS) {
 			test(`the first item of ${list} fits and lines up`, async ({ page }) => {

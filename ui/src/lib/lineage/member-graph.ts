@@ -4,9 +4,9 @@
 
 import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode, JobGroupMember, RunRef } from '$lib/api';
-import { folderTree, scopeGraph, type FolderTree } from './folder-graph';
+import { folderTree, layoutFolderGraph, scopeGraph, type FolderTree } from './folder-graph';
 import { needsBuilding, type NeedsBuilding } from './view-summary';
-import { edgeStyle, edgeWidth, visibleEdges, type NodeLink } from './visible-edges';
+import { edgeStyle, edgesTouching, edgeWidth, visibleEdges, type NodeLink } from './visible-edges';
 import { plural } from '$lib/format/plural';
 
 export { needsBuilding };
@@ -64,6 +64,96 @@ export const pairKey = (upstream: string, member: string) => `${upstream}>${memb
 function waitsWithin(members: readonly JobGroupMember[]): Map<string, string[]> {
 	const known = new Set(members.map((m) => m.jobKey));
 	return new Map(members.map((m) => [m.jobKey, [...new Set(m.upstream.map((u) => u.jobKey))].filter((k) => known.has(k) && k !== m.jobKey)]));
+}
+
+/**
+ * The edges no path through the other edges implies, in their order. Each implied edge is dropped in
+ * turn, so what stays still joins everything the input joined, even round a cycle; `droppable` says
+ * which edges may go at all. On a graph without cycles this is its transitive reduction.
+ */
+export function transitiveReduction<E extends { source: string; target: string }>(edges: readonly E[], droppable: (e: E) => boolean = () => true): E[] {
+	const kept = new Set(edges.map((_, i) => i));
+	const out = Map.groupBy(edges.keys(), (i) => edges[i].source);
+	const reaches = (from: string, to: string, skip: number) => {
+		const seen = new Set([from]);
+		const stack = [from];
+		while (stack.length) {
+			for (const i of out.get(stack.pop()!) ?? []) {
+				if (i === skip || !kept.has(i)) continue;
+				const next = edges[i].target;
+				if (next === to) return true;
+				if (!seen.has(next)) {
+					seen.add(next);
+					stack.push(next);
+				}
+			}
+		}
+		return false;
+	};
+	for (const [i, e] of edges.entries()) if (e.source !== e.target && droppable(e) && reaches(e.source, e.target, i)) kept.delete(i);
+	return edges.filter((_, i) => kept.has(i));
+}
+
+/**
+ * Each member's waits split in two: `direct`, the waits drawn, and `implied`, the waits that follow
+ * from them through other members (A waits for B and B for C, so A's wait for C is implied). The
+ * server lists every wait, implied ones too; drawing those turns a large group into a tangle.
+ */
+export function directWaits(members: readonly JobGroupMember[]): { direct: Map<string, string[]>; implied: Map<string, string[]> } {
+	const waits = waitsWithin(members);
+	const all = [...waits].flatMap(([member, ups]) => ups.map((up) => ({ source: up, target: member })));
+	const kept = new Set(transitiveReduction(all).map((e) => pairKey(e.source, e.target)));
+	const direct = new Map<string, string[]>();
+	const implied = new Map<string, string[]>();
+	for (const [member, ups] of waits) {
+		direct.set(member, ups.filter((up) => kept.has(pairKey(up, member))));
+		implied.set(member, ups.filter((up) => !kept.has(pairKey(up, member))));
+	}
+	return { direct, implied };
+}
+
+/** Every member each member waits for, directly or through others, and every member waiting for it. */
+export function memberReach(members: readonly JobGroupMember[]): { up: Map<string, Set<string>>; down: Map<string, Set<string>> } {
+	const waits = waitsWithin(members);
+	const after = new Map<string, string[]>();
+	for (const [member, ups] of waits) for (const up of ups) after.set(up, [...(after.get(up) ?? []), member]);
+	const closure = (start: string, next: (k: string) => string[]) => {
+		const seen = new Set<string>();
+		const stack = [...next(start)];
+		while (stack.length) {
+			const k = stack.pop()!;
+			if (seen.has(k) || k === start) continue;
+			seen.add(k);
+			stack.push(...next(k));
+		}
+		return seen;
+	};
+	const keys = [...waits.keys()];
+	return {
+		up: new Map(keys.map((k) => [k, closure(k, (x) => waits.get(x) ?? [])])),
+		down: new Map(keys.map((k) => [k, closure(k, (x) => after.get(x) ?? [])]))
+	};
+}
+
+/**
+ * The edges lit when a card is hovered or selected. For a member, its whole upstream and downstream:
+ * every drawn edge between members it waits for, directly or not, and between members waiting for
+ * it, so the waits the drawing leaves implied still light up; plus what touches its box. For a node
+ * inside a member, just the edges that touch it.
+ */
+export function litEdges(focus: string, edges: readonly Edge[], nodes: readonly Pick<Node, 'id' | 'parentId'>[], reach: ReturnType<typeof memberReach>): Set<string> {
+	const lit = edgesTouching(focus, edges, nodes);
+	const prefix = memberNodeId('');
+	const member = focus.startsWith(prefix) ? focus.slice(prefix.length) : null;
+	if (member === null) return lit;
+	const up = reach.up.get(member) ?? new Set<string>();
+	const down = reach.down.get(member) ?? new Set<string>();
+	for (const e of edges) {
+		const d = e.data as Partial<MemberEdgeData> | undefined;
+		if (!d?.from || !d.to) continue;
+		if ((up.has(d.from) && (d.to === member || up.has(d.to))) || (down.has(d.to) && (d.from === member || down.has(d.from)))) lit.add(e.id);
+	}
+	return lit;
 }
 
 /**
@@ -134,7 +224,7 @@ export type MemberGraphOptions = {
 export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMap<string, MemberInfo>, opts: MemberGraphOptions = {}): { nodes: Node[]; edges: Edge[] } {
 	const { catalog = [], links = new Map(), expanded = new Set(), openFolders = new Map(), ontoggle, oncloseFolder } = opts;
 	const byKey = new Map(catalog.map((n) => [n.key, n]));
-	const waits = waitsWithin(members);
+	const waits = directWaits(members).direct;
 	const drawn: Node[] = [];
 	const internal: Edge[] = [];
 	/** For each expanded member, what stands for one of its nodes. */
@@ -189,7 +279,40 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 			for (const e of visibleEdges(pairLinks, (k) => at(...split(k)), { title })) crossing.push({ ...e, data: { ...e.data, from: upstream, to: m.jobKey } satisfies MemberEdgeData });
 		}
 	}
-	return { nodes: drawn, edges: [...crossing, ...internal] };
+	// A wait implied by a path of other drawn edges isn't drawn either, now that hidden nodes stand
+	// in for their member or folder; lineage between two open members' nodes always is.
+	const atMember = (id: string) => id.startsWith(memberNodeId(''));
+	const between = new Set(crossing);
+	const reduced = new Set(transitiveReduction([...crossing, ...internal], (e) => between.has(e) && (atMember(e.source) || atMember(e.target))));
+	return { nodes: drawn, edges: [...crossing.filter((e) => reduced.has(e)), ...internal] };
+}
+
+/** Space between the cards of the block of members that wait for nothing and that nothing waits for. */
+const BLOCK_GAP = 24;
+
+/**
+ * `layoutFolderGraph`, with the collapsed members no drawn edge touches set apart in a compact block
+ * under the graph, rows as wide as the graph (or a square, if the graph is narrow), rather than a
+ * long column beside it.
+ */
+export function layoutMemberGraph(nodes: Node[], edges: Edge[]): Node[] {
+	const touched = new Set(edges.flatMap((e) => [e.source, e.target]));
+	const alone = new Set(nodes.filter((n) => !n.parentId && n.type === 'member' && !touched.has(n.id)).map((n) => n.id));
+	if (alone.size < 2) return layoutFolderGraph(nodes, edges);
+	const rest = nodes.filter((n) => !alone.has(n.id));
+	const placed = rest.length ? layoutFolderGraph(rest, edges) : [];
+	const top = placed.filter((n) => !n.parentId);
+	const left = top.length ? Math.min(...top.map((n) => n.position.x)) : BLOCK_GAP;
+	const right = top.length ? Math.max(...top.map((n) => n.position.x + (n.width ?? MEMBER_WIDTH))) : left;
+	const below = top.length ? Math.max(...top.map((n) => n.position.y + (n.height ?? MEMBER_HEIGHT))) + 2 * BLOCK_GAP : BLOCK_GAP;
+	const size = (n: Node) => ({ width: n.measured?.width ?? n.width ?? MEMBER_WIDTH, height: n.measured?.height ?? n.height ?? MEMBER_HEIGHT });
+	const cards = nodes.filter((n) => alone.has(n.id)).map(size);
+	const cardWidth = Math.max(...cards.map((c) => c.width));
+	const cardHeight = Math.max(...cards.map((c) => c.height));
+	const columns = Math.min(alone.size, Math.max(Math.ceil(Math.sqrt(alone.size)), Math.floor((right - left + BLOCK_GAP) / (cardWidth + BLOCK_GAP))));
+	const at = new Map([...alone].map((id, i) => [id, { x: left + (i % columns) * (cardWidth + BLOCK_GAP), y: below + Math.floor(i / columns) * (cardHeight + BLOCK_GAP) }]));
+	const byId = new Map(placed.map((n) => [n.id, n]));
+	return nodes.map((n) => (alone.has(n.id) ? { ...n, position: at.get(n.id)! } : byId.get(n.id)!));
 }
 
 /** "orders waits for customers: 12 node links", for an edge's tooltip. */
@@ -198,15 +321,22 @@ export function edgeTitle(data: MemberEdgeData): string {
 	return `${data.to} waits for ${data.from}: ${plural(data.count, 'node link')}`;
 }
 
-/** A member's waits with their node-level reasons, capped at `max` reasons each; `more` counts the rest. */
+/**
+ * A member's waits with their node-level reasons, capped at `max` reasons each; `more` counts the
+ * rest. Direct waits come first; an implied wait names `through`, the direct wait it comes after.
+ */
 export function waitReasons(
 	jobKey: string,
 	members: readonly JobGroupMember[],
 	links: ReadonlyMap<string, NodeLink[]>,
 	max = 5
-): { upstream: string; reasons: NodeLink[]; more: number }[] {
-	return (waitsWithin(members).get(jobKey) ?? []).map((upstream) => {
+): { upstream: string; reasons: NodeLink[]; more: number; through?: string }[] {
+	const { direct, implied } = directWaits(members);
+	const { up } = memberReach(members);
+	const reasons = (upstream: string) => {
 		const all = links.get(pairKey(upstream, jobKey)) ?? [];
 		return { upstream, reasons: all.slice(0, max), more: Math.max(0, all.length - max) };
-	});
+	};
+	const mine = direct.get(jobKey) ?? [];
+	return [...mine.map(reasons), ...(implied.get(jobKey) ?? []).map((upstream) => ({ ...reasons(upstream), through: mine.find((d) => up.get(d)?.has(upstream)) }))];
 }

@@ -9,15 +9,15 @@
 	import TooManyCard from '$lib/components/lineage/too-many-card.svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
-	import { folderBoxId, folderCardId, layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
+	import { folderBoxId, folderCardId, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { absolutePosition as positionOn, anchoredViewport } from '$lib/lineage/fit';
-	import { innerId, memberGraph, memberNodeId, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
+	import { innerId, layoutMemberGraph, litEdges, memberGraph, memberNodeId, memberReach, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
 	import { toggled } from '$lib/lineage/member-expand';
 	import JobBoxNode from './job-box-node.svelte';
 	import MemberNode from './member-node.svelte';
 	import MemberBoxNode from './member-box-node.svelte';
 	import CountEdge from './count-edge.svelte';
-	import { edgeStyle, edgesTouching } from '$lib/lineage/visible-edges';
+	import { edgeStyle } from '$lib/lineage/visible-edges';
 
 	// A job group's member jobs, one card each. Clicking a card selects it and opens the member in
 	// place, a box around its nodes, as a folder opens on Lineage; edges follow what is visible at
@@ -104,14 +104,16 @@
 	let shape = '';
 	let laidOut = '';
 	const selectedId = $derived(selection ? (selection.node ? innerId(selection.member, selection.node) : memberNodeId(selection.member)) : null);
-	// Hovering or selecting a card or box lights its edges and dims the rest, as on Lineage.
+	// Hovering or selecting a card or box lights its edges and dims the rest, as on Lineage; a member
+	// lights its whole upstream and downstream, including the waits the drawing leaves implied.
 	let hoveredId = $state<string | null>(null);
+	const reach = $derived(memberReach(members));
 	const focusId = $derived(hoveredId ?? selectedId);
 	$effect(() => {
 		const id = focusId;
 		// Tracks the edges too, so a redrawn graph is lit again; it writes only when a style changes.
 		const current = edges;
-		const lit = id ? edgesTouching(id, current, untrack(() => nodes)) : null;
+		const lit = id ? litEdges(id, current, untrack(() => nodes), reach) : null;
 		const styled = current.map((e) => {
 			const count = (e.data as { count?: number } | undefined)?.count ?? 1;
 			const style = edgeStyle(Math.max(1, count), !lit ? 'neutral' : lit.has(e.id) ? 'on' : 'dim', count === 0);
@@ -152,7 +154,7 @@
 		const cards = nodes.filter((n) => n.type === 'asset' || n.type === 'folder');
 		if (laidOut === shape || !nodes.length || !cards.every((n) => n.measured?.width && n.measured?.height)) return;
 		laidOut = shape;
-		nodes = layoutFolderGraph(nodes, edges);
+		nodes = layoutMemberGraph(nodes, edges);
 		const held = anchor;
 		anchor = null;
 		tick().then(() =>

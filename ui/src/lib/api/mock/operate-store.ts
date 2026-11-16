@@ -54,6 +54,7 @@ import {
 	CONCURRENCY_LIMITS,
 	IMAGE_ID,
 	JOB_DEFS,
+	DECLARED_WAITS,
 	SNAPSHOT_GENERATION,
 	TRIGGER_DEFS,
 	concurrencyGroupsOf,
@@ -1165,7 +1166,8 @@ export class MockOperate {
 		if (!job || job.kind !== 'group') return [];
 		const nodesOf = new Map(job.members.map((m) => [m, new Set(jobNodes(m))]));
 		const upstream = new Map<string, JobGroupMember['upstream']>();
-		for (const b of job.members) {
+		const declared = DECLARED_WAITS[key];
+		for (const b of declared ? [] : job.members) {
 			const ups: JobGroupMember['upstream'] = [];
 			const needs = new Set([...nodesOf.get(b)!].flatMap((n) => [...ancestors(n)]));
 			for (const a of job.members) {
@@ -1174,6 +1176,7 @@ export class MockOperate {
 			}
 			upstream.set(b, ups);
 		}
+		for (const [b, ups] of declared ?? []) upstream.set(b, ups.map((a) => ({ jobKey: a, source: 'lineage' as const })));
 		const stage = new Map<string, number>();
 		const stageOf = (m: string): number => {
 			if (stage.has(m)) return stage.get(m)!;

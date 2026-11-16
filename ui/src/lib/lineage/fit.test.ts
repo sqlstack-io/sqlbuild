@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { READABLE_ZOOM, absolutePosition, anchoredViewport, fitViewport, largestBox } from './fit';
+import { READABLE_ZOOM, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
 
 describe('fitting a graph to the view', () => {
 	it('centres a graph that fits, never closer than full size', () => {
@@ -61,5 +61,28 @@ describe('keeping the view steady when a folder opens or closes', () => {
 		];
 		expect(absolutePosition(nodes, 'model:orders')).toEqual({ x: 128, y: 138 });
 		expect(absolutePosition(nodes, 'group:missing')).toBeNull();
+	});
+});
+
+describe('a large graph without a box', () => {
+	it('starts on the card nearest its top-left, not on an empty corner', () => {
+		// A layered layout: the first column centred low, a later column reaching the top.
+		const cards = [
+			{ x: 0, y: 1800, width: 236, height: 82 },
+			{ x: 0, y: 1900, width: 236, height: 82 },
+			{ x: 3000, y: 0, width: 236, height: 82 }
+		];
+		const bounds = { x: 0, y: 0, width: 3236, height: 1982 };
+		const inside = (r: (typeof cards)[number], view: { x: number; y: number; zoom: number }) =>
+			r.x * view.zoom + view.x >= 0 && (r.x + r.width) * view.zoom + view.x <= 1000 && r.y * view.zoom + view.y >= 0 && (r.y + r.height) * view.zoom + view.y <= 500;
+		const start = firstCard(cards)!;
+		expect(start).toEqual(cards[0]);
+		const v = fitViewport(bounds, 1000, 500, { padding: 0, minZoom: 0.6, start });
+		// The start card's left edge is at the view's left; vertically the view stops at the graph's bottom edge.
+		expect(v.x + start.x * v.zoom).toBe(0);
+		expect(inside(start, v)).toBe(true);
+		// The bare corner would have shown no card at all.
+		const corner = fitViewport(bounds, 1000, 500, { padding: 0, minZoom: 0.6 });
+		expect(cards.some((c) => inside(c, corner))).toBe(false);
 	});
 });
