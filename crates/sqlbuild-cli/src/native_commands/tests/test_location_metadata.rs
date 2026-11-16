@@ -1,6 +1,6 @@
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryKind, WarehouseStateLocation,
+    WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseStateLocation,
 };
 
 use chrono::Utc;
@@ -11,8 +11,8 @@ use tokio::time::Instant;
 use crate::native_commands::_helpers::execution::{metadata_sync, safety_sync_seconds};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
-    MetadataRetryTestCase, SafetySyncIdleTestCase, SafetySyncSettingTestCase,
-    SyncCoalescingTestCase, UnchangedScanTestCase,
+    MetadataBackoffTestCase, MetadataRetryTestCase, SafetySyncIdleTestCase,
+    SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
 
 #[test]
@@ -47,7 +47,11 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             .iter()
             .position(|kind| *kind == test_case.failed_kind)
             .expect("kind is listed");
-        state.retry_read();
+        let wait = state.fail_read(WarehouseHistoryFailure {
+            reason: "Out of memory".into(),
+            page_size: true,
+        });
+        assert!(wait.is_some(), "{}", test_case.description);
         let state = acknowledge_complete_pages(state, test_case.acknowledged_pages);
         assert_eq!(
             (state.kind(), state.statistics_limit, state.limit),
@@ -58,6 +62,94 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             ),
             "{description}",
             description = test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_and_identical_errors_stop()
+ {
+    let denied = || WarehouseHistoryFailure {
+        reason: "Insufficient privileges to operate on table '_SQLBUILD_FINGERPRINTS'".into(),
+        page_size: false,
+    };
+    let memory = || WarehouseHistoryFailure {
+        reason: "Out of memory".into(),
+        page_size: true,
+    };
+    let missing = || WarehouseHistoryFailure {
+        reason: "Table '_SQLBUILD_FINGERPRINTS' does not exist".into(),
+        page_size: false,
+    };
+    let test_cases = [
+        MetadataBackoffTestCase {
+            description: "a permission error never shrinks the page and waits longer each time",
+            failures: vec![denied(), denied(), denied()],
+            failures_after_request: vec![],
+            expected_waits: vec![Some(30), Some(60), Some(120)],
+            expected_limit: MAX_HISTORY_RECORDS,
+            expected_halted: false,
+        },
+        MetadataBackoffTestCase {
+            description: "the fifth identical failure stops the sync",
+            failures: vec![],
+            failures_after_request: vec![denied(), denied(), denied(), denied(), denied()],
+            expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None],
+            expected_limit: MAX_HISTORY_RECORDS,
+            expected_halted: true,
+        },
+        MetadataBackoffTestCase {
+            description: "a different error starts the count again",
+            failures: vec![denied(), denied(), denied(), denied(), missing()],
+            failures_after_request: vec![],
+            expected_waits: vec![Some(30), Some(60), Some(120), Some(240), Some(30)],
+            expected_limit: MAX_HISTORY_RECORDS,
+            expected_halted: false,
+        },
+        MetadataBackoffTestCase {
+            description: "a page-size error halves the page and retries after one poll",
+            failures: vec![memory(), memory()],
+            failures_after_request: vec![],
+            expected_waits: vec![Some(30), Some(30)],
+            expected_limit: MAX_HISTORY_RECORDS / 4,
+            expected_halted: false,
+        },
+        MetadataBackoffTestCase {
+            description: "a sync request resumes a stopped sync with a fresh count",
+            failures: vec![denied(), denied(), denied(), denied(), denied()],
+            failures_after_request: vec![denied()],
+            expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None, Some(30)],
+            expected_limit: MAX_HISTORY_RECORDS,
+            expected_halted: false,
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.index = WarehouseHistoryKind::ALL
+            .iter()
+            .position(|kind| *kind == WarehouseHistoryKind::Fingerprints)
+            .expect("kind is listed");
+        let mut waits: Vec<Option<u64>> = test_case
+            .failures
+            .into_iter()
+            .map(|failure| state.fail_read(failure).map(|wait| wait.as_secs()))
+            .collect();
+        state.request_sync();
+        waits.extend(
+            test_case
+                .failures_after_request
+                .into_iter()
+                .map(|failure| state.fail_read(failure).map(|wait| wait.as_secs())),
+        );
+        assert_eq!(
+            (waits, state.limit, state.halted),
+            (
+                test_case.expected_waits,
+                test_case.expected_limit,
+                test_case.expected_halted
+            ),
+            "{}",
+            test_case.description
         );
     }
 }

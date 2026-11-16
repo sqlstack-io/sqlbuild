@@ -89,7 +89,14 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             "migrations",
             "Warehouse connection for metadata reads failed: OperationalError: "
             "unable to open database file\n"
-            "Warehouse metadata read (migrations) failed. No page delivered.\n",
+            "Warehouse metadata read (migrations) failed: OperationalError: "
+            "unable to open database file. No page delivered.\n",
+            {
+                "failed": {
+                    "reason": "OperationalError: unable to open database file",
+                    "page_size": False,
+                }
+            },
         )
     ],
     ids=lambda case: case.description,
@@ -109,7 +116,7 @@ def test_given_an_unreachable_warehouse_when_reading_history_then_the_driver_err
         },
     )
     result: subprocess.CompletedProcess[str] = warehouse_history_read(project, test_case.table)
-    assert (result.returncode, result.stdout) == (0, "null\n")
+    assert (result.returncode, json.loads(result.stdout)) == (0, test_case.expected_reply)
     assert test_case.expected_stderr in result.stderr
 
 

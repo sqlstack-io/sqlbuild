@@ -44,13 +44,15 @@ SIGN_IN_ADAPTER: str = (
     [
         DevelopmentTerminalTestCase(
             "the live screen hands the terminal to the client while it prompts",
-            {"NO_COLOR": None, "CI": None, "SQLBUILD_NO_PROGRESS": None, "TERM": "xterm"},
+            {"TERM": "xterm"},
+            frozenset({"NO_COLOR", "CI", "SQLBUILD_NO_PROGRESS"}),
             "ready in",
             ["terminal=True code=424242"],
         ),
         DevelopmentTerminalTestCase(
             "plain output still signs in on the terminal before ready",
             {"NO_COLOR": "1"},
+            frozenset(),
             "sqlbuild dev: ready ",
             ["terminal=True code=424242"],
         ),
@@ -76,19 +78,18 @@ def test_given_an_interactive_adapter_when_developing_then_sign_in_happens_once_
             "adapters/duckdb_sign_in.py": SIGN_IN_ADAPTER,
         },
     )
-    environment: dict[str, str] = {
-        key: value
-        for key, value in (
-            os.environ
-            | {
-                "ORDERS_SIGN_IN_TOKEN": str(tmp_path / "token"),
-                "ORDERS_SIGN_INS": str(sign_ins),
-                "ORDERS_CONNECTS": str(connects),
-                "SQLBUILD_PLATFORM_WEBHOOK_URL": None,
-            }
-            | test_case.environment
-        ).items()
-        if value is not None
+    environment: dict[str, str] = (
+        dict(os.environ)
+        | {
+            "ORDERS_SIGN_IN_TOKEN": str(tmp_path / "token"),
+            "ORDERS_SIGN_INS": str(sign_ins),
+            "ORDERS_CONNECTS": str(connects),
+        }
+        | test_case.environment
+    )
+    environment = {
+        key: environment[key]
+        for key in environment.keys() - test_case.unset - {"SQLBUILD_PLATFORM_WEBHOOK_URL"}
     }
     executable: str = str(Path(sys.executable).with_name("sqb"))
     terminal, attached = pty.openpty()

@@ -10,12 +10,15 @@ use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
-    WarehouseStateLocation,
+    MetadataBatch, StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind,
+    WarehouseHistoryPage, WarehouseStateLocation,
 };
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
+use crate::native_commands::constants::{
+    METADATA_BACKOFF_MAX_SECONDS, METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS,
+};
 use crate::native_commands::types::LocationPublication;
 
 /// Privileged local operations require direct ownership of the control database.
@@ -228,8 +231,10 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) safety_seconds: u64,
     /// When an idle location syncs even though no run ended and nobody asked.
     pub(crate) safety_at: tokio::time::Instant,
-    /// The last read found the warehouse file held by another process, such as a DuckDB build.
-    pub(crate) busy: bool,
+    /// The latest failed read and how many times in a row it failed the same way.
+    pub(crate) read_failure: Option<(WarehouseHistoryFailure, u32)>,
+    /// Identical failed reads stopped the synchronization until a sync request or a new publication.
+    pub(crate) halted: bool,
     /// Per scan index: the table's change token after its last complete read.
     pub(crate) change_tokens: HashMap<usize, ScanToken>,
     /// The token read before the current scan's first page, recorded once the scan completes.
@@ -245,8 +250,9 @@ pub(crate) struct LocationMetadataSync {
 /// The metadata reader's answer to one read.
 #[derive(Debug)]
 pub(crate) enum MetadataReply {
-    /// A page, or `None` when the read failed.
-    Page(Option<WarehouseHistoryPage>),
+    Page(WarehouseHistoryPage),
+    /// The read failed and delivered nothing; never an empty table.
+    Failed(WarehouseHistoryFailure),
     /// Another process holds the warehouse file; nothing was read.
     Busy,
 }
@@ -265,7 +271,8 @@ impl LocationMetadataSync {
     /// A person asked for a sync: start one now when idle, or one more after the current one.
     pub(crate) fn request_sync(&mut self) {
         self.cycle_started_at = None;
-        if self.idle {
+        self.read_failure = None;
+        if std::mem::take(&mut self.halted) || self.idle {
             self.next_at = tokio::time::Instant::now();
         }
     }
@@ -287,21 +294,45 @@ impl LocationMetadataSync {
         self.next_at = tokio::time::Instant::now();
     }
 
-    /// Failed samples revisit catalog before retrying; no frozen delivery is discarded.
-    pub(crate) fn retry_read(&mut self) {
+    /// Halve the page after a page-size failure, else back off; the wait, or `None` once stopped.
+    pub(crate) fn fail_read(
+        &mut self,
+        failure: WarehouseHistoryFailure,
+    ) -> Option<std::time::Duration> {
         self.statistics = None;
-        if self.kind() == WarehouseHistoryKind::Statistics {
-            self.statistics_limit = (self.statistics_limit / 2).max(1);
-            self.index -= 1;
-            self.source_after = None;
-            self.scan_id = Uuid::now_v7();
-            self.observed_since = None;
-            self.watermark_loaded = false;
+        let statistics = self.kind() == WarehouseHistoryKind::Statistics;
+        let limit = if statistics {
+            &mut self.statistics_limit
         } else {
-            self.limit = (self.limit / 2).max(1);
-        }
-        self.next_at = tokio::time::Instant::now()
-            + std::time::Duration::from_secs(super::constants::METADATA_POLL_SECONDS);
+            &mut self.limit
+        };
+        let seconds = if failure.page_size && *limit > 1 {
+            *limit /= 2;
+            if statistics {
+                self.index -= 1;
+                self.source_after = None;
+                self.scan_id = Uuid::now_v7();
+                self.observed_since = None;
+                self.watermark_loaded = false;
+            }
+            METADATA_POLL_SECONDS
+        } else {
+            let repeats = match &self.read_failure {
+                Some((last, repeats)) if *last == failure => repeats + 1,
+                _ => 1,
+            };
+            self.read_failure = Some((failure, repeats));
+            if repeats >= METADATA_FAILURE_LIMIT {
+                self.halted = true;
+                return None;
+            }
+            METADATA_POLL_SECONDS
+                .saturating_mul(1 << (repeats - 1))
+                .min(METADATA_BACKOFF_MAX_SECONDS)
+        };
+        let wait = std::time::Duration::from_secs(seconds);
+        self.next_at = tokio::time::Instant::now() + wait;
+        Some(wait)
     }
 
     /// A synchronization is mid-flight and its next page is due, so the loop need not wait a tick.

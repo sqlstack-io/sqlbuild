@@ -60,8 +60,9 @@ use sqlbuild_orchestration::store::main::set_release_version::set_release_versio
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind,
-    WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead, WarehouseWatermarkRead,
+    MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, WarehouseHistoryFailure,
+    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead,
+    WarehouseWatermarkRead,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::webhooks::main::{
@@ -99,11 +100,11 @@ use crate::native_commands::_helpers::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
-    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS,
-    METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
-    METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
-    METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
-    UNKNOWN_COMMAND,
+    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_ERROR_CHARS,
+    METADATA_FAILURE_LIMIT, METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS,
+    METADATA_READER_CLOSE_SECONDS, METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES,
+    METADATA_SAFETY_SYNC_SECONDS, METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND,
+    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -464,7 +465,8 @@ pub(crate) fn metadata_sync(
         cycle_started_at: None,
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
-        busy: false,
+        read_failure: None,
+        halted: false,
         change_tokens: HashMap::new(),
         scan_token: None,
         scan_delivered: false,
@@ -662,7 +664,7 @@ pub(crate) async fn load_watermark(
             Err(error) => {
                 tokio::select! {
                     result = &mut stopped => { result?; return Ok(None); },
-                    () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Watermark))) => {},
+                    () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Watermark)), None) => {},
                 }
                 return Ok(Some((state, Some(error))));
             }
@@ -707,6 +709,7 @@ pub(crate) async fn metadata_health(
     state: &LocationMetadataSync,
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
     (started, failure): (Instant, Option<WarehouseSyncFailure>),
+    error: Option<&str>,
 ) {
     let report = LocationHealthReport {
         event_id: Uuid::now_v7(),
@@ -722,6 +725,7 @@ pub(crate) async fn metadata_health(
                 .as_ref()
                 .map_or(0, |page| page.batch.records.len()) as u64,
             elapsed_millis: started.elapsed().as_millis() as u64,
+            error: error.map(|error| error.chars().take(METADATA_ERROR_CHARS).collect()),
         },
     };
     if let Err(error) = client.report_health(&report).await {
@@ -1317,13 +1321,12 @@ pub(crate) async fn stop_location_runtime(
     Ok(())
 }
 
-/// An outer absence means shutdown; an inner absence is a failed read, never an empty table.
+/// An absence means shutdown; a failed read never stands for an empty table.
 pub(crate) async fn read_metadata_page(
     (options, script): (&LocationServe, &Path),
     mut state: LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(LocationMetadataSync, Option<WarehouseHistoryPage>)>, ControlError> {
-    state.busy = false;
+) -> Result<Option<(LocationMetadataSync, MetadataReply)>, ControlError> {
     if let Some(statistics) = &state.statistics
         && statistics.names.is_empty()
     {
@@ -1333,7 +1336,7 @@ pub(crate) async fn read_metadata_page(
             change_token: None,
             unchanged: false,
         };
-        return Ok(Some((state, Some(page))));
+        return Ok(Some((state, MetadataReply::Page(page))));
     }
     let request = history_request(&state)?;
     let reader = match state.reader.take() {
@@ -1341,52 +1344,98 @@ pub(crate) async fn read_metadata_page(
         None => match open_location_runtime(options, script, Vec::new()) {
             Ok(reader) => reader,
             Err(error) => {
-                drop(write_output(&[(
-                    Stream::Stderr,
-                    &format!("Warehouse metadata reader did not start: {error}\n"),
-                )]));
-                return Ok(Some((state, None)));
+                let reason = format!("Warehouse metadata reader did not start: {error}");
+                drop(write_output(&[(Stream::Stderr, &format!("{reason}\n"))]));
+                let failure = WarehouseHistoryFailure {
+                    reason,
+                    page_size: false,
+                };
+                return Ok(Some((state, MetadataReply::Failed(failure))));
             }
         },
     };
     tokio::pin!(stopped);
-    tokio::select! {
+    let reply = tokio::select! {
         result = &mut stopped => {
             result?;
-            Ok(None)
+            return Ok(None);
         },
         result = tokio::time::timeout(
             Duration::from_secs(METADATA_POLL_SECONDS),
             exchange_metadata_read(reader, request),
         ) => match result {
-            Ok((reader, Ok(MetadataReply::Page(page)))) => {
+            Ok((reader, Ok(reply))) => {
                 state.reader = Some(reader);
-                Ok(Some((state, page)))
+                reply
             }
-            Ok((reader, Ok(MetadataReply::Busy))) => {
-                state.busy = true;
-                state.reader = Some(reader);
-                Ok(Some((state, None)))
-            }
-            Ok((reader, Err(error))) => {
+            Ok((reader, Err(failure))) => {
                 drop(write_output(&[(
                     Stream::Stderr,
-                    &format!("Warehouse metadata reader failed: {error}\n"),
+                    &format!("Warehouse metadata reader failed: {}\n", failure.reason),
                 )]));
                 stop_location_runtime(Some(reader)).await?;
-                Ok(Some((state, None)))
+                MetadataReply::Failed(failure)
             }
             Err(_) => {
-                drop(write_output(&[(
-                    Stream::Stderr,
-                    &format!(
-                        "Warehouse metadata read did not answer within {METADATA_POLL_SECONDS}s.\n"
-                    ),
-                )]));
-                Ok(Some((state, None)))
+                let reason =
+                    format!("Warehouse metadata read did not answer within {METADATA_POLL_SECONDS}s.");
+                drop(write_output(&[(Stream::Stderr, &format!("{reason}\n"))]));
+                MetadataReply::Failed(WarehouseHistoryFailure {
+                    reason,
+                    page_size: true,
+                })
             }
         },
+    };
+    if matches!(reply, MetadataReply::Page(_)) {
+        state.read_failure = None;
     }
+    Ok(Some((state, reply)))
+}
+
+/// A warehouse file held by another process, such as a DuckDB build, waits a poll interval.
+pub(crate) async fn wait_for_file(
+    mut state: LocationMetadataSync,
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    started: Instant,
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<LocationMetadataSync>, ControlError> {
+    let failure = Some(WarehouseSyncFailure::Busy);
+    tokio::select! {
+        result = stopped => { result?; return Ok(None); },
+        () = metadata_health(&state, (client, poll), (started, failure), None) => {},
+    }
+    state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+    Ok(Some(state))
+}
+
+/// Report the failed read with its error, then retry it later or stop after identical failures.
+pub(crate) async fn failed_read(
+    mut state: LocationMetadataSync,
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    (started, failure): (Instant, WarehouseHistoryFailure),
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<LocationMetadataSync>, ControlError> {
+    let read = Some(WarehouseSyncFailure::Read);
+    tokio::select! {
+        result = stopped => { result?; return Ok(None); },
+        () = metadata_health(&state, (client, poll), (started, read), Some(&failure.reason)) => {},
+    }
+    let reason = failure.reason.clone();
+    let message = match state.fail_read(failure) {
+        Some(wait) => format!(
+            "Warehouse history read failed; retaining mirror and retrying in {}s.\n",
+            wait.as_secs()
+        ),
+        None => {
+            state = close_metadata_reader(state).await?;
+            format!(
+                "Warehouse history synchronization stopped after {METADATA_FAILURE_LIMIT} identical failed reads: {reason}. Request a sync or publish again to retry.\n"
+            )
+        }
+    };
+    drop(write_output(&[(Stream::Stderr, &message)]));
+    Ok(Some(state))
 }
 
 /// A completed synchronization closes its reader, so no warehouse session outlives the sync.
@@ -1421,38 +1470,54 @@ pub(crate) async fn close_metadata_reader(
     Ok(state)
 }
 
-/// A reply of `null` means the reader's read failed and it dropped its warehouse session.
+/// A reply too long, or a reader gone and likely killed for memory, may fit a smaller page.
 async fn exchange_metadata_read(
     mut reader: LocationCompiler,
     request: Vec<u8>,
-) -> (LocationCompiler, Result<MetadataReply, ControlError>) {
+) -> (
+    LocationCompiler,
+    Result<MetadataReply, WarehouseHistoryFailure>,
+) {
+    let failed = |reason: &str, page_size| WarehouseHistoryFailure {
+        reason: reason.into(),
+        page_size,
+    };
     let result = async {
-        reader.stdin.write_all(&request).await?;
-        reader.stdin.write_all(b"\n").await?;
-        reader.stdin.flush().await?;
+        let written: std::io::Result<()> = async {
+            reader.stdin.write_all(&request).await?;
+            reader.stdin.write_all(b"\n").await?;
+            reader.stdin.flush().await
+        }
+        .await;
+        written.map_err(|error| failed(&error.to_string(), false))?;
         let mut line = String::new();
         let read = (&mut reader.stdout)
             .take(METADATA_REPLY_BYTES + 1)
             .read_line(&mut line)
-            .await?;
+            .await
+            .map_err(|error| failed(&error.to_string(), false))?;
         if read == 0 {
-            return Err(ControlError::Invalid(
-                "location metadata reader exited before replying".into(),
+            return Err(failed(
+                "location metadata reader exited before replying",
+                true,
             ));
         }
         if read as u64 > METADATA_REPLY_BYTES || !line.ends_with('\n') {
-            return Err(ControlError::Invalid(
-                "location reply exceeds its byte limit".into(),
-            ));
+            return Err(failed("location reply exceeds its byte limit", true));
         }
-        let reply: serde_json::Value = serde_json::from_str(&line)
-            .map_err(|_| ControlError::Invalid("invalid location reply".into()))?;
+        let reply: serde_json::Value =
+            serde_json::from_str(&line).map_err(|_| failed("invalid location reply", false))?;
         if reply.get("busy") == Some(&serde_json::Value::Bool(true)) {
             return Ok(MetadataReply::Busy);
         }
+        if let Some(failure) = reply.get("failed") {
+            return serde_json::from_value(failure.clone())
+                .map(MetadataReply::Failed)
+                .map_err(|_| failed("invalid location reply", false));
+        }
         serde_json::from_value(reply)
             .map(MetadataReply::Page)
-            .map_err(|_| ControlError::Invalid("invalid location reply".into()))
+            .map_err(|_| failed("invalid location reply", false))
     }
     .await;
     (reader, result)

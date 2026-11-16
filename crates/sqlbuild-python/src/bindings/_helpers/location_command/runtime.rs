@@ -3,7 +3,7 @@
 use std::io::{self, Write};
 
 use pyo3::PyErr;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyMemoryError, PyValueError};
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
@@ -11,7 +11,7 @@ use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::generation_failed::generation_failed;
 use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryKind, WarehouseHistoryRead,
+    WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseHistoryRead,
 };
 
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
@@ -70,6 +70,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             PyValueError::new_err("runtime received an invalid metadata read")
                         })?;
                     let mut busy = false;
+                    let mut unconnected = WarehouseHistoryFailure::default();
                     if session.is_none() {
                         let arguments = location_arguments(py, Some(options.clone()))?;
                         session = match open_history_session(py, &arguments) {
@@ -77,11 +78,12 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             Err(error) => {
                                 busy = error.to_string().contains(DUCKDB_LOCK_CONFLICT);
                                 if !busy {
+                                    unconnected.reason = failure_reason(&error);
                                     write_stderr(
                                         py,
                                         &format!(
                                             "Warehouse connection for metadata reads failed: {}\n",
-                                            failure_reason(&error)
+                                            unconnected.reason
                                         ),
                                     )?;
                                 } else if !reported_busy {
@@ -100,8 +102,11 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 stream = open;
                                 page
                             })
-                            .map_err(|error| format!(": {}", failure_reason(&error))),
-                        None => Err(String::new()),
+                            .map_err(|error| WarehouseHistoryFailure {
+                                reason: failure_reason(&error),
+                                page_size: error.is_instance_of::<PyMemoryError>(py),
+                            }),
+                        None => Err(unconnected),
                     };
                     if session.as_ref().is_some_and(|opened| opened.local)
                         && let Some(opened) = session.take()
@@ -112,23 +117,23 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     if busy {
                         serde_json::to_string(&serde_json::json!({ "busy": true }))
                     } else {
-                        let delivered = match &page {
-                            Ok(page) => Some(page),
-                            Err(reason) => {
+                        match page {
+                            Ok(page) => serde_json::to_string(&page),
+                            Err(failure) => {
                                 if let Some(opened) = session.take() {
                                     drop(close_history_session(opened, None));
                                 }
                                 write_stderr(
                                     py,
                                     &format!(
-                                        "Warehouse metadata read ({}) failed{reason}. No page delivered.\n",
-                                        kind.as_str()
+                                        "Warehouse metadata read ({}) failed: {}. No page delivered.\n",
+                                        kind.as_str(),
+                                        failure.reason
                                     ),
                                 )?;
-                                None
+                                serde_json::to_string(&serde_json::json!({ "failed": failure }))
                             }
-                        };
-                        serde_json::to_string(&delivered)
+                        }
                     }
                 } else {
                     let evaluation: SensorEvaluationRequest = serde_json::from_value(request)

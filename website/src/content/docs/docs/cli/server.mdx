@@ -367,6 +367,10 @@ Details:
   reasons never syncs extra.
 - A sync reads the warehouse and never writes to it. On Snowflake, it skips state tables that
   haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
+- When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
+  or time retries a smaller page. Any other error, such as a missing permission or table, retries
+  after 30 seconds, then waits twice as long after each identical failure, up to 30 minutes. After
+  5 identical failures the sync stops until you request one or the location publishes again.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 
 ## Skip overlapping runs and retry failures

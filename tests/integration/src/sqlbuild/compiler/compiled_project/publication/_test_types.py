@@ -291,7 +291,8 @@ class DevelopmentDiscoveryTestCase:
 @dataclass(frozen=True)
 class DevelopmentTerminalTestCase:
     description: str
-    environment: dict[str, str | None]
+    environment: dict[str, str]
+    unset: frozenset[str]
     expected_ready: str
     expected_sign_ins: list[str]
 
@@ -330,6 +331,7 @@ class ReadFailureTestCase:
     description: str
     table: str
     expected_stderr: str
+    expected_reply: dict[str, Any]
 
 
 @dataclass(frozen=True)

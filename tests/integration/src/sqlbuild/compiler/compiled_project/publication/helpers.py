@@ -500,7 +500,7 @@ def warehouse_history_pages(
     more: bool = True
     while more:
         page: dict[str, Any] = warehouse_history_page(project, table, after, observed_since)
-        assert page is not None
+        assert "failed" not in page, page
         pages.append(page)
         after = page["next_after"]
         more = after is not None
@@ -565,17 +565,18 @@ def wait_for_connection_health(
 ) -> dict[str, Any]:
     """The location's first connection report, sent once its own connection check finished."""
     deadline: float = time.monotonic() + 45
-    while True:
-        reports: list[dict[str, Any]] = [
-            report["report"]["health"]
-            for report in location_health_reports(api)
-            if report["report"]["health"]["kind"] == "connection"
-        ]
-        if reports:
-            return reports[0]
+    reports: list[dict[str, Any]] = []
+    while not reports:
         assert process.poll() is None, log.read_text()
         assert time.monotonic() < deadline, log.read_text()
         time.sleep(0.05)
+        reports = list(
+            filter(
+                lambda health: health["kind"] == "connection",
+                (report["report"]["health"] for report in location_health_reports(api)),
+            )
+        )
+    return reports[0]
 
 
 def read_terminal_until(
@@ -592,7 +593,7 @@ def read_terminal_until(
         assert process.poll() is None, written.decode(errors="replace")
         assert time.monotonic() < deadline, written.decode(errors="replace")
         readable, _, _ = select.select([terminal], [], [], 0.1)
-        written += os.read(terminal, 65536) if readable else b""
+        written += b"".join(os.read(ready, 65536) for ready in readable)
     return written.decode(errors="replace")
 
 
@@ -653,6 +654,7 @@ def wait_for_warehouse_sync_health(
         assert health["location"] == {"database": None, "schema": "main"}
         assert 0 <= health["records_sent"] <= 100
         assert health["elapsed_millis"] > 0
+        assert bool(health.get("error")) == (expected["failure"] == "read"), health
     return reports
 
 
