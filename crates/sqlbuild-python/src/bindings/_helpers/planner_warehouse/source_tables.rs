@@ -64,7 +64,6 @@ fn table_name(entry: &Bound<'_, PyAny>) -> PyResult<String> {
 fn external_table(entry: &Bound<'_, PyAny>) -> PyResult<bool> {
     Ok(!native_field(entry, "managed")?.is_truthy()?
         && native_field(entry, "loader")?.is_none()
-        && native_field(entry, "integration_loader")?.is_none()
         && native_field(entry, "expression")?.is_none()
         && !native_field(entry, "schema")?.is_none()
         && !table_name(entry)?.contains(WILDCARD_TABLE_CHARACTER))

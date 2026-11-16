@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
-from sqlbuild._native import LoaderConnectionMode, SourceColumnEntry
+from sqlbuild._native import SourceColumnEntry
 from sqlbuild.adapter.contract.types import CursorKind
 from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.cursor_algebra.types import CursorScalar
@@ -149,19 +150,6 @@ class LoadDagStateSchedulingTestCase:
 
 
 @dataclass(frozen=True)
-class ExternalLoadPipelineTestCase:
-    """One external loader pipeline behavior case."""
-
-    description: str
-    source_name: str
-    loader_name: str
-    expected_connection_count: int
-    expected_connection_is_none: bool
-    expected_status: ExecutionStatus
-    expected_lifecycle_message: str
-
-
-@dataclass(frozen=True)
 class LoadPipelineSkipFanInTestCase:
     """One loader skip fan-in behavior case."""
 
@@ -183,7 +171,6 @@ class ConcurrentLoadProgressTestCase:
 @dataclass(frozen=True)
 class LoadStartOrderingTestCase:
     description: str
-    connection_mode: LoaderConnectionMode
     expected_connection_count: int
 
 
@@ -234,6 +221,9 @@ class LoaderOperationLifecycleTestCase:
 
 
 @dataclass(frozen=True)
-class ExternalLoaderContractTestCase:
+class LoaderReferenceRejectionTestCase:
+    """A function passed to `ctx.loader()` that is not a loader, and the error it raises."""
+
     description: str
-    expected_error_fragment: str
+    reference: Callable[..., object]
+    expected_message: str

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::python_plan::models::LifecycleNode;
+use crate::python_plan::tests::test_types::LifecycleNodeSpec;
 
 pub(crate) fn edges(rows: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
     rows.iter()
@@ -13,16 +14,24 @@ pub(crate) fn edges(rows: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
         .collect()
 }
 
-pub(crate) fn lifecycle_nodes(rows: &[(&str, &str, bool)]) -> HashMap<String, LifecycleNode> {
+pub(crate) fn lifecycle_nodes(rows: &[LifecycleNodeSpec]) -> HashMap<String, LifecycleNode> {
     rows.iter()
-        .map(|(name, kind, external_loader)| {
+        .map(|(name, kind, sql_deps)| {
             (
                 (*name).to_owned(),
                 LifecycleNode {
                     kind: (*kind).to_owned(),
-                    external_loader: *external_loader,
+                    sql_deps: sql_deps
+                        .iter()
+                        .map(|(kind, name)| ((*kind).to_owned(), (*name).to_owned()))
+                        .collect(),
                 },
             )
         })
         .collect()
+}
+
+/// Owned copies of `values`.
+pub(crate) fn names(values: &[&str]) -> Vec<String> {
+    values.iter().map(|name| (*name).to_owned()).collect()
 }

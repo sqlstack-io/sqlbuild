@@ -136,9 +136,19 @@ fn project_sources(project: &Bound<'_, PyAny>) -> PyResult<Vec<(String, Option<S
         .collect()
 }
 
+/// `[settings] allow_warehouse_round_trips` of a compiled project.
+fn allows_round_trips(project: &Bound<'_, PyAny>) -> PyResult<bool> {
+    native_field(
+        &native_field(project, "settings")?,
+        "allow_warehouse_round_trips",
+    )?
+    .extract()
+}
+
 /// A compiled project's sources and discovered Python nodes, which publication resolves selectors over.
 pub(crate) struct ProjectSelection {
     sources: Vec<(String, Option<String>)>,
+    allow_warehouse_round_trips: bool,
     pub(crate) nodes: PythonSelectionGraph,
 }
 
@@ -149,6 +159,7 @@ impl ProjectSelection {
     ) -> PyResult<Self> {
         Ok(Self {
             sources: project_sources(project)?,
+            allow_warehouse_round_trips: allows_round_trips(project)?,
             nodes: selection_graph(&python_node_graph(discovered_inputs)?)?,
         })
     }
@@ -211,6 +222,7 @@ impl ProjectSelection {
         SqlSelectionGraph {
             graph,
             sources: &self.sources,
+            allow_warehouse_round_trips: self.allow_warehouse_round_trips,
         }
     }
 
@@ -283,6 +295,7 @@ pub(crate) fn resolve_python_sql_run_selection(
     let project_graph: &Bound<'_, CompiledProjectGraph> = project_graph.cast()?;
     let native: &Bound<'_, NativeProjectGraph> = project_graph.get().native(py);
     let sources: Vec<(String, Option<String>)> = project_sources(project_graph.get().project(py))?;
+    let allow_warehouse_round_trips: bool = allows_round_trips(project_graph.get().project(py))?;
     let nodes: PythonSelectionGraph = selection_graph(python_graph)?;
     let node_names: Vec<&str> = nodes.nodes.iter().map(|node| node.name.as_str()).collect();
     let selectors: Vec<String> = select.iter().chain(&exclude).cloned().collect();
@@ -292,6 +305,7 @@ pub(crate) fn resolve_python_sql_run_selection(
                 SqlSelectionGraph {
                     graph: native.get().graph(),
                     sources: &sources,
+                    allow_warehouse_round_trips,
                 },
                 &nodes,
                 catalog,
@@ -303,6 +317,7 @@ pub(crate) fn resolve_python_sql_run_selection(
             SqlSelectionGraph {
                 graph: &graph,
                 sources: &sources,
+                allow_warehouse_round_trips,
             },
             &nodes,
             &select,

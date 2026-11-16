@@ -496,10 +496,6 @@ const R_DISCOVERED_PYTHON_LOADER_METADATA: RecordSpec = RecordSpec {
         FieldSpec::new("unique_key", FieldDefault::EmptyTuple),
         FieldSpec::new("columns", FieldDefault::EmptyTuple),
         FieldSpec::new("contract", FieldDefault::None),
-        FieldSpec::new(
-            "connection_mode",
-            FieldDefault::NativeMember(RecordId::LoaderConnectionMode, "SQLBUILD"),
-        ),
     ],
 };
 const R_DISCOVERED_PYTHON_TASK_METADATA: RecordSpec = RecordSpec {
@@ -820,6 +816,7 @@ const R_PYTHON_SQL_RUN_LIFECYCLE_PLAN: RecordSpec = RecordSpec {
         FieldSpec::required("ingress_python_node_names"),
         FieldSpec::required("ingress_loader_names"),
         FieldSpec::required("read_side_python_node_names"),
+        FieldSpec::new("round_trip_loader_names", FieldDefault::EmptyFrozenset),
     ],
 };
 const R_PYTHON_IDENTITY_DEPENDENCY: RecordSpec = RecordSpec {

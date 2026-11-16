@@ -1,18 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
 
 import pytest
 
-from sqlbuild._native import SourceEntry, SourceParseError, SourceWriteStrategy
-from sqlbuild.integrations.dlt.models import DltSourceConfig
-from sqlbuild.integrations.ingestr.models import IngestrSourceConfig
+from sqlbuild._native import SourceEntry, SourceWriteStrategy
 from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
-    ParseSourcesYamlDltTestCase,
     ParseSourcesYamlErrorTestCase,
-    ParseSourcesYamlHelpTestCase,
-    ParseSourcesYamlIngestrTestCase,
     ParseSourcesYamlTestCase,
 )
 from tests.unit.src.sqlbuild.compiler.discovery._helpers.helpers import expected_or_actual
@@ -178,30 +172,6 @@ from tests.unit.src.sqlbuild.compiler.discovery.helpers import parse_sources_yml
             expected_unique_keys=((), ("customer_id", "updated_at"), (), ()),
             expected_source_audit_names=((), (), (), ()),
             expected_column_audit_names=((), (), (), ()),
-        ),
-        ParseSourcesYamlTestCase(
-            description="parses ingestr integration loader metadata",
-            contents="""
-        sources:
-          - name: raw_orders
-            table: orders
-            ingestr:
-              source_uri: stripe://token
-              source_table: charges
-              strategy: merge
-              primary_key: [id, account_id]
-              incremental_key: updated_at
-              columns: id,account_id,updated_at
-              extra_args: [--debug]
-        """,
-            expected_source_names=("raw_orders",),
-            expected_column_names=((),),
-            expected_type_enforcement_values=(None,),
-            expected_contract_values=(None,),
-            expected_expressions=(None,),
-            expected_loaders=("ingestr__raw_orders",),
-            expected_source_audit_names=((),),
-            expected_column_audit_names=((),),
         ),
         ParseSourcesYamlTestCase(
             description="parses source freshness strategies",
@@ -535,120 +505,6 @@ def test_given_sources_yaml_variants_when_parsing_then_it_returns_expected_raw_m
 @pytest.mark.parametrize(
     "test_case",
     [
-        ParseSourcesYamlIngestrTestCase(
-            description="stores typed ingestr integration config",
-            contents="""
-            sources:
-              - name: raw_orders
-                table: orders
-                ingestr:
-                  source_uri: stripe://token
-                  source_table: charges
-                  strategy: merge
-                  primary_key: [id, account_id]
-                  incremental_key: updated_at
-                  columns: id,account_id,updated_at
-                  extra_args: [--debug]
-            """,
-            expected_loader="ingestr__raw_orders",
-            expected_kind="ingestr",
-            expected_primary_key=("id", "account_id"),
-            expected_extra_args=("--debug",),
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_ingestr_source_yaml_when_parsing_then_stores_typed_integration_config(
-    test_case: ParseSourcesYamlIngestrTestCase,
-) -> None:
-    source_entries: tuple[SourceEntry, ...] = parse_sources_yml(
-        contents=test_case.contents,
-        file_path=Path("sources/raw.yml"),
-    )
-
-    assert source_entries[0].loader == test_case.expected_loader
-    assert source_entries[0].integration_loader is not None
-    assert source_entries[0].integration_loader.kind == test_case.expected_kind
-    ingestr_config: object = source_entries[0].integration_loader.config
-    assert isinstance(ingestr_config, IngestrSourceConfig)
-    assert ingestr_config.primary_key == test_case.expected_primary_key
-    assert ingestr_config.extra_args == test_case.expected_extra_args
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        ParseSourcesYamlDltTestCase(
-            description="expands dlt sources into managed source entries",
-            contents="""
-            dlt_sources:
-              - type: sql_database
-                schema: raw
-                destination:
-                  naming_convention: sql_cs_v1
-                  create_indexes: true
-                config:
-                  credentials: duckdb:///source.duckdb
-                  schema: main
-                resources:
-                  - name: raw_orders
-                    description: Orders from the storefront database
-                    table: orders
-                    write_disposition: merge
-                    primary_key: order_id
-                  - name: raw_customers
-                    schema: raw_customers_override
-                    table: customers
-                    write_disposition: append
-            """,
-            expected_source_names=("raw_orders", "raw_customers"),
-            expected_loaders=("raw_orders", "raw_customers"),
-            expected_kind="dlt",
-            expected_dlt_names=("orders", "customers"),
-            expected_schemas=("raw", "raw_customers_override"),
-            expected_destination_config={"naming_convention": "sql_cs_v1", "create_indexes": True},
-            expected_descriptions=("Orders from the storefront database", None),
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_dlt_sources_yaml_when_parsing_then_expands_managed_sources(
-    test_case: ParseSourcesYamlDltTestCase,
-) -> None:
-    source_entries: tuple[SourceEntry, ...] = parse_sources_yml(
-        contents=test_case.contents,
-        file_path=Path("sources/raw.yml"),
-    )
-
-    assert tuple(entry.name for entry in source_entries) == test_case.expected_source_names
-    assert tuple(entry.loader for entry in source_entries) == test_case.expected_loaders
-    assert all(entry.managed for entry in source_entries)
-    assert all(entry.integration_loader is not None for entry in source_entries)
-    assert tuple(cast(Any, entry.integration_loader).kind for entry in source_entries) == (
-        test_case.expected_kind,
-        test_case.expected_kind,
-    )
-    configs: tuple[object, ...] = tuple(
-        cast(Any, entry.integration_loader).config for entry in source_entries
-    )
-    assert all(isinstance(config, DltSourceConfig) for config in configs)
-    typed_configs: tuple[DltSourceConfig, ...] = cast(tuple[DltSourceConfig, ...], configs)
-    assert (
-        tuple(config.resource.dlt_name for config in typed_configs) == test_case.expected_dlt_names
-    )
-    assert tuple(entry.schema for entry in source_entries) == test_case.expected_schemas
-    assert tuple(entry.description for entry in source_entries) == test_case.expected_descriptions
-    assert all("description" not in config.resource.raw_config for config in typed_configs)
-    assert tuple(config.resource.schema for config in typed_configs) == test_case.expected_schemas
-    assert tuple(config.destination for config in typed_configs) == (
-        test_case.expected_destination_config,
-        test_case.expected_destination_config,
-    )
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
         ParseSourcesYamlErrorTestCase(
             description="raises when the file does not contain a top-level mapping",
             contents="- name: raw_orders\n",
@@ -709,16 +565,33 @@ def test_given_dlt_sources_yaml_when_parsing_then_expands_managed_sources(
             expected_error_fragment="source freshness age_policy has unknown keys: warn_afer",
         ),
         ParseSourcesYamlErrorTestCase(
-            description="raises when ingestr config declares an unknown key",
+            description="raises when a source declares the removed ingestr integration",
             contents="""
         sources:
           - name: raw_orders
             ingestr:
               source_uri: postgresql://localhost/shop
               source_table: public.orders
-              incremental_column: updated_at
         """,
-            expected_error_fragment="source ingestr has unknown keys: incremental_column",
+            expected_error_fragment=(
+                "source 'raw_orders' declares an ingestr integration, which SQLBuild no longer "
+                "supports"
+            ),
+        ),
+        ParseSourcesYamlErrorTestCase(
+            description="raises when a sources file declares the removed dlt integration",
+            contents="""
+        dlt_sources:
+          - type: sql_database
+            config:
+              credentials: duckdb:///source.duckdb
+            resources:
+              - name: raw_orders
+                table: orders
+        """,
+            expected_error_fragment=(
+                "declares dlt_sources, a dlt integration, which SQLBuild no longer supports"
+            ),
         ),
         ParseSourcesYamlErrorTestCase(
             description="raises when source meta is not a mapping",
@@ -834,117 +707,6 @@ def test_given_dlt_sources_yaml_when_parsing_then_expands_managed_sources(
             loader: ""
         """,
             expected_error_fragment="source 'loader' is not supported",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when source defines both loader and ingestr",
-            contents="""
-        sources:
-          - name: raw_orders
-            managed: true
-            ingestr:
-              source_uri: stripe://token
-              source_table: charges
-        """,
-            expected_error_fragment="cannot override loader for ingestr",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when ingestr strategy is unknown",
-            contents="""
-        sources:
-          - name: raw_orders
-            ingestr:
-              source_uri: stripe://token
-              source_table: charges
-              strategy: nope
-        """,
-            expected_error_fragment="ingestr strategy must be one of",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when dlt merge omits primary key",
-            contents="""
-        dlt_sources:
-          - type: sql_database
-            config:
-              credentials: duckdb:///source.duckdb
-            resources:
-              - name: raw_orders
-                table: orders
-                write_disposition: merge
-        """,
-            expected_error_fragment="merge requires primary_key",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when dlt uses sqlbuild write strategy",
-            contents="""
-        dlt_sources:
-          - type: sql_database
-            config:
-              credentials: duckdb:///source.duckdb
-            resources:
-              - name: raw_orders
-                table: orders
-                write_strategy: table
-        """,
-            expected_error_fragment="must use dlt write_disposition",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when dlt destination overrides credentials",
-            contents="""
-        dlt_sources:
-          - type: sql_database
-            destination:
-              credentials: other
-            config:
-              credentials: duckdb:///source.duckdb
-            resources:
-              - name: raw_orders
-                table: orders
-        """,
-            expected_error_fragment="dlt source destination cannot define 'credentials'",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when dlt source group has an unknown key",
-            contents="""
-        dlt_sources:
-          - type: sql_database
-            confg:
-              credentials: duckdb:///source.duckdb
-            resources:
-              - name: raw_orders
-                table: orders
-        """,
-            expected_error_fragment="dlt source has unknown keys: confg",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when dlt resource has an unknown key",
-            contents="""
-        dlt_sources:
-          - type: sql_database
-            config:
-              credentials: duckdb:///source.duckdb
-            resources:
-              - name: raw_orders
-                table: orders
-                primary_keys: id
-        """,
-            expected_error_fragment=(
-                "dlt sql_database resource 'raw_orders' has unknown keys: primary_keys"
-            ),
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when dlt resource uses a key of another source type",
-            contents="""
-        dlt_sources:
-          - type: sql_database
-            config:
-              credentials: duckdb:///source.duckdb
-            resources:
-              - name: raw_orders
-                table: orders
-                endpoint:
-                  path: orders
-        """,
-            expected_error_fragment="dlt sql_database resource 'raw_orders' has unknown keys: endpoint",
         ),
         ParseSourcesYamlErrorTestCase(
             description="raises when write strategy is unknown",
@@ -1527,38 +1289,3 @@ def test_given_invalid_sources_yaml_when_parsing_then_it_raises_clear_errors(
 ) -> None:
     with pytest.raises(ValueError, match=test_case.expected_error_fragment):
         parse_sources_yml(contents=test_case.contents, file_path=Path("sources/raw.yml"))
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        ParseSourcesYamlHelpTestCase(
-            description="misspelled rest_api resource key",
-            contents="""
-dlt_sources:
-  - type: rest_api
-    config:
-      client:
-        base_url: https://api.example.com/
-    resources:
-      - name: raw_orders
-        write_dispositon: append
-        endpoint:
-          path: orders
-""",
-            expected_error_fragment=(
-                "dlt rest_api resource 'raw_orders' has unknown keys: write_dispositon"
-            ),
-            expected_help="did you mean 'write_disposition'?",
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_misspelled_dlt_resource_key_when_parsing_then_help_names_nearest_key(
-    test_case: ParseSourcesYamlHelpTestCase,
-) -> None:
-    with pytest.raises(SourceParseError) as error_info:
-        parse_sources_yml(contents=test_case.contents, file_path=Path("sources/raw.yml"))
-
-    assert test_case.expected_error_fragment in str(error_info.value)
-    assert error_info.value.help == test_case.expected_help

@@ -16,6 +16,7 @@ from sqlbuild._native import (
     ModelPlanEntry,
     SeedPlanEntry,
     SnapshotsConfig,
+    SourceEntry,
     SourceLoadPlanEntry,
     SqlTestPlanEntry,
 )
@@ -123,6 +124,8 @@ class BuildCustomizations:
 
     custom_materializations: Mapping[str, Callable[..., MaterializationResult]] | None = None
     loader_functions: tuple[DiscoveredLoaderFunction, ...] = ()
+    source_load_gate: Callable[[SourceEntry], tuple[str, str] | None] | None = None
+    """Why and how (`hard` or `soft`) a source load is skipped before it starts."""
 
 
 @dataclass(frozen=True)
@@ -206,15 +209,6 @@ class NodeCompletion:
         | SqlTestExecutionResult
         | LoadExecutionResult
     )
-
-
-@dataclass(frozen=True)
-class ExternalSourceLoadResults:
-    """Results and scheduler state from pre-connection external source loads."""
-
-    results: tuple[LoadExecutionResult, ...]
-    completed_keys: frozenset[CompiledObjectKey]
-    failed_keys: frozenset[CompiledObjectKey]
 
 
 @dataclass(frozen=True)

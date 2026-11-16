@@ -335,3 +335,12 @@ pub(crate) struct GroupMemberRetryTestCase {
     /// The member events the group run's timeline shows, in order.
     pub(crate) expected_messages: &'static [&'static str],
 }
+
+pub(crate) struct RoundTripGroupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each member's jobs it waits for, as publication freezes them.
+    pub(crate) expected_waits: serde_json::Value,
+    /// The order the group launches its members in.
+    pub(crate) expected_order: &'static [&'static str],
+}

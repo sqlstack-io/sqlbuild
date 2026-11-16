@@ -12,7 +12,6 @@ use crate::bindings::_helpers::boundary::python_calls::{
 use crate::bindings::_helpers::compile_driver::config_validation::{
     ProjectConfiguration, reject_invalid_project_configuration,
 };
-use crate::bindings::_helpers::compile_driver::integration_loaders::integration_loader_functions;
 use crate::bindings::_helpers::compile_driver::stage_work::{PROJECT_DISCOVERIES, count_stage};
 use crate::bindings::_helpers::discovery::constants::{
     ALLOW_MISSING_SECRETS_ENV, ALLOW_MISSING_SECRETS_SETTING, TRUE_ENV_VALUES,
@@ -501,9 +500,7 @@ fn project_inputs<'py>(
         )?
         .into_any())
     };
-    let source_files: Bound<'py, PyAny> = declarations.get_item("source_files")?;
-    let integration_loaders: Bound<'py, PyAny> = integration_loader_functions(py, &source_files)?;
-    let loader_functions: Bound<'py, PyAny> = tuple_of("loaders")?.add(integration_loaders)?;
+    let loader_functions: Bound<'py, PyAny> = tuple_of("loaders")?;
     let mut fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
         ("project_config", project_config.clone()),
         ("local_config", local_config.clone()),

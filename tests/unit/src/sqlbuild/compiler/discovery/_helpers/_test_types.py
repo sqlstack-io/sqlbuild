@@ -616,19 +616,6 @@ class ParseSqlScenarioFileErrorTestCase:
 
 
 @dataclass(frozen=True)
-class ParseSourcesYamlDltTestCase:
-    description: str
-    contents: str
-    expected_source_names: tuple[str, ...]
-    expected_loaders: tuple[str, ...]
-    expected_kind: str
-    expected_dlt_names: tuple[str, ...]
-    expected_schemas: tuple[str | None, ...]
-    expected_destination_config: dict[str, object] = field(default_factory=dict)
-    expected_descriptions: tuple[str | None, ...] = ()
-
-
-@dataclass(frozen=True)
 class ParseSqlAuditFileTestCase:
     description: str
     contents: str
@@ -734,24 +721,6 @@ class ParseSourcesYamlErrorTestCase:
     description: str
     contents: str
     expected_error_fragment: str
-
-
-@dataclass(frozen=True)
-class ParseSourcesYamlHelpTestCase:
-    description: str
-    contents: str
-    expected_error_fragment: str
-    expected_help: str
-
-
-@dataclass(frozen=True)
-class ParseSourcesYamlIngestrTestCase:
-    description: str
-    contents: str
-    expected_loader: str
-    expected_kind: str
-    expected_primary_key: tuple[str, ...]
-    expected_extra_args: tuple[str, ...]
 
 
 @dataclass(frozen=True)

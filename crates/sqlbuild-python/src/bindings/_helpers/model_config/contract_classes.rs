@@ -3,7 +3,7 @@
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods};
-use sqlbuild_host::entries::models::{FacadeHost, ThirdPartyHost};
+use sqlbuild_host::entries::models::FacadeHost;
 
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::record_class;
@@ -24,7 +24,7 @@ const CONTRACT_CLASSES: [(&str, RecordId); 6] = [
         RecordId::MeasurementThresholdBound,
     ),
 ];
-const YAML_ENTRY_CLASSES: [(&str, RecordId); 10] = [
+const YAML_ENTRY_CLASSES: [(&str, RecordId); 9] = [
     ("schema_seed_entry", RecordId::SchemaSeedEntry),
     ("seed_csv_settings", RecordId::SeedCsvSettings),
     ("source_entry", RecordId::SourceEntry),
@@ -33,10 +33,6 @@ const YAML_ENTRY_CLASSES: [(&str, RecordId); 10] = [
     (
         "source_freshness_age_policy",
         RecordId::SourceFreshnessAgePolicy,
-    ),
-    (
-        "integration_loader_config",
-        RecordId::IntegrationLoaderConfig,
     ),
     ("source_write_strategy", RecordId::SourceWriteStrategy),
     (
@@ -48,12 +44,6 @@ const YAML_ENTRY_CLASSES: [(&str, RecordId); 10] = [
         RecordId::SourceFreshnessValueKind,
     ),
 ];
-const INTEGRATION_ENTRY_CLASSES: [(&str, ThirdPartyHost); 3] = [
-    ("ingestr_source_config", ThirdPartyHost::IngestrSourceConfig),
-    ("dlt_source_config", ThirdPartyHost::DltSourceConfig),
-    ("dlt_resource_config", ThirdPartyHost::DltResourceConfig),
-];
-
 static CONTRACT_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
 static YAML_ENTRY_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
 
@@ -92,9 +82,6 @@ fn built_yaml_entry_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     classes.set_item("contracts", contract_classes(py)?)?;
     for (key, class) in YAML_ENTRY_CLASSES {
         classes.set_item(key, record_class(py, class)?)?;
-    }
-    for (key, class) in INTEGRATION_ENTRY_CLASSES {
-        classes.set_item(key, host::entry(py, class)?)?;
     }
     Ok(classes)
 }

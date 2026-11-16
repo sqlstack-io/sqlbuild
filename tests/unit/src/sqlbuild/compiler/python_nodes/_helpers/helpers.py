@@ -24,7 +24,6 @@ from sqlbuild._native import (
     DiscoveredProjectInputs,
     DiscoveredSourceFile,
     DiscoveredTaskFunction,
-    LoaderConnectionMode,
     LocalConfig,
     ProjectConfig,
     ProjectGraph,
@@ -96,24 +95,6 @@ def notify_orders(_ctx: object, slack_provider: SlackProvider) -> None:
 
 def check_loaded_orders(_ctx: object) -> bool:
     return True
-
-
-def build_external_loader_python_node_graph() -> PythonNodeGraph:
-    return build_python_node_graph(
-        discovered_inputs=DiscoveredProjectInputs(
-            project_config=ProjectConfig(name="demo", adapter="duckdb"),
-            local_config=LocalConfig(),
-            loader_functions=(
-                DiscoveredLoaderFunction(
-                    file_path=Path("/project/loaders/events.py"),
-                    relative_path=Path("python/loaders/events.py"),
-                    name="load_events",
-                    function=load_events,
-                    connection_mode=LoaderConnectionMode.EXTERNAL,
-                ),
-            ),
-        )
-    )
 
 
 def build_terminal_loader_python_node_graph() -> PythonNodeGraph:
@@ -484,7 +465,6 @@ def build_python_node_graph_for_case(case_name: str) -> PythonNodeGraph:
             "intermediate_loader_check_dependency": (
                 build_intermediate_loader_check_dependency_python_node_graph
             ),
-            "external_loader": build_external_loader_python_node_graph,
             "orders": build_orders_python_node_graph,
         }
     )

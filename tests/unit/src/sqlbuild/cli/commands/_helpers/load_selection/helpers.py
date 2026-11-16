@@ -8,7 +8,6 @@ from sqlbuild._native import (
     DiscoveredLoaderFunction,
     DiscoveredProjectInputs,
     DiscoveredSourceFile,
-    IntegrationLoaderConfig,
     LocalConfig,
     ProjectConfig,
     SourceEntry,
@@ -24,10 +23,6 @@ def refresh_orders(_ctx: object) -> list[dict[str, object]]:
 
 
 def load_raw_orders(_ctx: object) -> list[dict[str, object]]:
-    return []
-
-
-def ingestr_raw_orders(_ctx: object) -> list[dict[str, object]]:
     return []
 
 
@@ -64,37 +59,6 @@ def build_load_selection_inputs() -> DiscoveredProjectInputs:
                 name="load_raw_orders",
                 function=load_raw_orders,
                 depends_on=(fetch_orders,),
-            ),
-        ),
-    )
-
-
-def build_integration_load_selection_inputs() -> DiscoveredProjectInputs:
-    """Build load-selection inputs with a terminal integration loader."""
-
-    return DiscoveredProjectInputs(
-        project_config=ProjectConfig(name="demo", adapter="duckdb"),
-        local_config=LocalConfig(),
-        source_files=(
-            DiscoveredSourceFile(
-                file_path=Path("sources/raw.yml"),
-                relative_path=Path("sources/raw.yml"),
-                contents="",
-                source_entries=(
-                    SourceEntry(
-                        name="raw_orders",
-                        loader="ingestr__raw_orders",
-                        integration_loader=IntegrationLoaderConfig(kind="ingestr", config=object()),
-                    ),
-                ),
-            ),
-        ),
-        loader_functions=(
-            DiscoveredLoaderFunction(
-                file_path=Path("sources/raw.yml"),
-                relative_path=Path("sources/raw.yml"),
-                name="ingestr__raw_orders",
-                function=ingestr_raw_orders,
             ),
         ),
     )

@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.assets import asset
 from sqlbuild.observability import LifecycleEvent
+from sqlbuild.tasks import task
 
 
 def operation_events(events: list[LifecycleEvent]) -> tuple[LifecycleEvent, ...]:
@@ -75,3 +77,23 @@ class CountingLoaderContextTestAdapter(LoaderContextTestAdapter):
     def connect(self, config: dict[str, object]) -> object:
         self.connection_count += 1
         return super().connect(config)
+
+
+@task
+def score_orders(ctx: object) -> object:
+    """A task a loader may read through `ctx.result_of`, never `ctx.loader`."""
+
+    return ctx
+
+
+@asset
+def scored_orders_export(ctx: object) -> object:
+    """An asset a loader may read through `ctx.result_of`, never `ctx.loader`."""
+
+    return ctx
+
+
+def plain_function(ctx: object) -> object:
+    """A function that is no Python node."""
+
+    return ctx

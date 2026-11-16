@@ -210,7 +210,6 @@ crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	FutureCursorAct
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	GrantKind.name
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	HardCodedRelationOwnerKind.name
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	InferredNullability.name
-crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	LoaderConnectionMode.name
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	MaterializationType.name
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	MicrobatchLimitAction.name
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	MissingMigrationOriginPolicy.name

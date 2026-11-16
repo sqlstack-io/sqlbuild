@@ -398,16 +398,6 @@ rule = 4
 note = "Documented orchestrator integration and rule 4 Rivers glue: translator invocation and AssetDef construction; the asset projection of the DAG artifact is native."
 
 [[stays]]
-path = "integrations/dlt"
-rule = 4
-note = "Loader runtime that runs inside user loaders and calls the dlt destination factories; synthetic loader record building, naming and adapter-config to destination mapping are native (dlt_destination_arguments)."
-
-[[stays]]
-path = "integrations/ingestr"
-rule = 1
-note = "Loader runtime that runs the ingestr subprocess inside the executor load phase; synthetic loader record building, naming, destination URIs and command lines are native."
-
-[[stays]]
 path = "integrations/dbt/_helpers/profile/load.py"
 rule = 4
 note = "Rule 4: PyYAML glue only; parses dbt_project.yml and profiles.yml with yaml.safe_load and reports YAMLError as DbtProfileError. Existence, mapping, field and target validation and output selection are native (dbt_interop/profile_load.rs)."
@@ -710,7 +700,7 @@ note = "Shape rule: data enums and aliases only (ExecutionResourceKind, Connecti
 [[stays]]
 path = "errors/contracts/exceptions.py"
 rule = 1
-note = "Shape rule: data exceptions only (SharedInputError, ExecutorInputError), no logic; consumed by executor/audit_results/_helpers/sql.py, executor/build/_helpers/external_source_loads.py, executor/build/_helpers/retention.py and 53 more."
+note = "Shape rule: data exceptions only (SharedInputError, ExecutorInputError), no logic; consumed by executor/audit_results/_helpers/sql.py, executor/build/_helpers/retention.py, executor/build/classes/build_scheduler.py and 52 more."
 
 [[stays]]
 path = "compiler/fingerprints/constants.py"

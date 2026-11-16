@@ -23,10 +23,8 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
 WAREHOUSE_AND_INTEGRATION_MODULES: tuple[str, ...] = (
     "dagster",
     "databricks",
-    "dlt",
     "duckdb",
     "google.cloud.bigquery",
-    "ingestr",
     "jinja2",
     "psycopg",
     "pyarrow",

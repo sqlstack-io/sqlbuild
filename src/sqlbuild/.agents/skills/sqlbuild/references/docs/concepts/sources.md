@@ -128,13 +128,6 @@ Managed sources support incremental write strategies (`table`, `append`, `delete
 
 See [Loaders](python-nodes/loaders.md) for the full guide on writing loader functions, write strategies, the loader context API, and auto-load behavior during builds.
 
-### Declarative integrations (no Python)
-
-For common ingestion you can declare the source entirely in YAML, with no `@loader` function. SQLBuild generates the loader for you and runs it during the build:
-
-- [dlt](../integrations/dlt.md) - declare `dlt_sources` for `rest_api`, `sql_database`, and `filesystem` sources.
-- [ingestr](../integrations/ingestr.md) - add an `ingestr` block to a source to pull from 50+ sources.
-
 ## Source freshness
 
 Source freshness lets SQLBuild observe whether a source's data changed between runs. This feeds into
@@ -294,11 +287,10 @@ without building.
 | `audits` | Source-level audits |
 | `meta` | Free-form metadata mapping |
 | `load_batch_size` | Positive row batch size for managed loaders |
-| `ingestr` | Declarative ingestr loader config (see [ingestr](../integrations/ingestr.md)) |
 
-A sources file contains only `sources` and `dlt_sources`. Unknown keys in a sources file, a source,
-a source column, `freshness`, `freshness.age_policy`, or `ingestr` fail discovery with `D006`,
-naming the key and suggesting the nearest supported key.
+A sources file contains only `sources`. Unknown keys in a sources file, a source, a source column,
+`freshness`, or `freshness.age_policy` fail discovery with `D006`, naming the key and suggesting the
+nearest supported key.
 
 ## YAML that SQLBuild reads
 

@@ -22,6 +22,8 @@ mod test_group_admission;
 mod test_group_dependencies;
 #[path = "test_group_retries.rs"]
 mod test_group_retries;
+#[path = "test_group_round_trips.rs"]
+mod test_group_round_trips;
 #[path = "test_groups.rs"]
 mod test_groups;
 #[path = "test_job_detail.rs"]

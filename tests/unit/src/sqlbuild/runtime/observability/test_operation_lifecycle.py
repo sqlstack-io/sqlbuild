@@ -319,7 +319,7 @@ def test_given_failing_subscriber_when_operation_runs_then_exact_result_is_prese
 
     with invocation_scope("inv-subscriber"), dispatcher_scope(dispatcher):
         result: object = OperationLifecycle(
-            operation_kind="loader", operation_name="external_source_load"
+            operation_kind="loader", operation_name="managed_source_load"
         ).run(lambda: expected)
 
     assert result is expected

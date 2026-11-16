@@ -288,7 +288,6 @@ fn source_load_text(entry: &Bound<'_, PyAny>) -> PyResult<SourceLoadPlanText> {
             "value",
         )?)?,
         is_reload: native_field(entry, "is_reload")?.is_truthy()?,
-        integration_kind: optional_text(&native_field(entry, "integration_kind")?)?,
         write_strategy: if strategy.is_none() {
             None
         } else {

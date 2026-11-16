@@ -343,7 +343,6 @@ pub struct SourceLoadPlanText {
     /// `ExecutionResourceKind` value; only `loader` and `source` loads are listed.
     pub resource_kind: String,
     pub is_reload: bool,
-    pub integration_kind: Option<String>,
     pub write_strategy: Option<String>,
     pub cursor_column: Option<String>,
     pub unique_key: Vec<String>,

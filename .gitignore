@@ -56,7 +56,6 @@ target/
 *.so
 *.pyd
 *.dylib
-.dlt/
 .amp/portals/*
 /.env
 

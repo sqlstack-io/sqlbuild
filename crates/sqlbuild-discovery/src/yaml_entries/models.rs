@@ -71,61 +71,6 @@ pub struct ParsedFreshness<N> {
     pub age_policy: Option<ParsedAgePolicy<N>>,
 }
 
-/// A source-level `ingestr` loader; key lists hold Python's stripped strings.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ParsedIngestrConfig<N> {
-    pub source_uri: N,
-    pub source_table: N,
-    pub strategy: Option<N>,
-    pub incremental_key: Option<N>,
-    pub primary_key: Vec<String>,
-    pub columns: Option<N>,
-    pub extra_args: Vec<String>,
-}
-
-/// One dlt resource as `DltResourceConfig` stores it.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ParsedDltResource<N> {
-    pub name: N,
-    pub dlt_name: N,
-    pub schema: Option<N>,
-    /// The resource entries the loader passes to dlt, in authored order.
-    pub raw_config: Vec<(N, N)>,
-    pub write_disposition: Option<N>,
-    pub primary_key: Option<N>,
-    pub merge_key: Option<N>,
-    pub incremental: Option<N>,
-}
-
-/// A dlt source group's settings shared by the source entry of each resource.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ParsedDltSource<N> {
-    pub source_type: N,
-    pub schema: Option<N>,
-    pub config: N,
-    /// The destination mapping, or `None` for Python's empty default.
-    pub destination: Option<N>,
-    pub resource: ParsedDltResource<N>,
-    pub group_index: usize,
-}
-
-/// The declarative integration loader a source is managed by.
-#[derive(Clone, Debug, PartialEq)]
-pub enum ParsedIntegrationLoader<N> {
-    Ingestr(ParsedIngestrConfig<N>),
-    Dlt(Box<ParsedDltSource<N>>),
-}
-
-impl<N> ParsedIntegrationLoader<N> {
-    /// The loader kind `IntegrationLoaderConfig` records.
-    pub fn kind(&self) -> &'static str {
-        match self {
-            Self::Ingestr(_) => "ingestr",
-            Self::Dlt(_) => "dlt",
-        }
-    }
-}
-
 /// One source declaration of a `sources/*.yml` file.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParsedSourceEntry<N> {
@@ -137,7 +82,6 @@ pub struct ParsedSourceEntry<N> {
     pub read_final: bool,
     pub loader: Option<String>,
     pub managed: bool,
-    pub integration_loader: Option<ParsedIntegrationLoader<N>>,
     pub freshness: Option<ParsedFreshness<N>>,
     /// `append`, `delete_insert`, `merge` or `table`.
     pub write_strategy: Option<&'static str>,
@@ -165,7 +109,6 @@ impl<N> ParsedSourceEntry<N> {
             read_final: false,
             loader: None,
             managed: false,
-            integration_loader: None,
             freshness: None,
             write_strategy: None,
             load_batch_size: None,

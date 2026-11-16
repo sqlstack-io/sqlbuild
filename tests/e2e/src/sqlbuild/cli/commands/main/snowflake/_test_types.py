@@ -2,14 +2,6 @@ from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
-class SnowflakeDltE2ETestCase:
-    description: str
-    expected_loaded_rows: tuple[tuple[object, ...], ...]
-    expected_model_rows: tuple[tuple[object, ...], ...]
-    expected_return_code: int = 0
-
-
-@dataclass(frozen=True)
 class SnowflakeCliTestCase:
     description: str
     command: tuple[str, ...]

@@ -423,15 +423,6 @@ pub enum ThirdPartyHost {
     LoadDbtYaml,
     RenderSelectedDbtProfileOutput,
     DbtProfileError,
-    DltIntegrationKind,
-    DltIntegrationError,
-    DltLoaderFunction,
-    DltResourceConfig,
-    DltSourceConfig,
-    IngestrIntegrationKind,
-    IngestrIntegrationError,
-    IngestrLoaderFunction,
-    IngestrSourceConfig,
     RiversAssetNodeKinds,
 }
 

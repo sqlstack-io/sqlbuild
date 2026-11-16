@@ -433,3 +433,14 @@ pub(crate) async fn seed_logged_runs(
         claim_logged_run(store, scope, &lease, position as u128 + 1).await;
     }
 }
+
+/// A published snapshot node of `kind` with only its `definition`.
+pub(crate) fn snapshot_node(kind: &str, definition: serde_json::Value) -> SnapshotNode {
+    SnapshotNode {
+        kind: kind.into(),
+        definition,
+        raw_sql: None,
+        compiled_sql: None,
+        python_source: None,
+    }
+}
