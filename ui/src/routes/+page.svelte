@@ -21,6 +21,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { catalogNodes, useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { folderCatalogHref, folderSelections } from '$lib/selection/folders';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
@@ -32,6 +33,8 @@
 	import OverviewCost from './overview-cost.svelte';
 
 	const catalog = useCatalogNodes();
+	/** Each top-level folder as a selection, for the folder rows' links to the catalog. */
+	const folderSelection = $derived(folderSelections(catalog.data ?? []));
 	// Reads again when the shared listing changes, which node status changes update; until it is held
 	// the overview waits for it rather than listing every node a second time.
 	const overview = createResource((client, scope) => {
@@ -254,7 +257,7 @@
 					<div class="groups">
 						<div class="group-row head"><span>Folder</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
 						{#each folders.rows as g (g.group)}
-							<a class="group-row" href={to(`/catalog?group=${encodeURIComponent(g.group)}`)} title="Open {g.group} in the catalog">
+							<a class="group-row" href={to(folderCatalogHref(folderSelection.get(g.group) ?? ''))} title="Open {g.group} in the catalog">
 								<span>{g.group}</span>
 								<span class="group-bar" title="{g.current} of {g.total} current">
 									<i class="fresh" style:width="{(g.current / g.total) * 100}%"></i>
