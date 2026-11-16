@@ -75,7 +75,7 @@ Which rows it deletes depends on the model's settings:
 | Settings | Rows deleted before the insert |
 |----------|--------------------------------|
 | `cursor` | Rows whose cursor falls in the replay window |
-| `unique_key` | Rows whose key appears in the delta |
+| `unique_key` | Rows whose key appears in the delta. The key must hold one row per value; for groups of rows per value, use `replace_key` |
 | `replace_key` | Rows whose `replace_key` values appear in the delta |
 | `cursor` and `unique_key` or `replace_key` | Rows in the replay window, and rows whose key appears in the delta |
 | `incremental_mode microbatch` | Rows in the batch's window; a `unique_key` only matches rows in diff and review |

@@ -105,7 +105,7 @@ dlt_sources:
 | `endpoint` | Endpoint mapping (`rest_api` only). Required for that type. |
 | `reader` | File reader: `csv`, `jsonl`, or `parquet` (`filesystem` only). Required for that type. |
 | `write_disposition` | dlt write disposition: `replace`, `append`, or `merge`. `merge` requires `primary_key`. |
-| `primary_key` / `merge_key` | dlt keys for `merge`. |
+| `primary_key` / `merge_key` | dlt keys for `merge`. A `merge_key` replaces every row whose key value arrives, like a SQL model's `delete_insert` with [`replace_key`](../concepts/incremental.md#delete_insert). |
 | `incremental` | dlt incremental config mapping (e.g. cursor column and start value). |
 | `schema` | Per-resource schema override (falls back to the group `schema`). |
 
