@@ -1,7 +1,8 @@
 //! Person reads of run nodes and their errors, node run history, catalog nodes, jobs and one job's declaration, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
@@ -18,6 +19,9 @@ use crate::declarations::main::read_person_providers::read_person_providers;
 use crate::declarations::models::{
     JobDetailRecord, JobRecord, PersonTriggerChange, PersonTriggerRecord, ProvidersRead,
 };
+use crate::node_states::main::list_person_catalog_nodes::list_person_catalog_nodes;
+use crate::node_states::main::read_person_node_states::read_person_node_states;
+use crate::node_states::models::{CachedJson, NodeStateCache, NodeStatesRecord};
 use crate::platform::main::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::read_person_problems::read_person_problems;
@@ -46,7 +50,6 @@ use crate::warehouse_history::main::read_person_run_output::read_person_run_outp
 use crate::warehouse_history::main::read_person_run_statement_sql::read_person_run_statement_sql;
 use crate::warehouse_history::main::read_person_run_statements::read_person_run_statements;
 use crate::warehouse_history::models::{CostSummaryRecord, NodeCostRecord};
-use crate::warehouse_metadata::main::person_reads::list_person_catalog_nodes::list_person_catalog_nodes;
 use crate::warehouse_metadata::models::{CatalogNodeRecord, WarehouseResourceCostRecord};
 
 /// Default and largest cost window, in days.
@@ -76,25 +79,75 @@ pub(crate) async fn run_nodes(
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/nodes", operation_id = "listPersonCatalogNodes",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)),
-    responses((status = 200, body = Vec<CatalogNodeRecord>, description = "Every node of the current snapshot; empty before the first publication"),
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("If-None-Match" = Option<String>, Header, description = "An ETag from an earlier response; 304 when the snapshot and state version are unchanged")),
+    responses((status = 200, body = Vec<CatalogNodeRecord>, description = "Every node of the current snapshot; empty before the first publication",
+            headers(("ETag" = String, description = "\"<snapshot_id>:<state_version>\"; absent before the first publication"))),
+        (status = 304, description = "Unchanged since the If-None-Match ETag", headers(("ETag" = String))),
         (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn nodes(
-    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Extension(cache), Extension(context)): (Extension<NodeStateCache>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target)), headers): (Path<(Uuid, String)>, HeaderMap),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Response, ApiError> {
+    let listing = list_person_catalog_nodes(
+        &cache,
+        (&context, principal),
+        (location_id, &target),
+        default_role,
+    )
+    .await?;
+    Ok(cached_json(listing, &headers))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/node-states", operation_id = "readPersonNodeStates",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = NodeStatesRecord, description = "Every current node's state at the state version node_status events continue from"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn node_states(
+    (Extension(cache), Extension(context)): (Extension<NodeStateCache>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
     Path((location_id, target)): Path<(Uuid, String)>,
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
-) -> Result<Json<Vec<CatalogNodeRecord>>, ApiError> {
-    Ok(Json(
-        list_person_catalog_nodes(
-            &store,
-            (&context, principal),
-            (location_id, &target),
-            default_role,
+) -> Result<Response, ApiError> {
+    let states = read_person_node_states(
+        &cache,
+        (&context, principal),
+        (location_id, &target),
+        default_role,
+    )
+    .await?;
+    Ok(cached_json(states, &HeaderMap::new()))
+}
+
+/// A held JSON body, or 304 when the request already names its ETag.
+fn cached_json(json: CachedJson, headers: &HeaderMap) -> Response {
+    let etag = json.etag.and_then(|etag| HeaderValue::from_str(&etag).ok());
+    let unchanged = etag.as_ref().is_some_and(|etag| {
+        headers
+            .get_all(header::IF_NONE_MATCH)
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .flat_map(|value| value.split(','))
+            .map(|tag| tag.trim().trim_start_matches("W/"))
+            .any(|tag| tag == "*" || etag.as_bytes() == tag.as_bytes())
+    });
+    let mut response = if unchanged {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        (
+            [(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))],
+            json.body,
         )
-        .await?,
-    ))
+            .into_response()
+    };
+    if let Some(etag) = etag {
+        response.headers_mut().insert(header::ETAG, etag);
+    }
+    response
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs", operation_id = "listPersonNodeRuns",

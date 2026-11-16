@@ -18,13 +18,33 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::warehouse_metadata::main::{
     ingest::ingest_catalog::ingest_catalog, ingest::ingest_fingerprints::ingest_fingerprints,
     ingest::ingest_source_freshness::ingest_source_freshness,
-    person_reads::list_person_catalog_nodes::list_person_catalog_nodes,
     person_reads::read_person_node_status::read_person_node_status,
 };
-use crate::warehouse_metadata::models::{MetadataBatch, NodeStatusQuery};
+use crate::warehouse_metadata::models::{CatalogNodeRecord, MetadataBatch, NodeStatusQuery};
 
 /// Statements a catalog listing issues besides one build read per 100 nodes: 8 fixed, 1 per extra namespace shape.
 const WIDE_LISTING_FIXED_STATEMENTS: usize = 9;
+
+/// A new server's node list, so every listing reads the store.
+async fn list_person_catalog_nodes(
+    store: &ControlStore,
+    credentials: (&AuditContext, Uuid),
+    scope: (Uuid, &str),
+    default_role: DefaultRole,
+) -> Result<Vec<CatalogNodeRecord>, ControlError> {
+    let (cache, _) = crate::node_states::main::start_node_states::start_node_states(
+        store,
+        &tokio::sync::broadcast::channel(1).0,
+    );
+    let listing = crate::node_states::main::list_person_catalog_nodes::list_person_catalog_nodes(
+        &cache,
+        credentials,
+        scope,
+        default_role,
+    )
+    .await?;
+    Ok(serde_json::from_slice(&listing.body).expect("node list JSON"))
+}
 
 pub(crate) async fn node_status_reads(
     store: &ControlStore,

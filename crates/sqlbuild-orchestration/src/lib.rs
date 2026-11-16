@@ -7,6 +7,7 @@ pub mod api;
 pub mod authorization;
 pub mod credentials;
 pub mod declarations;
+pub mod node_states;
 pub mod platform;
 pub mod runs;
 pub mod scheduler;

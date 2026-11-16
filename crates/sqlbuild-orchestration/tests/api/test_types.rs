@@ -79,6 +79,18 @@ pub(crate) struct PersonLiveTestCase {
     pub(crate) expected_disabled_bootstrap: reqwest::StatusCode,
 }
 
+pub(crate) struct NodeStatesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_listed: usize,
+}
+
+pub(crate) struct PushedStatesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) built: usize,
+    pub(crate) expected_pushed: Option<usize>,
+}
+
 pub(crate) struct ChangesTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

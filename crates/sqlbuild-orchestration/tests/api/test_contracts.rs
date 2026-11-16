@@ -64,6 +64,8 @@ mod test_location_work;
 mod test_maintenance;
 #[path = "test_microbatch_coverage.rs"]
 mod test_microbatch_coverage;
+#[path = "test_node_states.rs"]
+mod test_node_states;
 #[path = "test_oidc.rs"]
 mod test_oidc;
 #[path = "test_oidc_groups.rs"]

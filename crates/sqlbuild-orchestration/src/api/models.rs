@@ -30,6 +30,7 @@ use crate::api::_helpers::resources::{
     person_operations::acknowledgements,
     person_reads::run_nodes,
     person_reads::nodes,
+    person_reads::node_states,
     person_reads::node_runs,
     person_reads::run_events,
     person_reads::run_statements,
@@ -238,6 +239,18 @@ pub struct ControlBootstrap {
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ChangeNotice {
     pub topic: String,
+    /// `node_status` only: the state version after this change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<u64>,
+    /// `node_status` only: the version this change applies to; refetch node states when it is not yours.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_version: Option<u64>,
+    /// `node_status` only: the nodes whose state changed, absent when `full` is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub states: Option<std::collections::BTreeMap<String, crate::node_states::models::NodeState>>,
+    /// `node_status` only: too many nodes or a new snapshot changed; refetch node states.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full: Option<bool>,
 }
 
 /// Explicit local development scope; never enabled by ordinary server startup.
@@ -496,6 +509,8 @@ pub(crate) struct ChangeStream {
     pub(crate) target: String,
     pub(crate) target_hash: String,
     pub(crate) receiver: tokio::sync::broadcast::Receiver<crate::store::models::ChangeMessage>,
+    pub(crate) updates:
+        tokio::sync::broadcast::Receiver<crate::node_states::models::NodeStatusUpdate>,
     pub(crate) stopped: tokio::sync::watch::Receiver<bool>,
     pub(crate) keepalive: tokio::time::Interval,
     pub(crate) initial: bool,

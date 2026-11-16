@@ -12,6 +12,7 @@ use crate::api::_helpers::resources::{changes, router::router};
 use crate::api::main::openapi_document::openapi_document;
 use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, GroupRole, ServerFacts};
 use crate::authorization::main::publish_group_roles::publish_group_roles;
+use crate::node_states::main::start_node_states::start_node_states;
 use crate::runs::types::RunHandoff;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -33,12 +34,14 @@ pub async fn serve_api(
     prepare_store(&store, &group_roles).await?;
     let (sender, listener_changes) = subscribe_changes(&store).await?;
     let (stop, stopped) = tokio::sync::watch::channel(false);
+    let (node_states, refresh_node_states) = start_node_states(&store, &sender);
     let feed = ChangeFeed {
         sender: sender.clone(),
         stopped,
     };
     let application = router(&store, feed.clone())
         .merge(authentication_routes.layer(Extension(feed)))
+        .layer(Extension(node_states))
         .layer(Extension(std::sync::Arc::new(images)))
         .layer(Extension(planner))
         .layer(Extension(facts.statistics))
@@ -61,6 +64,7 @@ pub async fn serve_api(
     tokio::select! {
         result = async { server.await } => { result?; Ok(()) },
         result = changes::relay(store.clone(), listener_changes, sender) => result,
+        () = refresh_node_states => Ok(()),
     }
 }
 
