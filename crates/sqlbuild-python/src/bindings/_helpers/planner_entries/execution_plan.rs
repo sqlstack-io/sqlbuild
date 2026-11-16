@@ -3,7 +3,6 @@
 use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::build_command::support::utc_now;
 use crate::bindings::_helpers::planner_changes::actions::resolve_model_actions;
 use crate::bindings::_helpers::planner_changes::detect::detect_changes;
 use crate::bindings::_helpers::planner_entries::test_planning::{
@@ -42,6 +41,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_command::main::utc_now::utc_now;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;

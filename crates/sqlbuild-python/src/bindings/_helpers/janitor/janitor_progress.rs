@@ -15,10 +15,9 @@ use sqlbuild_core::janitor_text::main::janitor_phase_start_text::janitor_phase_s
 use sqlbuild_core::janitor_text::main::render_janitor_item_line::render_janitor_item_line;
 use sqlbuild_core::janitor_text::models::{JanitorItemText, JanitorPhase, JanitorPlanText};
 
-use crate::bindings::_helpers::build_progress::terminal::tty_flag;
-use crate::bindings::_helpers::build_progress::transient_status::{
-    TransientStatusReporter, progress_spinners_disabled,
-};
+use sqlbuild_python_base::build_progress::main::terminal::tty_flag::tty_flag;
+use sqlbuild_python_base::build_progress::main::transient_status::progress_spinners_disabled::progress_spinners_disabled;
+use sqlbuild_python_base::build_progress::models::TransientStatusReporter;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The running phase's start text, size, finished count, column width and start time.

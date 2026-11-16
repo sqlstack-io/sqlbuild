@@ -15,7 +15,7 @@ use sqlbuild_discovery::orchestration_files::models::{
 use sqlbuild_orchestration::scheduler::main::parse_cron::parse_cron;
 use sqlbuild_orchestration::store::errors::ControlError;
 
-use crate::bindings::_helpers::native_host::orchestration_declarations::run_resources;
+use sqlbuild_python_base::orchestration_reads::main::run_resources::run_resources;
 
 /// A `D017` at `position` of `path`, worded as discovery words its own.
 type ValueError = (FilePosition, String);

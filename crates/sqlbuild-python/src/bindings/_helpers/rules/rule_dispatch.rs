@@ -16,8 +16,6 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::cache::native_store::current_code_identity;
-use crate::bindings::_helpers::compile_driver::stage_work::count_stage;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::rules::catalogue::{
     resolved_ignore_selectors, rule_catalogue, select_rules,
@@ -48,6 +46,8 @@ use crate::bindings::_helpers::rules::sql_rules::run_planned_sql_rules;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::cache::main::current_code_identity::current_code_identity;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field;

@@ -12,6 +12,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::identifier_text::main::is_lowercase_identifier::is_lowercase_identifier;
 use sqlbuild_host::entries::models::{FacadeHost, UserCodeHost};
 use sqlbuild_model_config::header_metadata::main::json_meta_problem::json_meta_problem;
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -37,10 +38,7 @@ const HOOK_READS_INVALID: &str =
 
 /// `SharedInputError(message)`.
 fn shared_input_error(py: Python<'_>, message: &str) -> PyErr {
-    match host_entry(py, FacadeHost::SharedInputError).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    host_error(py, FacadeHost::SharedInputError, message)
 }
 
 /// `value < bound` under Python's comparison.

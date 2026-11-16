@@ -24,7 +24,6 @@ pub(crate) mod python_plan_entries;
 pub(crate) mod registration;
 pub(crate) mod relation_targets;
 pub(crate) mod selection_phases;
-pub(crate) mod stage_work;
 pub(crate) mod static_context;
 pub(crate) mod target_defaults;
 pub(crate) mod targets;

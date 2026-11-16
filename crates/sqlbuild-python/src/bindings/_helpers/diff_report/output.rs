@@ -10,11 +10,11 @@ use sqlbuild_cli::diff_report::models::{
 };
 
 use crate::bindings::_helpers::diff_report::facts::{diff_facts, json_of};
-use crate::bindings::_helpers::frontier::encoder::emit_error;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use sqlbuild_cli::diff_report::types::PhaseSeconds;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::frontier::main::emit_error::emit_error;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DEFAULT_MAX_VALUE_LENGTH: usize = 160;

@@ -10,7 +10,7 @@ use crate::bindings::_helpers::compile_attachment::effective_config::{
     build_effective_connection, build_effective_settings, build_effective_vars,
 };
 use crate::bindings::_helpers::compile_attachment::model_inputs::build_model_inputs;
-use crate::bindings::_helpers::compile_context::diagnostic_collector::collect_compile_diagnostics;
+use sqlbuild_python_base::compile_context::main::diagnostic_collector::collect_compile_diagnostics::collect_compile_diagnostics;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::records::{compile_inputs_view, inputs_with};
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;

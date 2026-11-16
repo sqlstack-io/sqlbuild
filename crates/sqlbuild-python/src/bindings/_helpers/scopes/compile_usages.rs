@@ -19,7 +19,7 @@ use sqlbuild_scopes::scope_index::models::{
     DeclarationKind, DeclaredScope, ResourceIdentity, ResourceKind, ScopeKind,
 };
 
-use crate::bindings::_helpers::compile_context::diagnostic_collector::report_compile_diagnostic;
+use sqlbuild_python_base::compile_context::main::diagnostic_collector::report_compile_diagnostic::report_compile_diagnostic;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

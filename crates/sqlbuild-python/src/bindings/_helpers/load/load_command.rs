@@ -1,5 +1,6 @@
 //! `sqb load`: run the selected source loaders and report each load.
 
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::time::Instant;
 
 use pyo3::prelude::{
@@ -19,7 +20,6 @@ use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
-use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_runtime_config;
@@ -36,18 +36,18 @@ use crate::bindings::_helpers::load::load_progress::{
 use crate::bindings::_helpers::load::load_selection::{
     LoadProject, LoaderDefaults, loader_defaults, loader_write_schemas, target_vars,
 };
-use crate::bindings::_helpers::native_host::connections::connection_failure;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use crate::bindings::_helpers::result_output::documents::format_load_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
+use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -182,10 +182,7 @@ fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Inv
 }
 
 fn user_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::CliUser).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::CliUser, &message)
 }
 
 fn target_name<'py>(source: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {

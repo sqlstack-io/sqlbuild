@@ -9,9 +9,9 @@ use sqlbuild_scopes::relationship_names::models::{
 };
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::cache::sql_test_scan_store::SqlTestScanStore;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::cache::models::SqlTestScanStore;
 use sqlbuild_python_base::types::CompilerDetach;
 
 /// A test file's relative path and each block's name, SQL and mode.

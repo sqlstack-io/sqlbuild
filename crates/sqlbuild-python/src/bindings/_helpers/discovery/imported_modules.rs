@@ -3,16 +3,16 @@
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::discovery::locations::project_relative_path;
 use crate::bindings::_helpers::discovery::python_module_files::discover_python_module_files;
-use crate::bindings::_helpers::event_exporting::scope::current_scope;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::event_exporting::main::current_scope::current_scope;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -113,9 +113,7 @@ pub(crate) fn discovered<'py>(
 
 /// `sqlbuild._native.<class_name>(message)`.
 pub(crate) fn discovery_error(py: Python<'_>, class_name: ErrorId, message: String) -> PyErr {
-    error_class(py, class_name)
-        .and_then(|class| class.call1((message,)))
-        .map_or_else(|error| error, PyErr::from_value)
+    new_plain_error(py, class_name, &message)
 }
 
 /// `discovery_error` raised from `cause`.

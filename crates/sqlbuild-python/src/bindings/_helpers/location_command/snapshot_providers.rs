@@ -10,9 +10,9 @@ use crate::bindings::_helpers::compiled_project::snapshot_boundary::relative_pat
 use crate::bindings::_helpers::location_command::constants::{
     MODEL_NODE_KIND, SNAPSHOT_HIDDEN_SETTING, SOURCE_NODE_KIND,
 };
-use crate::bindings::_helpers::native_host::provider_settings::{
-    missing_secrets, provider_class_settings, setting_rows,
-};
+use sqlbuild_python_base::orchestration_reads::main::missing_secrets::missing_secrets;
+use sqlbuild_python_base::orchestration_reads::main::provider_class_settings::provider_class_settings;
+use sqlbuild_python_base::orchestration_reads::main::setting_rows::setting_rows;
 use sqlbuild_python_base::records::main::fields::field::field;
 
 /// How a consumer's code runs inside other snapshot nodes, besides its own node.

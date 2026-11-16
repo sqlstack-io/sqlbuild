@@ -12,7 +12,7 @@ use sqlbuild_analysis::manifest::models::{
 };
 use sqlbuild_analysis::python_values::models::PythonValue;
 
-use crate::bindings::_helpers::python_values::values::python_value;
+use sqlbuild_python_base::python_values::main::python_value::python_value;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;

@@ -5,6 +5,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 
 use sqlbuild_model_config::templates::main::deferred_target_segments::deferred_target_segments;
 use sqlbuild_model_config::templates::models::DeferredSegment;
@@ -12,7 +13,6 @@ use sqlbuild_model_config::templates::models::DeferredSegment;
 use crate::bindings::_helpers::authored_values::project_vars::render_project_var_text;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -176,10 +176,7 @@ fn target_field<'py>(
 
 /// A `PlannerInputError` with `message` and the default code.
 fn planner_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::PlannerInput).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::PlannerInput, &message)
 }
 
 /// Validate and resolve the deferred target config.

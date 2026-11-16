@@ -19,11 +19,11 @@ use sqlbuild_cli::dispatch::models::{CommandFacts, CommandFailure, InvocationPol
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost};
 use sqlbuild_orchestration::runs::models::RunOutcome;
 
-use crate::bindings::_helpers::build_progress::transient_lines::shared_transient_line_coordinator;
+use sqlbuild_python_base::build_progress::main::transient_lines::shared_transient_line_coordinator::shared_transient_line_coordinator;
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
 use crate::bindings::_helpers::cli::dispatch::{command_facts, dispatch_command};
 use crate::bindings::_helpers::cli::failure_cause::take_failure_cause;
-use crate::bindings::_helpers::cli::launch_state::offer_launch_record;
+use sqlbuild_python_base::cli::main::offer_launch_record::offer_launch_record;
 use crate::bindings::_helpers::cli::machine_output::take_machine_output_written;
 use crate::bindings::_helpers::cli::observability::{
     CliObservabilityScope, cli_observability_scope,
@@ -36,9 +36,10 @@ use crate::bindings::_helpers::compile_command::constants::COMPILE_COMMAND_NAME;
 use crate::bindings::_helpers::compile_command::report::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
 use crate::bindings::_helpers::diff_report::output::render_diff_error_json;
-use crate::bindings::_helpers::native_host::interrupt::{InterruptHandler, interrupted};
+use sqlbuild_python_base::native_host::models::InterruptHandler;
+use sqlbuild_python_base::native_host::main::interrupted::interrupted;
 use crate::bindings::_helpers::output_capture::records::invocation_context;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::constants::{JSON_FORMAT, RECALL_SETTINGS_CODE};
 use crate::bindings::_helpers::recall::events::escaped_text;

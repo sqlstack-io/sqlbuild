@@ -7,7 +7,6 @@ use sqlbuild_analysis::review_command::constants::UNKNOWN_REVIEW_DATABASE_CODE;
 use sqlbuild_analysis::review_command::main::review_schema_name::review_schema_name;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::build_command::support::{boolean, none, text};
 use crate::bindings::_helpers::command_runtime::connection::resolve_target_connection_config;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::janitor::janitor_keys::utc_datetime;
@@ -15,6 +14,9 @@ use crate::bindings::_helpers::review_command::planning::{ReviewProject, ReviewS
 use crate::bindings::_helpers::review_command::support::review_error;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::build_command::main::boolean::boolean;
+use sqlbuild_python_base::build_command::main::none::none;
+use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

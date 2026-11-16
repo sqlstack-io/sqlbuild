@@ -9,6 +9,7 @@ use sqlbuild_cli::compute_logs::models::{
     CaptureCompletion, CaptureDocument, CaptureInstant, InventoryEntry,
 };
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -35,10 +36,7 @@ fn exception_class(kind: ComputeLogErrorKind) -> ExecutorHost {
 
 /// The Python exception for a storage rejection of `kind`.
 pub(crate) fn rejection(py: Python<'_>, kind: ComputeLogErrorKind, message: &str) -> PyErr {
-    match host_entry(py, exception_class(kind)).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    host_error(py, exception_class(kind), message)
 }
 
 /// The Python exception a native storage failure raises.

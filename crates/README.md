@@ -28,7 +28,7 @@ tested and benchmarked with `cargo test` alone.
 | `sqlbuild-refactor` | Native rename/move plans, contract-adoption edits, MODEL/SCHEMA/YAML text edits and atomic staging/commit with rollback. Shared scope placement delegates to the native scope implementation; user Python source inspection remains at the Python AST boundary. |
 | `sqlbuild-project` | The compiled project as plain Rust: `CompiledProject` with the producers' facts and each resource's records (model inputs and schemas, compiled models and their analysis, sources, functions, audits and seeds), and what those records answer without Python, such as lineage rows, resolved namespaces and dependency keys. Values the host owns, such as user config and discovered files, and the views it builds lazily live in one slot per record, whose types `sqlbuild-python` supplies through the `ProjectHost` trait; reads that need Python stay in the bindings as extension traits. |
 | `sqlbuild-cli` | The `sqb` and `sqlbuild` executables: `--version`, unchanged compiles replayed from the shared reuse store with Python's exact streams, exit code and compute log capture, and a handoff of every other invocation to the installed `sqlbuild-python` script. Built as its own wheel (`crates/sqlbuild-cli/pyproject.toml`). |
-| `sqlbuild-python-base` | The base of the PyO3 bindings: native record, enum and error classes with their specs, registration, construction and field reads; keyword calls, imports, conversions and panics at the Python boundary; host entry calls; and the process allocator. |
+| `sqlbuild-python-base` | The base of the PyO3 bindings: native record, enum and error classes with their specs, registration, construction and field reads; keyword calls, imports, conversions and panics at the Python boundary; host entry calls; the process allocator; and the shared runtime the binding modules build on: the native store, compile context, diagnostics, progress and terminal text, warehouse access and orchestration reads. |
 | `sqlbuild-python` | The `_native` module: its Python classes and functions and the conversions from Python objects, on top of `sqlbuild-python-base`. |
 
 ## Layering
@@ -67,7 +67,7 @@ entry carries a version other than its manifest's.
 `main/` entry points, `models.rs`, `types.rs` and `constants.rs`, not through `_helpers/`.
 
 Inside `sqlbuild-python`, the custom rule XSB075 orders the `bindings/_helpers` modules in layers
-that follow the planned crate split: shared Python plumbing (`infra`, part of which is already
+that follow the planned crate split: shared Python plumbing (`infra`, which is almost all in
 `sqlbuild-python-base`, which Cargo keeps below every other layer), then the glue of the lower
 crates (`front`), the compiled project (`project`), planning and compilation as siblings (`plan`,
 `compile`), command output (`output`), command handlers (`commands`) and registration
@@ -89,7 +89,7 @@ empty: every import points down, and a new upward import fails the check.
 - module paths are never built at runtime: a `format!` or `concat!` template may not start with
   `sqlbuild.` or with a `{..PACKAGE..}.`/`{..MODULE..}.` constant. Write the complete module
   path as a constant instead;
-- every row of the host table (`bindings/_helpers/native_host/`) must resolve as an attribute of
+- every row of the host table (`entries` in `sqlbuild-host`) must resolve as an attribute of
   `sqlbuild._native_host`.
 
 Staying-Python entry points (adapter, user code, executor and runtime, third-party and public

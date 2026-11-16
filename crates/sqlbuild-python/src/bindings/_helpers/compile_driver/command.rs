@@ -15,7 +15,6 @@ use sqlbuild_rules::custom_host_pool::constants::{
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::compile_command::models::CompileReuseAttempt;
 use crate::bindings::_helpers::compile_command::report::{
     format_compile_json_with_notice, format_compile_text,
@@ -27,13 +26,11 @@ use crate::bindings::_helpers::compile_command::reuse_recording::{
 use crate::bindings::_helpers::compile_command::target_writer::{
     remove_failed_compile, write_rule_failed_models,
 };
-use crate::bindings::_helpers::compile_context::input_reads::record_compile_input_reads;
 use crate::bindings::_helpers::compile_driver::analysis::analyze;
 use crate::bindings::_helpers::compile_driver::phases::{
     elapsed_ms, manifest_payload, monotonic, resolved_dag_path, sql_test_planning_diagnostics,
     target_dir, write_artifacts, write_dag_artifact,
 };
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::rules::results::format_skipped_type_proof_rules;
 use crate::bindings::_helpers::rules::rules_config::rules_config_of;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -41,6 +38,9 @@ use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::Status;
+use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
+use sqlbuild_python_base::compile_context::main::input_reads::record_compile_input_reads::record_compile_input_reads;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -278,8 +278,8 @@ pub(crate) fn compile_phases<'py>(
     let skip_write: bool = native_field(request, "profile_flags")?
         .getattr("skip_write")?
         .is_truthy()?;
-    let staging: bool =
-        !skip_write && crate::bindings::_helpers::compile_context::delta::injection().is_none();
+    let staging: bool = !skip_write
+        && sqlbuild_python_base::compile_context::main::delta::injection::injection().is_none();
     let (outcome, input_reads, artifact_writes): (
         CommandOutcome<'py>,
         Bound<'py, PyAny>,

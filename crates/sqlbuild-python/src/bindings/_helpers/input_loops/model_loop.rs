@@ -31,7 +31,6 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::cache::native_parse_store::NativeParseStore;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AttachedSqlTests;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditSettings;
@@ -111,6 +110,7 @@ use crate::bindings::_helpers::sqltext::static_sql::{
 };
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::cache::models::NativeParseStore;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::types::CompilerDetach;
 

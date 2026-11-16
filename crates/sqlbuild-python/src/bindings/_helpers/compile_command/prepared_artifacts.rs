@@ -14,14 +14,13 @@ use crate::bindings::_helpers::compile_command::target_writer::{
 use crate::bindings::_helpers::compile_command::target_writer::{
     Prepared, planning_diagnostics, publish_staged_target, staging_changed, write_static_target,
 };
-use crate::bindings::_helpers::compile_driver::stage_work::{
-    BACKGROUND_SQL_TEST_PLANS, count_stage,
-};
 use crate::bindings::_helpers::compile_outputs::artifacts::staged_artifact_files;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::compile_driver::constants::BACKGROUND_SQL_TEST_PLANS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MIN_PREPARED_ARTIFACT_MODELS: usize = 128;

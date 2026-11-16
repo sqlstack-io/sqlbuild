@@ -4,11 +4,12 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
-use crate::bindings::_helpers::event_exporting::models::{
-    BoundEventExporter, EventExportSummary, EventExporterAccounting, EventExporterCounts,
-    EventExporterFailure,
-};
-use crate::bindings::_helpers::event_exporting::scope::EventExporterCommandScope;
+use sqlbuild_python_base::event_exporting::models::BoundEventExporter;
+use sqlbuild_python_base::event_exporting::models::EventExportSummary;
+use sqlbuild_python_base::event_exporting::models::EventExporterAccounting;
+use sqlbuild_python_base::event_exporting::models::EventExporterCommandScope;
+use sqlbuild_python_base::event_exporting::models::EventExporterCounts;
+use sqlbuild_python_base::event_exporting::models::EventExporterFailure;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 

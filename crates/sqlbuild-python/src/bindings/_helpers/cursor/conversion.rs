@@ -1,5 +1,6 @@
 //! One call's cursor values read from and built as the native cursor value records.
 
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 use std::cell::RefCell;
 
 use pyo3::IntoPyObject;
@@ -20,7 +21,6 @@ use crate::bindings::_helpers::cursor::values::{
 };
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
@@ -39,10 +39,7 @@ pub(crate) const GRAIN_NAMES: [(&str, Grain); 6] = [
 
 /// `CursorAlgebraError(message)`.
 pub(crate) fn algebra_error(py: Python<'_>, message: &str) -> PyErr {
-    match host_entry(py, FacadeHost::CursorAlgebraError).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    host_error(py, FacadeHost::CursorAlgebraError, message)
 }
 
 /// The cursor values one native call reads, so unchanged inputs come back as the same objects.

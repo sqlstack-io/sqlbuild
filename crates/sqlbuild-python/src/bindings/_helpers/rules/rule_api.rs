@@ -1,5 +1,6 @@
 //! Custom-rule API decisions: finding positions, harness option TOML and project-tree paths.
 
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::path::{Path, PathBuf};
 
 use pyo3::exceptions::PyAttributeError;
@@ -28,10 +29,7 @@ const DEFAULT_POSITION: i64 = 1;
 
 /// `RuleUsageError(message)`.
 fn usage_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::RuleUsage).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::RuleUsage, &message)
 }
 
 /// `RuleUsageError(prefix + str(value))`, keeping the value's text exactly as Python spells it.

@@ -11,9 +11,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::build_command::defer_clone::run_defer_clone_boundary_prephase;
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::policies::{enforce_plan_policies, model_limit};
-use crate::bindings::_helpers::build_command::support::{
-    boolean, emit, joined, keyword_relay, none,
-};
 use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspection;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
@@ -21,6 +18,11 @@ use crate::bindings::_helpers::manifest::builder::build_manifest;
 use crate::bindings::_helpers::plan_output::plan_text::format_plan;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::build_command::main::boolean::boolean;
+use sqlbuild_python_base::build_command::main::emit::emit;
+use sqlbuild_python_base::build_command::main::joined::joined;
+use sqlbuild_python_base::build_command::main::keyword_relay::keyword_relay;
+use sqlbuild_python_base::build_command::main::none::none;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
