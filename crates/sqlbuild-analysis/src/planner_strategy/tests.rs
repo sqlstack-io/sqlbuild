@@ -1,3 +1,5 @@
+#[path = "tests/test_group_key_note.rs"]
+mod group_key_note;
 #[path = "tests/helpers.rs"]
 mod helpers;
 #[path = "tests/test_model_entry.rs"]
