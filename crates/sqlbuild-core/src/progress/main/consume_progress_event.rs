@@ -46,8 +46,7 @@ pub fn consume_progress_event(
         let line: Option<String> = statement_heartbeat_line(&projection, event);
         (projection, line)
     } else if event_type == STATEMENT_COMPLETED || event_type == STATEMENT_FAILED {
-        count_statement(&mut projection, event);
-        consume_statement_terminal(projection, event)
+        consume_statement_terminal(count_statement(projection, event), event)
     } else {
         (projection, None)
     };

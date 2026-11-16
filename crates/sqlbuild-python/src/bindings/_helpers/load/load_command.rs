@@ -21,9 +21,10 @@ use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::compile_attachment::target::effective_target_namespace;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compile_driver::targets::{TargetSettingsValues, target_settings};
+use crate::bindings::_helpers::compile_driver::targets::{
+    TargetSettingsValues, selected_target_settings,
+};
 use crate::bindings::_helpers::load::load_progress::{
     LoadCallbackRelay, LoadProgressReporter, load_result_text,
 };
@@ -82,30 +83,6 @@ struct Preparation<'py> {
     provider_session: Bound<'py, PyAny>,
     project_relations: Bound<'py, PyAny>,
     target_config: TargetSettingsValues,
-}
-
-/// The selected target's settings, with its database and schema resolved as `sqb debug` resolves them.
-fn selected_target_settings<'py>(
-    (discovered, selected_target): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    adapter_name: &str,
-    (connection, effective_vars, adapter): (
-        &Bound<'py, PyAny>,
-        &Bound<'py, PyAny>,
-        &Bound<'py, PyAny>,
-    ),
-) -> PyResult<TargetSettingsValues> {
-    let namespace: Bound<'py, PyTuple> = effective_target_namespace(
-        (discovered, selected_target),
-        (adapter_name, connection, adapter),
-    )?;
-    target_settings(
-        (discovered, &namespace.get_item(0)?),
-        (
-            namespace.get_item(2)?.extract()?,
-            namespace.get_item(3)?.extract()?,
-        ),
-        (connection, effective_vars, adapter),
-    )
 }
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
@@ -381,17 +358,20 @@ fn prepare<'py>(
     } else {
         new_record(py, RecordId::CursorOverrides, (), None)?
     };
-    let provider_session: Bound<'py, PyAny> = call_with(
-        &host_entry(py, UserCodeHost::BuildProviderSession)?,
-        &[(
-            "discovered_providers",
-            native_field(discovered, "providers")?,
-        )],
-    )?;
     let target_config: TargetSettingsValues = selected_target_settings(
         (discovered, &native_field(request, "selected_target")?),
         &adapter_name.extract::<String>()?,
         (&connection_config, &runtime.1, &adapter),
+    )?;
+    let provider_session: Bound<'py, PyAny> = call_with(
+        &host_entry(py, UserCodeHost::BuildProviderSession)?,
+        &[
+            (
+                "discovered_providers",
+                native_field(discovered, "providers")?,
+            ),
+            ("setup_context", target_config.setup_context(py)?),
+        ],
     )?;
     Ok(Preparation {
         target_config,

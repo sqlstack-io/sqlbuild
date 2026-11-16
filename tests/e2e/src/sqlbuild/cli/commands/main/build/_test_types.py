@@ -1642,3 +1642,13 @@ class PythonTargetConfigBuildE2ETestCase:
     project_target_lines: str
     local_target_lines: str
     expected_settings: dict[str, object]
+
+
+@dataclass(frozen=True)
+class CtxTargetSchemaE2ETestCase:
+    """Test case for commands under a target schema that resolves only inside a model."""
+
+    description: str
+    target_schema: str
+    expected_model_schema: str
+    expected_loader_schema: str | None

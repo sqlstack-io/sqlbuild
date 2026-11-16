@@ -685,10 +685,13 @@ pub(crate) fn run_check_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
     require_used_secrets(&discovered, &uses)?;
     let session: Bound<'_, PyAny> = call_with(
         &host_entry(py, UserCodeHost::BuildProviderSession)?,
-        &[(
-            "discovered_providers",
-            native_field(&invocation, "discovered_inputs")?.getattr("providers")?,
-        )],
+        &[
+            (
+                "discovered_providers",
+                native_field(&invocation, "discovered_inputs")?.getattr("providers")?,
+            ),
+            ("setup_context", prepared.target_config.setup_context(py)?),
+        ],
     )?;
     let outcome: PyResult<i32> = (|| {
         let results: Vec<Bound<'_, PyAny>> = execute(

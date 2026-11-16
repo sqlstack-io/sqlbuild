@@ -43,10 +43,10 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
+use crate::bindings::_helpers::native_host::statement_report::StatementReport;
 use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
-use crate::bindings::_helpers::result_output::statements::{StatementReport, StatementSource};
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use crate::bindings::_helpers::result_output::resource_ids::sql_test_identity;
 use crate::bindings::_helpers::sql_test_command::python_tests::{
@@ -678,26 +678,12 @@ fn complete(
     let style: CliStyle = CliStyle {
         use_color: invocation.getattr("use_color")?.is_truthy()?,
     };
-    stream.call_method1(
-        "write",
-        (render_test_completion(
-            (passed, results.len()),
-            &failures,
-            style,
-        ),),
-    )?;
-    let report: Option<StatementReport> = StatementReport::read(
-        py,
-        &StatementSource {
-            adapter_name: &invocation.getattr("adapter_name")?.extract::<String>()?,
-            adapter: &invocation.getattr("adapter")?,
-            connection_config: &invocation.getattr("connection_config")?,
-            started,
-        },
-    )?;
+    let report: Option<StatementReport> = StatementReport::of_invocation(invocation, started)?;
+    let mut completion: String = render_test_completion((passed, results.len()), &failures, style);
     if let Some(line) = report.as_ref().and_then(StatementReport::line) {
-        stream.call_method1("write", (format!("\n{line}\n"),))?;
+        completion.push_str(&format!("\n{line}\n"));
     }
+    stream.call_method1("write", (completion,))?;
     stream.call_method0("flush")?;
     let payload: String = with_since_section(test_execution_json(py, results)?, since_json)?;
     Ok((
@@ -914,7 +900,8 @@ fn run_sql_tests<'py>(
         &pipeline.getattr("plan_output")?,
         &results,
     )?;
-    let (code, payload): (i32, String) = complete(invocation, (&results, since_json.as_deref()), started)?;
+    let (code, payload): (i32, String) =
+        complete(invocation, (&results, since_json.as_deref()), started)?;
     Ok((code, python_tests, Some(payload)))
 }
 

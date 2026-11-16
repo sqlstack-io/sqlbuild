@@ -3,8 +3,7 @@
 use crate::cost_allocation::_helpers::history_function::query_history_function;
 use crate::cost_allocation::constants::QUERY_HISTORY_RESULT_LIMIT;
 
-/// One query-history read summing compile and execution milliseconds of `query_ids`, among
-/// queries that ended in the last `lookback_seconds`.
+/// One query-history read summing compile and execution milliseconds of `query_ids` that ended in the last `lookback_seconds`.
 #[must_use]
 pub fn statement_timings_sql(
     database: Option<&str>,

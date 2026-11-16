@@ -41,6 +41,22 @@ pub(crate) struct StatementReport {
 }
 
 impl StatementReport {
+    /// The report of a `sqb test` invocation's adapter and connection.
+    pub(crate) fn of_invocation(
+        invocation: &Bound<'_, PyAny>,
+        started: Instant,
+    ) -> PyResult<Option<Self>> {
+        Self::read(
+            invocation.py(),
+            &StatementSource {
+                adapter_name: &invocation.getattr("adapter_name")?.extract::<String>()?,
+                adapter: &invocation.getattr("adapter")?,
+                connection_config: &invocation.getattr("connection_config")?,
+                started,
+            },
+        )
+    }
+
     /// The report of the installed projector, or nothing when no projector is installed.
     pub(crate) fn read(py: Python<'_>, source: &StatementSource<'_, '_>) -> PyResult<Option<Self>> {
         let Some(projector) = current_projector(py)? else {
@@ -58,9 +74,8 @@ impl StatementReport {
 
     /// `payload` with the `statements` section added.
     pub(crate) fn with_section(&self, payload: &str) -> PyResult<String> {
-        let invalid = |error: serde_json::Error| {
-            pyo3::exceptions::PyValueError::new_err(error.to_string())
-        };
+        let invalid =
+            |error: serde_json::Error| pyo3::exceptions::PyValueError::new_err(error.to_string());
         let mut document: Value = serde_json::from_str(payload).map_err(invalid)?;
         if let Value::Object(fields) = &mut document {
             fields.insert(

@@ -171,6 +171,23 @@ class WarehouseClient(Provider):
 
 Both `setup` and `teardown` are optional. A provider with only field declarations and no lifecycle methods is valid; it acts as a validated configuration object.
 
+### The setup context
+
+In `sqb build`, `sqb check` and `sqb load`, `setup(ctx)` receives the active target's resolved settings as `ctx.target_config`, the same values Python nodes see (see [Target settings](overview.md#target-settings)):
+
+```python
+class PartnerStage(Provider):
+    """Stage for partner exports."""
+
+    def setup(self, ctx):
+        target = ctx.target_config
+        self.stage = f"{target.database}.{target.loader_schema}.partner_stage"
+```
+
+Details:
+
+- A provider first used by an event exporter or command output sink, or by an orchestration sensor or calendar, is set up with `ctx` set to `None`. Check for `None` when such a provider also reads the target.
+
 ## Configuration from environment variables
 
 Because `Provider` extends `pydantic-settings BaseSettings`, fields without defaults are read from environment variables. The environment variable name matches the field name in uppercase:

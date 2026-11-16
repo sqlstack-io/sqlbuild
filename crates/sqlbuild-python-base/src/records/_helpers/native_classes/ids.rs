@@ -398,6 +398,7 @@ native_id_names! {
         RecordId::Project => "Project",
         RecordId::ProjectConfig => "ProjectConfig",
         RecordId::ProjectPath => "ProjectPath",
+        RecordId::ProviderSetupContext => "ProviderSetupContext",
         RecordId::PythonHookEntry => "PythonHookEntry",
         RecordId::PythonIdentityDependency => "PythonIdentityDependency",
         RecordId::PythonIdentityStatus => "PythonIdentityStatus",

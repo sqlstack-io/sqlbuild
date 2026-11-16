@@ -661,6 +661,12 @@ class NativeSqlTestArtifact(NativeRecord):
     ) -> None: ...
     def __replace__(self, **changes: Any) -> NativeSqlTestArtifact: ...
 
+class ProviderSetupContext(NativeRecord):
+    """What a provider's setup receives: the active target's resolved settings."""
+
+    target_config: TargetSettings | None
+    def __init__(self, target_config: TargetSettings | None = ...) -> None: ...
+
 class RelationFixtureDiagnostic(NativeRecord):
     """One statically provable invalid fixture condition."""
 

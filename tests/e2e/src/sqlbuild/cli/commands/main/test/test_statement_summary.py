@@ -10,8 +10,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.scenario.helpers import (
     build_scenario_project_files,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
+    ScenarioStatementSummaryE2ETestCase,
     StatementSummaryE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import statement_summary_test_file
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
 _PROJECT_FILES: dict[str, str] = {
@@ -31,14 +33,6 @@ _PROJECT_FILES: dict[str, str] = {
         'SELECT order_id, amount * 2 AS doubled FROM __source("raw_orders")\n'
     ),
 }
-
-
-def _test_file(name: str, doubled: int) -> str:
-    return (
-        f'TEST (name "{name}");\n\nWITH\n'
-        "__source__raw_orders AS (\n  SELECT 1 AS order_id, 5 AS amount\n),\n"
-        f"__expected__orders AS (\n  SELECT 1 AS order_id, {doubled} AS doubled\n)\nSELECT 1\n"
-    )
 
 
 @pytest.mark.parametrize(
@@ -73,7 +67,9 @@ def test_given_sql_tests_when_running_then_statement_summary_counts_each_stateme
 ) -> None:
     files: dict[str, str] = dict(_PROJECT_FILES)
     for index, doubled in enumerate(test_case.expected_doubled):
-        files[f"tests/unit/test_orders_{index}.sql"] = _test_file(f"orders_{index}", doubled)
+        files[f"tests/unit/test_orders_{index}.sql"] = statement_summary_test_file(
+            f"orders_{index}", doubled
+        )
     project: Path = prepare_inline_project(
         tmp_path=tmp_path, project_name="statement_summary", repo_files=files
     )
@@ -94,8 +90,19 @@ def test_given_sql_tests_when_running_then_statement_summary_counts_each_stateme
     assert test_case.expected_line in json_run.stderr.splitlines(), json_run.stderr
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        ScenarioStatementSummaryE2ETestCase(
+            description="passing and failing scenarios report their statements",
+            expected_exit_code=1,
+            expected_kinds=frozenset({"CREATE", "DROP"}),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
 def test_given_scenarios_when_running_with_json_then_statement_summary_matches_progress_line(
-    tmp_path: Path,
+    tmp_path: Path, test_case: ScenarioStatementSummaryE2ETestCase
 ) -> None:
     project: Path = prepare_inline_project(
         tmp_path=tmp_path,
@@ -107,10 +114,11 @@ def test_given_scenarios_when_running_with_json_then_statement_summary_matches_p
         command=("--no-color", "scenario", "test", "--json"), project_dir=project
     )
 
-    assert result.returncode == 1, result.stderr
+    assert result.returncode == test_case.expected_exit_code, result.stderr
     statements: dict[str, object] = json.loads(result.stdout)["statements"]
     by_kind: dict[str, int] = statements["by_kind"]  # type: ignore[assignment]
-    assert statements["total"] == sum(by_kind.values()) and {"CREATE", "DROP"} <= set(by_kind)
+    assert statements["total"] == sum(by_kind.values()), statements
+    assert test_case.expected_kinds <= set(by_kind), statements
     assert statements["compile_time"] is None
     kinds: str = ", ".join(
         f"{kind} {count}"

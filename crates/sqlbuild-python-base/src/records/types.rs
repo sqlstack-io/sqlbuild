@@ -391,6 +391,7 @@ pub enum RecordId {
     Project,
     ProjectConfig,
     ProjectPath,
+    ProviderSetupContext,
     PythonHookEntry,
     PythonIdentityDependency,
     PythonIdentityStatus,

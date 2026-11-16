@@ -649,3 +649,12 @@ class StatementSummaryE2ETestCase:
     expected_exit_code: int
     expected_by_kind: Mapping[str, int]
     expected_line: str
+
+
+@dataclass(frozen=True)
+class ScenarioStatementSummaryE2ETestCase:
+    """A `sqb scenario test --json` run whose statement summary must match its progress line."""
+
+    description: str
+    expected_exit_code: int
+    expected_kinds: frozenset[str]

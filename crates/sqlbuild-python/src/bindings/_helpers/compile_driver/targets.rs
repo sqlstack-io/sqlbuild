@@ -6,7 +6,7 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{PyBool, PyDict, PyString, PyStringMethods};
+use pyo3::types::{PyBool, PyDict, PyString, PyStringMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_analysis::assembly::target_checks::constants::{
@@ -44,6 +44,8 @@ const DEFAULTS_HELP_PURPOSE: &str = "to set project-wide defaults";
 const NAMED_TARGET_HELP_PURPOSE: &str = "to build this target into that schema";
 use crate::bindings::_helpers::compile_attachment::target::resolved_target;
 use pyo3::IntoPyObjectExt;
+
+use crate::bindings::_helpers::compile_attachment::target::effective_target_namespace;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
@@ -450,9 +452,18 @@ impl TargetSettingsValues {
             ],
         )
     }
+
+    /// The `ctx` a provider's `setup` receives in a command with these settings.
+    pub(crate) fn setup_context<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        new_record_with(
+            py,
+            RecordId::ProviderSetupContext,
+            &[("target_config", self.record(py)?)],
+        )
+    }
 }
 
-/// The target `target_name` with its resolved `database` and `schema`, and the schema a managed source without its own loads into.
+/// The target `target_name` with its resolved locations; `loader_schema` is `None` when it resolves only inside a model, such as a `${CTX:...}` schema.
 pub(crate) fn target_settings<'py>(
     (discovered, target_name): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (database, schema): (Option<String>, Option<String>),
@@ -474,8 +485,6 @@ pub(crate) fn target_settings<'py>(
         )?
     };
     let none: Bound<'py, PyAny> = py.None().into_bound(py);
-    // A loader location that only resolves inside a model, such as a `${CTX:...}` target schema,
-    // has no value here; managed loads still resolve and report it themselves.
     let loader_schema: Option<String> = match managed_source_namespace(
         (none.clone(), none),
         (&target_config, connection, effective_vars),
@@ -491,6 +500,30 @@ pub(crate) fn target_settings<'py>(
         schema,
         loader_schema,
     })
+}
+
+/// The selected target's settings, with its database and schema resolved as `sqb debug` resolves them.
+pub(crate) fn selected_target_settings<'py>(
+    (discovered, selected_target): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    adapter_name: &str,
+    (connection, effective_vars, adapter): (
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+    ),
+) -> PyResult<TargetSettingsValues> {
+    let namespace: Bound<'py, PyTuple> = effective_target_namespace(
+        (discovered, selected_target),
+        (adapter_name, connection, adapter),
+    )?;
+    target_settings(
+        (discovered, &namespace.get_item(0)?),
+        (
+            namespace.get_item(2)?.extract()?,
+            namespace.get_item(3)?.extract()?,
+        ),
+        (connection, effective_vars, adapter),
+    )
 }
 
 /// `target_settings` of a compiled project's target.

@@ -13,6 +13,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     BuildE2ETestCase,
+    CtxTargetSchemaE2ETestCase,
     DeferCloneBuildE2ETestCase,
     DirectChangesOnlyBuildE2ETestCase,
     DirectPythonBuildHardeningE2ETestCase,
@@ -1867,30 +1868,41 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "[targets.dev]\n" + test_case.project_target_lines
             ),
             "python/recorder.py": _TARGET_CONFIG_RECORDER,
+            "providers/target_probe.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.providers import Provider\n\n"
+                "class TargetProbe(Provider):\n"
+                "    '''Test provider TargetProbe.'''\n\n"
+                "    def setup(self, ctx):\n"
+                "        record(ctx, 'provider')\n"
+            ),
             "python/tasks/configured.py": (
+                "from providers.target_probe import TargetProbe\n"
                 "from python.recorder import record\n"
                 "from sqlbuild.tasks import task\n\n"
                 "@task\n"
-                "def configured_task(ctx):\n"
+                "def configured_task(ctx, target_probe: TargetProbe):\n"
                 "    '''Test task configured_task.'''\n"
                 "    record(ctx, 'task')\n"
                 "    return ctx.result()\n"
             ),
             "python/loaders/raw.py": (
+                "from providers.target_probe import TargetProbe\n"
                 "from python.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
-                "def raw_orders(ctx):\n"
+                "def raw_orders(ctx, target_probe: TargetProbe):\n"
                 "    '''Test loader raw_orders.'''\n"
                 "    record(ctx, 'loader')\n"
                 "    return [{'order_id': 1}]\n"
             ),
             "python/checks/configured.py": (
+                "from providers.target_probe import TargetProbe\n"
                 "from python.recorder import record\n"
                 "from python.tasks.configured import configured_task\n"
                 "from sqlbuild.checks import check\n\n"
                 "@check(depends_on=configured_task)\n"
-                "def configured_check(ctx):\n"
+                "def configured_check(ctx, target_probe: TargetProbe):\n"
                 "    '''Test check configured_check.'''\n"
                 "    record(ctx, 'check')\n"
                 "    return ctx.pass_(message='recorded')\n"
@@ -1925,14 +1937,36 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
         json.loads(line)
         for line in (project_dir / "target_config.jsonl").read_text(encoding="utf-8").splitlines()
     ]
-    assert {str(line.pop("node")) for line in recorded} == {"task", "loader", "check"}
+    # Each command (build, load, check) sets the provider up once, before its first node runs.
+    assert [str(line.pop("node")) for line in recorded] == [
+        "provider",
+        "task",
+        "loader",
+        "check",
+        "provider",
+        "loader",
+        "provider",
+        "check",
+    ]
     assert all(line == test_case.expected_settings for line in recorded), recorded
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CtxTargetSchemaE2ETestCase(
+            description="a per-model schema has no loader location and fails no command",
+            target_schema="s_${CTX:model.name}",
+            expected_model_schema="s_orders",
+            expected_loader_schema=None,
+        )
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_loader_schema(
+    test_case: CtxTargetSchemaE2ETestCase,
     tmp_path: Path,
 ) -> None:
-    # A per-model schema has no single loader location outside a model; it must not fail commands.
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="ctx_target_project",
@@ -1944,7 +1978,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "[connection]\n"
                 'database = "ctx_target_project.duckdb"\n\n'
                 "[targets.dev]\n"
-                'schema = "s_${CTX:model.name}"\n'
+                f'schema = "{test_case.target_schema}"\n'
             ),
             "models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
             "python/recorder.py": _TARGET_CONFIG_RECORDER,
@@ -1978,14 +2012,16 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
     for result in results:
         assert result.returncode == 0, result.stdout + result.stderr
     db_path: Path = project_dir / "ctx_target_project.duckdb"
-    assert table_exists(db_path=db_path, table_name="orders", schema="s_orders")
+    assert table_exists(
+        db_path=db_path, table_name="orders", schema=test_case.expected_model_schema
+    )
     assert table_exists(db_path=db_path, table_name="raw_orders", schema="raw")
     recorded: list[dict[str, object]] = [
         json.loads(line)
         for line in (project_dir / "target_config.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert [(line["node"], line["name"], line["loader_schema"]) for line in recorded] == [
-        ("loader", "dev", None)
+        ("loader", "dev", test_case.expected_loader_schema)
     ], recorded
 
 

@@ -24,9 +24,9 @@ use crate::bindings::_helpers::change_selection::base_snapshot::{
 use crate::bindings::_helpers::change_selection::selection::{
     ChangedProject, changed_project, tests_and_models, with_since_section,
 };
+use crate::bindings::_helpers::native_host::statement_report::{StatementReport, StatementSource};
 use crate::bindings::_helpers::result_output::documents::format_scenario_execution_json_with;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
-use crate::bindings::_helpers::result_output::statements::{StatementReport, StatementSource};
 use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
 use crate::bindings::_helpers::scenario_command::presentation::{
     CompletionKind, RelayContext, SectionStatus, activity, begin_section, connection_hooks,
