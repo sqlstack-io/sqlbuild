@@ -155,7 +155,10 @@ describe('suggestions', () => {
 		const groups = suggest('+sta', VOCAB, [{ value: 'stg_stage', hint: 'models' }]);
 		expect(groups.map((g) => g.name)).toEqual(['Tags', 'Folders', 'Nodes']);
 		expect(groups[0].items[0]).toMatchObject({ insert: '+tag:staging', count: 9, complete: true });
-		expect(suggest('ta', VOCAB, [])[0].items[0]).toMatchObject({ insert: 'tag:', complete: false });
+		const ta = suggest('ta', VOCAB, []);
+		expect(ta[0].items[0]).toMatchObject({ insert: 'tag:', complete: false });
+		expect(ta[1]).toMatchObject({ name: 'Tags' });
+		expect(ta[1].items.map((i) => i.insert)).toEqual(['tag:finance', 'tag:staging', 'tag:daily']);
 	});
 
 	it('offers only that type’s values after a colon', () => {

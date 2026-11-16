@@ -67,7 +67,8 @@ export function popularTags(tags: readonly VocabularyEntry[], limit = 4): Vocabu
 /**
  * Suggestions for `typed`, the part in the input. A leading `+` stays on what is inserted. With
  * nothing typed: recent selections, the selector types and the popular tags; after `type:`, that
- * type's values; otherwise matching types, values of every type and node names.
+ * type's values; otherwise matching types, the values of a type whose name the fragment starts,
+ * matching values of every other type and node names.
  */
 export function suggest(typed: string, vocabulary: SelectionVocabulary | null, names: readonly NameEntry[], recent: readonly { select: string; count: number | null }[] = []): SuggestionGroup[] {
 	const plus = typed.startsWith('+') ? '+' : '';
@@ -95,8 +96,10 @@ export function suggest(typed: string, vocabulary: SelectionVocabulary | null, n
 	const q = rest.toLowerCase();
 	const types = SELECTOR_HINTS.filter((s) => s.type.startsWith(q));
 	if (types.length) groups.push({ name: 'Selectors', items: types.map((s) => ({ insert: `${plus}${s.type}:`, type: s.type, label: `${s.type}:`, hint: s.hint, complete: false })) });
-	for (const type of Object.keys(VALUES_OF)) {
-		const items = values(type, rest, MIXED_LIMIT);
+	// A fragment that starts a type's name, such as `tag`, lists that type's values first.
+	const named = Object.keys(VALUES_OF).filter((type) => type.startsWith(q));
+	for (const type of [...named, ...Object.keys(VALUES_OF).filter((type) => !named.includes(type))]) {
+		const items = named.includes(type) ? values(type, '', VALUE_LIMIT) : values(type, rest, MIXED_LIMIT);
 		if (items.length) groups.push({ name: GROUP_NAME[type], items, counts: true });
 	}
 	const nodes = firstMatches(names, rest, VALUE_LIMIT).map((n) => ({ insert: `${plus}${n.value}`, type: null, label: n.value, hint: n.hint, complete: true }));
