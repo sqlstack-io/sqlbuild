@@ -5,8 +5,8 @@ use std::time::Instant;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTypeMethods};
-use serde_json::Value;
 use sqlbuild_core::cost_allocation::main::statement_timings_sql::statement_timings_sql;
+use sqlbuild_core::json::main::with_section::with_section;
 use sqlbuild_core::progress::main::format_statement_summary::format_statement_summary;
 use sqlbuild_core::progress::main::statement_summary_json::statement_summary_json;
 use sqlbuild_core::progress::models::{StatementSummary, StatementTiming, StatementTimings};
@@ -74,19 +74,12 @@ impl StatementReport {
 
     /// `payload` with the `statements` section added.
     pub(crate) fn with_section(&self, payload: &str) -> PyResult<String> {
-        let invalid =
-            |error: serde_json::Error| pyo3::exceptions::PyValueError::new_err(error.to_string());
-        let mut document: Value = serde_json::from_str(payload).map_err(invalid)?;
-        if let Value::Object(fields) = &mut document {
-            fields.insert(
-                STATEMENTS_SECTION.to_owned(),
-                statement_summary_json(&self.summary, &self.timing),
-            );
-        }
-        Ok(format!(
-            "{}\n",
-            serde_json::to_string_pretty(&document).map_err(invalid)?
-        ))
+        with_section(
+            payload,
+            STATEMENTS_SECTION,
+            statement_summary_json(&self.summary, &self.timing),
+        )
+        .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))
     }
 }
 
