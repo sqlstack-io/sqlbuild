@@ -1,5 +1,6 @@
 //! dbt manifest loading, indexing and `__dbt_ref` resolution.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::collections::HashSet;
 
 use pyo3::prelude::{
@@ -21,7 +22,6 @@ use sqlbuild_config::dbt_manifest::models::{
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -32,15 +32,12 @@ const RELATION_OPTIONS: (&[&str], &[&str]) =
     (&["manifest", "ref_kind", "ref_name", "ref_package"], &[]);
 
 fn raised(py: Python<'_>, error: ManifestError) -> PyErr {
-    let created = || -> PyResult<PyErr> {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("code", error.code)?;
-        keywords.set_item("help", error.help)?;
-        let instance: Bound<'_, PyAny> =
-            error_class(py, ErrorId::CompileInput)?.call((error.message,), Some(&keywords))?;
-        Ok(PyErr::from_value(instance))
-    };
-    created().unwrap_or_else(|failure| failure)
+    new_error(
+        py,
+        ErrorId::CompileInput,
+        &error.message,
+        (Some(error.code), error.help.as_deref()),
+    )
 }
 
 fn text_value(value: Option<Bound<'_, PyAny>>) -> PyResult<Option<String>> {

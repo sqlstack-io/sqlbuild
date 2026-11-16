@@ -3,9 +3,7 @@
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
-use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDict, PyDictMethods, PyInt, PyString, PyTypeMethods,
-};
+use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyDictMethods, PyInt, PyTypeMethods};
 use sqlbuild_core::lifecycle_events::constants::INVOCATION_SEQUENCE_PROBLEM;
 use sqlbuild_core::lifecycle_events::main::diagnostic_severity_problem::diagnostic_severity_problem;
 use sqlbuild_core::lifecycle_events::main::diagnostic_version_problem::diagnostic_version_problem;
@@ -16,6 +14,7 @@ use sqlbuild_core::lifecycle_events::main::producer_version_problem::producer_ve
 use sqlbuild_core::lifecycle_events::main::publishable_hook_name::publishable_hook_name;
 use sqlbuild_core::lifecycle_events::main::run_bounds_problem::run_bounds_problem;
 use sqlbuild_core::lifecycle_events::models::{HookFacts, SequenceFact};
+use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 
 use crate::lifecycle_events::_helpers::payloads::validation_error;
 use crate::lifecycle_events::_helpers::validation::{
@@ -74,14 +73,6 @@ fn saturated(value: &Bound<'_, PyAny>) -> PyResult<i128> {
         Ok(number) => Ok(number),
         Err(_) if value.lt(0)? => Ok(i128::MIN),
         Err(_) => Ok(i128::MAX),
-    }
-}
-
-/// The text a value holds when it is a string.
-fn text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    match value.downcast::<PyString>() {
-        Ok(text) => Ok(Some(text.extract()?)),
-        Err(_) => Ok(None),
     }
 }
 
@@ -212,7 +203,7 @@ pub(crate) fn validated_operation_metadata<'py>(
         return Ok(result);
     }
     for key in metadata.try_iter()? {
-        if !operation_metadata_field(text(&key?)?.as_deref()) {
+        if !operation_metadata_field(optional_text(&key?)?.as_deref()) {
             return Err(validation_error(
                 py,
                 "operation metadata contains a non-allowlisted field",
@@ -234,7 +225,7 @@ pub(crate) fn validated_operation_metadata<'py>(
 
 /// Whether a hook name is publishable, raising like `re.fullmatch` for non-string names.
 fn hook_name_publishable(name: &Bound<'_, PyAny>) -> PyResult<bool> {
-    if let Some(name) = text(name)? {
+    if let Some(name) = optional_text(name)? {
         return Ok(publishable_hook_name(&name));
     }
     if name.is_instance_of::<PyBytes>() || name.is_instance_of::<PyByteArray>() {
@@ -265,8 +256,8 @@ pub(crate) fn validated_operation_hook_fields<'py>(
     if !supplied {
         return Ok(result);
     }
-    let phase: Option<String> = text(hook_phase)?;
-    let hook_type_text: Option<String> = text(hook_type)?;
+    let phase: Option<String> = optional_text(hook_phase)?;
+    let hook_type_text: Option<String> = optional_text(hook_type)?;
     let facts = HookFacts {
         phase: phase.as_deref(),
         hook_type: hook_type_text.as_deref(),
@@ -291,7 +282,10 @@ pub(crate) fn producer_check(
     producer: &Bound<'_, PyAny>,
     producer_version: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
-    match producer_version_problem(text(producer)?.as_deref(), !producer_version.is_none()) {
+    match producer_version_problem(
+        optional_text(producer)?.as_deref(),
+        !producer_version.is_none(),
+    ) {
         Some(problem) => Err(validation_error(producer.py(), problem)),
         None => Ok(()),
     }

@@ -43,22 +43,37 @@ pub(crate) fn error_class(py: Python<'_>, id: ErrorId) -> PyResult<Bound<'_, PyA
 
 /// The native `id` exception raised with `message`, or the error looking it up or raising it.
 pub(crate) fn new_plain_error(py: Python<'_>, id: ErrorId, message: &str) -> PyErr {
-    error_class(py, id)
-        .and_then(|class| class.call1((message,)))
-        .map_or_else(|error| error, PyErr::from_value)
+    new_error(py, id, message, (None, None))
 }
 
-/// A raisable native `id` error carrying `message` and the diagnostic `code`.
-pub(crate) fn new_error(py: Python<'_>, id: ErrorId, message: String, code: &str) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", code)?;
-        error_class(py, id)?.call((message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+/// The native `id` exception with `message` and the given `code` and `help`, or the error raising it.
+pub(crate) fn new_error(
+    py: Python<'_>,
+    id: ErrorId,
+    message: &str,
+    keywords: (Option<&str>, Option<&str>),
+) -> PyErr {
+    exception_from(error_class(py, id), message, keywords)
+}
+
+/// The exception `class` with `message` and the given `code` and `help`, or the error raising it.
+pub(crate) fn exception_from(
+    class: PyResult<Bound<'_, PyAny>>,
+    message: &str,
+    (code, help): (Option<&str>, Option<&str>),
+) -> PyErr {
+    class
+        .and_then(|class| {
+            let keywords: Bound<'_, PyDict> = PyDict::new(class.py());
+            if let Some(code) = code {
+                keywords.set_item("code", code)?;
+            }
+            if let Some(help) = help {
+                keywords.set_item("help", help)?;
+            }
+            class.call((message,), Some(&keywords))
+        })
+        .map_or_else(|error| error, PyErr::from_value)
 }
 
 /// A raisable native `id` error carrying `message`, with each `(name, value)` attribute set on it.
@@ -74,27 +89,6 @@ pub(crate) fn new_annotated_error(
             error.setattr(*name, value)?;
         }
         Ok::<_, PyErr>(error)
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
-}
-
-/// A raisable native `id` error carrying `message`, the diagnostic `code` and optional `help`.
-pub(crate) fn new_helped_error(
-    py: Python<'_>,
-    id: ErrorId,
-    (message, code): (String, &str),
-    help: Option<&str>,
-) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", code)?;
-        if let Some(help) = help {
-            options.set_item("help", help)?;
-        }
-        error_class(py, id)?.call((message,), Some(&options))
     })();
     match raised {
         Ok(error) => PyErr::from_value(error),

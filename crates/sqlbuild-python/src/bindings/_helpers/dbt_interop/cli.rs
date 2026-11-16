@@ -3,7 +3,7 @@
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
+use pyo3::types::{PyDict, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use serde_json::{Map, Value};
 use sqlbuild_core::dbt_cli::errors::DbtCliError;
@@ -17,12 +17,12 @@ use sqlbuild_core::dbt_cli::models::{
 };
 use sqlbuild_core::text::main::python_splitlines::python_splitlines;
 use sqlbuild_core::text::main::python_strip::python_strip;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -249,19 +249,7 @@ pub(crate) fn ls_nodes<'py>(py: Python<'py>, stdout: &str) -> PyResult<Bound<'py
 }
 
 pub(crate) fn raised(py: Python<'_>, class_name: ErrorId, error: DbtCliError) -> PyErr {
-    let created = || -> PyResult<PyErr> {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        if let Some(code) = error.code {
-            keywords.set_item("code", code)?;
-        }
-        if let Some(help) = error.help {
-            keywords.set_item("help", help)?;
-        }
-        let instance: Bound<'_, PyAny> =
-            error_class(py, class_name)?.call((error.message,), Some(&keywords))?;
-        Ok(PyErr::from_value(instance))
-    };
-    created().unwrap_or_else(|failure| failure)
+    new_error(py, class_name, &error.message, (error.code, error.help))
 }
 
 fn parsed_flags(parsed: &Bound<'_, PyAny>) -> PyResult<DbtParsedFlags> {

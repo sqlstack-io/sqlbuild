@@ -1,6 +1,7 @@
 //! `sqb check`: run the selected Python checks after their Python dependencies.
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
@@ -50,7 +51,6 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_com
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
@@ -77,15 +77,7 @@ struct Prepared<'py> {
 }
 
 fn user_error(py: Python<'_>, (code, message): (&str, &str)) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", code)?;
-        error_class(py, ErrorId::CliUser)?.call((message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(py, ErrorId::CliUser, message, (Some(code), None))
 }
 
 fn selection_error(py: Python<'_>, error: &CheckSelectionError) -> PyErr {

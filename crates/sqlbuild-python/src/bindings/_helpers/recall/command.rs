@@ -40,7 +40,7 @@ use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::types::ErrorId;
 
 fn user_error(py: Python<'_>, message: &str, code: &str) -> PyErr {
-    new_error(py, ErrorId::CliUser, message.to_owned(), code)
+    new_error(py, ErrorId::CliUser, message, (Some(code), None))
 }
 
 fn store_failure(py: Python<'_>, error: &StoreError) -> PyErr {

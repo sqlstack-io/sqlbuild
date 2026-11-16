@@ -1,5 +1,6 @@
 //! The combined dbt and SQLBuild graph, `sqb dbt` selector resolution and dbt selector terms.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
@@ -21,7 +22,6 @@ use sqlbuild_core::dbt_graph::types::DbtSelectorResolver;
 
 use crate::bindings::_helpers::dbt_interop::manifest::resolve_sqlbuild_model_dbt_refs;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
@@ -210,16 +210,12 @@ impl DbtSelectorResolver for PlannerResolver<'_> {
 fn selection_error(py: Python<'_>, error: DbtSelectionError<PyErr>) -> PyErr {
     match error {
         DbtSelectionError::Resolver(error) => error,
-        DbtSelectionError::PathSelector(message) => {
-            let raised = || -> PyResult<PyErr> {
-                let keywords: Bound<'_, PyDict> = PyDict::new(py);
-                keywords.set_item("code", PATH_SELECTOR_ERROR_CODE)?;
-                let error: Bound<'_, PyAny> = error_class(py, ErrorId::DbtInteropArgument)?
-                    .call((message,), Some(&keywords))?;
-                Ok(PyErr::from_value(error))
-            };
-            raised().unwrap_or_else(|failure| failure)
-        }
+        DbtSelectionError::PathSelector(message) => new_error(
+            py,
+            ErrorId::DbtInteropArgument,
+            &message,
+            (Some(PATH_SELECTOR_ERROR_CODE), None),
+        ),
     }
 }
 

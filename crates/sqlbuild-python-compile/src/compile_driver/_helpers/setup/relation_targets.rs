@@ -3,6 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PySet, PySetMethods, PyString};
 use sqlbuild_host::entries::models::{AdapterHost, UserCodeHost};
+use sqlbuild_python_base::records::main::construct::exception_from::exception_from;
 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -33,12 +34,11 @@ impl<'py> RefKinds<'py> {
 
 /// A `SharedInputError` with `message`.
 fn shared_error(py: Python<'_>, message: String) -> PyErr {
-    match imported(py, SHARED_EXCEPTIONS_MODULE, "SharedInputError")
-        .and_then(|class| class.call1((message,)))
-    {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    exception_from(
+        imported(py, SHARED_EXCEPTIONS_MODULE, "SharedInputError"),
+        &message,
+        (None, None),
+    )
 }
 
 /// The model, seed and Python source refs of a plan, as the frozenset Python builds.
