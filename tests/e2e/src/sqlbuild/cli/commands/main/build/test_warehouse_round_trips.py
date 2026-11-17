@@ -136,10 +136,24 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
             ),
             expected_scored_rows=((1, 10), (2, 20)),
         ),
+        ChangedRoundTripE2ETestCase(
+            description="--no-python leaves the task unrun and names the flag as the skip reason",
+            orders_sql=(
+                'MODEL (description "Orders to score", materialized table);\n\n'
+                "SELECT 1 AS order_id UNION ALL SELECT 2 UNION ALL SELECT 3\n"
+            ),
+            expected_output_fragments=(
+                "soft skip: Upstream task 'score_orders' did not run; --no-python skips "
+                "read-side tasks and assets",
+                "Completed successfully",
+            ),
+            expected_scored_rows=((1, 10), (2, 20)),
+            build_flags=("--no-python",),
+        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_built_round_trip_when_building_changed_then_the_decision_follows_the_chain(
+def test_given_a_built_round_trip_when_rebuilding_then_the_decision_follows_the_chain(
     tmp_path: Path,
     test_case: ChangedRoundTripE2ETestCase,
 ) -> None:
@@ -159,7 +173,7 @@ def test_given_a_built_round_trip_when_building_changed_then_the_decision_follow
     (project_dir / "models" / "orders.sql").write_text(test_case.orders_sql, encoding="utf-8")
 
     result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "build", "--changed"), project_dir=project_dir
+        command=("--no-color", "build", *test_case.build_flags), project_dir=project_dir
     )
 
     output: str = result.stdout + result.stderr
