@@ -14,7 +14,6 @@ use sqlbuild_core::scenario_command::models::ScenarioNamespace;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::ScenarioRunResult;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::scenario_command::conversions::{
     capture_row, scenario_result_row, write_local_runtime_target, write_warehouse_runtime_target,
 };
@@ -27,6 +26,7 @@ use sqlbuild_python_base::build_progress::main::transient_status::status_reporte
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 
 /// How a finished scenario is reported.
 #[derive(Clone, Debug)]

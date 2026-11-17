@@ -3,8 +3,6 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyBool;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
-use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -17,6 +15,8 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
+use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
 
 /// The project directory, discovered inputs, adapter context, colour and progress stream.
 struct InvocationContext<'py> {

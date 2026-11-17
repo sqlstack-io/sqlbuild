@@ -11,9 +11,6 @@ use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
 
-use crate::bindings::_helpers::build_progress::progress_reporters::{
-    ConnectionProgressReporter, PlanningProgressReporter,
-};
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::janitor::janitor_facts::Warehouse;
 use crate::bindings::_helpers::janitor::janitor_planning::{
@@ -29,6 +26,8 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
+use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
 
 const UNKNOWN_VIEW_CODE: &str = "C503";
 const UNKNOWN_VIEW_HELP: &str =

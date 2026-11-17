@@ -15,11 +15,6 @@ use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::lifecycle::{
     DirectPythonLifecycle, LifecycleInputs, prepare_direct_python_lifecycle,
 };
-use crate::bindings::_helpers::build_progress::build_callbacks::{
-    BuildProgressCallbacks, batch_complete_callback, check_callback,
-};
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
-use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::check::check_core::{
     build_check_relation_targets, load_results_by_loader_name, record_python_run_state_results,
     relevant_check_functions,
@@ -53,6 +48,11 @@ use sqlbuild_python_front::cost_context::models::CostContext;
 use sqlbuild_python_front::cursor::main::overrides::cursor_integer::cursor_integer;
 use sqlbuild_python_front::cursor::main::overrides::cursor_timestamp::cursor_timestamp;
 use sqlbuild_python_front::native_host::main::recorder_callbacks::recorder_callbacks;
+use sqlbuild_python_output::build_progress::main::batch_complete_callback::batch_complete_callback;
+use sqlbuild_python_output::build_progress::main::check_callback::check_callback;
+use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
+use sqlbuild_python_output::build_progress::models::BuildProgressCallbacks;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 use sqlbuild_python_planner::consumption::main::changed_policy::changed_policy;
 use sqlbuild_python_planner::consumption::main::held_back_text::held_back_text;
 use sqlbuild_python_planner::consumption::main::policy_line::policy_line;
