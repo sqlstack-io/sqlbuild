@@ -5,12 +5,12 @@ use crate::compile_driver::_helpers::setup::targets::DEFAULTS_SECTION;
 use crate::compile_driver::_helpers::setup::targets::ignored_connection_note;
 use crate::compile_driver::_helpers::setup::targets::planner_error;
 use crate::compile_driver::_helpers::setup::targets::project_setting_help;
-use crate::compile_driver::_helpers::setup::targets::text_or_none;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use sqlbuild_analysis::assembly::target_checks::constants::MANAGED_WRITE_SCHEMA_CODE;
 use sqlbuild_analysis::assembly::target_checks::errors::TargetError;
 use sqlbuild_analysis::assembly::target_checks::main::explicit_write_schema::explicit_write_schema;
 use sqlbuild_analysis::assembly::target_checks::main::target_error_message::target_error_message;
+use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 
 /// Raise when neither the resource nor the project names a physical write schema.
 pub fn managed_write_schema(
@@ -18,7 +18,8 @@ pub fn managed_write_schema(
     schema: &Bound<'_, PyAny>,
     (project_schema, ignored): (Option<&str>, Option<&str>),
 ) -> PyResult<()> {
-    if explicit_write_schema(text_or_none(schema)?.as_deref()).is_some() || project_schema.is_some()
+    if explicit_write_schema(optional_text(schema)?.as_deref()).is_some()
+        || project_schema.is_some()
     {
         return Ok(());
     }

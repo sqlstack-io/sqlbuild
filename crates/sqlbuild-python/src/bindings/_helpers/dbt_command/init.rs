@@ -3,38 +3,31 @@
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::dbt_command::constants::DBT_PROJECT_FILE;
 use sqlbuild_core::dbt_command::main::render_dbt_init_preview::render_dbt_init_preview;
 use sqlbuild_core::dbt_command::main::render_dbt_init_summary::render_dbt_init_summary;
 use sqlbuild_core::dbt_command::models::DbtInitSummary;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use crate::bindings::_helpers::build_progress::progress_reporters::DbtInitProgressReporter;
 use crate::bindings::_helpers::dbt_command::init_project::build_dbt_init_project;
 use crate::bindings::_helpers::dbt_command::init_project::validate_dbt_init_project;
 use crate::bindings::_helpers::dbt_command::support::{color_enabled, flag, path, stream};
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 
 fn missing_project(py: Python<'_>) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", "C242")?;
-        error_class(py, ErrorId::CliUser)?.call(
-            ("sqb dbt init requires --project-dir pointing at a dbt project",),
-            Some(&options),
-        )
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        ErrorId::CliUser,
+        "sqb dbt init requires --project-dir pointing at a dbt project",
+        (Some("C242"), None),
+    )
 }
 
 /// `Path(value)`, or `None` when the option was not given.

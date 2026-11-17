@@ -1,5 +1,6 @@
 //! The Python host the loop hands finished models and user-code steps to.
 
+use sqlbuild_python_base::boundary::main::text_item::text_item;
 use std::sync::Arc;
 
 use pyo3::FromPyObject;
@@ -35,7 +36,6 @@ use sqlbuild_python_project::compiled_project::constants::{CONTRACT_KEY, INCREME
 use sqlbuild_python_project::compiled_project::main::config_values::config_values;
 use sqlbuild_python_project::compiled_project::main::declarations::declarations;
 use sqlbuild_python_project::compiled_project::main::materialization::materialization;
-use sqlbuild_python_project::compiled_project::main::text_value::text_value;
 use sqlbuild_python_project::compiled_project::models::DeclarationPy;
 use sqlbuild_python_project::compiled_views::models::{
     InputProjections, ModelInputHandles, SchemaHandles,
@@ -310,9 +310,9 @@ pub(crate) fn finished_record<'py>(
             encoding_error,
             header_keys: native_field(&finished.config, HEADER_KEYS_ATTRIBUTE)?.extract()?,
             layer_schema: native_field(&finished.config, LAYER_SCHEMA_ATTRIBUTE)?.extract()?,
-            contract: text_value(&stripped, CONTRACT_KEY)?,
+            contract: text_item(&stripped, CONTRACT_KEY)?,
             materialized: materialization(&stripped)?,
-            incremental_mode: text_value(&stripped, INCREMENTAL_MODE_KEY)?,
+            incremental_mode: text_item(&stripped, INCREMENTAL_MODE_KEY)?,
         },
         schema: finished.header.schema.map(|schema| schema.fact),
         references: finished

@@ -22,7 +22,7 @@ use sqlbuild_config::project::models::ReviewConfig;
 use crate::bindings::_helpers::change_selection::base_snapshot::{base_comparison, base_variant};
 use crate::bindings::_helpers::change_selection::definition_snapshot::project_wide_keys;
 use crate::bindings::_helpers::change_selection::selection::{ChangedProject, changed_project};
-use crate::bindings::_helpers::execution_history::conversion::optional_text;
+use crate::bindings::_helpers::execution_history::conversion::nullable_text;
 use crate::bindings::_helpers::review_command::support::review_error;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;
@@ -107,7 +107,7 @@ pub(crate) fn review_settings(
 ) -> PyResult<ReviewSettings> {
     let py: Python<'_> = request.py();
     let config: ReviewConfig = configured_review(project_dir)?;
-    let since: String = match optional_text(&native_field(request, "since")?)? {
+    let since: String = match nullable_text(&native_field(request, "since")?)? {
         Some(since) => since,
         None if configured_git_base_ref(project_dir)?.is_some() => BASE_REF_ALIAS.to_owned(),
         None => {
@@ -120,7 +120,7 @@ pub(crate) fn review_settings(
         }
     };
     let against: String =
-        match optional_text(&native_field(request, "against")?)?.or(config.against.clone()) {
+        match nullable_text(&native_field(request, "against")?)?.or(config.against.clone()) {
             Some(against) => against,
             None => {
                 return Err(setting_error(
@@ -156,7 +156,7 @@ pub(crate) fn review_settings(
         ));
     };
     let downstream: Option<String> =
-        optional_text(&native_field(request, "downstream")?)?.or(config.downstream.clone());
+        nullable_text(&native_field(request, "downstream")?)?.or(config.downstream.clone());
     let policy: DownstreamPolicy = match downstream.as_deref() {
         None => DownstreamPolicy::Critical,
         Some(value) => parse_downstream_policy(value).ok_or_else(|| {
@@ -245,7 +245,7 @@ fn model_node(model: &Bound<'_, PyAny>, critical_tags: &[String]) -> PyResult<Re
 
 /// The database a model's or seed's compiled destination names, if any.
 fn destination_database(destination: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    optional_text(&native_field(destination, "database")?)
+    nullable_text(&native_field(destination, "database")?)
 }
 
 /// Dependency order over `nodes`, ties broken by name.
@@ -535,7 +535,7 @@ pub(crate) fn review_project<'py>(
     let changes_json: Value = serde_json::from_str(&changed.json((0, &[])))
         .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
     let target_database: Option<String> =
-        optional_text(&native_field(&project, "effective_target_database")?)?
+        nullable_text(&native_field(&project, "effective_target_database")?)?
             .filter(|database| !database.eq_ignore_ascii_case(PRESERVE_DATABASE));
     let review = ReviewProject {
         changed_declarations: changed_declarations(&changed.changes),
@@ -552,7 +552,7 @@ pub(crate) fn review_project<'py>(
         stateful,
         databases,
         target_database,
-        target_schema: optional_text(&native_field(&project, "effective_target_schema")?)?,
+        target_schema: nullable_text(&native_field(&project, "effective_target_schema")?)?,
     };
     Ok((review, (discovered, adapter, graph)))
 }

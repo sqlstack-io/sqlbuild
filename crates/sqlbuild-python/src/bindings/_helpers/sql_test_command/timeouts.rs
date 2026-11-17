@@ -63,7 +63,12 @@ impl RunTimeout {
 }
 
 fn invalid(py: Python<'_>, message: String) -> PyErr {
-    new_error(py, ErrorId::CompileInput, message, INVALID_TIMEOUT_CODE)
+    new_error(
+        py,
+        ErrorId::CompileInput,
+        &message,
+        (Some(INVALID_TIMEOUT_CODE), None),
+    )
 }
 
 fn limit_seconds(text: &str) -> Option<Option<u64>> {

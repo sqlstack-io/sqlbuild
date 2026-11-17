@@ -3,6 +3,7 @@
 use crate::compile_driver::main::setup::expanded_loader_namespace::expanded_loader_namespace;
 use crate::compile_driver::main::setup::managed_write_schema::managed_write_schema;
 use crate::compile_driver::models::TargetSettingsValues;
+use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::PyException;
@@ -92,27 +93,19 @@ pub(crate) fn planner_error(
 }
 
 /// `value` as an optional string: `None`, or a `str`'s text.
-fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+fn nullable_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if value.is_none() {
         return Ok(None);
     }
     Ok(Some(value.extract()?))
 }
 
-/// `value` when it is a `str`, else `None`.
-pub(crate) fn text_or_none(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    match value.downcast::<PyString>() {
-        Ok(text) => Ok(Some(text.to_cow()?.into_owned())),
-        Err(_) => Ok(None),
-    }
-}
-
 /// The connection's `part` when the compile leaves it unused because the project names connections or targets.
 fn ignored_connection_value(project: &Bound<'_, PyAny>, part: &str) -> PyResult<Option<String>> {
-    if text_or_none(&native_field(project, &format!("effective_target_{part}"))?)?.is_some() {
+    if optional_text(&native_field(project, &format!("effective_target_{part}"))?)?.is_some() {
         return Ok(None);
     }
-    text_or_none(&mapping_get(
+    optional_text(&mapping_get(
         &native_field(project, "effective_connection")?,
         part,
     )?)
@@ -186,7 +179,7 @@ pub(crate) fn named_target_schema_strategy(
     if target_name.is_none() {
         return Ok(());
     }
-    let schema: Option<String> = text_or_none(&native_field(&target_config, "schema")?)?;
+    let schema: Option<String> = optional_text(&native_field(&target_config, "schema")?)?;
     if schema.is_some_and(|schema| !python_strip(&schema).is_empty()) {
         return Ok(());
     }
@@ -198,7 +191,7 @@ pub(crate) fn named_target_schema_strategy(
         Some(cli_vars.clone()).filter(|value| !value.is_none()),
         false,
     )?;
-    let help: Option<String> = match text_or_none(&mapping_get(&connection, "schema")?)? {
+    let help: Option<String> = match optional_text(&mapping_get(&connection, "schema")?)? {
         Some(value) => {
             message.push_str(&ignored_connection_note("schema", &value));
             Some(project_setting_help(
@@ -336,7 +329,7 @@ fn target_namespaces(
     for item in mapping_items(&connection)?.try_iter()? {
         let item: Bound<'_, PyAny> = item?;
         let key: Bound<'_, PyAny> = item.get_item(0)?;
-        let Some(key) = text_or_none(&key)? else {
+        let Some(key) = optional_text(&key)? else {
             continue;
         };
         if CONNECTION_IDENTITY_KEYS.contains(&key.as_str()) {
@@ -476,7 +469,7 @@ pub(crate) fn validate_project_targets<'py>(
 
 /// Whether the adapter needs every model and seed database and schema resolved.
 pub(crate) fn requires_explicit_targets(adapter_name: &Bound<'_, PyAny>) -> PyResult<bool> {
-    Ok(text_or_none(adapter_name)?
+    Ok(optional_text(adapter_name)?
         .as_deref()
         .is_some_and(|name| EXPLICIT_TARGET_ADAPTERS.contains(&name)))
 }
@@ -528,8 +521,8 @@ fn required_target_parts(
     project: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
     let py: Python<'_> = target.py();
-    let database: Option<String> = optional_text(&native_field(target, "database")?)?;
-    let schema: Option<String> = optional_text(&native_field(target, "schema")?)?;
+    let database: Option<String> = nullable_text(&native_field(target, "database")?)?;
+    let schema: Option<String> = nullable_text(&native_field(target, "schema")?)?;
     let missing: Vec<&str> = missing_target_parts(database.as_deref(), schema.as_deref());
     let Some(first) = missing.first() else {
         return Ok(());
@@ -591,7 +584,7 @@ pub(crate) fn managed_write_schemas(
         return Ok(());
     }
     let project_schema: Option<String> = explicit_write_schema(
-        text_or_none(&native_field(project, "effective_target_schema")?)?.as_deref(),
+        optional_text(&native_field(project, "effective_target_schema")?)?.as_deref(),
     );
     for (label, attribute) in [
         ("Model", "models"),
@@ -631,7 +624,7 @@ pub(crate) fn managed_write_schemas(
     let source_loaders: HashSet<String> = managed_source_loaders(project)?;
     for loader in native_field(project, "loader_functions")?.try_iter()? {
         let loader: Bound<'_, PyAny> = loader?;
-        let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
+        let destination: Option<String> = optional_text(&native_field(&loader, "destination")?)?;
         if destination.is_some_and(|destination| destination.contains('.'))
             || source_loaders.contains(&native_field(&loader, "name")?.extract::<String>()?)
         {
@@ -653,7 +646,7 @@ pub(crate) fn managed_write_schemas(
 pub(crate) fn managed_source_loaders(project: &Bound<'_, PyAny>) -> PyResult<HashSet<String>> {
     let mut loaders: HashSet<String> = HashSet::new();
     for source in native_field(project, "sources")?.try_iter()? {
-        if let Some(loader) = text_or_none(&native_field(
+        if let Some(loader) = optional_text(&native_field(
             &native_field(&source?, "source_entry")?,
             "loader",
         )?)? {

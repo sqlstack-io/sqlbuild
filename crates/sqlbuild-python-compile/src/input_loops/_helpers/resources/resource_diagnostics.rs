@@ -1,5 +1,6 @@
 //! Compile-input diagnostics of the project's resources, read from the native owner.
 
+use sqlbuild_python_base::boundary::main::text_item::text_item;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -506,13 +507,6 @@ fn function_description<'py>(
     )
 }
 
-fn config_text(values: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<String>> {
-    match values.get_item(key)? {
-        Some(value) if value.is_instance_of::<PyString>() => Ok(Some(value.extract()?)),
-        _ => Ok(None),
-    }
-}
-
 fn cursor_without_inputs<'py>(
     project: &NativeCompiledProject,
     diagnostics: &Diagnostics<'_, 'py>,
@@ -527,9 +521,9 @@ fn cursor_without_inputs<'py>(
             .iter()
             .map(|ReferenceRow { kind, .. }| kind.as_str())
             .collect();
-        let materialized: Option<String> = config_text(&values, "materialized")?;
-        let cursor: Option<String> = config_text(&values, CURSOR_KEY)?;
-        let strategy: Option<String> = config_text(&values, "microbatch_strategy")?;
+        let materialized: Option<String> = text_item(&values, "materialized")?;
+        let cursor: Option<String> = text_item(&values, CURSOR_KEY)?;
+        let strategy: Option<String> = text_item(&values, "microbatch_strategy")?;
         let model_file: &NativeModelFile = record.host.model_file.get();
         let name: String = record.name.clone();
         let Some((message, help)) = cursor_lacks_inputs(

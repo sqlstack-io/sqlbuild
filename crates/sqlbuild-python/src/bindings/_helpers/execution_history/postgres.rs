@@ -1,5 +1,6 @@
 //! `PostgresExecutionHistory`: deployed PostgreSQL event-log and run-projection storage.
 
+use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 
@@ -41,8 +42,8 @@ use sqlbuild_state::execution_history::types::UtcTime;
 use crate::bindings::_helpers::execution_history::appends::prepared_batch;
 use crate::bindings::_helpers::execution_history::conversion::{
     checked, event_filter_spec, exact_int, history_error_of_kind, new_namespace, now,
-    optional_text, parsed_status, projection_facts, rejection, run_filter_spec, run_records,
-    run_rows, storage_error, stored_event, text_of, utc, utc_time,
+    nullable_text, parsed_status, projection_facts, rejection, run_filter_spec, run_records,
+    run_rows, storage_error, stored_event, utc, utc_time,
 };
 use crate::bindings::_helpers::execution_history::statements::{
     column, execute, execute_plain, execute_query, fetch_all, fetch_one, tuple_of,
@@ -201,7 +202,8 @@ impl PostgresExecutionHistory {
             if history_error_of_kind(py, &error, STORAGE_ERROR)? || !driver_failure(py, &error)? {
                 return Err(error);
             }
-            let sqlstate: Option<String> = text_of(&native_field(error.value(py), "sqlstate")?)?;
+            let sqlstate: Option<String> =
+                optional_text(&native_field(error.value(py), "sqlstate")?)?;
             if retries_transaction(sqlstate.as_deref(), attempts, max_retries) {
                 attempts += 1;
                 continue;
@@ -281,7 +283,7 @@ impl PostgresExecutionHistory {
             execute_plain(active, POSTGRES_NAMESPACE)?;
             let row = fetch_one(active)?;
             let namespace = match row {
-                Some(row) => text_of(&row.get_item("storage_namespace")?)?,
+                Some(row) => optional_text(&row.get_item("storage_namespace")?)?,
                 None => None,
             };
             namespace.ok_or_else(|| storage_error(py, NAMESPACE_MISSING))
@@ -299,7 +301,7 @@ impl PostgresExecutionHistory {
             "PostgreSQL event timestamp is invalid",
         )?;
         let payload: Bound<'py, PyAny> = column(row, "payload_json")?;
-        if text_of(&payload)?.is_none() {
+        if optional_text(&payload)?.is_none() {
             return Err(storage_error(
                 py,
                 "PostgreSQL canonical event content is invalid",
@@ -413,7 +415,7 @@ impl PostgresExecutionHistory {
         let Some(cursor) = cursor.filter(|cursor| !cursor.is_none()) else {
             return Ok(None);
         };
-        let text: String = text_of(cursor)?.unwrap_or_default();
+        let text: String = optional_text(cursor)?.unwrap_or_default();
         let namespace: String = Self::namespace_in(slf, None)?;
         let decoded = checked(py, decoded_run_cursor(Dialect::Postgres, &text, &namespace))?;
         let invalid = || rejection(py, HistoryErrorKind::InvalidCursor, RUN_CURSOR_TIMESTAMP);
@@ -496,7 +498,7 @@ impl PostgresExecutionHistory {
             Ok(Some(default))
         };
         let settings = PostgresSettings {
-            dsn: text_of(dsn)?,
+            dsn: optional_text(dsn)?,
             connect_timeout_seconds: setting(
                 "connect_timeout_seconds",
                 POSTGRES_CONNECT_TIMEOUT_SECONDS,
@@ -636,7 +638,7 @@ impl PostgresExecutionHistory {
         let after: i64 = match after_cursor.filter(|cursor| !cursor.is_none()) {
             None => 0,
             Some(cursor) => {
-                let text: String = text_of(cursor)?.unwrap_or_default();
+                let text: String = optional_text(cursor)?.unwrap_or_default();
                 let namespace: String = Self::namespace_in(slf, None)?;
                 let position: i64 = checked(
                     py,
@@ -688,7 +690,7 @@ impl PostgresExecutionHistory {
     ) -> PyResult<Bound<'py, PyAny>> {
         let py: Python<'py> = slf.py();
         slf.get().ensure_open(py)?;
-        let run_id: Option<String> = optional_text(run_id)?;
+        let run_id: Option<String> = nullable_text(run_id)?;
         let params: Vec<SqlParam> = vec![run_id.map_or(SqlParam::Null, SqlParam::Text)];
         let rows = Self::read_rows(
             slf,
@@ -940,8 +942,8 @@ impl PostgresExecutionHistory {
                     "PostgreSQL event append did not produce a durable fact",
                 ));
             };
-            let digest: Option<String> = text_of(&column(&row, "content_digest")?)?;
-            let payload: Option<String> = text_of(&column(&row, "payload_json")?)?;
+            let digest: Option<String> = optional_text(&column(&row, "content_digest")?)?;
+            let payload: Option<String> = optional_text(&column(&row, "payload_json")?)?;
             checked(
                 py,
                 validate_stored_content(event, (digest.as_deref(), payload.as_deref())),
