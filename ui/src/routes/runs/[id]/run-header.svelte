@@ -34,7 +34,7 @@
 				<h2>
 					{#if run.jobKey}<a href={to(`/jobs/${run.jobKey}`)}>{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
 				</h2>
-				<RunStatusPill status={run.status} size="md" />
+				<RunStatusPill status={run.status} size="md" ignored={run.ignoredAuditFailures} />
 				{#if retried}<span class="chip" title="Member jobs the group retried inside this run" data-testid="run-retried">· {retried} retried</span>{/if}
 				<!-- The kind is a fact about this run; the origin opens what started it, when that has a page. -->
 				<span class="chip" title="{runKindLabel[run.kind]} run">{runKindLabel[run.kind].toLowerCase()}</span>

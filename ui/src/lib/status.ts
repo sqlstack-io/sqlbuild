@@ -15,6 +15,9 @@ export const runStatusTone: Record<RunStatus, string> = {
 	presumed_failed: 'var(--sb-error)'
 };
 
+/** A finished run that let error-severity audit failures through instead of failing: it reads as a success with a warning. */
+export const ignoresAuditFailures = (status: RunStatus, ignored: number) => (status === 'success' || status === 'warn') && ignored > 0;
+
 export const runStatusLabel: Record<RunStatus, string> = {
 	queued: 'Queued',
 	launched: 'Starting',

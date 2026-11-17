@@ -29,6 +29,7 @@
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
 	import PlanBrowser from '$lib/run/plan-browser.svelte';
+	import PlanTimings from '$lib/run/plan-timings.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { changedModelKeys, jobRefreshText, loadedRows } from '$lib/run/plan-text';
@@ -410,11 +411,13 @@
 						<b>{picked.length}</b> {noun(picked.length, 'node')}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
 					{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code" title="Option">{value === true ? name : `${name}=${value}`}</span>{/each}
+					{#if shown.verb === 'build' && plan?.ignore_audit_failures}<span class="audits-note" data-testid="plan-ignores-audit-failures" title="An error-severity audit that fails is recorded, and the build goes on">Audit failures won't stop this build</span>{/if}
 					<div class="tabs">
 						<SegmentedFilter label="View" value={tab} options={[{ value: 'plan' as const, label: shown.verb === 'build' ? 'Plan' : 'Nodes' }, { value: 'graph' as const, label: 'Graph' }, ...(shown.verb === 'build' && planChecks.length ? [{ value: 'checks' as const, label: 'Checks', count: planChecks.length }] : [])]} onselect={(v) => (view = v)} />
 					</div>
 					{#if shown.verb === 'build' && plan}
-						<Button variant="ghost" size="sm" class="ml-auto" onclick={replan} disabled={planning}><RotateCwIcon class={planning ? 'animate-spin' : ''} />{planning ? 'Planning…' : 'Plan again'}</Button>
+						{#if plan.timings}<span class="ml-auto"><PlanTimings {plan} timings={plan.timings} /></span>{/if}
+						<Button variant="ghost" size="sm" class={plan.timings ? '' : 'ml-auto'} onclick={replan} disabled={planning}><RotateCwIcon class={planning ? 'animate-spin' : ''} />{planning ? 'Planning…' : 'Plan again'}</Button>
 					{/if}
 				</div>
 			{/if}
@@ -669,5 +672,13 @@
 	}
 	a:hover {
 		color: var(--primary);
+	}
+	.audits-note {
+		padding: 1px 8px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--sb-warning) 13%, transparent);
+		color: color-mix(in srgb, var(--sb-warning) 75%, var(--foreground));
+		font-size: 12px;
+		white-space: nowrap;
 	}
 </style>

@@ -12,6 +12,9 @@ import type { CatalogNode } from '../types';
 const LAYERS = [['sources'], ['seeds', 'orders'], ['customers', 'inventory'], ['payments', 'shipping'], ['returns', 'pricing'], ['suppliers', 'regions'], ['finance', 'marketing']];
 const PER_SUBFOLDER = 15;
 
+/** The models' last name parts, one per model of a subfolder. */
+const NOUNS = ['events', 'daily_totals', 'snapshot', 'latest', 'history', 'summary', 'mapped', 'enriched', 'curated', 'keys', 'lookup', 'changes', 'facts', 'rollup', 'audit_trail'];
+
 /** The large project's nodes, each a copy of `template` with its own key, folder and lineage. */
 export function largeProjectNodes(template: CatalogNode): CatalogNode[] {
 	const nodes: CatalogNode[] = [];
@@ -21,15 +24,17 @@ export function largeProjectNodes(template: CatalogNode): CatalogNode[] {
 			// Each folder reads the marts of two folders in the layer before it.
 			const before = LAYERS[depth - 1] ?? [];
 			const feeds = before.length ? [before[f % before.length], before[(f + 1) % before.length]].flatMap((b) => marts.get(b) ?? []) : [];
-			const staging = Array.from({ length: PER_SUBFOLDER }, (_, i) => `${folder}_stg_${i + 1}`);
-			const mart = Array.from({ length: PER_SUBFOLDER }, (_, i) => `${folder}_mart_${i + 1}`);
+			// Names as projects write them, layered with `__`: the same endings recur across layers and
+			// folders, so a zoomed-out card needs more of its name to tell it apart.
+			const staging = Array.from({ length: PER_SUBFOLDER }, (_, i) => `${folder}__stg__${NOUNS[i % NOUNS.length]}`);
+			const mart = Array.from({ length: PER_SUBFOLDER }, (_, i) => `${folder}__mart__${NOUNS[i % NOUNS.length]}`);
 			staging.forEach((key, i) =>
 				nodes.push({ ...template, key, group: `${folder}/staging`, path: `models/${folder}/staging/${key}.sql`, upstream: feeds.length ? [feeds[i % feeds.length]] : [], description: `Staged ${folder} data` })
 			);
 			mart.forEach((key, i) => nodes.push({ ...template, key, group: `${folder}/marts`, path: `models/${folder}/marts/${key}.sql`, upstream: [staging[i], staging[(i + 1) % staging.length]], description: `${folder} mart` }));
 			marts.set(folder, mart);
 			// Finance also reconciles against the orders marts directly, a read across five layers.
-			if (folder === 'finance') nodes.find((n) => n.key === `${folder}_stg_1`)!.upstream.push(marts.get('orders')![0]);
+			if (folder === 'finance') nodes.find((n) => n.key === staging[0])!.upstream.push(marts.get('orders')![0]);
 		});
 	});
 	return nodes;
@@ -50,7 +55,7 @@ export function largeProject(client: ApiClient): ApiClient {
 					const doc = largePlanDocument(args[1].some((t) => t === '--changed' || t.startsWith('--changed=')));
 					const requestId = crypto.randomUUID();
 					plans.set(requestId, doc);
-					return { plan: planSummary(doc), error: null, requestId };
+					return { plan: { ...planSummary(doc), timings: result.plan.timings }, error: null, requestId };
 				};
 			}
 			if (prop === 'planRows') {

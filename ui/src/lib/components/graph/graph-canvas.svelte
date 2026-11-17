@@ -1,7 +1,8 @@
 <script lang="ts">
 	import '@xyflow/svelte/dist/style.css';
 	import { Controls, SvelteFlow, ViewportPortal, type Edge, type Node, type Viewport } from '@xyflow/svelte';
-	import { untrack } from 'svelte';
+	import { setContext, untrack } from 'svelte';
+	import { COMPACT_TAILS, compactTitleOf, siblingTails, type CompactTails } from './compact-tails';
 	import { unzoom } from '$lib/lineage/hit-area';
 	import { obstacles, shareObstacles } from '$lib/lineage/edge-routes';
 	import type { ComponentProps, Snippet } from 'svelte';
@@ -121,11 +122,18 @@
 		press = null;
 	}
 	// Semantic zoom: zoomed out past the point where the cards' lines would no longer read, each card
-	// shows its compact form instead (CompactFace: its title filling the card, on its state's colour), by
-	// one class on the canvas; `data-compact` picks the title fit for the level of zoom, and
-	// `--sb-title-unzoom` keeps the title's size on screen. Cards keep their size, so edges don't move.
+	// shows its compact form instead (CompactFace: a one-line pill, its state's ring and its name), by
+	// one class on the canvas; `data-compact` picks the name's fit for the level of zoom, and
+	// `--sb-title-unzoom` keeps the pill's size on screen. Cards keep their size, so edges don't move.
 	// Card controls grow with `--sb-unzoom` so they keep their size.
 	const level = $derived(compactLevel(settledZoom));
+	// Each card's pill name: the part of its title none of its siblings ends with. Worked out from the
+	// cards' titles and boxes alone, so moving or selecting cards doesn't change it.
+	const cardKey = $derived(nodes.map((n) => `${n.id}\t${n.parentId ?? ''}\t${compactTitleOf(n.data as Record<string, unknown>) ?? ''}`).join('\n'));
+	const titled = $derived(cardKey ? cardKey.split('\n').map((line) => line.split('\t')).filter(([, , title]) => title).map(([id, parent, title]) => ({ id, parent, title })) : []);
+	const tails = $derived(siblingTails(titled));
+	const parents = $derived(new Map(titled.map((c) => [c.id, c.parent])));
+	setContext<CompactTails>(COMPACT_TAILS, { tail: (id) => tails.get(id), parent: (id) => parents.get(id) });
 	const compact = $derived(level > 0);
 	const titleUnzoom = $derived(compact ? 1 / Math.max(settledZoom, LABEL_MIN_ZOOM) : 1);
 	const controlScale = $derived(unzoom(settledZoom));

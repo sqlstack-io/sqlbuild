@@ -14,7 +14,7 @@
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
 	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
-	import { runKindLabel, runStatusTone } from '$lib/status';
+	import { ignoresAuditFailures, runKindLabel, runStatusTone } from '$lib/status';
 	import type { RunsState } from './state.svelte';
 	import type { TokenKey } from './types';
 	import { statusLine } from './utils';
@@ -30,7 +30,7 @@
 		{ id: 'run', label: 'Run', width: '140px' },
 		{ id: 'what', label: 'What', minWidth: 200 },
 		{ id: 'by', label: 'Started by', width: '180px' },
-		{ id: 'status', label: 'Status', width: '220px' },
+		{ id: 'status', label: 'Status', width: '280px' },
 		{ id: 'started', label: 'Started', width: '150px' },
 		{ id: 'took', label: 'Took', width: '90px', align: 'right' }
 	];
@@ -60,7 +60,7 @@
 				{@const line = statusLine(d.row, app.now)}
 				<tr class:child={d.child} class:checked={list.selected.has(r.id)} onclick={(e) => openRow(e, `/runs/${r.id}`)} onauxclick={(e) => e.button === 1 && openRow(e, `/runs/${r.id}`)}>
 					<td class="sel">
-						<i class="stripe" style:background={runStatusTone[r.status]}></i>
+						<i class="stripe" style:background={ignoresAuditFailures(r.status, r.ignoredAuditFailures) ? 'var(--sb-warning)' : runStatusTone[r.status]}></i>
 						<input type="checkbox" class="sb-check" checked={list.selected.has(r.id)} onchange={() => list.toggleSelected(r.id)} aria-label="Select run {shortRunId(r.id)}" />
 					</td>
 					<td>
@@ -110,7 +110,7 @@
 						{/if}
 					</td>
 					<td>
-						<RunStatusPill status={r.status} />
+						<RunStatusPill status={r.status} ignored={r.ignoredAuditFailures} />
 						<div class="status-line" style:color={toneColor[line.tone]} title={line.title ?? line.text}>{line.text}</div>
 					</td>
 					<td>

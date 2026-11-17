@@ -257,6 +257,8 @@ export type CheckEvaluation = {
 	measuredValue: number | null;
 	evidenceCount: number | null;
 	evidenceTruncated: boolean;
+	/** An error-severity failure its build let through (`ignore_audit_failures`) instead of stopping. */
+	ignored: boolean;
 };
 
 /** One audit or check with its latest result. */

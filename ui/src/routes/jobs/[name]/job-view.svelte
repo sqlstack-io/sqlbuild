@@ -94,7 +94,7 @@
 	const pools = $derived(def?.pools ?? []);
 	/** Runs holding a pool's slots now, where the server reports them. */
 	const holdersOf = (pool: string) => def?.poolHolders?.find((g) => g.pool === pool)?.holders ?? [];
-	const hasSettings = $derived(!!def && (!!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length)));
+	const hasSettings = $derived(!!def && (!!def.onFailure || !!def.ignoreAuditFailures || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length)));
 	let actionError = $state<string | null>(null);
 
 	async function toggleTrigger(t: Trigger) {
@@ -336,6 +336,7 @@
 									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
 									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
 								</dl>
+								{#if def.ignoreAuditFailures}<p class="audits" data-testid="job-ignores-audit-failures" title="ignore_audit_failures = true: an error-severity audit that fails is recorded, and the run goes on">Audit failures don't stop runs</p>{/if}
 								{#if def.settings && Object.keys(def.settings).length}
 									<p class="label">Options</p>
 									{#each Object.entries(def.settings) as [flag, value] (flag)}
@@ -578,5 +579,10 @@
 	}
 	a:hover {
 		color: var(--primary);
+	}
+	.audits {
+		margin: 6px 0 0;
+		color: color-mix(in srgb, var(--sb-warning) 70%, var(--foreground));
+		font-size: 12px;
 	}
 </style>

@@ -23,7 +23,8 @@ fail when a page breaks these budgets; keep them passing rather than raising the
    transform changes (a promoted layer). Anything that depends on zoom (label scale, compact cards) is
    one CSS custom property or class on the container, applied after the view settles, in coarse steps.
    No per-node state, style or data updates per zoom step; no SVG background repainted per frame.
-   A card's zoomed-out form (its compact title fit) is worked out once per card and shown by the class.
+   A card's zoomed-out pill (its name's tail among its siblings, and its size per compact level) is
+   worked out once per card, and again only when its font loads, and shown by the class.
    Edge routes are worked out when the nodes change (a layout, a measure, a drop), never per frame.
 4. **No DOM measuring in reactive paths** that run on scroll, pan or zoom.
 5. **Fetch once, derive locally.** Per-snapshot data (node lists, selection vocabulary) is cached per

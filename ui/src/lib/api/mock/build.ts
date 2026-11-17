@@ -551,7 +551,8 @@ export class MockBuild {
 				violationCount: violations,
 				measuredValue: isViolations || !counted ? null : (extra.measured ?? (outcome === 'pass' ? measured(index) : breach)),
 				evidenceCount: violations,
-				evidenceTruncated: (violations ?? 0) > 10
+				evidenceTruncated: (violations ?? 0) > 10,
+				ignored: false
 			};
 		};
 		// Audits run inside the build, so the node's outcome bounds the check's.
@@ -571,6 +572,10 @@ export class MockBuild {
 			const warn = spec.history.warnEvery && i % spec.history.warnEvery === spec.history.warnEvery - 1;
 			const outcome: CheckOutcome = !out.length && i === 0 ? spec.latest.outcome : fail ? (spec.severity === 'error' ? 'fail' : 'warn') : warn ? 'warn' : 'pass';
 			out.push(at(seed, i, outcome, { evaluatedAt: iso(oldest - (i - entries.length + 1) * 4 * HOUR), ...(i === 0 ? { violations: spec.latest.violations, measured: spec.latest.measured } : {}) }));
+		}
+		// The latest result of an audit a build let fail: from that run, failed, and marked ignored.
+		if (spec.ignoredIn && out.length) {
+			out[0] = { ...at(spec.ignoredIn, 0, 'fail', { runId: spec.ignoredIn, evaluatedAt: out[0].evaluatedAt, violations: spec.latest.violations }), ignored: true };
 		}
 		return out.slice(0, limit);
 	}

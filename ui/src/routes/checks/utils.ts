@@ -4,9 +4,13 @@ import type { Check, CheckEvaluation, CheckOutcome, EvaluationMode } from '$lib/
 import { plural } from '$lib/format/plural';
 
 /** The outcome buckets the Checks list filters by. */
-export type OutcomeFilter = 'all' | 'failing' | 'warn' | 'pass' | 'other';
+/** `ignored`: failures a build let through (`ignore_audit_failures`); they count as failing too. */
+export type OutcomeFilter = 'all' | 'failing' | 'ignored' | 'warn' | 'pass' | 'other';
 
-const OUTCOME_FILTERS: readonly OutcomeFilter[] = ['all', 'failing', 'warn', 'pass', 'other'];
+const OUTCOME_FILTERS: readonly OutcomeFilter[] = ['all', 'failing', 'ignored', 'warn', 'pass', 'other'];
+
+/** Whether a check's latest failure was let through by its build instead of stopping it. */
+export const ignoredFailure = (check: Pick<Check, 'latest'>): boolean => !!check.latest?.ignored;
 
 /** The `?outcome=` filter from a link, e.g. the overview's failing-checks count; anything else shows all. */
 export function parseOutcomeFilter(value: string | null): OutcomeFilter {

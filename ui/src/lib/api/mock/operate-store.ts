@@ -134,6 +134,9 @@ export type OperateContext = {
 	reply: <T>(value: T) => Promise<T>;
 };
 
+/** The end-to-end tests' stand-in for a plan recorded without timings: `window.__sqbPlanWithoutTimings`. */
+const withoutTimings = () => typeof window !== 'undefined' && !!(window as unknown as { __sqbPlanWithoutTimings?: boolean }).__sqbPlanWithoutTimings;
+
 /** A location preview's planning steps, as the plan summary reports them. */
 const MOCK_PLAN_TIMINGS: PlanTimings = {
 	total_seconds: 10.6,
@@ -727,7 +730,7 @@ export class MockOperate {
 			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas', 'recorded migrations']
 		};
 		return this.#ctx.reply({
-			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision, timings: MOCK_PLAN_TIMINGS },
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision, ...(withoutTimings() ? {} : { timings: MOCK_PLAN_TIMINGS }), ...(command.includes('--ignore-audit-failures') ? { ignore_audit_failures: true } : {}) },
 			error: null
 		});
 	}
@@ -1107,7 +1110,8 @@ export class MockOperate {
 				startedAt: null,
 				endedAt: null,
 				nodeCounts: { success: 0, warn: 0, failed: 0, skipped: 0, running: 0, pending: 0 },
-				cost: null
+				cost: null,
+				ignoredAuditFailures: 0
 			},
 			script: {
 				verb: spec.verb ?? 'build',
@@ -1254,6 +1258,7 @@ export class MockOperate {
 			triggerIds: TRIGGER_DEFS.filter((t) => t.jobKey === key).map((t) => triggerId(t.name)),
 			pools: poolUsesOf(job),
 			concurrency: runConcurrencyOf(job),
+			ignoreAuditFailures: job.ignoreAuditFailures ?? null,
 			resolvedConcurrency: resolvedConcurrencyOf(job),
 			poolHolders: poolHoldersOf(job).map((g) => ({ ...g, holders: holders.filter((h) => g.pool in h.script.pools).map((h) => h.run.id) })),
 			memberOf: JOB_DEFS.filter((g) => g.members.includes(key)).map((g) => g.key),

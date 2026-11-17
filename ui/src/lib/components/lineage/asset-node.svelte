@@ -44,7 +44,7 @@
 		columnCount?: number;
 	};
 
-	let { data, selected }: NodeProps = $props();
+	let { id, data, selected }: NodeProps = $props();
 	const d = $derived(data as AssetData);
 	const f = $derived(nodeFields.value);
 
@@ -150,8 +150,7 @@
 		</div>
 	{/if}
 
-	<!-- The card's inner height without its optional detail lines; a taller card centres the title. -->
-	<CompactFace title={d.label ?? d.name} tone={faceTone} height={showStatus ? 60 : 34} />
+	<CompactFace {id} title={d.label ?? d.name} tone={faceTone} kind="asset" />
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
 

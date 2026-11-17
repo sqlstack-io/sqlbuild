@@ -201,6 +201,7 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		pools: wire.pools.map((use) => ({ pool: use.pool, amount: use.amount, limit: use.limit, cap: use.cap ?? null, serverLimit: use.server_limit, clamped: use.clamped, sharedWith: use.shared_with })),
 		concurrency: wire.concurrency ?? null,
 		resolvedConcurrency: wire.resolved_concurrency ?? null,
+		ignoreAuditFailures: wire.ignore_audit_failures ?? null,
 		priority: null,
 		owner: wire.owner?.trim() || null,
 		sourceFile: wire.declared_at ? `${wire.declared_at.path}:${wire.declared_at.line}` : null,

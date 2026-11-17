@@ -6,6 +6,7 @@
 	import { runStatusTone } from '$lib/status';
 	import { shortRunId } from '$lib/operate/labels';
 	import FailuresPanel from './failures-panel.svelte';
+	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
 	import LiveStatements from './live-statements.svelte';
 	import NodePanel from './node-panel.svelte';
 	import RelatedRuns from './related-runs.svelte';
@@ -71,6 +72,7 @@
 	{#if detail}
 		<RunBanners banners={view.banners} />
 		<FailuresPanel {view} />
+		<IgnoredAuditsPanel {view} />
 		<RelatedRuns {view} />
 
 		<div bind:this={splitEl} class="flex min-h-0 flex-1 flex-col" class:select-none={dragging}>

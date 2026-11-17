@@ -37,6 +37,7 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			retention: list(document.retention),
 			synced_copy: document.synced_copy ?? null,
 			changed: document.changed ?? null,
+			...(document.ignore_audit_failures ? { ignore_audit_failures: true } : {}),
 			...(document.pages ? { pages: document.pages } : {}),
 			...(document.sections ? { sections: document.sections } : {})
 		},
@@ -168,7 +169,8 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		startedAt: wire.started_at ?? null,
 		endedAt: wire.ended_at ?? null,
 		nodeCounts: countsOf(wire),
-		cost: null
+		cost: null,
+		ignoredAuditFailures: wire.ignored_audit_failures ?? 0
 	};
 }
 

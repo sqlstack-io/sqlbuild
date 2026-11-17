@@ -1,10 +1,10 @@
-import { expect, test, type Page } from '@playwright/test';
-import { COMPACT_LEVELS } from '../src/lib/lineage/fit';
+import { expect, test } from '@playwright/test';
+import { zoomTo } from './zoom';
 
-// Zoomed out, cards take their compact form: the whole card is its title, on its state's colour; never
-// a small title in an empty frame, nor a shouting one. Each title shows centred, at 11 to 16 px on
-// screen, and covers half its card, or spans the card's width or height, or is as large as it may be.
-// Cards are drawn in full down to 0.82. Cards are drawn in full down to 0.6.
+// Zoomed out, cards take their compact form: a one-line pill, a ring in the colour of the card's state
+// holding its kind's icon, then the part of its name that tells it apart from its siblings. The name
+// never wraps, shows at 12 px or more on screen, shrinks to fit before it is cut, and is cut only at its
+// end. Cards are drawn in full down to 0.82.
 // With SHOTS set, each graph is also photographed at each zoom: SHOTS=/some/dir npx playwright test e2e/compact.spec.ts
 const shots = process.env.SHOTS;
 
@@ -12,77 +12,78 @@ const GRAPHS: { name: string; path: string; click?: string }[] = [
 	{ name: 'group', path: '/jobs/warehouse_nightly?mock&awkward' },
 	{ name: 'group-members', path: '/jobs/warehouse_nightly?mock&awkward', click: 'Folders' },
 	{ name: 'lineage-overview', path: '/lineage?mock&large' },
+	// Opened, its models' names share endings across layers and folders.
+	{ name: 'lineage-overview-open', path: '/lineage?mock&large', click: 'Expand all' },
 	{ name: 'lineage', path: '/lineage?mock' }
 ];
 
-const scaleOf = (page: Page) =>
-	page.locator('.svelte-flow__viewport').first().evaluate((v) => Number(/scale\(([\d.]+)\)/.exec((v as HTMLElement).style.transform)?.[1] ?? 1));
-
-/** Zooms with the wheel over the canvas until the zoom is within 0.02 of `target`, then lets the view settle. */
-async function zoomTo(page: Page, target: number) {
-	const box = (await page.locator('.svelte-flow').first().boundingBox())!;
-	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-	for (let i = 0; i < 200; i++) {
-		const zoom = await scaleOf(page);
-		if (Math.abs(zoom - target) <= 0.02) break;
-		// d3's wheel zoom: a factor of 2^(-deltaY / 500).
-		const delta = Math.max(-60, Math.min(60, Math.log2(zoom / target) * 500 * 0.8));
-		await page.mouse.wheel(0, Math.abs(delta) < 4 ? Math.sign(delta) * 4 : delta);
-		await page.waitForTimeout(30);
-	}
-	expect(Math.abs((await scaleOf(page)) - target), `zoomed to ${target}`).toBeLessThanOrEqual(0.02);
-	await page.waitForTimeout(600);
-}
-
-/**
- * Each compact card wholly in view whose title doesn't fill it, as problems. A title keeps its size on
- * screen through its level of zoom (`levels`: each level's lowest zoom, where it was fitted) while the
- * card grows, so how much of the card it fills is judged at that zoom.
- */
-function emptyCards(levels: readonly number[]): string[] {
+/** Each compact pill wholly in view that breaks a rule, as problems. */
+function pillProblems(): string[] {
 	const problems: string[] = [];
 	const flow = document.querySelector('.svelte-flow')!.getBoundingClientRect();
-	const level = Number(document.querySelector<HTMLElement>('.graph-canvas')!.dataset.compact);
 	const zoom = Number(/scale\(([\d.]+)\)/.exec(document.querySelector<HTMLElement>('.svelte-flow__viewport')!.style.transform)?.[1] ?? 1);
-	const cards = [...document.querySelectorAll<HTMLElement>('.svelte-flow__node')].filter((n) => n.querySelector('.cface'));
-	let checked = 0;
-	for (const node of cards) {
-		const card = (node.firstElementChild as HTMLElement).getBoundingClientRect();
-		if (card.left < flow.left || card.right > flow.right || card.top < flow.top || card.bottom > flow.bottom) continue;
-		const name = (node.querySelector('.name')?.textContent ?? node.dataset.id ?? '').trim();
-		const title = [...node.querySelectorAll<HTMLElement>('.cface .ctitle')].find((t) => t.offsetParent !== null);
-		if (!title || getComputedStyle(title.closest('.cface')!).display === 'none') {
-			problems.push(`${name}: no compact title shown`);
+	const root = getComputedStyle(document.documentElement);
+	// Colours compared as the browser resolves them.
+	const probe = document.body.appendChild(document.createElement('i'));
+	const colour = (value: string) => ((probe.style.color = ''), (probe.style.color = value.trim()), getComputedStyle(probe).color);
+	const token = (name: string) => colour(root.getPropertyValue(name));
+	const tones = Object.fromEntries(['--sb-success', '--sb-error', '--sb-running', '--sb-warning', '--sb-stale', '--sb-behind', '--sb-text-faint'].map((t) => [t, token(t)]));
+	/** The card's state colour, as its full card shows it: its last outcome, unless it needs building. */
+	function expected(card: HTMLElement): string | null {
+		const status = card.querySelector<HTMLElement>(':scope > .status');
+		if (card.classList.contains('group')) {
+			const dots = [...card.querySelectorAll<HTMLElement>('.status i')].map((i) => i.style.background);
+			const has = (t: string) => dots.some((d) => d.includes(t));
+			return has('--sb-error') ? tones['--sb-error'] : has('--sb-stale') ? tones['--sb-stale'] : has('--sb-success') ? tones['--sb-success'] : tones['--sb-text-faint'];
+		}
+		if (!status) return null;
+		const tone = colour(getComputedStyle(status).getPropertyValue('--tone'));
+		const outcomeFirst = tone === tones['--sb-error'] || tone === tones['--sb-running'] || (card.querySelector('.needs') && tone !== tones['--sb-success'] && tone !== tones['--sb-warning']);
+		if (outcomeFirst) return tone;
+		if (card.querySelector('.drift.behind, .needs .behind:only-child')) return tones['--sb-behind'];
+		if (card.querySelector('.drift, .needs .changed')) return tones['--sb-stale'];
+		return tone;
+	}
+	const visible: string[] = [];
+	for (const node of document.querySelectorAll<HTMLElement>('.svelte-flow__node')) {
+		const card = node.firstElementChild as HTMLElement;
+		const pill = card?.querySelector<HTMLElement>(':scope > .cface .pill');
+		if (!pill) continue;
+		const box = pill.getBoundingClientRect();
+		if (box.left < flow.left || box.right > flow.right || box.top < flow.top || box.bottom > flow.bottom) continue;
+		const full = pill.title;
+		const name = [...pill.querySelectorAll<HTMLElement>('.nm')].find((n) => getComputedStyle(n).display !== 'none');
+		if (!name) {
+			problems.push(`${full}: no name shown`);
 			continue;
 		}
-		checked++;
-		// The title's own box: its lines, each as wide as its text.
-		const lines = [...title.querySelectorAll('span')].map((s) => s.getBoundingClientRect());
-		const [left, right] = [Math.min(...lines.map((r) => r.left)), Math.max(...lines.map((r) => r.right))];
-		const [top, bottom] = [Math.min(...lines.map((r) => r.top)), Math.max(...lines.map((r) => r.bottom))];
-		const grown = Math.max(1, zoom / levels[level - 1]);
-		const [wide, tall] = [((right - left) / card.width) * grown, ((bottom - top) / card.height) * grown];
-		const share = wide * tall;
-		const px = parseFloat(getComputedStyle(title).fontSize) * zoom;
-		if (px < 10.95 || px > 16.05) problems.push(`${name}: its title shows at ${px.toFixed(1)} px`);
-		// As large as the card allows: a name too short to cover half its card spans the card's width or
-		// height, or shows at the largest size.
-		if (share < 0.5 && wide < 0.8 && tall < 0.75 && px < 15.5)
-			problems.push(`${name}: its title covers ${Math.round(share * 100)}% of the card, ${Math.round(wide * 100)}% of its width and ${Math.round(tall * 100)}% of its height, at ${px.toFixed(1)} px`);
-		// Centred in the card, beside its state edge.
-		const face = title.closest('.cface')!.getBoundingClientRect();
-		const edge = parseFloat(getComputedStyle(title.closest('.cface')!).borderLeftWidth) * zoom;
-		const [dx, dy] = [(left + right) / 2 - (face.left + edge + face.right) / 2, (top + bottom) / 2 - (face.top + face.bottom) / 2];
-		if (Math.abs(dx) > 4 || Math.abs(dy) > 4) problems.push(`${name}: its title is ${Math.round(dx)} px, ${Math.round(dy)} px off the card's centre`);
+		visible.push(`${pill.dataset.parent ?? ''} / ${name.textContent ?? ''}`);
+		const px = parseFloat(getComputedStyle(name).fontSize) * zoom;
+		if (px < 11.95) problems.push(`${full}: its name shows at ${px.toFixed(2)} px`);
+		if (Math.abs(box.height - 30) > 1) problems.push(`${full}: its pill is ${box.height.toFixed(1)} px tall`);
+		// One line: never wrapped, one line box.
+		if (getComputedStyle(name).whiteSpace !== 'nowrap' || name.getClientRects().length !== 1 || name.getBoundingClientRect().height > px * 1.6) problems.push(`${full}: its name wraps`);
+		// Cut only once it can shrink no further, and then at its end.
+		if (name.scrollWidth > name.clientWidth + 0.5) {
+			if (px > 12.05) problems.push(`${full}: cut at ${px.toFixed(2)} px, before shrinking to 12`);
+			if (getComputedStyle(name).textOverflow !== 'ellipsis') problems.push(`${full}: cut without an ellipsis at its end`);
+		}
+		if (!full.endsWith(name.textContent ?? '\0')) problems.push(`${full}: shows "${name.textContent}", not an ending of its name`);
+		const ring = pill.querySelector<HTMLElement>('.ring')!;
+		const want = expected(card);
+		if (want && getComputedStyle(ring).borderTopColor !== want) problems.push(`${full}: its ring is ${getComputedStyle(ring).borderTopColor}, its state ${want}`);
 	}
-	if (!checked) problems.push('no compact card in view');
+	probe.remove();
+	const repeated = visible.filter((t, i) => visible.indexOf(t) !== i);
+	if (repeated.length) problems.push(`names shown more than once among siblings: ${[...new Set(repeated)].join(', ')}`);
+	if (!visible.length) problems.push('no compact card in view');
 	return problems;
 }
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
 for (const { name, path, click } of GRAPHS) {
-	test(`${name}: zoomed out, each card is its title on its state's colour`, async ({ page }) => {
+	test(`${name}: zoomed out, each card is a one-line pill with its state's ring`, async ({ page }) => {
 		test.setTimeout(90_000);
 		await page.goto(path);
 		await page.locator('.graph-canvas:not(.unfitted) .svelte-flow__node').first().waitFor({ timeout: 20_000 });
@@ -95,12 +96,36 @@ for (const { name, path, click } of GRAPHS) {
 		await expect(canvas).not.toHaveClass(/\bcompact\b/);
 		if (shots) await page.screenshot({ path: `${shots}/compact-${name}-z085-full.png` });
 
-		// Each compact level: just below the switch, and further out.
 		for (const zoom of [0.7, 0.5, 0.4]) {
 			await zoomTo(page, zoom);
 			await expect(canvas).toHaveClass(/\bcompact\b/);
 			if (shots) await page.screenshot({ path: `${shots}/compact-${name}-z0${Math.round(zoom * 100)}.png` });
-			expect(await page.evaluate(emptyCards, COMPACT_LEVELS), `${name} at ${zoom}`).toEqual([]);
+			expect(await page.evaluate(pillProblems), `${name} at ${zoom}`).toEqual([]);
 		}
 	});
 }
+
+test('a job pill’s play triangle sits in the middle of its ring', async ({ page }) => {
+	await page.goto('/jobs/warehouse_nightly?mock');
+	await page.locator('.graph-canvas:not(.unfitted) .svelte-flow__node').first().waitFor({ timeout: 20_000 });
+	await page.waitForTimeout(800);
+	for (const zoom of [0.7, 0.5]) {
+		await zoomTo(page, zoom);
+		const offsets = await page.evaluate(() =>
+			[...document.querySelectorAll<HTMLElement>('.pill[data-kind="job"] .ring')].map((ring) => {
+				// The triangle's corners: two on its left edge, one at its right tip; its centroid a third of the way across.
+				const path = ring.querySelector<SVGGraphicsElement>('svg path')!;
+				const b = path.getBBox();
+				const m = path.getScreenCTM()!;
+				const centroid = new DOMPoint(b.x + b.width / 3, b.y + b.height / 2).matrixTransform(m);
+				const r = ring.getBoundingClientRect();
+				return { dx: centroid.x - (r.left + r.width / 2), dy: centroid.y - (r.top + r.height / 2), size: r.width };
+			})
+		);
+		expect(offsets.length, 'job pills in view').toBeGreaterThan(0);
+		for (const o of offsets) {
+			expect(Math.abs(o.dx), `horizontally, in a ${o.size.toFixed(1)} px ring at ${zoom}`).toBeLessThanOrEqual(0.5);
+			expect(Math.abs(o.dy), `vertically, at ${zoom}`).toBeLessThanOrEqual(0.5);
+		}
+	}
+});

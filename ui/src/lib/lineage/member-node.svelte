@@ -12,7 +12,7 @@
 
 	// A job group's member job, drawn as a Lineage card; clicking it opens the member in place, as a
 	// folder opens on Lineage, and "Open job" goes to the job's own page.
-	let { data, selected }: NodeProps = $props();
+	let { id, data, selected }: NodeProps = $props();
 	const d = $derived(data as MemberCardData);
 	// Before the first run the dot says whether the member needs building, in Lineage's purple.
 	const tone = $derived(d.lastRun ? runStatusTone[d.lastRun.status] : d.needs.changed ? 'var(--sb-stale)' : d.needs.behind ? 'var(--sb-behind)' : 'var(--sb-text-faint)');
@@ -53,7 +53,7 @@
 			<span class="label faint">No runs yet</span>
 		{/if}
 	</div>
-	<CompactFace title={d.jobKey} tone={faceTone} height={80} />
+	<CompactFace {id} title={d.jobKey} tone={faceTone} kind="job" />
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
 

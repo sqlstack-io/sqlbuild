@@ -6,7 +6,7 @@
 	import type { GroupCard } from '$lib/lineage/catalog-graph';
 	import CompactFace from '$lib/components/graph/compact-face.svelte';
 
-	let { data }: NodeProps = $props();
+	let { id, data }: NodeProps = $props();
 	const d = $derived(data as GroupCard);
 	// Zoomed out, the folder's colour is its worst state: any failure, then any stale node, then ok.
 	const tone = $derived(d.failed ? 'var(--sb-error)' : d.stale ? 'var(--sb-stale)' : d.ok ? 'var(--sb-success)' : 'var(--sb-text-faint)');
@@ -27,7 +27,7 @@
 		{#if d.failed}<span><i style:background="var(--sb-error)"></i>{d.failed} failed</span>{/if}
 		{#if !d.ok && !d.stale && !d.failed}<span class="faint">{d.empty ?? 'No builds'}</span>{/if}
 	</div>
-	<CompactFace title={d.label ?? d.group} {tone} height={59} badge={d.count} />
+	<CompactFace {id} title={d.label ?? d.group} {tone} kind="group" badge={d.count} />
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
 
