@@ -47,6 +47,21 @@ _TREE_RULE: str = custom_rule_source(
         "    ]\n"
     ),
 )
+_FACTS_RULE: str = custom_rule_source(
+    code="XSQBRTREE002",
+    body=(
+        "    sql = ctx.sql.for_model(model).expanded\n"
+        "    return [\n"
+        "        ctx.finding(\n"
+        "            subject=model,\n"
+        '            message=f"{node.kind}:{node.qualifier or ()}:{node.name or node.value}:"\n'
+        '            + (sql.source[node.span[0] : node.span[1]] if node.span else "-"),\n'
+        "        )\n"
+        "        for node in sql.ast().walk()\n"
+        '        if node.kind in ("alias", "column", "literal", "table")\n'
+        "    ]\n"
+    ),
+)
 
 
 @pytest.mark.parametrize(
@@ -169,6 +184,62 @@ def test_given_custom_rule_over_the_syntax_tree_when_compiling_then_nodes_point_
         selected_rules=("XSQBRTREE001",),
         files=(
             ("rules/tree.py", _TREE_RULE),
+            *((f"models/{name}.sql", sql) for name, sql in test_case.other_models.items()),
+        ),
+        adapter=test_case.adapter,
+    )
+    (tmp_path / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
+
+    result: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)
+
+    assert tuple(sorted(item["message"] for item in custom_rule_diagnostics(result))) == (
+        test_case.expected_messages
+    ), result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SyntaxTreeRuleE2ETestCase(
+            description="a rule reads names, literal values and source spans, a marker as its call",
+            adapter="snowflake",
+            model_sql=(
+                'MODEL (description "Orders", database analytics, schema analytics);\n'
+                "SELECT o.\"Status\" AS status_label, 'it''s' AS note\n"
+                'FROM __ref("raw_orders") AS o\n'
+                "WHERE o.region = 'EU'\n"
+            ),
+            other_models={
+                "raw_orders": (
+                    'MODEL (description "raw_orders", database analytics, schema analytics);\n'
+                    "SELECT 'open' AS \"Status\", 'EU' AS region\n"
+                )
+            },
+            expected_messages=(
+                "alias:():Status:'open' AS \"Status\"",
+                "alias:():note:'it''s' AS note",
+                "alias:():region:'EU' AS region",
+                'alias:():status_label:o."Status" AS status_label',
+                "column:('o',):Status:o.\"Status\"",
+                "column:('o',):region:o.region",
+                "literal:():EU:-",
+                "literal:():EU:-",
+                "literal:():it's:-",
+                "literal:():open:-",
+                'table:():__ref("raw_orders"):__ref("raw_orders")',
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_custom_rule_reading_node_facts_when_compiling_then_it_sees_the_authored_text(
+    test_case: SyntaxTreeRuleE2ETestCase, tmp_path: Path
+) -> None:
+    write_custom_rule_project(
+        project_dir=tmp_path,
+        selected_rules=("XSQBRTREE002",),
+        files=(
+            ("rules/facts.py", _FACTS_RULE),
             *((f"models/{name}.sql", sql) for name, sql in test_case.other_models.items()),
         ),
         adapter=test_case.adapter,

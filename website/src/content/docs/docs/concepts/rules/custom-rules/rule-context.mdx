@@ -66,18 +66,36 @@ if enum_types.get("fulfillment_method") != "fulfillment_method":
 
 ## Syntax tree
 
-Use the syntax tree only when the common structures are insufficient:
+Use the syntax tree only when the common structures are insufficient. Its nodes carry the names,
+literal values and source spans a rule reads:
 
 ```python
-for node in sql.expanded.ast().walk():
-    if node.kind == "window_function":
-        ...
+sql = ctx.sql.for_model(model).expanded
+for node in sql.ast().walk():
+    if node.kind == "alias" and node.quoted and node.name != node.name.lower():
+        start, end = node.span
+        return [ctx.finding(subject=model, node=node, message=sql.source[start:end])]
 ```
 
 `ast()` returns a `document` node whose children are the statements. Every `SqlTreeNode` has a
 `kind`, a `line` and `column` where it starts, `children`, and `walk()`, which yields the node and
 its descendants in pre-order. Kinds are SQLQuack's snake_case names, such as `select`, `subquery`,
-`star`, `join`, `cte`, `column`, `function` and `window_function`.
+`star`, `join`, `cte`, `alias`, `column`, `table`, `literal`, `function` and `window_function`.
+
+Nodes also have these attributes, which are `None` on nodes they don't apply to:
+
+| Attribute | Nodes | Value |
+| --- | --- | --- |
+| `name` | `identifier`, `column`, `alias`, `table`, `cte` | The name without quotes, such as `order_id` |
+| `quoted` | The same | Whether the source quotes the name |
+| `qualifier` | The same | The names before it, outermost first: `("db", "sales")` for `db.sales.orders` |
+| `value` | `literal` | The value as written, without quotes: `it's` for `'it''s'` |
+| `literal_type` | `literal` | `string`, `number`, `national_string`, `date`, `timestamp` and the other literal types |
+| `end_line`, `end_column` | Nodes with a source span | Where the node ends, just after its last character |
+| `span` | Nodes with a source span | `(start, end)` character offsets into `source`, end exclusive |
+
+A relation marker, such as `__ref("orders")`, reads as a `table` node whose `name` and `span` are
+the marker call as written.
 
 Parsing is lazy. A path or contract Rule does not pay for SQL parsing merely because syntax tree
 access exists elsewhere.
@@ -90,8 +108,9 @@ The tree comes from the SQLQuack parser SQLBuild uses for the project's dialect:
 | DuckDB, MotherDuck, Snowflake, SQLite | SQLQuack's shared parser |
 | Other dialects | Unavailable |
 
-For the shared parser, a node the parser records no position for, such as a bare `*` or the query
-inside a subquery, reports the position of its parent.
+A node without a source span has no end: `end_line`, `end_column` and `span` are `None`, and it
+reports its parent's start. Literals have no span. Under the shared parser, neither does the query
+inside a subquery.
 
 Reading the tree, or any common structure, raises `RuleUsageError` when:
 

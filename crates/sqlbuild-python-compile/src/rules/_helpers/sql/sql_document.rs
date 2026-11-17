@@ -8,7 +8,9 @@ use pyo3::types::PyTuple;
 use pyo3::{IntoPyObject, pyclass, pymethods};
 use sqlbuild_analysis::sql_tree::errors::SqlTreeError;
 use sqlbuild_analysis::sql_tree::main::sql_tree_nodes::sql_tree_nodes;
-use sqlbuild_analysis::sql_tree::models::SqlTreeNode as TreeNode;
+use sqlbuild_analysis::sql_tree::models::{
+    NodeExtent, NodeLiteral, NodeName, SqlTreeNode as TreeNode,
+};
 
 use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -57,6 +59,56 @@ impl SqlTreeNode {
             .map_or(1, |node| node.column)
     }
 
+    /// The name an identifier, column, alias, table or CTE carries, unquoted; a relation marker's is its call text.
+    #[getter]
+    fn name(&self) -> Option<&str> {
+        self.node_name().map(|name| name.name.as_str())
+    }
+
+    /// Whether the source quoted the name; `None` without one.
+    #[getter]
+    fn quoted(&self) -> Option<bool> {
+        self.node_name().map(|name| name.quoted)
+    }
+
+    /// The names qualifying the name, outermost first, such as `("db", "sales")`; `None` without a name.
+    #[getter]
+    fn qualifier<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyTuple>>> {
+        self.node_name()
+            .map(|name| PyTuple::new(py, &name.qualifier))
+            .transpose()
+    }
+
+    /// A literal's value as written, without quotes.
+    #[getter]
+    fn value(&self) -> Option<&str> {
+        self.node_literal().map(|literal| literal.value.as_str())
+    }
+
+    /// A literal's snake_case type, such as `string`, `number` or `date`.
+    #[getter]
+    fn literal_type(&self) -> Option<&'static str> {
+        self.node_literal().map(|literal| literal.literal_type)
+    }
+
+    /// The 1-based line just after the node's last character; `None` when the parser recorded no span.
+    #[getter]
+    fn end_line(&self) -> Option<usize> {
+        self.extent().map(|extent| extent.end_line)
+    }
+
+    /// The 1-based column just after the node's last character; `None` when the parser recorded no span.
+    #[getter]
+    fn end_column(&self) -> Option<usize> {
+        self.extent().map(|extent| extent.end_column)
+    }
+
+    /// The node's `(start, end)` character offsets into the document's source, end exclusive.
+    #[getter]
+    fn span(&self) -> Option<(usize, usize)> {
+        self.extent().map(|extent| extent.span)
+    }
+
     /// The node's direct children, in SQLQuack's traversal order.
     #[getter]
     fn children<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
@@ -85,6 +137,25 @@ impl SqlTreeNode {
             self.line(),
             self.column()
         )
+    }
+}
+
+impl SqlTreeNode {
+    /// The node's tree record; `None` for the document root.
+    fn record(&self) -> Option<&TreeNode> {
+        self.tree.nodes.get(self.index)
+    }
+
+    fn node_name(&self) -> Option<&NodeName> {
+        self.record().and_then(|node| node.name.as_ref())
+    }
+
+    fn node_literal(&self) -> Option<&NodeLiteral> {
+        self.record().and_then(|node| node.literal.as_ref())
+    }
+
+    fn extent(&self) -> Option<&NodeExtent> {
+        self.record().and_then(|node| node.extent.as_ref())
     }
 }
 

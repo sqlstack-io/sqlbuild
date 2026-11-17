@@ -1,7 +1,5 @@
 //! Snowflake table function markers wrapped in `TABLE( )`, as SQLBuild renders them.
 
-use std::cmp::Reverse;
-
 use sqlbuild_sqltext::sql_scan::constants::TABLE_WRAPPER;
 use sqlbuild_sqltext::sql_scan::main::dialect_matching_paren::dialect_matching_paren;
 use sqlbuild_sqltext::sql_scan::main::follows_table_wrapper::follows_table_wrapper;
@@ -9,11 +7,16 @@ use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::relation_markers::constants::{MARKER_NAME_PREFIX, TABLE_FUNCTION_MARKER};
 use crate::relation_markers::types::MarkerCall;
+use crate::sql_tree::_helpers::source_map::Rewrite;
 
-/// `named` with each table function marker call in `TABLE( )`, written over padding so later text keeps its column.
-pub(crate) fn table_wrapped(named: &str, calls: &[MarkerCall], syntax: &LexicalSyntax) -> String {
+/// `named` with each table function marker call in `TABLE( )`, written over padding so later text keeps its column, and the rewrites that did it.
+pub(crate) fn table_wrapped(
+    named: &str,
+    calls: &[MarkerCall],
+    syntax: &LexicalSyntax,
+) -> (String, Vec<Rewrite>) {
     let bytes = named.as_bytes();
-    let mut edits: Vec<(usize, usize, String)> = Vec::new();
+    let mut edits: Vec<(usize, usize, &str)> = Vec::new();
     for (index, (function, _)) in calls.iter().enumerate() {
         if function != TABLE_FUNCTION_MARKER {
             continue;
@@ -42,15 +45,41 @@ pub(crate) fn table_wrapped(named: &str, calls: &[MarkerCall], syntax: &LexicalS
         let replaced = usize::from(matches!(bytes.get(after), Some(b' ' | b'\t')));
         let text_follows = !matches!(bytes.get(after), None | Some(b'\n' | b'\r'));
         let borrowed = spaces.min(TABLE_WRAPPER.len() + usize::from(text_follows) - replaced);
-        edits.push((start, name_end + borrowed, format!("{TABLE_WRAPPER}{name}")));
-        edits.push((after, after + replaced, ")".to_owned()));
+        edits.push((start, start, TABLE_WRAPPER));
+        edits.push((name_end, name_end + borrowed, ""));
+        edits.push((after, after, ")"));
+        edits.push((after, after + replaced, ""));
     }
-    edits.sort_by_key(|(start, _, _)| Reverse(*start));
-    let mut wrapped = named.to_owned();
-    for (start, end, replacement) in edits {
-        wrapped.replace_range(start..end, &replacement);
+    edits.sort_by_key(|(start, _, _)| *start);
+    applied(named, &edits)
+}
+
+/// `named` with each ascending edit's byte range replaced by its text, and each edit as a character rewrite.
+fn applied(named: &str, edits: &[(usize, usize, &str)]) -> (String, Vec<Rewrite>) {
+    let mut wrapped: String = String::with_capacity(named.len() + edits.len());
+    let mut rewrites: Vec<Rewrite> = Vec::with_capacity(edits.len());
+    let (mut cursor, mut named_chars, mut wrapped_chars) = (0, 0, 0);
+    for (start, end, text) in edits
+        .iter()
+        .filter(|(start, end, text)| start < end || !text.is_empty())
+    {
+        let kept: &str = &named[cursor..*start];
+        wrapped.push_str(kept);
+        named_chars += kept.chars().count();
+        wrapped_chars += kept.chars().count();
+        let removed: usize = named[*start..*end].chars().count();
+        let added: usize = text.chars().count();
+        rewrites.push(Rewrite {
+            parsed: wrapped_chars..wrapped_chars + added,
+            source: named_chars..named_chars + removed,
+        });
+        wrapped.push_str(text);
+        named_chars += removed;
+        wrapped_chars += added;
+        cursor = *end;
     }
-    wrapped
+    wrapped.push_str(&named[cursor..]);
+    (wrapped, rewrites)
 }
 
 /// Where `name` first stands as a whole word in `bytes`.
