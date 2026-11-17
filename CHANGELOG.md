@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.241.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.240.0...v0.241.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* `sqb compile` fails when a loader depends on a task or asset that reads SQL, unless the project sets `allow_warehouse_round_trips = true` under `[settings]` in sqlbuild_project.toml, and when the SQL graph has a cycle. Plan and build refused both before; compile and `compile --dag` passed them.
+
+### Features
+
+* warehouse round trips, kind: selectors and whole-graph compile refusals ([#1550](https://github.com/sqlstack-io/sqlbuild/issues/1550)) ([78a786a](https://github.com/sqlstack-io/sqlbuild/commit/78a786a5514e13164261ac7e1fc1f311e23ea32c))
+
 ## [0.240.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.239.0...v0.240.0) (2026-11-17)
 
 
