@@ -75,12 +75,22 @@ test('a changed row shows its kind and line counts, and opens its diff a few lin
 	await big.getByRole('button', { name: 'diff' }).click();
 	const diff = big.locator('pre.diff');
 	await expect(diff).toBeVisible();
+	// Opened: the headers, a little context and the first 12 changed lines, then a link to the rest.
 	expect(await diff.locator('span.add, span.del').count()).toBe(12);
-	await big.getByRole('button', { name: 'open the full diff' }).click();
-	expect(await diff.locator('span.add, span.del').count()).toBe(121);
+	expect(await diff.locator('span').count()).toBeLessThanOrEqual(16);
+	const full = big.getByRole('button', { name: /^open the full diff \(\d+ more lines\)$/ });
+	await expect(full).toHaveText('open the full diff (110 more lines)');
 	if (shots) await big.scrollIntoViewIfNeeded().then(() => page.screenshot({ path: `${shots}/plan-b-changed-diff.png` }));
+	await full.click();
+	expect(await diff.locator('span.add, span.del').count()).toBe(121);
+	expect(await diff.locator('span').count()).toBe(126);
+	await expect(full).toHaveCount(0);
+	// Closing returns the row to closed; opening it again starts from the short view.
 	await big.getByRole('button', { name: 'hide diff' }).click();
 	await expect(diff).toHaveCount(0);
+	await big.getByRole('button', { name: 'diff' }).click();
+	expect(await diff.locator('span.add, span.del').count()).toBe(12);
+	await big.getByRole('button', { name: 'hide diff' }).click();
 	// A config change of more than two keys opens as a diff too.
 	await expect(rows(page).locator('.detail', { hasText: /^config · diff$/ })).toHaveCount(1);
 });
@@ -98,11 +108,14 @@ test('warnings with one message about different names read as one row, opened to
 	await select(page, 'warnings');
 	const groups = pane(page).locator('.warning-group');
 	await expect(groups).toHaveCount(2);
-	await expect(groups.first()).toContainText('Scenario … provides fixture for unknown model ….');
+	await expect(groups.first().locator('.template')).toHaveText('Scenario … provides fixture for unknown model …');
 	await expect(groups.first()).toContainText('71 in 24 scenarios');
-	await groups.first().getByRole('button', { name: 'show' }).click();
-	await expect(groups.first().locator('li')).toHaveCount(71);
+	await groups.first().getByRole('button', { name: 'show', exact: true }).click();
+	await expect(groups.first().locator('li')).toHaveCount(20);
 	if (shots) await page.screenshot({ path: `${shots}/plan-b-warnings.png` });
+	await groups.first().getByRole('button', { name: 'show all 71' }).click();
+	await expect(groups.first().locator('li')).toHaveCount(71);
+	await expect(groups.first().getByRole('button', { name: 'show all 71' })).toHaveCount(0);
 });
 
 test('a small plan reads as a short index', async ({ page }) => {

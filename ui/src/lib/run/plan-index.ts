@@ -224,7 +224,11 @@ function withoutNote(row: PlanRow, note: string): PlanRow {
 export function warningTemplate(w: PlanWarning): string {
 	let message = w.message;
 	if (w.model_name && message.startsWith(`${w.model_name}:`)) message = message.slice(w.model_name.length + 1).trim();
-	return message.replace(/'[^']*'|`[^`]*`|"[^"]*"/g, '…').replace(/\b\w*(?:__|\d)\w*\b/g, '…');
+	// A sentence ending on an elided name ends on the ellipsis, not "…." as well.
+	return message
+		.replace(/'[^']*'|`[^`]*`|"[^"]*"/g, '…')
+		.replace(/\b\w*(?:__|\d)\w*\b/g, '…')
+		.replace(/…\.$/, '…');
 }
 
 /**
@@ -347,12 +351,15 @@ export function selectedGroup(groups: PlanGroup[], wanted: string | null): PlanG
 /** How many changed lines an opened diff shows before "open the full diff". */
 export const DIFF_PREVIEW = 12;
 
-/** The start of a diff up to its `most`th changed line, and whether that cut anything off. */
-export function diffPreview(diff: DiffLine[], most = DIFF_PREVIEW): { lines: DiffLine[]; cut: boolean } {
+/** The start of a diff (its headers, context and first `most` changed lines), and how many lines it leaves out. */
+export function diffPreview(diff: DiffLine[], most = DIFF_PREVIEW): { lines: DiffLine[]; cut: boolean; more: number } {
 	let changed = 0;
 	for (let i = 0; i < diff.length; i++) {
 		if (diff[i].cls === 'add' || diff[i].cls === 'del') changed++;
-		if (changed === most) return { lines: diff.slice(0, i + 1), cut: i + 1 < diff.length };
+		if (changed === most) return { lines: diff.slice(0, i + 1), cut: i + 1 < diff.length, more: diff.length - i - 1 };
 	}
-	return { lines: diff, cut: false };
+	return { lines: diff, cut: false, more: 0 };
 }
+
+/** How many warnings an opened warning group lists before "show all". */
+export const WARNINGS_SHOWN = 20;

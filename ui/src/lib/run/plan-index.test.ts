@@ -95,7 +95,7 @@ describe('warnings grouped by message', () => {
 		];
 		const groups = groupWarnings(warnings);
 		expect(groups.map((g) => [g.template, g.label, g.warnings.length])).toEqual([
-			['Scenario … provides fixture for unknown model ….', '6 in 2 scenarios', 6],
+			['Scenario … provides fixture for unknown model …', '6 in 2 scenarios', 6],
 			['Scenario … requires source …, but no fixture was provided. Add a CTE named … AS (...).', '2 warnings', 2],
 			['schema change detected but on_schema_change is set to ignore', '1 warning', 1]
 		]);
@@ -149,6 +149,7 @@ describe('an opened diff', () => {
 		const preview = diffPreview(diff, 12);
 		expect(preview.lines).toHaveLength(13);
 		expect(preview.cut).toBe(true);
-		expect(diffPreview(diff.slice(0, 5), 12)).toEqual({ lines: diff.slice(0, 5), cut: false });
+		expect(preview.more).toBe(8);
+		expect(diffPreview(diff.slice(0, 5), 12)).toEqual({ lines: diff.slice(0, 5), cut: false, more: 0 });
 	});
 });

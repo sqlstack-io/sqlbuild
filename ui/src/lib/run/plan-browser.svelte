@@ -8,7 +8,7 @@
 	import { to } from '$lib/paths';
 	import type { PlanDocument, PlanPageSection } from '$lib/api';
 	import { warningText } from './plan-text';
-	import { AFTER_DIVIDER, diffPreview, planGroups, planSummaryLine, selectedGroup, type PlanGroupKey, type PlanRow } from './plan-index';
+	import { AFTER_DIVIDER, WARNINGS_SHOWN, diffPreview, planGroups, planSummaryLine, selectedGroup, type PlanGroupKey, type PlanRow } from './plan-index';
 
 	/**
 	 * `section` is the group shown, kept in the address by the page; `more` loads the next page of a
@@ -39,6 +39,7 @@
 	let filterOf = $state<Record<string, string>>({});
 	let openDiff = $state<Record<string, 'preview' | 'full'>>({});
 	let openWarnings = $state<Record<string, boolean>>({});
+	let allWarnings = $state<Record<string, boolean>>({});
 	let loading = $state(false);
 	let loadError = $state<string | null>(null);
 
@@ -108,9 +109,13 @@
 							<Button variant="link" size="inline" class="text-[11.5px]" onclick={() => (openWarnings[w.template] = !openWarnings[w.template])}>{openWarnings[w.template] ? 'hide' : 'show'}</Button>
 						</div>
 						{#if openWarnings[w.template]}
+							{@const all = allWarnings[w.template]}
 							<ul class="warning-list">
-								{#each w.warnings as one, i (i)}<li class:err={one.severity === 'error'}>{#if one.code}<code>{one.code}</code> {/if}{one.message}</li>{/each}
+								{#each all ? w.warnings : w.warnings.slice(0, WARNINGS_SHOWN) as one, i (i)}<li class:err={one.severity === 'error'}>{#if one.code}<code>{one.code}</code> {/if}{one.message}</li>{/each}
 							</ul>
+							{#if !all && w.warnings.length > WARNINGS_SHOWN}
+								<Button variant="link" size="inline" class="ml-4 text-[11.5px]" onclick={() => (allWarnings[w.template] = true)}>show all {w.warnings.length.toLocaleString()}</Button>
+							{/if}
 						{/if}
 					</div>
 				{/each}
@@ -140,9 +145,9 @@
 							{#each r.notes as note, i (i)}<div class="note">{note}</div>{/each}
 							{#each r.warnings as w, i (i)}<p class="row-warning" class:err={w.severity === 'error'}>{warningText(w)}</p>{/each}
 							{#if open && r.diff}
-								{@const preview = open === 'full' ? { lines: r.diff, cut: false } : diffPreview(r.diff)}
+								{@const preview = open === 'full' ? { lines: r.diff, cut: false, more: 0 } : diffPreview(r.diff)}
 								<pre class="diff">{#each preview.lines as l, i (i)}<span class={l.cls}>{l.text}</span>{'\n'}{/each}</pre>
-								{#if preview.cut}<Button variant="link" size="inline" class="diff-more text-[11.5px]" onclick={() => (openDiff[diffKey(r)] = 'full')}>open the full diff</Button>{/if}
+								{#if preview.cut}<Button variant="link" size="inline" class="diff-more text-[11.5px]" onclick={() => (openDiff[diffKey(r)] = 'full')}>open the full diff ({preview.more.toLocaleString()} more lines)</Button>{/if}
 							{/if}
 						</div>
 					{/each}
