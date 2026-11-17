@@ -10,9 +10,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTypeMethods};
 use sqlbuild_discovery::project_validation::errors::CsvDialectError;
 use sqlbuild_discovery::project_validation::models::{
-    AuditFileFact, CsvSettings, DependencyFact, ModelFact, NamedPath,
-    NodeFact, NodeKind, SchemaFileFact, ScopedDeclarationsFact, SeedEntryFact, SeedFileFact,
-    SourceFact, SourceFileFact, TestBlockFact, TestFileFact,
+    AuditFileFact, CsvSettings, DependencyFact, ModelFact, NamedPath, NodeFact, NodeKind,
+    SchemaFileFact, ScopedDeclarationsFact, SeedEntryFact, SeedFileFact, SourceFact,
+    SourceFileFact, TestBlockFact, TestFileFact,
 };
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
