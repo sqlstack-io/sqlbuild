@@ -14,10 +14,10 @@ use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::HashSet;
 
-/// Raise when a `preserve` target leaves one of `loaders`, or the Python node results, without a schema.
+/// Raise when a `preserve` target leaves `loaders` or Python node results without a schema, after `effective_vars`.
 pub fn preserved_loader_schemas(
     discovered: &Bound<'_, PyAny>,
-    selected_target: &Bound<'_, PyAny>,
+    (selected_target, effective_vars): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     loaders: &HashSet<String>,
 ) -> PyResult<()> {
     let py: Python<'_> = discovered.py();
@@ -48,5 +48,5 @@ pub fn preserved_loader_schemas(
             )),
         ));
     }
-    require_node_results_schema(discovered, (&target_name, &target_config))
+    require_node_results_schema(discovered, (&target_name, &target_config), effective_vars)
 }

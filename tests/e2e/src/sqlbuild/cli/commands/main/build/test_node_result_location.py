@@ -11,6 +11,8 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     AdapterDefaultResultsFallbackE2ETestCase,
+    PlanAfterBuildsE2ETestCase,
+    PlanAfterTargetChangeE2ETestCase,
     PreservedTargetNodeResultsE2ETestCase,
     PreservedTargetRefusalE2ETestCase,
 )
@@ -62,6 +64,16 @@ _COPYING_LOADER: str = (
         PreservedTargetNodeResultsE2ETestCase(
             description="a preserved schema keeps node results in the loader schema",
             target_lines='schema = "preserve"\nloader_schema = "raw"\n',
+            source_location="    schema: raw\n",
+            expected_results_schema="raw",
+            expected_runs_per_node=2,
+        ),
+        PreservedTargetNodeResultsE2ETestCase(
+            description="a preserved schema keeps node results in a loader schema set by a var",
+            target_lines=(
+                'schema = "preserve"\nloader_schema = "${results_schema}"\n\n'
+                '[vars]\nresults_schema = "raw"\n'
+            ),
             source_location="    schema: raw\n",
             expected_results_schema="raw",
             expected_runs_per_node=2,
@@ -158,6 +170,22 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
             },
             expected_error="error[S105]: Target 'dev' keeps each model's own schema",
         ),
+        PreservedTargetRefusalE2ETestCase(
+            description="a loader schema whose var resolves to empty is no loader schema",
+            python_files={
+                "python/tasks/announce.py": _TASK.replace('depends_on=source("raw_orders")', "")
+            },
+            expected_error="error[S105]: Target 'dev' keeps each model's own schema",
+            target_lines='loader_schema = "${results_schema}"\n\n[vars]\nresults_schema = ""\n',
+        ),
+        PreservedTargetRefusalE2ETestCase(
+            description="a loader schema that resolves only inside a model is no loader schema",
+            python_files={
+                "python/tasks/announce.py": _TASK.replace('depends_on=source("raw_orders")', "")
+            },
+            expected_error="error[S105]: Target 'dev' keeps each model's own schema",
+            target_lines='loader_schema = "raw_${CTX:model.name}"\n',
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -172,6 +200,7 @@ def test_given_preserved_schema_without_loader_schema_when_compiling_then_python
                 'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
                 '[connection]\ndatabase = "dev.duckdb"\n\n'
                 '[defaults]\nschema = "mart"\n\n[targets.dev]\nschema = "preserve"\n'
+                + test_case.target_lines
             ),
             "models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n",
         }
@@ -184,6 +213,110 @@ def test_given_preserved_schema_without_loader_schema_when_compiling_then_python
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert test_case.expected_error in result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PlanAfterBuildsE2ETestCase(
+            description="a preserved schema reads the task's fingerprint from the loader schema",
+            target_lines='schema = "preserve"\nloader_schema = "raw"\n',
+            expected_plan_line="announce_orders      task (unchanged)",
+        ),
+        PlanAfterBuildsE2ETestCase(
+            description="a plan of the task alone reads its fingerprint from the loader schema",
+            target_lines='schema = "preserve"\nloader_schema = "raw"\n',
+            expected_plan_line="announce_orders      task (unchanged)",
+            plan_args=("--select", "announce_orders"),
+        ),
+        PlanAfterBuildsE2ETestCase(
+            description="a named schema reads the task's fingerprint from the target schema",
+            target_lines='schema = "analytics"\n',
+            expected_plan_line="announce_orders      task (unchanged)",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_two_builds_when_planning_then_python_nodes_are_not_new(
+    test_case: PlanAfterBuildsE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = node_result_project(
+        tmp_path=tmp_path,
+        target_lines=test_case.target_lines,
+        files={
+            "sources/raw.yml": node_result_source_yml("    schema: raw\n"),
+            "python/loaders/orders.py": _LOADER,
+            "python/tasks/announce.py": _TASK,
+        },
+    )
+    for _ in range(2):
+        build: subprocess.CompletedProcess[str] = run_sqb(
+            command=("--no-color", "build"), project_dir=project_dir
+        )
+        assert build.returncode == 0, build.stdout + build.stderr
+
+    plan: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", *test_case.plan_args), project_dir=project_dir
+    )
+
+    assert plan.returncode == 0, plan.stdout + plan.stderr
+    assert test_case.expected_plan_line in plan.stdout, plan.stdout
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PlanAfterTargetChangeE2ETestCase(
+            description="older task results in a later-sorting model schema do not hide current ones",
+            earlier_target_lines='schema = "staging"\n',
+            target_lines='schema = "preserve"\nloader_schema = "raw"\n',
+            expected_plan_line="announce_orders      task (unchanged)",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_older_named_schema_results_when_planning_preserved_target_then_loader_schema_wins(
+    test_case: PlanAfterTargetChangeE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = node_result_project(
+        tmp_path=tmp_path,
+        target_lines=test_case.earlier_target_lines,
+        files={
+            "sources/raw.yml": node_result_source_yml("    schema: raw\n"),
+            "python/loaders/orders.py": _LOADER,
+            "python/tasks/announce.py": _TASK,
+            "models/staged_orders.sql": (
+                "MODEL (description 'Staged orders.', schema \"staging\");\n\n"
+                "SELECT 1 AS order_id\n"
+            ),
+            "models/raw_order_ids.sql": (
+                "MODEL (description 'Order ids beside the raw data.', schema \"raw\");\n\n"
+                "SELECT 1 AS order_id\n"
+            ),
+        },
+    )
+    first: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build"), project_dir=project_dir
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+    config: Path = project_dir / "sqlbuild_project.toml"
+    config.write_text(
+        config.read_text().replace(test_case.earlier_target_lines, test_case.target_lines)
+    )
+    task: Path = project_dir / "python/tasks/announce.py"
+    task.write_text(task.read_text().replace("'announced': True", "'announced': 1"))
+    for _ in range(2):
+        build: subprocess.CompletedProcess[str] = run_sqb(
+            command=("--no-color", "build"), project_dir=project_dir
+        )
+        assert build.returncode == 0, build.stdout + build.stderr
+
+    plan: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan"), project_dir=project_dir
+    )
+
+    assert plan.returncode == 0, plan.stdout + plan.stderr
+    assert test_case.expected_plan_line in plan.stdout, plan.stdout
 
 
 @pytest.mark.parametrize(

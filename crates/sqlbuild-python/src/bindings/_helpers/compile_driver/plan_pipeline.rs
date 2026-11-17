@@ -24,6 +24,8 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::compiled_phase::compiled_phase;
 use sqlbuild_python_compile::compile_driver::main::setup::progress::progress;
 use sqlbuild_python_compile::compile_driver::main::setup::project_graph::project_graph;
+use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
+use sqlbuild_python_compile::compile_driver::main::setup::python_node_count::python_node_count;
 use sqlbuild_python_compile::compile_driver::main::setup::timing_tracker::timing_tracker;
 use sqlbuild_python_compile::compile_driver::main::stages::apply_unit_test_selectors::apply_unit_test_selectors;
 use sqlbuild_python_compile::compile_driver::main::stages::monotonic::monotonic;
@@ -204,19 +206,27 @@ fn planned<'py>(
     let started: f64 = monotonic(py)?;
     let mut connection: Option<Bound<'py, PyAny>> = None;
     let result: PyResult<Bound<'py, PyAny>> = (|| {
-        let opened: Bound<'py, PyAny> = connection_with_hooks(
-            adapter,
-            &native_field(compiled, "connection_config")?,
-            hooks,
-        )?;
+        let connection_config: Bound<'py, PyAny> = native_field(compiled, "connection_config")?;
+        let project: Bound<'py, PyAny> = native_field(compiled, "project")?;
+        let node_results_location: Option<(Option<String>, Option<String>)> =
+            if python_node_count(discovered)? == 0 {
+                None
+            } else {
+                let (database, schema) =
+                    project_target_settings(discovered, &project, (&connection_config, adapter))?
+                        .node_locations(adapter)?;
+                Some((database.extract()?, schema.extract()?))
+            };
+        let opened: Bound<'py, PyAny> = connection_with_hooks(adapter, &connection_config, hooks)?;
         connection = Some(opened.clone());
         pipeline_result(
             &PlanningInputs {
                 discovered_inputs: discovered,
                 adapter,
                 connection: &opened,
+                node_results_location,
             },
-            &native_field(compiled, "project")?,
+            &project,
             options,
             &native_field(hooks, "on_progress")?,
         )

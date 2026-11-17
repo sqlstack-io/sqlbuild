@@ -343,4 +343,6 @@ pub struct SnapshotRequest<'py> {
     pub on_progress: Bound<'py, PyAny>,
     pub deferred_locations: Bound<'py, PyAny>,
     pub cursor_scope: Bound<'py, PyAny>,
+    /// Python nodes' `(database, schema)`; their fingerprints are read there too. `None` when unknown.
+    pub node_results_location: Option<(Option<String>, Option<String>)>,
 }
