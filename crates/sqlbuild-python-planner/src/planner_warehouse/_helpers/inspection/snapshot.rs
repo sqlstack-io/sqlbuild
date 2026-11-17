@@ -7,11 +7,11 @@ use crate::planner_warehouse::constants::{
     RELATIONS_MAIN_COLUMNS, RELATIONS_MAIN_LIST,
 };
 use crate::planner_warehouse::models::SnapshotRequest;
-use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
+use pyo3::{IntoPyObject, IntoPyObjectExt};
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_MODEL;
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_SEED;
 use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;
@@ -511,6 +511,7 @@ fn gather_fingerprints<'py>(
     let Some(schemas) = schemas else {
         return native(py, RecordId::WarehouseFingerprints, &[]);
     };
+    let location = node_results_location(request, database, schemas)?;
     let node_names: Option<BTreeSet<String>> = if relevant.is_none() {
         None
     } else {
@@ -609,7 +610,11 @@ fn gather_fingerprints<'py>(
             }
         }
         let by_identity = native_field(&set, "fingerprints_by_identity")?;
-        if !by_identity.is_none() {
+        let holds_python_nodes = match &location {
+            None => true,
+            Some(location) => location.read_as.as_deref() == Some(schema_lower.as_str()),
+        };
+        if holds_python_nodes && !by_identity.is_none() {
             for item in mapping_items(&by_identity)?.try_iter()? {
                 let (key, fingerprint): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
                 let node_type: String = native_field(&fingerprint, "node_type")?.extract()?;
@@ -621,6 +626,9 @@ fn gather_fingerprints<'py>(
                 }
             }
         }
+    }
+    if let Some(location) = location.filter(|location| location.read_as.is_none()) {
+        read_node_result_fingerprints(request, location, &python_nodes)?;
     }
     native(
         py,
@@ -634,6 +642,114 @@ fn gather_fingerprints<'py>(
             ("unfiltered_database", database.clone()),
         ],
     )
+}
+
+/// Where the Python nodes of a plan record their fingerprints.
+struct NodeResultsLocation {
+    database: Option<String>,
+    schema: String,
+    /// The lowercased schema when the snapshot reads it in its own database.
+    read_as: Option<String>,
+}
+
+/// The request's node results location, or `None` when it has none.
+fn node_results_location(
+    request: &SnapshotRequest<'_>,
+    database: &Bound<'_, PyAny>,
+    schemas: &BTreeSet<String>,
+) -> PyResult<Option<NodeResultsLocation>> {
+    let py = request.project.py();
+    let Some((node_database, Some(schema))) = request.node_results_location.clone() else {
+        return Ok(None);
+    };
+    let schema_lower = lower(&text(py, &schema))?;
+    let same_database = match (&node_database, database.is_none()) {
+        (None, true) => true,
+        (Some(name), false) => lower(&text(py, name))? == lower(database)?,
+        _ => false,
+    };
+    let mut read_as = None;
+    for name in schemas {
+        if same_database && lower(&text(py, name))? == schema_lower {
+            read_as = Some(schema_lower.clone());
+        }
+    }
+    Ok(Some(NodeResultsLocation {
+        database: node_database,
+        schema,
+        read_as,
+    }))
+}
+
+/// Add Python node fingerprints from an unread results location, listing only its fingerprints table.
+fn read_node_result_fingerprints<'py>(
+    request: &SnapshotRequest<'py>,
+    NodeResultsLocation {
+        database, schema, ..
+    }: NodeResultsLocation,
+    python_nodes: &Bound<'py, PyDict>,
+) -> PyResult<()> {
+    let py = request.project.py();
+    let node_database: Bound<'py, PyAny> = database.into_bound_py_any(py)?;
+    let node_schema: Bound<'py, PyAny> = text(py, &schema);
+    let mut table_exists = false;
+    for relation in list_relations(
+        (&request.adapter, &request.connection),
+        &node_database,
+        tuple(py, vec![node_schema.clone()])?,
+        tuple(py, vec![text(py, FINGERPRINT_TABLE_NAME)])?,
+    )?
+    .try_iter()?
+    {
+        let name: String = native_field(&relation?, "name")?.extract()?;
+        table_exists |= name.eq_ignore_ascii_case(FINGERPRINT_TABLE_NAME);
+    }
+    let set = read_latest_fingerprints(Some(&keywords(
+        py,
+        &[
+            ("connection", request.connection.clone()),
+            ("execute", request.execute.clone()),
+            (
+                "table_exists",
+                table_exists.into_pyobject(py)?.to_owned().into_any(),
+            ),
+            ("database", node_database),
+            ("schema", node_schema),
+            (
+                "render_qualified_name",
+                native_field(&request.adapter, "render_qualified_name")?,
+            ),
+            (
+                "render_read_latest_sql",
+                native_field(&request.adapter, "render_read_latest_fingerprints_sql")?,
+            ),
+            ("node_names", tuple(py, Vec::new())?),
+            (
+                "filtered_node_types",
+                tuple(
+                    py,
+                    [
+                        NODE_TYPE_MODEL,
+                        FUNCTION_NODE_TYPES[0],
+                        FUNCTION_NODE_TYPES[1],
+                        NODE_TYPE_SEED,
+                    ]
+                    .iter()
+                    .map(|name| text(py, name))
+                    .collect(),
+                )?,
+            ),
+        ],
+    )?))?;
+    let by_identity = native_field(&set, "fingerprints_by_identity")?;
+    if by_identity.is_none() {
+        return Ok(());
+    }
+    for item in mapping_items(&by_identity)?.try_iter()? {
+        let (key, fingerprint): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
+        python_nodes.set_item(key, fingerprint)?;
+    }
+    Ok(())
 }
 
 fn scope_field<'py>(scope: &Bound<'py, PyAny>, name: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -782,6 +898,7 @@ pub(crate) fn gather_warehouse_snapshot<'py>(
         on_progress: on_progress.clone(),
         deferred_locations: deferred_locations.clone(),
         cursor_scope: cursor_scope.clone(),
+        node_results_location: None,
     })
 }
 
@@ -836,6 +953,7 @@ pub(crate) fn gather_redirected_cursor_snapshots<'py>(
         on_progress: args.value("on_progress")?,
         deferred_locations: deferred_locations.clone(),
         cursor_scope: cursor_scope.clone(),
+        node_results_location: None,
     };
     let snapshots = cursor_snapshots(
         &request,

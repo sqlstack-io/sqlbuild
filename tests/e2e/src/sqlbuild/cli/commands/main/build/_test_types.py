@@ -1689,6 +1689,26 @@ class PreservedTargetRefusalE2ETestCase:
 
 
 @dataclass(frozen=True)
+class PlanAfterBuildsE2ETestCase:
+    """A target's location settings, and the line `sqb plan` prints for a task after two builds."""
+
+    description: str
+    target_lines: str
+    expected_plan_line: str
+    plan_args: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PlanAfterTargetChangeE2ETestCase:
+    """Location settings before and after a change, and the plan line for the task."""
+
+    description: str
+    earlier_target_lines: str
+    target_lines: str
+    expected_plan_line: str
+
+
+@dataclass(frozen=True)
 class AdapterDefaultResultsFallbackE2ETestCase:
     """Results left in the adapter default by an earlier build, and the loader rebuilt after it."""
 

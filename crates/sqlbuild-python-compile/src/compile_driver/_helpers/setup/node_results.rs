@@ -28,8 +28,7 @@ pub(crate) fn require_node_results_schema(
     effective_vars: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
     let loader_schema: Option<String> = resolved_loader_schema(target_config, effective_vars)?;
-    if kept_loader_schema(loader_schema.as_deref()).is_some()
-        || python_node_count(discovered)? == 0
+    if kept_loader_schema(loader_schema.as_deref()).is_some() || python_node_count(discovered)? == 0
     {
         return Ok(());
     }
@@ -60,7 +59,9 @@ fn resolved_loader_schema(
     match expanded_loader_namespace(namespace.as_any(), effective_vars) {
         Ok(expanded) => {
             let schema: Bound<'_, PyAny> = expanded.get_item("schema")?;
-            Ok((!schema.is_none()).then(|| schema.str()?.extract()).transpose()?)
+            Ok((!schema.is_none())
+                .then(|| schema.str()?.extract())
+                .transpose()?)
         }
         Err(error) if error.is_instance_of::<PyException>(py) => Ok(None),
         Err(error) => Err(error),
@@ -68,7 +69,7 @@ fn resolved_loader_schema(
 }
 
 /// How many loaders, tasks, assets and checks the project declares in Python.
-fn python_node_count(discovered: &Bound<'_, PyAny>) -> PyResult<usize> {
+pub(crate) fn python_node_count(discovered: &Bound<'_, PyAny>) -> PyResult<usize> {
     PYTHON_NODE_FIELDS
         .iter()
         .map(|field| native_field(discovered, field)?.len())
