@@ -1,12 +1,21 @@
 <script lang="ts">
 	import type { RunStatus } from '$lib/api';
-	import { isActiveRun, runStatusHelp, runStatusLabel, runStatusTone } from '$lib/status';
+	import { ignoresAuditFailures, isActiveRun, runStatusHelp, runStatusLabel, runStatusTone } from '$lib/status';
+	import { plural } from '$lib/format/plural';
 
-	let { status, size = 'sm' }: { status: RunStatus; size?: 'sm' | 'md' } = $props();
+	/** `ignored` counts the audit failures a finished run let through: it reads as a success with a warning, never as a failure. */
+	let { status, size = 'sm', ignored = 0 }: { status: RunStatus; size?: 'sm' | 'md'; ignored?: number } = $props();
+	const letThrough = $derived(ignoresAuditFailures(status, ignored));
 </script>
 
-<span class="pill {size}" class:live={isActiveRun(status) && status !== 'queued'} style:--tone={runStatusTone[status]} title={runStatusHelp[status]}>
-	<i></i>{runStatusLabel[status]}
+<span
+	class="pill {size}"
+	class:live={isActiveRun(status) && status !== 'queued'}
+	style:--tone={letThrough ? 'var(--sb-warning)' : runStatusTone[status]}
+	title={letThrough ? `${runStatusLabel[status]}, letting through ${plural(ignored, 'error-severity audit failure')}: audit failures don't stop this job` : runStatusHelp[status]}
+	data-testid="run-status"
+>
+	<i></i>{runStatusLabel[status]}{#if letThrough}<span class="ignored-count">{` · ${plural(ignored, 'audit failure')} ignored`}</span>{/if}
 </span>
 
 <style>
@@ -27,6 +36,9 @@
 		padding: 2px 10px 2px 9px;
 		font-size: 12.5px;
 		line-height: 20px;
+	}
+	.ignored-count {
+		color: color-mix(in srgb, var(--sb-warning) 70%, var(--foreground));
 	}
 	i {
 		width: 7px;

@@ -38,11 +38,13 @@ export const SNAPSHOT_GENERATION = 42;
 type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 
 type JobDef = Known<
-	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'pools' | 'concurrency' | 'resolvedConcurrency' | 'poolHolders' | 'memberOf' | 'cursorType' | 'groupMembers'>,
+	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'pools' | 'concurrency' | 'resolvedConcurrency' | 'poolHolders' | 'memberOf' | 'cursorType' | 'groupMembers' | 'ignoreAuditFailures'>,
 	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
 > & {
 	/** Each pool the job takes, with its amount. */
 	pools: Record<string, number>;
+	/** The job's own `ignore_audit_failures`, when it sets one. */
+	ignoreAuditFailures?: boolean;
 };
 
 /** Each pool's limit in the mock project, and this mock server's `pool_caps`, which lower it. */
@@ -105,6 +107,7 @@ export const JOB_DEFS: JobDef[] = [
 		targets: null,
 		owner: 'data-platform',
 		criticalNodes: ['fact_orders'],
+		ignoreAuditFailures: true,
 		declaration: decl(
 			'orchestration/jobs.py',
 			24,
@@ -116,6 +119,7 @@ export const JOB_DEFS: JobDef[] = [
     on_failure=on_failure(retries=2, retry_delay_seconds=600),
     pools={"warehouse_heavy": 1},
     settings={"--concurrency": 8},
+    ignore_audit_failures=True,
     owner="data-platform",
     schedule=schedule(cron="{cron:core_build}", timezone="UTC"),
 )`
@@ -754,6 +758,8 @@ type Seed = {
 	image?: string;
 	generation?: number;
 	reason?: string;
+	/** Error-severity audit failures a successful run let through. */
+	ignored?: number;
 };
 
 function rng(seed: number) {
@@ -877,7 +883,8 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			startedAt: started != null ? new Date(started).toISOString() : null,
 			endedAt: ended ? new Date(ended).toISOString() : null,
 			nodeCounts: { success: 0, warn: 0, failed: 0, skipped: 0, running: 0, pending: 0 },
-			cost: null
+			cost: null,
+			ignoredAuditFailures: seed.ignored ?? 0
 		};
 		const rec = { run, script };
 		records.push(rec);
@@ -938,7 +945,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 		queuedAgo: at('core_build', 0, 0), startedAgo: at('core_build', 0, 10), durationMin: 6,
 		warn: ['stg_payments'], fail: ['dim_customers'], errors: { dim_customers: 'Numeric value out of range in lifetime_value' }
 	});
-	record({ id: 'run-2b70', origin: 'schedule', job: 'core_build', trigger: 'core_build', tick: 1, by: SCHEDULER, queuedAgo: at('core_build', 1, 0), startedAgo: at('core_build', 1, 9), durationMin: 7 });
+	record({ id: 'run-2b70', origin: 'schedule', job: 'core_build', trigger: 'core_build', tick: 1, by: SCHEDULER, queuedAgo: at('core_build', 1, 0), startedAgo: at('core_build', 1, 9), durationMin: 7, ignored: 2 });
 	record({ id: 'run-2b71', origin: 'sensor', job: 'reporting_exports', trigger: 'after_core_build', runKey: 'run-2b70', by: SENSOR_DAEMON, queuedAgo: at('core_build', 1, 9) - 7.2, startedAgo: at('core_build', 1, 9) - 7.4, durationMin: 3 });
 	record({ id: 'run-0c7d', origin: 'rerun', job: 'core_build', by: CI_ACCOUNT, rerunOf: 'run-2b70', queuedAgo: 600, startedAgo: 599.8, durationMin: 3, end: 'cancelled', cancel: { requestedAgoSec: 75, by: CI_ACCOUNT, sigtermAgoSec: 74, done: true }, reason: 'Cancelled by svc-ci' });
 	record({ id: 'run-91cd', origin: 'manual', job: 'marts_only', by: DEMO_USER, queuedAgo: 97, startedAgo: 96.8, durationMin: 5 });

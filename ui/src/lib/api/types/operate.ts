@@ -89,6 +89,8 @@ export type Run = {
 	endedAt: Iso | null;
 	nodeCounts: NodeCounts;
 	cost: RunCost | null;
+	/** Error-severity audit failures the run let through instead of stopping (`ignore_audit_failures`); a group sums its members'. */
+	ignoredAuditFailures: number;
 };
 
 export type RunListQuery = {
@@ -813,6 +815,8 @@ export type Job = {
 	concurrency: number | null;
 	/** What a run uses on the target and which layer set it; null for a snapshot published before it was recorded. */
 	resolvedConcurrency: ResolvedConcurrency | null;
+	/** The job's own `ignore_audit_failures` setting: failing audits don't stop its runs; null uses the target's, then the project's. */
+	ignoreAuditFailures: boolean | null;
 	priority: number | null;
 	owner: string | null;
 	sourceFile: string | null;
