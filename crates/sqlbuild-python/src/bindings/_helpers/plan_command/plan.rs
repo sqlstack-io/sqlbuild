@@ -6,6 +6,7 @@ use sqlbuild_python_planner::planner_phases::constants::WRITING;
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
 use sqlbuild_python_planner::planner_phases::models::PlanTimings;
+use sqlbuild_python_planner::planner_phases::constants::DISCOVERING;
 use std::sync::Arc;
 
 use pyo3::prelude::{
@@ -164,16 +165,18 @@ fn resolve_invocation<'py>(
     };
     let discovered: Bound<'py, PyAny> = match project {
         PlanProject::Held { discovered, .. } => discovered.clone(),
-        PlanProject::Compiled => discover_project_inputs(
-            py,
-            Some(keywords(
+        PlanProject::Compiled => timed(DISCOVERING, || {
+            discover_project_inputs(
                 py,
-                &[
-                    ("project_dir", project_dir.clone()),
-                    ("extract_output_column_locations", flag(py, false)),
-                ],
-            )?),
-        )?,
+                Some(keywords(
+                    py,
+                    &[
+                        ("project_dir", project_dir.clone()),
+                        ("extract_output_column_locations", flag(py, false)),
+                    ],
+                )?),
+            )
+        })?,
     };
     validate_preview_target(
         py,
