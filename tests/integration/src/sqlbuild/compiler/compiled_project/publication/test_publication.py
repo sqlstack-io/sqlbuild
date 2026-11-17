@@ -73,6 +73,9 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
             ]
         }
         | {
+            # DuckShop's edge-case jobs take these pools, which its project file declares.
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
+            + "\n[pools]\nedge_inventory_limit = 1\nedge_products_limit = 1\n",
             "models/orders.sql": PUBLISHABLE_FILES["models/orders.sql"].replace(
                 "MODEL (", "MODEL (tags ['edge_case'],", 1
             ),

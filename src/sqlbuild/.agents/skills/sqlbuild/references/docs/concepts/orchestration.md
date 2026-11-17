@@ -98,10 +98,6 @@ cpus = 2
 A job's `[settings]` cannot set `select` or `exclude`: the job's own selection is the run's
 selection.
 
-`[retry]` was called `[on_failure]`, with `retries` and `retry_delay_seconds` for `attempts` and
-`delay_seconds`. `retries` counted reruns, so `retries = 2` reads as `attempts = 3`. The old names
-still load, and `sqb compile` prints a deprecation warning for each one a file uses.
-
 Select a pipeline by its folder or a tag rather than listing its nodes. Rule `SQBRORCHESTRATION101`
 reports a job or sensor `select` that names more than three nodes one by one; see
 [Orchestration Rules](rules/orchestration-rules.md).

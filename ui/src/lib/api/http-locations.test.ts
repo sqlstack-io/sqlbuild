@@ -68,6 +68,8 @@ describe('location processes', () => {
 			['s-1', at(5), 'live'],
 			['old', at(95), 'stale']
 		]);
+		const capped = seen(1, { kind: 'pool_capped', generation: 2, jobs: [] }, '00000000-0000-0000-0000-000000000000');
+		expect(instancesOf([capped, ...observations], now).map((i) => i.id)).toEqual(['s-1', 'old']);
 	});
 });
 
@@ -152,6 +154,8 @@ describe('warehouseSyncOf', () => {
 		expect([halted.halted, halted.nextSyncAt, halted.tables.find((t) => t.table === 'catalog')?.error]).toEqual([true, null, 'permission denied for table _sqlbuild_catalog']);
 		const resumed = toWarehouseConnection(location, [sync('2026-11-08T12:10:00Z', 'catalog', null), stopped]);
 		expect(resumed.halted).toBe(false);
+		expect(warehouseSyncOf([stopped])?.syncing).toBeNull();
+		expect(warehouseSyncOf([{ ...stopped, report: { ...stopped.report, health: { ...stopped.report.health, progress: { ...progress, halted: false } } } }])?.syncing).toMatchObject({ position: 2, kinds: 14 });
 	});
 
 	it('shows the connection settings published with the newest snapshot, and none before it publishes them', () => {

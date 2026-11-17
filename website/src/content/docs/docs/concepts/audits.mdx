@@ -442,9 +442,9 @@ through:
 sqb build --ignore-audit-failures
 ```
 
-Every audit still runs at the same point and records `pass`, `warn` or `fail` as before, but no
-failure holds anything back: staged tables are promoted, incremental batches are applied, a source
-whose audit fails no longer blocks the models that read it, and everything downstream runs. It
+Every audit still runs at the same point and records its outcome, but no failure holds anything
+back: staged tables are promoted, incremental batches are applied, a source whose audit fails
+doesn't block the models that read it, and everything downstream runs. It
 applies to every audit, including ones whose query raises an error. Unit tests are not affected; use
 `--no-tests` to skip them.
 
@@ -478,8 +478,8 @@ job's `ignore_audit_failures = false` does the same for its runs. Each job in a
 failure to ignore.
 
 On the server, a run that ignored failures still ends `success` or `warn`, and the run records how
-many it ignored: a group adds up its members'. Each ignored failure is recorded as `fail`, marked as
-ignored: see [Result history](#result-history).
+many it ignored: a group adds up its members'. Each ignored failure is recorded with outcome `error`,
+marked as ignored: see [Result history](#result-history).
 
 ## Run scope
 

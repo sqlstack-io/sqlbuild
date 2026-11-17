@@ -7,10 +7,17 @@ use crate::plan_display::models::DiffStats;
 pub(crate) fn diff_stats(diff: &[String]) -> DiffStats {
     let mut removed: Vec<&str> = Vec::new();
     let mut added: Vec<&str> = Vec::new();
+    // File headers come before the first hunk; inside hunks a removed `-- comment` reads `--- comment`.
+    let mut in_hunk = false;
     for line in diff {
-        if DIFF_HEADER_PREFIXES
-            .iter()
-            .any(|prefix| line.starts_with(prefix))
+        if line.starts_with("@@") {
+            in_hunk = true;
+            continue;
+        }
+        if !in_hunk
+            && DIFF_HEADER_PREFIXES
+                .iter()
+                .any(|prefix| line.starts_with(prefix))
         {
             continue;
         }

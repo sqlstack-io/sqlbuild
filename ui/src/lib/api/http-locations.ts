@@ -105,10 +105,11 @@ export function toLocationSummary(
 	};
 }
 
-/** One process per reporting session, newest check-in first; the server keeps no image, commit or start time for them. */
+/** One process per reporting session, newest check-in first; the server keeps no image, commit or start time for them, and its own pool-cap warning is no process. */
 export function instancesOf(observations: Wire['LocationHealthObservation'][], now: number): LocationInstance[] {
 	const lastSeen = new Map<string, string>();
 	for (const o of observations) {
+		if (o.report.health.kind === 'pool_capped') continue;
 		const seen = lastSeen.get(o.report.session_id);
 		if (!seen || o.received_at > seen) lastSeen.set(o.report.session_id, o.received_at);
 	}
@@ -251,7 +252,7 @@ export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,
 		lastError: failing.length ? failing.sort().join('\n') : null,
 		lastReportedAt: syncs[0].received_at,
-		syncing: running.progress && !running.progress.completed ? { position: running.progress.position, kinds: running.progress.kinds, table: running.table, rows: running.progress.rows } : null,
+		syncing: running.progress && !running.progress.completed && !running.progress.halted ? { position: running.progress.position, kinds: running.progress.kinds, table: running.table, rows: running.progress.rows } : null,
 		completed: done?.report.health.progress ? { at: done.received_at, kinds: done.report.health.progress.kinds, rows: done.report.health.progress.rows, elapsedMs: done.report.health.progress.elapsed_millis } : null
 	};
 }

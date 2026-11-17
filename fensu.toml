@@ -2079,7 +2079,7 @@ paths = ["src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"]
 reason = "SQL Server overrides each state table's create SQL to add that table's own key index; the keyed DDL lives in _keyed_state_table_sql."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-planner/src/microbatches/_helpers/projection.rs", "crates/sqlbuild-python-base/src/warehouse_access/_helpers/synced_copy.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/checking/dsl_headers.rs"]
+paths = ["crates/sqlbuild-python-planner/src/microbatches/_helpers/projection.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/checking/dsl_headers.rs"]
 reason = "Each turns its own record type into its own Python objects; only the loop that collects them is alike."
 
 [[dupes.allowlist]]

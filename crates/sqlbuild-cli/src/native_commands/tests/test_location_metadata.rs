@@ -11,7 +11,7 @@ use crate::native_commands::tests::test_types::{
 };
 use crate::native_commands::tests::test_types::{
     MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
-    SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
+    SafetySyncSettingTestCase, StoppedPassTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
 use chrono::Utc;
 use sqlbuild_config::project::models::ControlConfig;
@@ -68,7 +68,7 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             .iter()
             .position(|kind| *kind == test_case.failed_kind)
             .expect("kind is listed");
-        let wait = state.fail_read(test_case.page_size, Utc::now());
+        let wait = state.fail_read(test_case.page_size);
         assert!(wait.is_some(), "{}", test_case.description);
         let state = acknowledge_complete_pages(state, test_case.acknowledged_pages);
         assert_eq!(
@@ -135,11 +135,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
         let mut waits: Vec<Option<u64>> = test_case
             .failures
             .into_iter()
-            .map(|page_size| {
-                state
-                    .fail_read(page_size, Utc::now())
-                    .map(|wait| wait.as_secs())
-            })
+            .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs()))
             .collect();
         state.request_sync();
         if state.idle && state.sync_due(None) {
@@ -150,11 +146,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             test_case
                 .failures_after_request
                 .into_iter()
-                .map(|page_size| {
-                    state
-                        .fail_read(page_size, Utc::now())
-                        .map(|wait| wait.as_secs())
-                }),
+                .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs())),
         );
         assert_eq!(
             (
@@ -224,8 +216,7 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_a
         state.reads_wake_compute = test_case.billed;
         state.safety_explicit = !test_case.billed;
         state.begin_sync(Utc::now());
-        let stopped: Vec<Option<Duration>> =
-            (0..5).map(|_| state.fail_read(false, Utc::now())).collect();
+        let stopped: Vec<Option<Duration>> = (0..5).map(|_| state.fail_read(false)).collect();
         state.safety_at = Instant::now() + test_case.due_in;
         let runs_ended_at = test_case
             .ran
@@ -235,7 +226,7 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_a
             state.begin_sync(Utc::now());
         }
         let paging: bool = state.paging();
-        let wait: Option<Duration> = state.fail_read(false, Utc::now());
+        let wait: Option<Duration> = state.fail_read(false);
         assert_eq!(
             (
                 stopped[4],
@@ -248,6 +239,55 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_a
             (None, test_case.expected_outcome, true),
             "{}",
             test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_sync_stopped_mid_pass_when_a_later_run_resumes_it_then_the_pass_restarts_and_still_replans()
+ {
+    let test_cases = [
+        StoppedPassTestCase {
+            description: "a run that ended before the stop by the server's clock does not resume it, \
+                          though it ended after the stop by the location's clock",
+            run_ended_after_stop: -1800,
+            expected_outcome: (false, false, true),
+        },
+        StoppedPassTestCase {
+            description: "a run that ended after the stop resumes it from the first table and the \
+                          page it applied before stopping still replans",
+            run_ended_after_stop: 60,
+            expected_outcome: (true, true, true),
+        },
+    ];
+    let statistics: usize = WarehouseHistoryKind::ALL
+        .iter()
+        .position(|kind| *kind == WarehouseHistoryKind::Statistics)
+        .expect("statistics scan");
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.take_replan();
+        let server_now = Utc::now() + chrono::Duration::hours(1);
+        state.begin_sync(server_now);
+        state.applied = true;
+        state = acknowledge_complete_pages(state, statistics);
+        while state.fail_read(false).is_some() {}
+        let stopped_at = state.cycle_started_at.expect("stop time");
+        let resumed: bool = state.sync_due(Some(
+            server_now + chrono::Duration::seconds(test_case.run_ended_after_stop),
+        ));
+        if resumed {
+            state.begin_sync(Utc::now() + chrono::Duration::hours(1));
+        }
+        assert_eq!(
+            (resumed, state.index == 0, state.take_replan()),
+            test_case.expected_outcome,
+            "{}",
+            test_case.description
+        );
+        assert!(
+            (stopped_at - server_now).num_seconds().abs() < 60,
+            "the stop is timed by the server's clock"
         );
     }
 }
@@ -895,7 +935,7 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
         state.safety_explicit = false;
         state.begin_sync(Utc::now());
         for _ in 0..test_case.failures_before {
-            state.fail_read(false, Utc::now());
+            state.fail_read(false);
         }
         let page_size: bool = test_case.failure.page_size();
         let halts: bool = state.halts(page_size);

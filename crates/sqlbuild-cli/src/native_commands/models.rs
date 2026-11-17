@@ -9,6 +9,7 @@ use sqlbuild_orchestration::credentials::models::CredentialScope;
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWorkRequest, WarehouseReadFailure};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
+use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind,
     WarehouseHistoryPage, WarehouseStateLocation,
@@ -256,6 +257,8 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) idle: bool,
     /// Server time when the current or last synchronization began; `None` before the first.
     pub(crate) cycle_started_at: Option<DateTime<Utc>>,
+    /// Server time minus local time, measured as the last synchronization began.
+    pub(crate) server_offset: chrono::Duration,
     /// Seconds between safety syncs; `0` turns them off.
     pub(crate) safety_seconds: u64,
     /// When an idle location syncs even though no run ended and nobody asked.
@@ -429,10 +432,26 @@ impl LocationMetadataSync {
     }
 
     /// Start the sync `sync_due` asked for, at server time `now`.
+    ///
+    /// A stopped synchronization starts its pass again from the first table, since the run that
+    /// resumes it may have changed tables it already read; what it applied before stopping still
+    /// asks for a plan of what changed once the pass completes.
     pub(crate) fn begin_sync(&mut self, now: DateTime<Utc>) {
+        if std::mem::take(&mut self.halted) {
+            self.index = 0;
+            self.source_after = None;
+            self.scan_id = Uuid::now_v7();
+            self.observed_since = None;
+            self.watermark_loaded = false;
+            self.statistics = None;
+            self.limit = MAX_HISTORY_PAGE_RECORDS;
+            self.scan_token = None;
+            self.scan_delivered = false;
+        } else {
+            self.applied = false;
+        }
         self.idle = false;
-        self.halted = false;
-        self.applied = false;
+        self.server_offset = now - Utc::now();
         self.progress = SyncProgress::new();
         self.cycle_started_at = Some(now);
         self.next_at = tokio::time::Instant::now();
@@ -457,14 +476,10 @@ impl LocationMetadataSync {
 
     /// Statistics revisit catalog; a page-size failure halves the page, any other backs off.
     ///
-    /// `None` once failures in a row stop the sync: it rests idle from `now`, so the next run, a
-    /// request, a publication or a due safety sync resumes it where it stopped, and one more
+    /// `None` once failures in a row stop the sync: it rests idle from the current server time,
+    /// so the next run, a request, a publication or a due safety sync resumes it, and one more
     /// failure stops it again.
-    pub(crate) fn fail_read(
-        &mut self,
-        page_size: bool,
-        now: DateTime<Utc>,
-    ) -> Option<std::time::Duration> {
+    pub(crate) fn fail_read(&mut self, page_size: bool) -> Option<std::time::Duration> {
         let shrinks: bool = self.shrinks(page_size);
         self.statistics = None;
         let statistics = self.kind() == WarehouseHistoryKind::Statistics;
@@ -488,7 +503,7 @@ impl LocationMetadataSync {
             if self.failed_reads >= METADATA_FAILURE_LIMIT {
                 self.halted = true;
                 self.idle = true;
-                self.cycle_started_at = Some(now);
+                self.cycle_started_at = Some(Utc::now() + self.server_offset);
                 self.safety_at = tokio::time::Instant::now()
                     + std::time::Duration::from_secs(self.safety_seconds);
                 return None;

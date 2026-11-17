@@ -121,6 +121,17 @@ pub(super) struct MetadataBackoffTestCase {
     pub(super) expected_paging: (bool, bool),
 }
 
+/// A sync that applied a page and stopped at statistics on a server whose clock runs an hour ahead.
+pub(super) struct StoppedPassTestCase {
+    pub(super) description: &'static str,
+    /// When the last run ended, in seconds after the stop by the server's clock; the reads fail
+    /// as the sync begins, so the stop is at the sync's server start time.
+    pub(super) run_ended_after_stop: i64,
+    /// Whether it resumed, whether its pass starts again at the first table, and whether its
+    /// completion plans what changed.
+    pub(super) expected_outcome: (bool, bool, bool),
+}
+
 /// A sync stopped by failed reads, its safety interval and how soon the safety sync is due.
 pub(super) struct SafetyResumeTestCase {
     pub(super) description: &'static str,

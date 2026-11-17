@@ -238,6 +238,7 @@ audit_results (view): one row per evaluated audit; its evidence rows are in arti
   evidence_count ANY
   evidence_truncated ANY
   sample_digest ANY
+  ignored ANY
 
 conflicts (view): record keys reused with different content; the first row is kept
   dataset TEXT
@@ -303,7 +304,8 @@ events (view): every lifecycle fact
   outcome TEXT
   row_count INTEGER
   affected_rows INTEGER
-  payload TEXT
+  payload ANY
+  started_at TEXT
   invocation_id TEXT  join key
   invocation_started_at TEXT
   schema_version INTEGER

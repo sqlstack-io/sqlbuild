@@ -499,6 +499,7 @@ pub(crate) fn metadata_sync(
         applied: false,
         replan: true,
         cycle_started_at: None,
+        server_offset: chrono::Duration::zero(),
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
         busy: false,

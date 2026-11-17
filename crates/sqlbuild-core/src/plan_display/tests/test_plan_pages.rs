@@ -489,6 +489,22 @@ fn given_diffs_when_counted_then_whitespace_only_needs_identical_text_without_wh
             },
         },
         DiffStatsTestCase {
+            description: "a removed SQL comment inside a hunk is a changed line, not a header",
+            diff: &[
+                "--- a/orders.sql",
+                "+++ b/orders.sql",
+                "@@ -1,2 +1 @@",
+                "--- legacy",
+                "-where x = 1",
+                "+where  x = 1",
+            ],
+            expected_stats: DiffStats {
+                added: 1,
+                removed: 2,
+                whitespace_only: false,
+            },
+        },
+        DiffStatsTestCase {
             description: "no changed lines",
             diff: &[" select id"],
             expected_stats: DiffStats {

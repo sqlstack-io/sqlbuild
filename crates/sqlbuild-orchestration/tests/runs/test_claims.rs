@@ -572,7 +572,7 @@ fn given_claimed_work_here_and_elsewhere_when_listing_the_queue_then_each_run_sh
                 .expect("elect")
                 .expect("leader");
             let mut running = request((location, here.snapshot_id), 1, 0, &["orders"]);
-            running.pools.insert("warehouse".into(), pool_slots(1, 100));
+            running.pools.insert("warehouse".into(), pool_slots(2, 100));
             let mut elsewhere = request((other, there.snapshot_id), 2, 0, &["products"]);
             elsewhere
                 .pools

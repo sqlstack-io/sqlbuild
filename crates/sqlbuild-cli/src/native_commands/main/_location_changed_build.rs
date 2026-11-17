@@ -99,10 +99,15 @@ pub(super) async fn report_changed_build(
             downstream: Vec::new(),
             failing: Some(reason.chars().take(MAX_FAILING_REASON_CHARS).collect()),
         };
-        if let Err(error) = client.report_changed_build(&options.target, &request).await {
-            report(&format!("Reporting the failed plan failed: {error}\n"));
-        }
-        return Ok(Some(false));
+        // A failure the server holds is not planned again until the copy or the project changes.
+        let reported = match client.report_changed_build(&options.target, &request).await {
+            Ok(_) => true,
+            Err(error) => {
+                report(&format!("Reporting the failed plan failed: {error}\n"));
+                false
+            }
+        };
+        return Ok(Some(reported));
     }
     let (changed, downstream) = match changed_build_nodes(&document) {
         Ok(nodes) => nodes,

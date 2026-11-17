@@ -46,7 +46,7 @@ executable = "/usr/local/bin/sqb"
 | Section | Keys |
 | --- | --- |
 | `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`) |
-| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`; see [Set retention](#set-retention) |
+| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`; see [Set retention](#set-retention) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
 | `[trusted_proxy]` | `origin`, `trusted_peers` and `identities` |
 | `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
@@ -230,8 +230,7 @@ and always keeps the latest one:
 - Builds and results that arrive later are added, and older ones are deleted in small batches about
   once a minute.
 - A SQLite control database gives the freed space back to the disk, so the file shrinks. A file
-  created by an older release is vacuumed once, when at least a quarter of it is free; after that,
-  space is freed a little at a time.
+  with at least a quarter free is vacuumed once; after that, space is freed a little at a time.
 
 The PostgreSQL default matches the janitor's
 [`direct_state_history_versions`](/docs/cli/janitor#state-history-pruning), so with the janitor
@@ -389,9 +388,9 @@ Details:
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
   or time retries a smaller page. Any other error, such as a missing permission or table, retries
   after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
-  the sync stops until you request one, the location publishes again, or the next safety sync is
-  due (`sync_at_least_every`). The safety sync tries once; another failure stops it until the
-  following one.
+  the sync stops until a run ends, you request one, the location publishes again, or the next safety
+  sync is due (`sync_at_least_every`). It then starts again from the first kind of history. A sync
+  resumed by a run or the safety sync tries once, and another failure stops it again.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 - When a state table holds two rows with the same ID, such as one check result written twice, the
   server keeps the row with the earlier time. Estimated query costs are the exception: when two
@@ -432,10 +431,14 @@ Warehouse history synchronization completed: 14 kinds, 31,204 rows in 12.8 s.
 ```
 
 A page holds up to 2,000 rows and ends early at 8 MiB, so wide rows make smaller pages. A failed
-read prints which kind failed, the page size and why, then retries a smaller page:
+read prints which kind failed, the page size and why, then what the location does next. A read that
+ran out of time or memory retries a smaller page; any other failure retries the same page after a
+wait that doubles each time, and the fifth in a row stops the sync:
 
 ```text
-Warehouse history read failed for statistics (100-relation page): no reply within 130 s. Sync incomplete; retaining mirror and retrying a smaller page.
+Warehouse history read failed for statistics (100-relation page): no reply within 130 s. Sync incomplete; retaining mirror and retrying a smaller page in 30 s.
+Warehouse history read failed for catalog (2000-row page): permission denied for table _sqlbuild_catalog. Sync incomplete; retaining mirror and retrying in 60 s.
+Warehouse history read failed for catalog (2000-row page): permission denied for table _sqlbuild_catalog. Synchronization stopped after 5 failed reads in a row; it resumes after the next run, on request or after a publish.
 ```
 
 | Cause | Printed as |
@@ -450,11 +453,11 @@ The location's page shows a running sync, for example
 A location is ready as soon as it has compiled and published; nothing waits for the sync. Lineage,
 jobs, the catalog and code work at once. Plan previews, node history, check results and costs read
 the server's copy of the warehouse, so until the location's first sync completes they show
-**Syncing warehouse history…** and fill in when it does.
+**Syncing warehouse history** with its progress, and fill in when it does.
 
-The location's page shows a failure as **Warehouse sync failing**, with the kind, the cause
-and the page size. It leaves out the warehouse's message, which can name hosts or users; read it in
-the location's log.
+The location's page shows a failing sync as **failing** with when it last synced; its tooltip lists
+each failing kind with the cause, the page size and the warehouse's message, shortened and with
+secrets removed. The Connections page shows a stopped sync as **stopped after failed reads**.
 
 ## Skip overlapping runs and retry failures
 
@@ -507,9 +510,6 @@ Details:
 - Sensors and alerts see a member's final attempt only. The group run's timeline shows each retry,
   such as `orders_job failed, retrying in 15 min (attempt 2 of 3)`, the member's row shows its
   attempt, and the run's header counts the members it retried.
-- `[retry]` was called `[on_failure]`, with `retries` and `retry_delay_seconds`. `retries` counted
-  reruns, so `retries = 2` reads as `attempts = 3`. The old names still load, with a deprecation
-  warning.
 - An invalid value is a `D017` error at its line, such as
   ``orchestration/jobs/nightly_orders_job.toml:6:11: unknown variant `coalesce`, expected `queue` or `skip` ``.
 

@@ -4,7 +4,6 @@ use std::future::Future;
 use std::path::Path;
 use std::time::Duration;
 
-use chrono::Utc;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::models::{
     LocationWorkClient, LocationWorkPoll, WarehouseSyncFailure,
@@ -50,7 +49,7 @@ pub(super) async fn sync_location_metadata(
         };
         state = next;
         match due {
-            Ok(true) if halted => resumed_line(),
+            Ok(true) if halted => resumed_line(state.failed_reads > 0),
             Ok(true) => {}
             Ok(false) => return Ok(Some(state)),
             Err(error) => return retry_metadata(state, error),
@@ -183,7 +182,7 @@ async fn failed_read(
     }
     let line: String = read_failure_line(&state, &failure);
     let shrinks: bool = state.shrinks(failure.page_size());
-    let outcome: String = match state.fail_read(failure.page_size(), Utc::now()) {
+    let outcome: String = match state.fail_read(failure.page_size()) {
         Some(wait) if shrinks => {
             format!(
                 " Sync incomplete; retaining mirror and retrying a smaller page in {} s.\n",
@@ -226,15 +225,21 @@ async fn failed_read(
     Ok(Some(state))
 }
 
-/// A stopped synchronization that resumes says so before its first read.
-fn resumed_line() {
+/// A stopped synchronization that resumes says so before its first read; after a request its
+/// failed reads count from zero again, otherwise one more failure stops it.
+fn resumed_line(one_attempt: bool) {
     drop(write_output(&[(
         Stream::Stderr,
         "Retrying the stopped warehouse history synchronization.\n",
     )]));
     location_warning(
         "warehouse sync retrying",
-        "one attempt; another failed read stops it again".to_owned(),
+        if one_attempt {
+            "one attempt; another failed read stops it again"
+        } else {
+            "on request; failed reads back off again before they stop it"
+        }
+        .to_owned(),
     );
 }
 
