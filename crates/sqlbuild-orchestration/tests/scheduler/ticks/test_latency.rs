@@ -112,28 +112,28 @@ fn given_a_set_database_clock_when_times_fall_due_then_each_cycle_ticks_the_late
             backend: Backend::Sqlite,
             calendar: &[2, 3, 4, 8, 9],
             steps: ON_TIME_THEN_FAILOVER,
-            expected_total_ticks: 4,
+            expected_ticked: &[2, 3, 4, 9],
         },
         SchedulerClockTestCase {
             description: "PostgreSQL on-time ticks then standby catch-up",
             backend: Backend::Postgres,
             calendar: &[2, 3, 4, 8, 9],
             steps: ON_TIME_THEN_FAILOVER,
-            expected_total_ticks: 4,
+            expected_ticked: &[2, 3, 4, 9],
         },
         SchedulerClockTestCase {
             description: "SQLite late cycle folds overdue times",
             backend: Backend::Sqlite,
             calendar: &[2, 3, 4],
             steps: LATE_CYCLE,
-            expected_total_ticks: 2,
+            expected_ticked: &[3, 4],
         },
         SchedulerClockTestCase {
             description: "PostgreSQL late cycle folds overdue times",
             backend: Backend::Postgres,
             calendar: &[2, 3, 4],
             steps: LATE_CYCLE,
-            expected_total_ticks: 2,
+            expected_ticked: &[3, 4],
         },
     ];
     for test_case in test_cases {
@@ -156,12 +156,12 @@ fn given_a_set_database_clock_when_times_fall_due_then_each_cycle_ticks_the_late
                 list_ticks(store, trigger_id, 100).await.expect("ticks")
             })
             .await;
-            assert_eq!(
-                ticks.len(),
-                test_case.expected_total_ticks,
-                "{}",
-                test_case.description
-            );
+            let mut ticked: Vec<i64> = ticks
+                .iter()
+                .map(|tick| (tick.scheduled_for - base).num_seconds())
+                .collect();
+            ticked.sort_unstable();
+            assert_eq!(ticked, test_case.expected_ticked, "{}", test_case.description);
             close_test_store(fixture).await;
         });
     }

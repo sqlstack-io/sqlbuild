@@ -178,7 +178,7 @@ pub(crate) struct ClockCycleStep {
     pub(crate) at_seconds: i64,
     pub(crate) expected_leader: bool,
     pub(crate) expected_ticks: usize,
-    /// How long the loop sleeps after this cycle: exactly until the next due time, at most a renewal.
+    /// The cycle's wait to the next due time, capped at one renewal interval.
     pub(crate) expected_wait: std::time::Duration,
 }
 
@@ -188,7 +188,8 @@ pub(crate) struct SchedulerClockTestCase {
     /// Calendar times, in seconds after the test's base time.
     pub(crate) calendar: &'static [i64],
     pub(crate) steps: &'static [ClockCycleStep],
-    pub(crate) expected_total_ticks: usize,
+    /// Due times that ticked, in seconds after the base time.
+    pub(crate) expected_ticked: &'static [i64],
 }
 
 pub(crate) struct SchedulerWakeTestCase {
