@@ -1,3 +1,4 @@
+import { recordPlanRows } from './plan-rows-log';
 import type { ApiClient } from '../client';
 import { ApiError } from '../client';
 import { LocalChangeBus, type ConnectionState } from '../signals';
@@ -355,10 +356,11 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.planBuild(scope, command, changed);
 	}
 
-	/** The mock plans whole documents, so no section is paged. */
-	async planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number): Promise<PlanPage> {
+	/** The mock plans whole documents, so no section is paged; `?large` serves a paged plan (large-project.ts). */
+	async planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number): Promise<PlanPage> {
 		this.#location(scope);
-		void [requestId, section, offset];
+		recordPlanRows(section, offset, limit);
+		void requestId;
 		return { total: 0, rows: [], runs: [] };
 	}
 

@@ -146,3 +146,42 @@ for (const { name, path, panFromCard } of GRAPHS) {
 		expect(over, `frames over budget (p90 ≤ ${P90_MS} ms, max ≤ ${MAX_MS} ms)`).toEqual([]);
 	});
 }
+
+// The plan page on a plan the size of a real `build --changed` (`?mock&large`), on a slow computer: the
+// index switches section, and Show more adds a page, each with its rows on screen within a second.
+const PLAN_STEP_MS = 1000;
+
+test('the plan page switches sections and shows more quickly on a slow computer', async ({ page }) => {
+	test.setTimeout(180_000);
+	await page.setViewportSize({ width: 1600, height: 1000 });
+	await page.goto(`/plan?mock&large&cmd=${encodeURIComponent('sqb build --changed')}`);
+	await page.locator('.pane .plan-row').first().waitFor({ timeout: 30_000 });
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+	const timed = async (act: () => Promise<void>, done: () => Promise<boolean>) => {
+		const start = Date.now();
+		await act();
+		await expect.poll(done, { timeout: 10_000, intervals: [10] }).toBe(true);
+		return Date.now() - start;
+	};
+	const steps: string[] = [];
+	const over: string[] = [];
+	for (const key of ['first_run', 'python', 'unchanged', 'warnings', 'changed']) {
+		const ms = await timed(
+			() => page.locator(`.index .entry[data-section="${key}"]`).click(),
+			async () => (await page.locator(`.pane[data-section="${key}"]`).count()) > 0 && (key === 'warnings' || (await page.locator('.pane .plan-row').count()) >= 50)
+		);
+		steps.push(`${key} ${ms} ms`);
+		if (ms > PLAN_STEP_MS) over.push(`${key}: ${ms} ms`);
+	}
+	await page.locator('.index .entry[data-section="unchanged"]').click();
+	await page.locator('.pane[data-section="unchanged"] .plan-row').nth(49).waitFor();
+	const more = await timed(
+		() => page.getByRole('button', { name: /^Show more/ }).click(),
+		async () => (await page.locator('.pane .plan-row').count()) >= 100
+	);
+	steps.push(`show more ${more} ms`);
+	if (more > PLAN_STEP_MS) over.push(`show more: ${more} ms`);
+	console.info(`plan page, CPU slowed 6×: ${steps.join('; ')}`);
+	expect(over, `steps over ${PLAN_STEP_MS} ms`).toEqual([]);
+});

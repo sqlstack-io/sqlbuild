@@ -9,6 +9,8 @@ fail when a page breaks these budgets; keep them passing rather than raising the
 - Opening a list page, first or repeat visit: settled within 2 s.
 - Graph pan, wheel zoom, trackpad momentum and pinch: 90% of frames ≤ 50 ms, none over 200 ms.
 - Typing in a search or selection field: suggestions update without a visible stall.
+- The plan page on a real-sized plan: switching section, or Show more, has its rows on screen within 1 s.
+  A large section loads one page of rows when it is opened, never all of them.
 
 ## Rules
 
