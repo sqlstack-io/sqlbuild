@@ -343,11 +343,20 @@ pub(crate) struct PreviousTriggerState {
     pub(crate) status_override: Option<TriggerStatus>,
 }
 
-/// Each member job's waits, and why it waits: the first lineage edge found.
+/// Each member job's waits, why it waits (the first lineage edge found, as node and upstream), and its cycles.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct GroupWaits {
-    pub(crate) edges: BTreeMap<String, BTreeSet<String>>,
-    pub(crate) reasons: BTreeMap<(String, String), String>,
+pub struct GroupWaits {
+    pub edges: BTreeMap<String, BTreeSet<String>>,
+    pub reasons: BTreeMap<(String, String), (String, String)>,
+    pub cycles: Vec<GroupCycle>,
+}
+
+/// Members that wait on each other, named as one cycle among them with a reason per wait.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GroupCycle {
+    pub description: String,
+    /// Whether a wait in the cycle reads a seed or a node that more than one member builds.
+    pub shared_read: bool,
 }
 
 /// Providers the current snapshot declares; empty before a publish or when the project has none.
