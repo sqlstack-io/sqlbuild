@@ -62,8 +62,7 @@ pub(crate) async fn frozen_group_children(
             write_set,
             selection,
             settings,
-            concurrency_groups: job.concurrency_groups.clone(),
-            concurrency_limits: job.concurrency_limits.clone(),
+            pools: job.pools.clone(),
             ..request.clone()
         });
     }

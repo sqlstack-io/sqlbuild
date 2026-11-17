@@ -1,4 +1,4 @@
-//! A group takes every child's limits when admitted, so no admitted run waits on another limit.
+//! A group takes every child's pools when admitted, so no admitted run waits on another pool.
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
@@ -10,31 +10,26 @@ use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
 use crate::store::models::ControlTransaction;
 
-/// A group's slots in its run's location and target: groups belong to their project.
-pub(crate) fn slot_key(request: &RunRequest, group: &str) -> String {
-    format!("{}/{}/{group}", request.location_id, request.target)
+/// A pool's slots in its run's location and target: pools belong to their project.
+pub(crate) fn slot_key(request: &RunRequest, pool: &str) -> String {
+    format!("{}/{}/{pool}", request.location_id, request.target)
 }
 
-/// The group name of a slot key.
-pub(crate) fn slot_group(key: &str) -> &str {
-    key.rsplit_once('/').map_or(key, |(_, group)| group)
+/// The pool name of a slot key.
+pub(crate) fn slot_pool(key: &str) -> &str {
+    key.rsplit_once('/').map_or(key, |(_, pool)| pool)
 }
 
-/// The request a group is admitted with: its own and every child's groups, with their limits.
+/// The request a group is admitted with: its own and every child's pools, each at the largest amount.
 pub(crate) fn admitted<'a>(
     request: &RunRequest,
     children: impl IntoIterator<Item = &'a RunRequest>,
 ) -> RunRequest {
     let mut admitted = request.clone();
     for child in children {
-        admitted
-            .concurrency_groups
-            .extend(child.concurrency_groups.iter().cloned());
-        for (group, limit) in &child.concurrency_limits {
-            admitted
-                .concurrency_limits
-                .entry(group.clone())
-                .or_insert(*limit);
+        for (pool, slots) in &child.pools {
+            let held = admitted.pools.entry(pool.clone()).or_insert(*slots);
+            held.amount = held.amount.max(slots.amount);
         }
     }
     admitted
@@ -49,9 +44,9 @@ pub(crate) fn admission_limits<'a>(
         return BTreeSet::new();
     }
     admitted(request, children)
-        .concurrency_groups
-        .iter()
-        .map(|group| slot_key(request, group))
+        .pools
+        .keys()
+        .map(|pool| slot_key(request, pool))
         .collect()
 }
 

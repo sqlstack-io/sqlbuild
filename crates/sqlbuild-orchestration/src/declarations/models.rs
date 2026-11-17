@@ -34,11 +34,9 @@ pub struct JobDefinition {
     pub selection: BTreeSet<String>,
     #[serde(default)]
     pub settings: BTreeMap<String, serde_json::Value>,
-    #[serde(default)]
-    pub concurrency_groups: BTreeSet<String>,
-    /// Each of `concurrency_groups` with its most runs at once, as the project declares it for the target.
+    /// Each pool the job takes, with its amount and the pool's limit on the target.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub concurrency_limits: BTreeMap<String, NonZeroU32>,
+    pub pools: BTreeMap<String, PoolSlots>,
     /// The selectors as written, for display; `selection` is what runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub select: Option<String>,
@@ -179,12 +177,22 @@ pub struct WaitReason {
     pub to_node: String,
 }
 
-/// A job's concurrency group: its most runs at once and the other jobs and groups that share it.
+/// How many slots of a pool a job takes, and the pool's limit on the job's target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PoolSlots {
+    #[schema(value_type = u32)]
+    pub amount: NonZeroU32,
+    #[schema(value_type = u32)]
+    pub limit: NonZeroU32,
+}
+
+/// A pool a job takes: its slots, the pool's limit, and the other jobs and groups taking it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ConcurrencyRule {
-    pub group: String,
-    /// Absent for a snapshot published before limits were part of it.
-    pub limit: Option<u32>,
+pub struct PoolUse {
+    pub pool: String,
+    pub amount: u32,
+    pub limit: u32,
     pub shared_with: BTreeSet<String>,
 }
 
@@ -256,9 +264,10 @@ pub struct JobRecord {
     pub kind: crate::runs::models::RunKind,
     pub description: String,
     pub selection: BTreeSet<String>,
-    pub concurrency_groups: BTreeSet<String>,
-    /// Each concurrency group's limit and the other jobs sharing it, by group name.
-    pub concurrency: Vec<ConcurrencyRule>,
+    /// Each pool the job takes, by pool name.
+    pub pools: Vec<PoolUse>,
+    /// The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
+    pub concurrency: Option<u64>,
     pub snapshot_id: uuid::Uuid,
     /// A job's selectors as written; absent for a group and for snapshots published before they were recorded.
     pub select: Option<String>,
@@ -285,9 +294,10 @@ pub struct JobDetailRecord {
     pub description: String,
     pub snapshot_id: uuid::Uuid,
     pub selection: BTreeSet<String>,
-    pub concurrency_groups: BTreeSet<String>,
-    /// Each concurrency group's limit and the other jobs sharing it, by group name.
-    pub concurrency: Vec<ConcurrencyRule>,
+    /// Each pool the job takes, by pool name.
+    pub pools: Vec<PoolUse>,
+    /// The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
+    pub concurrency: Option<u64>,
     /// Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction.
     pub settings: BTreeMap<String, serde_json::Value>,
     /// A group's member jobs in run order; empty for a job.

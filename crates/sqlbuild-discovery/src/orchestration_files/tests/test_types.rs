@@ -11,6 +11,7 @@ pub(super) struct JobReadTestCase {
     pub(super) expected_select: Positioned<String>,
     pub(super) expected_exclude: Option<&'static str>,
     pub(super) expected_overlap: Overlap,
+    pub(super) expected_pools: &'static [(&'static str, u32)],
     pub(super) expected_retry: Option<RetryPolicy>,
     /// Each deprecation message with its line and column.
     pub(super) expected_deprecations: Vec<(&'static str, FilePosition)>,
@@ -54,9 +55,9 @@ pub(super) struct GroupDependenciesTestCase {
     pub(super) expected: Result<GroupDependencies, (&'static str, FilePosition)>,
 }
 
-pub(super) struct ConcurrencyGroupCheckTestCase {
+pub(super) struct PoolCheckTestCase {
     pub(super) description: &'static str,
     pub(super) files: Vec<(&'static str, &'static str)>,
-    pub(super) declared: &'static [(&'static str, u32)],
+    pub(super) limits: sqlbuild_config::project::models::PoolLimits,
     pub(super) expected_failure: Option<(&'static str, &'static str)>,
 }

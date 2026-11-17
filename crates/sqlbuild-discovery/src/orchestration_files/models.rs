@@ -114,7 +114,8 @@ pub struct RunFile {
     pub targets: Vec<String>,
     pub owner: Option<String>,
     pub overlap: Overlap,
-    pub concurrency_groups: Vec<String>,
+    /// Each pool the run takes, with how many of its slots.
+    pub pools: BTreeMap<String, u32>,
     pub schedule: Option<ScheduleFile>,
     /// `[retry]`, or the deprecated `[on_failure]` it replaces.
     pub retry: Option<RetryPolicy>,

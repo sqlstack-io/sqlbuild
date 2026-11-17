@@ -22,7 +22,7 @@
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { concurrencyText, formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId } from '$lib/operate/labels';
+	import { formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, poolText, shortRunId } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
 	import { memberLinks, publishedLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
@@ -89,14 +89,11 @@
 		const took = finished.flatMap((r) => (r.startedAt && r.endedAt ? [Date.parse(r.endedAt) - Date.parse(r.startedAt)] : [])).sort((a, b) => a - b);
 		return took.length ? took[Math.floor(took.length / 2)] : null;
 	});
-	// Each concurrency group's rule as published; from a server that only names the groups, the
-	// group alone, its limit unknown.
-	const concurrencyRules = $derived(
-		!def ? [] : def.concurrencyRules.length ? def.concurrencyRules : def.concurrencyGroups.map((group) => ({ group, limit: null, sharedWith: [] }))
-	);
-	/** Runs holding a concurrency group's slots now, where the server reports them. */
-	const holdersOf = (group: string) => def?.concurrency?.find((g) => g.key === group)?.holders ?? [];
-	const hasSettings = $derived(!!def && (!!def.overlap || !!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length) || concurrencyRules.length > 0));
+	// Each pool the job takes, as published.
+	const pools = $derived(def?.pools ?? []);
+	/** Runs holding a pool's slots now, where the server reports them. */
+	const holdersOf = (pool: string) => def?.poolHolders?.find((g) => g.pool === pool)?.holders ?? [];
+	const hasSettings = $derived(!!def && (!!def.overlap || !!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length) || pools.length > 0));
 	let actionError = $state<string | null>(null);
 
 	async function toggleTrigger(t: Trigger) {
@@ -308,11 +305,11 @@
 									{#if def.onFailure}<div><dt>Retries</dt><dd title="[retry] attempts = {def.onFailure.retries + 1}, delay_seconds = {def.onFailure.retryDelaySeconds}{def.memberOf?.length ? '. Inside a group run, the group retries this job while the jobs that depend on it wait' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
 									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
 									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
-									{#each concurrencyRules as rule (rule.group)}
-										{@const text = concurrencyText(rule)}
-										{@const holders = holdersOf(rule.group)}
+									{#each pools as use (use.pool)}
+										{@const text = poolText(use)}
+										{@const holders = holdersOf(use.pool)}
 										<div class="concurrency">
-											<dt>Concurrency</dt>
+											<dt>Pool</dt>
 											<dd>
 												<span
 													>{text.rule}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span

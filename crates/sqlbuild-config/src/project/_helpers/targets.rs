@@ -15,9 +15,8 @@ use crate::project::_helpers::keys::{
 use crate::project::_helpers::sections::{fixed_duration_seconds, item_timeout};
 use crate::project::_helpers::values::{int_below, is_int};
 use crate::project::constants::{
-    CLONE_KEYS, CONCURRENCY_GROUPS_KEY, CONCURRENCY_KEY, CONFIRMATION_POLICIES,
-    EXECUTION_LIMIT_KEYS, MAX_FULL_ROWS_KEY, RETENTION_MATERIALIZATIONS, TARGET_KEYS,
-    UNLIMITED_DIFF_FULL_ROWS, WAREHOUSE_GROUPS,
+    CLONE_KEYS, CONCURRENCY_KEY, CONFIRMATION_POLICIES, EXECUTION_LIMIT_KEYS, MAX_FULL_ROWS_KEY,
+    POOLS_KEY, RETENTION_MATERIALIZATIONS, TARGET_KEYS, UNLIMITED_DIFF_FULL_ROWS, WAREHOUSE_GROUPS,
 };
 use crate::project::errors::ConfigFailure;
 use crate::project::models::{Built, ConfigFile};
@@ -316,13 +315,11 @@ fn validate_target_keys(mapping: &Entries, target: TargetPlace<'_>) -> Result<()
     reject_removed_virtual_keys(mapping, &["state", "changes_only"], place)?;
     validate_allowed_keys(mapping, &TARGET_KEYS, place)?;
     if matches!(target.file, ConfigFile::Local | ConfigFile::LegacyLocal)
-        && get(mapping, CONCURRENCY_GROUPS_KEY).is_some()
+        && get(mapping, POOLS_KEY).is_some()
     {
         return Err(ConfigFailure::at(
             target.file,
-            format!(
-                "{label}.{CONCURRENCY_GROUPS_KEY} is project policy; set it in sqlbuild_project.toml"
-            ),
+            format!("{label}.{POOLS_KEY} is project policy; set it in sqlbuild_project.toml"),
         ));
     }
     if let Some(recall) = get(mapping, RECALL_SECTION) {

@@ -497,3 +497,14 @@ pub(crate) struct SelectionRequestTestCase {
     pub(crate) limit: Option<u32>,
     pub(crate) expected_outcome: Result<ExpectedSelection, u16>,
 }
+
+/// A queued run: its ID, priority and each pool it takes as `(pool, amount, limit)`.
+pub(crate) type PooledRun = (u128, i64, &'static [(&'static str, u32, u32)]);
+
+pub(crate) struct PoolAmountTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) runs: &'static [PooledRun],
+    pub(crate) caps: &'static [(&'static str, u32)],
+    pub(crate) expected_claimed: &'static [u128],
+    pub(crate) expected_slots: &'static [(&'static str, i64)],
+}

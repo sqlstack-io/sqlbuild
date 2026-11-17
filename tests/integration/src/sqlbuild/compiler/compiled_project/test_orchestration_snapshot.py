@@ -886,8 +886,8 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             project_dir=tmp_path,
             files={
                 "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
-                + "\n[concurrency_groups]\norder_reporting = 2\n"
-                + "\n[targets.development.concurrency_groups]\norder_reporting = 1\n",
+                + "\n[pools]\norder_reporting = 3\n"
+                + "\n[targets.development.pools]\norder_reporting = 2\n",
                 "orchestration/jobs/nightly_orders_job.toml": (
                     'name = "nightly_orders_job"\n'
                     'description = "Refresh order reporting."\n'
@@ -896,7 +896,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                     'targets = ["development"]\n'
                     'owner = "Orders team"\n'
                     'overlap = "skip"\n'
-                    'concurrency_groups = ["order_reporting"]\n'
+                    "pools = { order_reporting = 2 }\n"
                     f"schedule = {schedule}\n"
                     "\n[on_failure]\nretries = 2\nretry_delay_seconds = 600\n"
                     '\n[settings]\nrun_tests = false\nvars = { batch = 3 }\nwarehouse = "reporting"\n'
@@ -931,8 +931,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                 "vars": {"batch": 3},
                 "warehouse": "reporting",
             },
-            "concurrency_groups": ["order_reporting"],
-            "concurrency_limits": {"order_reporting": 1},
+            "pools": {"order_reporting": {"amount": 2, "limit": 2}},
             "select": "+orders",
             "exclude": "stg_orders",
             "targets": ["development"],
@@ -1234,7 +1233,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "MODEL (", "MODEL (tags ['edge_case'],", 1
                 ),
                 "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
-                + "\n[concurrency_groups]\nedge_inventory_limit = 1\nedge_products_limit = 1\n",
+                + "\n[pools]\nedge_inventory_limit = 1\nedge_products_limit = 1\n",
             },
             expected_jobs=(
                 "edge_snapshot_inventory_job",
@@ -1995,19 +1994,38 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_message="unknown variant",
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="a job naming a concurrency group the project does not declare",
+            description="a job using a pool the project does not declare",
             files={
                 "orchestration/jobs/nightly_orders_job.toml": (
                     'name = "nightly_orders_job"\n'
                     'description = "Refresh order reporting."\n'
                     'select = "orders"\n'
-                    'concurrency_groups = ["nightly_window"]\n'
+                    "pools = { nightly_window = 1 }\n"
                 )
             },
             expected_error=ValueError,
             expected_message=(
-                r"job 'nightly_orders_job' names concurrency group 'nightly_window', which "
-                r"\[concurrency_groups\] in sqlbuild_project.toml does not declare"
+                r"job 'nightly_orders_job' uses pool 'nightly_window', which "
+                r"\[pools\] in sqlbuild_project.toml does not declare"
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a job taking more of a pool than its limit on a target",
+            files={
+                "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+                + "\n[pools]\nsupplier_api = 3\n"
+                + "\n[targets.production.pools]\nsupplier_api = 1\n",
+                "orchestration/jobs/nightly_orders_job.toml": (
+                    'name = "nightly_orders_job"\n'
+                    'description = "Refresh order reporting."\n'
+                    'select = "orders"\n'
+                    "pools = { supplier_api = 2 }\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message=(
+                r"job 'nightly_orders_job' takes 2 slots of pool 'supplier_api', more than its "
+                r"limit of 1 on target 'production'"
             ),
         ),
     ],

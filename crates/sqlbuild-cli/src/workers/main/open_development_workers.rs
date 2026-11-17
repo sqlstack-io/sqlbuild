@@ -23,7 +23,7 @@ pub(crate) fn open_development_workers(
                 max_workers: std::thread::available_parallelism()?,
                 project_dir,
                 executable,
-                concurrency_caps: Default::default(),
+                pool_caps: Default::default(),
             }],
             docker: Vec::new(),
         },

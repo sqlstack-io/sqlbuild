@@ -70,25 +70,21 @@ pub(crate) fn limits_and_reasons(
     Ok(())
 }
 
-/// `limits` with the declaration's own, which must cover its groups and match earlier declarations.
+/// `limits` with the declaration's own: no amount above its pool's limit, and one limit per pool.
 fn same_limits(
     name: &str,
     job: &JobDefinition,
     mut limits: BTreeMap<String, NonZeroU32>,
 ) -> Result<BTreeMap<String, NonZeroU32>, ControlError> {
-    if !job
-        .concurrency_limits
-        .keys()
-        .eq(job.concurrency_groups.iter())
-    {
-        return Err(ControlError::Invalid(format!(
-            "{name} must give each of its concurrency groups the project's limit"
-        )));
-    }
-    for (group, limit) in &job.concurrency_limits {
-        if *limits.entry(group.clone()).or_insert(*limit) != *limit {
+    for (pool, slots) in &job.pools {
+        if slots.amount > slots.limit {
             return Err(ControlError::Invalid(format!(
-                "concurrency group {group} has more than one limit"
+                "{name} takes more slots of pool {pool} than its limit"
+            )));
+        }
+        if *limits.entry(pool.clone()).or_insert(slots.limit) != slots.limit {
+            return Err(ControlError::Invalid(format!(
+                "pool {pool} has more than one limit"
             )));
         }
     }

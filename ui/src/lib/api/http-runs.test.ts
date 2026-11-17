@@ -125,7 +125,7 @@ describe('run queue', () => {
 	it('keeps claim order, drops runs that started meanwhile and never names a run elsewhere', () => {
 		const entries = queueEntriesOf(
 			[
-				wire('urgent', { status: 'queued', queue: { position: 1, waits: [{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'] }] } }),
+				wire('urgent', { status: 'queued', queue: { position: 1, waits: [{ kind: 'pool_full', pool: 'warehouse', holders: ['held'] }] } }),
 				wire('started', { status: 'queued' }),
 				wire('blocked', {
 					status: 'queued',
@@ -133,7 +133,7 @@ describe('run queue', () => {
 						position: 2,
 						waits: [
 							{ kind: 'write_claim', run_id: null, node_key: 'model.orders', other_nodes: 3 },
-							{ kind: 'earlier_run', run_id: 'urgent', limit: 'warehouse' },
+							{ kind: 'earlier_run', run_id: 'urgent', pool: 'warehouse' },
 							{ kind: 'upstream_job', run_id: 'stage', job_key: 'staging' },
 							{ kind: 'upstream_job', run_id: 'retry', job_key: 'partner_export', attempt: 2 },
 							{ kind: 'job_running', run_id: 'same' },
@@ -148,10 +148,10 @@ describe('run queue', () => {
 			['urgent', 1],
 			['blocked', 2]
 		]);
-		expect(entries[0].waits).toEqual([{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'] }]);
+		expect(entries[0].waits).toEqual([{ kind: 'pool_full', pool: 'warehouse', holders: ['held'] }]);
 		expect(entries[1].waits).toEqual([
 			{ kind: 'write_claim', runId: null, nodeKey: 'model.orders', otherNodes: 3 },
-			{ kind: 'earlier_run', runId: 'urgent', limit: 'warehouse' },
+			{ kind: 'earlier_run', runId: 'urgent', pool: 'warehouse' },
 			{ kind: 'upstream_job', runId: 'stage', jobKey: 'staging', attempt: null },
 			{ kind: 'upstream_job', runId: 'retry', jobKey: 'partner_export', attempt: 2 },
 			{ kind: 'job_running', runId: 'same' }

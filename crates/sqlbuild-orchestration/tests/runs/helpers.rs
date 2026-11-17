@@ -8,6 +8,7 @@ use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, BuiltinRole, RoleAssignmentRequest};
 use crate::credentials::tests::location_helpers::create_location;
+use crate::declarations::models::PoolSlots;
 use crate::runs::_helpers::requests::publication::publish_request;
 use crate::runs::models::{
     AdhocCheck, AdhocCheckRequest, AdhocRunRequest, RunCommand, RunKind, RunOrigin, RunRequest,
@@ -107,8 +108,7 @@ pub(crate) fn request(
         selection,
         settings: BTreeMap::new(),
         window: None,
-        concurrency_groups: BTreeSet::new(),
-        concurrency_limits: BTreeMap::new(),
+        pools: BTreeMap::new(),
         narrowing: None,
         retry: None,
         member_attempt: None,
@@ -446,13 +446,24 @@ pub(crate) fn snapshot_node(kind: &str, definition: serde_json::Value) -> Snapsh
     }
 }
 
-/// A project limit of 100 for each group, above every test's server cap, so the caps govern.
-pub(crate) fn hundred(groups: &[&str]) -> serde_json::Value {
-    let mut limits = serde_json::Map::new();
-    for group in groups {
-        limits.insert((*group).to_owned(), serde_json::json!(100));
+/// One slot of each pool, with a project limit of 100 above every test's server cap, so the caps govern.
+pub(crate) fn one_slot_each(pools: &[&str]) -> serde_json::Value {
+    let mut slots = serde_json::Map::new();
+    for pool in pools {
+        slots.insert(
+            (*pool).to_owned(),
+            serde_json::json!({"amount": 1, "limit": 100}),
+        );
     }
-    serde_json::Value::Object(limits)
+    serde_json::Value::Object(slots)
+}
+
+/// `amount` slots of a pool whose project limit is `limit`.
+pub(crate) fn pool_slots(amount: u32, limit: u32) -> PoolSlots {
+    PoolSlots {
+        amount: std::num::NonZeroU32::new(amount).expect("positive amount"),
+        limit: std::num::NonZeroU32::new(limit).expect("positive limit"),
+    }
 }
 
 /// IDs that differ by a case's small numbers, so cases read as `target 1, snapshot 2`.

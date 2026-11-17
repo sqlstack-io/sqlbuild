@@ -19,7 +19,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Sync from the warehouse now
 - Skip overlapping runs and retry failures
 - Limit worker containers
-- Cap concurrency groups
+- Cap pools
 - Run ad-hoc commands
 - Plan builds
 - Define project roles
@@ -68,8 +68,8 @@ executable = "/usr/local/bin/sqb"
 | `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`; see [Set retention](#set-retention) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
 | `[trusted_proxy]` | `origin`, `trusted_peers` and `identities` |
-| `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `concurrency_caps` tables; see [Limit worker containers](#limit-worker-containers) |
-| `[[launchers.local]]` | `location`, `target`, `server_url`, `max_workers`, absolute `project_dir` and `executable` paths, and an optional `concurrency_caps` table |
+| `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
+| `[[launchers.local]]` | `location`, `target`, `server_url`, `max_workers`, absolute `project_dir` and `executable` paths, and an optional `pool_caps` table |
 
 - A flag overrides the same setting in the file: `sqb server --config server.toml --port 9000`
   listens on port 9000.
@@ -506,7 +506,7 @@ Details:
   that failed. Cancelling a run stops its retries.
 - A member job's `[retry]` also applies inside a group run. When the member fails, the group runs it
   again after `delay_seconds`, inside the same group run, and the jobs that depend on it wait
-  instead of skipping. The group keeps its concurrency slots meanwhile.
+  instead of skipping. The group keeps its pool slots meanwhile.
 - A group's own `[retry]` is a final sweep: after the group run ends `failed` or `partial`, it
   queues one new linked rerun of the group's failed and skipped nodes.
 - So a retry of a whole run, a job's or a group's, is a new linked run, and a retry of a member
@@ -572,10 +572,10 @@ cpus = 2
 - An invalid value fails publication with the job's name, such as
   `job nightly_orders_job resources: cpus must be a positive number`.
 
-## Cap concurrency groups
+## Cap pools
 
-A project declares how many runs of each concurrency group may run at once. To keep a location's
-runs within what its warehouse takes, lower a group's limit for one launcher:
+A project declares each [pool](../concepts/concurrency.md#jobs-sharing-something-else-pools)'s
+limit. To keep one launcher's runs below it, lower the limit with `pool_caps`:
 
 ```toml
 [[launchers.local]]
@@ -586,17 +586,17 @@ max_workers = 4
 project_dir = "/srv/orders"
 executable = "/usr/local/bin/sqb"
 
-[launchers.local.concurrency_caps]
+[launchers.local.pool_caps]
 warehouse_heavy = 1
 ```
 
-- A run takes a group's slot when the project's limit and the cap both allow it, so a cap lowers
-  the limit and never raises it.
-- A group without a cap runs at the project's limit; see
-  [Concurrency groups](../concepts/project-configuration.md#concurrency-groups).
-- A cap applies to its launcher's location and target only; groups are never shared between
-  locations or targets.
-- A cap for a group the project doesn't declare has no effect.
+- A cap lowers a limit and never raises it. A pool without a cap keeps the project's limit.
+- A job taking more slots than the cap takes the whole capped pool.
+- A cap applies to its launcher's location and target only.
+- A cap for a pool the project doesn't declare has no effect.
+
+`max_workers`, write claims, `overlap` and pools are compared on
+[Concurrency](../concepts/concurrency.md).
 
 ## Run ad-hoc commands
 

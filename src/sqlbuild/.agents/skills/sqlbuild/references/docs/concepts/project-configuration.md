@@ -23,7 +23,7 @@ Online: https://sqlbuild.com/docs/concepts/project-configuration/
 - Scenario
 - Git
 - Review
-- Concurrency groups
+- Pools
 - dbt
 - Skills
 - Project Python
@@ -257,7 +257,7 @@ still takes precedence for that invocation.
 
 Targets often run on very different warehouses. A target can set its own worker limit, so local
 and CI runs use many workers while production stays within what its warehouse runs without
-queuing:
+queuing. To limit runs rather than models, see [Concurrency](concurrency.md):
 
 ```toml
 [settings]
@@ -725,42 +725,26 @@ critical_tags = ["critical"]
 | `schema_prefix` | `"review"` | Prefix of the schema each review creates and drops; the schema name is lowercase |
 | `critical_tags` | `["critical"]` | Model tags that make a model critical, in addition to `critical true` in its `MODEL` header |
 
-## Concurrency groups
+## Pools
 
-Jobs that must not run together share a concurrency group. Declare each group with the most runs
-it allows at once, and change a group's limit for one target:
+`[pools]` declares each pool with its limit, and `[targets.<name>.pools]` changes a limit for one
+target. Jobs and job groups take slots of a pool with `pools = { supplier_api = 1 }`.
 
 ```toml
-[concurrency_groups]
-nightly_window = 1
-warehouse_heavy = 3
+[pools]
+supplier_api = 2
 
-[targets.prod.concurrency_groups]
-warehouse_heavy = 2
+[targets.dev.pools]
+supplier_api = 1
 ```
-
-A job or job group takes a group by listing it in `concurrency_groups`; see
-[Declare a job](orchestration.md#declare-a-job). Here, at most one run in
-`nightly_window` and two in `warehouse_heavy` run at once on `prod`, and three on every other
-target.
 
 | Field | Value |
 |-------|-------|
-| `[concurrency_groups]` | Each group's most runs at once, a whole number from `1` to `10000` |
-| `[targets.<name>.concurrency_groups]` | The target's limit for groups `[concurrency_groups]` declares |
+| `[pools]` | Each pool's limit, a whole number of slots from `1` to `10000` |
+| `[targets.<name>.pools]` | The target's limit for pools `[pools]` declares |
 
-Details:
-
-- A job or job group naming a group the project doesn't declare fails `sqb compile` with `D017`,
-  naming the job and the declared groups.
-- A target can change only the limit of a declared group. Naming another group fails with
-  `D001`, such as `targets.prod.concurrency_groups.nightly_windw overrides a group
-  [concurrency_groups] does not declare`.
-- Limits are project policy, so `sqlbuild_local.toml` can't set them.
-- A group belongs to its project and target: runs of another location or target never take its
-  slots.
-- The server can lower a limit for one launcher, never raise it; see
-  [Cap concurrency groups](../cli/server.md#cap-concurrency-groups).
+When to use a pool, and how amounts, targets and server caps work, is on
+[Concurrency](concurrency.md#jobs-sharing-something-else-pools).
 
 ## dbt
 

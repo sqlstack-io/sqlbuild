@@ -1,6 +1,6 @@
 //! Positions, unknown keys and value checks shared by job and group files.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use sqlbuild_core::text::main::close_matches::close_matches;
 use toml::Spanned;
@@ -8,8 +8,8 @@ use toml::de::DeTable;
 
 use crate::orchestration_files::_helpers::raw::{RawRetry, RawRun, RawSchedule};
 use crate::orchestration_files::constants::{
-    ATTEMPTS_RANGE, CONCURRENCY_KEY, RETRIES_RANGE, RETRY_ATTEMPTS_KEY, RETRY_DELAY_KEY,
-    RETRY_DELAY_RANGE, RETRY_TABLE, SUGGESTION_CUTOFF,
+    ATTEMPTS_RANGE, CONCURRENCY_KEY, MAX_POOL_AMOUNT, RETRIES_RANGE, RETRY_ATTEMPTS_KEY,
+    RETRY_DELAY_KEY, RETRY_DELAY_RANGE, RETRY_TABLE, SUGGESTION_CUTOFF,
 };
 use crate::orchestration_files::errors::FileError;
 use crate::orchestration_files::models::{
@@ -252,17 +252,22 @@ pub(crate) fn run_file(text: &str, raw: RawRun) -> Result<RunFile, FileError> {
         .owner
         .map(|owner| nonblank(text, owner, "owner"))
         .transpose()?;
-    let mut groups: BTreeSet<&str> = BTreeSet::new();
-    if let Some(repeated) = raw
-        .concurrency_groups
-        .iter()
-        .find(|group| !groups.insert(group.as_str()))
-    {
-        return Err(error_at(
-            text,
-            0,
-            format!("concurrency group '{repeated}' is listed twice"),
-        ));
+    let mut pools: BTreeMap<String, u32> = BTreeMap::new();
+    for (pool, amount) in raw.pools {
+        let slots: u32 = match u32::try_from(*amount.get_ref()) {
+            Ok(slots) if (1..=MAX_POOL_AMOUNT).contains(&i64::from(slots)) => slots,
+            _ => {
+                return Err(error_at(
+                    text,
+                    amount.span().start,
+                    format!(
+                        "pools.{pool} must take a whole number of slots from 1 to \
+                         {MAX_POOL_AMOUNT}, such as {pool} = 1"
+                    ),
+                ));
+            }
+        };
+        pools.insert(pool, slots);
     }
     Ok(RunFile {
         name: nonblank(text, raw.name, "name")?,
@@ -270,7 +275,7 @@ pub(crate) fn run_file(text: &str, raw: RawRun) -> Result<RunFile, FileError> {
         targets: raw.targets,
         owner: owner.map(|owner| owner.value),
         overlap: raw.overlap,
-        concurrency_groups: raw.concurrency_groups,
+        pools,
         schedule: raw
             .schedule
             .map(|value| schedule(text, value))

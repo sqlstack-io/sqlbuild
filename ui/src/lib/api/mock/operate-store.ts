@@ -57,14 +57,15 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import {
-	CONCURRENCY_LIMITS,
+	POOL_LIMITS,
 	IMAGE_ID,
 	JOB_DEFS,
 	DECLARED_WAITS,
 	SNAPSHOT_GENERATION,
 	TRIGGER_DEFS,
-	concurrencyGroupsOf,
-	concurrencyRulesOf,
+	poolHoldersOf,
+	poolUsesOf,
+	runConcurrencyOf,
 	createOperateFixtures,
 	jobDef,
 	jobNodes,
@@ -998,20 +999,19 @@ export class MockOperate {
 				if (overlap.length)
 					waits.push({ kind: 'write_claim', runId: h.run.id, nodeKey: overlap[0], otherNodes: overlap.length - 1 });
 			}
-			const fullGroups: string[] = [];
-			for (const group of rec.script.concurrencyGroups) {
-				const inGroup = holders.filter((h) => h.script.concurrencyGroups.includes(group)).map((h) => h.run.id);
-				const limit = CONCURRENCY_LIMITS[group] ?? 1;
-				if (inGroup.length >= limit) {
-					waits.push({ kind: 'concurrency_limit', limit: group, holders: inGroup });
-					fullGroups.push(group);
+			const fullPools: string[] = [];
+			for (const [pool, amount] of Object.entries(rec.script.pools)) {
+				const inPool = holders.filter((h) => pool in h.script.pools);
+				const limit = POOL_LIMITS[pool] ?? 1;
+				const held = inPool.reduce((sum, h) => sum + h.script.pools[pool], 0);
+				if (held + Math.min(amount, limit) > limit) {
+					waits.push({ kind: 'pool_full', pool, holders: inPool.map((h) => h.run.id) });
+					fullPools.push(pool);
 				}
 			}
-			if (fullGroups.length) {
-				for (const group of fullGroups) {
-					const first = ahead.find((a) => a.script.concurrencyGroups.includes(group));
-					if (first) waits.push({ kind: 'earlier_run', runId: first.run.id, limit: group });
-				}
+			for (const pool of fullPools) {
+				const first = ahead.find((a) => pool in a.script.pools);
+				if (first) waits.push({ kind: 'earlier_run', runId: first.run.id, pool });
 			}
 			if (rec.run.parentRunId) {
 				const parent = this.#byId(rec.run.parentRunId);
@@ -1106,7 +1106,7 @@ export class MockOperate {
 				lastHeartbeatAt: null,
 				imageId: IMAGE_ID,
 				snapshotGeneration: SNAPSHOT_GENERATION,
-				concurrencyGroups: job?.concurrencyGroups ?? []
+				pools: job?.pools ?? {}
 			}
 		};
 		this.#records.unshift(rec);
@@ -1233,8 +1233,9 @@ export class MockOperate {
 			resolvedNodes: resolved,
 			lastRun: view ? { id: view.id, status: view.status, startedAt: view.startedAt, endedAt: view.endedAt } : null,
 			triggerIds: TRIGGER_DEFS.filter((t) => t.jobKey === key).map((t) => triggerId(t.name)),
-			concurrencyRules: concurrencyRulesOf(job),
-			concurrency: concurrencyGroupsOf(job).map((g) => ({ ...g, holders: holders.filter((h) => h.script.concurrencyGroups.includes(g.key)).map((h) => h.run.id) })),
+			pools: poolUsesOf(job),
+			concurrency: runConcurrencyOf(job),
+			poolHolders: poolHoldersOf(job).map((g) => ({ ...g, holders: holders.filter((h) => g.pool in h.script.pools).map((h) => h.run.id) })),
 			memberOf: JOB_DEFS.filter((g) => g.members.includes(key)).map((g) => g.key),
 			cursorType: resolved.map((n) => snapshotNode(n)?.cursor).find((c) => c) ?? null,
 			groupMembers: this.#groupMembers(key),

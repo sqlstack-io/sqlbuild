@@ -58,22 +58,22 @@ fn given_group_members_when_publishing_then_each_wait_has_its_node_level_reasons
 fn given_invalid_limits_or_reasons_when_publishing_then_the_snapshot_is_refused() {
     let test_cases = [
         DeclarationCheckTestCase {
-            description: "a group without its project limit",
+            description: "an amount above its pool's limit",
             jobs: json!({"orders": {"description": "Orders", "selection": ["orders"],
-                "concurrency_groups": ["warehouse"]}}),
+                "pools": {"warehouse": {"amount": 2, "limit": 1}}}}),
             groups: json!({}),
-            expected_error: "orders must give each of its concurrency groups the project's limit",
+            expected_error: "orders takes more slots of pool warehouse than its limit",
         },
         DeclarationCheckTestCase {
             description: "one group with two limits",
             jobs: json!({
                 "orders": {"description": "Orders", "selection": ["orders"],
-                    "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 1}},
+                    "pools": {"warehouse": {"amount": 1, "limit": 1}}},
                 "customers": {"description": "Customers", "selection": ["customers"],
-                    "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 2}},
+                    "pools": {"warehouse": {"amount": 1, "limit": 2}}},
             }),
             groups: json!({}),
-            expected_error: "concurrency group warehouse has more than one limit",
+            expected_error: "pool warehouse has more than one limit",
         },
         DeclarationCheckTestCase {
             description: "a wait reason naming a node outside the snapshot",

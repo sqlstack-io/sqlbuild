@@ -1,6 +1,5 @@
 //! Load the project and local configuration files into their Python config objects.
 
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use pyo3::exceptions::{PyOSError, PyValueError};
@@ -12,13 +11,14 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_config::project::errors::{ConfigFailure, FailureClass, LoadFailure};
 use sqlbuild_config::project::main::deprecated_setting_warnings::deprecated_setting_warnings;
 use sqlbuild_config::project::main::load_changes_config::load_changes_config;
-use sqlbuild_config::project::main::load_concurrency_groups::load_concurrency_groups;
 use sqlbuild_config::project::main::load_git_base_ref::load_git_base_ref;
 use sqlbuild_config::project::main::load_local_config::load_local_config;
+use sqlbuild_config::project::main::load_pool_limits::load_pool_limits;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
 use sqlbuild_config::project::main::load_review_config::load_review_config;
 use sqlbuild_config::project::main::local_sql_analysis_failure::local_sql_analysis_failure;
 use sqlbuild_config::project::main::resolve_config_file::resolve_config_file;
+use sqlbuild_config::project::models::PoolLimits;
 use sqlbuild_config::project::models::{
     Built, ChangesConfig, ConfigFile, ConfigPaths, ReviewConfig,
 };
@@ -183,15 +183,13 @@ pub(crate) fn warn_deprecated_settings(
     }
 }
 
-/// `[concurrency_groups]` of `project_dir`, with `target`'s overrides when one is named.
-pub(crate) fn project_concurrency_groups(
+/// `[pools]` of `project_dir` and each target's pool limits.
+pub(crate) fn project_pool_limits(
     py: Python<'_>,
     project_dir: &Bound<'_, PyAny>,
-    target: Option<&str>,
-) -> PyResult<BTreeMap<String, u32>> {
+) -> PyResult<PoolLimits> {
     let files = files(project_dir)?;
-    load_concurrency_groups(&files.native, target)
-        .or_else(|failure| Err(load_error(py, &failure, &files)?))
+    load_pool_limits(&files.native).or_else(|failure| Err(load_error(py, &failure, &files)?))
 }
 
 /// `load_project_config`: the validated `ProjectConfig` of `project_dir`.

@@ -67,6 +67,21 @@ pub struct ControlConfig {
     pub sync_at_least_every_seconds: Option<u64>,
 }
 
+/// Each declared pool's limit, and its limit on each target in `[targets]`, overrides applied.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PoolLimits {
+    pub declared: std::collections::BTreeMap<String, u32>,
+    pub targets: std::collections::BTreeMap<String, std::collections::BTreeMap<String, u32>>,
+}
+
+impl PoolLimits {
+    /// The limits on `target`: its overrides when it is in `[targets]`, otherwise the declared ones.
+    #[must_use]
+    pub fn on(&self, target: &str) -> &std::collections::BTreeMap<String, u32> {
+        self.targets.get(target).unwrap_or(&self.declared)
+    }
+}
+
 /// `[changes]` of `sqlbuild_project.toml`: what `--changed` counts and how far a change reaches.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ChangesConfig {

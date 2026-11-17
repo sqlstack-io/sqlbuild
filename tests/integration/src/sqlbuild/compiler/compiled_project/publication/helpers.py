@@ -811,10 +811,8 @@ def scheduled_worker(
                 'name = "orders"\nadapter = "duckdb"\n'
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 '[targets.development]\nschema = "main"\n'
-                "[concurrency_groups]\n"
-                + "".join(
-                    f"{name} = {limit}\n" for name, limit in test_case.concurrency_groups.items()
-                )
+                "[pools]\n"
+                + "".join(f"{name} = {limit}\n" for name, limit in test_case.pools.items())
             ),
             "models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n" + test_case.model_sql + "\n"
@@ -1061,7 +1059,6 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
         "selection": selection,
         "write_set": selection,
         "settings": {"full_refresh": True},
-        "concurrency_groups": [],
     }
     with sqlite3.connect(directory / ".sqlbuild/control.sqlite3") as connection:
         _ = connection.execute(

@@ -1,2 +1,2 @@
-pub mod check_concurrency_groups;
+pub mod check_pools;
 pub mod orchestration_inventory;

@@ -45,14 +45,14 @@ pub(crate) struct ReviewConfigErrorTestCase {
     pub(crate) expected_fragment: &'static str,
 }
 
-pub(crate) struct ConcurrencyGroupsTestCase {
+pub(crate) struct PoolsTestCase {
     pub(crate) description: &'static str,
     pub(crate) project: &'static str,
     pub(crate) target: Option<&'static str>,
-    pub(crate) expected_groups: &'static [(&'static str, u32)],
+    pub(crate) expected_pools: &'static [(&'static str, u32)],
 }
 
-pub(crate) struct ConcurrencyGroupsErrorTestCase {
+pub(crate) struct PoolsErrorTestCase {
     pub(crate) description: &'static str,
     pub(crate) project: &'static str,
     pub(crate) local: &'static str,

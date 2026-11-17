@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use uuid::Uuid;
 
-use crate::runs::_helpers::groups::admission::{earlier_waiters, limit_waiters, slot_group};
+use crate::runs::_helpers::groups::admission::{earlier_waiters, limit_waiters, slot_pool};
 use crate::runs::_helpers::groups::selection::child_waits;
 use crate::runs::models::{
     LimitWaiter, QueueCandidate, QueueHolder, QueueWait, RunQueueState, RunRecord, RunningJob,
@@ -124,8 +124,8 @@ fn held_limits(
             .map(|slot| slot.run_id)
             .collect();
         if !holders.is_empty() {
-            waits.push(QueueWait::ConcurrencyLimit {
-                limit: slot_group(limit).to_owned(),
+            waits.push(QueueWait::PoolFull {
+                pool: slot_pool(limit).to_owned(),
                 holders,
             });
         }
@@ -145,7 +145,7 @@ fn earlier_runs(
         if ahead.insert(limit) {
             waits.push(QueueWait::EarlierRun {
                 run_id: here.contains_key(&waiter.run_id).then_some(waiter.run_id),
-                limit: slot_group(limit).to_owned(),
+                pool: slot_pool(limit).to_owned(),
             });
         }
     }

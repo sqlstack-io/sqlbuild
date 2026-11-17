@@ -38,7 +38,7 @@ pub(crate) struct RawRun {
     #[serde(default)]
     pub(crate) overlap: Overlap,
     #[serde(default)]
-    pub(crate) concurrency_groups: Vec<String>,
+    pub(crate) pools: BTreeMap<String, Spanned<i64>>,
     pub(crate) schedule: Option<Spanned<RawSchedule>>,
     pub(crate) retry: Option<Spanned<RawRetry>>,
     pub(crate) on_failure: Option<Spanned<RawRetry>>,

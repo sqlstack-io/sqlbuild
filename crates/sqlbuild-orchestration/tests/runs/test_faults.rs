@@ -14,7 +14,7 @@ use crate::store::tests::helpers::read_recall_events;
 use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
-use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::runs::tests::helpers::{pool_slots, queue, request, snapshot};
 use crate::runs::tests::test_types::{ClaimFailureTestCase, TransactionFault};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::lease_helpers::expire_lease;
@@ -55,7 +55,7 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
                 1,
                 &["customers", "orders"],
             );
-            input.concurrency_groups.insert("warehouse".into());
+            input.pools.insert("warehouse".into(), pool_slots(1, 100));
             queue(store, &input).await;
             let lease = acquire_lease(store, Uuid::now_v7())
                 .await

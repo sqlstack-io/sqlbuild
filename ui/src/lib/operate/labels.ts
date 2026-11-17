@@ -3,11 +3,11 @@
 import { formatStamp } from '$lib/format/time';
 
 import type {
-	ConcurrencyRule,
 	LivenessState,
 	NodeCounts,
 	OnFailure,
 	OverlapPolicy,
+	PoolUse,
 	QueueWait,
 	RunCost,
 	RunEvent,
@@ -105,33 +105,24 @@ export function shortRunId(id: string): string {
 	return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(short) ? short.slice(0, 8) : short;
 }
 
-/** A concurrency group's slots in words, e.g. `warehouse_heavy` → `warehouse heavy`, `target:prod` → `prod target`. */
-/** How many of the jobs sharing a concurrency group are named before "+N more". */
+/** How many of the jobs sharing a pool are named before "+N more". */
 export const SHARED_SHOWN = 3;
 
 /**
- * A concurrency group's rule in plain words: "One run at a time" or "At most 3 runs at a time", the
- * other jobs and groups sharing it (the first `SHARED_SHOWN`, then `more`), and the group itself as a
- * secondary detail. A limit the snapshot doesn't record isn't implied: the rule says only that the
- * group is shared.
+ * A pool the job takes in plain words: "One run at a time", "At most 3 runs at a time" or "Takes 2 of
+ * 4 slots", the other jobs and groups sharing it (the first `SHARED_SHOWN`, then `more`), and the pool
+ * itself as a secondary detail.
  */
-export function concurrencyText(rule: ConcurrencyRule): { rule: string; shared: string[]; more: number; detail: string } {
-	const shared = rule.sharedWith.slice(0, SHARED_SHOWN);
-	const more = rule.sharedWith.length - shared.length;
-	if (rule.limit === null) {
-		return { rule: 'Runs in a concurrency group', shared, more, detail: `concurrency group ${rule.group}, no limit recorded in this snapshot` };
-	}
-	return {
-		rule: rule.limit === 1 ? 'One run at a time' : `At most ${rule.limit} runs at a time`,
-		shared,
-		more,
-		detail: `concurrency group ${rule.group}, limit ${rule.limit}`
-	};
+export function poolText(use: PoolUse): { rule: string; shared: string[]; more: number; detail: string } {
+	const shared = use.sharedWith.slice(0, SHARED_SHOWN);
+	const more = use.sharedWith.length - shared.length;
+	const rule = use.amount === 1 ? (use.limit === 1 ? 'One run at a time' : `At most ${use.limit} runs at a time`) : `Takes ${use.amount} of ${use.limit} slots`;
+	return { rule, shared, more, detail: `pool ${use.pool}, ${use.amount} of ${use.limit} slots` };
 }
 
-export function slotLabel(group: string): string {
-	if (group.startsWith('target:')) return `${group.slice('target:'.length)} target`;
-	return group.replace(/[_-]+/g, ' ');
+/** A pool's name in words, e.g. `warehouse_heavy` → `warehouse heavy`. */
+export function slotLabel(pool: string): string {
+	return pool.replace(/[_-]+/g, ' ');
 }
 
 const runLink = (id: string): WaitPart => ({ text: `run ${shortRunId(id)}`, href: `/runs/${id}` });
@@ -150,13 +141,13 @@ export function describeWait(wait: QueueWait): WaitPart[] {
 				{ text: ' · ' },
 				wait.runId ? runLink(wait.runId) : { text: 'another location' }
 			];
-		case 'concurrency_limit':
+		case 'pool_full':
 			return [
-				{ text: `${slotLabel(wait.limit)} limit full · ` },
+				{ text: `${slotLabel(wait.pool)} pool full · ` },
 				...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)])
 			];
 		case 'earlier_run':
-			return [{ text: 'Behind ' }, wait.runId ? runLink(wait.runId) : { text: 'a run elsewhere' }, { text: ` · ${slotLabel(wait.limit)} limit` }];
+			return [{ text: 'Behind ' }, wait.runId ? runLink(wait.runId) : { text: 'a run elsewhere' }, { text: ` · ${slotLabel(wait.pool)} pool` }];
 		case 'job_running':
 			return [{ text: 'Job running · ' }, runLink(wait.runId)];
 		case 'upstream_job':
@@ -180,10 +171,10 @@ export function waitTechnical(wait: QueueWait): string {
 	switch (wait.kind) {
 		case 'write_claim':
 			return `write claim held by ${wait.runId ?? 'another location or target'} on ${wait.nodeKey}${wait.otherNodes ? ` (+${wait.otherNodes})` : ''}`;
-		case 'concurrency_limit':
-			return `concurrency limit ${wait.limit} held by ${wait.holders.join(', ')}`;
+		case 'pool_full':
+			return `pool ${wait.pool} full, slots held by ${wait.holders.join(', ')}`;
 		case 'earlier_run':
-			return `${wait.runId ?? 'a run elsewhere'} is ahead on ${wait.limit} (priority, then queue order)`;
+			return `${wait.runId ?? 'a run elsewhere'} is ahead on pool ${wait.pool} (priority, then queue order)`;
 		case 'job_running':
 			return `job already running in ${wait.runId}`;
 		case 'upstream_job':
