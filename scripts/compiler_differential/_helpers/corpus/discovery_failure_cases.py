@@ -271,6 +271,29 @@ def _yaml_file_cases() -> tuple[FailureCase, ...]:
             },
         ),
         failure_case(
+            name="source-removed-ingestr-block",
+            expected_code="D006",
+            expected_message="declares an ingestr integration, which SQLBuild no longer supports",
+            files={
+                FAILURE_SOURCES_PATH: FAILURE_BASE_FILES[FAILURE_SOURCES_PATH].replace(
+                    "    description: Orders feed.\n",
+                    "    description: Orders feed.\n    ingestr:\n"
+                    "      source_table: public.orders\n",
+                )
+            },
+        ),
+        failure_case(
+            name="sources-removed-dlt-sources",
+            expected_code="D006",
+            expected_message="declares dlt_sources, a dlt integration",
+            files={
+                "sources/loaded.yml": (
+                    "dlt_sources:\n  - type: sql_database\n    resources:\n"
+                    "      - name: loaded_orders\n        table: orders\n"
+                )
+            },
+        ),
+        failure_case(
             name="seed-declaration-without-csv",
             expected_code="D008",
             files={"seeds/order_channels.yml": _SEED_DECLARATION},

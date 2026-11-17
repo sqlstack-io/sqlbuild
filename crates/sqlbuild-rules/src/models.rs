@@ -952,6 +952,23 @@ impl fensu_policy::policy::types::PolicyRule for RuleMetadata {
     }
 }
 
+/// What places a model's expanded query in its file, mapped only when a rule reports a node.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ModelQueryPlace {
+    /// The authored query below the model's header; `None` when the model has none.
+    pub authored_query: Option<AuthoredQuery>,
+    /// The expansion passes from the authored query to the expanded query; empty when unknown.
+    pub passes: Vec<Vec<crate::lint_text::models::ExpansionSpan>>,
+}
+
+/// A model's authored query: its byte range in the model file, or its text when the file lacks it.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthoredQuery {
+    Range(usize, usize),
+    Text(String),
+}
+
 /// The expansion passes from a model's authored query to `query_sql`, and the query's file place.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AuthoredQueryMap {

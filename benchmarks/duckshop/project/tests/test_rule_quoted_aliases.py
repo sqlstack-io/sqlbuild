@@ -30,6 +30,7 @@ def test_given_quoted_mixed_case_alias_outside_an_export_when_evaluating_then_re
     )
 
     assert result.finding_count == 1
+    assert (result.findings[0].line, result.findings[0].column) == (3, 3)
     assert result.findings[0].message == (
         "Quoted mixed-case name 'listingId' in `l.listing_id AS \"listingId\"`"
     )

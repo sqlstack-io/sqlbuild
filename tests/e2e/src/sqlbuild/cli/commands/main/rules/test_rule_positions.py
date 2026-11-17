@@ -63,6 +63,18 @@ _FACTS_RULE: str = custom_rule_source(
     ),
 )
 
+_NODE_RULE: str = custom_rule_source(
+    code="XSQBRTREE003",
+    body=(
+        "    sql = ctx.sql.for_model(model).expanded\n"
+        '    aliases = [node for node in sql.ast().walk() if node.kind == "alias"]\n'
+        "    return [\n"
+        "        ctx.finding(subject=model, node=node, message=node.kind)\n"
+        "        for node in (*sql.star_projections(), *aliases)\n"
+        "    ]\n"
+    ),
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -251,3 +263,53 @@ def test_given_custom_rule_reading_node_facts_when_compiling_then_it_sees_the_au
     assert tuple(sorted(item["message"] for item in custom_rule_diagnostics(result))) == (
         test_case.expected_messages
     ), result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SyntaxTreeRuleE2ETestCase(
+            description="a multi-line MODEL header puts nodes on their file lines",
+            model_sql=(
+                'MODEL (\n  description "Orders",\n  materialized table\n);\n\n'
+                "SELECT\n  *\nFROM (SELECT 1 AS id) AS o\n"
+            ),
+            expected_messages=("Star@7:3", "alias@8:14"),
+        ),
+        SyntaxTreeRuleE2ETestCase(
+            description="a multi-line macro expansion above a node leaves it on its file line",
+            model_sql=(
+                'MODEL (\n  description "Orders"\n);\n'
+                "SELECT\n  @sql.blank_to_null('a') AS a,\n  *\nFROM (SELECT 'x' AS b) AS o\n"
+            ),
+            other_models=_BLANK_TO_NULL,
+            expected_messages=("Star@6:3", "alias@5:3", "alias@7:14"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_custom_rule_finding_at_a_node_when_compiling_then_it_points_at_the_model_file(
+    test_case: SyntaxTreeRuleE2ETestCase, tmp_path: Path
+) -> None:
+    write_custom_rule_project(
+        project_dir=tmp_path,
+        selected_rules=("XSQBRTREE003",),
+        files=(("rules/nodes.py", _NODE_RULE), *test_case.other_models.items()),
+        configuration="\n[scopes]\nenforce_placement = false\n",
+        adapter=test_case.adapter,
+    )
+    (tmp_path / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
+
+    cold: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)
+    warm: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)
+
+    for result in (cold, warm):
+        assert (
+            tuple(
+                sorted(
+                    f"{item['message']}@{item['line']}:{item['column']}"
+                    for item in custom_rule_diagnostics(result)
+                )
+            )
+            == test_case.expected_messages
+        ), result.stdout + result.stderr

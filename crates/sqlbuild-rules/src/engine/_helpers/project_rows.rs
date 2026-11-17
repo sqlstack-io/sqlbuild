@@ -119,23 +119,43 @@ pub(crate) fn declaration(fact: &DeclarationFact) -> Declaration {
 
 /// The expansion passes back to the authored query and where that query starts in the file.
 fn authored_query_map(facts: &CompiledModelFacts) -> Option<AuthoredQueryMap> {
+    if facts.authored_query_sql.is_empty() || facts.expansion_passes.iter().all(Vec::is_empty) {
+        return None;
+    }
+    located_query_map(
+        &facts.authored_sql,
+        &facts.authored_query_sql,
+        expansion_spans(&facts.expansion_passes),
+    )
+}
+
+/// `passes` in characters, as the rules request carries them.
+pub(crate) fn expansion_spans(passes: &[Vec<CharSpan>]) -> Vec<Vec<ExpansionSpan>> {
     let span = |span: &CharSpan| ExpansionSpan {
         source_start: character_offset(span.source_start),
         source_end: character_offset(span.source_end),
         output_start: character_offset(span.output_start),
         output_end: character_offset(span.output_end),
     };
-    if facts.authored_query_sql.is_empty() || facts.expansion_passes.iter().all(Vec::is_empty) {
+    passes
+        .iter()
+        .map(|pass| pass.iter().map(span).collect())
+        .collect()
+}
+
+/// `passes` back to `authored_query` and where that query starts in `file`.
+pub(crate) fn located_query_map(
+    file: &str,
+    authored_query: &str,
+    passes: Vec<Vec<ExpansionSpan>>,
+) -> Option<AuthoredQueryMap> {
+    if authored_query.is_empty() || passes.iter().all(Vec::is_empty) {
         return None;
     }
-    let start: usize = facts.authored_sql.rfind(&*facts.authored_query_sql)?;
-    let above: &str = &facts.authored_sql[..start];
+    let start: usize = file.rfind(authored_query)?;
+    let above: &str = &file[..start];
     Some(AuthoredQueryMap {
-        passes: facts
-            .expansion_passes
-            .iter()
-            .map(|pass| pass.iter().map(span).collect())
-            .collect(),
+        passes,
         line_offset: above.matches('\n').count() as u64,
         column_offset: above
             .rsplit('\n')
@@ -151,7 +171,7 @@ fn character_offset(offset: usize) -> i64 {
 }
 
 /// The file-line characters before the query's first content that the query itself lacks.
-fn query_column_offset(file: &str, authored_query: &str, query: &str) -> u64 {
+pub(crate) fn query_column_offset(file: &str, authored_query: &str, query: &str) -> u64 {
     let line_prefix = |text: &str, at: usize| {
         text[..at]
             .rsplit('\n')
@@ -172,7 +192,7 @@ fn query_column_offset(file: &str, authored_query: &str, query: &str) -> u64 {
 }
 
 /// The lines of `file` above `query`, the rendered form of its `authored_query`; 0 if unknown.
-fn query_line_offset(file: &str, authored_query: &str, query: &str) -> u64 {
+pub(crate) fn query_line_offset(file: &str, authored_query: &str, query: &str) -> u64 {
     let leading_lines = |text: &str| {
         let body: &str = text.trim_start();
         text[..text.len() - body.len()].matches('\n').count()

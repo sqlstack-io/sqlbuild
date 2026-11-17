@@ -5,6 +5,7 @@
 pub mod build_progress;
 pub mod compute_logs;
 pub mod cost_telemetry;
+pub mod event_exporting;
 pub mod output_capture;
 pub mod recall;
 pub mod result_output;

@@ -1,5 +1,8 @@
 //! A call's argument list: split, bound to parameters and checked against their types.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+
 use crate::sql_macros::_helpers::parsing::header::{split_top_level, unquoted};
 use crate::sql_macros::_helpers::parsing::lexing::{Token, TokenKind, closing_token, tokens};
 use crate::sql_macros::_helpers::rendering::slot_mappings::slot_mappings;
@@ -531,8 +534,34 @@ pub(crate) fn is_atomic(sql: &str) -> bool {
     false
 }
 
+thread_local! {
+    /// Each declared type's family by adapter, since normalizing a type parses it.
+    static FAMILIES: RefCell<HashMap<String, HashMap<String, TypeFamily>>> =
+        RefCell::new(HashMap::new());
+}
+
 /// The family of a declared type, normalized as schema declaration types are for the adapter.
 pub(crate) fn type_family(data_type: &str, adapter: &str) -> TypeFamily {
+    FAMILIES.with(|families| {
+        if let Some(family) = families
+            .borrow()
+            .get(adapter)
+            .and_then(|by_type| by_type.get(data_type))
+        {
+            return *family;
+        }
+        let family: TypeFamily = normalized_family(data_type, adapter);
+        families
+            .borrow_mut()
+            .entry(adapter.to_owned())
+            .or_default()
+            .insert(data_type.to_owned(), family);
+        family
+    })
+}
+
+/// The family `normalize_type` gives a declared type for the adapter's dialect.
+fn normalized_family(data_type: &str, adapter: &str) -> TypeFamily {
     use crate::type_system::models::TypeFamily as Normalized;
     let dialect: &str = adapter_dialect(adapter);
     let normalized = normalize_type(data_type, dialect)
