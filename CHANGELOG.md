@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.238.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.1...v0.238.2) (2026-11-17)
+
+
+### Performance Improvements
+
+* **compile:** stop repeating per-call SQL macro work ([#1549](https://github.com/sqlstack-io/sqlbuild/issues/1549)) ([4740e84](https://github.com/sqlstack-io/sqlbuild/commit/4740e84b4533d1459d03dafa0e820bffd1b4f814))
+
 ## [0.238.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.0...v0.238.1) (2026-11-17)
 
 
