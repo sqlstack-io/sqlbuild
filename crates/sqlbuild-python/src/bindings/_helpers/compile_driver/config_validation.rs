@@ -23,7 +23,7 @@ use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
 const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 /// `WarehouseGroup` members in declaration order.
-const WAREHOUSE_GROUPS: [&str; 2] = ["build", "query"];
+const WAREHOUSE_GROUPS: [&str; 3] = ["build", "query", "sync"];
 
 /// The loaded configuration of one project.
 pub(crate) struct ProjectConfiguration<'a, 'py> {

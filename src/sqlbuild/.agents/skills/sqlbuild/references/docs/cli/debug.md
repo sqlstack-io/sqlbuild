@@ -70,6 +70,7 @@ Configuration:
   schema: DEV [OK resolved]
   build warehouse: BUILD_WH [OK sqlbuild_project.toml [targets.dev.warehouses] build]
   query warehouse: TRANSFORM_WH [OK connection warehouse]
+  sync warehouse: BUILD_WH [OK sqlbuild_project.toml [targets.dev.warehouses] build]
 
 Providers:
   providers: none discovered [OK none discovered]

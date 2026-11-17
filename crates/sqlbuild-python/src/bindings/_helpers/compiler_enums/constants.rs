@@ -342,7 +342,7 @@ const E_EVENT_EXPORT_SEVERITY: EnumSpec = EnumSpec {
 const E_WAREHOUSE_GROUP: EnumSpec = EnumSpec {
     name: "WarehouseGroup",
     doc: "Command group that selects a target's default warehouse.",
-    members: &[("BUILD", "build"), ("QUERY", "query")],
+    members: &[("BUILD", "build"), ("QUERY", "query"), ("SYNC", "sync")],
 };
 const E_SOURCE_WRITE_STRATEGY: EnumSpec = EnumSpec {
     name: "SourceWriteStrategy",
