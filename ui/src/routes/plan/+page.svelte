@@ -29,6 +29,7 @@
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
 	import PlanBrowser from '$lib/run/plan-browser.svelte';
+	import PlanTimings from '$lib/run/plan-timings.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { changedModelKeys, jobRefreshText, loadedRows } from '$lib/run/plan-text';
@@ -414,7 +415,8 @@
 						<SegmentedFilter label="View" value={tab} options={[{ value: 'plan' as const, label: shown.verb === 'build' ? 'Plan' : 'Nodes' }, { value: 'graph' as const, label: 'Graph' }, ...(shown.verb === 'build' && planChecks.length ? [{ value: 'checks' as const, label: 'Checks', count: planChecks.length }] : [])]} onselect={(v) => (view = v)} />
 					</div>
 					{#if shown.verb === 'build' && plan}
-						<Button variant="ghost" size="sm" class="ml-auto" onclick={replan} disabled={planning}><RotateCwIcon class={planning ? 'animate-spin' : ''} />{planning ? 'Planning…' : 'Plan again'}</Button>
+						{#if plan.timings}<span class="ml-auto"><PlanTimings {plan} timings={plan.timings} /></span>{/if}
+						<Button variant="ghost" size="sm" class={plan.timings ? '' : 'ml-auto'} onclick={replan} disabled={planning}><RotateCwIcon class={planning ? 'animate-spin' : ''} />{planning ? 'Planning…' : 'Plan again'}</Button>
 					{/if}
 				</div>
 			{/if}

@@ -134,6 +134,9 @@ export type OperateContext = {
 	reply: <T>(value: T) => Promise<T>;
 };
 
+/** The end-to-end tests' stand-in for a plan recorded without timings: `window.__sqbPlanWithoutTimings`. */
+const withoutTimings = () => typeof window !== 'undefined' && !!(window as unknown as { __sqbPlanWithoutTimings?: boolean }).__sqbPlanWithoutTimings;
+
 /** A location preview's planning steps, as the plan summary reports them. */
 const MOCK_PLAN_TIMINGS: PlanTimings = {
 	total_seconds: 10.6,
@@ -727,7 +730,7 @@ export class MockOperate {
 			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas', 'recorded migrations']
 		};
 		return this.#ctx.reply({
-			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision, timings: MOCK_PLAN_TIMINGS },
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision, ...(withoutTimings() ? {} : { timings: MOCK_PLAN_TIMINGS }) },
 			error: null
 		});
 	}

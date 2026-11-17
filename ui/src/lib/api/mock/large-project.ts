@@ -50,7 +50,7 @@ export function largeProject(client: ApiClient): ApiClient {
 					const doc = largePlanDocument(args[1].some((t) => t === '--changed' || t.startsWith('--changed=')));
 					const requestId = crypto.randomUUID();
 					plans.set(requestId, doc);
-					return { plan: planSummary(doc), error: null, requestId };
+					return { plan: { ...planSummary(doc), timings: result.plan.timings }, error: null, requestId };
 				};
 			}
 			if (prop === 'planRows') {
