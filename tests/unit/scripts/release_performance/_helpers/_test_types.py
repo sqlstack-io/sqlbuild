@@ -1,6 +1,8 @@
 """Test-case models for the release performance comparison."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from scripts.release_performance.models import BenchmarkCommand, CommandComparison, SkippedCommand
 
@@ -100,3 +102,10 @@ class ReleaseSourceTestCase:
     requested_version: str
     expected_files: tuple[str, ...]
     expected_error_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class HangingSetupPhaseTestCase:
+    description: str
+    run_phase: Callable[[Path], object]
+    expected_error: Callable[[Path], str]

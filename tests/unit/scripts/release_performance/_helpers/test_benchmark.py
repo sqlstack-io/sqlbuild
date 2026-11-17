@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.release_performance._helpers import benchmark, versions
 from scripts.release_performance._helpers.benchmark import (
     write_baseline_dense_project,
     write_baseline_pristine_projects,
@@ -15,6 +16,7 @@ from scripts.release_performance.exceptions import ReleasePerformanceError
 from tests.unit.scripts.release_performance._helpers._test_types import (
     BaselineDenseGeneratorTestCase,
     BaselineGeneratorTestCase,
+    HangingSetupPhaseTestCase,
     ReleaseSourceTestCase,
 )
 from tests.unit.scripts.release_performance._helpers.helpers import (
@@ -25,6 +27,8 @@ from tests.unit.scripts.release_performance._helpers.helpers import (
     FAILING_GENERATOR,
     MARKER_DENSE_GENERATOR,
     MARKER_GENERATOR,
+    generate_with_hanging_generator,
+    read_hanging_sqb_version,
     tagged_repository,
     write_baseline_dense_source,
     write_baseline_environment,
@@ -173,6 +177,38 @@ def test_given_release_tag_when_extracting_source_then_returns_its_tree(
 
     assert tuple(sorted(path.name for path in destination.glob("*"))) == test_case.expected_files
     assert all(fragment in error for fragment in test_case.expected_error_fragments), error
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        HangingSetupPhaseTestCase(
+            description="a hanging baseline generator is stopped and named",
+            run_phase=generate_with_hanging_generator,
+            expected_error=lambda _root: (
+                "Baseline benchmark generation did not finish within 2s and was stopped"
+            ),
+        ),
+        HangingSetupPhaseTestCase(
+            description="a hanging sqb --version is stopped and named",
+            run_phase=read_hanging_sqb_version,
+            expected_error=lambda root: (
+                f"Reading the version of {root / 'sqb'} did not finish within 2s and was stopped"
+            ),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_a_hanging_setup_command_when_comparing_then_fails_naming_its_phase(
+    test_case: HangingSetupPhaseTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(benchmark, "SETUP_COMMAND_TIMEOUT_SECONDS", 2.0)
+    monkeypatch.setattr(versions, "SETUP_COMMAND_TIMEOUT_SECONDS", 2.0)
+
+    with pytest.raises(ReleasePerformanceError) as raised:
+        _ = test_case.run_phase(tmp_path)
+
+    assert str(raised.value) == test_case.expected_error(tmp_path)
 
 
 if __name__ == "__main__":
