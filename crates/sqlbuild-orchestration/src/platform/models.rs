@@ -82,7 +82,7 @@ pub enum LocationHealth {
         /// Where the synchronization this report belongs to has got to; absent from older locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         progress: Option<WarehouseSyncProgress>,
-        /// On the report that completes a sync, when the next safety sync is due unless a run ends first; absent otherwise and from older locations.
+        /// On the report that completes or stops a sync, when the next safety sync is due unless a run ends first; absent otherwise, where no timed sync follows, and from older locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         next_sync_at: Option<DateTime<Utc>>,
     },

@@ -2200,7 +2200,7 @@ export interface components {
             location: components["schemas"]["WarehouseStateLocation"];
             /**
              * Format: date-time
-             * @description On the report that completes a sync, when the next safety sync is due unless a run ends first; absent otherwise and from older locations.
+             * @description On the report that completes or stops a sync, when the next safety sync is due unless a run ends first; absent otherwise, where no timed sync follows, and from older locations.
              */
             next_sync_at?: string | null;
             /**
@@ -4161,6 +4161,11 @@ export interface components {
              * @description Milliseconds since the synchronization began.
              */
             elapsed_millis: number;
+            /**
+             * @description Failed reads in a row stopped the synchronization. It resumes after the next run, on
+             *     request or on a publication, and at `next_sync_at` when the report sets one.
+             */
+            halted?: boolean;
             /**
              * Format: int64
              * @description Kinds the synchronization reads: 14 for each state schema.

@@ -233,6 +233,7 @@ export function toWarehouseConnection(
 		lastTest: connectionTestOf(observations),
 		// The report that completes a sync names the next safety sync; one still running names none.
 		nextSyncAt: syncs[0]?.report.health.next_sync_at ?? null,
+		halted: syncs[0]?.report.health.progress?.halted ?? false,
 		tables
 	};
 }

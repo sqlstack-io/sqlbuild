@@ -60,16 +60,18 @@ export function lastFullSync(tables: WarehouseConnection['tables']): string | nu
 
 /**
  * The State history sync card's summary, e.g. "14 tables · last full sync 13m ago · 130k records
- * mirrored · next in 17m"; facts the server does not report are left out.
+ * mirrored · next in 17m"; facts the server does not report are left out. A sync that failed reads
+ * stopped says so, and when it resumes.
  */
-export function syncSummary(c: Pick<WarehouseConnection, 'tables' | 'nextSyncAt'>, now: number): string {
+export function syncSummary(c: Pick<WarehouseConnection, 'tables' | 'nextSyncAt' | 'halted'>, now: number): string {
 	const parts = [`${plural(c.tables.length, 'table')}`];
 	const full = lastFullSync(c.tables);
 	parts.push(full ? `last full sync ${formatAgo(full, now)}` : 'no full sync yet');
 	if (c.tables.length && c.tables.every((t) => t.mirroredTotal !== null)) {
 		parts.push(`${formatCount(c.tables.reduce((sum, t) => sum + t.mirroredTotal!, 0))} records mirrored`);
 	}
-	if (c.nextSyncAt) parts.push(`next ${formatIn(c.nextSyncAt, now)}`);
+	if (c.halted) parts.push(c.nextSyncAt ? `stopped after failed reads, retrying ${formatIn(c.nextSyncAt, now)}` : 'stopped after failed reads until the next run or a sync request');
+	else if (c.nextSyncAt) parts.push(`next ${formatIn(c.nextSyncAt, now)}`);
 	return parts.join(' · ');
 }
 

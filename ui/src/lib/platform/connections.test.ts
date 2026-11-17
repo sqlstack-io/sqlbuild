@@ -12,6 +12,7 @@ const table = (name: string, minutesAgo: number | null, mirroredTotal: number | 
 	recordsSent: 5,
 	elapsedMs: 200,
 	failure: null,
+	error: null,
 	waiting: false,
 	lastSyncedAt: minutesAgo === null ? null : ago(minutesAgo),
 	mirroredTotal
@@ -19,7 +20,7 @@ const table = (name: string, minutesAgo: number | null, mirroredTotal: number | 
 
 const details: ConnectionDetails = { adapter: 'snowflake', account: 'example-account', host: null, user: 'SQB_BUILDER', role: 'TRANSFORMER', warehouse: 'ORDERS_WH', database: 'ORDERS', authMethod: 'key_pair' };
 
-const connection = (id: string, d: ConnectionDetails | null): WarehouseConnection => ({ id, location: 'Orders', target: id, details: d, stateLocation: null, lastTest: null, nextSyncAt: null, tables: [] });
+const connection = (id: string, d: ConnectionDetails | null): WarehouseConnection => ({ id, location: 'Orders', target: id, details: d, stateLocation: null, lastTest: null, nextSyncAt: null, halted: false, tables: [] });
 
 describe('connection details', () => {
 	it('keeps the same rows before details are published', () => {
@@ -58,13 +59,19 @@ describe('state history sync summary', () => {
 	it('counts tables and dates the last full sync by the table synced longest ago', () => {
 		const tables = [table('orders', 13), table('customers', 4)];
 		expect(lastFullSync(tables)).toBe(ago(13));
-		expect(syncSummary({ tables, nextSyncAt: null }, now)).toBe('2 tables · last full sync 13m ago');
+		expect(syncSummary({ tables, nextSyncAt: null, halted: false }, now)).toBe('2 tables · last full sync 13m ago');
 		expect(lastFullSync([...tables, table('inventory', null)])).toBeNull();
 	});
 
 	it('adds the mirrored total and the next sync once reported', () => {
 		const tables = [table('orders', 13, 120_000), table('customers', 4, 10_400)];
-		expect(syncSummary({ tables, nextSyncAt: new Date(now + 17 * MINUTE).toISOString() }, now)).toBe('2 tables · last full sync 13m ago · 130k records mirrored · next in 17m');
+		expect(syncSummary({ tables, nextSyncAt: new Date(now + 17 * MINUTE).toISOString(), halted: false }, now)).toBe('2 tables · last full sync 13m ago · 130k records mirrored · next in 17m');
+	});
+
+	it('says a sync stopped after failed reads, and resumes on its retry or on the next run or request', () => {
+		const tables = [table('orders', 13), table('customers', 4)];
+		expect(syncSummary({ tables, nextSyncAt: new Date(now + 30 * MINUTE).toISOString(), halted: true }, now)).toBe('2 tables · last full sync 13m ago · stopped after failed reads, retrying in 30m');
+		expect(syncSummary({ tables, nextSyncAt: null, halted: true }, now)).toBe('2 tables · last full sync 13m ago · stopped after failed reads until the next run or a sync request');
 	});
 
 	it('shortens large counts', () => {

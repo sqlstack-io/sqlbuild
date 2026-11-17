@@ -263,6 +263,8 @@ export type WarehouseConnection = {
 	lastTest: ConnectionTest | null;
 	/** When the next background state history sync is due; null while a sync runs or when not reported. */
 	nextSyncAt: Iso | null;
+	/** Failed reads in a row stopped the newest sync: it resumes at `nextSyncAt` when set, otherwise after the next run, a sync request or a deploy. */
+	halted: boolean;
 	/** The newest sync of each SQLBuild table, in table order. */
 	tables: WarehouseTableSync[];
 };

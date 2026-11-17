@@ -143,6 +143,17 @@ describe('warehouseSyncOf', () => {
 		expect([running.nextSyncAt, running.tables[0].mirroredTotal]).toEqual([null, null]);
 	});
 
+	it('marks a sync that failed reads stopped, from the newest report only', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const failed = sync('2026-11-08T12:03:00Z', 'catalog', 'read', 'permission denied for table _sqlbuild_catalog');
+		const progress = { position: 2, kinds: 14, rows: 40, elapsed_millis: 900, completed: false, halted: true };
+		const stopped = { ...failed, report: { ...failed.report, health: { ...failed.report.health, progress } } };
+		const halted = toWarehouseConnection(location, [stopped, sync('2026-11-08T12:02:00Z', 'statistics', null)]);
+		expect([halted.halted, halted.nextSyncAt, halted.tables.find((t) => t.table === 'catalog')?.error]).toEqual([true, null, 'permission denied for table _sqlbuild_catalog']);
+		const resumed = toWarehouseConnection(location, [sync('2026-11-08T12:10:00Z', 'catalog', null), stopped]);
+		expect(resumed.halted).toBe(false);
+	});
+
 	it('shows the connection settings published with the newest snapshot, and none before it publishes them', () => {
 		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
 		const published = {
