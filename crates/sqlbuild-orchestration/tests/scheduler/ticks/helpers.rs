@@ -804,11 +804,14 @@ pub(crate) async fn step_cycles(
         holders[step.holder] = state;
         assert_eq!(
             (cycle.leader, cycle.ticks, cycle.wait_for),
-            (step.expected_leader, step.expected_ticks, step.expected_wait),
+            (
+                step.expected_leader,
+                step.expected_ticks,
+                step.expected_wait
+            ),
             "{description}: holder {} at +{}s",
             step.holder,
             step.at_seconds
         );
     }
 }
-

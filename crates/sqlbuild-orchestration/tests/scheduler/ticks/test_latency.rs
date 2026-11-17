@@ -161,7 +161,11 @@ fn given_a_set_database_clock_when_times_fall_due_then_each_cycle_ticks_the_late
                 .map(|tick| (tick.scheduled_for - base).num_seconds())
                 .collect();
             ticked.sort_unstable();
-            assert_eq!(ticked, test_case.expected_ticked, "{}", test_case.description);
+            assert_eq!(
+                ticked, test_case.expected_ticked,
+                "{}",
+                test_case.description
+            );
             close_test_store(fixture).await;
         });
     }
@@ -208,7 +212,10 @@ fn given_a_running_scheduler_when_a_time_falls_due_then_it_is_decided_without_ha
             let (ticks, cycles) = run_scheduler_until(
                 store,
                 trigger_id,
-                (due + test_case.window + TimeDelta::seconds(1), test_case.launcher_poll),
+                (
+                    due + test_case.window + TimeDelta::seconds(1),
+                    test_case.launcher_poll,
+                ),
             )
             .await;
             println!(
