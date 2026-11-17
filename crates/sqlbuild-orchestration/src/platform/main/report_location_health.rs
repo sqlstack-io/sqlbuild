@@ -4,6 +4,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::platform::_helpers::location_heartbeat::location_heartbeat;
+use crate::platform::_helpers::reported_generation::reported_generation;
 use crate::platform::constants::{MAX_REPORTED_RULE_FINDINGS, MAX_RULE_FINDING_CHARS};
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::store::errors::ControlError;
@@ -18,23 +19,7 @@ pub async fn report_location_health(
     location_id: Uuid,
     report: &LocationHealthReport,
 ) -> Result<bool, ControlError> {
-    if report.target.trim().is_empty() {
-        return Err(ControlError::Invalid(
-            "location health target is invalid".into(),
-        ));
-    }
-    let generation = match report.health {
-        LocationHealth::Heartbeat {} => None,
-        LocationHealth::CompileFailed { generation, .. }
-        | LocationHealth::Connection { generation, .. }
-        | LocationHealth::ProviderSecrets { generation, .. }
-        | LocationHealth::WarehouseSync { generation, .. } => Some(generation),
-    };
-    if generation.is_some_and(|generation| generation < 1) {
-        return Err(ControlError::Invalid(
-            "location health generation must be positive".into(),
-        ));
-    }
+    let generation = reported_generation(report)?;
     if let LocationHealth::CompileFailed {
         rules: Some(rules), ..
     } = &report.health

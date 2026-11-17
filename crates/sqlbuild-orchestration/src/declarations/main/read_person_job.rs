@@ -9,7 +9,7 @@ use crate::declarations::_helpers::job_detail::{
 };
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::declarations::main::published_job::published_job;
-use crate::declarations::models::JobDetailRecord;
+use crate::declarations::models::{JobDetailRecord, ServerPoolCaps};
 use crate::runs::models::RunKind;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
@@ -21,7 +21,7 @@ pub async fn read_person_job(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
     (location_id, target, job_key): (Uuid, &str, &str),
-    default_role: DefaultRole,
+    (default_role, caps): (DefaultRole, &ServerPoolCaps),
 ) -> Result<Option<JobDetailRecord>, ControlError> {
     let (transaction, _) = authorize_listing(
         begin(store, TransactionMode::Write).await?,
@@ -49,7 +49,8 @@ pub async fn read_person_job(
             ));
         }
     };
-    let (member_of, pools, concurrency) = snapshot_relations(&definitions, (job_key, &job));
+    let (member_of, pools, concurrency) =
+        snapshot_relations(&definitions, (job_key, &job), (caps, (location_id, target)));
     let (transaction, nodes) =
         read_snapshot_nodes(transaction, snapshot_id, Some(&job.selection)).await?;
     commit(transaction).await?;
@@ -66,6 +67,7 @@ pub async fn read_person_job(
         selection: job.selection,
         pools,
         concurrency,
+        resolved_concurrency: job.resolved_concurrency,
         select: job.select,
         exclude: job.exclude,
         targets: job.targets,

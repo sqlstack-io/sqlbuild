@@ -46,7 +46,7 @@ concurrency = 2
 ```
 
 `--concurrency` on the command line wins over all of them; see
-[Target concurrency](project-configuration.md#target-concurrency) for the full order.
+[Target concurrency](project-configuration.md#target-concurrency) for the full order. The job's page shows the value its runs use on the target and where it came from.
 
 ## Runs at once on a server: `max_workers`
 
@@ -169,6 +169,8 @@ Details:
   members then use the group's slots, one member per pool at a time.
 - The server can lower a limit for one launcher with `pool_caps`, never raise it; see
   [Cap pools](../cli/server.md#cap-pools). A job whose amount is above the cap takes the whole
-  capped pool.
+  capped pool, and the location's health shows a warning naming it, such as `job
+  backfill_prices_job takes 2 of pool supplier_api; this server caps it at 1, so it runs alone in
+  that pool`.
 - The job's page shows each pool it takes, its limit and the other jobs taking it. A queued run's
   wait names the full pool and the runs holding it.

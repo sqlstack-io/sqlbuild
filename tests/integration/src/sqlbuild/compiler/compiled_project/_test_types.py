@@ -289,6 +289,17 @@ class PythonCheckJobRejectionTestCase:
 
 
 @dataclass(frozen=True)
+class SnapshotConcurrencyTestCase:
+    description: str
+    project_tables: str
+    local_files: dict[str, str]
+    job_settings: str
+    selected_target: str | None
+    expected_job: dict[str, object]
+    expected_group: dict[str, object]
+
+
+@dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
     schedule: str

@@ -418,10 +418,10 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         jobs.as_array().into_iter().flatten().cloned().collect();
                     let expected_jobs = [
                         json!({"job_key": "nightly", "kind": "group", "description": "Nightly orders",
-                            "selection": ["orders"], "pools": [], "concurrency": null, "snapshot_id": published.snapshot_id,
+                            "selection": ["orders"], "pools": [], "concurrency": null, "resolved_concurrency": null, "snapshot_id": published.snapshot_id,
                             "select": null, "declared_at": null, "owner": null, "overlap": "queue", "on_failure": null}),
                         json!({"job_key": "orders", "kind": "job", "description": "Refresh orders",
-                            "selection": ["orders"], "pools": [{"pool": "warehouse_heavy", "amount": 2, "limit": 3, "shared_with": []}], "concurrency": null, "snapshot_id": published.snapshot_id,
+                            "selection": ["orders"], "pools": [{"pool": "warehouse_heavy", "amount": 2, "limit": 3, "cap": null, "server_limit": 3, "clamped": false, "shared_with": []}], "concurrency": null, "resolved_concurrency": null, "snapshot_id": published.snapshot_id,
                             "select": null, "declared_at": null, "owner": null, "overlap": "queue", "on_failure": null}),
                     ];
                     assert_eq!(

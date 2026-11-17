@@ -29,6 +29,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     PythonJobGroupTestCase,
     PythonJobSelectionTestCase,
     SnapshotCatalogTestCase,
+    SnapshotConcurrencyTestCase,
     SnapshotDeclarationRejectionTestCase,
     SnapshotDiscoveryRejectionTestCase,
     SnapshotDiscoveryTestCase,
@@ -932,6 +933,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                 "warehouse": "reporting",
             },
             "pools": {"order_reporting": {"amount": 2, "limit": 2}},
+            "resolved_concurrency": {"limit": 4, "source": "job"},
             "select": "+orders",
             "exclude": "stg_orders",
             "targets": ["development"],
@@ -956,6 +958,102 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         "30 3 * * *"
     )
     assert second["nodes"] == first["nodes"]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotConcurrencyTestCase(
+            description="nothing set uses SQLBuild's default",
+            project_tables="",
+            local_files={},
+            job_settings="",
+            selected_target=None,
+            expected_job={"limit": 1, "source": "default"},
+            expected_group={"limit": 1, "source": "default"},
+        ),
+        SnapshotConcurrencyTestCase(
+            description="the project's setting",
+            project_tables="\n[settings]\nconcurrency = 3\n",
+            local_files={},
+            job_settings="",
+            selected_target=None,
+            expected_job={"limit": 3, "source": "project"},
+            expected_group={"limit": 3, "source": "project"},
+        ),
+        SnapshotConcurrencyTestCase(
+            description="the location's local setting over the project's",
+            project_tables="\n[settings]\nconcurrency = 3\n",
+            local_files={"sqlbuild_local.toml": "[settings]\nconcurrency = 5\n"},
+            job_settings="",
+            selected_target=None,
+            expected_job={"limit": 5, "source": "local"},
+            expected_group={"limit": 5, "source": "local"},
+        ),
+        SnapshotConcurrencyTestCase(
+            description="the target's concurrency over the settings",
+            project_tables='\n[settings]\nconcurrency = 3\n\n[targets.development]\nschema = "main"\nconcurrency = 6\n',
+            local_files={},
+            job_settings="",
+            selected_target="development",
+            expected_job={"limit": 6, "source": "target"},
+            expected_group={"limit": 6, "source": "target"},
+        ),
+        SnapshotConcurrencyTestCase(
+            description="the job's own setting over the target's; its group keeps the target's",
+            project_tables='\n[targets.development]\nschema = "main"\nconcurrency = 6\n',
+            local_files={},
+            job_settings="\n[settings]\nconcurrency = 2\n",
+            selected_target="development",
+            expected_job={"limit": 2, "source": "job"},
+            expected_group={"limit": 6, "source": "target"},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_concurrency_layers_when_publishing_then_each_job_and_group_carries_its_resolved_concurrency(
+    tmp_path: Path, test_case: SnapshotConcurrencyTestCase
+) -> None:
+    write_files(
+        project_dir=tmp_path,
+        files=TYPE_PROOF_FILES
+        | test_case.local_files
+        | {
+            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            + test_case.project_tables,
+            "orchestration/jobs/nightly_orders_job.toml": (
+                'name = "nightly_orders_job"\n'
+                'description = "Refresh order reporting."\n'
+                'select = "+orders"\n' + test_case.job_settings
+            ),
+            "orchestration/job_groups/nightly_job_group.toml": (
+                'name = "nightly_job_group"\n'
+                'description = "Everything nightly."\n'
+                'jobs = ["nightly_orders_job"]\n'
+            ),
+        },
+    )
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discovered,
+        adapter=DuckDbAdapter(),
+        selected_target=test_case.selected_target,
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+
+    documents: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=project,
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            discovered_inputs=discovered,
+        ).to_json()
+    )["documents"]
+
+    assert (
+        documents["jobs"]["nightly_orders_job"]["resolved_concurrency"],
+        documents["groups"]["nightly_job_group"]["resolved_concurrency"],
+    ) == (test_case.expected_job, test_case.expected_group)
 
 
 @pytest.mark.parametrize(

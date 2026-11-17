@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 
-use crate::declarations::_helpers::job_detail::{DeclaredPools, pool_uses, run_concurrency};
+use crate::declarations::_helpers::job_detail::{Caps, DeclaredPools, pool_uses, run_concurrency};
 use crate::declarations::models::{
     JobRecord, PersonTriggerChange, PoolUse, StoredJob, TriggerChangeRequest, TriggerRecord,
 };
@@ -67,9 +67,11 @@ pub(crate) async fn trigger_changes_in(
     Ok((transaction, changes))
 }
 
+/// The target's current jobs and groups, each pool against this server's `caps`.
 pub(crate) async fn jobs_in(
     transaction: ControlTransaction,
     (location_id, target): (Uuid, &str),
+    caps: &Caps,
 ) -> Result<(ControlTransaction, Vec<JobRecord>), ControlError> {
     let (transaction, stored): (_, Vec<StoredJob>) = query_records(
         transaction,
@@ -84,13 +86,14 @@ pub(crate) async fn jobs_in(
         .collect();
     let pools: Vec<Vec<PoolUse>> = stored
         .iter()
-        .map(|job| pool_uses((&job.job_key, &job.definition_json), &declared))
+        .map(|job| pool_uses((&job.job_key, &job.definition_json), &declared, caps))
         .collect();
     let jobs: Vec<JobRecord> = stored
         .into_iter()
         .zip(pools)
         .map(|(job, pools)| JobRecord {
             concurrency: run_concurrency(&job.definition_json),
+            resolved_concurrency: job.definition_json.resolved_concurrency,
             job_key: job.job_key,
             kind: job.kind,
             description: job.definition_json.description,

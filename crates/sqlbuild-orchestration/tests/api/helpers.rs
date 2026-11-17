@@ -156,3 +156,22 @@ pub(crate) fn large_snapshot(location_id: uuid::Uuid) -> crate::snapshots::model
         .collect();
     input
 }
+
+/// Each `pool_capped` observation's warnings, with the generation and event ID they carry.
+pub(crate) fn pool_capped(
+    observations: &[crate::platform::models::LocationHealthObservation],
+) -> Vec<(i64, uuid::Uuid, crate::platform::models::PoolCapWarning)> {
+    let mut warnings = Vec::new();
+    for observation in observations {
+        let health = serde_json::to_value(&observation.report.health).expect("health as JSON");
+        let jobs: Vec<crate::platform::models::PoolCapWarning> =
+            serde_json::from_value(health.get("jobs").cloned().unwrap_or_default())
+                .unwrap_or_default();
+        let generation = health["generation"].as_i64().unwrap_or_default();
+        warnings.extend(
+            jobs.into_iter()
+                .map(|warning| (generation, observation.report.event_id, warning)),
+        );
+    }
+    warnings
+}

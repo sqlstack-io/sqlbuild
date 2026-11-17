@@ -31,7 +31,7 @@ describe('operate labels are short facts', () => {
 
 describe('pools in plain words', () => {
 	it('states one slot of a one-slot pool as one run at a time, with what shares it and the pool as detail', () => {
-		expect(poolText({ pool: 'supplier_api', amount: 1, limit: 1, sharedWith: ['orders_refresh'] })).toEqual({
+		expect(poolText({ pool: 'supplier_api', amount: 1, limit: 1, cap: null, serverLimit: 1, clamped: false, sharedWith: ['orders_refresh'] })).toEqual({
 			rule: 'One run at a time',
 			shared: ['orders_refresh'],
 			more: 0,
@@ -40,13 +40,13 @@ describe('pools in plain words', () => {
 	});
 
 	it('states one slot of a larger pool as at most so many runs, and names only the first few sharing it', () => {
-		const text = poolText({ pool: 'warehouse', amount: 1, limit: 3, sharedWith: ['a', 'b', 'c', 'd', 'e'] });
+		const text = poolText({ pool: 'warehouse', amount: 1, limit: 3, cap: null, serverLimit: 3, clamped: false, sharedWith: ['a', 'b', 'c', 'd', 'e'] });
 		expect(text.rule).toBe('At most 3 runs at a time');
 		expect(text.shared).toEqual(['a', 'b', 'c']);
 		expect(text.more).toBe(2);
 	});
 
 	it('states a larger amount as the slots it takes of the limit', () => {
-		expect(poolText({ pool: 'warehouse', amount: 2, limit: 4, sharedWith: [] }).rule).toBe('Takes 2 of 4 slots');
+		expect(poolText({ pool: 'warehouse', amount: 2, limit: 4, cap: null, serverLimit: 4, clamped: false, sharedWith: [] }).rule).toBe('Takes 2 of 4 slots');
 	});
 });

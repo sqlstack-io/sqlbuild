@@ -1828,6 +1828,11 @@ export interface components {
             /** Format: uuid */
             snapshot_id?: string | null;
         };
+        /**
+         * @description The layer that set a run's concurrency.
+         * @enum {string}
+         */
+        ConcurrencySource: "job" | "target" | "local" | "project" | "default";
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -2020,7 +2025,7 @@ export interface components {
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
             /**
-             * Format: int32
+             * Format: int64
              * @description The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
              */
             concurrency?: number | null;
@@ -2042,6 +2047,7 @@ export interface components {
             owner?: string | null;
             /** @description Each pool the job takes, by pool name. */
             pools: components["schemas"]["PoolUse"][];
+            resolved_concurrency?: null | components["schemas"]["ResolvedConcurrency"];
             select?: string | null;
             selection: string[];
             /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
@@ -2063,7 +2069,7 @@ export interface components {
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
             /**
-             * Format: int32
+             * Format: int64
              * @description The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
              */
             concurrency?: number | null;
@@ -2077,6 +2083,7 @@ export interface components {
             owner?: string | null;
             /** @description Each pool the job takes, by pool name. */
             pools: components["schemas"]["PoolUse"][];
+            resolved_concurrency?: null | components["schemas"]["ResolvedConcurrency"];
             /** @description A job's selectors as written; absent for a group and for snapshots published before they were recorded. */
             select?: string | null;
             selection: string[];
@@ -2152,6 +2159,12 @@ export interface components {
             kind: "provider_secrets";
             /** Format: int64 */
             missing: number;
+        } | {
+            /** Format: int64 */
+            generation: number;
+            jobs: components["schemas"]["PoolCapWarning"][];
+            /** @enum {string} */
+            kind: "pool_capped";
         } | {
             /** Format: int64 */
             elapsed_millis: number;
@@ -2802,6 +2815,18 @@ export interface components {
              */
             scheduler_lease_expires_at?: string | null;
         };
+        /** @description A job or group asking for more of a pool than this server's cap, so it runs alone in that pool. */
+        PoolCapWarning: {
+            /** Format: int32 */
+            amount: number;
+            /** Format: int32 */
+            cap: number;
+            job_key: string;
+            kind: components["schemas"]["RunKind"];
+            /** @description Such as "job X takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool". */
+            message: string;
+            pool: string;
+        };
         /** @description How many slots of a pool a job takes, and the pool's limit on the job's target. */
         PoolSlots: {
             /** Format: int32 */
@@ -2811,11 +2836,29 @@ export interface components {
         };
         /** @description A pool a job takes: its slots, the pool's limit, and the other jobs and groups taking it. */
         PoolUse: {
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description The slots the job asks for.
+             */
             amount: number;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description This server's `pool_caps` entry for the location and target; absent when it sets none.
+             */
+            cap?: number | null;
+            /** @description The job asks for more slots than `server_limit`, so on this server it takes the whole pool. */
+            clamped: boolean;
+            /**
+             * Format: int32
+             * @description The project's limit on the target.
+             */
             limit: number;
             pool: string;
+            /**
+             * Format: int32
+             * @description The limit on this server: the project's limit, lowered to the cap.
+             */
+            server_limit: number;
             shared_with: string[];
         };
         /** @description What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly. */
@@ -3021,6 +3064,12 @@ export interface components {
             run_id: string;
             /** Format: uuid */
             source_run_id: string;
+        };
+        /** @description The models a run builds at once on its target, and the layer that set it. */
+        ResolvedConcurrency: {
+            /** Format: int64 */
+            limit: number;
+            source: components["schemas"]["ConcurrencySource"];
         };
         RoleAssignmentRequest: {
             /** Format: uuid */

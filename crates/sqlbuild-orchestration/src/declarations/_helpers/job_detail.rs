@@ -1,15 +1,17 @@
 //! Display projections of a declaration: run order of a group's members and settings safe to show.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU32;
 
 use serde_json::Value;
 use sqlbuild_core::redaction::main::redact_text::redact_text;
+use uuid::Uuid;
 
 use crate::declarations::constants::{
     CONCURRENCY_SETTING, DEFER_SETTING_PREFIX, VARS_SETTING, WITHHELD_SETTING,
 };
 use crate::declarations::models::{
-    Definitions, GroupDefinition, JobDefinition, JobMember, PoolSlots, PoolUse,
+    Definitions, GroupDefinition, JobDefinition, JobMember, PoolSlots, PoolUse, ServerPoolCaps,
 };
 use crate::snapshots::models::SnapshotNode;
 
@@ -53,17 +55,26 @@ fn all_placed(waits: &BTreeSet<String>, placed: &BTreeSet<&str>) -> bool {
 /// The pools a declaration takes, keyed by name.
 pub(crate) type DeclaredPools<'a> = (&'a str, &'a BTreeMap<String, PoolSlots>);
 
-/// Each pool `job` takes, with its slots and the other declarations in `all` taking it.
+/// The caps of this server's launcher for the job's location and target, by pool.
+pub(crate) type Caps = BTreeMap<String, NonZeroU32>;
+
+/// Each pool `job` takes, with its slots, this server's limit, and the other declarations in `all` taking it.
 pub(crate) fn pool_uses(
     (job_key, job): (&str, &JobDefinition),
     all: &[DeclaredPools<'_>],
+    caps: &Caps,
 ) -> Vec<PoolUse> {
     let mut uses: Vec<PoolUse> = Vec::new();
     for (pool, slots) in &job.pools {
+        let cap = caps.get(pool).map(|cap| cap.get());
+        let server_limit = cap.map_or(slots.limit.get(), |cap| cap.min(slots.limit.get()));
         uses.push(PoolUse {
             pool: pool.clone(),
             amount: slots.amount.get(),
             limit: slots.limit.get(),
+            cap,
+            server_limit,
+            clamped: slots.amount.get() > server_limit,
             shared_with: sharing(pool, job_key, all),
         });
     }
@@ -92,6 +103,7 @@ pub(crate) fn run_concurrency(job: &JobDefinition) -> Option<u64> {
 pub(crate) fn snapshot_relations(
     definitions: &Definitions,
     (job_key, job): (&str, &JobDefinition),
+    (caps, location): (&ServerPoolCaps, (Uuid, &str)),
 ) -> (BTreeSet<String>, Vec<PoolUse>, Option<u64>) {
     let mut all: Vec<DeclaredPools<'_>> = Vec::new();
     for (name, other) in &definitions.jobs {
@@ -102,7 +114,7 @@ pub(crate) fn snapshot_relations(
     }
     (
         groups_running(definitions, job_key),
-        pool_uses((job_key, job), &all),
+        pool_uses((job_key, job), &all, &caps.on(location)),
         run_concurrency(job),
     )
 }

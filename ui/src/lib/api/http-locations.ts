@@ -13,8 +13,10 @@ function latestOf<K extends Wire['LocationHealth']['kind']>(observations: Wire['
 
 /** Health from the newest observations: down without a recent check-in, then load failures, then missing provider secrets, then connection failures. */
 export function healthOf(observations: Wire['LocationHealthObservation'][], now: number): { health: LocationHealth; liveInstances: number; lastSeenAt: string | null } {
-	const live = new Set(observations.filter((o) => now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
-	const lastSeenAt = observations.reduce<string | null>((latest, o) => (!latest || o.received_at > latest ? o.received_at : latest), null);
+	// The server's own pool-cap warning is not a location check-in.
+	const reported = observations.filter((o) => o.report.health.kind !== 'pool_capped');
+	const live = new Set(reported.filter((o) => now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
+	const lastSeenAt = reported.reduce<string | null>((latest, o) => (!latest || o.received_at > latest ? o.received_at : latest), null);
 	const failed = latestOf(observations, 'compile_failed');
 	const connection = latestOf(observations, 'connection');
 	const secrets = latestOf(observations, 'provider_secrets');

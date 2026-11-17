@@ -750,6 +750,8 @@ export type Job = {
 	pools: PoolUse[];
 	/** The job's own `concurrency` setting, models building at once in a run; null uses the project's or target's. */
 	concurrency: number | null;
+	/** What a run uses on the target and which layer set it; null for a snapshot published before it was recorded. */
+	resolvedConcurrency: ResolvedConcurrency | null;
 	priority: number | null;
 	owner: string | null;
 	sourceFile: string | null;
@@ -760,10 +762,21 @@ export type Job = {
 /** A pool a job takes: `amount` of its `limit` slots, shared with the other jobs and groups taking it. */
 export type PoolUse = {
 	pool: string;
+	/** The slots the job asks for. */
 	amount: number;
+	/** The project's limit on the target. */
 	limit: number;
+	/** This server's `pool_caps` entry; null when it sets none. */
+	cap: number | null;
+	/** The limit on this server: `limit` lowered to `cap`. */
+	serverLimit: number;
+	/** `amount` is above `serverLimit`, so on this server the job takes the whole pool. */
+	clamped: boolean;
 	sharedWith: string[];
 };
+
+/** Models a run builds at once, and the layer that set it. */
+export type ResolvedConcurrency = { limit: number; source: 'job' | 'target' | 'local' | 'project' | 'default' };
 
 /** One reason a member waits: `fromNode` of `upstreamJob` feeds its `toNode`, directly or through nodes no member selects. */
 export type WaitReason = { upstreamJob: string; fromNode: string; toNode: string };

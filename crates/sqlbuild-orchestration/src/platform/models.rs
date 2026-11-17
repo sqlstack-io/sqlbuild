@@ -58,6 +58,11 @@ pub enum LocationHealth {
         generation: i64,
         missing: u64,
     },
+    /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
+    PoolCapped {
+        generation: i64,
+        jobs: Vec<PoolCapWarning>,
+    },
     WarehouseSync {
         generation: i64,
         location: WarehouseStateLocation,
@@ -78,6 +83,19 @@ pub enum LocationHealth {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         next_sync_at: Option<DateTime<Utc>>,
     },
+}
+
+/// A job or group asking for more of a pool than this server's cap, so it runs alone in that pool.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PoolCapWarning {
+    pub job_key: String,
+    pub kind: crate::runs::models::RunKind,
+    pub pool: String,
+    pub amount: u32,
+    pub cap: u32,
+    /// Such as "job X takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool".
+    pub message: String,
 }
 
 /// When a location checks its warehouse connection on its own.
@@ -208,10 +226,10 @@ impl LocationState {
             .collect();
         let silence =
             chrono::TimeDelta::seconds(crate::platform::constants::LOCATION_SILENCE_SECONDS);
-        if !own
-            .iter()
-            .any(|observation| now - observation.received_at <= silence)
-        {
+        if !own.iter().any(|observation| {
+            !matches!(observation.report.health, LocationHealth::PoolCapped { .. })
+                && now - observation.received_at <= silence
+        }) {
             return Self::Broken;
         }
         let mut failed: Option<(DateTime<Utc>, i64)> = None;

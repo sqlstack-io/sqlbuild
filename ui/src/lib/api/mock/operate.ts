@@ -10,6 +10,7 @@ import type {
 	LaunchVerb,
 	PoolHolders,
 	PoolUse,
+	ResolvedConcurrency,
 	Principal,
 	Run,
 	RunOrigin,
@@ -37,7 +38,7 @@ export const SNAPSHOT_GENERATION = 42;
 type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 
 type JobDef = Known<
-	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'pools' | 'concurrency' | 'poolHolders' | 'memberOf' | 'cursorType' | 'groupMembers'>,
+	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'pools' | 'concurrency' | 'resolvedConcurrency' | 'poolHolders' | 'memberOf' | 'cursorType' | 'groupMembers'>,
 	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
 > & {
 	/** Each pool the job takes, with its amount. */
@@ -383,12 +384,21 @@ export function poolUsesOf(job: JobDef | undefined): PoolUse[] {
 		pool,
 		amount,
 		limit: POOL_LIMITS[pool] ?? 1,
+		cap: null,
+		serverLimit: POOL_LIMITS[pool] ?? 1,
+		clamped: false,
 		sharedWith: JOB_DEFS.filter((other) => other.key !== job?.key && pool in other.pools).map((other) => other.key)
 	}));
 }
 
 export function poolHoldersOf(job: JobDef | undefined): PoolHolders[] {
 	return Object.keys(job?.pools ?? {}).map((pool) => ({ pool, limit: POOL_LIMITS[pool] ?? 1, holders: [] }));
+}
+
+/** What a run of the job uses: its own setting, else the mock project's default of 4. */
+export function resolvedConcurrencyOf(job: JobDef | undefined): ResolvedConcurrency {
+	const own = runConcurrencyOf(job);
+	return own ? { limit: own, source: 'job' } : { limit: 4, source: 'project' };
 }
 
 /** The job's own `concurrency` setting, as the server reports it. */

@@ -557,6 +557,8 @@ pub struct ServerFacts {
     pub snapshots: crate::snapshots::models::SnapshotRetention,
     pub run_logs: crate::runs::models::RunLogRetention,
     pub state_history: crate::warehouse_metadata::models::StateHistoryRetention,
+    /// Each launcher's `pool_caps`; empty where this server runs no launcher.
+    pub pool_caps: crate::declarations::models::ServerPoolCaps,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.
