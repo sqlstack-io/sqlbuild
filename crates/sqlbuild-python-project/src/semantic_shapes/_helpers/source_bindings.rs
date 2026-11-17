@@ -107,21 +107,35 @@ pub(crate) fn source_binding_diagnostics<'py>(
                 ))
             })
             .collect::<PyResult<_>>()?;
-        if sensitive || adds_physical_evidence(&physical, shapes.get_item(&name)?.as_ref())? {
+        let bound: Vec<(String, Option<String>)> = physical
+            .iter()
+            .map(|(column, column_type)| {
+                let listed_quoted: bool = folds_upper && unquoted_column_name(column) != column;
+                let name: String = if exact_unquoted
+                    || listed_quoted
+                    || (folds_upper && is_folded_identifier(column))
+                {
+                    column.clone()
+                } else {
+                    format!("\"{}\"", column.replace('"', "\"\""))
+                };
+                (name, column_type.clone())
+            })
+            .collect();
+        let known: Option<Object<'py>> = shapes.get_item(&name)?;
+        let evidence: bool = if sensitive {
+            adds_physical_evidence(&bound, known.as_ref(), |column| {
+                bound_identity(column, folds_upper)
+            })?
+        } else {
+            adds_physical_evidence(&physical, known.as_ref(), str::to_owned)?
+        };
+        if evidence {
             changed.insert(name.clone());
         }
         let quoted: Bound<'py, PyDict> = PyDict::new(py);
-        for (column, column_type) in physical {
-            let listed_quoted: bool = folds_upper && unquoted_column_name(&column) != column;
-            let name: String = if exact_unquoted
-                || listed_quoted
-                || (folds_upper && is_folded_identifier(&column))
-            {
-                column
-            } else {
-                format!("\"{}\"", column.replace('"', "\"\""))
-            };
-            quoted.set_item(name, column_type)?;
+        for (column, column_type) in bound {
+            quoted.set_item(column, column_type)?;
         }
         shapes.set_item(name, quoted)?;
     }
@@ -410,25 +424,33 @@ fn positions<'py>(
     Ok(Bound::new(py, BindingPositions::new(request.extract()?)?)?.into_any())
 }
 
-/// Whether inspected columns differ from the known shape; untyped names match any type.
+/// Whether inspected columns differ from the known shape by `identity`; untyped names match any.
 fn adds_physical_evidence(
     physical: &[(String, Option<String>)],
     known: Option<&Object<'_>>,
+    identity: impl Fn(&str) -> String,
 ) -> PyResult<bool> {
     let Some(known) = known else {
         return Ok(true);
     };
     let known: Vec<(String, String)> = mapping_items(known)?
         .try_iter()?
-        .map(|item| item?.extract())
+        .map(|item| {
+            let (name, column_type): (String, String) = item?.extract()?;
+            Ok((identity(&name), column_type))
+        })
         .collect::<PyResult<_>>()?;
+    let physical: Vec<(String, Option<&str>)> = physical
+        .iter()
+        .map(|(name, column_type)| (identity(name), column_type.as_deref()))
+        .collect();
     let physical_names: HashSet<&str> = physical.iter().map(|(name, _)| name.as_str()).collect();
     let known_names: HashSet<&str> = known.iter().map(|(name, _)| name.as_str()).collect();
-    if physical_names != known_names {
+    if physical_names != known_names || physical_names.len() != physical.len() {
         return Ok(true);
     }
-    for (name, physical_type) in physical {
-        let Some(physical_type) = physical_type.as_deref() else {
+    for (name, physical_type) in &physical {
+        let Some(physical_type) = *physical_type else {
             continue;
         };
         if physical_type.is_empty() {
@@ -460,6 +482,19 @@ fn placeholders<'py>(model: &Object<'py>) -> PyResult<Object<'py>> {
         placeholders.set_item(key.str()?, value.str()?)?;
     }
     Ok(placeholders.into_any())
+}
+
+/// The column a name binds to on a case-sensitive dialect: quoted exactly, unquoted case-folded.
+fn bound_identity(name: &str, folds_upper: bool) -> String {
+    match name
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+        .filter(|inner| !inner.is_empty())
+    {
+        Some(inner) => inner.replace("\"\"", "\""),
+        None if folds_upper => name.to_uppercase(),
+        None => name.to_lowercase(),
+    }
 }
 
 /// Whether a listed column is a plain identifier in one case, so it binds as an unquoted name.
