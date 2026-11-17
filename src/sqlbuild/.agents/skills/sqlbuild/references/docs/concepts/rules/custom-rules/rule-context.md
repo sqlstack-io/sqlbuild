@@ -86,7 +86,7 @@ sql = ctx.sql.for_model(model).expanded
 for node in sql.ast().walk():
     if node.kind == "alias" and node.quoted and node.name != node.name.lower():
         start, end = node.span
-        return [ctx.finding(subject=model, node=node, message=sql.source[start:end])]
+        return [ctx.finding(subject=model, message=sql.source[start:end])]
 ```
 
 `ast()` returns a `document` node whose children are the statements. Every `SqlTreeNode` has a
