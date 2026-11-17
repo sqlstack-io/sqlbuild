@@ -12,6 +12,7 @@ use crate::bindings::_helpers::planner_identity::identities::with_honest_model_w
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::{ChangeReconciliation, ModelEntryResults};
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -151,7 +152,7 @@ pub(crate) fn build_planner_entry_results<'py>(
     )?;
     plan_entries(PlanEntriesRequest {
         project,
-        adapter: runtime_field(runtime, |runtime| &runtime.adapter)?,
+        dialect: runtime_dialect(runtime)?,
         scope: execution_scope.clone(),
         snapshot: warehouse_field(warehouse, |warehouse| &warehouse.snapshot)?,
         relations,

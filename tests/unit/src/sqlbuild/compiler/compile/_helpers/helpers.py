@@ -29,6 +29,7 @@ from sqlbuild._native import (
     DeclarationResolutionContext,
     DeclarationRuntimeProjection,
     DeclarationScopeResolver,
+    Dialect,
     DiscoveredMacroFile,
     DiscoveredProjectInputs,
     InferredNullability,
@@ -349,7 +350,7 @@ def resolve_model_references_for_adapter(*, sql: str, adapter_name: str) -> str:
         seed_locations={},
         cursor_bounds=None,
         cursor_filter_inputs={},
-        adapter=adapters[adapter_name](),
+        dialect=Dialect(adapters[adapter_name]()),
         cursor_type=None,
         lower_bound_inclusive=True,
     )

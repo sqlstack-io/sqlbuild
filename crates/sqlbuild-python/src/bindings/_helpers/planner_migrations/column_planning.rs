@@ -2,12 +2,13 @@
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::compiled_views::model_reads;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_migrations::column_objects::replace;
 use crate::bindings::_helpers::planner_migrations::known_input_columns::KnownInputColumns;
 use crate::bindings::_helpers::planner_migrations::models::{
     ColumnMigrationInputs, ColumnMigrationPlanning, MigrationPhase,
 };
-use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -64,10 +65,10 @@ pub(crate) fn plan_column_migrations<'py>(
     let py = phase.runtime.py();
     let runtime = phase.runtime.clone();
     let snapshot = phase.snapshot.clone();
-    let adapter = runtime_field(&runtime, |runtime| &runtime.adapter)?;
+    let dialect = runtime_dialect(&runtime)?;
     let candidates = super::column_candidates::candidates(
         (phase, columns),
-        &adapter.call_method0("sql_analysis_dialect")?,
+        &dialect.syntax("sql_analysis_dialect")?.call0()?,
     )?;
     if candidates.is_empty() {
         return Ok(ColumnMigrationPlanning {

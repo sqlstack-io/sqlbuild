@@ -5,6 +5,7 @@ use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
 use sqlbuild_host::entries::main::host_entry_labels::host_entry_labels;
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::native_host::orchestration_declarations::declaration_site;
 use crate::bindings::_helpers::native_host::preview_state::WarehouseAccessRefusedError;
 
@@ -17,5 +18,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         "WarehouseAccessRefusedError",
         module.py().get_type::<WarehouseAccessRefusedError>(),
     )?;
+    module.add_class::<Dialect>()?;
     module.add_function(wrap_pyfunction!(declaration_site, module)?)
 }

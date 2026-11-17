@@ -5,6 +5,7 @@ use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, within};
 use crate::bindings::_helpers::build_command::support::utc_now;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_changes::actions::resolve_model_actions;
 use crate::bindings::_helpers::planner_changes::detect::detect_changes;
@@ -260,12 +261,14 @@ pub(crate) fn build_execution_plan<'py>(
     let project = args.value("project")?;
     let adapter = args.value("adapter")?;
     let connection = args.value("connection")?;
+    let dialect = Dialect::of(&adapter)?;
     let runtime = Bound::new(
         py,
         PlannerRuntime {
             project: project.clone().unbind(),
             adapter: adapter.clone().unbind(),
             connection: connection.clone().unbind(),
+            dialect: dialect.clone().unbind(),
             project_config: args.value("project_config")?.unbind(),
             local_config: args.value("local_config")?.unbind(),
             on_progress: args.value("on_progress")?.unbind(),
@@ -279,7 +282,7 @@ pub(crate) fn build_execution_plan<'py>(
         py,
         PlanningRequest {
             project: project.clone().unbind(),
-            adapter: adapter.clone().unbind(),
+            dialect: dialect.unbind(),
             selected_keys: native_field(&inspection, "selected_keys")?.unbind(),
             sql_test_selection: native_field(&inspection, "sql_test_selection")?.unbind(),
         },

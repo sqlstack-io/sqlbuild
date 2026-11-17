@@ -1,5 +1,7 @@
 //! Warehouse-aware time-travel retention and Snowflake table-type planning.
 
+use crate::bindings::_helpers::native_host::dialect::Syntax;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
@@ -76,7 +78,7 @@ fn selected_models<'py>(
 }
 
 fn adapter_is(runtime: &Bound<'_, PyAny>, name: &str) -> PyResult<bool> {
-    native_field(&native_field(runtime, "adapter")?, "adapter_name")?.eq(name)
+    runtime_dialect(runtime)?.syntax("adapter_name")?.eq(name)
 }
 
 /// Entries for selected Snowflake table-type drift.

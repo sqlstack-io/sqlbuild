@@ -3,6 +3,7 @@
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
 use crate::bindings::_helpers::planner_resolution::orchestration::resolve_function_sql;
 use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_UNKNOWN_SEED;
@@ -82,7 +83,7 @@ pub(super) fn function_entry<'py>(
         Some(keywords(
             py,
             &[
-                ("adapter", context.adapter.clone()),
+                ("dialect", context.dialect.clone().into_any()),
                 ("function", function.clone()),
                 (
                     "model_locations",
@@ -100,7 +101,7 @@ pub(super) fn function_entry<'py>(
                 ("source_warehouse_columns", warehouse_columns.clone()),
                 (
                     "star_exclude_keyword",
-                    context.adapter.call_method0("star_exclude_keyword")?,
+                    context.dialect.syntax("star_exclude_keyword")?.call0()?,
                 ),
             ],
         )?),

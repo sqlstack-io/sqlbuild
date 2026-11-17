@@ -1228,12 +1228,23 @@ class PlanProviderUsage(NativeRecord):
     ) -> None: ...
     def __replace__(self, **changes: Any) -> PlanProviderUsage: ...
 
+class Dialect:
+    """How a plan writes SQL: the adapter's syntax, with no way to reach the warehouse.
+
+    Attributes that only write SQL or describe the dialect (`render_*`, `supports_*` and
+    dialect facts) are the adapter's own; anything reaching the warehouse raises `AttributeError`.
+    """
+
+    def __init__(self, adapter: BaseAdapter) -> None: ...
+    def __getattr__(self, name: str) -> Any: ...
+
 class PlannerRuntime:
     """Resolved execution environment shared by planner phases."""
 
     project: CompiledProjectView
     adapter: BaseAdapter
     connection: Any
+    dialect: Dialect
     project_config: ProjectConfig | None
     local_config: LocalConfig | None
     on_progress: Callable[[str], None] | None
@@ -1989,7 +2000,7 @@ def normalize_cursor_snapshot_grain(
 ) -> ModelCursorSnapshot: ...
 def resolve_model_sql(
     *,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     model: CompiledModelView,
     snapshot: WarehouseSnapshot,
     context: ModelPlanContext,
@@ -2002,7 +2013,7 @@ def resolve_model_sql(
 ) -> str: ...
 def resolve_function_sql(
     *,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     function: CompiledFunctionView,
     model_locations: dict[str, CompiledRelationLocation],
     seed_locations: dict[str, CompiledRelationLocation],
@@ -2014,7 +2025,7 @@ def resolve_function_sql(
 def resolve_model_hook_entries(
     *,
     model: CompiledModelView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     context: ModelPlanContext,
     external_sql_reference_resolver: ExternalSqlReferenceResolver | None,
 ) -> tuple[object, object]: ...
@@ -3469,7 +3480,7 @@ def build_relation_fixture_context(
 def build_relation_fixture_completion(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     request: tuple[tuple[str, ...], FixtureGroups],
     planning_context: RelationFixturePlanningContext | None = None,
 ) -> RelationFixtureCompletion: ...
@@ -4473,7 +4484,7 @@ def resolve_ref_references(
     seed_locations: dict[str, CompiledRelationLocation],
     cursor_bounds: CursorBounds | None,
     cursor_filter_inputs: dict[str, str],
-    adapter: BaseAdapter,
+    dialect: Dialect,
     cursor_type: str | None,
     lower_bound_inclusive: bool,
 ) -> str: ...
@@ -4485,7 +4496,7 @@ def resolve_source_references(
     star_exclude_keyword: str,
     cursor_bounds: CursorBounds | None,
     cursor_filter_inputs: dict[str, str],
-    adapter: BaseAdapter,
+    dialect: Dialect,
     cursor_type: str | None,
     lower_bound_inclusive: bool,
 ) -> str: ...
@@ -4498,13 +4509,13 @@ def resolve_udf_references(
     *,
     query_sql: str,
     function_locations: dict[str, CompiledRelationLocation],
-    adapter: BaseAdapter,
+    dialect: Dialect,
 ) -> str: ...
 def resolve_table_function_references(
     *,
     query_sql: str,
     function_locations: dict[str, CompiledRelationLocation],
-    adapter: BaseAdapter,
+    dialect: Dialect,
 ) -> str: ...
 def apply_deferred_locations(
     *,
@@ -4922,7 +4933,7 @@ def build_cli_scenario_plan(
     *,
     scenario: CompiledSqlScenario,
     pipeline_result: CompilePipelineResult,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     project_name: str,
     source_lexical_syntax: SqlLexicalSyntax,
 ) -> ScenarioExecutionPlan: ...
@@ -4958,7 +4969,7 @@ def resolve_scenario_check_sql(
     *,
     sql: str,
     relation_plan: ScenarioRelationPlan,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     source_label: str,
     source_lexical_syntax: SqlLexicalSyntax,
 ) -> str: ...
@@ -4967,7 +4978,7 @@ def build_scenario_fixture_plans(
     scenario: CompiledSqlScenario,
     graph_plan: ScenarioGraphPlan,
     relation_plan: ScenarioRelationPlan,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     source_lexical_syntax: SqlLexicalSyntax,
     fixture_sql_overrides: dict[tuple[CompiledResourceType, str], str] | None = None,
 ) -> tuple[ScenarioFixturePlan, ...]: ...
@@ -4975,7 +4986,7 @@ def build_scenario_execution_plan(
     *,
     scenario: CompiledSqlScenario,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     graph_plan: ScenarioGraphPlan,
     relation_plan: ScenarioRelationPlan,
     source_lexical_syntax: SqlLexicalSyntax,
@@ -5643,7 +5654,7 @@ def apply_maximum_start_policy(
 def build_selected_test_entries(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     selected_keys: frozenset[CompiledObjectKey],
     sql_test_selection: SqlTestSelection,
     case_name: str | None = None,
@@ -5654,7 +5665,7 @@ def resolve_static_command_scope(
 def resolve_static_relation_context(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     scope: PlannerScope,
     deferral: DeferralInputs | None = None,
     project_config: ProjectConfig | None = None,
@@ -5664,14 +5675,14 @@ def resolve_static_relation_context(
 def build_audit_command_plan(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     scope: PlannerScope,
     relations: PlannerRelationsContext,
 ) -> PlanOutput: ...
 def build_test_command_plan(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     scope: PlannerScope,
     relations: PlannerRelationsContext,
     case_name: str | None = None,
@@ -5725,7 +5736,7 @@ class SqlTestPlanning:
 def start_sql_test_planning(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     selected_keys: frozenset[CompiledObjectKey],
     sql_test_selection: SqlTestSelection,
     enabled: bool,
@@ -6100,7 +6111,7 @@ def plan_audit(
     model_locations: dict[str, CompiledRelationLocation],
     seed_locations: dict[str, CompiledRelationLocation],
     source_map: dict[str, SourceEntry],
-    adapter: BaseAdapter,
+    dialect: Dialect,
     lineage_upstream_deps: dict[CompiledObjectKey, tuple[CompiledObjectKey, ...]],
     lineage_downstream_deps: dict[CompiledObjectKey, tuple[CompiledObjectKey, ...]],
     model_materializations: dict[str, str],

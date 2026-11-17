@@ -7,6 +7,7 @@ use pyo3::types::{PyDict, PyTuple};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::build_command::support::utc_now;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_phases::models::{PlannerRuntime, PlannerWarehouseState};
 
 #[pymethods]
@@ -33,9 +34,11 @@ impl PlannerRuntime {
         } else {
             utc_now(py)?
         };
+        let adapter = args.value("adapter")?;
         Ok(Self {
             project: args.value("project")?.unbind(),
-            adapter: args.value("adapter")?.unbind(),
+            dialect: Dialect::of(&adapter)?.unbind(),
+            adapter: adapter.unbind(),
             connection: args.value("connection")?.unbind(),
             project_config: args.value("project_config")?.unbind(),
             local_config: args.value("local_config")?.unbind(),
@@ -51,6 +54,16 @@ pub(crate) fn runtime_field<'py>(
     field: fn(&PlannerRuntime) -> &Py<PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     Ok(field(runtime.cast::<PlannerRuntime>()?.get())
+        .bind(runtime.py())
+        .clone())
+}
+
+/// The SQL dialect of a planner runtime passed as a Python object.
+pub(crate) fn runtime_dialect<'py>(runtime: &Bound<'py, PyAny>) -> PyResult<Bound<'py, Dialect>> {
+    Ok(runtime
+        .cast::<PlannerRuntime>()?
+        .get()
+        .dialect
         .bind(runtime.py())
         .clone())
 }

@@ -1,5 +1,6 @@
 //! Construction, comparison and display of native record field values.
 
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 
@@ -99,6 +100,8 @@ pub(crate) fn field<'py>(value: &Bound<'py, PyAny>, name: &str) -> PyResult<Boun
         return found;
     } else if let Some(found) = enum_member_field(value, name) {
         return found;
+    } else if let Ok(dialect) = value.cast::<Dialect>() {
+        return dialect.syntax(name);
     }
     strict_fallback(value, name)?;
     value.getattr(name)

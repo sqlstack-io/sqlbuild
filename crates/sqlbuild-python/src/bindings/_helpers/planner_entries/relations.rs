@@ -5,6 +5,7 @@ use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use crate::bindings::_helpers::planner_entries::models::{
     PlannerRelationsContext, RelationsRequest,
 };
@@ -87,6 +88,7 @@ pub(crate) fn planner_relations_context<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let RelationsRequest {
         project,
+        dialect,
         adapter,
         connection,
         scope,
@@ -212,7 +214,7 @@ pub(crate) fn planner_relations_context<'py>(
             source_read_map: source_read_map.unbind(),
             python_source_read_map: python_source_read_map.unbind(),
             source_warehouse_columns: semantic_columns.unbind(),
-            star_exclude_keyword: adapter.call_method0("star_exclude_keyword")?.unbind(),
+            star_exclude_keyword: dialect.syntax("star_exclude_keyword")?.call0()?.unbind(),
             listed_source_names: listed_source_names.unbind(),
         },
     )?
@@ -243,6 +245,7 @@ fn build_planner_relations_context<'py>(
     )?;
     planner_relations_context(RelationsRequest {
         project: args.value("project")?,
+        dialect: Dialect::of(&args.value("adapter")?)?,
         adapter: args.value("adapter")?,
         connection: args.value("connection")?,
         scope: args.value("scope")?,

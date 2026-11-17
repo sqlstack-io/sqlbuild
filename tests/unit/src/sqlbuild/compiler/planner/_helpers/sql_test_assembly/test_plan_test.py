@@ -16,6 +16,7 @@ from sqlbuild._native import (
     CompiledResourceType,
     CompiledSqlTest,
     CompileSqlTestCte,
+    Dialect,
     DiscoveredSqlTestBlock,
     DiscoveredSqlTestFile,
     NativeSqlTestPlan,
@@ -1098,11 +1099,11 @@ def test_given_udf_sql_test_when_planning_then_compares_resolved_actual_to_expec
     )
     command_plan: PlanOutput = build_test_command_plan(
         project=project,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         scope=scope,
         relations=resolve_static_relation_context(
             project=project,
-            adapter=DuckDbAdapter(),
+            dialect=Dialect(DuckDbAdapter()),
             scope=scope,
         ),
     )
@@ -1232,11 +1233,11 @@ def test_given_table_function_sql_test_when_planning_then_compares_resolved_actu
     )
     command_plan: PlanOutput = build_test_command_plan(
         project=project,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         scope=scope,
         relations=resolve_static_relation_context(
             project=project,
-            adapter=DuckDbAdapter(),
+            dialect=Dialect(DuckDbAdapter()),
             scope=scope,
         ),
     )

@@ -9,6 +9,7 @@ import pytest
 from sqlbuild._native import (
     CompiledSqlScenario,
     CompileSqlScenarioCte,
+    Dialect,
     DiscoveredHookFunction,
     PlannerInputError,
     ScenarioExecutionPlan,
@@ -209,7 +210,7 @@ def test_given_scenario_helpers_when_building_fixture_plans_then_fixtures_are_se
         scenario=build_scenario_relation_test_scenario(),
         graph_plan=test_case.graph_plan,
         relation_plan=relation_plan,
-        adapter=PlannerTestAdapter(),
+        dialect=Dialect(PlannerTestAdapter()),
         source_lexical_syntax=SqlLexicalSyntax(),
     )
 
@@ -296,7 +297,7 @@ def test_given_project_source_ref_in_scenario_fixture_when_building_fixture_plan
         scenario=scenario,
         graph_plan=test_case.graph_plan,
         relation_plan=relation_plan,
-        adapter=PlannerTestAdapter(),
+        dialect=Dialect(PlannerTestAdapter()),
         source_lexical_syntax=SqlLexicalSyntax(),
     )
 
@@ -414,7 +415,7 @@ def test_given_scenario_graph_when_building_execution_plan_then_returns_scenario
     result, warnings = build_scenario_execution_plan(
         scenario=build_scenario_relation_test_scenario(),
         project=project,
-        adapter=PlannerTestAdapter(),
+        dialect=Dialect(PlannerTestAdapter()),
         source_lexical_syntax=SqlLexicalSyntax(),
         graph_plan=test_case.graph_plan,
         relation_plan=relation_plan,
@@ -512,7 +513,7 @@ def test_given_required_unmocked_seed_when_building_execution_plan_then_loads_pr
     result, warnings = build_scenario_execution_plan(
         scenario=build_scenario_relation_test_scenario(include_seed_fixture=False),
         project=project,
-        adapter=PlannerTestAdapter(),
+        dialect=Dialect(PlannerTestAdapter()),
         source_lexical_syntax=SqlLexicalSyntax(),
         graph_plan=test_case.graph_plan,
         relation_plan=relation_plan,
@@ -612,7 +613,7 @@ def test_given_scenario_check_sql_when_resolving_then_uses_scenario_relations(
     result: str = resolve_scenario_check_sql(
         sql=test_case.sql,
         relation_plan=relation_plan,
-        adapter=PlannerTestAdapter(),
+        dialect=Dialect(PlannerTestAdapter()),
         source_lexical_syntax=SqlLexicalSyntax(),
         source_label=SCENARIO_PATH,
     )
@@ -753,7 +754,7 @@ def test_given_dialect_lexical_syntax_when_resolving_check_sql_then_replaces_eve
         resolve_scenario_check_sql(
             sql=test_case.sql,
             relation_plan=relation_plan,
-            adapter=PlannerTestAdapter(),
+            dialect=Dialect(PlannerTestAdapter()),
             source_lexical_syntax=lexical_syntax,
             source_label=SCENARIO_PATH,
         )
@@ -819,7 +820,7 @@ def test_given_unresolvable_check_sql_when_resolving_then_raises_scenario_error(
             resolve_scenario_check_sql(
                 sql=test_case.sql,
                 relation_plan=relation_plan,
-                adapter=PlannerTestAdapter(),
+                dialect=Dialect(PlannerTestAdapter()),
                 source_lexical_syntax=lexical_syntax,
                 source_label=SCENARIO_PATH,
             )
@@ -877,7 +878,7 @@ def test_given_unresolvable_fixture_sql_when_planning_fixtures_then_raises_namin
             scenario=scenario,
             graph_plan=graph_plan,
             relation_plan=relation_plan,
-            adapter=PlannerTestAdapter(),
+            dialect=Dialect(PlannerTestAdapter()),
             source_lexical_syntax=test_case.lexical_syntax,
         )
 

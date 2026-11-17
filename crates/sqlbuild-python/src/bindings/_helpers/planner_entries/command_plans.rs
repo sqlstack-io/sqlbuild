@@ -7,6 +7,7 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_entries::models::RelationsRequest;
 use crate::bindings::_helpers::planner_entries::plan_output::{
     function_entry, selected_test_entries, test_selected,
@@ -129,7 +130,7 @@ pub(crate) fn resolve_static_relation_context<'py>(
         "resolve_static_relation_context",
         kwargs,
         (
-            &["project", "adapter", "scope"],
+            &["project", "dialect", "scope"],
             &[
                 "deferral",
                 "project_config",
@@ -140,7 +141,8 @@ pub(crate) fn resolve_static_relation_context<'py>(
     )?;
     planner_relations_context(RelationsRequest {
         project: args.value("project")?,
-        adapter: args.value("adapter")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
+        adapter: none(py),
         connection: none(py),
         scope: args.value("scope")?,
         deferral: args.value("deferral")?,
@@ -153,10 +155,10 @@ pub(crate) fn resolve_static_relation_context<'py>(
 
 /// Project selected audits from canonical static state.
 #[pyfunction]
-#[pyo3(signature = (*, project, adapter, scope, relations))]
+#[pyo3(signature = (*, project, dialect, scope, relations))]
 pub(crate) fn build_audit_command_plan<'py>(
     project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     scope: &Bound<'py, PyAny>,
     relations: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -175,7 +177,7 @@ pub(crate) fn build_audit_command_plan<'py>(
             py,
             &[
                 ("project", project.clone()),
-                ("adapter", adapter.clone()),
+                ("dialect", dialect.clone().into_any()),
                 ("scope", scope.clone()),
                 ("relations", relations.clone()),
                 ("model_materializations", materializations.into_any()),
@@ -239,18 +241,18 @@ pub(crate) fn build_test_command_plan<'py>(
         "build_test_command_plan",
         kwargs,
         (
-            &["project", "adapter", "scope", "relations"],
+            &["project", "dialect", "scope", "relations"],
             &["case_name"],
         ),
     )?;
     let project = args.value("project")?;
-    let adapter = args.value("adapter")?;
+    let dialect = Dialect::passed(args.value("dialect")?)?;
     let scope = args.value("scope")?;
     let relations = args.value("relations")?;
     let selected_keys = native_field(&scope, "selected_keys")?;
     let selection = native_field(&scope, "sql_test_selection")?;
     let selected = selected_test_entries(
-        (&project, &adapter),
+        (&project, &dialect),
         &selected_keys,
         &selection,
         &args.value("case_name")?,
@@ -282,7 +284,7 @@ pub(crate) fn build_test_command_plan<'py>(
         let fingerprint_sql = object(py, build_compiled_function_fingerprint_sql(&function)?)?;
         functions.push(function_entry(
             &function,
-            &adapter,
+            &dialect,
             &relations,
             (
                 fingerprint_sql,

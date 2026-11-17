@@ -1,5 +1,6 @@
 //! Inference and schema preparation at the fixture Python boundary.
 
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_fixtures::main::empty_fixture_marker::empty_fixture_marker;
@@ -24,7 +25,7 @@ pub(crate) struct PreparedFixtures<'py> {
 pub(crate) fn prepare<'py>(
     groups: &Bound<'py, PyAny>,
     context: &RelationFixturePlanningContext,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
 ) -> PyResult<PreparedFixtures<'py>> {
     let py = groups.py();
     let inferences = context.fixture_inferences.bind(py);
@@ -47,7 +48,7 @@ pub(crate) fn prepare<'py>(
             let mut sql: String = sql.extract()?;
             if empty_fixture_marker(&sql).map_err(value_error)? {
                 let (empty_sql, error) =
-                    complete_empty_fixture_sql(&sql, context.relations.get(&fixture_key), adapter)?;
+                    complete_empty_fixture_sql(&sql, context.relations.get(&fixture_key), dialect)?;
                 if let Some(error) = error {
                     prepared
                         .diagnostics
@@ -62,7 +63,7 @@ pub(crate) fn prepare<'py>(
             kwargs.set_item("query_sql", &sql)?;
             kwargs.set_item(
                 "inference_profile",
-                adapter.call_method0("expression_inference_profile")?,
+                dialect.syntax("expression_inference_profile")?.call0()?,
             )?;
             let inference = inferences.call_method("infer", (), Some(&kwargs))?;
             if !inference.is_none() {

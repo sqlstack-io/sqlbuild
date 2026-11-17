@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from sqlbuild._native import (
+    Dialect,
     ModelPlanContext,
     PythonHookEntry,
     SourceEntry,
@@ -70,7 +71,7 @@ def test_given_sql_hook_references_when_planning_then_they_resolve_like_model_sq
 
     pre_hooks, post_hooks = resolve_model_hook_entries(
         model=model,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         context=_CONTEXT,
         external_sql_reference_resolver=None,
     )

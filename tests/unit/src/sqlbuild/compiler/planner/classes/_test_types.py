@@ -40,3 +40,17 @@ class PlanningExitTestCase:
     script: str
     expected_returncode: int
     expected_output: str
+
+
+@dataclass(frozen=True)
+class DialectAttributeTestCase:
+    description: str
+    attribute: str
+    arguments: dict[str, object]
+    expected: object
+
+
+@dataclass(frozen=True)
+class DialectRefusalTestCase:
+    description: str
+    attribute: str

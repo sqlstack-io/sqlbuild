@@ -12,6 +12,7 @@ use crate::bindings::_helpers::graph::node_set::PyNodeSet;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_entries::values::{
     native, planner_model, planner_type, string,
@@ -240,7 +241,7 @@ fn model_entry<'py>(
 
 fn clone_model_entries<'py>(
     (project, plan): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     resolution: &CloneResolution<'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
@@ -268,7 +269,7 @@ fn clone_model_entries<'py>(
                     function_locations: resolution.function_locations.clone().unbind(),
                     source_map: resolution.source_map.clone().unbind(),
                     source_warehouse_columns: resolution.source_warehouse_columns.clone().unbind(),
-                    star_exclude_keyword: adapter.call_method0("star_exclude_keyword")?.unbind(),
+                    star_exclude_keyword: dialect.syntax("star_exclude_keyword")?.call0()?.unbind(),
                     runtime_cursor_producer_names: PyFrozenSet::empty(py)?.into_any().unbind(),
                     future_cursor_config: py.None(),
                     start_cursor_config: py.None(),
@@ -277,7 +278,7 @@ fn clone_model_entries<'py>(
             )?
             .into_any();
             let sql = resolve_model_sql(
-                &Resolution::of_context(adapter.clone(), &context, py.None().into_bound(py))?,
+                &Resolution::of_context(dialect.clone(), &context, py.None().into_bound(py))?,
                 &context,
                 &ModelSqlRequest {
                     model: model.clone(),
@@ -311,7 +312,7 @@ fn clone_model_entries<'py>(
 fn clone_source_entries<'py>(
     project: &Bound<'py, PyAny>,
     (selected, execution_order): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
     let entries = PyDict::new(py);
@@ -335,7 +336,9 @@ fn clone_source_entries<'py>(
         kwargs.set_item("database", native_field(&entry, "database")?)?;
         kwargs.set_item("schema", native_field(&entry, "schema")?)?;
         kwargs.set_item("name", &relation_name)?;
-        let qualified = native_field(adapter, "render_qualified_name")?.call((), Some(&kwargs))?;
+        let qualified = dialect
+            .syntax("render_qualified_name")?
+            .call((), Some(&kwargs))?;
         let destination = new_record(
             py,
             RecordId::CompiledRelationLocation,
@@ -367,7 +370,7 @@ fn clone_source_entries<'py>(
 
 fn clone_function_entries<'py>(
     (project, plan): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     resolution: &CloneResolution<'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
@@ -383,7 +386,7 @@ fn clone_function_entries<'py>(
             Some(keywords(
                 py,
                 &[
-                    ("adapter", adapter.clone()),
+                    ("dialect", dialect.clone().into_any()),
                     ("function", function.clone()),
                     ("model_locations", resolution.model_locations.clone()),
                     ("seed_locations", resolution.seed_locations.clone()),
@@ -395,7 +398,7 @@ fn clone_function_entries<'py>(
                     ),
                     (
                         "star_exclude_keyword",
-                        adapter.call_method0("star_exclude_keyword")?,
+                        dialect.syntax("star_exclude_keyword")?.call0()?,
                     ),
                 ],
             )?),
@@ -496,7 +499,7 @@ fn names_of<'py>(entries: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
 fn origin_source_entries<'py>(
     project: &Bound<'py, PyAny>,
     selected_names: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
     let mut keys: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -514,7 +517,7 @@ fn origin_source_entries<'py>(
             &PyFrozenSet::new(py, keys)?.into_any(),
             &tuple_of(py, order)?,
         ),
-        adapter,
+        dialect,
     )
 }
 
@@ -545,6 +548,7 @@ pub(crate) fn timed_clone_planning<'py>(
     let project = args.value("project")?;
     let adapter = args.value("adapter")?;
     let connection = args.value("connection")?;
+    let dialect = Dialect::of(&adapter)?;
     let destination_sources = args.value("destination_source_project")?;
     let plan = clone_plan_output(&project, &args.value("select")?, &args.value("exclude")?)?;
     let inspection_started = std::time::Instant::now();
@@ -554,9 +558,9 @@ pub(crate) fn timed_clone_planning<'py>(
         (&adapter, &connection),
     )?;
     let inspection_seconds = inspection_started.elapsed().as_secs_f64();
-    let models = clone_model_entries((&project, &plan), &adapter, &resolution)?;
+    let models = clone_model_entries((&project, &plan), &dialect, &resolution)?;
     let seeds = seed_entries(&project, "key", &native_field(&plan, "selected_keys")?)?;
-    let functions = clone_function_entries((&project, &plan), &adapter, &resolution)?;
+    let functions = clone_function_entries((&project, &plan), &dialect, &resolution)?;
     let mut sources = PyTuple::empty(py).into_any();
     if native_field(&destination_sources, "effective_target_name")?
         .eq(native_field(&project, "effective_target_name")?)?
@@ -567,7 +571,7 @@ pub(crate) fn timed_clone_planning<'py>(
                 &native_field(&plan, "selected_keys")?,
                 &native_field(&plan, "execution_order")?,
             ),
-            &adapter,
+            &dialect,
         )?;
     }
     let origin_project = args.value("origin_project")?;
@@ -576,7 +580,7 @@ pub(crate) fn timed_clone_planning<'py>(
     let origin_sources = origin_source_entries(
         &args.value("origin_source_project")?,
         &names_of(&sources)?,
-        &adapter,
+        &dialect,
     )?;
     let origin_by_name = PyDict::new(py);
     for entry in origin_sources.try_iter()? {

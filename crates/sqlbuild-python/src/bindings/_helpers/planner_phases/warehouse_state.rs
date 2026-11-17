@@ -14,6 +14,7 @@ use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_re
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::models::PlannerWarehouseState;
 use crate::bindings::_helpers::planner_phases::objects::native;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::fingerprint_cache::MigrationFingerprintCache;
@@ -117,6 +118,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
     fingerprints.call_method0("persist")?;
     let inspection_relations = planner_relations_context(RelationsRequest {
         project: project.clone(),
+        dialect: runtime_dialect(runtime)?,
         adapter: adapter.clone(),
         connection: runtime_field(runtime, |runtime| &runtime.connection)?,
         scope: class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?,

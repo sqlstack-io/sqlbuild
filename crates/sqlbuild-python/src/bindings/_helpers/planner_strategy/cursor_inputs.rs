@@ -1,5 +1,6 @@
 //! Cursor input relations and authored cursor input column checks of model plan entries.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyTuple};
@@ -166,10 +167,10 @@ pub(crate) fn reject_unexposed_cursor_input_columns<'py>(
 
 /// The qualified relation one cursor input reference reads, when it resolves.
 fn input_relation<'py>(
-    (lookups, adapter): (&CursorInputLookups<'py>, &Bound<'py, PyAny>),
+    (lookups, dialect): (&CursorInputLookups<'py>, &Bound<'py, Dialect>),
     (kind, name): (&str, &str),
 ) -> PyResult<Option<String>> {
-    let py: Python<'py> = adapter.py();
+    let py: Python<'py> = dialect.py();
     let location: Bound<'py, PyAny> = match kind {
         MODEL_REFERENCE => {
             let model: Bound<'py, PyAny> = mapping_get(&lookups.model_locations, name)?;
@@ -185,7 +186,7 @@ fn input_relation<'py>(
             if source.is_none() {
                 return Ok(None);
             }
-            return render_source_relation(&source, Some(adapter)).map(Some);
+            return render_source_relation(&source, Some(dialect.as_any())).map(Some);
         }
         _ => py.None().into_bound(py),
     };
@@ -242,7 +243,10 @@ pub(crate) fn cursor_input_relations_of<'py>(
         request.get(name)?;
     }
     build_cursor_input_relations(
-        (&request.get("model")?, &request.get("adapter")?),
+        (
+            &request.get("model")?,
+            &Dialect::of(&request.get("adapter")?)?,
+        ),
         &request.get("cursor_column")?,
         &lookups_of(&request)?,
     )
@@ -250,7 +254,7 @@ pub(crate) fn cursor_input_relations_of<'py>(
 
 /// Cursor-bearing input relations of an incremental model, for runtime range discovery.
 pub(crate) fn build_cursor_input_relations<'py>(
-    (model, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (model, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
     cursor_column: &Bound<'py, PyAny>,
     lookups: &CursorInputLookups<'py>,
 ) -> PyResult<Bound<'py, PyTuple>> {
@@ -282,7 +286,7 @@ pub(crate) fn build_cursor_input_relations<'py>(
         let kind: String = text(&native_field(&reference, "ref_kind")?)?;
         let name: Bound<'py, PyAny> = native_field(&reference, "ref_name")?;
         let name_text: String = text(&name)?;
-        let Some(relation) = input_relation((lookups, adapter), (&kind, &name_text))? else {
+        let Some(relation) = input_relation((lookups, dialect), (&kind, &name_text))? else {
             continue;
         };
         let producer: Option<Bound<'py, PyAny>> = if kind == MODEL_REFERENCE {

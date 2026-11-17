@@ -10,6 +10,7 @@ use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
 use crate::bindings::_helpers::model_config::typed_config::{
     config_node_of, config_text_is, config_text_object, config_value, model_values,
 };
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use crate::bindings::_helpers::native_host::preview_state::PreviewScope;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
@@ -36,7 +37,7 @@ const APPEND_STRATEGY: &str = "append";
 
 /// What resolving one model's, hook's or function's references reads.
 pub(crate) struct Resolution<'py> {
-    pub(crate) adapter: Bound<'py, PyAny>,
+    pub(crate) dialect: Bound<'py, Dialect>,
     external: Bound<'py, PyAny>,
     source_map: Bound<'py, PyAny>,
     source_warehouse_columns: Bound<'py, PyAny>,
@@ -48,12 +49,12 @@ pub(crate) struct Resolution<'py> {
 impl<'py> Resolution<'py> {
     /// Resolution against a `ModelPlanContext`'s relations.
     pub(crate) fn of_context(
-        adapter: Bound<'py, PyAny>,
+        dialect: Bound<'py, Dialect>,
         context: &Bound<'py, PyAny>,
         external: Bound<'py, PyAny>,
     ) -> PyResult<Self> {
         Ok(Self {
-            adapter,
+            dialect,
             external,
             source_map: class_field(context, |c: &ModelPlanContext| &c.source_map)?,
             source_warehouse_columns: class_field(context, |c: &ModelPlanContext| {
@@ -66,17 +67,17 @@ impl<'py> Resolution<'py> {
     }
 
     fn resolve(&self, sql: &str, filtering: &CursorFiltering<'py>) -> PyResult<String> {
-        let py = self.adapter.py();
+        let py = self.dialect.py();
         let resolved: String = resolve_sources(
             sql,
             (&self.source_map, &self.source_warehouse_columns),
-            &self.adapter,
+            &self.dialect,
             filtering,
         )?;
         let resolved: String = resolve_refs(
             &resolved,
             (&self.model_locations, &self.seed_locations),
-            &self.adapter,
+            &self.dialect,
             filtering,
         )?;
         let resolved: String = resolve_dbt_ref_references(&resolved, Some(&self.external))?;
@@ -85,12 +86,12 @@ impl<'py> Resolution<'py> {
         } else {
             PyDict::new(py).into_any()
         };
-        let resolved: String = resolve_udf_references(&resolved, &locations, &self.adapter)?;
-        resolve_table_function_references(&resolved, &locations, &self.adapter)
+        let resolved: String = resolve_udf_references(&resolved, &locations, &self.dialect)?;
+        resolve_table_function_references(&resolved, &locations, &self.dialect)
     }
 
     fn assert_resolved(&self, sql: &str, label: &str) -> PyResult<()> {
-        let py = self.adapter.py();
+        let py = self.dialect.py();
         assert_no_unresolved_sql_markers(
             py,
             &PyString::new(py, sql),
@@ -99,7 +100,7 @@ impl<'py> Resolution<'py> {
     }
 
     fn unbounded(&self, sql: Bound<'py, PyAny>, label: &str) -> PyResult<String> {
-        let py = self.adapter.py();
+        let py = self.dialect.py();
         let resolved = self.resolve(
             &sql.extract::<String>()?,
             &CursorFiltering {
@@ -151,7 +152,7 @@ fn resolve_model_sql_of<'py>(
         kwargs,
         (
             &[
-                "adapter",
+                "dialect",
                 "model",
                 "snapshot",
                 "context",
@@ -168,7 +169,7 @@ fn resolve_model_sql_of<'py>(
     )?;
     let context = args.value("context")?;
     let resolution = Resolution::of_context(
-        args.value("adapter")?,
+        Dialect::passed(args.value("dialect")?)?,
         &context,
         args.value("external_sql_reference_resolver")?,
     )?;
@@ -234,7 +235,7 @@ pub(crate) fn resolve_model_sql<'py>(
             }
             _ => return Err(unresolved_bounds_error(py, &name, cause.as_deref())?),
         };
-        sql = intrinsic_bounds(&sql, &bounds, &cursor_type, &resolution.adapter)?;
+        sql = intrinsic_bounds(&sql, &bounds, &cursor_type, &resolution.dialect)?;
     }
     resolution.assert_resolved(&sql, &format!("Model '{name}'"))?;
     Ok(sql)
@@ -257,12 +258,12 @@ fn intrinsic_bounds<'py>(
     sql: &str,
     bounds: &Bound<'py, PyAny>,
     cursor_type: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
 ) -> PyResult<String> {
-    let py = adapter.py();
+    let py = dialect.py();
     let literal = |field: &str| -> PyResult<String> {
         call_with(
-            &native_field(adapter, "render_cursor_bound_literal")?,
+            &dialect.syntax("render_cursor_bound_literal")?,
             &[
                 (
                     "value",
@@ -305,7 +306,7 @@ pub(crate) fn resolve_function_sql<'py>(
         kwargs,
         (
             &[
-                "adapter",
+                "dialect",
                 "function",
                 "model_locations",
                 "seed_locations",
@@ -318,7 +319,7 @@ pub(crate) fn resolve_function_sql<'py>(
         ),
     )?;
     let resolution = Resolution {
-        adapter: args.value("adapter")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
         external: py.None().into_bound(py),
         source_map: args.value("source_map")?,
         source_warehouse_columns: args.value("source_warehouse_columns")?,
@@ -336,14 +337,14 @@ pub(crate) fn resolve_function_sql<'py>(
 }
 
 #[pyfunction]
-#[pyo3(signature = (*, model, adapter, context, external_sql_reference_resolver))]
+#[pyo3(signature = (*, model, dialect, context, external_sql_reference_resolver))]
 fn resolve_model_hook_entries<'py>(
     model: &Bound<'py, PyAny>,
-    adapter: Bound<'py, PyAny>,
+    dialect: Bound<'py, Dialect>,
     context: Bound<'py, PyAny>,
     external_sql_reference_resolver: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let resolution = Resolution::of_context(adapter, &context, external_sql_reference_resolver)?;
+    let resolution = Resolution::of_context(dialect, &context, external_sql_reference_resolver)?;
     model_hook_entries(model, &resolution)
 }
 

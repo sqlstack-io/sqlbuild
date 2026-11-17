@@ -1,5 +1,6 @@
 //! Assemble audit plan dataclasses using native rendering and scheduling.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::GraphIndexes;
@@ -54,7 +55,7 @@ fn render_query<'py>(
                 ("model_locations", request.model_locations.clone()),
                 ("seed_locations", request.seed_locations.clone()),
                 ("source_map", request.source_map.clone()),
-                ("adapter", request.adapter.clone()),
+                ("adapter", request.dialect.clone().into_any()),
             ],
         )?))?,
     )?;
@@ -92,7 +93,7 @@ pub(crate) fn plan_audit_of<'py>(
             model_locations: request.get("model_locations")?,
             seed_locations: request.get("seed_locations")?,
             source_map: request.get("source_map")?,
-            adapter: request.get("adapter")?,
+            dialect: Dialect::passed(request.get("dialect")?)?,
             model_materializations: request.get("model_materializations")?,
             lineage: Py::new(
                 request.py(),
@@ -253,7 +254,7 @@ pub(crate) fn build_selected_audit_entries<'py>(
         model_locations: native_field(&relations, "model_locations")?,
         seed_locations: native_field(&relations, "seed_locations")?,
         source_map: native_field(&relations, "source_read_map")?,
-        adapter: request.get("adapter")?,
+        dialect: Dialect::passed(request.get("dialect")?)?,
         model_materializations: request.get("model_materializations")?,
         lineage: native_field(&project, "lineage_graph")?.extract()?,
     };

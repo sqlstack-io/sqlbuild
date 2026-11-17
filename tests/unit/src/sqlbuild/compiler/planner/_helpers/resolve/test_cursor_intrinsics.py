@@ -6,6 +6,7 @@ from sqlbuild._native import (
     BackfillAction,
     BackfillResult,
     CursorOverridePair,
+    Dialect,
     ModelCursorSnapshot,
     PlannerInputError,
     WarehouseSnapshot,
@@ -69,7 +70,7 @@ def test_given_cursor_interval_when_resolving_then_renders_expected_sql(
     model: CompiledModelView = build_cursor_intrinsic_model(config_values=test_case.model_config)
 
     resolved_sql: str = resolve_model_sql(
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         model=model,
         snapshot=WarehouseSnapshot(cursor_snapshots=test_case.cursor_snapshots),
         context=build_empty_model_plan_context(),
@@ -108,7 +109,7 @@ def test_given_missing_cursor_interval_when_resolving_then_rejects_intrinsics(
 
     with pytest.raises(PlannerInputError, match=test_case.expected_error_fragment):
         resolve_model_sql(
-            adapter=DuckDbAdapter(),
+            dialect=Dialect(DuckDbAdapter()),
             model=model,
             snapshot=WarehouseSnapshot(),
             context=build_empty_model_plan_context(),

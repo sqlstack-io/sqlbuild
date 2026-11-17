@@ -1,5 +1,6 @@
 //! Typed requests of plan entry construction.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
@@ -8,6 +9,7 @@ use pyo3::pyclass;
 #[derive(Debug)]
 pub(crate) struct RelationsRequest<'py> {
     pub(crate) project: Bound<'py, PyAny>,
+    pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) adapter: Bound<'py, PyAny>,
     pub(crate) connection: Bound<'py, PyAny>,
     pub(crate) scope: Bound<'py, PyAny>,
@@ -22,7 +24,7 @@ pub(crate) struct RelationsRequest<'py> {
 #[derive(Debug)]
 pub(crate) struct PlanEntriesRequest<'py> {
     pub(crate) project: Bound<'py, PyAny>,
-    pub(crate) adapter: Bound<'py, PyAny>,
+    pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) scope: Bound<'py, PyAny>,
     pub(crate) snapshot: Bound<'py, PyAny>,
     pub(crate) relations: Bound<'py, PyAny>,
@@ -38,7 +40,7 @@ pub(crate) struct PlanEntriesRequest<'py> {
 #[derive(Debug)]
 pub(crate) struct PlanOutputInputs<'py> {
     pub(crate) project: Bound<'py, PyAny>,
-    pub(crate) adapter: Bound<'py, PyAny>,
+    pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) scope: Bound<'py, PyAny>,
     pub(crate) snapshot: Bound<'py, PyAny>,
     pub(crate) relations: Bound<'py, PyAny>,
