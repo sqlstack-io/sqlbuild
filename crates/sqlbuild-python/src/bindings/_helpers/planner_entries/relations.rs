@@ -19,6 +19,7 @@ use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_scope::sources::source_load_map;
 use crate::bindings::_helpers::planner_scope::values::keys;
 use crate::bindings::_helpers::planner_strategy::audit_entries::audit_is_selected;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::semantic_sources::semantic_source_columns;
 use crate::bindings::_helpers::planner_warehouse::source_columns::gather_source_inspection;
 use crate::bindings::_helpers::planner_warehouse::source_deferral::build_source_read_map;
@@ -51,7 +52,7 @@ fn selected_audit_relation_keys(
 
 /// Reuse already-gathered source columns for the read map, or gather them once.
 fn source_warehouse_columns<'py>(
-    (project, adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (project, reads): (&Bound<'py, PyAny>, Option<&Bound<'py, PlannerReads>>),
     source_read_map: &Bound<'py, PyAny>,
     known_source_columns: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
@@ -67,6 +68,12 @@ fn source_warehouse_columns<'py>(
         let names = PyFrozenSet::new(py, known.keys())?.into_any();
         return Ok((known.into_any(), names));
     }
+    let Some(reads) = reads else {
+        return Ok((
+            PyDict::new(py).into_any(),
+            PyFrozenSet::empty(py)?.into_any(),
+        ));
+    };
     let entries = PyTuple::new(
         py,
         mapping_values(source_read_map)?
@@ -75,8 +82,7 @@ fn source_warehouse_columns<'py>(
     )?;
     let gathered = gather_source_inspection(
         project,
-        adapter,
-        connection,
+        reads,
         entries.into_any().extract::<Option<Bound<PyAny>>>()?,
     )?;
     Ok((gathered.get_item(0)?, gathered.get_item(1)?))
@@ -89,8 +95,7 @@ pub(crate) fn planner_relations_context<'py>(
     let RelationsRequest {
         project,
         dialect,
-        adapter,
-        connection,
+        reads,
         scope,
         deferral,
         project_config,
@@ -185,7 +190,7 @@ pub(crate) fn planner_relations_context<'py>(
     .into_any();
     let python_source_read_map = read_map(&python_source_map, Some(python_names))?;
     let (columns, listed_source_names) = source_warehouse_columns(
-        (&project, &adapter, &connection),
+        (&project, reads.as_ref()),
         &source_read_map,
         &known_source_columns,
     )?;
@@ -195,8 +200,10 @@ pub(crate) fn planner_relations_context<'py>(
             py,
             &[
                 ("project", project.clone()),
-                ("adapter", adapter.clone()),
-                ("connection", connection),
+                (
+                    "reads",
+                    reads.map_or_else(|| py.None().into_bound(py), Bound::into_any),
+                ),
                 ("source_read_map", source_read_map.clone()),
                 ("selected_keys", selected_keys),
                 ("columns", columns),
@@ -233,7 +240,7 @@ fn build_planner_relations_context<'py>(
         "build_planner_relations_context",
         kwargs,
         (
-            &["project", "adapter", "connection", "scope"],
+            &["project", "dialect", "reads", "scope"],
             &[
                 "deferral",
                 "project_config",
@@ -245,9 +252,8 @@ fn build_planner_relations_context<'py>(
     )?;
     planner_relations_context(RelationsRequest {
         project: args.value("project")?,
-        dialect: Dialect::of(&args.value("adapter")?)?,
-        adapter: args.value("adapter")?,
-        connection: args.value("connection")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
+        reads: Some(PlannerReads::passed(args.value("reads")?)?),
         scope: args.value("scope")?,
         deferral: args.value("deferral")?,
         project_config: args.value("project_config")?,

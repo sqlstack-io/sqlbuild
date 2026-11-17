@@ -6,7 +6,7 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python, pyclass, p
 /// Adapter attributes that only write SQL or describe the dialect, by prefix.
 const SYNTAX_PREFIXES: [&str; 3] = ["render_", "_render_", "supports_"];
 /// Adapter attributes that only describe the dialect or its defaults; none takes a connection.
-const SYNTAX_ATTRIBUTES: [&str; 31] = [
+const SYNTAX_ATTRIBUTES: [&str; 33] = [
     "adapter_name",
     "allows_implicit_managed_write_schema",
     "build_cursor_filter",
@@ -24,8 +24,10 @@ const SYNTAX_ATTRIBUTES: [&str; 31] = [
     "normalize_row_diff_numeric_type",
     "persists_python_functions",
     "python_functions_inherit_default_namespace",
+    "relation_grants_supported",
     "relation_names_match",
     "requires_derived_table_aliases",
+    "retention_state_from_relation",
     "sql_analysis_dialect",
     "sql_analysis_dialect_name",
     "sql_lexical_syntax",

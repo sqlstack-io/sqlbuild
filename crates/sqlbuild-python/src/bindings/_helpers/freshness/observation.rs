@@ -12,9 +12,10 @@ use crate::bindings::_helpers::freshness::support::{
     OBSERVATION_ERROR, exception_text, freshness_error, presumed_utc_datetime, presumed_utc_value,
     text,
 };
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::preview_state::{preview_of, refused};
-use crate::bindings::_helpers::planner_warehouse::state_reads::preview_freshness_metadata;
+use crate::bindings::_helpers::planner_warehouse::reads::{PlannerReads, Read};
+use crate::bindings::_helpers::planner_warehouse::synced_reads::refused;
 use crate::bindings::_helpers::records::constants::{DATA_VERSION_FIELD, OBSERVED_AT_FIELD};
 use crate::bindings::_helpers::records::construct::{
     enum_from_value, enum_member, new_record, new_record_with,
@@ -33,10 +34,10 @@ const DEFAULT_STRATEGY: &str = "sql";
 const METADATA_OPERATION: &str = "source_freshness_metadata_observation";
 const QUERY_OPERATION: &str = "source_freshness_query_observation";
 
-/// The adapter, connection and observation time every source is observed with.
+/// The SQL dialect, warehouse reads and observation time every source is observed with.
 pub(crate) struct Observer<'py> {
-    pub(crate) adapter: Bound<'py, PyAny>,
-    pub(crate) connection: Bound<'py, PyAny>,
+    pub(crate) dialect: Bound<'py, Dialect>,
+    pub(crate) reads: Bound<'py, PlannerReads>,
     pub(crate) observed_at: Bound<'py, PyAny>,
 }
 
@@ -57,7 +58,7 @@ pub(crate) fn strategy(source: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
 
 /// The source as observed: itself with freshness config, an adapter-metadata copy, or none.
 pub(crate) fn observation_source<'py>(
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     source: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     let py: Python<'py> = source.py();
@@ -66,8 +67,9 @@ pub(crate) fn observation_source<'py>(
     }
     if !native_field(source, "expression")?.is_none()
         || native_field(source, "table")?.is_none()
-        || !adapter
-            .call_method0("supports_table_freshness_metadata")?
+        || !dialect
+            .syntax("supports_table_freshness_metadata")?
+            .call0()?
             .is_truthy()?
     {
         return Ok(None);
@@ -201,9 +203,11 @@ fn observe_configured_inner<'py>(
         } else {
             format!(" WHERE {}", filter.str()?)
         };
-        let relation: String = render_source_read(source, &observer.adapter)?;
+        let relation: String = render_source_read(source, &observer.dialect)?;
         call_with(
-            &native_field(&observer.adapter, "render_source_freshness_max_query")?,
+            &observer
+                .dialect
+                .syntax("render_source_freshness_max_query")?,
             &[
                 ("column", column),
                 ("source_relation", text(py, &relation)),
@@ -245,18 +249,11 @@ fn single_data_version<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = source_name.py();
     let name: String = source_name.str()?.extract()?;
-    if preview_of(&observer.connection).is_some() {
-        return Err(refused(&format!("freshness query of source {name}")));
-    }
-    let result: Bound<'py, PyAny> = match call_with(
-        &native_field(&observer.adapter, "query")?,
-        &[
-            ("connection", observer.connection.clone()),
-            ("sql", sql),
-            ("limit", py.None().into_bound(py)),
-        ],
-    ) {
-        Ok(result) => result,
+    let result: Bound<'py, PyAny> = match observer.reads.get().reads().freshness_query(py, sql) {
+        Ok(Read::Known(result)) => result,
+        Ok(Read::Unknown(_)) => {
+            return Err(refused(&format!("freshness query of source {name}")));
+        }
         Err(error) => {
             let Some(message) = exception_text(py, &error)? else {
                 return Err(error);
@@ -291,16 +288,17 @@ fn single_data_version<'py>(
 }
 
 fn unsupported_message(
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     source: &Bound<'_, PyAny>,
 ) -> PyResult<Option<String>> {
-    if !adapter
-        .call_method0("supports_table_freshness_metadata")?
+    if !dialect
+        .syntax("supports_table_freshness_metadata")?
+        .call0()?
         .is_truthy()?
     {
         return Ok(Some(format!(
             "adapter '{}' does not support table freshness metadata",
-            native_field(adapter, "adapter_name")?.str()?
+            dialect.syntax("adapter_name")?.str()?
         )));
     }
     if !native_field(source, "expression")?.is_none() || native_field(source, "table")?.is_none() {
@@ -391,18 +389,23 @@ fn observe_adapter_source<'py>(
     source: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = source.py();
-    if let Some(message) = unsupported_message(&observer.adapter, source)? {
+    if let Some(message) = unsupported_message(&observer.dialect, source)? {
         return Err(observation_error(py, &message));
     }
-    let metadata: Bound<'py, PyAny> = call_with(
-        &native_field(&observer.adapter, "get_table_freshness_metadata")?,
-        &[
-            ("connection", observer.connection.clone()),
-            ("database", native_field(source, "database")?),
-            ("schema", native_field(source, "schema")?),
-            ("name", native_field(source, "table")?),
+    let metadata: Bound<'py, PyAny> = match observer.reads.get().reads().single_table_freshness(
+        py,
+        [
+            native_field(source, "database")?,
+            native_field(source, "schema")?,
+            native_field(source, "table")?,
         ],
-    )?;
+    )? {
+        Read::Known(metadata) => metadata,
+        Read::Unknown(_) => {
+            let name: String = native_field(source, "name")?.str()?.extract()?;
+            return Err(refused(&format!("freshness metadata of source {name}")));
+        }
+    };
     let name: Bound<'py, PyAny> = native_field(source, "name")?;
     if let Some(unknown) = metadata_unknown(&name, &metadata)? {
         return Err(observation_error(
@@ -420,7 +423,7 @@ pub(crate) fn observe_adapter_batch<'py>(
     observer: &Observer<'py>,
     sources: &[Bound<'py, PyAny>],
 ) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = observer.adapter.py();
+    let py: Python<'py> = observer.reads.py();
     if sources.is_empty() {
         return new_record(py, RecordId::AdapterSourceFreshnessBatch, (), None);
     }
@@ -446,13 +449,13 @@ fn observe_adapter_batch_inner<'py>(
     observer: &Observer<'py>,
     sources: &[Bound<'py, PyAny>],
 ) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = observer.adapter.py();
+    let py: Python<'py> = observer.reads.py();
     let unknown_sources: Bound<'py, PyDict> = PyDict::new(py);
     let requests: Bound<'py, PyDict> = PyDict::new(py);
     let request_class: Bound<'py, PyAny> = host::entry(py, AdapterHost::TableFreshnessRequest)?;
     for source in sources {
         let name: Bound<'py, PyAny> = native_field(source, "name")?;
-        if let Some(message) = unsupported_message(&observer.adapter, source)? {
+        if let Some(message) = unsupported_message(&observer.dialect, source)? {
             unknown_sources
                 .set_item(&name, unknown(&name, ("UNAVAILABLE", text(py, &message)))?)?;
             continue;
@@ -481,16 +484,14 @@ fn observe_adapter_batch_inner<'py>(
         unique.set_item(request, py.None())?;
     }
     let unique_requests: Bound<'py, PyAny> = PyTuple::new(py, unique.keys())?.into_any();
-    let metadata_by_request: Bound<'py, PyAny> = if preview_of(&observer.connection).is_some() {
-        preview_freshness_metadata(py, &unique_requests)?.into_any()
-    } else {
-        call_with(
-            &native_field(&observer.adapter, "get_tables_freshness_metadata")?,
-            &[
-                ("connection", observer.connection.clone()),
-                ("requests", unique_requests),
-            ],
-        )?
+    let metadata_by_request: Bound<'py, PyAny> = match observer
+        .reads
+        .get()
+        .reads()
+        .table_freshness(py, unique_requests)?
+    {
+        Read::Known(metadata) => metadata,
+        Read::Unknown(item) => return Err(refused(&item)),
     };
     let metadata_class: Bound<'py, PyAny> = host::entry(py, AdapterHost::TableFreshnessMetadata)?;
     let observations: Bound<'py, PyDict> = PyDict::new(py);
@@ -566,16 +567,16 @@ pub(crate) fn observation_record<'py>(
 
 /// Observe one source freshness config and return a comparable data version.
 #[pyfunction]
-#[pyo3(signature = (*, adapter, connection, source, observed_at))]
+#[pyo3(signature = (*, dialect, reads, source, observed_at))]
 fn observe_configured_source_freshness<'py>(
-    adapter: Bound<'py, PyAny>,
-    connection: Bound<'py, PyAny>,
+    dialect: Bound<'py, Dialect>,
+    reads: Bound<'py, PlannerReads>,
     source: &Bound<'py, PyAny>,
     observed_at: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let observer: Observer<'py> = Observer {
-        adapter,
-        connection,
+        dialect,
+        reads,
         observed_at,
     };
     observe_configured(&observer, source)
@@ -583,16 +584,16 @@ fn observe_configured_source_freshness<'py>(
 
 /// Observe adapter metadata freshness per source, batching the warehouse lookups.
 #[pyfunction]
-#[pyo3(signature = (*, adapter, connection, sources, observed_at))]
+#[pyo3(signature = (*, dialect, reads, sources, observed_at))]
 fn observe_adapter_sources_freshness<'py>(
-    adapter: Bound<'py, PyAny>,
-    connection: Bound<'py, PyAny>,
+    dialect: Bound<'py, Dialect>,
+    reads: Bound<'py, PlannerReads>,
     sources: &Bound<'py, PyAny>,
     observed_at: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let observer: Observer<'py> = Observer {
-        adapter,
-        connection,
+        dialect,
+        reads,
         observed_at,
     };
     let sources: Vec<Bound<'py, PyAny>> = sources.try_iter()?.collect::<PyResult<_>>()?;

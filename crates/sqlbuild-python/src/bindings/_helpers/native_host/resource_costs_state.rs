@@ -19,9 +19,10 @@ use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::execution_history::conversion::{parsed_iso, utc};
+use crate::bindings::_helpers::native_host::consumption_io::execute;
 use crate::bindings::_helpers::native_host::consumption_state::{
-    Location, ROWS_PER_STATEMENT, execute, fixed_state_table_sql, integer_literal, literal,
-    optional_text, state_table_name,
+    Location, ROWS_PER_STATEMENT, fixed_state_table_sql, integer_literal, literal, optional_text,
+    state_table_name,
 };
 use crate::bindings::_helpers::records::fields::field as native_field;
 

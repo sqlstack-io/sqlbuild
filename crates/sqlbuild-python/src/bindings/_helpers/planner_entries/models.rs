@@ -2,6 +2,7 @@
 
 use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
 
@@ -10,8 +11,8 @@ use pyo3::pyclass;
 pub(crate) struct RelationsRequest<'py> {
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
-    pub(crate) adapter: Bound<'py, PyAny>,
-    pub(crate) connection: Bound<'py, PyAny>,
+    /// The warehouse reads, or `None` to resolve from canonical static state only.
+    pub(crate) reads: Option<Bound<'py, PlannerReads>>,
     pub(crate) scope: Bound<'py, PyAny>,
     pub(crate) deferral: Bound<'py, PyAny>,
     pub(crate) project_config: Bound<'py, PyAny>,

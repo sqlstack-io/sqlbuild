@@ -77,8 +77,8 @@ pub(crate) struct MigrationFingerprintCache {
     ref_names: HashMap<(String, String), Vec<String>>,
     fingerprints: HashMap<MemoKey, Option<String>>,
     database_path: Option<Py<PyAny>>,
-    connection: Option<Py<PyAny>>,
-    connection_opened: bool,
+    store: Option<Py<PyAny>>,
+    store_opened: bool,
     pending: Vec<(String, String)>,
     shared_digest: String,
 }
@@ -87,11 +87,11 @@ fn sqlite_error(py: Python<'_>, error: &PyErr) -> PyResult<bool> {
     Ok(error.is_instance(py, &imported(py, "sqlite3", "DatabaseError")?))
 }
 
-fn close(py: Python<'_>, connection: Option<Py<PyAny>>) -> PyResult<()> {
-    let Some(connection) = connection else {
+fn close(py: Python<'_>, store: Option<Py<PyAny>>) -> PyResult<()> {
+    let Some(store) = store else {
         return Ok(());
     };
-    match connection.bind(py).call_method0("close") {
+    match store.bind(py).call_method0("close") {
         Ok(_) => Ok(()),
         Err(error) if sqlite_error(py, &error)? => Ok(()),
         Err(error) => Err(error),
@@ -152,8 +152,8 @@ impl MigrationFingerprintCache {
             ref_names: HashMap::new(),
             fingerprints: HashMap::new(),
             database_path,
-            connection: None,
-            connection_opened: false,
+            store: None,
+            store_opened: false,
             pending: Vec::new(),
             shared_digest,
         })
@@ -173,14 +173,11 @@ impl MigrationFingerprintCache {
         .map_err(|error| PyValueError::new_err(format!("{error:?}")))
     }
 
-    fn open_connection(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
-        if self.connection_opened {
-            return Ok(self
-                .connection
-                .as_ref()
-                .map(|connection| connection.clone_ref(py)));
+    fn open_store(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        if self.store_opened {
+            return Ok(self.store.as_ref().map(|store| store.clone_ref(py)));
         }
-        self.connection_opened = true;
+        self.store_opened = true;
         let Some(path) = &self.database_path else {
             return Ok(None);
         };
@@ -188,32 +185,29 @@ impl MigrationFingerprintCache {
         if !path.call_method0("is_file")?.is_truthy()? {
             return Ok(None);
         }
-        self.connection = match connect(path) {
-            Ok(connection) => Some(connection.unbind()),
+        self.store = match connect(path) {
+            Ok(store) => Some(store.unbind()),
             Err(error) if error.is_instance_of::<PyOSError>(py) || sqlite_error(py, &error)? => {
                 None
             }
             Err(error) => return Err(error),
         };
-        Ok(self
-            .connection
-            .as_ref()
-            .map(|connection| connection.clone_ref(py)))
+        Ok(self.store.as_ref().map(|store| store.clone_ref(py)))
     }
 
     fn stored(&mut self, py: Python<'_>, cache_key: &str) -> PyResult<Option<Option<String>>> {
-        let Some(connection) = self.open_connection(py)? else {
+        let Some(store) = self.open_store(py)? else {
             return Ok(None);
         };
-        let row = connection
+        let row = store
             .bind(py)
             .call_method1("execute", (SELECT_SQL, PyTuple::new(py, [cache_key])?))
             .and_then(|cursor| cursor.call_method0("fetchone"));
         let row = match row {
             Ok(row) => row,
             Err(error) if sqlite_error(py, &error)? => {
-                self.connection = None;
-                close(py, Some(connection))?;
+                self.store = None;
+                close(py, Some(store))?;
                 return Ok(None);
             }
             Err(error) => return Err(error),
@@ -245,17 +239,17 @@ impl MigrationFingerprintCache {
         &self,
         py: Python<'_>,
         pending: &[(String, String)],
-        connection: Option<Py<PyAny>>,
+        store: Option<Py<PyAny>>,
     ) -> (Option<Py<PyAny>>, PyResult<()>) {
         let Some(path) = &self.database_path else {
-            return (connection, Ok(()));
+            return (store, Ok(()));
         };
         if pending.is_empty() {
-            return (connection, Ok(()));
+            return (store, Ok(()));
         }
         let path = path.bind(py);
-        let connection = match connection {
-            Some(connection) => connection,
+        let store = match store {
+            Some(store) => store,
             None => {
                 let created = call_with(
                     &match native_field(path, "parent")
@@ -277,7 +271,7 @@ impl MigrationFingerprintCache {
             }
         };
         let written = (|| -> PyResult<()> {
-            let open = connection.bind(py);
+            let open = store.bind(py);
             open.call_method1("execute", (CREATE_CACHE_TABLE_SQL,))?;
             let rows = PyList::empty(py);
             for (key, entry) in pending {
@@ -287,7 +281,7 @@ impl MigrationFingerprintCache {
             open.call_method0("commit")?;
             Ok(())
         })();
-        (Some(connection), written)
+        (Some(store), written)
     }
 }
 
@@ -377,10 +371,10 @@ impl MigrationFingerprintCache {
     /// Write fingerprints computed since the last persist; failures only skip reuse.
     fn persist(&mut self, py: Python<'_>) -> PyResult<()> {
         let pending = std::mem::take(&mut self.pending);
-        let connection = self.connection.take();
-        self.connection_opened = false;
-        let (connection, written) = self.write_pending(py, &pending, connection);
-        let closed = close(py, connection);
+        let store = self.store.take();
+        self.store_opened = false;
+        let (store, written) = self.write_pending(py, &pending, store);
+        let closed = close(py, store);
         match written {
             Err(error) if error.is_instance_of::<PyOSError>(py) || sqlite_error(py, &error)? => {}
             Err(error) => return Err(error),

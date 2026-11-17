@@ -10,7 +10,6 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, typed_values};
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::preview_state::preview_of;
 use crate::bindings::_helpers::planner_phases::constants::{
     BIGQUERY_ADAPTER, DECREASE_WARNING, DOWNGRADE_HISTORY_DAYS, PERMANENT_TABLE_TYPE,
     RETENTION_DECREASE, RETENTION_INCREASE, RETENTION_MATCH, SNOWFLAKE_ADAPTER,
@@ -21,7 +20,9 @@ use crate::bindings::_helpers::planner_phases::objects::{
     sorted_names, text, tuple,
 };
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_reads;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
+use crate::bindings::_helpers::planner_warehouse::reads::Read;
 use crate::bindings::_helpers::records::construct::record_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -116,11 +117,10 @@ pub(crate) fn plan_table_types<'py>(
     if !snowflake {
         return tuple(py, Vec::new());
     }
-    if let Some(preview) = preview_of(&runtime_field(runtime, |runtime| &runtime.connection)?) {
-        preview.get().mark_unknown("table types".to_owned());
+    if let Read::Unknown(_) = runtime_reads(runtime)?.get().reads().table_types() {
         return tuple(py, Vec::new());
     }
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
+    let dialect = runtime_dialect(runtime)?;
     let target = effective_target_config(runtime)?;
     let relations = native_field(&native_field(warehouse, "snapshot")?, "existing_relations")?;
     let materialization = record_class(py, RecordId::MaterializationType)?;
@@ -154,8 +154,9 @@ pub(crate) fn plan_table_types<'py>(
         }
         let downgrade = actual == Some(false) && desired_transient;
         let destination = model_reads::destination(&model)?;
-        let limit: i64 = adapter
-            .call_method0("maximum_identifier_length")?
+        let limit: i64 = dialect
+            .syntax("maximum_identifier_length")?
+            .call0()?
             .extract()?;
         let target_name: String = native_field(&destination, "name")?.extract()?;
         entries.push(planner_model(
@@ -272,31 +273,16 @@ fn render_changes<'py>(
         fields.push(("state", state.clone()));
     }
     call_with(
-        &native_field(
-            &native_field(runtime, "adapter")?,
-            "render_retention_changes",
-        )?,
+        &runtime_dialect(runtime)?.syntax("render_retention_changes")?,
         &fields,
     )
 }
 
 fn inspect<'py>(
-    runtime: &Bound<'py, PyAny>,
+    inspect_retention: &Bound<'py, PyAny>,
     request: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    call_with(
-        &native_field(
-            &runtime_field(runtime, |runtime| &runtime.adapter)?,
-            "inspect_retention",
-        )?,
-        &[
-            (
-                "connection",
-                runtime_field(runtime, |runtime| &runtime.connection)?,
-            ),
-            ("request", request.clone()),
-        ],
-    )
+    call_with(inspect_retention, &[("request", request.clone())])
 }
 
 fn state_direction(state: &Bound<'_, PyAny>, desired_days: i64) -> PyResult<&'static str> {
@@ -322,7 +308,7 @@ fn transient_error(py: Python<'_>, name: &str, desired_days: i64, convert: &str)
 }
 
 fn relation_retention<'py>(
-    runtime: &Bound<'py, PyAny>,
+    (runtime, inspect_retention): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     warehouse: &Bound<'py, PyAny>,
     model: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -397,17 +383,14 @@ fn relation_retention<'py>(
     let mut listed = py.None().into_bound(py);
     if native_field(&relation, "identity")?.eq(&lookup)? {
         listed = call_with(
-            &native_field(
-                &native_field(runtime, "adapter")?,
-                "retention_state_from_relation",
-            )?,
+            &runtime_dialect(runtime)?.syntax("retention_state_from_relation")?,
             &[("request", request.clone()), ("relation", relation.clone())],
         )?;
     }
     let state = if listed.is_truthy()? {
         listed
     } else {
-        inspect(runtime, &request)?
+        inspect(inspect_retention, &request)?
     };
     if native_field(&state, "is_transient")?.is_truthy()?
         && desired_days > 1
@@ -456,7 +439,7 @@ fn relation_retention<'py>(
 }
 
 fn bigquery_retention<'py>(
-    runtime: &Bound<'py, PyAny>,
+    (runtime, inspect_retention): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     models: &[Bound<'py, PyAny>],
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let py = runtime.py();
@@ -555,7 +538,7 @@ fn bigquery_retention<'py>(
                 ("desired_days", desired_days.into_pyobject(py)?.into_any()),
             ],
         )?;
-        let state = inspect(runtime, &request)?;
+        let state = inspect(inspect_retention, &request)?;
         let base = RetentionEntry {
             request: request.clone(),
             model_names: sorted_names(py, names)?,
@@ -607,17 +590,23 @@ pub(crate) fn plan_retention<'py>(
             models.push(model);
         }
     }
-    if models.is_empty()
-        || preview_of(&runtime_field(runtime, |runtime| &runtime.connection)?).is_some()
-    {
+    if models.is_empty() {
         return tuple(py, Vec::new());
     }
+    let Read::Known(inspect_retention) = runtime_reads(runtime)?.get().reads().retention(py)?
+    else {
+        return tuple(py, Vec::new());
+    };
     let entries = if adapter_is(runtime, BIGQUERY_ADAPTER)? {
-        bigquery_retention(runtime, &models)?
+        bigquery_retention((runtime, &inspect_retention), &models)?
     } else {
         let mut entries: Vec<_> = Vec::new();
         for model in &models {
-            entries.extend(relation_retention(runtime, warehouse, model)?);
+            entries.extend(relation_retention(
+                (runtime, &inspect_retention),
+                warehouse,
+                model,
+            )?);
         }
         entries
     };

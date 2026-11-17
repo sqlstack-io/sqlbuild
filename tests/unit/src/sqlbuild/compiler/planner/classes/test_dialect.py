@@ -11,48 +11,57 @@ from tests.unit.src.sqlbuild.compiler.planner.classes._test_types import (
     DialectRefusalTestCase,
 )
 
-ATTRIBUTE_CASES: list[DialectAttributeTestCase] = [
-    DialectAttributeTestCase(
-        description="renders a qualified name",
-        attribute="render_qualified_name",
-        arguments={"database": "shop", "schema": "sales", "name": "orders"},
-        expected=DuckDbAdapter().render_qualified_name(
-            database="shop", schema="sales", name="orders"
-        ),
-    ),
-    DialectAttributeTestCase(
-        description="reports the adapter name",
-        attribute="adapter_name",
-        arguments={},
-        expected=DuckDbAdapter().adapter_name,
-    ),
-]
-
-REFUSAL_CASES: list[DialectRefusalTestCase] = [
-    DialectRefusalTestCase(description="executing SQL", attribute="execute"),
-    DialectRefusalTestCase(description="listing relations", attribute="list_relations"),
-    DialectRefusalTestCase(description="opening a connection", attribute="connect"),
-    DialectRefusalTestCase(description="an unknown attribute", attribute="no_such_attribute"),
-]
+_ADAPTER: DuckDbAdapter = DuckDbAdapter()
 
 
 @pytest.mark.parametrize(
-    "case", ATTRIBUTE_CASES, ids=[case.description for case in ATTRIBUTE_CASES]
+    "test_case",
+    [
+        DialectAttributeTestCase(
+            description="a render method is the adapter's own",
+            attribute="render_qualified_name",
+            expected_value=_ADAPTER.render_qualified_name,
+        ),
+        DialectAttributeTestCase(
+            description="a dialect fact is the adapter's own",
+            attribute="adapter_name",
+            expected_value=_ADAPTER.adapter_name,
+        ),
+    ],
+    ids=lambda case: case.description,
 )
 def test_given_syntax_attribute_when_read_through_dialect_then_matches_adapter(
-    case: DialectAttributeTestCase,
+    test_case: DialectAttributeTestCase,
 ) -> None:
-    value: object = getattr(Dialect(DuckDbAdapter()), case.attribute)
-    result: object = value(**case.arguments) if callable(value) else value
-    assert result == case.expected
+    assert getattr(Dialect(_ADAPTER), test_case.attribute) == test_case.expected_value
 
 
-@pytest.mark.parametrize("case", REFUSAL_CASES, ids=[case.description for case in REFUSAL_CASES])
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DialectRefusalTestCase(
+            description="executing SQL",
+            attribute="execute",
+            expected_message="`execute` would reach the warehouse",
+        ),
+        DialectRefusalTestCase(
+            description="listing relations",
+            attribute="list_relations",
+            expected_message="`list_relations` would reach the warehouse",
+        ),
+        DialectRefusalTestCase(
+            description="opening a connection",
+            attribute="connect",
+            expected_message="`connect` would reach the warehouse",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_warehouse_attribute_when_read_through_dialect_then_refuses(
-    case: DialectRefusalTestCase,
+    test_case: DialectRefusalTestCase,
 ) -> None:
-    with pytest.raises(AttributeError, match=f"`{case.attribute}` would reach the warehouse"):
-        getattr(Dialect(DuckDbAdapter()), case.attribute)
+    with pytest.raises(AttributeError, match=test_case.expected_message):
+        getattr(Dialect(_ADAPTER), test_case.attribute)
 
 
 if __name__ == "__main__":

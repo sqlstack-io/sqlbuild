@@ -1,8 +1,10 @@
 //! Deferred locations of renamed models the deferred target holds only under their old name.
 
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, IntoPyObject, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods, PyString};
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
@@ -57,7 +59,7 @@ type ListedSchemas<'py> = Vec<(Option<String>, String, Bound<'py, PyDict>)>;
 
 /// Relations of one deferred `database.schema`, listing it on first use, with the cache.
 fn schema_relations<'py>(
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    reads: &Bound<'py, PlannerReads>,
     (database, schema): (&Option<String>, &str),
     mut listed: ListedSchemas<'py>,
 ) -> (PyResult<Bound<'py, PyDict>>, ListedSchemas<'py>) {
@@ -66,18 +68,20 @@ fn schema_relations<'py>(
     }) {
         return (Ok(found.clone()), listed);
     }
-    let py: Python<'py> = adapter.py();
+    let py: Python<'py> = reads.py();
     let found = (|| -> PyResult<Bound<'py, PyDict>> {
         let found: Bound<'py, PyDict> = PyDict::new(py);
-        for relation in call_with(
-            &native_field(adapter, "list_relations")?,
-            &[
-                ("connection", connection.clone()),
-                ("database", database.clone().into_pyobject(py)?.into_any()),
-                ("schemas", PyTuple::new(py, [schema])?.into_any()),
-            ],
-        )?
-        .try_iter()?
+        for relation in reads
+            .get()
+            .reads()
+            .deferred_relations(
+                py,
+                (
+                    database.clone().into_pyobject(py)?.into_any(),
+                    PyString::new(py, schema).into_any(),
+                ),
+            )?
+            .try_iter()?
         {
             let relation: Bound<'py, PyAny> = relation?;
             found.set_item(native_field(&relation, "name")?, relation)?;
@@ -107,7 +111,11 @@ fn migration_origin_relation(
 
 /// Redirect unselected `models` unbuilt in the deferred target to their `migrate_from` relation.
 pub(crate) fn defer_to_migration_origins<'py>(
-    (project, adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (project, dialect, reads): (
+        &Bound<'py, PyAny>,
+        &Bound<'py, Dialect>,
+        &Bound<'py, PlannerReads>,
+    ),
     (locations, relations): (&Bound<'py, PyDict>, &Bound<'py, PyDict>),
     models: &[String],
 ) -> PyResult<Vec<(String, String)>> {
@@ -137,8 +145,7 @@ pub(crate) fn defer_to_migration_origins<'py>(
         lookups.push((origin_database, origin_schema, origin_name));
         let mut origin: Option<Bound<'py, PyAny>> = None;
         for (index, (database, schema, relation_name)) in lookups.iter().enumerate() {
-            let (schema_found, updated) =
-                schema_relations((adapter, connection), (database, schema), listed);
+            let (schema_found, updated) = schema_relations(reads, (database, schema), listed);
             listed = updated;
             let hit: Option<Bound<'py, PyAny>> = match schema_found {
                 Ok(schema_found) => relation_named(&schema_found, relation_name)?,
@@ -181,7 +188,7 @@ pub(crate) fn defer_to_migration_origins<'py>(
         let schema: Bound<'py, PyAny> = native_field(&origin, "schema")?;
         let relation_name: Bound<'py, PyAny> = native_field(&origin, "name")?;
         let qualified_name: Bound<'py, PyAny> = call_with(
-            &native_field(adapter, "render_qualified_name")?,
+            &dialect.syntax("render_qualified_name")?,
             &[
                 ("database", database.clone()),
                 ("schema", schema.clone()),

@@ -26,6 +26,7 @@ from sqlbuild._native import (
     CompilePipelineResult,
     CompileSqlReference,
     DeferralInputs,
+    Dialect,
     DiscoveredProjectInputs,
     DiscoveredSchemaFile,
     DiscoveredSeedFile,
@@ -45,6 +46,7 @@ from sqlbuild._native import (
     compiled_model_record,
     compute_query_hash,
     discover_project_inputs,
+    live_reads,
     project_with,
     run_compile_pipeline,
     write_fingerprint,
@@ -457,7 +459,11 @@ def build_execution_plan_from_kwargs(**kwargs: Any) -> PlanOutput:
     overrides: PlannerOverrides = PlannerOverrides(**grouped(PlannerOverrides))
     deferral: DeferralInputs = DeferralInputs(**grouped(DeferralInputs))
     policies: PlannerPolicies = PlannerPolicies(**grouped(PlannerPolicies))
+    adapter: Any = kwargs.pop("adapter")
+    connection: Any = kwargs.pop("connection")
     return build_execution_plan(
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection),
         selection=selection,
         overrides=overrides,
         deferral=deferral,

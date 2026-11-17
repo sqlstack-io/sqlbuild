@@ -1,40 +1,46 @@
-//! The consumption table through the adapter, and the connection and callbacks a recording build holds.
+//! The consumption table's rows, SQL and locations, and the callbacks a recording build holds.
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use std::sync::Mutex;
 
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyInt, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::CONSUMPTION_TABLE_NAME;
 use sqlbuild_state::consumption::constants::{
-    CONSUMPTION_COLUMN_TYPES, INTEGER_STATE_VALUE_TYPE, NULLABLE_COLUMNS, RECENT_EXECUTIONS,
+    CONSUMPTION_COLUMN_TYPES, INTEGER_STATE_VALUE_TYPE, NULLABLE_COLUMNS,
 };
-use sqlbuild_state::consumption::main::executions_by_id_sql::executions_by_id_sql;
 use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
-use sqlbuild_state::consumption::main::recent_executions::recent_executions;
-use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_sql;
 use sqlbuild_state::consumption::models::{
     ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
 };
 use sqlbuild_state::freshness::constants::STRING_STATE_VALUE_TYPE;
-use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
-use crate::bindings::_helpers::native_host::preview_state::{PreviewConnection, preview_of};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
 
 /// Rows per `INSERT`; SQL Server accepts at most 1,000 rows in one `VALUES` list.
 pub(crate) const ROWS_PER_STATEMENT: usize = 500;
 /// Execution IDs per `IN` list when reading executions back by ID.
-const EXECUTION_ID_BATCH: usize = 500;
+pub(crate) const EXECUTION_ID_BATCH: usize = 500;
 /// Warehouse timestamp texts with a UTC offset, as drivers render aware values.
 const OFFSET_TIME_FORMATS: [&str; 2] = ["%Y-%m-%dT%H:%M:%S%.f%:z", "%Y-%m-%d %H:%M:%S%.f%:z"];
 /// Warehouse timestamp texts without an offset, which the consumption table stores as UTC.
 const NAIVE_TIME_FORMATS: [&str; 2] = ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M:%S%.f"];
+
+/// Reading recorded consumption: from the warehouse table, or from a synced state.
+pub(crate) trait ConsumptionReads {
+    /// The newest executions per relation recorded in `location`.
+    fn read_recent(&self, py: Python<'_>, location: &Location) -> PyResult<Vec<ConsumptionRow>>;
+    /// The named executions recorded in `location`.
+    fn read_executions(
+        &self,
+        py: Python<'_>,
+        location: &Location,
+        execution_ids: &[&str],
+    ) -> PyResult<Vec<ConsumptionRow>>;
+}
 
 /// One destination schema of the consumption table.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -87,19 +93,6 @@ pub(crate) fn state_table_name(
         return Ok(None);
     }
     Ok(Some(name.extract()?))
-}
-
-fn table_of(adapter: &Bound<'_, PyAny>, location: &Location) -> PyResult<Option<String>> {
-    let py: Python<'_> = adapter.py();
-    let database: Bound<'_, PyAny> = location
-        .database
-        .as_deref()
-        .map_or_else(|| py.None().into_bound(py), |database| text(py, database));
-    state_table_name(
-        &native_field(adapter, "render_qualified_name")?,
-        (&database, &text(py, &location.schema)),
-        CONSUMPTION_TABLE_NAME,
-    )
 }
 
 /// Create-if-missing DDL for the consumption table, with adapter-rendered column types.
@@ -173,112 +166,6 @@ fn build_consumption_prune_sql(
     .unwrap_or_default())
 }
 
-pub(crate) fn execute<'py>(
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
-    sql: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    call_with(
-        &native_field(adapter, "execute")?,
-        &[
-            ("connection", connection.clone()),
-            ("sql", text(adapter.py(), sql)),
-        ],
-    )
-}
-
-/// Create the schema, table and indexes in `location`; `started` rows precede schema preparation.
-fn ensure_table(
-    adapter: &Bound<'_, PyAny>,
-    connection: &Bound<'_, PyAny>,
-    location: &Location,
-) -> PyResult<()> {
-    let py: Python<'_> = adapter.py();
-    let keywords = location.keywords(py);
-    for statement in
-        call_with(&native_field(adapter, "render_create_schema")?, &keywords)?.try_iter()?
-    {
-        execute(adapter, connection, &statement?.extract::<String>()?)?;
-    }
-    let create: String = call_with(
-        &native_field(adapter, "render_create_consumption_table_sql")?,
-        &keywords,
-    )?
-    .extract()?;
-    if !create.is_empty() {
-        execute(adapter, connection, &create)?;
-    }
-    for index in call_with(
-        &native_field(adapter, "render_create_consumption_index_sqls")?,
-        &keywords,
-    )?
-    .try_iter()?
-    {
-        execute(adapter, connection, &index?.extract::<String>()?)?;
-    }
-    Ok(())
-}
-
-/// Whether the warehouse catalog lists the consumption table in `location`.
-fn table_exists(
-    adapter: &Bound<'_, PyAny>,
-    connection: &Bound<'_, PyAny>,
-    location: &Location,
-) -> PyResult<bool> {
-    let py: Python<'_> = adapter.py();
-    let mut keywords = location.keywords(py);
-    keywords.push(("connection", connection.clone()));
-    keywords.push(("name", text(py, CONSUMPTION_TABLE_NAME)));
-    call_with(&native_field(adapter, "get_columns")?, &keywords)?.is_truthy()
-}
-
-/// Rows of the newest executions per relation in `location`; none when the table is missing.
-fn read_recent(
-    adapter: &Bound<'_, PyAny>,
-    connection: &Bound<'_, PyAny>,
-    location: &Location,
-) -> PyResult<Vec<ConsumptionRow>> {
-    let Some(table) = table_of(adapter, location)? else {
-        return Ok(Vec::new());
-    };
-    if !table_exists(adapter, connection, location)? {
-        return Ok(Vec::new());
-    }
-    let result: Bound<'_, PyAny> = execute(
-        adapter,
-        connection,
-        &recent_executions_sql(&table, RECENT_EXECUTIONS),
-    )?;
-    call_with(&native_field(&result, "fetchall")?, &[])?
-        .try_iter()?
-        .map(|row| read_row(&row?))
-        .collect()
-}
-
-/// Rows of the named executions in `location`, read in batches; none when the table is missing.
-fn read_executions(
-    adapter: &Bound<'_, PyAny>,
-    connection: &Bound<'_, PyAny>,
-    location: &Location,
-    execution_ids: &[&str],
-) -> PyResult<Vec<ConsumptionRow>> {
-    let Some(table) = table_of(adapter, location)? else {
-        return Ok(Vec::new());
-    };
-    if execution_ids.is_empty() || !table_exists(adapter, connection, location)? {
-        return Ok(Vec::new());
-    }
-    let mut rows: Vec<ConsumptionRow> = Vec::new();
-    for batch in execution_ids.chunks(EXECUTION_ID_BATCH) {
-        let result: Bound<'_, PyAny> =
-            execute(adapter, connection, &executions_by_id_sql(&table, batch))?;
-        for row in call_with(&native_field(&result, "fetchall")?, &[])?.try_iter()? {
-            rows.push(read_row(&row?)?);
-        }
-    }
-    Ok(rows)
-}
-
 pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if value.is_none() {
         return Ok(None);
@@ -309,7 +196,7 @@ fn epoch_micros(value: &Bound<'_, PyAny>) -> PyResult<i64> {
     )))
 }
 
-fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
+pub(crate) fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
     let cell = |index: usize| row.get_item(index);
     let input_kind: Option<String> = optional_text(&cell(10)?)?;
     let input: Option<ConsumedInput> = match input_kind {
@@ -379,7 +266,11 @@ pub(crate) fn integer_literal(py: Python<'_>, value: Option<i64>) -> PyResult<St
     )
 }
 
-fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyResult<Vec<String>> {
+pub(crate) fn row_cells(
+    py: Python<'_>,
+    row: &ConsumptionAppend,
+    recorded_at: &str,
+) -> PyResult<Vec<String>> {
     let input = row.input.as_ref();
     Ok(vec![
         literal(py, Some(&row.execution_id))?,
@@ -397,148 +288,6 @@ fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyRe
         literal(py, input.map(|input| input.version.as_str()))?,
         recorded_at.to_owned(),
     ])
-}
-
-/// Append `rows` to `location`'s table, in statements no longer than every warehouse accepts.
-fn append(
-    adapter: &Bound<'_, PyAny>,
-    connection: &Bound<'_, PyAny>,
-    location: &Location,
-    rows: &[ConsumptionAppend],
-) -> PyResult<()> {
-    let py: Python<'_> = adapter.py();
-    let Some(table) = table_of(adapter, location)? else {
-        return Ok(());
-    };
-    let recorded_at: String =
-        call_with(&native_field(adapter, "render_current_utc_timestamp")?, &[])?.extract()?;
-    let columns: Vec<&str> = CONSUMPTION_COLUMN_TYPES
-        .iter()
-        .map(|(column, _)| *column)
-        .collect();
-    for chunk in rows.chunks(ROWS_PER_STATEMENT) {
-        let cells: Vec<Vec<String>> = chunk
-            .iter()
-            .map(|row| row_cells(py, row, &recorded_at))
-            .collect::<PyResult<_>>()?;
-        execute(
-            adapter,
-            connection,
-            &values_insert_sql(&table, &columns, &cells),
-        )?;
-    }
-    Ok(())
-}
-
-/// One build's consumption I/O, connected only per phase so loaders can lock file warehouses.
-pub(crate) struct ConsumptionConnection {
-    adapter: Py<PyAny>,
-    connection_config: Py<PyAny>,
-    connection: Mutex<Option<Py<PyAny>>>,
-    /// Set for a plan preview, which reads consumption history from the synced state.
-    preview: Option<Py<PreviewConnection>>,
-}
-
-impl ConsumptionConnection {
-    pub(crate) fn new(adapter: &Bound<'_, PyAny>, connection_config: &Bound<'_, PyAny>) -> Self {
-        Self {
-            adapter: adapter.clone().unbind(),
-            connection_config: connection_config.clone().unbind(),
-            connection: Mutex::new(None),
-            preview: None,
-        }
-    }
-
-    /// Consumption I/O of a plan through `connection`: a preview's synced state, or the warehouse.
-    pub(crate) fn planned_through(
-        adapter: &Bound<'_, PyAny>,
-        connection_config: &Bound<'_, PyAny>,
-        connection: Option<&Bound<'_, PyAny>>,
-    ) -> Self {
-        Self {
-            preview: connection
-                .and_then(preview_of)
-                .map(|preview| preview.unbind()),
-            ..Self::new(adapter, connection_config)
-        }
-    }
-
-    pub(crate) fn connected<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut open = self
-            .connection
-            .lock()
-            .map_err(|_| PyRuntimeError::new_err("consumption connection lock poisoned"))?;
-        if let Some(connection) = open.as_ref() {
-            return Ok(connection.bind(py).clone());
-        }
-        let connection: Bound<'py, PyAny> = native_field(self.adapter.bind(py), "connect")?
-            .call1((self.connection_config.bind(py),))?;
-        *open = Some(connection.clone().unbind());
-        Ok(connection)
-    }
-
-    pub(crate) fn ensure_table(&self, py: Python<'_>, location: &Location) -> PyResult<()> {
-        ensure_table(self.adapter.bind(py), &self.connected(py)?, location)
-    }
-
-    pub(crate) fn read_recent(
-        &self,
-        py: Python<'_>,
-        location: &Location,
-    ) -> PyResult<Vec<ConsumptionRow>> {
-        if let Some(preview) = &self.preview {
-            return Ok(recent_executions(
-                &preview
-                    .get()
-                    .consumption((location.database.as_deref(), &location.schema)),
-                RECENT_EXECUTIONS,
-            ));
-        }
-        read_recent(self.adapter.bind(py), &self.connected(py)?, location)
-    }
-
-    pub(crate) fn read_executions(
-        &self,
-        py: Python<'_>,
-        location: &Location,
-        execution_ids: &[&str],
-    ) -> PyResult<Vec<ConsumptionRow>> {
-        if let Some(preview) = &self.preview {
-            let mut rows: Vec<ConsumptionRow> = preview
-                .get()
-                .consumption((location.database.as_deref(), &location.schema));
-            rows.retain(|row| execution_ids.contains(&row.row.execution_id.as_str()));
-            return Ok(rows);
-        }
-        read_executions(
-            self.adapter.bind(py),
-            &self.connected(py)?,
-            location,
-            execution_ids,
-        )
-    }
-
-    pub(crate) fn append(
-        &self,
-        py: Python<'_>,
-        location: &Location,
-        rows: &[ConsumptionAppend],
-    ) -> PyResult<()> {
-        append(self.adapter.bind(py), &self.connected(py)?, location, rows)
-    }
-
-    /// Close the connection if one is open; the next operation connects again.
-    pub(crate) fn close(&self, py: Python<'_>) -> PyResult<()> {
-        let open: Option<Py<PyAny>> = self
-            .connection
-            .lock()
-            .map_err(|_| PyRuntimeError::new_err("consumption connection lock poisoned"))?
-            .take();
-        if let Some(connection) = open {
-            native_field(self.adapter.bind(py), "close")?.call1((connection.bind(py),))?;
-        }
-        Ok(())
-    }
 }
 
 /// The build's own node-completion callback, which the recorder forwards every result to.

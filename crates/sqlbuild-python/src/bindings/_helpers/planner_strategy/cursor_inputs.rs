@@ -233,7 +233,7 @@ pub(crate) fn cursor_input_relations_of<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let request = Request::new("build_cursor_input_relations", request)?;
     for name in [
-        "adapter",
+        "dialect",
         "model_locations",
         "models_by_name",
         "seed_locations",
@@ -245,7 +245,7 @@ pub(crate) fn cursor_input_relations_of<'py>(
     build_cursor_input_relations(
         (
             &request.get("model")?,
-            &Dialect::of(&request.get("adapter")?)?,
+            &Dialect::passed(request.get("dialect")?)?,
         ),
         &request.get("cursor_column")?,
         &lookups_of(&request)?,

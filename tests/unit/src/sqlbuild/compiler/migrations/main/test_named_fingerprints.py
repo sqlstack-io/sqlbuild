@@ -5,7 +5,7 @@ from __future__ import annotations
 import duckdb
 import pytest
 
-from sqlbuild._native import Fingerprint, MigrationStateInspection, write_fingerprints
+from sqlbuild._native import Fingerprint, MigrationStateInspection, live_reads, write_fingerprints
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from tests.unit.src.sqlbuild.compiler.migrations.main._test_types import NamedFingerprintTestCase
 from tests.unit.src.sqlbuild.compiler.migrations.main.helpers import built_fingerprint
@@ -73,7 +73,7 @@ def test_given_inspected_schemas_when_a_model_is_named_then_its_newest_fingerpri
             render_framework_type=adapter.render_framework_type,
         )
     inspection: MigrationStateInspection = MigrationStateInspection(
-        adapter=adapter, connection=connection, database=None
+        reads=live_reads(adapter=adapter, connection=connection), database=None
     )
 
     inspection.inspect_schemas(schemas={"main"})

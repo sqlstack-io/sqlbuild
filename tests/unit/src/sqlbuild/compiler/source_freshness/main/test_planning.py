@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from sqlbuild._native import (
+    Dialect,
     DirectSourceFreshnessPlanningResult,
     SourceEntry,
     SourceFreshnessAgePolicy,
@@ -16,6 +17,7 @@ from sqlbuild._native import (
     SourceFreshnessStrategy,
     SourceFreshnessValueKind,
     build_direct_source_freshness_planning_result,
+    live_reads,
     source_freshness_data_version_hash,
     write_source_freshness_records,
 )
@@ -136,8 +138,8 @@ def test_given_direct_source_freshness_state_when_planning_then_classifies_hash_
         )
 
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(source,),
             state_database=None,
             state_schemas=("state_schema",),
@@ -227,8 +229,8 @@ def test_given_source_freshness_age_policy_when_planning_then_records_age_status
         )
 
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(source,),
             state_database=None,
             state_schemas=("state_schema",),
@@ -287,8 +289,8 @@ def test_given_adapter_metadata_age_policy_when_planning_then_records_age_status
         )
 
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(source,),
             state_database=None,
             state_schemas=("state_schema",),
@@ -379,8 +381,8 @@ def test_given_timestamp_lag_tolerance_when_planning_then_classifies_tolerated_m
         )
 
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(
                 SourceEntry(
                     name="raw.orders",
@@ -428,8 +430,8 @@ def test_given_unconfigured_source_without_adapter_metadata_when_planning_then_m
     connection: Any = adapter.connect({"database": ":memory:"})
     try:
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(SourceEntry(name="raw.orders", table="orders"),),
             state_database=None,
             state_schemas=("state_schema",),
@@ -469,8 +471,8 @@ def test_given_column_freshness_expression_when_planning_then_observes_subquery(
     connection: Any = adapter.connect({"database": ":memory:"})
     try:
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(
                 SourceEntry(
                     name="raw_orders",
@@ -521,8 +523,8 @@ def test_given_adapter_metadata_support_when_planning_unconfigured_source_then_o
     connection: Any = adapter.connect({"database": ":memory:"})
     try:
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(
                 SourceEntry(name="raw.orders", schema="raw", table="orders"),
                 SourceEntry(name="raw.customers", schema="raw", table="customers"),
@@ -566,8 +568,8 @@ def test_given_managed_source_when_planning_source_freshness_then_skips_observat
     connection: Any = adapter.connect({"database": ":memory:"})
     try:
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(SourceEntry(name="raw.orders", schema="raw", table="orders", managed=True),),
             state_database=None,
             state_schemas=("state_schema",),
@@ -626,8 +628,8 @@ def test_given_multiple_state_schemas_when_planning_then_merges_previous_records
             data_version="2",
         )
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(
                 SourceEntry(
                     name="raw.orders",
@@ -698,8 +700,8 @@ def test_given_duplicate_state_schema_records_when_planning_then_uses_newest_obs
         )
 
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=(
                 SourceEntry(
                     name="raw.orders",

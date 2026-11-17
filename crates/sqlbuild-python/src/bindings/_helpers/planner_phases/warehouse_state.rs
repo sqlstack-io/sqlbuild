@@ -14,8 +14,8 @@ use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_re
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::models::PlannerWarehouseState;
 use crate::bindings::_helpers::planner_phases::objects::native;
-use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_phases::runtime::{runtime_dialect, runtime_reads};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::fingerprint_cache::MigrationFingerprintCache;
 use crate::bindings::_helpers::planner_warehouse::snapshot::{SnapshotRequest, warehouse_snapshot};
@@ -82,7 +82,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
             ),
         ],
     )?;
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
+    let reads = runtime_reads(runtime)?;
     let stale_scope = scope_data(&class_field(scopes, |s: &PlannerScopeResolution| {
         &s.stale_warning_scope
     })?)?;
@@ -97,9 +97,8 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
     .into_any();
     let snapshot = warehouse_snapshot(&SnapshotRequest {
         project: project.clone(),
-        adapter: adapter.clone(),
-        connection: runtime_field(runtime, |runtime| &runtime.connection)?,
-        execute: native_field(&adapter, "execute")?,
+        dialect: runtime_dialect(runtime)?,
+        reads: reads.clone(),
         selected_keys: stale_keys,
         full_refresh: false,
         full_refresh_model_names: effectively_full_refreshed_model_names(&project, full_refresh)?,
@@ -119,8 +118,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
     let inspection_relations = planner_relations_context(RelationsRequest {
         project: project.clone(),
         dialect: runtime_dialect(runtime)?,
-        adapter: adapter.clone(),
-        connection: runtime_field(runtime, |runtime| &runtime.connection)?,
+        reads: Some(reads),
         scope: class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?,
         deferral: deferral.clone(),
         project_config: config,

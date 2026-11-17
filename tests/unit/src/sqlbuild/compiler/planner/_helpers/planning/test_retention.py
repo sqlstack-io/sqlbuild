@@ -755,8 +755,8 @@ def test_given_missing_bigquery_dataset_when_planning_then_defers_retention_unti
     )
     runtime: PlannerRuntime = PlannerRuntime(
         project=runtime.project,
-        adapter=runtime.adapter,
-        connection=runtime.connection,
+        dialect=runtime.dialect,
+        reads=runtime.reads,
         invocation_time=runtime.invocation_time,
         project_config=ProjectConfig(
             name="test",

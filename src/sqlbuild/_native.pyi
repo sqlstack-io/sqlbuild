@@ -787,6 +787,7 @@ class WarehouseSnapshot(NativeRecord):
     existing_columns: dict[str, tuple[ColumnInfo, ...]]
     fingerprints: WarehouseFingerprints
     cursor_snapshots: dict[str, ModelCursorSnapshot]
+    cursor_inputs_at_run: bool
     source_freshness_state_schemas: frozenset[str]
     column_dialect: str | None
     renamed_models: frozenset[str]
@@ -800,6 +801,7 @@ class WarehouseSnapshot(NativeRecord):
         existing_columns: dict[str, tuple[ColumnInfo, ...]] = ...,
         fingerprints: WarehouseFingerprints = ...,
         cursor_snapshots: dict[str, ModelCursorSnapshot] = ...,
+        cursor_inputs_at_run: bool = ...,
         source_freshness_state_schemas: frozenset[str] = ...,
         column_dialect: str | None = ...,
         renamed_models: frozenset[str] = ...,
@@ -1238,13 +1240,23 @@ class Dialect:
     def __init__(self, adapter: BaseAdapter) -> None: ...
     def __getattr__(self, name: str) -> Any: ...
 
+class WarehouseReads:
+    """The warehouse reads one plan runs through: live, or a preview's synced state."""
+
+def live_reads(
+    *,
+    adapter: BaseAdapter,
+    connection: Any,
+    connection_config: Any = ...,
+    execute: Callable[..., Any] | None = ...,
+) -> WarehouseReads: ...
+
 class PlannerRuntime:
     """Resolved execution environment shared by planner phases."""
 
     project: CompiledProjectView
-    adapter: BaseAdapter
-    connection: Any
     dialect: Dialect
+    reads: WarehouseReads
     project_config: ProjectConfig | None
     local_config: LocalConfig | None
     on_progress: Callable[[str], None] | None
@@ -1253,8 +1265,8 @@ class PlannerRuntime:
         self,
         *,
         project: CompiledProjectView,
-        adapter: BaseAdapter,
-        connection: Any,
+        dialect: Dialect,
+        reads: WarehouseReads,
         project_config: ProjectConfig | None = ...,
         local_config: LocalConfig | None = ...,
         on_progress: Callable[[str], None] | None = ...,
@@ -5420,8 +5432,7 @@ class MigrationStateInspection:
     def __init__(
         self,
         *,
-        adapter: BaseAdapter,
-        connection: Any,
+        reads: WarehouseReads,
         database: str | None,
         known_fingerprints: WarehouseFingerprints | None = None,
     ) -> None: ...
@@ -5571,19 +5582,19 @@ def append_eligible_direct_source_freshness_records(
     run_id: str,
 ) -> None: ...
 def observe_configured_source_freshness(
-    *, adapter: StrictAdapter, connection: object, source: SourceEntry, observed_at: datetime
+    *, dialect: Dialect, reads: WarehouseReads, source: SourceEntry, observed_at: datetime
 ) -> SourceFreshnessObservation: ...
 def observe_adapter_sources_freshness(
     *,
-    adapter: StrictAdapter,
-    connection: object,
+    dialect: Dialect,
+    reads: WarehouseReads,
     sources: tuple[SourceEntry, ...],
     observed_at: datetime,
 ) -> AdapterSourceFreshnessBatch: ...
 def build_direct_source_freshness_planning_result(
     *,
-    adapter: StrictAdapter,
-    connection: object,
+    dialect: Dialect,
+    reads: WarehouseReads,
     sources: tuple[SourceEntry, ...],
     state_database: str | None,
     state_schemas: tuple[str, ...],
@@ -5695,7 +5706,7 @@ def build_seed_command_plan(
     fingerprints: dict[str, Fingerprint] | None = None,
 ) -> PlanOutput: ...
 def read_selected_seed_fingerprints(
-    *, adapter: BaseAdapter, connection: Any, seeds: tuple[CompiledSeedView, ...]
+    *, reads: WarehouseReads, seeds: tuple[CompiledSeedView, ...]
 ) -> dict[str, Fingerprint]: ...
 def resolve_clone_boundary[K](
     *,
@@ -5717,8 +5728,8 @@ def sql_test_model_chain_names_by_key(
 def build_execution_plan(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
-    connection: Any,
+    dialect: Dialect,
+    reads: WarehouseReads,
     selection: PlannerSelection,
     overrides: PlannerOverrides,
     deferral: DeferralInputs,
@@ -5789,8 +5800,8 @@ def resolve_cursor_overrides(
 def build_planner_relations_context(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
-    connection: Any,
+    dialect: Dialect,
+    reads: WarehouseReads,
     scope: PlannerScope,
     deferral: DeferralInputs | None = None,
     project_config: ProjectConfig | None = None,
@@ -6090,7 +6101,7 @@ def validate_source_cursor_input_columns(
 def build_cursor_input_relations(
     *,
     model: CompiledModelView,
-    adapter: BaseAdapter,
+    dialect: Dialect,
     model_locations: dict[str, CompiledRelationLocation],
     models_by_name: dict[str, CompiledModelView],
     functions_by_name: dict[str, CompiledFunctionView] | None = None,
@@ -6298,9 +6309,8 @@ class MigrationFingerprintCache:
 def gather_warehouse_snapshot(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
-    connection: Any,
-    execute: AdapterExecute[Any, Any],
+    dialect: Dialect,
+    reads: WarehouseReads,
     selected_keys: frozenset[CompiledObjectKey] | None = None,
     full_refresh: bool = False,
     full_refresh_model_names: frozenset[str] | None = None,
@@ -6312,15 +6322,13 @@ def watermark_type_is_compatible(*, declared_type: str, cursor_type: str | None)
 def gather_source_columns(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
-    connection: Any,
+    reads: WarehouseReads,
     source_entries: tuple[SourceEntry, ...] | None = None,
 ) -> dict[str, tuple[ColumnInfo, ...]]: ...
 def get_semantic_source_columns(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
-    connection: Any,
+    reads: WarehouseReads,
     source_read_map: dict[str, SourceEntry],
     columns: dict[str, tuple[ColumnInfo, ...]],
     selected_keys: frozenset[CompiledObjectKey],
@@ -6328,16 +6336,16 @@ def get_semantic_source_columns(
 def check_selected_source_tables_exist(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
-    connection: Any,
+    dialect: Dialect,
+    reads: WarehouseReads,
     scope: PlannerScope,
     relations: PlannerRelationsContext,
 ) -> None: ...
 def build_planner_source_freshness_result(
     *,
     project: CompiledProjectView,
-    adapter: BaseAdapter,
-    connection: Any,
+    dialect: Dialect,
+    reads: WarehouseReads,
     scope: PlannerScope,
     relations: PlannerRelationsContext,
     freshness_state_schemas: frozenset[str] | None = None,
@@ -6374,8 +6382,7 @@ def planner_metadata_name_filter(
 ) -> tuple[str, ...] | None: ...
 def list_source_candidates(
     *,
-    adapter: BaseAdapter,
-    connection: Any,
+    reads: WarehouseReads,
     database: str | None,
     entries: tuple[SourceEntry, ...],
 ) -> tuple[RelationInfo, ...]: ...

@@ -1,5 +1,7 @@
 //! The compile-and-plan pipeline of execution commands: compile, rules gate, then planning.
 
+use crate::bindings::_helpers::native_host::live_reads::LiveReads;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
@@ -59,7 +61,7 @@ pub(crate) fn run_compile_pipeline<'py>(
 }
 
 /// Compile unless `held` is a `CompiledProjectPhaseResult`, gate on rules unless they ran at load, and
-/// plan; a `planned_through` connection, such as a preview's synced state, is used instead of connecting.
+/// plan; `planned_through` reads, such as a preview's synced state, are used instead of connecting.
 pub(crate) fn planned_project<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
@@ -256,13 +258,16 @@ fn planned<'py>(
     let started: f64 = monotonic(py)?;
     let mut connection: Option<Bound<'py, PyAny>> = None;
     let result: PyResult<Bound<'py, PyAny>> = (|| {
-        let opened: Bound<'py, PyAny> = match planned_through {
+        let (opened, reads): (Bound<'py, PyAny>, Bound<'py, PlannerReads>) = match planned_through {
             Some(through) => {
                 let on_start: Bound<'py, PyAny> = native_field(hooks, "on_connection_start")?;
                 if !on_start.is_none() {
                     on_start.call1((1,))?;
                 }
-                through.clone()
+                (
+                    py.None().into_bound(py),
+                    PlannerReads::passed(through.clone())?,
+                )
             }
             None => {
                 let opened: Bound<'py, PyAny> = connection_with_hooks(
@@ -271,7 +276,8 @@ fn planned<'py>(
                     hooks,
                 )?;
                 connection = Some(opened.clone());
-                opened
+                let reads = LiveReads::handle(adapter, &opened, None)?;
+                (opened, reads)
             }
         };
         pipeline_result(
@@ -279,6 +285,7 @@ fn planned<'py>(
                 discovered_inputs: discovered,
                 adapter,
                 connection: &opened,
+                reads: &reads,
             },
             &native_field(compiled, "project")?,
             options,

@@ -1,5 +1,7 @@
 //! `sqb freshness`: observe selected source freshness without writing state.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use std::collections::BTreeSet;
 
 use pyo3::exceptions::PyValueError;
@@ -240,8 +242,8 @@ fn observe(
         let observed_at: Bound<'_, PyAny> = imported(py, "datetime", "datetime")?
             .call_method1("now", (imported(py, "datetime", "UTC")?,))?;
         let observer: Observer<'_> = Observer {
-            adapter: adapter.clone(),
-            connection: connection.clone(),
+            dialect: Dialect::of(adapter)?,
+            reads: LiveReads::handle(adapter, &connection, None)?,
             observed_at,
         };
         let state: PreviousState<'_> = PreviousState { by_identity };

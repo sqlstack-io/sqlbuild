@@ -11,7 +11,6 @@ use crate::bindings::_helpers::model_config::typed_config::{
     config_node_of, config_text_is, config_text_object, config_value, model_values,
 };
 use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
-use crate::bindings::_helpers::native_host::preview_state::PreviewScope;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_resolution::cursor_model::{
@@ -228,7 +227,7 @@ pub(crate) fn resolve_model_sql<'py>(
         let bounds = match bounds {
             bounds if !bounds.is_none() => bounds,
             _ if cause.is_none()
-                && PreviewScope::active()
+                && native_field(&request.snapshot, "cursor_inputs_at_run")?.is_truthy()?
                 && native_field(&roles, "watermark_inputs")?.is_truthy()? =>
             {
                 unbounded(py)?

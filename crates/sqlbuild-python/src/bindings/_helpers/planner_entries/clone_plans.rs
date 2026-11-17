@@ -28,6 +28,7 @@ use crate::bindings::_helpers::planner_resolution::orchestration::resolve_functi
 use crate::bindings::_helpers::planner_resolution::orchestration::{Resolution, resolve_model_sql};
 use crate::bindings::_helpers::planner_selection::selectors::resolve_graph_selection;
 use crate::bindings::_helpers::planner_strategy::strategy::materialization_of;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::source_columns::gather_source_columns;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -172,7 +173,7 @@ fn resolved_source_entries<'py>(
 fn clone_resolution<'py>(
     (project, plan): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     source_project: &Bound<'py, PyAny>,
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    reads: &Bound<'py, PlannerReads>,
 ) -> PyResult<CloneResolution<'py>> {
     let py = project.py();
     let model_locations = object(py, build_model_locations(&project_reads::models(project)?)?)?;
@@ -193,8 +194,7 @@ fn clone_resolution<'py>(
         py,
         gather_source_columns(
             source_project,
-            adapter,
-            connection,
+            reads,
             Some(resolved_source_entries((project, plan), source_project)?),
         )?,
     )?;
@@ -536,8 +536,8 @@ pub(crate) fn timed_clone_planning<'py>(
                 "project",
                 "select",
                 "exclude",
-                "adapter",
-                "connection",
+                "dialect",
+                "reads",
                 "origin_project",
                 "origin_source_project",
                 "destination_source_project",
@@ -546,17 +546,12 @@ pub(crate) fn timed_clone_planning<'py>(
         ),
     )?;
     let project = args.value("project")?;
-    let adapter = args.value("adapter")?;
-    let connection = args.value("connection")?;
-    let dialect = Dialect::of(&adapter)?;
+    let dialect = Dialect::passed(args.value("dialect")?)?;
+    let reads = PlannerReads::passed(args.value("reads")?)?;
     let destination_sources = args.value("destination_source_project")?;
     let plan = clone_plan_output(&project, &args.value("select")?, &args.value("exclude")?)?;
     let inspection_started = std::time::Instant::now();
-    let resolution = clone_resolution(
-        (&project, &plan),
-        &destination_sources,
-        (&adapter, &connection),
-    )?;
+    let resolution = clone_resolution((&project, &plan), &destination_sources, &reads)?;
     let inspection_seconds = inspection_started.elapsed().as_secs_f64();
     let models = clone_model_entries((&project, &plan), &dialect, &resolution)?;
     let seeds = seed_entries(&project, "key", &native_field(&plan, "selected_keys")?)?;

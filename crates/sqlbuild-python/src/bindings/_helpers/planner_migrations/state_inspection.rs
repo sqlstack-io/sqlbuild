@@ -1,32 +1,26 @@
 //! Read-only warehouse evidence gathered once for all model migrations in one plan.
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
-use crate::bindings::_helpers::native_host::preview_state::preview_of;
 use crate::bindings::_helpers::planner_warehouse::snapshot::{columns_for, list_relations};
-use crate::bindings::_helpers::planner_warehouse::state_reads::preview_fingerprints;
-use sqlbuild_state::warehouse_state::models::StateLocation;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyRef, PyRefMut, PyResult, Python, pyclass, pymethods,
 };
-use pyo3::types::{PyBool, PyDict, PyString, PyTuple, PyTupleMethods};
+use pyo3::types::{PyDict, PyString, PyTuple, PyTupleMethods};
 use sqlbuild_core::constants::COLUMN_MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
 use sqlbuild_state::events::models::{EventRelation, FingerprintKey, FingerprintOrder};
 
-use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_reads;
+use crate::bindings::_helpers::planner_warehouse::reads::{FingerprintRead, PlannerReads, Read};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::fields::mapping_get_or;
 use crate::bindings::_helpers::state_rows::constants::{COLUMN_KIND, MODEL_KIND, OLD_NAME_KIND};
-use crate::bindings::_helpers::state_rows::migration_io::{read_events, stored_old_name_columns};
 use crate::bindings::_helpers::state_rows::migration_objects::layout;
 use crate::bindings::_helpers::state_rows::migration_projections::old_name_views;
-use crate::bindings::_helpers::state_rows::models::StateAccess;
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_MODEL;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 
@@ -36,8 +30,7 @@ type RelationKey = (String, String);
 /// Relations, fingerprints and migration events for one planning database.
 #[pyclass(module = "sqlbuild._native", name = "MigrationStateInspection")]
 pub(crate) struct MigrationStateInspection {
-    adapter: Py<PyAny>,
-    connection: Py<PyAny>,
+    reads: Py<PlannerReads>,
     database: Py<PyAny>,
     known_fingerprints: Py<PyAny>,
     read_schemas: HashSet<String>,
@@ -137,13 +130,8 @@ fn newest<'py>(
 }
 
 impl MigrationStateInspection {
-    fn access<'py>(&self, py: Python<'py>) -> PyResult<StateAccess<'py>> {
-        let adapter: &Bound<'py, PyAny> = self.adapter.bind(py);
-        Ok(StateAccess {
-            connection: self.connection.bind(py).clone(),
-            execute: native_field(adapter, "execute")?,
-            render_qualified_name: native_field(adapter, "render_qualified_name")?,
-        })
+    fn reads<'py>(&self, py: Python<'py>) -> Bound<'py, PlannerReads> {
+        self.reads.bind(py).clone()
     }
 
     fn list_relations<'py>(
@@ -153,13 +141,30 @@ impl MigrationStateInspection {
         names: Bound<'py, PyAny>,
     ) -> PyResult<Vec<Bound<'py, PyAny>>> {
         list_relations(
-            (self.adapter.bind(py), self.connection.bind(py)),
+            self.reads.bind(py),
             self.database.bind(py),
             PyTuple::new(py, schemas)?.into_any(),
             names,
         )?
         .try_iter()?
         .collect()
+    }
+
+    /// The listed migration state tables of `schemas`, or `None` when the reads do not know them.
+    fn migration_state_tables<'py>(
+        &self,
+        py: Python<'py>,
+        schemas: Vec<Bound<'py, PyAny>>,
+        names: Bound<'py, PyAny>,
+    ) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
+        match self.reads.get().reads().migration_state_tables(
+            py,
+            self.database.bind(py),
+            (PyTuple::new(py, schemas)?.into_any(), names),
+        )? {
+            Read::Known(listed) => Ok(Some(listed.try_iter()?.collect::<PyResult<_>>()?)),
+            Read::Unknown(_) => Ok(None),
+        }
     }
 
     /// Every inspected schema's model fingerprint positions by node name, in the order `fingerprints` lists them.
@@ -181,37 +186,18 @@ impl MigrationStateInspection {
         key: &str,
     ) -> PyResult<Vec<Py<PyAny>>> {
         let known: Bound<'py, PyAny> = mapping_get(self.known_fingerprints.bind(py), key)?;
-        let preview = preview_of(self.connection.bind(py));
-        let latest: Bound<'py, PyAny> = if let (true, Some(preview)) = (known.is_none(), &preview) {
-            let fingerprint_set: Bound<'py, PyAny> = preview_fingerprints(
-                preview,
-                &StateLocation {
-                    database: self.database.bind(py).extract()?,
-                    schema: schema.extract()?,
-                },
-                (None, Vec::new()),
-            )?;
-            native_field(&fingerprint_set, "fingerprints_by_identity")?.call_method0("values")?
-        } else if known.is_none() {
-            let adapter: &Bound<'py, PyAny> = self.adapter.bind(py);
-            let fingerprint_set: Bound<'py, PyAny> = read_latest_fingerprints(Some(&keywords(
+        let latest: Bound<'py, PyAny> = if known.is_none() {
+            let schema: String = schema.extract()?;
+            let fingerprint_set: Bound<'py, PyAny> = self.reads.get().reads().fingerprints(
                 py,
-                &[
-                    ("connection", self.connection.bind(py).clone()),
-                    ("execute", native_field(adapter, "execute")?),
-                    ("table_exists", PyBool::new(py, true).to_owned().into_any()),
-                    ("database", self.database.bind(py).clone()),
-                    ("schema", schema.clone()),
-                    (
-                        "render_qualified_name",
-                        native_field(adapter, "render_qualified_name")?,
-                    ),
-                    (
-                        "render_read_latest_sql",
-                        native_field(adapter, "render_read_latest_fingerprints_sql")?,
-                    ),
-                ],
-            )?))?;
+                FingerprintRead {
+                    database: self.database.bind(py).extract()?,
+                    schema: &schema,
+                    table_exists: true,
+                    node_names: None,
+                    filtered_node_types: Vec::new(),
+                },
+            )?;
             let by_identity: Bound<'py, PyAny> =
                 native_field(&fingerprint_set, "fingerprints_by_identity")?;
             if by_identity.is_truthy()? {
@@ -236,14 +222,13 @@ impl MigrationStateInspection {
 #[pymethods]
 impl MigrationStateInspection {
     #[new]
-    #[pyo3(signature = (*, adapter, connection, database, known_fingerprints = None))]
+    #[pyo3(signature = (*, reads, database, known_fingerprints = None))]
     fn new(
-        adapter: &Bound<'_, PyAny>,
-        connection: &Bound<'_, PyAny>,
+        reads: &Bound<'_, PlannerReads>,
         database: &Bound<'_, PyAny>,
         known_fingerprints: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let py: Python<'_> = adapter.py();
+        let py: Python<'_> = reads.py();
         let known: Bound<'_, PyAny> = match known_fingerprints {
             Some(known)
                 if !known.is_none()
@@ -254,8 +239,7 @@ impl MigrationStateInspection {
             _ => PyDict::new(py).into_any(),
         };
         Ok(Self {
-            adapter: adapter.clone().unbind(),
-            connection: connection.clone().unbind(),
+            reads: reads.clone().unbind(),
             database: database.clone().unbind(),
             known_fingerprints: known.unbind(),
             read_schemas: HashSet::new(),
@@ -311,11 +295,14 @@ impl MigrationStateInspection {
         slf.borrow_mut()
             .column_event_schemas
             .extend(pending.iter().map(|(_, key)| key.clone()));
-        let listed: Vec<Bound<'_, PyAny>> = slf.borrow().list_relations(
+        let Some(listed) = slf.borrow().migration_state_tables(
             py,
             pending.iter().map(|(schema, _)| schema.clone()).collect(),
             PyTuple::new(py, [COLUMN_MIGRATION_TABLE_NAME])?.into_any(),
-        )?;
+        )?
+        else {
+            return Ok(());
+        };
         let mut present: HashSet<String> = HashSet::new();
         for relation in &listed {
             if lowered(&native_field(relation, "name")?)? == COLUMN_MIGRATION_TABLE_NAME {
@@ -328,11 +315,19 @@ impl MigrationStateInspection {
             if !present.contains(&key) {
                 continue;
             }
-            let (access, database) = {
+            let (reads, database) = {
                 let this: PyRef<'_, Self> = slf.borrow();
-                (this.access(py)?, this.database.bind(py).clone())
+                (this.reads(py), this.database.bind(py).clone())
             };
-            let events = read_events(&access, &layout(COLUMN_KIND)?, (database, schema), None)?;
+            let Read::Known(events) = reads.get().reads().recorded_migrations(
+                py,
+                &layout(COLUMN_KIND)?,
+                (database, schema),
+                None,
+            )?
+            else {
+                return Ok(());
+            };
             slf.borrow_mut()
                 .column_events
                 .extend(events.iter().map(Bound::unbind));
@@ -351,11 +346,14 @@ impl MigrationStateInspection {
         slf.borrow_mut()
             .old_name_schemas
             .extend(pending.iter().map(|(_, key)| key.clone()));
-        let listed: Vec<Bound<'_, PyAny>> = slf.borrow().list_relations(
+        let Some(listed) = slf.borrow().migration_state_tables(
             py,
             pending.iter().map(|(schema, _)| schema.clone()).collect(),
             PyTuple::new(py, [MIGRATION_TABLE_NAME, OLD_NAME_VIEW_TABLE_NAME])?.into_any(),
-        )?;
+        )?
+        else {
+            return Ok(());
+        };
         let state_tables: HashSet<RelationKey> =
             listed.iter().map(relation_key).collect::<PyResult<_>>()?;
         for (schema, key) in pending {
@@ -364,29 +362,33 @@ impl MigrationStateInspection {
             {
                 continue;
             }
-            let (access, adapter, database) = {
+            let (reads, database) = {
                 let this: PyRef<'_, Self> = slf.borrow();
-                (
-                    this.access(py)?,
-                    this.adapter.bind(py).clone(),
-                    this.database.bind(py).clone(),
-                )
+                (this.reads(py), this.database.bind(py).clone())
             };
-            let stored: Vec<String> = stored_old_name_columns(
-                &adapter,
-                &access.connection,
-                (database.clone(), schema.clone()),
-            )?;
-            let facts = read_events(
-                &access,
+            let reads = reads.get().reads();
+            let Read::Known(stored) =
+                reads.old_name_view_columns(py, (database.clone(), schema.clone()))?
+            else {
+                return Ok(());
+            };
+            let Read::Known(facts) = reads.recorded_migrations(
+                py,
                 &layout(OLD_NAME_KIND)?,
                 (database.clone(), schema.clone()),
                 Some(&stored),
-            )?;
+            )?
+            else {
+                return Ok(());
+            };
             slf.borrow_mut()
                 .old_name_facts
                 .extend(facts.iter().map(Bound::unbind));
-            let moves = read_events(&access, &layout(MODEL_KIND)?, (database, schema), None)?;
+            let Read::Known(moves) =
+                reads.recorded_migrations(py, &layout(MODEL_KIND)?, (database, schema), None)?
+            else {
+                return Ok(());
+            };
             slf.borrow_mut()
                 .old_name_moves
                 .extend(moves.iter().map(Bound::unbind));
@@ -409,11 +411,19 @@ impl MigrationStateInspection {
             if !slf.borrow_mut().event_schemas.insert(key) {
                 continue;
             }
-            let (access, database) = {
+            let (reads, database) = {
                 let this: PyRef<'_, Self> = slf.borrow();
-                (this.access(py)?, this.database.bind(py).clone())
+                (this.reads(py), this.database.bind(py).clone())
             };
-            let events = read_events(&access, &layout(MODEL_KIND)?, (database, schema), None)?;
+            let Read::Known(events) = reads.get().reads().recorded_migrations(
+                py,
+                &layout(MODEL_KIND)?,
+                (database, schema),
+                None,
+            )?
+            else {
+                return Ok(());
+            };
             slf.borrow_mut()
                 .events
                 .extend(events.iter().map(Bound::unbind));
@@ -511,12 +521,9 @@ impl MigrationStateInspection {
         let columns: Bound<'_, PyAny> = if matched.is_empty() {
             PyDict::new(py).into_any()
         } else {
-            let this: PyRef<'_, Self> = slf.borrow();
-            let adapter: Bound<'_, PyAny> = this.adapter.bind(py).clone();
-            let connection: Bound<'_, PyAny> = this.connection.bind(py).clone();
-            drop(this);
+            let reads: Bound<'_, PlannerReads> = slf.borrow().reads(py);
             columns_for(
-                (&adapter, &connection),
+                &reads,
                 PyTuple::new(py, matched.iter().map(|(_, relation)| relation))?.into_any(),
             )?
         };
@@ -616,8 +623,7 @@ pub(super) fn inspection<'py>(
     known_fingerprints: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let state = MigrationStateInspection::new(
-        &runtime_field(runtime, |runtime| &runtime.adapter)?,
-        &runtime_field(runtime, |runtime| &runtime.connection)?,
+        &runtime_reads(runtime)?,
         &super::planning_origin::planning_database(runtime)?,
         known_fingerprints,
     )?;

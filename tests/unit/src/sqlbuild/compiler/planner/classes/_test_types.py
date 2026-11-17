@@ -46,11 +46,11 @@ class PlanningExitTestCase:
 class DialectAttributeTestCase:
     description: str
     attribute: str
-    arguments: dict[str, object]
-    expected: object
+    expected_value: object
 
 
 @dataclass(frozen=True)
 class DialectRefusalTestCase:
     description: str
     attribute: str
+    expected_message: str

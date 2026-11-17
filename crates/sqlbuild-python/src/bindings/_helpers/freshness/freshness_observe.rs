@@ -1,5 +1,7 @@
 //! Observe the current freshness of selected sources and compare it with previous state.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::{PyException, PyValueError};
@@ -146,7 +148,7 @@ fn adapter_batch<'py>(
     observer: &Observer<'py>,
     sources: &[Bound<'py, PyAny>],
 ) -> PyResult<Result<Bound<'py, PyAny>, String>> {
-    let py: Python<'py> = observer.adapter.py();
+    let py: Python<'py> = observer.reads.py();
     match observe_adapter_batch(observer, sources) {
         Ok(batch) => Ok(Ok(batch)),
         Err(error) => Ok(Err(exception_message(py, error)?)),
@@ -222,7 +224,7 @@ fn observe_sources(
     let mut adapter_sources: Vec<Bound<'_, PyAny>> = Vec::new();
     for source in sources {
         let name: String = native_field(source, "name")?.extract()?;
-        let Some(observed_source) = observation_source(&observer.adapter, source)? else {
+        let Some(observed_source) = observation_source(&observer.dialect, source)? else {
             results.push(target_result(
                 source,
                 (&name, FreshnessStatus::Unknown),
@@ -263,7 +265,7 @@ pub(crate) fn observe_freshness(
     (sources, select, exclude): (&Bound<'_, PyAny>, &[String], &[String]),
     (run_id, state): (Option<String>, &PreviousState<'_>),
 ) -> PyResult<Vec<FreshnessSourceResult>> {
-    let py: Python<'_> = observer.adapter.py();
+    let py: Python<'_> = observer.reads.py();
     let selected: HashSet<&str> = select.iter().map(String::as_str).collect();
     let excluded: HashSet<&str> = exclude.iter().map(String::as_str).collect();
     let mut chosen: Vec<Bound<'_, PyAny>> = Vec::new();
@@ -319,9 +321,10 @@ fn observe_source_freshness_json(
         }
         value.extract()
     };
+    let adapter: Bound<'_, PyAny> = arguments.value("adapter")?;
     let observer: Observer<'_> = Observer {
-        adapter: arguments.value("adapter")?,
-        connection: arguments.value("connection")?,
+        dialect: Dialect::of(&adapter)?,
+        reads: LiveReads::handle(&adapter, &arguments.value("connection")?, None)?,
         observed_at: arguments.value("observed_at")?,
     };
     let previous: Bound<'_, PyAny> = arguments.value("previous_records")?;

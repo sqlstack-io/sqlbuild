@@ -9,6 +9,7 @@ use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::build_command::support::utc_now;
 use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_phases::models::{PlannerRuntime, PlannerWarehouseState};
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 
 #[pymethods]
 impl PlannerRuntime {
@@ -20,7 +21,7 @@ impl PlannerRuntime {
             "PlannerRuntime",
             kwargs,
             (
-                &["project", "adapter", "connection"],
+                &["project", "dialect", "reads"],
                 &[
                     "project_config",
                     "local_config",
@@ -34,12 +35,10 @@ impl PlannerRuntime {
         } else {
             utc_now(py)?
         };
-        let adapter = args.value("adapter")?;
         Ok(Self {
             project: args.value("project")?.unbind(),
-            dialect: Dialect::of(&adapter)?.unbind(),
-            adapter: adapter.unbind(),
-            connection: args.value("connection")?.unbind(),
+            dialect: Dialect::passed(args.value("dialect")?)?.unbind(),
+            reads: PlannerReads::passed(args.value("reads")?)?.unbind(),
             project_config: args.value("project_config")?.unbind(),
             local_config: args.value("local_config")?.unbind(),
             on_progress: args.value("on_progress")?.unbind(),
@@ -54,6 +53,18 @@ pub(crate) fn runtime_field<'py>(
     field: fn(&PlannerRuntime) -> &Py<PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     Ok(field(runtime.cast::<PlannerRuntime>()?.get())
+        .bind(runtime.py())
+        .clone())
+}
+
+/// The warehouse reads of a planner runtime passed as a Python object.
+pub(crate) fn runtime_reads<'py>(
+    runtime: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PlannerReads>> {
+    Ok(runtime
+        .cast::<PlannerRuntime>()?
+        .get()
+        .reads
         .bind(runtime.py())
         .clone())
 }
