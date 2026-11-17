@@ -212,6 +212,8 @@ impl<W: Write> PayloadWriter<W> {
             self.part(TEXT_TAG, authored.as_bytes())?,
         );
         model.insert("query".to_owned(), self.part(TEXT_TAG, query.as_bytes())?);
+        let place: String = view.query_place(py)?;
+        model.insert("place".to_owned(), self.part(TEXT_TAG, place.as_bytes())?);
         let inferred: Value = match view.inferred_rows(py)? {
             Some(rows) => self.part(INFERRED_TAG, &json_bytes(&rows)?)?,
             None => Value::Null,
@@ -242,6 +244,7 @@ impl<W: Write> PayloadWriter<W> {
         model.insert("authored".to_owned(), authored);
         let query: Value = self.text(&native_field(record, "query_sql")?)?;
         model.insert("query".to_owned(), query);
+        model.insert("place".to_owned(), Value::Null);
         let inferred: Bound<'_, PyAny> = native_field(record, "inferred_columns")?;
         let inferred: Value = if inferred.is_none() {
             Value::Null

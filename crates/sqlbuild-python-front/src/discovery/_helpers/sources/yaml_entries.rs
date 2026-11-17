@@ -6,8 +6,8 @@ use pyo3::{FromPyObject, pyfunction};
 use sqlbuild_discovery::yaml_entries::main::parse_schema_document::parse_schema_document as parse_schema;
 use sqlbuild_discovery::yaml_entries::main::parse_sources_document::parse_sources_document as parse_sources;
 use sqlbuild_discovery::yaml_entries::models::{
-    ParsedCsvSettings, ParsedDltSource, ParsedFreshness, ParsedIngestrConfig,
-    ParsedIntegrationLoader, ParsedNaValues, ParsedSeedEntry, ParsedSourceEntry, ParsedYamlColumn,
+    ParsedCsvSettings, ParsedFreshness, ParsedNaValues, ParsedSeedEntry, ParsedSourceEntry,
+    ParsedYamlColumn,
 };
 use sqlbuild_model_config::errors::{ConfigError, ErrorClass};
 
@@ -34,10 +34,6 @@ pub(crate) struct YamlClasses<'py> {
     source_column_entry: Bound<'py, PyAny>,
     source_freshness_config: Bound<'py, PyAny>,
     source_freshness_age_policy: Bound<'py, PyAny>,
-    integration_loader_config: Bound<'py, PyAny>,
-    ingestr_source_config: Bound<'py, PyAny>,
-    dlt_source_config: Bound<'py, PyAny>,
-    dlt_resource_config: Bound<'py, PyAny>,
     source_write_strategy: Bound<'py, PyAny>,
     source_freshness_strategy: Bound<'py, PyAny>,
     source_freshness_value_kind: Bound<'py, PyAny>,
@@ -217,79 +213,11 @@ fn freshness<'py>(
     classes.source_freshness_config.call((), Some(&fields))
 }
 
-fn ingestr_config<'py>(
-    py: Python<'py>,
-    classes: &YamlClasses<'py>,
-    config: &ParsedIngestrConfig<PyNode<'py>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let fields: Bound<'py, PyDict> = PyDict::new(py);
-    fields.set_item("source_uri", &config.source_uri.0)?;
-    fields.set_item("source_table", &config.source_table.0)?;
-    fields.set_item("strategy", optional(py, config.strategy.as_ref()))?;
-    fields.set_item(
-        "incremental_key",
-        optional(py, config.incremental_key.as_ref()),
-    )?;
-    fields.set_item("primary_key", strings(py, &config.primary_key)?)?;
-    fields.set_item("columns", optional(py, config.columns.as_ref()))?;
-    fields.set_item("extra_args", strings(py, &config.extra_args)?)?;
-    classes.ingestr_source_config.call((), Some(&fields))
-}
-
-fn dlt_config<'py>(
-    py: Python<'py>,
-    classes: &YamlClasses<'py>,
-    source: &ParsedDltSource<PyNode<'py>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let resource = &source.resource;
-    let raw_config: Bound<'py, PyDict> = PyDict::new(py);
-    for (key, value) in &resource.raw_config {
-        raw_config.set_item(&key.0, &value.0)?;
-    }
-    let resource_fields: Bound<'py, PyDict> = PyDict::new(py);
-    resource_fields.set_item("name", &resource.name.0)?;
-    resource_fields.set_item("dlt_name", &resource.dlt_name.0)?;
-    resource_fields.set_item("schema", optional(py, resource.schema.as_ref()))?;
-    resource_fields.set_item("raw_config", raw_config)?;
-    resource_fields.set_item(
-        "write_disposition",
-        optional(py, resource.write_disposition.as_ref()),
-    )?;
-    resource_fields.set_item("primary_key", optional(py, resource.primary_key.as_ref()))?;
-    resource_fields.set_item("merge_key", optional(py, resource.merge_key.as_ref()))?;
-    resource_fields.set_item("incremental", meta(py, resource.incremental.as_ref()))?;
-    let fields: Bound<'py, PyDict> = PyDict::new(py);
-    fields.set_item("source_type", &source.source_type.0)?;
-    fields.set_item("schema", optional(py, source.schema.as_ref()))?;
-    fields.set_item("config", &source.config.0)?;
-    fields.set_item("destination", meta(py, source.destination.as_ref()))?;
-    fields.set_item(
-        "resource",
-        classes
-            .dlt_resource_config
-            .call((), Some(&resource_fields))?,
-    )?;
-    fields.set_item("group_index", source.group_index)?;
-    classes.dlt_source_config.call((), Some(&fields))
-}
-
 fn source_entry<'py>(
     py: Python<'py>,
     classes: &YamlClasses<'py>,
     source: &ParsedSourceEntry<PyNode<'py>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let integration: Bound<'py, PyAny> = match &source.integration_loader {
-        None => py.None().into_bound(py),
-        Some(loader) => {
-            let config: Bound<'py, PyAny> = match loader {
-                ParsedIntegrationLoader::Ingestr(config) => ingestr_config(py, classes, config)?,
-                ParsedIntegrationLoader::Dlt(source) => dlt_config(py, classes, source)?,
-            };
-            classes
-                .integration_loader_config
-                .call1((loader.kind(), config))?
-        }
-    };
     let fields: Bound<'py, PyDict> = PyDict::new(py);
     fields.set_item("name", &source.name.0)?;
     fields.set_item("database", optional(py, source.database.as_ref()))?;
@@ -298,7 +226,6 @@ fn source_entry<'py>(
     fields.set_item("final", source.read_final)?;
     fields.set_item("loader", source.loader.as_deref())?;
     fields.set_item("managed", source.managed)?;
-    fields.set_item("integration_loader", integration)?;
     let freshness_config: Bound<'py, PyAny> = match &source.freshness {
         Some(config) => freshness(py, classes, config)?,
         None => py.None().into_bound(py),
@@ -370,9 +297,7 @@ pub(crate) fn parse_sources_document<'py>(
 fn loaded_sources(sources: &[ParsedSourceEntry<PyNode<'_>>]) -> Vec<String> {
     sources
         .iter()
-        .filter(|source| {
-            source.managed || source.loader.is_some() || source.integration_loader.is_some()
-        })
+        .filter(|source| source.managed || source.loader.is_some())
         .filter_map(|source| {
             let Ok(name) = source.name.0.extract::<String>() else {
                 return None;

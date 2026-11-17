@@ -9,7 +9,6 @@ use crate::project_validation::_helpers::python_nodes::{
 use crate::project_validation::models::{
     NamedPath, NodeFact, NodeKind, ProjectFacts, SourceFileFact, ValidationFailure,
 };
-use crate::yaml_entries::main::integration_loader_name::integration_loader_name;
 
 /// Validate loader and node names, node dependencies, then the loaders sources name.
 pub(crate) fn validate_loaders(facts: &ProjectFacts) -> Result<(), ValidationFailure> {
@@ -71,10 +70,7 @@ fn source_loader_references(
     let loader_names: HashSet<&str> = loaders.iter().map(|loader| loader.name.as_str()).collect();
     for file in sources {
         for entry in &file.entries {
-            let expected: String = match &entry.integration_loader {
-                Some(integration) => integration_loader_name(&integration.kind, &entry.name),
-                None => entry.name.clone(),
-            };
+            let expected: String = entry.name.clone();
             if entry.managed && entry.loader.as_deref() != Some(expected.as_str()) {
                 return Err(conflict(format!(
                     "Managed source '{}' in {} must use terminal loader '{expected}'",

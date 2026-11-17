@@ -213,7 +213,6 @@ def build_source_load_entry(
     cursor_column: str | None = None,
     unique_key: tuple[str, ...] = (),
     is_reload: bool = False,
-    integration_kind: str | None = None,
 ) -> SourceLoadPlanEntry:
     """Build a minimal SourceLoadPlanEntry for formatter tests."""
 
@@ -226,7 +225,6 @@ def build_source_load_entry(
         cursor_column=cursor_column,
         unique_key=unique_key,
         is_reload=is_reload,
-        integration_kind=integration_kind,
     )
 
 

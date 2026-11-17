@@ -9,12 +9,9 @@ from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.executor.load._helpers.execution import build_load_execution_indexes
 from sqlbuild.executor.load._helpers.scheduling import (
     open_load_connections,
-    run_external_source_loads,
     run_load_dag,
-    validate_external_loaders_are_preconnect_runnable,
 )
 from sqlbuild.executor.load.models import (
-    ExternalLoadPhaseResult,
     LoadCallbacks,
     LoadExecutionIndexes,
     LoadExecutionResult,
@@ -44,24 +41,8 @@ def run_load_pipeline(
     source_count: int = sum(1 for source in sources if source.loader is not None)
     if source_count == 0:
         return ()
-    validate_external_loaders_are_preconnect_runnable(sources=sources, indexes=indexes)
     source_by_name: dict[str, SourceEntry] = {source.name: source for source in index_sources}
-    external_phase: ExternalLoadPhaseResult = run_external_source_loads(
-        sources=sources,
-        indexes=indexes,
-        source_by_name=source_by_name,
-        adapter=adapter,
-        connection_config=connection_config,
-        runtime=runtime,
-        callbacks=resolved_callbacks,
-    )
-    if not external_phase.sqlbuild_sources:
-        return external_phase.preloaded_results
-
-    remaining_source_count: int = sum(
-        1 for source in external_phase.sqlbuild_sources if source.loader is not None
-    )
-    effective_concurrency: int = max(1, min(max_concurrency, remaining_source_count))
+    effective_concurrency: int = max(1, min(max_concurrency, source_count))
     connections: tuple[Any, ...] = open_load_connections(
         adapter=adapter,
         connection_config=connection_config,
@@ -72,14 +53,13 @@ def run_load_pipeline(
     )
     try:
         dag_results: tuple[LoadExecutionResult, ...] = run_load_dag(
-            sqlbuild_sources=external_phase.sqlbuild_sources,
+            sources=sources,
             source_by_name=source_by_name,
             indexes=indexes,
             adapter=adapter,
             connection_config=connection_config,
             connections=connections,
             effective_concurrency=effective_concurrency,
-            initial_failed_or_hard_skipped=external_phase.failed_or_hard_skipped,
             runtime=runtime,
             callbacks=resolved_callbacks,
         )
@@ -87,4 +67,4 @@ def run_load_pipeline(
         connection: Any
         for connection in connections:
             adapter.close(connection)
-    return external_phase.preloaded_results + dag_results
+    return dag_results

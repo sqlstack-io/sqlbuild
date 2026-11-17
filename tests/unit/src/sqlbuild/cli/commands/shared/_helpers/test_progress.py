@@ -876,7 +876,7 @@ def test_given_model_node_when_reporting_progress_then_writes_materialization_la
             description="completed source load renders multiline lifecycle logs",
             expected_fragments=(
                 "source    raw_orders",
-                "log  ingestr stdout",
+                "log  loader stdout",
                 "         Starting data ingestion",
                 "         Rows: 3",
             ),
@@ -886,7 +886,7 @@ def test_given_model_node_when_reporting_progress_then_writes_materialization_la
             description="completed source load colors log label and content semantically",
             expected_fragments=(
                 "\033[2m    log  \033[0m",
-                "\033[2mingestr stdout\033[0m",
+                "\033[2mloader stdout\033[0m",
                 "\033[2m         Starting data ingestion\033[0m",
             ),
             use_color=True,
@@ -908,13 +908,13 @@ def test_given_source_load_logs_when_reporting_progress_then_writes_indented_log
     callbacks.on_node_complete(
         LoadExecutionResult(
             source_name="raw_orders",
-            loader_name="ingestr__raw_orders",
+            loader_name="raw_orders",
             status=ExecutionStatus.SUCCESS,
             target="raw_orders",
             lifecycle_events=(
                 LifeCycleEvent(
                     kind=LifeCycleEventKind.LOG,
-                    content="ingestr stdout\nStarting data ingestion\nRows: 3",
+                    content="loader stdout\nStarting data ingestion\nRows: 3",
                 ),
             ),
         )

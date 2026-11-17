@@ -497,10 +497,6 @@ const R_DISCOVERED_PYTHON_LOADER_METADATA: RecordSpec = RecordSpec {
         FieldSpec::new("unique_key", FieldDefault::EmptyTuple),
         FieldSpec::new("columns", FieldDefault::EmptyTuple),
         FieldSpec::new("contract", FieldDefault::None),
-        FieldSpec::new(
-            "connection_mode",
-            FieldDefault::NativeMember(RecordId::LoaderConnectionMode, "SQLBUILD"),
-        ),
     ],
 };
 const R_DISCOVERED_PYTHON_TASK_METADATA: RecordSpec = RecordSpec {

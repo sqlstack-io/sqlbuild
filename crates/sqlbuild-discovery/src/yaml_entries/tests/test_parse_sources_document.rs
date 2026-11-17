@@ -8,23 +8,35 @@ use crate::yaml_entries::tests::test_types::{
 fn given_sources_documents_when_parsing_then_matches_python_sources_and_errors() {
     let test_cases = [
         SourcesDocumentTestCase {
-            description: "a dlt resource becomes a managed source named after it",
+            description: "a dlt_sources group is a removed integration",
             document: dlt_group(vec![
                 ("type", text("sql_database")),
                 (
-                    "config",
-                    map(vec![("credentials", text("duckdb:///shop.db"))]),
-                ),
-                ("schema", text("raw")),
-                (
                     "resources",
-                    Node::List(vec![map(vec![
-                        ("name", text("orders")),
-                        ("table", text("orders_v1")),
-                    ])]),
+                    Node::List(vec![map(vec![("name", text("orders"))])]),
                 ),
             ]),
-            expected_sources: lines(&["orders loader=orders managed=true schema=raw table=orders"]),
+            expected_sources: parse_error(
+                "/project/sources/shop.yml declares dlt_sources, a dlt integration, which \
+                 SQLBuild no longer supports; declare each source under `sources:` with \
+                 `managed: true` and load it with a Python `@loader` named after the source \
+                 instead",
+            ),
+        },
+        SourcesDocumentTestCase {
+            description: "an ingestr block on a source is a removed integration",
+            document: sources(vec![
+                ("name", text("orders")),
+                (
+                    "ingestr",
+                    map(vec![("source_table", text("public.orders"))]),
+                ),
+            ]),
+            expected_sources: parse_error(
+                "/project/sources/shop.yml source 'orders' declares an ingestr integration, \
+                 which SQLBuild no longer supports; declare the source with `managed: true` and \
+                 load it with a Python `@loader` named after the source instead",
+            ),
         },
         SourcesDocumentTestCase {
             description: "final reads a table through its deduplicating form",
@@ -94,24 +106,6 @@ fn given_sources_documents_when_parsing_then_matches_python_sources_and_errors()
             ]),
             expected_sources: parse_error(
                 "/project/sources/shop.yml source freshness type and filter require column or query",
-            ),
-        },
-        SourcesDocumentTestCase {
-            description: "a dlt resource with write_strategy",
-            document: dlt_group(vec![
-                ("type", text("filesystem")),
-                ("config", map(vec![("bucket_url", text("s3://orders"))])),
-                (
-                    "resources",
-                    Node::List(vec![map(vec![
-                        ("name", text("orders")),
-                        ("write_strategy", text("append")),
-                    ])]),
-                ),
-            ]),
-            expected_sources: parse_error(
-                "/project/sources/shop.yml dlt resource 'orders' must use dlt write_disposition, \
-                 not write_strategy",
             ),
         },
     ];

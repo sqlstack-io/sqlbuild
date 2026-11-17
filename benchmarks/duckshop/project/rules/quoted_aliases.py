@@ -29,6 +29,7 @@ def mixed_case_names_stay_in_exports(*, model: Model, ctx: RuleContext) -> list[
         findings.append(
             ctx.finding(
                 subject=model,
+                node=node,
                 message=f"Quoted mixed-case name {node.name!r} in `{text}`",
             )
         )

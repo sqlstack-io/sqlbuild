@@ -16,16 +16,13 @@ from sqlbuild._native import (
     TargetConfig,
     resolve_loader_defaults,
     select_load_entries,
-    select_load_reference_entries,
 )
 from tests.unit.src.sqlbuild.cli.commands._helpers.load_selection._test_types import (
     LoaderDefaultResolutionTestCase,
     LoaderDestinationSelectionTestCase,
-    LoadReferenceSelectionTestCase,
     LoadSelectionTestCase,
 )
 from tests.unit.src.sqlbuild.cli.commands._helpers.load_selection.helpers import (
-    build_integration_load_selection_inputs,
     build_load_selection_inputs,
 )
 
@@ -63,37 +60,6 @@ def test_given_load_selector_when_selecting_then_returns_expected_source_entries
         tuple(entry.meta.get("sqlbuild_loader_node") is True for entry in entries)
         == test_case.expected_loader_node_flags
     )
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        LoadReferenceSelectionTestCase(
-            description="integration terminal loader is selected, not reference-only",
-            select=("raw_orders",),
-            expected_entry_names=(),
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_integration_loader_selected_when_selecting_references_then_returns_no_terminal_ref(
-    test_case: LoadReferenceSelectionTestCase,
-) -> None:
-    discovered_inputs: DiscoveredProjectInputs = build_integration_load_selection_inputs()
-    selected_entries: tuple[SourceEntry, ...] = select_load_entries(
-        discovered_inputs=discovered_inputs,
-        select=test_case.select,
-        exclude=(),
-        target_config=None,
-    )
-
-    reference_entries: tuple[SourceEntry, ...] = select_load_reference_entries(
-        discovered_inputs=discovered_inputs,
-        selected_sources=selected_entries,
-        target_config=None,
-    )
-
-    assert tuple(entry.name for entry in reference_entries) == test_case.expected_entry_names
 
 
 @pytest.mark.parametrize(

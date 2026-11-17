@@ -123,8 +123,6 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [Overview](integrations/dagster.md) (`integrations/dagster`) - Orchestrate SQLBuild pipelines with Dagster scheduling, retries, and asset UI.
 - [API Reference](integrations/dagster-reference.md) (`integrations/dagster-reference`) - Dagster integration classes, decorators, and translator hooks.
 - [Rivers](integrations/rivers.md) (`integrations/rivers`) - Orchestrate SQLBuild pipelines with Rivers scheduling, jobs, and asset tracking.
-- [dlt](integrations/dlt.md) (`integrations/dlt`) - Declarative dlt sources in YAML, or full dlt pipelines inside Python source loaders.
-- [ingestr](integrations/ingestr.md) (`integrations/ingestr`) - Declarative data ingestion from 50+ sources using ingestr.
 
 ## Reference
 

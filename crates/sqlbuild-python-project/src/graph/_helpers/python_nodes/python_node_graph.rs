@@ -64,7 +64,6 @@ fn kind_metadata<'py>(
                     "unique_key",
                     "columns",
                     "contract",
-                    "connection_mode",
                 ],
             )?,
         ),

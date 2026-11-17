@@ -25,6 +25,8 @@ use crate::type_system::models::TypeNormalization;
 
 /// Each body's type, by the probe that typed it, so a macro is typed once per process.
 static BODY_TYPES: OnceLock<Mutex<HashMap<String, BodyType>>> = OnceLock::new();
+/// `returns` verdicts by dialect, adapter, definition and body, so each is probed once per process.
+static RETURNS_MISMATCHES: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
 /// Each body's first type error, by the probe that found it.
 static TYPE_ERRORS: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
 
@@ -159,6 +161,31 @@ fn remembered<T: Clone>(
     verdict
 }
 
+/// The body's known type when it is not `returns`, typed over stand-in arguments.
+fn returns_mismatch(
+    (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
+    body: &ExpandedText,
+    (returns, adapter): (&str, &str),
+) -> Option<String> {
+    let (probe, table) = body_probe((parser, definition), body, false)?;
+    let key: String = format!("returns\n{}\n{table:?}\n{probe}", parser.name());
+    let body_type: BodyType = remembered(&BODY_TYPES, key, || {
+        inferred_body_type(parser, &probe, &table)
+    });
+    let (shown, wrong): (String, bool) = match body_type {
+        BodyType::Unknown => return None,
+        BodyType::Known(inferred) if inferred.eq_ignore_ascii_case(INFERRED_TEXT_TYPE) => (
+            VARCHAR_TYPE.to_owned(),
+            disagrees(returns, VARCHAR_TYPE, adapter),
+        ),
+        BodyType::Known(inferred) => {
+            let wrong: bool = disagrees(returns, &inferred, adapter);
+            (inferred, wrong)
+        }
+    };
+    wrong.then_some(shown)
+}
+
 /// Rejects an expression macro whose body's known type is not its declared `returns`.
 pub(crate) fn check_body_returns(
     (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
@@ -171,27 +198,13 @@ pub(crate) fn check_body_returns(
     let Some(returns) = definition.returns.as_deref() else {
         return Ok(());
     };
-    let Some((probe, table)) = body_probe((parser, definition), body, false) else {
-        return Ok(());
-    };
-    let key: String = format!("returns\n{}\n{table:?}\n{probe}", parser.name());
-    let body_type: BodyType = remembered(&BODY_TYPES, key, || {
-        inferred_body_type(parser, &probe, &table)
+    let key: String = format!("{}\n{adapter}\n{definition:?}\n{body:?}", parser.name());
+    let mismatch: Option<String> = remembered(&RETURNS_MISMATCHES, key, || {
+        returns_mismatch((parser, definition), body, (returns, adapter))
     });
-    let (shown, wrong): (String, bool) = match body_type {
-        BodyType::Unknown => return Ok(()),
-        BodyType::Known(inferred) if inferred.eq_ignore_ascii_case(INFERRED_TEXT_TYPE) => (
-            VARCHAR_TYPE.to_owned(),
-            disagrees(returns, VARCHAR_TYPE, adapter),
-        ),
-        BodyType::Known(inferred) => {
-            let wrong: bool = disagrees(returns, &inferred, adapter);
-            (inferred, wrong)
-        }
-    };
-    if !wrong {
+    let Some(shown) = mismatch else {
         return Ok(());
-    }
+    };
     Err(SqlMacroError::new(
         RETURNS_MISMATCH_CODE,
         format!(

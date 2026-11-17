@@ -216,9 +216,7 @@
 					"docs/integrations/dagster-reference"
 				]
 			},
-			"docs/integrations/rivers",
-			"docs/integrations/dlt",
-			"docs/integrations/ingestr"
+			"docs/integrations/rivers"
 		]
 	},
 	{

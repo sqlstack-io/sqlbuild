@@ -140,51 +140,6 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::ThirdParty,
     },
     HostEntry {
-        name: "DLT_INTEGRATION_KIND",
-        kind: HostKind::Value,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
-        name: "DltIntegrationError",
-        kind: HostKind::Exception,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
-        name: "dlt_loader_function",
-        kind: HostKind::Function,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
-        name: "DltResourceConfig",
-        kind: HostKind::Class,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
-        name: "DltSourceConfig",
-        kind: HostKind::Class,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
-        name: "INGESTR_INTEGRATION_KIND",
-        kind: HostKind::Value,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
-        name: "IngestrIntegrationError",
-        kind: HostKind::Exception,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
-        name: "ingestr_loader_function",
-        kind: HostKind::Function,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
-        name: "IngestrSourceConfig",
-        kind: HostKind::Class,
-        edge: HostEdge::ThirdParty,
-    },
-    HostEntry {
         name: "RIVERS_ASSET_NODE_KINDS",
         kind: HostKind::Value,
         edge: HostEdge::ThirdParty,

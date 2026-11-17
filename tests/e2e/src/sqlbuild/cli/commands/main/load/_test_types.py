@@ -108,20 +108,6 @@ class SourceLoaderErrorE2ETestCase:
 
 
 @dataclass(frozen=True)
-class DltSqlDatabaseE2ETestCase:
-    description: str
-    expected_loaded_rows: tuple[tuple[object, ...], ...]
-    expected_model_rows: tuple[tuple[object, ...], ...]
-
-
-@dataclass(frozen=True)
-class DltLocalSourceE2ETestCase:
-    description: str
-    expected_loaded_rows: tuple[tuple[object, ...], ...]
-    expected_model_rows: tuple[tuple[object, ...], ...]
-
-
-@dataclass(frozen=True)
 class LoaderRelationGuardE2ETestCase:
     description: str
     enforce_explicit: bool

@@ -83,15 +83,6 @@ pub(crate) fn build_source_load_entries<'py>(
             kinds.getattr(if intermediate { "LOADER" } else { "SOURCE" })?,
         )?;
         kwargs.set_item("is_reload", is_reload)?;
-        let integration = native_field(&entry, "integration_loader")?;
-        kwargs.set_item(
-            "integration_kind",
-            if integration.is_none() {
-                py.None().into_bound(py)
-            } else {
-                native_field(&integration, "kind")?
-            },
-        )?;
         entries.push(new_record(
             py,
             RecordId::SourceLoadPlanEntry,

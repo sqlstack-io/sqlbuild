@@ -18,19 +18,12 @@ pub struct ModelFact {
     pub local_declarations: Vec<NamedPath>,
 }
 
-/// One declarative integration loader a source names.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IntegrationLoaderFact {
-    pub kind: String,
-}
-
 /// One source entry of a source YAML file.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SourceFact {
     pub name: String,
     pub managed: bool,
     pub loader: Option<String>,
-    pub integration_loader: Option<IntegrationLoaderFact>,
 }
 
 /// A source YAML file and its entries.

@@ -110,7 +110,7 @@ SQLite stores values by type affinity, so SQLBuild keeps column types explicitly
 | `sqb diff`, `sqb clone` | Supported; clones are physical copies |
 | Scenarios, `sqb scenario capture`, `--local` replay | Supported; see below |
 | Statement time limits | Connection interrupt |
-| `sqb load`: Python, dlt and ingestr loaders | Supported; dlt writes through its `sqlalchemy` destination |
+| `sqb load`: Python loaders | Supported |
 
 ## Scenarios
 

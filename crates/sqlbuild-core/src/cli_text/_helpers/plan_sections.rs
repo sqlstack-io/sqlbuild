@@ -258,11 +258,10 @@ pub(crate) fn python_entry_lines(
 }
 
 fn source_load_label(entry: &SourceLoadPlanText) -> String {
-    let strategy: String = match (&entry.integration_kind, &entry.write_strategy) {
-        (Some(kind), _) => format!("external ({kind})"),
-        (None, Some(strategy)) => strategy.clone(),
-        (None, None) => "self-managed".to_owned(),
-    };
+    let strategy: String = entry
+        .write_strategy
+        .clone()
+        .unwrap_or_else(|| "self-managed".to_owned());
     let mut details: Vec<String> = Vec::new();
     if let Some(column) = &entry.cursor_column {
         details.push(format!("cursor: {column}"));

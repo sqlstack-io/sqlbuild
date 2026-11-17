@@ -218,7 +218,6 @@ crates/sqlbuild-python-base/src/frontier/models.rs	FutureCursorAction.name
 crates/sqlbuild-python-base/src/frontier/models.rs	GrantKind.name
 crates/sqlbuild-python-base/src/frontier/models.rs	HardCodedRelationOwnerKind.name
 crates/sqlbuild-python-base/src/frontier/models.rs	InferredNullability.name
-crates/sqlbuild-python-base/src/frontier/models.rs	LoaderConnectionMode.name
 crates/sqlbuild-python-base/src/frontier/models.rs	MaterializationType.name
 crates/sqlbuild-python-base/src/frontier/models.rs	MicrobatchLimitAction.name
 crates/sqlbuild-python-base/src/frontier/models.rs	MissingMigrationOriginPolicy.name

@@ -18,7 +18,6 @@ from sqlbuild._native import (
     DiscoveredProvider,
     DiscoveredPythonNode,
     DiscoveredTaskFunction,
-    LoaderConnectionMode,
     LocalConfig,
     ProjectConfig,
     PythonNodeGraph,
@@ -284,7 +283,6 @@ def test_given_fully_configured_python_nodes_when_building_then_identity_config_
                     unique_key=("event_id",),
                     columns=columns,
                     contract="enforced",
-                    connection_mode=LoaderConnectionMode.EXTERNAL,
                 ),
             ),
             task_functions=(

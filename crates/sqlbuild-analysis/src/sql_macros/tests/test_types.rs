@@ -22,6 +22,13 @@ pub(super) struct ExpansionErrorTestCase {
     pub(super) expected_message: &'static str,
 }
 
+pub(super) struct ReturnsSequenceTestCase {
+    pub(super) description: &'static str,
+    pub(super) definitions: &'static [(&'static str, &'static str)],
+    pub(super) sql: &'static str,
+    pub(super) expected_codes: &'static [Option<&'static str>],
+}
+
 pub(super) struct DefinitionErrorTestCase {
     pub(super) description: &'static str,
     pub(super) source: &'static str,

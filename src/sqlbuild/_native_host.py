@@ -748,24 +748,6 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "render_selected_dbt_profile_output",
     ),
     "DbtProfileError": ("sqlbuild.integrations.dbt.exceptions", "DbtProfileError"),
-    "DLT_INTEGRATION_KIND": ("sqlbuild.integrations.dlt.constants", "DLT_INTEGRATION_KIND"),
-    "DltIntegrationError": ("sqlbuild.integrations.dlt.exceptions", "DltIntegrationError"),
-    "dlt_loader_function": ("sqlbuild.integrations.dlt.main._loaders", "dlt_loader_function"),
-    "DltResourceConfig": ("sqlbuild.integrations.dlt.models", "DltResourceConfig"),
-    "DltSourceConfig": ("sqlbuild.integrations.dlt.models", "DltSourceConfig"),
-    "INGESTR_INTEGRATION_KIND": (
-        "sqlbuild.integrations.ingestr.constants",
-        "INGESTR_INTEGRATION_KIND",
-    ),
-    "IngestrIntegrationError": (
-        "sqlbuild.integrations.ingestr.exceptions",
-        "IngestrIntegrationError",
-    ),
-    "ingestr_loader_function": (
-        "sqlbuild.integrations.ingestr.main._loaders",
-        "ingestr_loader_function",
-    ),
-    "IngestrSourceConfig": ("sqlbuild.integrations.ingestr.models", "IngestrSourceConfig"),
     "RIVERS_ASSET_NODE_KINDS": (
         "sqlbuild.integrations.rivers.constants",
         "RIVERS_ASSET_NODE_KINDS",
