@@ -40,7 +40,7 @@ pub(crate) const UNKNOWN_PATH_CODE: &str = "S009";
 pub(crate) const UNMAPPED_KIND_CODE: &str = "S010";
 pub(crate) const PATH_ROOT_CODE: &str = "S012";
 pub(crate) const UNIT_TEST_CODE: &str = "S013";
-pub(crate) const PLANNER_DEFAULT_CODE: &str = "S000";
+pub const PLANNER_DEFAULT_CODE: &str = "S000";
 pub(crate) const PATH_ROOT_ERROR: &str =
     "path selectors require an explicit root: use 'models/' or 'python/'";
 pub(crate) const UNIT_TEST_ONLY_TEST_AND_BUILD: &str =

@@ -4,6 +4,7 @@ use crate::graph::main::build_project_graph::build_project_graph;
 use crate::graph::models::{GraphResource, ProjectGraph};
 use crate::python_selection::main::published_python_graph::published_python_graph;
 use crate::python_selection::main::python_node_graph_indexes::python_node_graph_indexes;
+use crate::python_selection::main::python_sql_graph_error::python_sql_graph_error;
 use crate::python_selection::main::resolve_python_node_excludes::resolve_python_node_excludes;
 use crate::python_selection::main::resolve_python_node_selectors::resolve_python_node_selectors;
 use crate::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
@@ -350,4 +351,25 @@ pub(super) fn expected_round_trip(
     expected
         .map(|(keys, names)| (keys.iter().map(key).collect(), owned(names)))
         .map_err(|(code, message, help)| (code.to_owned(), message.to_owned(), help.to_owned()))
+}
+
+/// The whole-graph error of a round-trip project, when it has one; the loader fills its source only when `filled`.
+pub(super) fn round_trip_graph_error(
+    nodes: &[RoundTripNodeSpec],
+    (filled, allow_warehouse_round_trips): (bool, bool),
+) -> Option<String> {
+    let graph: ProjectGraph = round_trip_sql_graph();
+    let sources: Vec<(String, Option<String>)> = vec![(
+        "partner_scores".to_owned(),
+        filled.then(|| "partner_scores".to_owned()),
+    )];
+    python_sql_graph_error(
+        SqlSelectionGraph {
+            graph: &graph,
+            sources: &sources,
+            allow_warehouse_round_trips,
+        },
+        &round_trip_python_graph(nodes),
+    )
+    .map(|error| error.message)
 }

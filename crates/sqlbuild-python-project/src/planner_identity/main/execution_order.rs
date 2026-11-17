@@ -13,6 +13,14 @@ pub fn execution_order(
     upstream: &[(ObjectKey, Vec<ObjectKey>)],
     origins: &[((ObjectKey, ObjectKey), String)],
 ) -> PyResult<Vec<ObjectKey>> {
+    ordered_keys(upstream, origins).map_err(|message| planner_input_error(py, message))
+}
+
+/// The execution order of `upstream`, or the cycle that prevents one.
+pub(crate) fn ordered_keys(
+    upstream: &[(ObjectKey, Vec<ObjectKey>)],
+    origins: &[((ObjectKey, ObjectKey), String)],
+) -> Result<Vec<ObjectKey>, String> {
     let key = |(kind, name): &ObjectKey| GraphKey {
         kind: kind.clone(),
         name: name.clone(),
@@ -25,8 +33,7 @@ pub fn execution_order(
         .iter()
         .map(|((gated, read), origin)| ((key(gated), key(read)), origin.clone()))
         .collect();
-    Ok(topological_order(&edges, &origins)
-        .map_err(|message| planner_input_error(py, message))?
+    Ok(topological_order(&edges, &origins)?
         .into_iter()
         .map(|key| (key.kind, key.name))
         .collect())

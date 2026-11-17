@@ -1450,3 +1450,14 @@ class JobGroupCyclesCase:
     description: str
     fixed_group_toml: str
     expected_messages: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class GraphBoundaryCompileTestCase:
+    """A round-trip project edited into a graph every plan refuses, and what compile reports."""
+
+    description: str
+    project_settings: str
+    edited_files: dict[str, str]
+    expected_exit_code: int
+    expected_output_fragments: tuple[str, ...]

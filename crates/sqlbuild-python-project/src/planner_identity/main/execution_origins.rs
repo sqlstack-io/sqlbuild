@@ -6,6 +6,7 @@ use crate::graph::models::NativeProjectGraph;
 use crate::planner_identity::_helpers::graph::hook_label;
 use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
 use crate::references::models::{GateRow, HookRow};
+use crate::references::types::ExecutionGates;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::edge_keys::edge_keys;
@@ -16,6 +17,14 @@ use std::collections::HashSet;
 /// Injected-edge descriptions remain native for cycle and buildability diagnostics.
 pub fn execution_origins(
     project: &Bound<'_, PyAny>,
+) -> PyResult<Vec<((ObjectKey, ObjectKey), String)>> {
+    execution_origins_with(project, &native_execution_gate_edges(project)?)
+}
+
+/// [`execution_origins`] over gate edges already computed for this project.
+pub fn execution_origins_with(
+    project: &Bound<'_, PyAny>,
+    (gates, hooks): &ExecutionGates,
 ) -> PyResult<Vec<((ObjectKey, ObjectKey), String)>> {
     let mut origins: Vec<((ObjectKey, ObjectKey), String)> = Vec::new();
     for test in sql_tests(project)?.try_iter()? {
@@ -31,7 +40,6 @@ pub fn execution_origins(
             ));
         }
     }
-    let (gates, hooks): (Vec<GateRow>, Vec<HookRow>) = native_execution_gate_edges(project)?;
     let lineage = native_field(project, "lineage_graph")?;
     let lineage = lineage.cast::<NativeProjectGraph>()?.borrow();
     let is_lineage = |gated: &ObjectKey, read: &ObjectKey| {
@@ -43,7 +51,7 @@ pub fn execution_origins(
         target,
         gated,
         read,
-    } in &gates
+    } in gates
     {
         if is_lineage(gated, read) || !seen.insert((gated.clone(), read.clone())) {
             continue;
@@ -59,7 +67,7 @@ pub fn execution_origins(
         read,
         hook_type: kind,
         ..
-    } in &hooks
+    } in hooks
     {
         if is_lineage(gated, read) || !seen.insert((gated.clone(), read.clone())) {
             continue;
