@@ -53,6 +53,7 @@ _CURSOR_BATCH_BRANCH: re.Pattern[str] = re.compile(
     r"^SELECT (?P<read>\d+) AS _read, (?P<select>.*?)(?:\s+FROM\s+(?P<relation>[^\s()]+))?$",
     re.IGNORECASE | re.DOTALL,
 )
+_DESCRIBE_PATTERN: re.Pattern[str] = re.compile(r"\) AS __describe_source LIMIT 0$")
 _ANY_PATTERN: re.Pattern[str] = re.compile(r"")
 _CURRENT_DATABASE_PATTERN: re.Pattern[str] = re.compile(r"^SELECT CURRENT_DATABASE\(\)$")
 _USE_DATABASE_PATTERN: re.Pattern[str] = re.compile(
@@ -329,6 +330,7 @@ class RecordingSnowflakeWarehouse:
             (_SHOW_COLUMNS_PATTERN, self._answer_show_columns),
             (_SHOW_SCHEMA_RELATIONS_PATTERN, self._answer_show_schema_relations),
             (_SHOW_SCHEMA_COLUMNS_PATTERN, self._answer_show_schema_columns),
+            (_DESCRIBE_PATTERN, self._answer_describe),
             (_CURSOR_BATCH_PATTERN, self._answer_cursor_batch),
             (_CURSOR_BOUND_PATTERN, self._answer_cursor_bounds),
             (_CURRENT_DATABASE_PATTERN, self._answer_current_database),
@@ -516,6 +518,16 @@ class RecordingSnowflakeWarehouse:
             compress(self.cursor_values, (marker in select_list for marker in _BOUND_MARKERS))
         )
         return [values], tuple((f"_{index}",) for index in range(len(values)))
+
+    def _answer_describe(
+        self, *, sql: str, params: tuple[object, ...]
+    ) -> tuple[list[tuple[Any, ...]], Any]:
+        """A query's columns, named as Snowflake folds unquoted identifiers, and no rows."""
+
+        del params
+        with self._lock:
+            description: Any = self._database.execute(sql).description
+        return [], tuple((str(column[0]).upper(),) for column in description)
 
     def _answer_cursor_batch(
         self, *, sql: str, params: tuple[object, ...]
