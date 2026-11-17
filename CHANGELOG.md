@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.238.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.237.0...v0.238.0) (2026-11-17)
+
+
+### Features
+
+* **rules:** give syntax tree nodes names, literal values and source extents ([#1544](https://github.com/sqlstack-io/sqlbuild/issues/1544)) ([b318adc](https://github.com/sqlstack-io/sqlbuild/commit/b318adc07f2e08ced440b64747786348432e6b5a))
+
 ## [0.237.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.4...v0.237.0) (2026-11-17)
 
 
