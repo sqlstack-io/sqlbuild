@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { planHref } from '$lib/run/command';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import CopyButton from '$lib/components/copy-button.svelte';
@@ -79,6 +80,10 @@
 					<a href={to(`/changes`)} title="Project version {p.snapshotGeneration}{p.gitRevision ? `, commit ${p.gitRevision}` : ''}{p.gitDirty ? ' with uncommitted changes' : ''}">version {p.snapshotGeneration}</a>
 				{/if}
 				<Button variant="link" size="inline" class="ml-2.5" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Version, command, image, worker and other technical details">{view.showDetails ? 'Hide details' : 'Details'}</Button>
+				{#if run.jobKey}
+					<!-- The plan the run made is printed in its log (Show printed output); the plan page plans the same build on today's state, in full. -->
+					<a class="plan-link" href={to(planHref(run.narrowing?.select ?? [], 'build', { job: run.jobKey, exclude: run.narrowing?.exclude ?? [] }))} title="Plan this build of {run.jobKey} on the current state, section by section; the run's own plan is in its printed output" data-testid="run-plan-link">Plan it now</a>
+				{/if}
 			</div>
 			{#if view.detail?.provenance?.command}
 				{@const command = view.detail.provenance.command}
@@ -245,5 +250,13 @@
 		margin-top: 6px;
 		color: var(--muted-foreground);
 		font-size: 12.5px;
+	}
+	.plan-link {
+		margin-left: 10px;
+		color: var(--primary);
+		font-size: 12.5px;
+	}
+	.plan-link:hover {
+		text-decoration: underline;
 	}
 </style>

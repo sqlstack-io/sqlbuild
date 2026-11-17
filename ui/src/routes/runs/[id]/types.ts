@@ -3,7 +3,7 @@ import type { RunNode, RunNodeStatus } from '$lib/api';
 export type BottomTab = 'log' | 'statements' | 'cost';
 
 /** The node panel's groups, in display order. */
-export type NodeGroupKey = 'running' | 'failed' | 'skipped' | 'succeeded' | 'not_run';
+export type NodeGroupKey = 'running' | 'waiting' | 'failed' | 'skipped' | 'succeeded' | 'not_run';
 export type NodeGroup = { key: NodeGroupKey; label: string; tone: string; statuses: RunNodeStatus[]; nodes: RunNode[] };
 
 /** Event categories for the Events tab filter. */

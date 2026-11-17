@@ -3,22 +3,26 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import type { RunNode } from '$lib/api';
-	import { shortRunId } from '$lib/operate/labels';
+	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { RunDetailState } from './state.svelte';
 	import type { NodeGroupKey } from './types';
-	import { formatSpan, groupNodes, notRunReason } from './utils';
+	import { formatSpan, notRunReason } from './utils';
 
 	let { view }: { view: RunDetailState } = $props();
 
-	const groups = $derived(groupNodes(view.nodes));
-	// Small runs show every node; large ones start with the successes folded away.
+	/** The most nodes a run may have for this panel to list them all. */
+	const LIST_MAX = 40;
+
+	const groups = $derived(view.nodeGroups);
+	/**
+	 * A small run lists every node here. A large one's timeline already lists them, so here it is a summary:
+	 * each outcome's count, which narrows the timeline to it, with only the failed and skipped nodes listed,
+	 * as each says why.
+	 */
+	const summary = $derived(view.nodes.length > LIST_MAX);
+	const LISTED_IN_SUMMARY: NodeGroupKey[] = ['failed', 'skipped'];
 	let closed = $state<Set<NodeGroupKey>>(new Set());
-	let folded = false;
-	$effect(() => {
-		if (folded || !view.nodes.length) return;
-		folded = true;
-		if (view.nodes.length > 40) closed = new Set(['succeeded']);
-	});
+	const open = (key: NodeGroupKey) => (summary ? LISTED_IN_SUMMARY.includes(key) : !closed.has(key));
 	const took = (n: RunNode) => (n.startedAt && n.endedAt ? formatSpan((Date.parse(n.endedAt) - Date.parse(n.startedAt)) / 1000) : null);
 
 	function toggle(key: NodeGroupKey) {
@@ -38,17 +42,24 @@
 <div class="panel sb-scroll" aria-label="Nodes by outcome">
 	{#each groups as g (g.key)}
 		<section>
-			<!-- raw-button: the sticky header of an outcome group, clickable as a whole to fold it -->
-			<button class="group" onclick={() => toggle(g.key)} aria-expanded={!closed.has(g.key)}>
-				<i style:background={g.tone}></i>{g.label}<b>{g.nodes.length}</b><ChevronRightIcon size={13} class="caret {closed.has(g.key) ? '' : 'open'}" />
-			</button>
-			{#if !closed.has(g.key)}
+			{#if summary}
+				<!-- raw-button: an outcome's count in the summary; it narrows the timeline to that outcome's nodes -->
+				<button class="group" class:picked={view.statusFilter === g.key} data-group={g.key} onclick={() => view.filterStatus(g.key)} aria-pressed={view.statusFilter === g.key} title="Show only these on the timeline">
+					<i style:background={g.tone}></i>{g.label}<b>{g.nodes.length}</b>
+				</button>
+			{:else}
+				<!-- raw-button: the sticky header of an outcome group, clickable as a whole to fold it -->
+				<button class="group" data-group={g.key} onclick={() => toggle(g.key)} aria-expanded={!closed.has(g.key)}>
+					<i style:background={g.tone}></i>{g.label}<b>{g.nodes.length}</b><ChevronRightIcon size={13} class="caret {closed.has(g.key) ? '' : 'open'}" />
+				</button>
+			{/if}
+			{#if open(g.key)}
 				<ul>
 					{#each g.nodes as n (`${n.runId}/${n.nodeKey}`)}
 						<li class:sel={view.selected.includes(n.nodeKey)}>
 							<!-- raw-button: a row of the node list; it filters the tabs below to that node -->
 							<button class="node" onclick={(e) => pick(e, n)} title="Click to filter below; Ctrl- or Cmd-click to add to the selection">
-								<span class="mono">{n.nodeKey}</span>
+								<span class="mono" title={n.nodeKey}>{nodeLabel(n.nodeKey)}</span>
 								{#if n.status === 'warn'}<span class="sb-tag warn">warnings</span>{/if}
 								{#if took(n)}<span class="took">{took(n)}</span>{/if}
 							</button>
@@ -63,8 +74,8 @@
 									{/if}
 									failed{#if why.runId !== n.runId}&nbsp;in {why.jobKey ?? shortRunId(why.runId)}{/if}
 								</div>
-							{:else if notRunReason(n)}
-								<div class="why" title={n.status === 'not_run' ? 'The run ended before this node started' : undefined}>{notRunReason(n)}</div>
+							{:else if n.status !== 'pending' && notRunReason(n, view.active)}
+								<div class="why" title={n.status === 'not_run' ? 'The run ended before this node started' : undefined}>{notRunReason(n, view.active)}</div>
 							{/if}
 						</li>
 					{/each}
@@ -103,6 +114,10 @@
 		background: var(--background);
 		font-weight: 500;
 		text-align: left;
+	}
+	.group.picked {
+		background: color-mix(in srgb, var(--primary) 12%, var(--background));
+		box-shadow: inset 2px 0 0 var(--primary);
 	}
 	.group i {
 		width: 8px;
