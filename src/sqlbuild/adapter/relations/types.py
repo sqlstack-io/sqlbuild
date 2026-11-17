@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
     from sqlbuild.adapter.relations.models import SchemaColumnListing, SchemaRelationListing
 
@@ -66,6 +68,23 @@ class SchemaScopedMetadataReader(Protocol):
 
     def metadata_name_key(self, name: str) -> str:
         """Return the stored metadata name a logical identifier filter matches."""
+        ...
+
+
+@runtime_checkable
+class PartedRelationListingReader(Protocol):
+    """Schema-scoped reader whose relation listing is independent reads that may run together."""
+
+    def relation_listing_reads(
+        self, *, connection: Any, database: str | None, schema: str
+    ) -> tuple[Callable[[], object], ...]:
+        """The reads ``read_schema_relation_listing`` runs one after another for one schema."""
+        ...
+
+    def relation_listing_from_reads(
+        self, *, database: str | None, schema: str, results: tuple[object, ...]
+    ) -> SchemaRelationListing:
+        """The schema's listing from its reads' results, in ``relation_listing_reads`` order."""
         ...
 
 

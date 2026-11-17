@@ -13,6 +13,7 @@ from sqlbuild.adapter.relations._helpers.relation_metadata_context import (
     current_relation_metadata_cache,
 )
 from sqlbuild.adapter.relations.classes.relation_metadata_cache import RelationMetadataCache
+from sqlbuild.adapter.relations.classes.remembered_flight import RememberedFlight
 from sqlbuild.adapter.relations.constants import (
     INSPECTION_DESCRIBED_NAME_LIMIT,
     INSPECTION_IN_LIST_LIMIT,
@@ -25,6 +26,7 @@ from sqlbuild.adapter.relations.models import (
     SchemaRelationListing,
 )
 from sqlbuild.adapter.relations.types import (
+    PartedRelationListingReader,
     RelationListingScoper,
     SchemaScopedMetadataReader,
     ViewDefinitionBatchReader,
@@ -50,19 +52,35 @@ class InspectionCatalog:
         self._capped_column_schemas: set[_SchemaKey] = set()
         self._remembered: dict[tuple[str, ...], object] = {}
         self._remember_lock: threading.Lock = threading.Lock()
+        self._in_flight: dict[tuple[str, ...], RememberedFlight] = {}
         self._relation_requests: dict[_RelationRequestKey, tuple[RelationInfo, ...]] = {}
         self._relation_columns: dict[_RelationIdentity, tuple[ColumnInfo, ...] | None] = {}
         self._view_definitions: dict[_RelationIdentity, str | None] = {}
 
     def remember[ValueT](self, *, key: tuple[str, ...], compute: Callable[[], ValueT]) -> ValueT:
-        """Compute one adapter-owned metadata fact at most once per planning invocation."""
+        """Compute one adapter-owned metadata fact at most once; concurrent callers share it."""
 
         with self._remember_lock:
             if key in self._remembered:
                 return cast(ValueT, self._remembered[key])
-        value: ValueT = compute()
+            flight: RememberedFlight | None = self._in_flight.get(key)
+            owner: bool = flight is None
+            if flight is None:
+                flight = RememberedFlight()
+                self._in_flight[key] = flight
+        if not owner:
+            return cast(ValueT, flight.wait())
+        try:
+            value: ValueT = compute()
+        except BaseException as error:
+            with self._remember_lock:
+                del self._in_flight[key]
+            flight.fail(error)
+            raise
         with self._remember_lock:
             self._remembered.setdefault(key, value)
+            del self._in_flight[key]
+        flight.succeed(value)
         return value
 
     @property
@@ -126,20 +144,72 @@ class InspectionCatalog:
             key: _SchemaKey = self._schema_key(database=database, schema=schema)
             if key not in self._relation_listings:
                 missing.setdefault(key, (database, schema))
-        listings: list[SchemaRelationListing | None] = run_bounded_inspections(
-            tasks=tuple(
-                self._bind_relation_listing(
-                    reader=reader, database=database, schema=schema, best_effort=best_effort
-                )
-                for database, schema in missing.values()
-            ),
-            concurrency=self._concurrency,
-        )
+        listings: list[SchemaRelationListing | None]
+        if isinstance(reader, PartedRelationListingReader) and (
+            current_relation_metadata_cache(adapter=self.adapter) is None
+        ):
+            listings = self._read_parted_listings(
+                reader=reader, scopes=tuple(missing.values()), best_effort=best_effort
+            )
+        else:
+            listings = run_bounded_inspections(
+                tasks=tuple(
+                    self._bind_relation_listing(
+                        reader=reader, database=database, schema=schema, best_effort=best_effort
+                    )
+                    for database, schema in missing.values()
+                ),
+                concurrency=self._concurrency,
+            )
         missing_key: _SchemaKey
         listing: SchemaRelationListing | None
         for missing_key, listing in zip(missing, listings, strict=True):
             if listing is not None:
                 self._relation_listings[missing_key] = listing
+
+    def _read_parted_listings(
+        self,
+        *,
+        reader: PartedRelationListingReader,
+        scopes: tuple[tuple[str | None, str], ...],
+        best_effort: bool,
+    ) -> list[SchemaRelationListing | None]:
+        """Run every schema's listing reads together; a best-effort failure loses its schema."""
+
+        parts: list[tuple[int, Callable[[], object]]] = []
+        failed: set[int] = set()
+        index: int
+        database: str | None
+        schema: str
+        for index, (database, schema) in enumerate(scopes):
+            try:
+                reads: tuple[Callable[[], object], ...] = reader.relation_listing_reads(
+                    connection=self.connection, database=database, schema=schema
+                )
+            except Exception:
+                if not best_effort:
+                    raise
+                failed.add(index)
+                continue
+            parts.extend((index, read) for read in reads)
+        results: list[object] = run_bounded_inspections(
+            tasks=tuple(_guarded_read(read=read, best_effort=best_effort) for _, read in parts),
+            concurrency=self._concurrency,
+        )
+        by_scope: dict[int, list[object]] = {}
+        result: object
+        for (index, _), result in zip(parts, results, strict=True):
+            if result is _FAILED_READ:
+                failed.add(index)
+            by_scope.setdefault(index, []).append(result)
+        return [
+            None
+            if index in failed
+            else reader.relation_listing_from_reads(
+                database=database, schema=schema, results=tuple(by_scope.get(index, ()))
+            )
+            for index, (database, schema) in enumerate(scopes)
+        ]
 
     def prefetch_view_definitions(
         self, *, requests: tuple[tuple[str | None, str, tuple[str, ...]], ...]
@@ -469,6 +539,23 @@ class InspectionCatalog:
             None if database is None else self._reader.metadata_name_key(database),
             self._reader.metadata_name_key(schema),
         )
+
+
+_FAILED_READ: object = object()
+
+
+def _guarded_read(*, read: Callable[[], object], best_effort: bool) -> Callable[[], object]:
+    """``read``, answering a failure with ``_FAILED_READ`` when the listing is best effort."""
+
+    def run() -> object:
+        try:
+            return read()
+        except Exception:
+            if best_effort:
+                return _FAILED_READ
+            raise
+
+    return run
 
 
 def _flatten_relations(chunks: list[tuple[RelationInfo, ...]]) -> tuple[RelationInfo, ...]:
