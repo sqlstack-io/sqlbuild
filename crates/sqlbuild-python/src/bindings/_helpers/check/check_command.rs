@@ -25,7 +25,6 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
-use sqlbuild_python_compile::compile_driver::main::setup::model_free_locations::model_free_locations;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
@@ -343,12 +342,12 @@ fn prepare<'py>(
         (&native_field(invocation, "connection_config")?, &adapter),
     )?;
     Ok(Prepared {
-        target_config,
         check_functions: PyTuple::new(py, check_functions)?.into_any(),
         lifecycle_plan,
         relation_targets,
         relation_refs,
-        defaults: model_free_locations(&project, |method| adapter.call_method0(method))?,
+        defaults: target_config.node_locations(&adapter)?,
+        target_config,
         project_relations: object(
             py,
             build_project_relation_targets(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
@@ -26,9 +27,11 @@ class DirectNodeResultStore(NodeResultStore):
         connection: Any,
         database: str | None,
         schema: str | None,
+        previous_locations: tuple[tuple[str | None, str | None], ...] = (),
     ) -> None:
         self.adapter: BaseAdapter = adapter
         self.connection: Any = connection
+        self.previous_locations: tuple[tuple[str | None, str | None], ...] = previous_locations
         super().__init__(database=database, schema=schema)
 
     def write(self, record: NodeResultRecord) -> None:
@@ -54,14 +57,34 @@ class DirectNodeResultStore(NodeResultStore):
         self._cache_record(record=record)
 
     def _read_persisted(self, *, query: NodeResultQuery) -> tuple[NodeResultEnvelope, ...]:
-        if self.schema is None:
+        """Read this store's location, then each earlier location until one has the node."""
+
+        results: tuple[NodeResultEnvelope, ...] = self._read_at(
+            database=self.database, schema=self.schema, query=query
+        )
+        location: tuple[str | None, str | None]
+        for location in self.previous_locations:
+            if results:
+                break
+            database, schema = location
+            results = self._read_at(
+                database=database,
+                schema=schema,
+                query=replace(query, target_database=database, target_schema=schema),
+            )
+        return results
+
+    def _read_at(
+        self, *, database: str | None, schema: str | None, query: NodeResultQuery
+    ) -> tuple[NodeResultEnvelope, ...]:
+        if schema is None:
             return ()
         return read_node_results(
             connection=self.connection,
             execute=self.adapter.execute,
             relation_exists=self.adapter.relation_exists,
-            database=self.database,
-            schema=self.schema,
+            database=database,
+            schema=schema,
             query=query,
             render_qualified_name=self.adapter.render_qualified_name,
         )

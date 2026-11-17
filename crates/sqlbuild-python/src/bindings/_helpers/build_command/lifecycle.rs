@@ -28,7 +28,6 @@ use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_key
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
-use sqlbuild_python_compile::compile_driver::main::setup::model_free_locations::model_free_locations;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
@@ -432,17 +431,15 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         )?),
     )
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
+    let target_config: TargetSettingsValues =
+        project_target_settings(&discovered, &project, (&connection_config, &adapter))?;
     let parts: RuntimeParts<'_, 'py> = RuntimeParts {
         adapter: &adapter,
         connection_config: &connection_config,
         project: &project,
         reload: context.request_flag("reload_sources")?,
-        defaults: model_free_locations(&project, |method| adapter.call_method0(method))?,
-        target_config: project_target_settings(
-            &discovered,
-            &project,
-            (&connection_config, &adapter),
-        )?,
+        defaults: target_config.node_locations(&adapter)?,
+        target_config,
         relations: (relation_targets, project_relations),
         inputs,
     };

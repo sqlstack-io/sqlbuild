@@ -283,6 +283,8 @@ class LoadRuntimeParams:
     vars: dict[str, object]
     is_reload: bool
     target_config: TargetSettings | None = None
+    default_database: str | None = None
+    default_schema: str | None = None
     runtime_dir: Path = Path("target")
     start_cursor_ts: datetime | None = None
     end_cursor_ts: datetime | None = None

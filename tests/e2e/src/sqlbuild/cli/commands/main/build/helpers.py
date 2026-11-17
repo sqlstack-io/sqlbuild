@@ -1489,3 +1489,46 @@ def changed_build_steps(warehouse: ChangedWarehouse) -> tuple[ChangedBuildStep, 
         ChangedBuildStep("after the plain build", (), {}, (CHANGED_ANY,)),
         ChangedBuildStep("full refresh", (), {}, (CHANGED_ANY, "--full-refresh")),
     )
+
+
+def node_result_source_yml(location: str) -> str:
+    """A managed `raw_orders` source at `location`, for node result location tests."""
+
+    return (
+        "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+        f"    managed: true\n{location}    write_strategy: table\n"
+        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+    )
+
+
+def node_result_project(*, tmp_path: Path, target_lines: str, files: dict[str, str]) -> Path:
+    """A DuckDB orders project whose `dev` target has `target_lines`, plus `files`."""
+
+    return prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="orders",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                f'[defaults]\ndatabase = "dev"\nschema = "mart"\n\n[targets.dev]\n{target_lines}'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n\n"
+                'SELECT order_id FROM __source("raw_orders")\n'
+            ),
+        }
+        | files,
+    )
+
+
+def node_results_in(*, db_path: Path, schema: str, node_type: str) -> list[tuple[str, str, str]]:
+    """`(node_name, run_id, payload_json_b64)` of one node type's results in `schema`."""
+
+    return query_duckdb(
+        db_path=db_path,
+        sql=(
+            f"SELECT node_name, run_id, payload_json_b64 FROM {schema}._sqlbuild_node_results "
+            f"WHERE node_type = '{node_type}' ORDER BY node_name"
+        ),
+    )

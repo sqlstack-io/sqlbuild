@@ -67,6 +67,7 @@ struct Invocation<'py> {
     selected: Vec<Bound<'py, PyAny>>,
     references: Vec<Bound<'py, PyAny>>,
     relation_sources: Vec<Bound<'py, PyAny>>,
+    defaults: LoaderDefaults<'py>,
     style: CliStyle,
     stream: Bound<'py, PyAny>,
 }
@@ -181,6 +182,7 @@ fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Inv
         selected,
         references,
         relation_sources: project.sources,
+        defaults,
         style: CliStyle { use_color },
         stream,
     })
@@ -394,6 +396,10 @@ fn runtime_params<'py>(
     let py: Python<'py> = request.py();
     let (target_name, effective_vars, run_id) = &preparation.runtime;
     let overrides: &Bound<'py, PyAny> = &preparation.cursor_overrides;
+    let defaults = (&invocation.defaults.database, &invocation.defaults.schema);
+    let (default_database, default_schema) = preparation
+        .target_config
+        .node_locations_from(defaults, &preparation.adapter)?;
     call_with(
         &host_entry(py, ExecutorHost::LoadRuntimeParams)?,
         &[
@@ -408,6 +414,8 @@ fn runtime_params<'py>(
             ("vars", effective_vars.clone()),
             ("is_reload", native_field(request, "reload")?),
             ("target_config", preparation.target_config.record(py)?),
+            ("default_database", default_database),
+            ("default_schema", default_schema),
             (
                 "start_cursor_ts",
                 cursor_timestamp(&native_field(overrides, "start_ts")?)?,
