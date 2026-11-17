@@ -34,6 +34,8 @@ pub const NULLABLE_COLUMNS: [&str; 4] = [
 pub const STARTED_PHASE: &str = "started";
 /// Phase of the rows appended after the write succeeded.
 pub const SUCCEEDED_PHASE: &str = "succeeded";
+/// Phase of the row appended when something other than a recorded build replaced the relation.
+pub const REPLACED_PHASE: &str = "replaced";
 /// Input kind of a source, versioned by its observed `data_version_hash`.
 pub const SOURCE_INPUT: &str = "source";
 /// Input kind of an upstream model or seed, versioned by its `execution_id`.
