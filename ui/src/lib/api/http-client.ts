@@ -16,7 +16,7 @@ import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './ht
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
 import { timelineOf } from './http-timeline';
-import { RUN_WINDOW, groupRunNodes, mergePlanPage, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
+import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
 import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
@@ -109,7 +109,6 @@ const CONNECTION_TEST_WAIT_MS = 60_000;
 /** How often the plan page asks for the location's plan; the server expires a plan after ten minutes. */
 const PLAN_POLL_MS = 750;
 /** Rows of each paged plan section loaded with the summary, as many as the plan report shows before "Show more". */
-const PLAN_FIRST_PAGE = 50;
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
 const AUDIT_PAGE = 100;
@@ -591,11 +590,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				if (outcome) {
 					const result = planResultOf(outcome);
 					if (!result.plan) return result;
-					let plan = result.plan;
-					for (const [section, total] of Object.entries(plan.pages ?? {}) as [PlanPageSection, number][]) {
-						if (total) plan = mergePlanPage(plan, section, await planRows(scope, requestId, section, 0, PLAN_FIRST_PAGE));
-					}
-					return { plan, error: null, requestId };
+					// The summary alone: the plan page loads a large section's rows a page at a time, when it is opened.
+					return { plan: result.plan, error: null, requestId };
 				}
 				if (Date.parse(data.expires_at) <= Date.now()) return { plan: null, error: 'The location did not plan the command in time; check that sqb location serve is running' };
 			}

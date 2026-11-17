@@ -4,6 +4,9 @@
 // with `?mock&large`. Pure apart from wrapping the client it is given.
 
 import type { ApiClient } from '../client';
+import type { PlanDocument, PlanPage, PlanResult } from '../types';
+import { largePlanDocument, planPage, planSummary } from './large-plan';
+import { recordPlanRows } from './plan-rows-log';
 import type { CatalogNode } from '../types';
 
 const LAYERS = [['sources'], ['seeds', 'orders'], ['customers', 'inventory'], ['payments', 'shipping'], ['returns', 'pricing'], ['suppliers', 'regions'], ['finance', 'marketing']];
@@ -32,11 +35,33 @@ export function largeProjectNodes(template: CatalogNode): CatalogNode[] {
 	return nodes;
 }
 
-/** The client with its catalog replaced by the large project. */
+/** The large plans planned so far, by request, for their pages. */
+const plans = new Map<string, PlanDocument>();
+
+/** The client with its catalog replaced by the large project, and a build planned as the large plan. */
 export function largeProject(client: ApiClient): ApiClient {
 	return new Proxy(client, {
 		get(target, prop, receiver) {
 			const value = Reflect.get(target, prop, receiver);
+			if (prop === 'planBuild') {
+				return async (...args: Parameters<ApiClient['planBuild']>): Promise<PlanResult> => {
+					const result = await target.planBuild(...args);
+					if (!result.plan) return result;
+					const doc = largePlanDocument(args[1].some((t) => t === '--changed' || t.startsWith('--changed=')));
+					const requestId = crypto.randomUUID();
+					plans.set(requestId, doc);
+					return { plan: planSummary(doc), error: null, requestId };
+				};
+			}
+			if (prop === 'planRows') {
+				return async (...[scope, requestId, section, offset, limit]: Parameters<ApiClient['planRows']>): Promise<PlanPage> => {
+					const doc = plans.get(requestId);
+					if (!doc) return target.planRows(scope, requestId, section, offset, limit);
+					recordPlanRows(section, offset, limit);
+					await new Promise((resolve) => setTimeout(resolve, 120));
+					return planPage(doc, section, offset, limit);
+				};
+			}
 			if (prop !== 'listCatalogNodes') return typeof value === 'function' ? value.bind(target) : value;
 			return async (...args: Parameters<ApiClient['listCatalogNodes']>) => {
 				const real = await target.listCatalogNodes(...args);

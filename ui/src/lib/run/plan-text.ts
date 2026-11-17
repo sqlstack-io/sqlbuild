@@ -57,9 +57,15 @@ export function loadedRows(plan: PlanDocument, section: PlanPageSection): number
 /** The names of every model the run builds, including routine ones a server summary has not loaded yet. */
 export const builtModelNames = (plan: PlanDocument): string[] => plan.built_model_names ?? builtModels(plan).map((m) => m.name);
 
+/** Each plan's `--changed` run nodes as a set, worked out once per plan: a large plan has thousands. */
+const runNodes = new WeakMap<PlanChanged, Set<string>>();
+
 /** Without `--changed` every planned node runs; with it, only those its decision runs. */
 function runsUnderChanged(plan: PlanDocument, key: string): boolean {
-	return !plan.changed || plan.changed.runs.some((r) => r.node === key);
+	if (!plan.changed) return true;
+	let nodes = runNodes.get(plan.changed);
+	if (!nodes) runNodes.set(plan.changed, (nodes = new Set(plan.changed.runs.map((r) => r.node))));
+	return nodes.has(key);
 }
 
 /** The seeds the run loads or reports on: under `--changed`, only those it runs. */

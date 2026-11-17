@@ -28,7 +28,7 @@
 	import { VERBS } from '$lib/run/command-table';
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
-	import PlanReport from '$lib/run/plan-report.svelte';
+	import PlanBrowser from '$lib/run/plan-browser.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { builtModelNames, builtSeeds, changedModelKeys, jobRefreshText, loadedRows } from '$lib/run/plan-text';
@@ -48,6 +48,8 @@
 	let cmdEl = $state<HTMLInputElement>();
 	/** The job this run belongs to; the command then only narrows it. */
 	let job = $state<string | null>(page.url.searchParams.get('job'));
+	/** The plan section shown, kept in the address with the command. */
+	let section = $state<string | null>(page.url.searchParams.get('section'));
 
 	const typed = $derived(parseCommand(cmd));
 	/** For a job run, an option still being typed is left out until it is finished. */
@@ -81,7 +83,7 @@
 
 	// The command stays in the address, so a plan can be shared or reopened.
 	$effect(() => {
-		const href = `/plan?cmd=${encodeURIComponent(cmd.trim())}${job ? `&job=${encodeURIComponent(job)}` : ''}`;
+		const href = `/plan?cmd=${encodeURIComponent(cmd.trim())}${job ? `&job=${encodeURIComponent(job)}` : ''}${section ? `&section=${encodeURIComponent(section)}` : ''}`;
 		const timer = setTimeout(() => {
 			if (appPath(page.url.pathname) === '/plan' && appPath(page.url.pathname) + page.url.search !== href) void goto(to(href), { replaceState: true, keepFocus: true, noScroll: true });
 		}, 400);
@@ -152,12 +154,12 @@
 		return () => clearTimeout(timer);
 	});
 	/** The next page of a large plan section, added to the plan shown. */
-	async function morePlan(section: PlanPageSection) {
+	async function morePlan(paged: PlanPageSection, limit: number) {
 		const scope = app.scope;
 		const requestId = planRequestId;
 		if (!scope || !plan || !requestId) return;
-		const page = await app.client.planRows(scope, requestId, section, loadedRows(plan, section));
-		if (planRequestId === requestId && plan) plan = mergePlanPage(plan, section, page);
+		const page = await app.client.planRows(scope, requestId, paged, loadedRows(plan, paged), limit);
+		if (planRequestId === requestId && plan) plan = mergePlanPage(plan, paged, page);
 	}
 	function replan() {
 		plannedKey = '';
@@ -309,6 +311,8 @@
 	];
 </script>
 
+<svelte:head><title>Plan · {cmd.trim() || 'sqb'}</title></svelte:head>
+
 <AppTopbar title="Plan" events={affectsPlan} />
 
 <div class="flex min-h-0 flex-1 flex-col">
@@ -394,7 +398,7 @@
 					{/snippet}
 				</DataTable>
 			{:else if shown?.verb === 'build' && plan}
-				<PlanReport {plan} {refresh} more={planRequestId ? morePlan : undefined} />
+				<PlanBrowser {plan} {refresh} {section} onselect={(key) => (section = key)} more={planRequestId ? morePlan : undefined} />
 			{:else if shown?.verb && shown.verb !== 'build'}
 				<DataTable class="static compact" embedded columns={nodeColumns} rows={picked} key={(key) => key} rowHeight={32} empty="No nodes selected.">
 					{#snippet row(key)}
