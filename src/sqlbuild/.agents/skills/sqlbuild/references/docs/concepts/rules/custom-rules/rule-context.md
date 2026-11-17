@@ -64,6 +64,9 @@ for star in sql.expanded.star_projections():
 text, not the model file. Authored SQL is the whole model file, including its `MODEL` header, so it
 does not parse as SQL; read its text through `source`.
 
+`ctx.finding(subject=model, node=node)` reports a node of that model's expanded SQL where it is in
+the model file. A node inside a macro's output is reported at the macro call.
+
 ## Declared enum types
 
 `ctx.columns.declared(model)` reports each declared column with its portable scalar type, so an
@@ -86,7 +89,7 @@ sql = ctx.sql.for_model(model).expanded
 for node in sql.ast().walk():
     if node.kind == "alias" and node.quoted and node.name != node.name.lower():
         start, end = node.span
-        return [ctx.finding(subject=model, message=sql.source[start:end])]
+        return [ctx.finding(subject=model, node=node, message=sql.source[start:end])]
 ```
 
 `ast()` returns a `document` node whose children are the statements. Every `SqlTreeNode` has a

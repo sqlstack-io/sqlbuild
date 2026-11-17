@@ -118,7 +118,7 @@ pub(crate) fn declaration(fact: &DeclarationFact) -> Declaration {
 }
 
 /// The expansion passes back to the authored query and where that query starts in the file.
-fn authored_query_map(facts: &CompiledModelFacts) -> Option<AuthoredQueryMap> {
+pub(crate) fn authored_query_map(facts: &CompiledModelFacts) -> Option<AuthoredQueryMap> {
     let span = |span: &CharSpan| ExpansionSpan {
         source_start: character_offset(span.source_start),
         source_end: character_offset(span.source_end),
@@ -151,7 +151,7 @@ fn character_offset(offset: usize) -> i64 {
 }
 
 /// The file-line characters before the query's first content that the query itself lacks.
-fn query_column_offset(file: &str, authored_query: &str, query: &str) -> u64 {
+pub(crate) fn query_column_offset(file: &str, authored_query: &str, query: &str) -> u64 {
     let line_prefix = |text: &str, at: usize| {
         text[..at]
             .rsplit('\n')
@@ -172,7 +172,7 @@ fn query_column_offset(file: &str, authored_query: &str, query: &str) -> u64 {
 }
 
 /// The lines of `file` above `query`, the rendered form of its `authored_query`; 0 if unknown.
-fn query_line_offset(file: &str, authored_query: &str, query: &str) -> u64 {
+pub(crate) fn query_line_offset(file: &str, authored_query: &str, query: &str) -> u64 {
     let leading_lines = |text: &str| {
         let body: &str = text.trim_start();
         text[..text.len() - body.len()].matches('\n').count()

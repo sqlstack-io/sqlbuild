@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use pyo3::prelude::{Bound, Py, PyAny, PyErr, PyResult, Python};
+use pyo3::exceptions::{PyAttributeError, PyValueError};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::sync::PyOnceLock;
 use pyo3::types::PyTuple;
 use pyo3::{IntoPyObject, pyclass, pymethods};
@@ -11,9 +12,12 @@ use sqlbuild_analysis::sql_tree::main::sql_tree_nodes::sql_tree_nodes;
 use sqlbuild_analysis::sql_tree::models::{
     NodeExtent, NodeLiteral, NodeName, SqlTreeNode as TreeNode,
 };
+use sqlbuild_rules::models::ModelQueryPlace;
+use sqlbuild_rules::query_facts::main::query_file_position::query_file_position;
 
 use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 
@@ -165,19 +169,26 @@ pub(crate) struct SqlDocument {
     #[pyo3(get)]
     source: String,
     dialect: String,
+    /// Where `source`, a model's expanded query, sits in the model file; `None` for other SQL.
+    place: Option<ModelQueryPlace>,
     tree: PyOnceLock<Arc<Tree>>,
 }
 
 #[pymethods]
 impl SqlDocument {
     #[new]
-    #[pyo3(signature = (*, source, dialect))]
-    fn new(source: String, dialect: String) -> Self {
-        Self {
+    #[pyo3(signature = (*, source, dialect, place=None))]
+    fn new(source: String, dialect: String, place: Option<&str>) -> PyResult<Self> {
+        let place: Option<ModelQueryPlace> = place
+            .map(serde_json::from_str)
+            .transpose()
+            .map_err(|error| PyValueError::new_err(format!("invalid query place: {error}")))?;
+        Ok(Self {
             source,
             dialect,
+            place,
             tree: PyOnceLock::new(),
-        }
+        })
     }
 
     /// The syntax tree: a `document` node whose children are the statements.
@@ -205,6 +216,29 @@ impl SqlDocument {
     /// Every parenthesized subquery.
     fn subqueries<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         self.nodes(py, "Subquery")
+    }
+
+    /// Where `node`, read from this model query, is in the model file; `None` for other SQL.
+    #[pyo3(signature = (*, node))]
+    fn file_position(&self, node: &Bound<'_, PyAny>) -> PyResult<Option<(u64, u64)>> {
+        let Some(place) = self.place.as_ref() else {
+            return Ok(None);
+        };
+        let (Some(line), Some(column)) = (node_index(node, "line")?, node_index(node, "column")?)
+        else {
+            return Ok(None);
+        };
+        let above: usize = self
+            .source
+            .split_inclusive('\n')
+            .take(line - 1)
+            .map(|text| text.chars().count())
+            .sum();
+        Ok(Some(query_file_position(
+            &self.source,
+            place,
+            above + column - 1,
+        )))
     }
 
     /// Every projected star, bare or qualified; a star a function call takes, such as `COUNT(*)`, is no projection.
@@ -251,6 +285,19 @@ impl SqlDocument {
                 .map_err(|error| usage_error(py, &error))
         })
     }
+}
+
+/// A node's 1-based `line` or `column` attribute; `None` when it has none or it is not positive.
+fn node_index(node: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<usize>> {
+    let value: i64 = match native_field(node, name) {
+        Ok(value) => value.extract()?,
+        Err(error) if error.is_instance_of::<PyAttributeError>(node.py()) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    Ok(match usize::try_from(value) {
+        Ok(index) if index > 0 => Some(index),
+        _ => None,
+    })
 }
 
 /// `nodes` with each node's children listed, in ascending index order, under its parent.

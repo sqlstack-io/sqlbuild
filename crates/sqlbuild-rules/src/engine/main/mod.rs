@@ -6,6 +6,7 @@ pub mod evaluate_rows;
 pub mod finalize_rows;
 pub mod json_grain_skipped_models;
 pub mod json_grains;
+pub mod model_query_place;
 pub mod needs_json_grains;
 pub mod project_model_rows;
 pub mod retained_request;
