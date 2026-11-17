@@ -46,7 +46,9 @@ def test_given_a_job_group_with_cycles_when_compiling_then_every_cycle_fails_unt
         },
     )
 
-    failed: subprocess.CompletedProcess[str] = run_sqb(command=("compile",), project_dir=project_dir)
+    failed: subprocess.CompletedProcess[str] = run_sqb(
+        command=("compile",), project_dir=project_dir
+    )
 
     assert failed.returncode == 1, failed.stdout + failed.stderr
     assert "error[D017]" in failed.stderr
