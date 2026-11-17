@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from scripts.compile_performance_ratio._helpers.report import cpu_model
@@ -44,6 +45,7 @@ from scripts.release_performance.constants import (
     BASELINE_SOURCE_DIRECTORY,
     BENCHMARK_COMMANDS,
     CANDIDATE_LABEL,
+    PROGRESS_HEADING,
     RELEASE_TAG_PREFIX,
     REPO_ROOT,
 )
@@ -66,10 +68,12 @@ def run_release_comparison(*, options: ComparisonOptions) -> int:
     try:
         if options.work_dir is not None:
             options.work_dir.mkdir(parents=True, exist_ok=True)
-            comparison: ReleaseComparison = _compare(options=options, root=options.work_dir)
+            comparison: ReleaseComparison = _compare(
+                options=options, root=options.work_dir, summary=summary
+            )
         else:
             with tempfile.TemporaryDirectory(prefix="sqlbuild-release-performance-") as root:
-                comparison = _compare(options=options, root=Path(root))
+                comparison = _compare(options=options, root=Path(root), summary=summary)
     except (ReleasePerformanceError, BenchmarkEditError, OSError) as error:
         print(f"Release performance comparison failed: {error}", file=sys.stderr)
         _ = append_summary(path=summary, markdown=error_markdown(message=str(error)))
@@ -87,8 +91,9 @@ def run_release_comparison(*, options: ComparisonOptions) -> int:
     return 0
 
 
-def _compare(*, options: ComparisonOptions, root: Path) -> ReleaseComparison:
-    print(f"Installing candidate {options.candidate}", file=sys.stderr)
+def _compare(*, options: ComparisonOptions, root: Path, summary: Path | None) -> ReleaseComparison:
+    _ = append_summary(path=summary, markdown=PROGRESS_HEADING)
+    _progress(summary=summary, message=f"Installing candidate {options.candidate}")
     candidate: InstalledVersion = _install(
         label=CANDIDATE_LABEL,
         spec=options.candidate,
@@ -99,7 +104,7 @@ def _compare(*, options: ComparisonOptions, root: Path) -> ReleaseComparison:
     baseline_spec: str = options.baseline or resolve_baseline(
         candidate=candidate.version, same_version=options.same_version_baseline
     )
-    print(f"Installing baseline {baseline_spec}", file=sys.stderr)
+    _progress(summary=summary, message=f"Installing baseline {baseline_spec}")
     baseline: InstalledVersion = _install(
         label=BASELINE_LABEL,
         spec=baseline_spec,
@@ -107,12 +112,12 @@ def _compare(*, options: ComparisonOptions, root: Path) -> ReleaseComparison:
         python=options.python,
         wait_seconds=BASELINE_PUBLICATION_WAIT_SECONDS,
     )
-    print(
-        f"Comparing candidate {candidate.version} with baseline {baseline.version}",
-        file=sys.stderr,
+    _progress(
+        summary=summary,
+        message=f"Comparing candidate {candidate.version} with baseline {baseline.version}",
     )
     load_before: tuple[float, float, float] = os.getloadavg()
-    print("Generating candidate benchmark projects", file=sys.stderr)
+    _progress(summary=summary, message="Generating candidate benchmark projects")
     pristine: dict[str, Path] = {
         CANDIDATE_LABEL: write_pristine_projects(
             root=root,
@@ -126,7 +131,9 @@ def _compare(*, options: ComparisonOptions, root: Path) -> ReleaseComparison:
         else RELEASE_TAG_PREFIX + baseline.version
     )
     write_dense_project(pristine=pristine[CANDIDATE_LABEL], models=options.dense_models)
-    print(f"Generating baseline benchmark projects with {baseline_generator}", file=sys.stderr)
+    _progress(
+        summary=summary, message=f"Generating baseline benchmark projects with {baseline_generator}"
+    )
     baseline_source: Path = (
         options.baseline_source.absolute()
         if options.baseline_source is not None
@@ -152,7 +159,7 @@ def _compare(*, options: ComparisonOptions, root: Path) -> ReleaseComparison:
     versions: tuple[InstalledVersion, InstalledVersion] = (baseline, candidate)
     projects: dict[str, dict[str, Path]] = {}
     for version in versions:
-        print(f"Warming caches for {version.label} {version.version}", file=sys.stderr)
+        _progress(summary=summary, message=f"Warming caches for {version.label} {version.version}")
         projects[version.label] = prepare_version_projects(
             version=version, pristine=pristine[version.label], root=root
         )
@@ -166,6 +173,7 @@ def _compare(*, options: ComparisonOptions, root: Path) -> ReleaseComparison:
             print(f"Skipping {command.name}: {reason}", file=sys.stderr)
             skipped.append(SkippedCommand(name=command.name, reason=reason))
             continue
+        _progress(summary=summary, message=f"Timing `{command.name}`")
         measured.append(
             compare_command(
                 command=command, versions=versions, projects=projects, root=root, runs=options.runs
@@ -184,6 +192,13 @@ def _compare(*, options: ComparisonOptions, root: Path) -> ReleaseComparison:
         ),
         commands=tuple(measured),
         skipped=tuple(skipped),
+    )
+
+
+def _progress(*, summary: Path | None, message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
+    _ = append_summary(
+        path=summary, markdown=f"- {time.strftime('%H:%M:%S', time.gmtime())} UTC: {message}"
     )
 
 

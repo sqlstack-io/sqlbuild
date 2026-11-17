@@ -43,6 +43,8 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
+    GROUP_CYCLE_MESSAGE,
+    GROUP_CYCLE_NODES,
     METADATA,
     PARITY_FILES,
     TYPE_PROOF_FILES,
@@ -1502,6 +1504,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
 @pytest.mark.parametrize(
     "test_case",
     [
+        SnapshotDiscoveryRejectionTestCase(
+            description="every job group cycle is reported at once, with the seed hint",
+            files={**duckshop_orchestration("group_cycles"), **GROUP_CYCLE_NODES},
+            expected_error=ValueError,
+            expected_message=re.escape(GROUP_CYCLE_MESSAGE),
+        ),
         SnapshotDiscoveryRejectionTestCase(
             description="group members are jobs, not nested groups",
             files=duckshop_orchestration("nested_groups"),

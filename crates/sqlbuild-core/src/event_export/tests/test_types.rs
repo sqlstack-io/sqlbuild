@@ -40,6 +40,13 @@ pub(crate) struct DeliveryOrderTestCase {
     pub(crate) expected_sequences: &'static [u64],
 }
 
+/// Queued events as `(priority, invocation start, invocation)`, and the order they are taken in.
+pub(crate) struct InvocationStartOrderTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) events: &'static [(u8, bool, &'static str)],
+    pub(crate) expected_sequences: &'static [u64],
+}
+
 /// One event routed across sink filters, and the resulting accounting.
 pub(crate) struct RoutingTestCase {
     pub(crate) description: &'static str,

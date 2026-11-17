@@ -23,6 +23,8 @@ DEFAULT_INSPECTION_MODELS: int = 3_000
 DEFAULT_BUILD_MODELS: int = 1_000
 DEFAULT_DENSE_MODELS: int = 3_000
 COMMAND_TIMEOUT_SECONDS: float = 900.0
+SETUP_COMMAND_TIMEOUT_SECONDS: float = 2_400.0
+PROGRESS_HEADING: str = "### Release performance progress\n"
 
 PACKAGE_NAME: str = "sqlbuild"
 PYPI_SIMPLE_URL: str = "https://pypi.org/simple/sqlbuild/"

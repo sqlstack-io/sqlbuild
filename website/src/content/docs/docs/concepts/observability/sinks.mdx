@@ -98,9 +98,11 @@ durability. SQLBuild core does not provide a Kafka or ClickHouse implementation.
 - `sqb compile` sends lifecycle sinks only its invocation events (`invocation_started` and its
   outcome), never its phase `operation` events, so a sink never lengthens a compile with phase
   deliveries. Other commands send every subscribed kind.
-- Each sink receives events in order on its own long-lived delivery thread.
-- Lifecycle dispatch prioritizes failures and terminal facts, remaining FIFO within equal priority;
-  `invocation_completed` and `invocation_failed` come after every other queued event.
+- Each sink receives events on its own long-lived delivery thread.
+- An invocation's `invocation_started` arrives before its other events, and `invocation_completed`
+  or `invocation_failed` after every other queued event. Events between them are prioritized:
+  failures and terminal facts first, FIFO within equal priority. For exact chronology, sort by
+  `invocation_sequence`.
 - Queue overflow can displace or drop lower-priority records and is reflected in sink accounting.
   Run and invocation outcomes (`run_started`, `run_completed`, `run_failed`, `invocation_started`,
   `invocation_completed`, `invocation_failed`) are always admitted and never displaced.

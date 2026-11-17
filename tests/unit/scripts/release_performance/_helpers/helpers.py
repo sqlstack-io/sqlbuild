@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts.release_performance._helpers.benchmark import write_baseline_pristine_projects
+from scripts.release_performance._helpers.versions import installed_version
 from scripts.release_performance.models import CommandComparison, CommandSample
 
 MIB: int = 1024 * 1024
@@ -30,6 +32,12 @@ def write_pristine_projects(*, root: Path, inspection_models: int, build_models:
 """
 FAILING_GENERATOR: str = """def write_pristine_projects(*, root, inspection_models, build_models):
     raise RuntimeError("baseline generator exploded")
+"""
+HANGING_GENERATOR: str = """import time
+
+
+def write_pristine_projects(*, root, inspection_models, build_models):
+    time.sleep(60)
 """
 MARKER_DENSE_GENERATOR: str = """from pathlib import Path
 
@@ -138,3 +146,24 @@ def tagged_repository(*, root: Path, tag: str) -> Path:
     ):
         _ = subprocess.run(["git", "-C", str(root), *command], check=True, capture_output=True)
     return root
+
+
+def generate_with_hanging_generator(root: Path) -> object:
+    """Generate baseline projects with a generator that never returns."""
+
+    return write_baseline_pristine_projects(
+        source=write_baseline_source(root=root / "source", generator=HANGING_GENERATOR),
+        python=write_baseline_environment(root=root / "venv"),
+        root=root / "generated",
+        inspection_models=30,
+        build_models=10,
+    )
+
+
+def read_hanging_sqb_version(root: Path) -> object:
+    """Read the version of an sqb that never exits."""
+
+    sqb: Path = root / "sqb"
+    _ = sqb.write_text("#!/bin/sh\nexec sleep 60\n", encoding="utf-8")
+    sqb.chmod(0o755)
+    return installed_version(sqb=sqb)

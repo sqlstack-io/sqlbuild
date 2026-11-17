@@ -1,0 +1,5 @@
+# Bundling nodes into jobs creates three wait cycles the node lineage does not have: two between
+# model jobs, and one through a seed that a single job builds for everyone else.
+name = "nightly_job_group"
+description = "Build everything nightly."
+jobs = ["customers_job", "orders_job", "inventory_job", "shipments_job", "reference_job", "region_report_job"]
