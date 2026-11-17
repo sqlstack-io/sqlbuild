@@ -3,7 +3,6 @@
 use crate::render::models::DeclarationExpansion;
 use crate::render::models::DeclarationExpansionClasses;
 use crate::render::models::ExpandedDeclarations;
-use crate::render::types::SpanRow;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyInt, PyTuple};
 use sqlbuild_analysis::compiled_project::errors::DeclarationError;
@@ -15,9 +14,9 @@ use sqlbuild_analysis::compiled_project::models::{
 };
 use sqlbuild_analysis::sql_macros::models::{ExpandedText, TypedCall};
 
-use crate::render::_helpers::sql_macros::sql_macro_host::expanded_sql_macro_calls;
-use crate::render::_helpers::sql_macros::sql_macro_host::is_sql_macro_reference;
-use crate::render::_helpers::sql_macros::sql_macro_host::reject_bare_macro_calls;
+use crate::render::_helpers::sql_macros::sql_macro_host::{
+    expanded_sql_macro_calls, is_sql_macro_reference, reject_bare_macro_calls,
+};
 use crate::sqltext::models::ScannedReference;
 
 const ENUM_REFERENCE_KIND: u8 = 0;
@@ -328,17 +327,4 @@ pub(crate) fn compile_error(
         Ok(instance) => PyErr::from_value(instance),
         Err(failure) => failure,
     }
-}
-
-pub(crate) fn span_rows(spliced: &SplicedSql) -> Vec<SpanRow> {
-    spliced
-        .spans
-        .iter()
-        .map(|span| SpanRow {
-            source_start: span.source_start,
-            source_end: span.source_end,
-            output_start: span.output_start,
-            output_end: span.output_end,
-        })
-        .collect()
 }

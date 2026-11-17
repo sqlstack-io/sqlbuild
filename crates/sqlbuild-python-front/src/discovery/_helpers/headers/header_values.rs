@@ -1,9 +1,9 @@
 //! MODEL-style header values with a bounded parse cache, and authored column locations.
 
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::sqltext::main::header_failure::header_failure;
 use crate::sqltext::main::model_output_columns::model_output_columns;
@@ -30,7 +30,7 @@ fn header_cache(py: Python<'_>) -> Bound<'_, PyDict> {
 
 /// Parse every header the cache misses in one native batch.
 #[pyfunction]
-fn prepare_model_header_tokens(headers: &Bound<'_, PyAny>) -> PyResult<()> {
+pub(crate) fn prepare_model_header_tokens(headers: &Bound<'_, PyAny>) -> PyResult<()> {
     let py: Python<'_> = headers.py();
     let cache: Bound<'_, PyDict> = header_cache(py);
     let missing: Bound<'_, PyDict> = PyDict::new(py);
@@ -57,7 +57,9 @@ fn prepare_model_header_tokens(headers: &Bound<'_, PyAny>) -> PyResult<()> {
 /// `parse_header_values(*, header, file_path, statement_name, header_line, error_class=None)`.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn parse_header_values<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyDict>> {
+pub(crate) fn parse_header_values<'py>(
+    request: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyDict>> {
     let request = Request::new("parse_header_values", request)?;
     let py: Python<'py> = request.py();
     let header: Bound<'py, PyAny> = request.get("header")?;
@@ -131,7 +133,7 @@ fn source_locations<'py>(
 /// `model_output_column_locations(*, contents, relative_path, extract_implicit_alias_columns=True)`.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn model_output_column_locations<'py>(
+pub(crate) fn model_output_column_locations<'py>(
     request: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let request = Request::new("model_output_column_locations", request)?;
@@ -142,10 +144,4 @@ fn model_output_column_locations<'py>(
     let contents: String = request.get("contents")?.extract()?;
     let rows: Vec<ColumnLocation> = model_output_columns(&contents, implicit)?;
     source_locations(rows, &request.get("relative_path")?)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(prepare_model_header_tokens, module)?)?;
-    module.add_function(wrap_pyfunction!(parse_header_values, module)?)?;
-    module.add_function(wrap_pyfunction!(model_output_column_locations, module)?)
 }

@@ -5,10 +5,10 @@ use pyo3::{FromPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_rules::lint_text::models::InterpolationSite;
 use sqlbuild_rules::lint_text::types::PreparedSql;
 
-use crate::bindings::_helpers::compiled_views::relation_keys;
-use crate::bindings::models::Positional;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_project::analysis::models::Positional;
+use sqlbuild_python_project::compiled_views::main::compiled_models::register_relation_keys::register_relation_keys;
 
 #[pyfunction]
 fn lint_sql_json(py: Python<'_>, request_json: &str) -> PyResult<String> {
@@ -63,5 +63,5 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(lint_sql_json, module)?)?;
     module.add_function(wrap_pyfunction!(prepare_lint_sql, module)?)?;
     module.add_function(wrap_pyfunction!(format_sql_json, module)?)?;
-    relation_keys::register(module)
+    register_relation_keys(module)
 }

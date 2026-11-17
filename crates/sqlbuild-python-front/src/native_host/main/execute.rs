@@ -6,7 +6,6 @@ use pyo3::prelude::PyAny;
 use pyo3::prelude::PyResult;
 
 /// Execute.
-#[inline]
 pub fn execute<'py>(
     adapter: &Bound<'py, PyAny>,
     connection: &Bound<'py, PyAny>,

@@ -1,7 +1,5 @@
 //! Live candidate inspection and automatic request materialization.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_migrations::column_objects::config;
 use crate::bindings::_helpers::planner_migrations::column_objects::native;
 use crate::bindings::_helpers::planner_migrations::discovery_events::identity;
@@ -10,7 +8,6 @@ use crate::bindings::_helpers::planner_migrations::discovery_events::newest;
 use crate::bindings::_helpers::planner_migrations::discovery_events::relation;
 use crate::bindings::_helpers::planner_migrations::models::ModelMigrationDeclaration;
 use crate::bindings::_helpers::planner_migrations::models::ModelMigrationRequest;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{
     PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PySet, PySetMethods, PyString, PyTuple,
@@ -22,6 +19,10 @@ use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::BTreeMap;
 
 fn location<'py>(
@@ -118,13 +119,10 @@ pub(super) fn automatic<'py>(
     let scope = scope_data(scope)?;
     let mut requests: Vec<ModelMigrationRequest<'py>> = Vec::new();
     for item in models {
-        if !scope
-            .selected
-            .contains(&native_key(&model_reads::model_key(item)?)?)
-        {
+        if !scope.selected.contains(&native_key(&model_key(item)?)?) {
             continue;
         }
-        let name = model_reads::name_object(item)?;
+        let name = name_object(item)?;
         let event = matches.1.get_item(&name)?;
         let candidate = mapping_get(matches.0, &name)?;
         let origin = if let Some(event) = event {
@@ -170,11 +168,8 @@ pub(super) fn warnings<'py>(
     let scope = scope_data(scope)?;
     let selected = PySet::empty(py)?;
     for item in models {
-        if scope
-            .selected
-            .contains(&native_key(&model_reads::model_key(item)?)?)
-        {
-            selected.add(model_reads::name_object(item)?)?;
+        if scope.selected.contains(&native_key(&model_key(item)?)?) {
+            selected.add(name_object(item)?)?;
         }
     }
     let ambiguous: BTreeMap<String, String> = ambiguous.extract()?;

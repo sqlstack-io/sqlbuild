@@ -23,7 +23,6 @@ use crate::bindings::_helpers::compile_driver::assembly_models::binding_rows;
 use crate::bindings::_helpers::compile_driver::assembly_models::compiled_models;
 use crate::bindings::_helpers::compile_driver::assembly_models::project_binding_diagnostics;
 use crate::bindings::_helpers::compile_driver::assembly_sql_tests::assembled_sql_tests;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::semantic_checks::stage::SemanticCompletion;
 use crate::bindings::_helpers::semantic_checks::stage::completed_semantic_project;
 use pyo3::IntoPyObjectExt;
@@ -41,6 +40,7 @@ use sqlbuild_python_front::contracts::main::resolve_effective_scenario_config::r
 use sqlbuild_python_front::model_config::main::config::early_model_templates::early_model_templates;
 use sqlbuild_python_front::scopes::main::checks::scope_index_with_compile_usages::scope_index_with_compile_usages;
 use sqlbuild_python_front::scopes::main::reports::report_scope_index_errors::report_scope_index_errors;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
 
 const SOURCE_SLOT: &str = "source";
 const SEED_SLOT: &str = "seed";

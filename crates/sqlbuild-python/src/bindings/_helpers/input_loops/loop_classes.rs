@@ -15,6 +15,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::project::declaration_rows_function::declaration_rows_function;
 
 /// The materializations a model's storage policies are inherited for, besides none.
 const TABLE_BACKED_MATERIALIZATIONS: [&str; 3] = ["TABLE", "INCREMENTAL", "SNAPSHOT"];
@@ -378,11 +379,7 @@ pub(crate) fn model_loop_classes<'py>(
         py,
         vec![(
             "declaration_rows",
-            pyo3::wrap_pyfunction!(
-                crate::bindings::_helpers::compiled_views::records::declaration_rows,
-                py
-            )?
-            .into_any(),
+            declaration_rows_function(py)?.into_any(),
         )],
     )?;
     dict(

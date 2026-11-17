@@ -1,51 +1,39 @@
 //! Source and schema YAML files discovered natively and built as Python discovery records.
 
+use crate::discovery::main::snapshots::escaped::escaped;
 use pyo3::exceptions::PyUnicodeEncodeError;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
-use pyo3::types::{PyList, PyStringMethods, PyTuple};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::types::{PyList, PyStringMethods};
+use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_config::models::ConfigValue;
 use sqlbuild_discovery::models::{DiscoveryFailure, FailureKind, ProjectRoot, StageFailure};
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_discovery::yaml_files::main::load_yaml_files::load_yaml_files as load_yaml;
 use sqlbuild_discovery::yaml_files::main::load_yaml_text::load_yaml_text;
-use sqlbuild_discovery::yaml_files::main::schema_yaml_paths::schema_yaml_paths;
-use sqlbuild_discovery::yaml_files::main::source_yaml_paths::source_yaml_paths;
-use sqlbuild_discovery::yaml_files::models::{YamlFileOutcome, YamlPathFailure};
+use sqlbuild_discovery::yaml_files::models::YamlFileOutcome;
 use sqlbuild_python_base::compile_context::main::yaml_cache::retain_read_sources::retain_read_sources;
 use std::path::PathBuf;
 
-use crate::discovery::_helpers::failures::faults::FileFaults;
-use crate::discovery::_helpers::failures::faults::record_tuple;
-use crate::discovery::_helpers::failures::raised::discovery_error;
-use crate::discovery::_helpers::failures::raised::failure_error;
-use crate::discovery::_helpers::failures::raised::read_error;
-use crate::discovery::_helpers::failures::raised::stage_error;
+use crate::discovery::_helpers::failures::raised::{
+    discovery_error, failure_error, read_error, stage_error,
+};
 use crate::discovery::_helpers::project::project_files::path_object;
-use crate::discovery::_helpers::snapshots::native_classes::NativeProjectTree;
-use crate::discovery::_helpers::snapshots::native_classes::YamlDiscoveryRequest;
-use crate::discovery::_helpers::snapshots::snapshot::escaped;
-use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
-use crate::discovery::_helpers::snapshots::snapshot::project_root;
-use crate::discovery::_helpers::snapshots::snapshot::project_tree;
-use crate::discovery::_helpers::sources::yaml_entries::parse_schema_document;
-use crate::discovery::_helpers::sources::yaml_entries::parse_sources_document;
+use crate::discovery::_helpers::snapshots::native_classes::{
+    NativeProjectTree, YamlDiscoveryRequest,
+};
+use crate::discovery::_helpers::snapshots::snapshot::{project_root, project_tree};
 use sqlbuild_python_base::boundary::main::config_value_to_python::config_value_to_python;
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
-use sqlbuild_python_base::records::types::RecordId;
 
 /// The most YAML bytes one native load reads before its files are built and released.
 const YAML_BATCH_BYTES: u64 = 4 * 1024 * 1024;
 const PATHLIB_MODULE: &str = "pathlib";
 const PROJECT_PATH_KIND: &str = "project_path";
-const SCHEMA_KIND: &str = "schema";
+pub(crate) const SCHEMA_KIND: &str = "schema";
 
 /// The YAML files one discovery reads, and the kind their failures raise as.
 #[derive(Clone, Copy)]
-enum YamlKind {
+pub(crate) enum YamlKind {
     Source,
     Schema,
 }
@@ -59,12 +47,12 @@ impl YamlKind {
     }
 }
 
-fn path_class(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+pub(crate) fn path_class(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     imported(py, PATHLIB_MODULE, "Path")
 }
 
 /// `(contents, loaded)` of a loaded file; a value Python cannot build fails like invalid YAML.
-fn loaded<'py>(
+pub(crate) fn loaded<'py>(
     py: Python<'py>,
     (display_path, kind): (&str, FailureKind),
     (contents, value): (String, ConfigValue),
@@ -101,7 +89,7 @@ fn outcome_loaded<'py>(
 }
 
 /// The pass's tree, or a private one for an undecodable project directory (fails on first read).
-fn listing_tree<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<ListingTree<'py>> {
+pub(crate) fn listing_tree<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<ListingTree<'py>> {
     match project_dir.str()?.to_str() {
         Ok(_) => Ok(ListingTree::Shared(project_tree(project_dir)?)),
         Err(error) if error.is_instance_of::<PyUnicodeEncodeError>(project_dir.py()) => {
@@ -112,13 +100,13 @@ fn listing_tree<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<ListingTree<'p
     }
 }
 
-enum ListingTree<'py> {
+pub(crate) enum ListingTree<'py> {
     Shared(Bound<'py, NativeProjectTree>),
     Private(ProjectTree),
 }
 
 impl ListingTree<'_> {
-    fn tree(&self) -> &ProjectTree {
+    pub(crate) fn tree(&self) -> &ProjectTree {
         match self {
             Self::Shared(tree) => &tree.get().inner,
             Self::Private(tree) => tree,
@@ -148,7 +136,7 @@ fn batches(tree: &ProjectTree, paths: Vec<String>, limit: u64) -> Vec<Vec<String
 }
 
 /// Pass each file's paths and `(contents, loaded)` or error to `on_file`, in size-bounded batches.
-fn load_files<'py>(
+pub(crate) fn load_files<'py>(
     project_dir: &Bound<'py, PyAny>,
     (paths, kind): (Vec<String>, YamlKind),
     mut on_file: impl FnMut(
@@ -233,113 +221,6 @@ fn unnamed_error(project_dir: &Bound<'_, PyAny>, relative: &Bound<'_, PyAny>) ->
     ))
 }
 
-/// Discover source YAML files natively, reporting failing files to `on_fault`.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, on_fault=None))]
-pub(crate) fn discover_source_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    on_fault: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = project_dir.py();
-    in_snapshot(project_dir, || {
-        let listing: ListingTree<'py> = listing_tree(project_dir)?;
-        let paths: Vec<String> = source_yaml_paths(listing.tree())
-            .map_err(|failure| stage_error(listing.tree(), project_dir, failure))?;
-        if paths.is_empty() {
-            return record_tuple(py, Vec::new());
-        }
-        let faults = FileFaults {
-            project_dir: project_dir.clone(),
-            on_fault,
-        };
-        let mut records: Vec<Bound<'py, PyAny>> = Vec::new();
-        load_files(
-            project_dir,
-            (paths, YamlKind::Source),
-            |(relative_path, file_path), built| {
-                let record = built.and_then(|(contents, loaded)| {
-                    let shown: String = file_path.str()?.to_str()?.to_owned();
-                    new_record_with(
-                        py,
-                        RecordId::DiscoveredSourceFile,
-                        &[
-                            ("file_path", file_path.clone()),
-                            ("relative_path", relative_path.clone()),
-                            ("contents", contents.into_bound_py_any(py)?),
-                            (
-                                "source_entries",
-                                parse_sources_document(py, loaded, &shown)?.into_any(),
-                            ),
-                        ],
-                    )
-                });
-                records.extend(faults.kept(&relative_path, record)?);
-                Ok(())
-            },
-        )?;
-        record_tuple(py, records)
-    })
-}
-
-/// Discover model schema.yml and seed declaration files natively.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir))]
-pub(crate) fn discover_schema_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = project_dir.py();
-    in_snapshot(project_dir, || {
-        let listing: ListingTree<'py> = listing_tree(project_dir)?;
-        let paths: Vec<String> = match schema_yaml_paths(listing.tree()) {
-            Ok(paths) => paths,
-            Err(YamlPathFailure::Stage(failure)) => {
-                return Err(stage_error(listing.tree(), project_dir, failure));
-            }
-            Err(YamlPathFailure::YamlSeedDeclaration(path)) => {
-                let relative: Bound<'py, PyAny> =
-                    path_class(py)?.call1((path_object(py, listing.tree(), path)?,))?;
-                return Err(discovery_error(
-                    py,
-                    SCHEMA_KIND,
-                    format!(
-                        "Seed declaration file {} must use .yml; .yaml is not supported",
-                        relative.str()?
-                    ),
-                    None,
-                ));
-            }
-        };
-        if paths.is_empty() {
-            return record_tuple(py, Vec::new());
-        }
-        let mut records: Vec<Bound<'py, PyAny>> = Vec::new();
-        load_files(
-            project_dir,
-            (paths, YamlKind::Schema),
-            |(relative_path, file_path), built| {
-                let (contents, loaded) = built?;
-                let shown: String = file_path.str()?.to_str()?.to_owned();
-                records.push(new_record_with(
-                    py,
-                    RecordId::DiscoveredSchemaFile,
-                    &[
-                        ("file_path", file_path.clone()),
-                        ("relative_path", relative_path),
-                        ("contents", contents.into_bound_py_any(py)?),
-                        ("model_entries", PyTuple::empty(py).into_any()),
-                        (
-                            "seed_entries",
-                            parse_schema_document(py, loaded, &shown)?.into_any(),
-                        ),
-                    ],
-                )?);
-                Ok(())
-            },
-        )?;
-        record_tuple(py, records)
-    })
-}
-
 fn yaml_kind(kind: &str) -> PyResult<FailureKind> {
     match kind {
         "source" => Ok(FailureKind::Source),
@@ -352,7 +233,7 @@ fn yaml_kind(kind: &str) -> PyResult<FailureKind> {
 
 /// Read and load YAML files: each file's `(contents, loaded)`, or the error it raises.
 #[pyfunction]
-fn load_yaml_files<'py>(
+pub(crate) fn load_yaml_files<'py>(
     py: Python<'py>,
     request: YamlDiscoveryRequest,
     relative_paths: Vec<String>,
@@ -382,7 +263,7 @@ fn load_yaml_files<'py>(
 
 /// Load one in-memory YAML document as a discovered `kind` file named `file_path` loads.
 #[pyfunction]
-fn load_yaml_document<'py>(
+pub(crate) fn load_yaml_document<'py>(
     py: Python<'py>,
     file_path: &str,
     text: String,
@@ -392,11 +273,4 @@ fn load_yaml_document<'py>(
     let value: ConfigValue =
         load_yaml_text(file_path, &text, kind).map_err(|failure| failure_error(py, failure))?;
     Ok(loaded(py, (file_path, kind), (text, value))?.1)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_source_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_schema_files, module)?)?;
-    module.add_function(wrap_pyfunction!(load_yaml_files, module)?)?;
-    module.add_function(wrap_pyfunction!(load_yaml_document, module)?)
 }

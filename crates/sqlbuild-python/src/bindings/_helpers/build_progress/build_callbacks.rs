@@ -30,7 +30,6 @@ use crate::bindings::_helpers::build_progress::result_text::optional;
 use crate::bindings::_helpers::build_progress::result_text::seed_text;
 use crate::bindings::_helpers::build_progress::result_text::test_text;
 use crate::bindings::_helpers::build_progress::result_text::text;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -53,6 +52,7 @@ use sqlbuild_python_base::build_progress::main::terminal::tty_flag::tty_flag;
 use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
 const RUNTIME_LOGGER: &str = "sqlbuild.executor.runtime";
 const PASS_OUTCOME: &str = "pass";

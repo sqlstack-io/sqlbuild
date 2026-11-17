@@ -1,7 +1,7 @@
 //! Static inventory of project macro modules for the Python macro loader, with the GIL released.
 
-use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{PyResult, Python};
+use pyo3::pyfunction;
 use sqlbuild_pysource::macro_modules::main::inventory_macro_modules::inventory_macro_modules as inventory;
 use sqlbuild_pysource::macro_modules::main::macro_load_plan::macro_load_plan;
 use sqlbuild_pysource::macro_modules::models::{
@@ -47,7 +47,7 @@ positional_record! {
 positional_record! {
     extract;
     /// `(name, path, contents, dependencies)` of one macro module to load.
-    struct ModuleSpecRow {
+    pub(crate) struct ModuleSpecRow {
         name: String,
         file_path: String,
         contents: String,
@@ -146,7 +146,9 @@ pub(crate) fn inventory_macro_modules(
 
 /// `(synthetic root, packages shallowest first, module execution order)` of `(name, path, contents, dependencies)` rows.
 #[pyfunction]
-fn macro_module_load_plan(modules: Vec<ModuleSpecRow>) -> (String, Vec<String>, Vec<String>) {
+pub(crate) fn macro_module_load_plan(
+    modules: Vec<ModuleSpecRow>,
+) -> (String, Vec<String>, Vec<String>) {
     let specs: Vec<MacroModuleSpec> = modules
         .into_iter()
         .map(
@@ -169,10 +171,4 @@ fn macro_module_load_plan(modules: Vec<ModuleSpecRow>) -> (String, Vec<String>, 
         order,
     } = macro_load_plan(&specs);
     (root, packages, order)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(inventory_macro_modules, module)?)?;
-    module.add_function(wrap_pyfunction!(macro_module_load_plan, module)?)?;
-    Ok(())
 }

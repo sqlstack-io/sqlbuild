@@ -1,8 +1,8 @@
 //! Declaration file collections discovered natively and built as Python discovery records.
 
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::IntoPyObjectExt;
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_discovery::declaration_files::main::discover_declaration_collection::discover_declaration_collection;
 use sqlbuild_discovery::declaration_files::main::retained_collection::retained_collection;
 use sqlbuild_discovery::declaration_files::models::{
@@ -17,19 +17,16 @@ use sqlbuild_host::entries::models::FacadeHost;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 use std::sync::Arc;
 
-use crate::discovery::_helpers::failures::faults::FileFaults;
-use crate::discovery::_helpers::failures::faults::record_tuple;
-use crate::discovery::_helpers::failures::raised::failure_error;
-use crate::discovery::_helpers::failures::raised::read_error;
-use crate::discovery::_helpers::failures::raised::stage_error;
+use crate::discovery::_helpers::failures::faults::{FileFaults, record_tuple};
+use crate::discovery::_helpers::failures::raised::{failure_error, read_error, stage_error};
 use crate::discovery::_helpers::headers::header_declarations::typed_constant_record;
 use crate::discovery::_helpers::project::project_files::path_object;
-use crate::discovery::_helpers::snapshots::native_classes::NativeDiscoverySession;
-use crate::discovery::_helpers::snapshots::native_classes::NativeProjectTree;
-use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
-use crate::discovery::_helpers::snapshots::snapshot::project_root;
-use crate::discovery::_helpers::snapshots::snapshot::project_tree;
-use crate::discovery::_helpers::snapshots::snapshot::snapshot_memo;
+use crate::discovery::_helpers::snapshots::native_classes::{
+    NativeDiscoverySession, NativeProjectTree,
+};
+use crate::discovery::_helpers::snapshots::snapshot::{
+    in_snapshot, project_root, project_tree, snapshot_memo,
+};
 use crate::model_config::main::headers::schema_columns::schema_columns;
 use crate::sqltext::main::map_to_python::map_to_python;
 use sqlbuild_discovery::declaration_files::main::declaration_file_options::declaration_file_options;
@@ -43,7 +40,7 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 
 const PATHLIB_MODULE: &str = "pathlib";
-const SESSION_MEMO_KEY: &str = "native_discovery_session";
+pub(crate) const SESSION_MEMO_KEY: &str = "native_discovery_session";
 const MEASUREMENT_MODE: &str = "MEASUREMENT";
 
 /// One declaration file being built: its paths and the scope native discovery listed it in.
@@ -391,19 +388,6 @@ pub(crate) fn discovery_session<'py>(
     Ok(created)
 }
 
-/// The session this discovery pass read its declaration files with, if any.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir))]
-pub(crate) fn retained_discovery_session<'py>(
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = project_dir.py();
-    Ok(snapshot_memo(project_dir)?
-        .get_item(SESSION_MEMO_KEY)?
-        .filter(|session| session.is_instance_of::<NativeDiscoverySession>())
-        .unwrap_or_else(|| py.None().into_bound(py)))
-}
-
 /// One collection read in the pass's snapshot, with the tree it was read from.
 fn collection<'py>(
     project_dir: &Bound<'py, PyAny>,
@@ -487,7 +471,7 @@ fn records<'py, T>(
     record_tuple(py, built)
 }
 
-fn discovered<'py>(
+pub(crate) fn discovered<'py>(
     faults: &FileFaults<'py>,
     kind: CollectionKind,
     isolate_kind: bool,
@@ -538,7 +522,7 @@ fn seed_records<'py, T>(
     record_tuple(py, seeds)
 }
 
-fn faults<'py>(
+pub(crate) fn faults<'py>(
     project_dir: &Bound<'py, PyAny>,
     on_fault: Option<Bound<'py, PyAny>>,
 ) -> FileFaults<'py> {
@@ -546,148 +530,4 @@ fn faults<'py>(
         project_dir: project_dir.clone(),
         on_fault: on_fault.filter(|on_fault| !on_fault.is_none()),
     }
-}
-
-/// Discover global and scoped enum declaration files.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, on_fault=None, isolate_declaration_kind=false))]
-pub(crate) fn discover_enum_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    on_fault: Option<Bound<'py, PyAny>>,
-    isolate_declaration_kind: bool,
-) -> PyResult<Bound<'py, PyTuple>> {
-    discovered(
-        &faults(project_dir, on_fault),
-        CollectionKind::Enums,
-        isolate_declaration_kind,
-    )
-}
-
-/// Discover global and scoped constant declaration files.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, on_fault=None, isolate_declaration_kind=false))]
-pub(crate) fn discover_constant_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    on_fault: Option<Bound<'py, PyAny>>,
-    isolate_declaration_kind: bool,
-) -> PyResult<Bound<'py, PyTuple>> {
-    discovered(
-        &faults(project_dir, on_fault),
-        CollectionKind::Constants,
-        isolate_declaration_kind,
-    )
-}
-
-/// Discover project-wide and scoped reusable model schemas.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, on_fault=None))]
-pub(crate) fn discover_model_schema_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    on_fault: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    discovered(
-        &faults(project_dir, on_fault),
-        CollectionKind::ModelSchemas,
-        false,
-    )
-}
-
-/// Discover SQL function files under functions/sql/.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, on_fault=None))]
-pub(crate) fn discover_sql_function_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    on_fault: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    discovered(
-        &faults(project_dir, on_fault),
-        CollectionKind::SqlFunctions,
-        false,
-    )
-}
-
-/// Discover named SQL lifecycle hooks in their project-wide and scoped roles.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, on_fault=None))]
-pub(crate) fn discover_sql_hook_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    on_fault: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    discovered(
-        &faults(project_dir, on_fault),
-        CollectionKind::SqlHooks,
-        false,
-    )
-}
-
-/// Discover generic and singular audit SQL files in their project-wide and scoped roles.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, on_fault=None))]
-pub(crate) fn discover_audit_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    on_fault: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    discovered(
-        &faults(project_dir, on_fault),
-        CollectionKind::Audits,
-        false,
-    )
-}
-
-/// Discover global and scoped project macro Python files.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, isolate_declaration_kind=false))]
-pub(crate) fn discover_macro_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    isolate_declaration_kind: bool,
-) -> PyResult<Bound<'py, PyTuple>> {
-    discovered(
-        &faults(project_dir, None),
-        CollectionKind::Macros,
-        isolate_declaration_kind,
-    )
-}
-
-/// Discover seed CSV files under seeds/.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir))]
-pub(crate) fn discover_seed_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    discovered(&faults(project_dir, None), CollectionKind::Seeds, false)
-}
-
-/// Detect a project-level adapter.py without importing it.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir))]
-pub(crate) fn discover_adapter_file<'py>(
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = project_dir.py();
-    let file_path: Bound<'py, PyAny> = project_dir.div("adapter.py")?;
-    if !file_path.call_method0("is_file")?.is_truthy()? {
-        return Ok(py.None().into_bound(py));
-    }
-    new_record_with(
-        py,
-        RecordId::DiscoveredAdapterFile,
-        &[
-            ("file_path", file_path),
-            ("relative_path", path_class(py)?.call1(("adapter.py",))?),
-        ],
-    )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_enum_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_constant_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_model_schema_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_sql_function_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_sql_hook_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_audit_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_macro_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_seed_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_adapter_file, module)?)?;
-    module.add_function(wrap_pyfunction!(retained_discovery_session, module)?)?;
-    Ok(())
 }

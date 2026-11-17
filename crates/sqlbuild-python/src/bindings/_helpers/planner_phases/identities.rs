@@ -1,14 +1,11 @@
 //! Expected version identities and stale-warning change detection.
 
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_changes::detect::scope_model_changes;
 use crate::bindings::_helpers::planner_identity::identities::direct_model_version_identities;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::models::IdentityWork;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
-use crate::bindings::_helpers::planner_phases::objects::native;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::sync::PyOnceLock;
@@ -20,6 +17,10 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::project::functions::functions;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::planner_phases::main::native::native;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::{BTreeMap, HashSet};
 
 static IDENTITY_WORK: PyOnceLock<Py<IdentityWork>> = PyOnceLock::new();
@@ -53,10 +54,10 @@ fn version_identities<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     identity_work(project.py())?.identity_builds += 1;
     direct_model_version_identities(
-        (&project_reads::functions(project)?, &scope),
+        (&functions(project)?, &scope),
         native_field(project, "sql_analysis_dialect")?.extract()?,
         (
-            &project_reads::seeds(project)?,
+            &seeds(project)?,
             &project.py().None().into_bound(project.py()),
             &native_field(project, "hook_functions")?,
         ),

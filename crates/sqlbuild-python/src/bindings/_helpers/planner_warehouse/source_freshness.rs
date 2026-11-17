@@ -1,14 +1,7 @@
 //! Direct planner source freshness observation and the warnings for unknown freshness.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::freshness::planning::build_direct_source_freshness_planning_result;
 use crate::bindings::_helpers::freshness::planning::build_direct_source_freshness_propagation_result;
-use crate::bindings::_helpers::planner_phases::objects::native;
-use crate::bindings::_helpers::planner_phases::objects::replace;
-use crate::bindings::_helpers::planner_phases::objects::text;
-use crate::bindings::_helpers::planner_phases::objects::tuple;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_SCOPE;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::snapshot::destination_nodes;
@@ -30,6 +23,11 @@ use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::planner_phases::main::native::native;
+use sqlbuild_python_project::planner_phases::main::replace::replace;
+use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::BTreeSet;
 
 /// One warning per reason that left configured source freshness unknown.
@@ -77,7 +75,7 @@ pub(crate) fn source_freshness_unknown_warnings<'py>(
 
 fn state_database<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     for node in destination_nodes(project)? {
-        let database = native_field(&resource_reads::destination(&node)?, "database")?;
+        let database = native_field(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?, "database")?;
         if !database.is_none() {
             return Ok(database);
         }
@@ -91,7 +89,7 @@ fn state_schemas(
 ) -> PyResult<BTreeSet<String>> {
     let mut schemas: BTreeSet<_> = BTreeSet::new();
     for node in destination_nodes(project)? {
-        let schema = native_field(&resource_reads::destination(&node)?, "schema")?;
+        let schema = native_field(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?, "schema")?;
         if !schema.is_none() {
             schemas.insert(schema.extract()?);
         }
@@ -105,7 +103,7 @@ fn state_schemas(
             let Some(model) = data.model(scope.py(), name) else {
                 continue;
             };
-            let schema = native_field(&model_reads::destination(&model)?, "schema")?;
+            let schema = native_field(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?, "schema")?;
             if !schema.is_none() {
                 schemas.insert(schema.extract()?);
             }

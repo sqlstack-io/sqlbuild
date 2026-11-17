@@ -14,7 +14,6 @@ use sqlbuild_attachments::test_targets::main::scenario_source_violation::scenari
 use sqlbuild_attachments::test_targets::models::ScenarioCteSources;
 use sqlbuild_sqltext::sql_references::models::SqlReference;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::ScenarioRow;
 use crate::bindings::_helpers::input_loops::model_loop::compile_error;
 use crate::bindings::_helpers::input_loops::model_loop_calls::origin_references;
 use crate::bindings::_helpers::input_loops::source_loop::AuthoredExpansion;
@@ -27,6 +26,7 @@ use crate::bindings::_helpers::input_loops::sql_test_loop::checked_body;
 use crate::bindings::_helpers::input_loops::sql_test_loop::source_names;
 use crate::bindings::_helpers::input_loops::sql_test_loop::unique;
 use sqlbuild_python_base::compile_context::main::delta::record_test_source_reads::record_test_source_reads;
+use sqlbuild_python_project::compiled_project::models::ScenarioRow;
 
 impl<'py> TestScope<'_, 'py> {
     /// Every scenario expanded, classified and checked, in discovery order.

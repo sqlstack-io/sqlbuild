@@ -1,9 +1,7 @@
 //! `@enum`/`@const` reference offsets scanned natively for the model loop.
 
 use crate::sqltext::models::ScannedReference;
-use sqlbuild_analysis::sql_macros::constants::SQL_CALL_PREFIX;
 use sqlbuild_analysis::sql_macros::main::sql_macro_calls::sql_macro_calls;
-use sqlbuild_sqltext::compiler::main::declaration_references::scan_declaration_references;
 use sqlbuild_sqltext::compiler::models::{
     DeclarationReference, DeclarationReferenceKind, DeclarationReferenceScan,
     DeclarationReferenceStop,
@@ -16,19 +14,12 @@ const SQL_MACRO_REFERENCE_KIND: u8 = 2;
 /// References and stop code: unclosed quote 0, block comment 1, invalid enum 2, constant 3.
 pub(crate) type ScanRow = (Vec<ScannedReference>, Option<u8>);
 
-/// One SQL string's references and stop code, scanned without walking past malformed ones.
-pub(crate) fn declaration_scan(sql: &str, syntax: Option<&LexicalSyntax>) -> ScanRow {
-    let scanned: Vec<DeclarationReferenceScan> =
-        scan_declaration_references(&[sql.to_owned()], false, syntax);
-    let row: ScanRow = scanned.into_iter().next().map(scan_row).unwrap_or_default();
-    if !sql.contains(SQL_CALL_PREFIX) {
-        return row;
-    }
-    with_sql_macro_calls(sql, row, syntax)
-}
-
 /// The scan with each outer SQL macro call as one kind-2 reference, replacing those inside it.
-fn with_sql_macro_calls(sql: &str, row: ScanRow, syntax: Option<&LexicalSyntax>) -> ScanRow {
+pub(crate) fn with_sql_macro_calls(
+    sql: &str,
+    row: ScanRow,
+    syntax: Option<&LexicalSyntax>,
+) -> ScanRow {
     let (references, stop) = row;
     let Ok(calls) = sql_macro_calls(sql, syntax) else {
         return (references, stop);
@@ -66,7 +57,7 @@ fn with_sql_macro_calls(sql: &str, row: ScanRow, syntax: Option<&LexicalSyntax>)
     (merged, stop)
 }
 
-fn scan_row(scan: DeclarationReferenceScan) -> ScanRow {
+pub(crate) fn scan_row(scan: DeclarationReferenceScan) -> ScanRow {
     (
         scan.references.into_iter().map(reference_row).collect(),
         scan.stop.map(|stop| match stop {

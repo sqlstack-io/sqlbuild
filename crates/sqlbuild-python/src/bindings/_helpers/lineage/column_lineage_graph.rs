@@ -11,12 +11,12 @@ use pyo3::{pyclass, pymethods};
 use sqlbuild_analysis::lineage_graph::main::edge_index::edge_index;
 use sqlbuild_analysis::lineage_graph::models::{EdgeIndex, EdgeKey};
 
-use crate::bindings::_helpers::lineage::lineage_facts::confidence_member;
-use crate::bindings::_helpers::lineage::lineage_facts::transform_kind_member;
 use crate::bindings::_helpers::lineage::lineage_objects::LineageClasses;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_project::lineage::main::confidence_member::confidence_member;
+use sqlbuild_python_project::lineage::main::transform_kind_member::transform_kind_member;
 
 /// Where a compact model's facts are: given, or projected from its compiled model on first read.
 pub(crate) enum CompactColumns {

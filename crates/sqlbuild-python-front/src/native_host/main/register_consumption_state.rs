@@ -1,12 +1,15 @@
 //! Register the consumption state functions and classes.
 
-use crate::native_host::_helpers::consumption_state;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::native_host::_helpers::consumption_state::build_consumption_create_table_sql;
+use crate::native_host::_helpers::consumption_state::build_consumption_prune_sql;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the consumption state functions and classes.
-#[inline]
 pub fn register_consumption_state(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    consumption_state::register(module)
+    module.add_function(wrap_pyfunction!(
+        build_consumption_create_table_sql,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(build_consumption_prune_sql, module)?)
 }

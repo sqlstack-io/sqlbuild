@@ -4,14 +4,16 @@ use std::collections::{BTreeSet, HashMap};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_reference_calls;
+use sqlbuild_analysis::relation_names::main::extract_relation_names::extract_relation_names;
 use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 
-use crate::bindings::_helpers::analysis::relation_names::RelationRow;
-use crate::bindings::_helpers::analysis::relation_names::extract_sql_relation_names;
-use crate::bindings::_helpers::analysis::relation_names::prefetch_sql_relation_names;
+use crate::bindings::_helpers::input_loops::model_loop_prepass::pooled;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_front::native_host::main::optional_text::optional_text;
+use sqlbuild_python_project::analysis::main::extract_sql_relation_names::extract_sql_relation_names;
+use sqlbuild_python_project::analysis::main::prefetch_sql_relation_names::prefetch_sql_relation_names;
+use sqlbuild_python_project::analysis::types::RelationRow;
 
 /// Function calls, `__udf("name")(...)`, parsed as plain calls; their reads are declared inputs.
 const FUNCTION_CALLS: [&str; 2] = ["__udf", "__table_fn"];
@@ -141,7 +143,12 @@ pub(crate) fn prefetch_reads(
     sqls: Vec<String>,
     dialect: Option<&str>,
 ) -> PyResult<()> {
-    prefetch_sql_relation_names(py, sqls.into_iter().map(plain_calls).collect(), dialect)
+    prefetch_sql_relation_names(
+        py,
+        sqls.into_iter().map(plain_calls).collect(),
+        dialect,
+        |missing: &[String]| pooled(missing, |sql: &String| extract_relation_names(sql, dialect)),
+    )
 }
 
 /// True when `sql` cannot be parsed or names an ambiguous relation or one no input writes.

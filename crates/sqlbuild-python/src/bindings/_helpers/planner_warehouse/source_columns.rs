@@ -1,10 +1,5 @@
 //! Warehouse source relation listing and column gathering for planning.
 
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::planner_phases::objects::frozenset;
-use crate::bindings::_helpers::planner_phases::objects::text;
-use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_warehouse::constants::COLUMN_INFO;
 use crate::bindings::_helpers::planner_warehouse::constants::METADATA_NAME_FILTER_LIMIT;
 use crate::bindings::_helpers::planner_warehouse::constants::RELATION_LOOKUP;
@@ -18,6 +13,11 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
+use sqlbuild_python_project::planner_phases::main::frozenset::frozenset;
+use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 use std::collections::{BTreeSet, HashSet};
 
 fn entries_of<'py>(
@@ -26,9 +26,9 @@ fn entries_of<'py>(
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     match source_entries.filter(|entries| !entries.is_none()) {
         Some(entries) => entries.try_iter()?.collect(),
-        None => project_reads::sources(project)?
+        None => sources(project)?
             .try_iter()?
-            .map(|source| source_reads::source_entry(&source?))
+            .map(|source| source_entry(&source?))
             .collect(),
     }
 }

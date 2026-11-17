@@ -9,7 +9,6 @@ use sqlbuild_analysis::janitor_planning::constants::UNTRACKED_QUERY_DIFF_REASON;
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use crate::bindings::_helpers::janitor::janitor_keys::Folded;
 use crate::bindings::_helpers::janitor::janitor_keys::Key;
 use crate::bindings::_helpers::janitor::janitor_keys::SchemaKey;
@@ -25,6 +24,7 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 
 const QUERY_ARTIFACT_LIFECYCLE: ExecutorHost = ExecutorHost::QueryDiffArtifactLifecycle;
 const INSPECTION_LIST: AdapterHost = AdapterHost::ListRelationsForInspection;

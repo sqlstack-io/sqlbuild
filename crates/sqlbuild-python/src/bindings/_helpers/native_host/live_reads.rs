@@ -11,11 +11,9 @@ use pyo3::types::{PyBool, PyCFunction, PyDict, PyFloat, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use crate::bindings::_helpers::freshness::state_io::StateRead;
 use crate::bindings::_helpers::freshness::state_io::read_latest;
 use crate::bindings::_helpers::observations::source_capture::capture_source_columns;
-use crate::bindings::_helpers::planner_phases::objects::planner_error;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_BOUNDED;
 use crate::bindings::_helpers::planner_warehouse::reads::CursorProgress;
 use crate::bindings::_helpers::planner_warehouse::reads::EligibleCursorQuery;
@@ -35,6 +33,8 @@ use sqlbuild_python_front::state_rows::main::migrations::read_events::read_event
 use sqlbuild_python_front::state_rows::main::migrations::stored_old_name_columns::stored_old_name_columns;
 use sqlbuild_python_front::state_rows::models::EventTableLayout;
 use sqlbuild_python_front::state_rows::models::StateAccess;
+use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
+use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_state::consumption::models::ConsumptionRow;
 
 const ACTIVE_CATALOG: AdapterHost = AdapterHost::ActiveInspectionCatalog;

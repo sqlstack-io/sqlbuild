@@ -1,9 +1,10 @@
 //! Explicit references help.
 
-use crate::discovery::_helpers::failures::guidance;
+use pyo3::pyfunction;
+use sqlbuild_config::project::main::explicit_references_help::explicit_references_help as references_help;
 
-/// Explicit references help.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, allowed))]
 pub fn explicit_references_help(allowed: &str) -> String {
-    guidance::explicit_references_help(allowed)
+    references_help(allowed)
 }

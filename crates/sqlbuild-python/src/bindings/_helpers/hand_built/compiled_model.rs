@@ -5,7 +5,6 @@ use crate::bindings::_helpers::analysis::binding_locations::LocatedRow;
 use crate::bindings::_helpers::analysis::binding_locations::locate_model_binding_diagnostics;
 use crate::bindings::_helpers::analysis_session::outcome_objects::dynamic_contract_proof;
 use crate::bindings::_helpers::analysis_session::outcome_objects::session_outcome_analysis;
-use crate::bindings::models::Positional;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyList, PyString, PyTuple};
@@ -16,6 +15,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::analysis::models::Positional;
 
 type Object<'py> = Bound<'py, PyAny>;
 

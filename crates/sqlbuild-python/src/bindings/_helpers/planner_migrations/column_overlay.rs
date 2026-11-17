@@ -1,7 +1,5 @@
 //! Project column renames onto the existing snapshot and redirect cursor reads.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_migrations::column_objects::config;
 use crate::bindings::_helpers::planner_migrations::column_objects::definition_hash;
 use crate::bindings::_helpers::planner_migrations::column_objects::lower;
@@ -11,8 +9,6 @@ use crate::bindings::_helpers::planner_migrations::models::ColumnCandidate;
 use crate::bindings::_helpers::planner_migrations::models::ColumnMigrationInputs;
 use crate::bindings::_helpers::planner_migrations::models::MigrationPhase;
 use crate::bindings::_helpers::planner_migrations::projections::renames_explain_change;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -20,6 +16,12 @@ use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::native_host::models::ModelLookup;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 pub(super) fn overlay<'py>(
     snapshot: &Bound<'py, PyAny>,
@@ -37,7 +39,7 @@ pub(super) fn overlay<'py>(
     let fingerprints =
         imported(py, "builtins", "dict")?.call1((native_field(&stored, "models")?,))?;
     for candidate in candidates {
-        let name = model_reads::name_object(&candidate.model)?;
+        let name = name_object(&candidate.model)?;
         let renames = PyDict::new(py);
         let pending = PyDict::new(py);
         let mut blocked = false;
@@ -97,7 +99,7 @@ pub(super) fn overlay<'py>(
                 replace(
                     &candidate.fingerprint,
                     &[
-                        ("definition", model_reads::query_sql(&candidate.model)?),
+                        ("definition", query_sql(&candidate.model)?),
                         (
                             "definition_hash",
                             definition_hash(&candidate.model, snapshot)?,
@@ -161,7 +163,7 @@ pub(super) fn cursors<'py>(
             physical
         } else {
             let qualified = native_field(
-                &model_reads::destination(&models.get(py, &name.extract::<String>()?)?)?,
+                &destination(&models.get(py, &name.extract::<String>()?)?)?,
                 "qualified_name",
             )?;
             if qualified.is_truthy()? {

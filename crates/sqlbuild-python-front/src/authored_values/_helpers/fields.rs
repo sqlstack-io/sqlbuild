@@ -1,8 +1,8 @@
 //! Optional authored string and boolean settings, rejected with the caller's error class.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyString, PyStringMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_python_base::boundary::models::Request;
 
@@ -42,7 +42,9 @@ impl<'py> Setting<'py> {
 /// An optional non-empty string setting, or `None` when absent.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn optional_named_string<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn optional_named_string<'py>(
+    request: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyAny>> {
     let setting: Setting<'py> = Setting::read(&Request::new("optional_named_string", request)?)?;
     if setting.raw_value.is_none() {
         return Ok(setting.raw_value);
@@ -60,7 +62,9 @@ fn optional_named_string<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<
 /// An optional boolean setting, or `default` when absent.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn optional_named_bool<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn optional_named_bool<'py>(
+    request: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyAny>> {
     let request = Request::new("optional_named_bool", request)?;
     let setting: Setting<'py> = Setting::read(&request)?;
     if setting.raw_value.is_none() {
@@ -70,10 +74,4 @@ fn optional_named_bool<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bo
         return Err(setting.rejected("must be a boolean"));
     }
     Ok(setting.raw_value)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(optional_named_string, module)?)?;
-    module.add_function(wrap_pyfunction!(optional_named_bool, module)?)?;
-    Ok(())
 }

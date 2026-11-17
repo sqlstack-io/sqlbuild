@@ -16,12 +16,7 @@ use sqlbuild_analysis::planner_identity::main::function_fingerprint_sql::functio
 use sqlbuild_analysis::planner_identity::models::FunctionFingerprintFields;
 use sqlbuild_core::fingerprint_identity::main::stable_identity_hash::stable_identity_hash;
 
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::microbatches::conversion::timestamp;
-use crate::bindings::_helpers::planner_identity::hashing::baselined_function_definition_hash;
-use crate::bindings::_helpers::planner_identity::hashing::function_definition_hash;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -34,6 +29,20 @@ use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_front::discovery::main::headers::hook_entries::hook_entries;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::config::config;
+use sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::planner_identity::main::baselined_function_definition_hash::baselined_function_definition_hash;
+use sqlbuild_python_project::planner_identity::main::function_definition_hash::function_definition_hash;
+use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::entry_point::entry_point;
+use sqlbuild_python_project::resource_views::main::function_reads::packages::packages;
+use sqlbuild_python_project::resource_views::main::function_reads::return_columns::return_columns;
+use sqlbuild_python_project::resource_views::main::function_reads::returns::returns;
+use sqlbuild_python_project::resource_views::main::function_reads::runtime_version::runtime_version;
+use sqlbuild_python_project::resource_views::main::seed_reads::external::external;
+use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 
 const LOCAL_FUNCTION_HASHES_KEY: &str = "local_function_hashes";
 const DATACLASSES_MODULE: &str = "dataclasses";
@@ -101,7 +110,7 @@ pub(crate) fn model_version_identity_metadata_json<'py>(
     let py: Python<'py> = model.py();
     let local_function_hashes: Bound<'py, PyDict> = PyDict::new(py);
     if let Some(function_hashes) = function_local_hashes.filter(|hashes| !hashes.is_none()) {
-        for upstream_key in model_reads::deps(model)?.try_iter()? {
+        for upstream_key in deps(model)?.try_iter()? {
             let upstream_key: Bound<'py, PyAny> = upstream_key?;
             let kind: String = native_field(&upstream_key, "resource_type")?
                 .str()?
@@ -116,11 +125,11 @@ pub(crate) fn model_version_identity_metadata_json<'py>(
             }
         }
     }
-    let config_values: Bound<'py, PyAny> = native_field(&model_reads::config(model)?, "values")?;
+    let config_values: Bound<'py, PyAny> = native_field(&config(model)?, "values")?;
     let signature: Bound<'py, PyDict> =
         execution_signature(model, &config_values, hook_version_hashes)?;
     version_identity_metadata_json(
-        &model_reads::name_object(model)?,
+        &name_object(model)?,
         &config_values,
         (
             Some(local_function_hashes.into_any()),
@@ -181,7 +190,10 @@ fn contract_output_signature<'py>(
     config_values: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyDict>>> {
     let py: Python<'py> = model.py();
-    let schema_entry: Bound<'py, PyAny> = model_reads::schema_entry(model)?;
+    let schema_entry: Bound<'py, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
+            model,
+        )?;
     if schema_entry.is_none() {
         return Ok(None);
     }
@@ -195,7 +207,10 @@ fn contract_output_signature<'py>(
     if !enforced && native_field(&schema_entry, "model_schema")?.is_none() {
         return Ok(None);
     }
-    let enum_columns: Bound<'py, PyAny> = model_reads::enum_columns(model)?;
+    let enum_columns: Bound<'py, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::enum_columns::enum_columns(
+            model,
+        )?;
     let rendered: Bound<'py, PyList> = PyList::empty(py);
     for column in columns.try_iter()? {
         let column: Bound<'py, PyAny> = column?;
@@ -258,7 +273,10 @@ fn family_signatures<'py>(families: &Bound<'py, PyAny>) -> PyResult<Bound<'py, P
 /// The hash of a model's own declared columns, column families and contract setting.
 pub(crate) fn model_declared_columns_hash(model: &Bound<'_, PyAny>) -> PyResult<String> {
     let py: Python<'_> = model.py();
-    let schema_entry: Bound<'_, PyAny> = model_reads::schema_entry(model)?;
+    let schema_entry: Bound<'_, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
+            model,
+        )?;
     let payload: Bound<'_, PyDict> = PyDict::new(py);
     payload.set_item(
         "contract",
@@ -298,7 +316,12 @@ fn recorded_function_unchanged(
         return Ok(false);
     }
     let py: Python<'_> = function.py();
-    let language: String = function_reads::language(function)?.str()?.extract()?;
+    let language: String =
+        sqlbuild_python_project::resource_views::main::function_reads::language::language(
+            function,
+        )?
+        .str()?
+        .extract()?;
     let fingerprint_sql: String = compiled_function_fingerprint_sql(function)?;
     let current: String =
         function_definition_hash(py, name, (&fingerprint_sql, &language, dialect))?;
@@ -351,36 +374,36 @@ pub(crate) fn function_local_hashes<'py>(
     let mut recorded_local: Option<HashMap<String, String>> = None;
     for function in functions.try_iter()? {
         let function: Bound<'py, PyAny> = function?;
-        let name: String = function_reads::name(&function)?.extract()?;
-        let language: Bound<'py, PyAny> =
-            native_field(&function_reads::language(&function)?, "value")?;
+        let name: String =
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
+                .extract()?;
+        let language: Bound<'py, PyAny> = native_field(
+            &sqlbuild_python_project::resource_views::main::function_reads::language::language(
+                &function,
+            )?,
+            "value",
+        )?;
         let body_hash: String = function_definition_hash(
             py,
             &name,
             (
-                &function_reads::body_sql(&function)?.extract::<String>()?,
+                &body_sql(&function)?.extract::<String>()?,
                 &language.extract::<String>()?,
                 dialect,
             ),
         )?;
         let payload: Bound<'py, PyDict> = PyDict::new(py);
-        payload.set_item(
-            "arguments",
-            name_type_pairs(&function_reads::arguments(&function)?)?,
-        )?;
-        payload.set_item("returns", function_reads::returns(&function)?)?;
+        payload.set_item("arguments", name_type_pairs(&arguments(&function)?)?)?;
+        payload.set_item("returns", returns(&function)?)?;
         payload.set_item(
             "return_columns",
-            name_type_pairs(&function_reads::return_columns(&function)?)?,
+            name_type_pairs(&return_columns(&function)?)?,
         )?;
         payload.set_item("body_sql", body_hash)?;
         payload.set_item("language", language)?;
-        payload.set_item(
-            "runtime_version",
-            function_reads::runtime_version(&function)?,
-        )?;
-        payload.set_item("entry_point", function_reads::entry_point(&function)?)?;
-        payload.set_item("packages", function_reads::packages(&function)?)?;
+        payload.set_item("runtime_version", runtime_version(&function)?)?;
+        payload.set_item("entry_point", entry_point(&function)?)?;
+        payload.set_item("packages", packages(&function)?)?;
         let mut local_hash: String =
             stable_identity_hash(&sorted_dumps(payload.as_any(), SPACED, true)?);
         if recorded_function_unchanged(&function, (&name, dialect), recorded)? {
@@ -440,39 +463,50 @@ fn rendered_pairs(items: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
 /// Stable function definition text used for change fingerprints.
 pub(crate) fn compiled_function_fingerprint_sql(function: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(function_fingerprint_sql(&FunctionFingerprintFields {
-        language: function_reads::language(function)?.str()?.extract()?,
-        arguments: rendered_pairs(&function_reads::arguments(function)?)?,
-        returns: function_reads::returns(function)?.str()?.extract()?,
-        return_columns: rendered_pairs(&function_reads::return_columns(function)?)?,
-        runtime_version: text_of(function_reads::runtime_version(function))?,
-        entry_point: text_of(function_reads::entry_point(function))?,
-        packages: function_reads::packages(function)?
+        language:
+            sqlbuild_python_project::resource_views::main::function_reads::language::language(
+                function,
+            )?
+            .str()?
+            .extract()?,
+        arguments: rendered_pairs(&arguments(function)?)?,
+        returns: returns(function)?.str()?.extract()?,
+        return_columns: rendered_pairs(&return_columns(function)?)?,
+        runtime_version: text_of(runtime_version(function))?,
+        entry_point: text_of(entry_point(function))?,
+        packages: packages(function)?
             .try_iter()?
             .map(|package| package?.extract::<String>())
             .collect::<PyResult<_>>()?,
-        body_sql: function_reads::body_sql(function)?.extract()?,
+        body_sql: body_sql(function)?.extract()?,
     }))
 }
 
 /// `(identity_hash, metadata_json)` of one compiled seed from its content and load-affecting config.
 pub(crate) fn seed_identity(seed: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
     let py: Python<'_> = seed.py();
-    let schema_entry: Bound<'_, PyAny> = seed_reads::schema_entry(seed)?;
+    let schema_entry: Bound<'_, PyAny> =
+        sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry(
+            seed,
+        )?;
     let csv_settings: Bound<'_, PyAny> = native_field(&schema_entry, "csv_settings")?;
     let columns: Bound<'_, PyList> = PyList::empty(py);
     for column in native_field(&schema_entry, "columns")?.try_iter()? {
         columns.append(column_signature(&column?)?)?;
     }
-    let rows: Bound<'_, PyAny> = if seed_reads::external(seed)?.is_truthy()? {
+    let rows: Bound<'_, PyAny> = if external(seed)?.is_truthy()? {
         PyList::empty(py).into_any()
     } else {
         seed_rows(
-            &native_field(&seed_reads::seed_file(seed)?, "file_path")?,
+            &native_field(&seed_file(seed)?, "file_path")?,
             &csv_settings,
         )?
     };
     let payload: Bound<'_, PyDict> = PyDict::new(py);
-    payload.set_item("name", seed_reads::name(seed)?)?;
+    payload.set_item(
+        "name",
+        sqlbuild_python_project::resource_views::main::seed_reads::name::name(seed)?,
+    )?;
     payload.set_item(
         "csv_settings",
         imported(py, DATACLASSES_MODULE, "asdict")?.call1((&csv_settings,))?,

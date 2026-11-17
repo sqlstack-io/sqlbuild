@@ -1,6 +1,5 @@
 //! Plan output assembly: storage policies, warnings and direct-mode metadata.
 
-use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_entries::models::PlanOutputInputs;
 use crate::bindings::_helpers::planner_entries::plan_output::plan_output_fields;
 use crate::bindings::_helpers::planner_identity::staleness::build_stale_out_of_selection_warnings;
@@ -16,19 +15,11 @@ use crate::bindings::_helpers::planner_phases::models::PlannedModelEntries;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::models::StoragePolicyContext;
-use crate::bindings::_helpers::planner_phases::objects::native;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_phases::objects::replace;
-use crate::bindings::_helpers::planner_phases::objects::sorted_names;
-use crate::bindings::_helpers::planner_phases::objects::strings;
-use crate::bindings::_helpers::planner_phases::objects::text;
-use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_phases::retention::plan_retention;
 use crate::bindings::_helpers::planner_phases::retention::plan_table_types;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::source_freshness::source_freshness_unknown_warnings;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
@@ -41,6 +32,15 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::native_host::models::ModelLookup;
+use sqlbuild_python_project::planner_phases::main::native::native;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_phases::main::replace::replace;
+use sqlbuild_python_project::planner_phases::main::sorted_names::sorted_names;
+use sqlbuild_python_project::planner_phases::main::strings::strings;
+use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 fn concat<'py>(py: Python<'py>, parts: &[Bound<'py, PyAny>]) -> PyResult<Bound<'py, PyAny>> {
     let mut items: Vec<_> = Vec::new();
@@ -298,7 +298,7 @@ pub(crate) fn add_plan_warnings<'py>(
 /// The unselected models the selected scope reads, sorted.
 pub(crate) fn unselected_upstream_models(scopes: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     let selected = class_field(scopes, |s: &PlannerScopeResolution| &s.selected_scope)?;
-    let selected = crate::bindings::_helpers::planner_scope::retained::scope_data(&selected)?;
+    let selected = sqlbuild_python_project::planner_scope::main::scope_data::scope_data(&selected)?;
     let mut names: Vec<String> = Vec::new();
     for (key, deps) in &selected.upstream {
         if !selected.selected.contains(key) {

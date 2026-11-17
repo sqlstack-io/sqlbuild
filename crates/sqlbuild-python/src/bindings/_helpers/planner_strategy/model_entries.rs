@@ -18,21 +18,11 @@ use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_
 use sqlbuild_model_config::execution_limits::models::ExecutionLimit;
 use sqlbuild_model_config::model_validation::constants::PHYSICAL_STORAGE_KEYS;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::planner_strategy::constants::CUSTOM_MATERIALIZATION;
-use crate::bindings::_helpers::planner_strategy::constants::DDL_SEPARATOR;
-use crate::bindings::_helpers::planner_strategy::constants::ENFORCED_CONTRACT;
-use crate::bindings::_helpers::planner_strategy::constants::MICROBATCH_MODE;
-use crate::bindings::_helpers::planner_strategy::constants::PHYSICAL_STORAGE_DIALECT;
-use crate::bindings::_helpers::planner_strategy::constants::PHYSICAL_STORAGE_UNSUPPORTED_CODE;
-use crate::bindings::_helpers::planner_strategy::constants::TABLE_RECREATING_ACTIONS;
 use crate::bindings::_helpers::planner_strategy::cursor_types::cursor_type_warning_record;
 use crate::bindings::_helpers::planner_strategy::cursor_types::warehouse_column_types;
 use crate::bindings::_helpers::planner_strategy::microbatch_limits::replay_grain;
 use crate::bindings::_helpers::planner_strategy::microbatch_limits::unknown_grain;
 use crate::bindings::_helpers::planner_strategy::microbatches::microbatch_limit_config;
-use crate::bindings::_helpers::planner_strategy::models::ModelEntryDecisions;
 use crate::bindings::_helpers::planner_strategy::strategy::model_warning_records;
 use crate::bindings::_helpers::planner_strategy::strategy::resolve_schema_actions;
 use crate::bindings::_helpers::planner_strategy::strategy::warning_inputs;
@@ -58,6 +48,20 @@ use sqlbuild_python_front::model_config::main::config::config_text_tuple::config
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_front::model_config::types::ConfigValues;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::compiled_models::relative_path::relative_path;
+use sqlbuild_python_project::planner_strategy::constants::CUSTOM_MATERIALIZATION;
+use sqlbuild_python_project::planner_strategy::constants::DDL_SEPARATOR;
+use sqlbuild_python_project::planner_strategy::constants::ENFORCED_CONTRACT;
+use sqlbuild_python_project::planner_strategy::constants::MICROBATCH_MODE;
+use sqlbuild_python_project::planner_strategy::constants::PHYSICAL_STORAGE_DIALECT;
+use sqlbuild_python_project::planner_strategy::constants::PHYSICAL_STORAGE_UNSUPPORTED_CODE;
+use sqlbuild_python_project::planner_strategy::constants::TABLE_RECREATING_ACTIONS;
+use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
 
 /// Model config keys copied to the plan entry as optional strings, with their entry fields.
 const STRING_FIELDS: [(&str, &str); 15] = [
@@ -117,7 +121,10 @@ fn schema_columns<'py>(
     typed_only: bool,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = model.py();
-    let entry: Bound<'py, PyAny> = resource_reads::schema_entry(model)?;
+    let entry: Bound<'py, PyAny> =
+        sqlbuild_python_project::resource_views::main::resource_reads::schema_entry::schema_entry(
+            model,
+        )?;
     if entry.is_none() {
         return Ok(PyTuple::empty(py));
     }
@@ -147,7 +154,7 @@ fn inferred_columns<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTup
     let py: Python<'py> = model.py();
     let class: Bound<'py, PyAny> = host_entry(py, AdapterHost::ColumnInfo)?;
     let mut columns: Vec<Bound<'py, PyAny>> = Vec::new();
-    for (name, column_type, _) in model_reads::inferred_rows(model)?.unwrap_or_default() {
+    for (name, column_type, _) in inferred_rows(model)?.unwrap_or_default() {
         if let Some(column_type) = column_type {
             columns.push(column_info(
                 &class,
@@ -200,7 +207,7 @@ fn on_schema_change<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny
         ErrorId::PlannerInput,
         &format!(
             "model '{}': unknown on_schema_change '{}'",
-            model_reads::model_name(model)?,
+            model_name(model)?,
             raw.str()?
         ),
         None,
@@ -210,7 +217,10 @@ fn on_schema_change<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny
 /// Whether the model's schema enforces declared column types.
 fn type_enforcement<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = model.py();
-    let entry: Bound<'py, PyAny> = model_reads::schema_entry(model)?;
+    let entry: Bound<'py, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
+            model,
+        )?;
     if !entry.is_none() {
         let enforcement: Bound<'py, PyAny> = native_field(&entry, "type_enforcement")?;
         if !enforcement.is_none() {
@@ -267,7 +277,10 @@ fn logical_ddl<'py>(
     let py: Python<'py> = request.model.py();
     let dialect: &Bound<'py, Dialect> = &request.dialect;
     let model: &Bound<'py, PyAny> = &request.model;
-    let destination: Bound<'py, PyAny> = model_reads::destination(model)?;
+    let destination: Bound<'py, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
+            model,
+        )?;
     let qualified: Bound<'py, PyAny> = native_field(&destination, "qualified_name")?;
     let qualified: Bound<'py, PyAny> = if qualified.is_truthy()? {
         qualified
@@ -330,7 +343,7 @@ fn logical_ddl<'py>(
 /// The output column names SQL analysis inferred for the model, when it inferred them.
 fn expected_output_columns<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = model.py();
-    let inferred: Bound<'py, PyAny> = model_reads::inferred_columns(model)?;
+    let inferred: Bound<'py, PyAny> = sqlbuild_python_project::compiled_views::main::compiled_models::inferred_columns::inferred_columns(model)?;
     if inferred.is_none() {
         return Ok(none(py));
     }
@@ -368,7 +381,7 @@ fn storage_fields<'py>(
                 ErrorId::CompileInput,
                 &format!(
                     "model '{}' sets {}, but adapter '{}' has no physical table layout settings",
-                    model_reads::model_name(&request.model)?,
+                    model_name(&request.model)?,
                     keys.join(", "),
                     request.dialect.syntax("adapter_name")?.str()?
                 ),
@@ -418,7 +431,7 @@ fn model_warnings<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = request.model.py();
     let model: &Bound<'py, PyAny> = &request.model;
-    let name: Bound<'py, PyAny> = model_reads::name_object(model)?;
+    let name: Bound<'py, PyAny> = name_object(model)?;
     let inputs = warning_inputs(
         &name,
         &request.materialization_type,
@@ -599,7 +612,10 @@ fn contract_fields<'py>(
         mapping_get(values, "contract")?.eq(ENFORCED_CONTRACT)?,
     )?;
     entry.set_item("contract_columns", schema_columns(model, false)?)?;
-    let schema_entry: Bound<'py, PyAny> = model_reads::schema_entry(model)?;
+    let schema_entry: Bound<'py, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
+            model,
+        )?;
     entry.set_item(
         "contract_dynamic_columns",
         if schema_entry.is_none() {
@@ -657,7 +673,7 @@ pub(crate) fn assemble_model_plan_entry<'py>(
     let values: ConfigValues<'py> = model_values(model)?;
     let change: &Bound<'py, PyAny> = &request.change_result;
     let snapshot: &Bound<'py, PyAny> = &request.snapshot;
-    let name: Bound<'py, PyAny> = model_reads::name_object(model)?;
+    let name: Bound<'py, PyAny> = name_object(model)?;
     let policy: Bound<'py, PyAny> = on_schema_change(model)?;
     let schema_actions: Bound<'py, PyAny> =
         resolve_schema_actions(&native_field(change, "schema_findings")?, &policy)?.into_any();
@@ -675,7 +691,12 @@ pub(crate) fn assemble_model_plan_entry<'py>(
             .unwrap_or_else(|| PyTuple::empty(py));
     let table_type: Bound<'py, PyAny> = native_field(
         &native_field(
-            &native_field(&model_reads::config(model)?, "table_type")?,
+            &native_field(
+                &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(
+                    model,
+                )?,
+                "table_type",
+            )?,
             "value",
         )?,
         "value",
@@ -686,11 +707,16 @@ pub(crate) fn assemble_model_plan_entry<'py>(
         (&warehouse_columns, ddl_cursor_bounds(request)?),
     )?;
     let entry: Bound<'py, PyDict> = PyDict::new(py);
-    entry.set_item("key", model_reads::model_key(model)?)?;
+    entry.set_item("key", model_key(model)?)?;
     entry.set_item("name", &name)?;
-    entry.set_item("relative_path", model_reads::relative_path(model)?)?;
-    entry.set_item("destination", model_reads::destination(model)?)?;
-    entry.set_item("fingerprint_query_sql", model_reads::query_sql(model)?)?;
+    entry.set_item("relative_path", relative_path(model)?)?;
+    entry.set_item(
+        "destination",
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
+            model,
+        )?,
+    )?;
+    entry.set_item("fingerprint_query_sql", query_sql(model)?)?;
     entry.set_item("logical_ddl", table_type_ddl(&ddl, &text(&table_type)?))?;
     passed_fields(request, &entry)?;
     for field in CHANGE_FIELDS {

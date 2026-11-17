@@ -15,15 +15,18 @@ use sqlbuild_analysis::planner_strategy::main::effective_run_scope::effective_ru
 use sqlbuild_analysis::planner_strategy::main::singular_attachment::singular_attachment;
 use sqlbuild_analysis::planner_strategy::models::{AuditAttachmentKind, AuditRunScope};
 
-use crate::bindings::_helpers::compiled_views::audit_reads;
-use crate::bindings::_helpers::graph::keys::native_key;
-use crate::bindings::_helpers::planner_scope::values::edges;
 use crate::bindings::_helpers::planner_strategy::values::input_error;
 use crate::bindings::_helpers::planner_strategy::values::optional_string;
 use crate::bindings::_helpers::planner_strategy::values::text;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
+use sqlbuild_python_project::planner_scope::main::edges::edges;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_kind::attached_target_kind;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_name::attached_target_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::references::references;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
 
 const AUDITING_TYPES_MODULE: &str = "sqlbuild.compiler.auditing.types";
 const COMPILE_TYPES_MODULE: &str = "sqlbuild.compiler.compile.types";
@@ -33,7 +36,7 @@ const FINAL_RUN_SCOPE: &str = "final";
 /// The names of an audit's references of one kind, in order.
 fn reference_names(audit: &Bound<'_, PyAny>, kind: &str) -> PyResult<Vec<String>> {
     let mut names: Vec<String> = Vec::new();
-    for reference in audit_reads::references(audit)?.try_iter()? {
+    for reference in references(audit)?.try_iter()? {
         let reference: Bound<'_, PyAny> = reference?;
         if text(&native_field(&reference, "ref_kind")?)? == kind {
             names.push(text(&native_field(&reference, "ref_name")?)?);
@@ -79,7 +82,7 @@ pub(crate) fn attachment(
     graph: &ProjectGraph,
 ) -> PyResult<(String, Option<String>)> {
     let py = audit.py();
-    let attached_kind = audit_reads::attached_target_kind(audit)?;
+    let attached_kind = attached_target_kind(audit)?;
     let (kind, name): (String, Option<String>) = if attached_kind.is_none() {
         let reached = RefCell::new(HashMap::new());
         let reaches = |from: &str, to: &str| -> PyResult<bool> {
@@ -102,14 +105,18 @@ pub(crate) fn attachment(
         )?;
         (attachment_value(kind).to_owned(), name)
     } else {
-        let name = audit_reads::attached_target_name(audit)?;
+        let name = attached_target_name(audit)?;
         if name.is_none() {
             return Err(input_error(
                 py,
                 ErrorId::PlannerInput,
                 &format!(
                     "audit '{}': attached audit is missing an attached target name",
-                    text(&audit_reads::name(audit)?)?
+                    text(
+                        &sqlbuild_python_project::resource_views::main::audit_reads::name::name(
+                            audit
+                        )?
+                    )?
                 ),
                 None,
             ));
@@ -143,8 +150,8 @@ pub(crate) fn outside_target_lineage(
     graph: &ProjectGraph,
 ) -> PyResult<bool> {
     let py: Python<'_> = audit.py();
-    let kind: Bound<'_, PyAny> = audit_reads::attached_target_kind(audit)?;
-    let name: Bound<'_, PyAny> = audit_reads::attached_target_name(audit)?;
+    let kind: Bound<'_, PyAny> = attached_target_kind(audit)?;
+    let name: Bound<'_, PyAny> = attached_target_name(audit)?;
     if kind.is_none() || name.is_none() {
         return Ok(false);
     }
@@ -152,7 +159,7 @@ pub(crate) fn outside_target_lineage(
         text(&imported(py, COMPILE_TYPES_MODULE, "AttachedAuditTargetKind")?.call1((kind,))?)?;
     let target = (kind, text(&name)?);
     let lineage = reachable_graph_keys(&[target], graph, EdgeDirection::Upstream);
-    for dependency in audit_reads::scope_deps(audit)?.try_iter()? {
+    for dependency in scope_deps(audit)?.try_iter()? {
         if !lineage.contains(&native_key(&dependency?)?) {
             return Ok(true);
         }

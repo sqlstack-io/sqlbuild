@@ -7,13 +7,13 @@ use pyo3::types::{PyDict, PyDictMethods, PySet, PySetMethods, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::{AdapterHost, UserCodeHost};
 
-use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 
 const SHARED_EXCEPTIONS_MODULE: &str = "sqlbuild.errors.contracts.exceptions";
 

@@ -2,16 +2,6 @@
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::compiled_views::audit_reads;
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_phases::objects::optional_text;
-use crate::bindings::_helpers::planner_phases::objects::planner_error;
-use crate::bindings::_helpers::planner_phases::objects::replace;
-use crate::bindings::_helpers::planner_phases::objects::text;
 use crate::bindings::_helpers::planner_warehouse::constants::MODEL_HOOK_CONFIG_KEYS;
 use crate::bindings::_helpers::planner_warehouse::constants::SQL_HOOK_ENTRY;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -27,12 +17,30 @@ use sqlbuild_python_front::authored_values::main::render_project_var_text::rende
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::project::audits::audits;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::functions::functions;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
+use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
+use sqlbuild_python_project::planner_phases::main::replace::replace;
+use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::resource_views::main::audit_reads::references::references;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
+use sqlbuild_python_project::resource_views::main::audit_reads::sql_body::sql_body;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::key::key;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
+use sqlbuild_python_project::resource_views::main::source_reads::source_file::source_file;
 use std::collections::BTreeSet;
 
 fn managed_names(project: &Bound<'_, PyAny>) -> PyResult<BTreeSet<String>> {
     let mut names: BTreeSet<_> = BTreeSet::new();
-    for source in project_reads::sources(project)?.try_iter()? {
-        let entry = source_reads::source_entry(&source?)?;
+    for source in sources(project)?.try_iter()? {
+        let entry = source_entry(&source?)?;
         if !native_field(&entry, "loader")?.is_none() {
             names.insert(native_field(&entry, "name")?.extract()?);
         }
@@ -91,26 +99,23 @@ fn selected_managed_refs(
     managed: &BTreeSet<String>,
 ) -> PyResult<BTreeSet<String>> {
     let mut names: BTreeSet<_> = BTreeSet::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
-        if !selected.contains(model_reads::model_key(&model)?)? {
+        if !selected.contains(model_key(&model)?)? {
             continue;
         }
-        names.extend(sql_source_reads(&model_reads::query_sql(&model)?, managed)?);
+        names.extend(sql_source_reads(&query_sql(&model)?, managed)?);
         names.extend(hook_source_reads(&model, managed)?);
     }
-    for function in project_reads::functions(project)?.try_iter()? {
+    for function in functions(project)?.try_iter()? {
         let function = function?;
-        if selected.contains(function_reads::key(&function)?)? {
-            names.extend(sql_source_reads(
-                &function_reads::body_sql(&function)?,
-                managed,
-            )?);
+        if selected.contains(key(&function)?)? {
+            names.extend(sql_source_reads(&body_sql(&function)?, managed)?);
         }
     }
-    for audit in project_reads::audits(project)?.try_iter()? {
+    for audit in audits(project)?.try_iter()? {
         let audit = audit?;
-        let deps = audit_reads::scope_deps(&audit)?;
+        let deps = scope_deps(&audit)?;
         if deps.is_truthy()? {
             let mut any = false;
             for dep in deps.try_iter()? {
@@ -123,14 +128,14 @@ fn selected_managed_refs(
                 continue;
             }
         }
-        for reference in audit_reads::references(&audit)?.try_iter()? {
+        for reference in references(&audit)?.try_iter()? {
             let reference = reference?;
             let name: String = native_field(&reference, "ref_name")?.extract()?;
             if native_field(&reference, "ref_kind")?.eq("source")? && managed.contains(&name) {
                 names.insert(name);
             }
         }
-        names.extend(sql_source_reads(&audit_reads::sql_body(&audit)?, managed)?);
+        names.extend(sql_source_reads(&sql_body(&audit)?, managed)?);
     }
     Ok(names)
 }
@@ -173,9 +178,9 @@ fn source_target_name<'py>(
 }
 
 fn raw_source_entry<'py>(source: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let declared = source_reads::source_entry(source)?;
+    let declared = source_entry(source)?;
     let name = native_field(&declared, "name")?;
-    for entry in native_field(&source_reads::source_file(source)?, "source_entries")?.try_iter()? {
+    for entry in native_field(&source_file(source)?, "source_entries")?.try_iter()? {
         let entry = entry?;
         if native_field(&entry, "name")?.eq(&name)? {
             return Ok(entry);
@@ -306,10 +311,9 @@ pub(crate) fn build_source_read_map<'py>(
     let target = resolve_target(project_config, local_config, target_name)?;
     let effective_vars = native_field(project, "effective_vars")?;
     let result = source_map.copy()?;
-    for source in project_reads::sources(project)?.try_iter()? {
+    for source in sources(project)?.try_iter()? {
         let source = source?;
-        let name: String =
-            native_field(&source_reads::source_entry(&source)?, "name")?.extract()?;
+        let name: String = native_field(&source_entry(&source)?, "name")?.extract()?;
         if !selected.contains(&name) {
             continue;
         }
@@ -339,8 +343,8 @@ pub(crate) fn with_declared_source_reads<'py>(
         return Ok(source_map.clone());
     }
     let result = source_map.copy()?;
-    for source in project_reads::sources(project)?.try_iter()? {
-        let entry = source_reads::source_entry(&source?)?;
+    for source in sources(project)?.try_iter()? {
+        let entry = source_entry(&source?)?;
         let name: String = native_field(&entry, "name")?.extract()?;
         if missing.contains(&name) {
             result.set_item(name, entry)?;

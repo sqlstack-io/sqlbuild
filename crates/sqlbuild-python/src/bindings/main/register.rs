@@ -45,7 +45,6 @@ use crate::bindings::_helpers::sql_test_glue;
 use crate::bindings::_helpers::sqltext;
 use crate::bindings::_helpers::state_rows;
 use crate::bindings::_helpers::type_system;
-use crate::bindings::models;
 use sqlbuild_python_base::boundary::main::register_expected_errors::register_expected_errors;
 use sqlbuild_python_base::boundary::main::register_native_compiler_error::register_native_compiler_error;
 use sqlbuild_python_base::boundary::main::register_oracles::register_oracles;
@@ -53,6 +52,10 @@ use sqlbuild_python_base::records::main::registry::capture::capture;
 use sqlbuild_python_base::records::main::registry::register_records::register_records;
 use sqlbuild_python_base::records::main::registry::verify_attributes::verify_attributes;
 use sqlbuild_python_base::records::main::registry::verify_tables::verify_tables;
+use sqlbuild_python_project::analysis::main::register_normalization::register_normalization;
+use sqlbuild_python_project::analysis::models::BindingPositions;
+use sqlbuild_python_project::analysis::models::CompactAnalysisJob;
+use sqlbuild_python_project::analysis::models::ProjectCatalog;
 
 #[pymodule]
 pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -66,7 +69,7 @@ pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     native_host::registration::register(module)?;
     rules::registration::register(module)?;
     cli::registration::register(module)?;
-    analysis::normalization::register(module)?;
+    register_normalization(module)?;
     analysis::queries::register(module)?;
     analysis::sql_tests::register(module)?;
     sqltext::registration::register(module)?;
@@ -85,9 +88,9 @@ pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 fn register_project_stages(module: &Bound<'_, PyModule>) -> PyResult<()> {
     register_native_compiler_error(module)?;
-    module.add_class::<models::ProjectCatalog>()?;
-    module.add_class::<models::CompactAnalysisJob>()?;
-    module.add_class::<models::BindingPositions>()?;
+    module.add_class::<ProjectCatalog>()?;
+    module.add_class::<CompactAnalysisJob>()?;
+    module.add_class::<BindingPositions>()?;
     cache::registration::register(module)?;
     attachments::registration::register(module)?;
     refactor::registration::register(module)?;

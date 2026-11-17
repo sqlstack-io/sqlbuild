@@ -2,9 +2,9 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::planner_selection::model_selectors;
+use sqlbuild_python_project::planner_selection::main::register_model_selectors::register_model_selectors;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    model_selectors::register(module)?;
+    register_model_selectors(module)?;
     Ok(())
 }

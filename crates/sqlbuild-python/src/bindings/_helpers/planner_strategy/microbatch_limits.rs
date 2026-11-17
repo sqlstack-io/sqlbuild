@@ -14,7 +14,6 @@ use sqlbuild_core::plan_display::errors::UnknownCursorGrain;
 use sqlbuild_core::plan_display::main::effective_timestamp_grain::effective_timestamp_grain;
 use sqlbuild_core::plan_display::models::TimestampGrainFacts;
 
-use crate::bindings::_helpers::compiled_views::records::replace;
 use crate::bindings::_helpers::plan_output::display::resolve_effective_microbatch_batch_size;
 use crate::bindings::_helpers::planner_strategy::microbatches::CAP_ACTIONS;
 use crate::bindings::_helpers::planner_strategy::microbatches::capped_microbatch_bounds;
@@ -25,6 +24,7 @@ use crate::bindings::_helpers::planner_strategy::values::text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::project::replace::replace;
 
 const ERROR_ACTION: &str = "error";
 const SKIP_ACTION: &str = "skip";

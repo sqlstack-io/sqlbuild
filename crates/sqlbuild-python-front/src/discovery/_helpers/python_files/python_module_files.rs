@@ -1,8 +1,8 @@
 //! The project Python module files Python imports, listed natively in Python's sorted order.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::PyTuple;
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_discovery::declaration_files::main::python_module_files::python_module_files;
 use sqlbuild_discovery::tree::models::ProjectTree;
 
@@ -30,8 +30,4 @@ pub(crate) fn discover_python_module_files<'py>(
         .map(|relative_path| project_dir.div(path_object(py, inner, relative_path)?))
         .collect::<PyResult<_>>()?;
     PyTuple::new(py, paths)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_python_module_files, module)?)
 }

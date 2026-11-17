@@ -10,12 +10,12 @@ use sqlbuild_rules::models::{
     SqlTestParameterFact, SqlTestParameterValueFact, TestedResource,
 };
 
-use crate::bindings::_helpers::compiled_project::values::plain_value;
-use crate::bindings::_helpers::compiled_views::records::plain_typed_value;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_project::main::plain_value::plain_value;
+use sqlbuild_python_project::compiled_views::main::project::plain_typed_value::plain_typed_value;
 
 const DESCRIPTION_KEY: &str = "description";
 

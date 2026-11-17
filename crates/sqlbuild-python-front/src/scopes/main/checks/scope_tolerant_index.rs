@@ -1,11 +1,7 @@
 //! The tolerant index: fault diagnostics, prospective resources and partial completeness.
 
 use crate::scopes::_helpers::checks::scope_tolerant;
-use pyo3::prelude::Bound;
-use pyo3::prelude::Py;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 
 /// The tolerant index: fault diagnostics, prospective resources and partial completeness.
 #[inline]

@@ -1,11 +1,11 @@
 //! Create, read and append SQL of migration state tables, and stored rows decoded to events.
 
+use crate::state_rows::main::event_rows::date_time_typed::date_time_typed;
+use crate::state_rows::main::migrations::layout::layout;
 use pyo3::exceptions::{PyKeyError, PyValueError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_state::events::constants::TIMESTAMP_COLUMNS;
 use sqlbuild_state::events::main::column_aliases_json::column_aliases_json;
 use sqlbuild_state::events::main::decoded_column_aliases::decoded_column_aliases;
@@ -17,13 +17,9 @@ use sqlbuild_state::events::main::readable_columns::readable_columns;
 
 use crate::cursor::constants::DATETIME_MODULE;
 use crate::state_rows::_helpers::event_rows::events::typed_insert_sql;
-use crate::state_rows::_helpers::event_rows::timestamps::date_time_typed;
-use crate::state_rows::_helpers::migrations::migration_objects::layout;
-use crate::state_rows::_helpers::migrations::migration_objects::qualified_table;
-use crate::state_rows::_helpers::migrations::migration_objects::state_error;
+use crate::state_rows::_helpers::migrations::migration_objects::{qualified_table, state_error};
 use crate::state_rows::_helpers::tables::state_tables::state_table_create_sql;
-use crate::state_rows::models::EventTable;
-use crate::state_rows::models::EventTableLayout;
+use crate::state_rows::models::{EventTable, EventTableLayout};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
@@ -35,7 +31,7 @@ use sqlbuild_python_base::records::types::RecordId;
 /// DDL that creates one migration state table when it is missing.
 #[pyfunction(name = "render_migration_state_create_sql")]
 #[pyo3(signature = (**request))]
-fn create_sql<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn create_sql<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
     let request = Request::new("render_migration_state_create_sql", request)?;
     let py: Python<'py> = request.py();
     let layout: EventTableLayout = layout(&request.get("kind")?.extract::<String>()?)?;
@@ -413,9 +409,4 @@ pub(crate) fn decoded_events<'py>(
         events.extend(decoded);
     }
     PyTuple::new(py, events)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(create_sql, module)?)?;
-    Ok(())
 }

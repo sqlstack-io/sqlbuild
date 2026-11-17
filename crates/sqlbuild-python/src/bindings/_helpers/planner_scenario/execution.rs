@@ -1,14 +1,7 @@
 //! Assemble scenario execution plans through existing planner and adapter APIs.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::records::compiled_model_record;
-use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::planner_entries::model_entries::plan_model;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
-use crate::bindings::_helpers::planner_identity::graph::execution_deps;
-use crate::bindings::_helpers::planner_identity::graph::execution_order;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::locations::build_function_locations;
 use crate::bindings::_helpers::planner_scenario::constants::CURSOR_INTRINSIC_NAMES;
 use crate::bindings::_helpers::planner_scenario::constants::CURSOR_TYPE_KEY;
@@ -30,12 +23,6 @@ use crate::bindings::_helpers::planner_scenario::sql::resolve_sql;
 use crate::bindings::_helpers::planner_scenario::sql::source_label;
 use crate::bindings::_helpers::planner_scenario::values::error;
 use crate::bindings::_helpers::planner_scenario::values::string;
-use crate::bindings::_helpers::planner_strategy::fixture_completion::complete_fixtures as complete_relation_fixtures;
-use crate::bindings::_helpers::planner_strategy::fixture_context::planning_context;
-use crate::bindings::_helpers::sql_test_glue::constants::DEFAULT_INTEGER_END;
-use crate::bindings::_helpers::sql_test_glue::constants::DEFAULT_INTEGER_START;
-use crate::bindings::_helpers::sql_test_glue::constants::DEFAULT_TIMESTAMP_END;
-use crate::bindings::_helpers::sql_test_glue::constants::DEFAULT_TIMESTAMP_START;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::compiler::main::scenario_expected_column_message::scenario_expected_column_message;
@@ -56,6 +43,21 @@ use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_key
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_names::inferred_names;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::project::compiled_model_record::compiled_model_record;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::graph::models::KeyCache;
+use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
+use sqlbuild_python_project::planner_identity::main::execution_order::execution_order;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_strategy::main::complete_fixtures::complete_fixtures as complete_relation_fixtures;
+use sqlbuild_python_project::planner_strategy::main::planning_context::planning_context;
+use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_INTEGER_END;
+use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_INTEGER_START;
+use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_TIMESTAMP_END;
+use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_TIMESTAMP_START;
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
@@ -110,9 +112,15 @@ pub(crate) fn build_scenario_execution_plan<'py>(
     } else {
         analysis.is_truthy()?
     };
-    let models = by_attribute(&project_reads::models(&project)?, "name")?;
-    let functions = by_attribute(&project_reads::functions(&project)?, "key")?;
-    let locations = build_function_locations(&project_reads::functions(&project)?)?.into_any();
+    let models = by_attribute(&compiled_models(&project)?, "name")?;
+    let functions = by_attribute(
+        &sqlbuild_python_project::compiled_views::main::project::functions::functions(&project)?,
+        "key",
+    )?;
+    let locations = build_function_locations(
+        &sqlbuild_python_project::compiled_views::main::project::functions::functions(&project)?,
+    )?
+    .into_any();
     let upstream = execution_deps(&project)?;
     let ordered = execution_order(py, &upstream, &[])?;
     let ordered = KeyCache::new(py)?.keys(&ordered)?;
@@ -148,13 +156,11 @@ pub(crate) fn build_scenario_execution_plan<'py>(
         let destination = required_target(
             &context.relations,
             "model_locations",
-            &model_reads::model_name(&model)?,
+            &model_name(&model)?,
             "model",
         )?;
-        let query = resolve_model_dbt_refs(
-            &model_reads::query_sql(&model)?.extract::<String>()?,
-            &context.relations,
-        )?;
+        let query =
+            resolve_model_dbt_refs(&query_sql(&model)?.extract::<String>()?, &context.relations)?;
         let cursor_window = scenario_cursor_window(&model)?;
         let record = compiled_model_record(&model)?;
         let changes = PyDict::new(py);
@@ -285,9 +291,14 @@ fn model_context<'py>(
         ModelPlanContext {
             model_locations: native_field(&context.relations, "model_locations")?.unbind(),
             models_by_name: models.clone().into_any().into(),
-            functions_by_name: by_attribute(&project_reads::functions(project)?, "name")?
-                .into_any()
-                .unbind(),
+            functions_by_name: by_attribute(
+                &sqlbuild_python_project::compiled_views::main::project::functions::functions(
+                    project,
+                )?,
+                "name",
+            )?
+            .into_any()
+            .unbind(),
             seed_locations: native_field(&context.relations, "seed_locations")?.unbind(),
             function_locations: locations.clone().unbind(),
             source_map: native_field(&context.relations, "source_map")?.unbind(),
@@ -323,7 +334,7 @@ fn compared_columns(
 ) -> PyResult<Option<Vec<String>>> {
     let py = scenario.py();
     let model_columns: Option<Vec<String>> = match model {
-        Some(model) => model_reads::inferred_names(&model)?,
+        Some(model) => inferred_names(&model)?,
         None => None,
     };
     let dialect: Option<String> = context
@@ -416,7 +427,7 @@ fn expectations<'py>(
 /// The SQL-test wide window for a non-microbatch model whose SQL reads the cursor intrinsics.
 fn scenario_cursor_window<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py = model.py();
-    let query: String = model_reads::query_sql(model)?.extract()?;
+    let query: String = query_sql(model)?.extract()?;
     let values = model_values(model)?;
     let microbatch: bool =
         config_value(py, &values, INCREMENTAL_MODE_KEY)?.eq(MICROBATCH_INCREMENTAL_MODE)?;

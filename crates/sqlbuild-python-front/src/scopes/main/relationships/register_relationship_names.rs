@@ -1,12 +1,13 @@
 //! Register the relationship names functions and classes.
 
-use crate::scopes::_helpers::relationships::relationship_names;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::scopes::_helpers::relationships::relationship_names::scope_expected_model_names;
+use crate::scopes::_helpers::relationships::relationship_names::scope_test_ctes;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the relationship names functions and classes.
-#[inline]
 pub fn register_relationship_names(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    relationship_names::register(module)
+    module.add_function(wrap_pyfunction!(scope_expected_model_names, module)?)?;
+    module.add_function(wrap_pyfunction!(scope_test_ctes, module)?)?;
+    Ok(())
 }

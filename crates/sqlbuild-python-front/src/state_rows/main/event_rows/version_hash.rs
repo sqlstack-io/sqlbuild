@@ -1,15 +1,18 @@
 //! Hash the stable source freshness identity used as a graph input.
 
-use crate::state_rows::_helpers::event_rows::freshness;
 use pyo3::prelude::PyResult;
+use pyo3::pyfunction;
+use sqlbuild_state::freshness::main::data_version_hash::data_version_hash;
 
 /// Hash the stable source freshness identity used as a graph input.
-#[inline]
+#[pyfunction(name = "source_freshness_data_version_hash")]
+#[pyo3(signature = (*, source_name, strategy, value_kind, data_version))]
 pub fn version_hash(
     source_name: &str,
     strategy: &str,
     value_kind: &str,
     data_version: &str,
 ) -> PyResult<String> {
-    freshness::version_hash(source_name, strategy, value_kind, data_version)
+    data_version_hash((source_name, strategy), value_kind, data_version)
+        .map_err(|error| pyo3::exceptions::PyValueError::new_err(format!("{error:?}")))
 }

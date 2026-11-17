@@ -3,7 +3,6 @@
 use crate::bindings::_helpers::planner_changes::metadata::without_declared_columns_hash;
 use crate::bindings::_helpers::planner_migrations::fingerprint::fingerprint;
 use crate::bindings::_helpers::planner_migrations::fingerprint::migration_fingerprint_ref_names;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_warehouse::models::FingerprintWork;
 use pyo3::PyRefMut;
 use pyo3::exceptions::{PyOSError, PyValueError};
@@ -20,6 +19,7 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::planner_phases::main::object::object;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{DefaultHasher, Hash, Hasher};
 

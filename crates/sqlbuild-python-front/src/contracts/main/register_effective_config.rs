@@ -1,12 +1,19 @@
 //! Register the effective config functions and classes.
 
-use crate::contracts::_helpers::effective_config;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::contracts::_helpers::effective_config::effective_config_connection;
+use crate::contracts::_helpers::effective_config::effective_config_target_fields;
+use crate::contracts::_helpers::effective_config::effective_config_target_name;
+use crate::contracts::main::effective_config_settings::effective_config_settings;
+use crate::contracts::main::effective_config_vars::effective_config_vars;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the effective config functions and classes.
-#[inline]
 pub fn register_effective_config(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    effective_config::register(module)
+    module.add_function(wrap_pyfunction!(effective_config_target_name, module)?)?;
+    module.add_function(wrap_pyfunction!(effective_config_target_fields, module)?)?;
+    module.add_function(wrap_pyfunction!(effective_config_vars, module)?)?;
+    module.add_function(wrap_pyfunction!(effective_config_connection, module)?)?;
+    module.add_function(wrap_pyfunction!(effective_config_settings, module)?)?;
+    Ok(())
 }

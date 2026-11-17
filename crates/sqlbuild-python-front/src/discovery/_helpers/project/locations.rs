@@ -1,19 +1,9 @@
 //! Authored locations Python consumers read: YAML entry lines and project-relative paths.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::{PyTuple, PyTupleMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_discovery::yaml_files::main::yaml_entry_lines::yaml_entry_lines;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-
-/// The 1-based line of the outermost `- name: <name>` entry, if present.
-#[pyfunction]
-#[pyo3(signature = (*, contents, name))]
-pub(crate) fn yaml_entry_line(contents: &str, name: &str) -> Option<usize> {
-    yaml_entry_lines(contents)
-        .into_iter()
-        .find_map(|(entry, line)| (entry == name).then_some(line))
-}
 
 /// `path.relative_to(project_dir)` without pathlib's per-parent comparison scan.
 #[pyfunction]
@@ -36,10 +26,4 @@ pub(crate) fn project_relative_path<'py>(
         "with_segments",
         path_parts.get_slice(root_parts.len(), path_parts.len()),
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(yaml_entry_line, module)?)?;
-    module.add_function(wrap_pyfunction!(project_relative_path, module)?)?;
-    Ok(())
 }

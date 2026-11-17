@@ -25,8 +25,6 @@ use crate::bindings::_helpers::compile_driver::pipeline_entries::build_project_g
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::contract_command::write::ContractWrite;
 use crate::bindings::_helpers::contract_command::write::write_contracts;
-use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
-use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -39,6 +37,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::refactor::main::compare_contracts::compare_contracts;
+use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
+use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 
 const GENERATE_ACTION: &str = "generate";
 

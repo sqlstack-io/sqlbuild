@@ -1,15 +1,15 @@
 //! Build effective target config without compiling resources.
 
-use crate::compile_attachment::_helpers::effective_config;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::compile_attachment::main::target_selection::target_selection;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use pyo3::pyfunction;
 
 /// Build effective target config without compiling resources.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, discovered_inputs, selected_target = None))]
 pub fn build_effective_target_config<'py>(
     discovered_inputs: &Bound<'py, PyAny>,
     selected_target: Option<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    effective_config::build_effective_target_config(discovered_inputs, selected_target)
+    Ok(target_selection(discovered_inputs, selected_target)?.1)
 }

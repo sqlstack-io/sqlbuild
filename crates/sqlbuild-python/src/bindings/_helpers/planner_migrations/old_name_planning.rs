@@ -2,16 +2,12 @@
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_migrations::models::MigrationPhase;
 use crate::bindings::_helpers::planner_migrations::models::OldNameViewPlanning;
 use crate::bindings::_helpers::planner_migrations::old_name_objects::recorded_view;
 use crate::bindings::_helpers::planner_migrations::old_names::old_name_claim_errors;
 use crate::bindings::_helpers::planner_migrations::old_names::old_name_schemas_to_read;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PySet, PySetMethods, PyTuple};
 use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
@@ -19,6 +15,12 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::HashMap;
 
 fn schemas<'py>(
@@ -30,7 +32,7 @@ fn schemas<'py>(
     let snapshot = phase.snapshot.clone();
     let needed = PySet::empty(py)?;
     for item in selected {
-        let schema = native_field(&model_reads::destination(item)?, "schema")?;
+        let schema = native_field(&destination(item)?, "schema")?;
         if !schema.is_none() {
             needed.add(schema)?;
         }
@@ -49,7 +51,7 @@ fn schemas<'py>(
     if !include_project {
         for item in selected {
             let existing = native_field(&snapshot, "existing_relations")?
-                .call_method1("get", (model_reads::name_object(item)?,))?;
+                .call_method1("get", (name_object(item)?,))?;
             if !existing.is_none()
                 && host_entry(py, AdapterHost::NormalizeRelationType)?
                     .call1((native_field(&existing, "relation_type")?,))?
@@ -81,12 +83,12 @@ pub(crate) fn plan_old_name_views<'py>(
     let runtime = phase.runtime.clone();
     let scope = scope_data(&phase.scope)?;
     let project = runtime_field(&runtime, |runtime| &runtime.project)?;
-    let models: Vec<Bound<'py, PyAny>> = project_reads::models(&project)?
+    let models: Vec<Bound<'py, PyAny>> = compiled_models(&project)?
         .try_iter()?
         .collect::<PyResult<_>>()?;
     let mut by_name: HashMap<String, Bound<'py, PyAny>> = HashMap::new();
     for item in &models {
-        by_name.insert(model_reads::model_name(item)?, item.clone());
+        by_name.insert(model_name(item)?, item.clone());
     }
     let mut selected: Vec<Bound<'py, PyAny>> = Vec::new();
     for key in &scope.order {
@@ -141,7 +143,7 @@ pub(crate) fn plan_old_name_views<'py>(
         }
     }
     for item in &selected {
-        if !covered.contains(model_reads::name_object(item)?)?
+        if !covered.contains(name_object(item)?)?
             && let Some(planned) = planner.pending_for(item)?
         {
             entries.push(planned);

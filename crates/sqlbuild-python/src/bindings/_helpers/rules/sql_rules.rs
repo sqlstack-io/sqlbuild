@@ -19,11 +19,6 @@ use sqlbuild_rules::rule_results::main::duplicate_literal_hints::duplicate_liter
 use sqlbuild_rules::rule_results::models::RuleFinding;
 
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::SqlRuleInputs;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::SqlRuleKey;
-use crate::bindings::_helpers::compiled_views::model_reads::output_proven;
-use crate::bindings::_helpers::compiled_views::relation_keys::project_relation_keys;
 use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
 use crate::bindings::_helpers::rules::early_sql_lint::EarlyLintResult;
@@ -64,6 +59,11 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::compiled_models::output_proven::output_proven;
+use sqlbuild_python_project::compiled_views::main::compiled_models::project_relation_keys::project_relation_keys;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
+use sqlbuild_python_project::compiled_views::models::SqlRuleInputs;
+use sqlbuild_python_project::compiled_views::models::SqlRuleKey;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const JSON_MODULE: &str = "json";

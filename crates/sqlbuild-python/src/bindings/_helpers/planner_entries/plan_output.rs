@@ -1,8 +1,5 @@
 //! `PlanOutput` assembly from planned model entries, seeds, sources, functions, audits and tests.
 
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::planner_entries::model_entries::scope_overlaps;
 use crate::bindings::_helpers::planner_entries::models::PlanOutputInputs;
 use crate::bindings::_helpers::planner_entries::values::error_of;
@@ -11,16 +8,9 @@ use crate::bindings::_helpers::planner_entries::values::none;
 use crate::bindings::_helpers::planner_entries::values::planner_model;
 use crate::bindings::_helpers::planner_entries::values::planner_type;
 use crate::bindings::_helpers::planner_entries::values::string;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::orchestration::resolve_function_sql;
-use crate::bindings::_helpers::planner_scope::loaders::upstream_loader_dependency_names;
-use crate::bindings::_helpers::planner_scope::sources::build_source_load_entries;
 use crate::bindings::_helpers::planner_strategy::audit_entries::build_selected_audit_entries;
-use crate::bindings::_helpers::planner_strategy::fixture_context::planning_context;
 use crate::bindings::_helpers::planner_strategy::model_entries::extract_seed_columns;
-use crate::bindings::_helpers::sql_test_glue::models::SqlTestAssembly;
-use crate::bindings::_helpers::sql_test_glue::plan_assembly::assemble_sql_test_plans;
-use crate::bindings::_helpers::sql_test_glue::plan_driver::sql_test_model_chain_names_by_key;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -32,6 +22,26 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_scope::main::build_source_load_entries::build_source_load_entries;
+use sqlbuild_python_project::planner_scope::main::upstream_loader_dependency_names::upstream_loader_dependency_names;
+use sqlbuild_python_project::planner_strategy::main::planning_context::planning_context;
+use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
+use sqlbuild_python_project::resource_views::main::function_reads::entry_point::entry_point;
+use sqlbuild_python_project::resource_views::main::function_reads::fingerprint_destination::fingerprint_destination;
+use sqlbuild_python_project::resource_views::main::function_reads::language::language;
+use sqlbuild_python_project::resource_views::main::function_reads::packages::packages;
+use sqlbuild_python_project::resource_views::main::function_reads::relative_path::relative_path;
+use sqlbuild_python_project::resource_views::main::function_reads::return_columns::return_columns;
+use sqlbuild_python_project::resource_views::main::function_reads::returns::returns;
+use sqlbuild_python_project::resource_views::main::function_reads::runtime_version::runtime_version;
+use sqlbuild_python_project::resource_views::main::function_reads::source_file_path::source_file_path;
+use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
+use sqlbuild_python_project::sql_test_glue::main::assemble_sql_test_plans::assemble_sql_test_plans;
+use sqlbuild_python_project::sql_test_glue::main::sql_test_model_chain_names_by_key_function::sql_test_model_chain_names_by_key_function;
+use sqlbuild_python_project::sql_test_glue::models::SqlTestAssembly;
 
 const LOADER_CONSUMER: &str = "loader";
 const HOOK_CONSUMER: &str = "hook";
@@ -112,27 +122,31 @@ fn seed_entries<'py>(
     let metadata_jsons = native_field(extras, "seed_metadata_jsons")?;
     let plan_reasons = native_field(extras, "seed_plan_reasons")?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for seed in project_reads::seeds(project)?.try_iter()? {
+    for seed in
+        sqlbuild_python_project::compiled_views::main::project::seeds::seeds(project)?.try_iter()?
+    {
         let seed = seed?;
-        if !selected_keys.contains(seed_reads::key(&seed)?)? {
+        if !selected_keys
+            .contains(sqlbuild_python_project::resource_views::main::seed_reads::key::key(&seed)?)?
+        {
             continue;
         }
-        let name = seed_reads::name(&seed)?;
+        let name = sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?;
         entries.push(planner_model(
             py,
             RecordId::SeedPlanEntry,
             &[
-                ("key", seed_reads::key(&seed)?),
+                ("key", sqlbuild_python_project::resource_views::main::seed_reads::key::key(&seed)?),
                 ("name", name.clone()),
-                ("destination", seed_reads::destination(&seed)?),
+                ("destination", sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(&seed)?),
                 (
                     "file_path",
-                    native_field(&seed_reads::seed_file(&seed)?, "file_path")?,
+                    native_field(&seed_file(&seed)?, "file_path")?,
                 ),
                 ("columns", object(py, extract_seed_columns(&seed)?)?),
                 (
                     "csv_settings",
-                    native_field(&seed_reads::schema_entry(&seed)?, "csv_settings")?,
+                    native_field(&schema_entry(&seed)?, "csv_settings")?,
                 ),
                 (
                     "fingerprint_definition",
@@ -380,30 +394,30 @@ pub(super) fn function_entry<'py>(
         py,
         RecordId::FunctionPlanEntry,
         &[
-            ("key", function_reads::key(function)?),
-            ("name", function_reads::name(function)?),
-            ("relative_path", function_reads::relative_path(function)?),
-            ("destination", function_reads::destination(function)?),
-            ("arguments", function_reads::arguments(function)?),
-            ("returns", function_reads::returns(function)?),
+            ("key", sqlbuild_python_project::resource_views::main::function_reads::key::key(function)?),
+            ("name", sqlbuild_python_project::resource_views::main::function_reads::name::name(function)?),
+            ("relative_path", relative_path(function)?),
+            ("destination", sqlbuild_python_project::resource_views::main::function_reads::destination::destination(function)?),
+            ("arguments", arguments(function)?),
+            ("returns", returns(function)?),
             ("body_sql", body_sql),
             ("fingerprint_query_sql", fingerprint_query_sql),
             (
                 "fingerprint_destination",
-                function_reads::fingerprint_destination(function)?,
+                fingerprint_destination(function)?,
             ),
-            ("return_columns", function_reads::return_columns(function)?),
-            ("language", function_reads::language(function)?),
+            ("return_columns", return_columns(function)?),
+            ("language", language(function)?),
             (
                 "source_file_path",
-                function_reads::source_file_path(function)?,
+                source_file_path(function)?,
             ),
             (
                 "runtime_version",
-                function_reads::runtime_version(function)?,
+                runtime_version(function)?,
             ),
-            ("entry_point", function_reads::entry_point(function)?),
-            ("packages", function_reads::packages(function)?),
+            ("entry_point", entry_point(function)?),
+            ("packages", packages(function)?),
             ("previous_query_sql", previous_query_sql),
             ("reason", reason),
         ],
@@ -420,12 +434,18 @@ fn function_entries<'py>(
     let functions = native_field(changes, "functions")?;
     let previous = native_field(&native_field(snapshot, "fingerprints")?, "functions")?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for function in project_reads::functions(project)?.try_iter()? {
+    for function in
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?
+            .try_iter()?
+    {
         let function = function?;
-        if !selected_keys.contains(function_reads::key(&function)?)? {
+        if !selected_keys.contains(
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
+        )? {
             continue;
         }
-        let name = function_reads::name(&function)?;
+        let name =
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?;
         let change = functions.get_item(&name)?;
         let previous_query_sql = if previous.contains(&name)? {
             native_field(&previous.get_item(&name)?, "definition")?
@@ -480,7 +500,7 @@ pub(super) fn selected_test_entries<'py>(
 ) -> PyResult<SelectedTests<'py>> {
     let py = project.py();
     let mut selected: Vec<Bound<'py, PyAny>> = Vec::new();
-    for test in project_reads::sql_tests(project)?.try_iter()? {
+    for test in sql_tests(project)?.try_iter()? {
         let test = test?;
         if !test_selected(&test, selected_keys, selection)? {
             continue;
@@ -785,6 +805,6 @@ fn build_selected_test_entries<'py>(
 }
 
 pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(sql_test_model_chain_names_by_key, module)?)?;
+    module.add_function(sql_test_model_chain_names_by_key_function(module)?)?;
     module.add_function(wrap_pyfunction!(build_selected_test_entries, module)?)
 }

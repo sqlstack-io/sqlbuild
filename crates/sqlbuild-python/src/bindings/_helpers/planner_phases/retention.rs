@@ -4,8 +4,6 @@ use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::native_host::types::Syntax;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_phases::constants::BIGQUERY_ADAPTER;
 use crate::bindings::_helpers::planner_phases::constants::DECREASE_WARNING;
 use crate::bindings::_helpers::planner_phases::constants::DOWNGRADE_HISTORY_DAYS;
@@ -15,20 +13,8 @@ use crate::bindings::_helpers::planner_phases::constants::RETENTION_INCREASE;
 use crate::bindings::_helpers::planner_phases::constants::RETENTION_MATCH;
 use crate::bindings::_helpers::planner_phases::constants::SNOWFLAKE_ADAPTER;
 use crate::bindings::_helpers::planner_phases::constants::TRANSIENT_TABLE_TYPE;
-use crate::bindings::_helpers::planner_phases::objects::construct;
-use crate::bindings::_helpers::planner_phases::objects::member;
-use crate::bindings::_helpers::planner_phases::objects::native;
-use crate::bindings::_helpers::planner_phases::objects::native_member;
-use crate::bindings::_helpers::planner_phases::objects::optional_text;
-use crate::bindings::_helpers::planner_phases::objects::planner_error;
-use crate::bindings::_helpers::planner_phases::objects::planner_model;
-use crate::bindings::_helpers::planner_phases::objects::replace;
-use crate::bindings::_helpers::planner_phases::objects::sorted_names;
-use crate::bindings::_helpers::planner_phases::objects::text;
-use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_reads;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::reads::Read;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -45,6 +31,22 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::typed_values::typed_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::planner_phases::main::construct::construct;
+use sqlbuild_python_project::planner_phases::main::member::member;
+use sqlbuild_python_project::planner_phases::main::native::native;
+use sqlbuild_python_project::planner_phases::main::native_member::native_member;
+use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
+use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
+use sqlbuild_python_project::planner_phases::main::planner_model::planner_model;
+use sqlbuild_python_project::planner_phases::main::replace::replace;
+use sqlbuild_python_project::planner_phases::main::sorted_names::sorted_names;
+use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::{BTreeMap, BTreeSet};
 
 const MATERIALIZED_KEY: &str = "materialized";
@@ -77,12 +79,12 @@ fn selected_models<'py>(
     let scope = scope_data(scope)?;
     let mut models: Vec<_> = Vec::new();
     for model in
-        project_reads::models(&runtime_field(runtime, |runtime| &runtime.project)?)?.try_iter()?
+        compiled_models(&runtime_field(runtime, |runtime| &runtime.project)?)?.try_iter()?
     {
         let model = model?;
         if scope
             .selected
-            .contains(&("model".to_owned(), model_reads::model_name(&model)?))
+            .contains(&("model".to_owned(), model_name(&model)?))
         {
             models.push(model);
         }
@@ -108,12 +110,17 @@ pub(crate) fn plan_table_types<'py>(
     let mut declared: Vec<_> = Vec::new();
     for model in &models {
         if native_field(
-            &native_field(&model_reads::config(model)?, "table_type")?,
+            &native_field(
+                &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(
+                    model,
+                )?,
+                "table_type",
+            )?,
             "declared",
         )?
         .is_truthy()?
         {
-            declared.push(model_reads::model_name(model)?);
+            declared.push(model_name(model)?);
         }
     }
     if !declared.is_empty() && !snowflake {
@@ -149,7 +156,7 @@ pub(crate) fn plan_table_types<'py>(
         if !backed.is_truthy()? {
             continue;
         }
-        let relation = mapping_get(&relations, model_reads::name_object(&model)?)?;
+        let relation = mapping_get(&relations, name_object(&model)?)?;
         if relation.is_none() {
             continue;
         }
@@ -165,7 +172,7 @@ pub(crate) fn plan_table_types<'py>(
             continue;
         }
         let downgrade = actual == Some(false) && desired_transient;
-        let destination = model_reads::destination(&model)?;
+        let destination = destination(&model)?;
         let limit: i64 = dialect
             .syntax("maximum_identifier_length")?
             .call0()?
@@ -175,7 +182,7 @@ pub(crate) fn plan_table_types<'py>(
             py,
             RecordId::TableTypePlanEntry,
             &[
-                ("model_name", model_reads::name_object(&model)?),
+                ("model_name", name_object(&model)?),
                 ("destination", destination),
                 ("copy_name", text(py, &copy_name(&target_name, limit))),
                 ("desired_type", native_field(&native_field(&table_type, "value")?, "value")?),
@@ -325,7 +332,7 @@ fn relation_retention<'py>(
     model: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let py = runtime.py();
-    let name: String = model_reads::model_name(model)?;
+    let name: String = model_name(model)?;
     let config = native_field(model, "config")?;
     let retention = native_field(&config, "time_travel_retention")?;
     if native_field(&retention, "desired_days")?.is_none()
@@ -338,7 +345,10 @@ fn relation_retention<'py>(
         ));
     }
     let desired_days: i64 = native_field(&retention, "desired_days")?.extract()?;
-    let destination = model_reads::destination(model)?;
+    let destination =
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
+            model,
+        )?;
     let schema = native_field(&destination, "schema")?;
     if schema.is_none() {
         return Err(planner_error(
@@ -351,7 +361,7 @@ fn relation_retention<'py>(
         py,
         AdapterHost::RetentionRequest,
         &[
-            ("request_id", model_reads::name_object(model)?),
+            ("request_id", name_object(model)?),
             (
                 "scope",
                 member(py, AdapterHost::RetentionScope, "relation")?,
@@ -364,14 +374,14 @@ fn relation_retention<'py>(
     )?;
     let mut base = RetentionEntry {
         request: request.clone(),
-        model_names: tuple(py, vec![model_reads::name_object(model)?])?,
+        model_names: tuple(py, vec![name_object(model)?])?,
         state: None,
         source: native_field(&native_field(&retention, "source")?, "value")?,
     };
     let snowflake = adapter_is(runtime, SNOWFLAKE_ADAPTER)?;
     let table_type = native_field(&native_field(&config, "table_type")?, "value")?;
     let relations = native_field(&native_field(warehouse, "snapshot")?, "existing_relations")?;
-    if !relations.contains(model_reads::name_object(model)?)? {
+    if !relations.contains(name_object(model)?)? {
         if snowflake && desired_days > 1 && table_type.eq(TRANSIENT_TABLE_TYPE)? {
             return Err(transient_error(py, &name, desired_days, "set "));
         }
@@ -382,7 +392,7 @@ fn relation_retention<'py>(
             flatten(&changes)?,
         )?]);
     }
-    let relation = relations.get_item(model_reads::name_object(model)?)?;
+    let relation = relations.get_item(name_object(model)?)?;
     let relation_transient = native_field(&relation, "is_transient")?;
     let lookup = call_with(
         &host_entry(py, AdapterHost::RelationLookup)?.getattr("key")?,
@@ -473,7 +483,7 @@ fn bigquery_retention<'py>(
     {
         let model = model?;
         let retention = native_field(&native_field(&model, "config")?, "time_travel_retention")?;
-        let destination = model_reads::destination(&model)?;
+        let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
         if native_field(&retention, "unmanaged")?.is_truthy()?
             || native_field(&retention, "desired_days")?.is_none()
             || native_field(&destination, "schema")?.is_none()
@@ -490,7 +500,7 @@ fn bigquery_retention<'py>(
     }
     let mut scopes: BTreeSet<(String, String, Option<String>)> = BTreeSet::new();
     for model in models {
-        let destination = model_reads::destination(model)?;
+        let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(model)?;
         let database: Option<String> = native_field(&destination, "database")?.extract()?;
         let schema: String = native_field(&destination, "schema")?.str()?.extract()?;
         scopes.insert((database.clone().unwrap_or_default(), schema, database));
@@ -595,7 +605,12 @@ pub(crate) fn plan_retention<'py>(
     let py = runtime.py();
     let mut models: Vec<_> = Vec::new();
     for model in selected_models(runtime, scope)? {
-        let retention = native_field(&model_reads::config(&model)?, "time_travel_retention")?;
+        let retention = native_field(
+            &sqlbuild_python_project::compiled_views::main::compiled_models::config::config(
+                &model,
+            )?,
+            "time_travel_retention",
+        )?;
         if !native_field(&retention, "unmanaged")?.is_truthy()?
             && !native_field(&retention, "desired_days")?.is_none()
         {

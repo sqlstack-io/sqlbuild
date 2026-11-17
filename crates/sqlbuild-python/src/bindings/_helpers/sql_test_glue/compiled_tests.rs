@@ -70,7 +70,11 @@ impl<'py> Classes<'py> {
             assembly: record_class(py, RecordId::NativeSqlTestAssembly)?,
             failure: record_class(py, RecordId::NativeSqlTestFailure)?,
             location: record_class(py, RecordId::SourceLocation)?,
-            code: PyString::new(py, super::constants::SQL_TEST_HELPER_REFERENCE_CODE).into_any(),
+            code: PyString::new(
+                py,
+                sqlbuild_python_project::sql_test_glue::constants::SQL_TEST_HELPER_REFERENCE_CODE,
+            )
+            .into_any(),
         })
     }
 

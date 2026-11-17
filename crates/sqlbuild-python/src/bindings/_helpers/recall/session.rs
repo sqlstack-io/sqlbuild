@@ -36,7 +36,6 @@ use sqlbuild_recall::writer::models::{
     DeliverySummary, RecallSession, SessionConfig, SessionStore, SetupOutcome,
 };
 
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use crate::bindings::_helpers::recall::clickhouse_store::ClickHouseLocation;
 use crate::bindings::_helpers::recall::clickhouse_store::ClickHouseStoreOpener;
@@ -61,6 +60,7 @@ use crate::bindings::_helpers::recall::replacements::in_replacement_sink;
 use crate::bindings::_helpers::recall::sinks::InvocationEvents;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
 /// What the invocation records: its session, when enabled, and the resolved target and adapter.
 #[derive(Clone, Debug, Default)]

@@ -2,12 +2,9 @@
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::plan_output::display::resolve_bounded_cursor_override;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::constants::CURSOR_START;
 use crate::bindings::_helpers::planner_resolution::cursor_bounds::compute_cursor_bounds;
 use crate::bindings::_helpers::planner_resolution::cursor_policies::future_cursor_config;
@@ -33,6 +30,9 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::planner_phases::main::object::object;
 
 fn config<'py>(model: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = model.py();
@@ -60,11 +60,14 @@ pub(crate) fn unbounded(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 
 fn destination_exists(model: &Bound<'_, PyAny>, snapshot: &Bound<'_, PyAny>) -> PyResult<bool> {
     let relation = native_field(snapshot, "existing_relations")?
-        .call_method1("get", (model_reads::name_object(model)?,))?;
+        .call_method1("get", (name_object(model)?,))?;
     if relation.is_none() {
         return Ok(false);
     }
-    let destination = model_reads::destination(model)?;
+    let destination =
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
+            model,
+        )?;
     let key = call_with(
         &host_entry(model.py(), AdapterHost::RelationLookup)?.getattr("key")?,
         &[
@@ -80,7 +83,7 @@ fn history_redirected(model: &Bound<'_, PyAny>, snapshot: &Bound<'_, PyAny>) -> 
     let target = native_field(snapshot, "target_relation")?;
     Ok(!target.is_none()
         && target.ne(native_field(
-            &model_reads::destination(model)?,
+            &sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(model)?,
             "qualified_name",
         )?)?)
 }
@@ -123,8 +126,8 @@ pub(crate) fn compute_model_cursor_bounds<'py>(
         return Ok(bounded);
     }
     let snapshot = &request.snapshot;
-    let mut cursor_snapshot = native_field(snapshot, "cursor_snapshots")?
-        .call_method1("get", (model_reads::name_object(&model)?,))?;
+    let mut cursor_snapshot =
+        native_field(snapshot, "cursor_snapshots")?.call_method1("get", (name_object(&model)?,))?;
     let roles = resolve_cursor_input_roles(&model)?;
     let producers = class_field(context, |c: &ModelPlanContext| {
         &c.runtime_cursor_producer_names
@@ -151,7 +154,7 @@ pub(crate) fn compute_model_cursor_bounds<'py>(
             let refusal = object(
                 py,
                 empty_input_rebuild_refusal(
-                    &model_reads::name_object(&model)?.extract::<String>()?,
+                    &name_object(&model)?.extract::<String>()?,
                     empty.extract::<Vec<String>>()?,
                     cursor_type.extract::<Option<String>>()?.as_deref(),
                 ),
@@ -177,7 +180,7 @@ pub(crate) fn compute_model_cursor_bounds<'py>(
             };
             return Err(PyErr::from_value(unreadable_cursor_inputs_error(
                 py,
-                &model_reads::name_object(&model)?.extract::<String>()?,
+                &name_object(&model)?.extract::<String>()?,
                 cursor_type.extract::<Option<String>>()?.as_deref(),
                 names.extract::<Vec<String>>()?,
             )?));

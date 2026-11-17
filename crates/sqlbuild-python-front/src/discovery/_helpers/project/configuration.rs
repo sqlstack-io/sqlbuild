@@ -1,36 +1,20 @@
 //! Project inputs holding only the project and local configuration.
 
+use crate::compile_driver::main::reject_invalid_connection_configuration::reject_invalid_connection_configuration;
+use crate::discovery::main::project::load_local_config_file::load_local_config_file;
+use crate::discovery::main::project::load_project_config_file::load_project_config_file;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::types::PyString;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::compile_driver::main::reject_invalid_connection_configuration::reject_invalid_connection_configuration;
 use crate::compile_driver::models::ProjectConfiguration;
-use crate::discovery::_helpers::project::project_config::load_local_config_file;
-use crate::discovery::_helpers::project::project_config::load_project_config_file;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::types::RecordId;
 
-/// `DiscoveredProjectInputs` with the loaded configuration, inside the project discovery lifecycle.
-pub(crate) fn discover_project_configuration<'py>(
-    py: Python<'py>,
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    configuration_inputs(py, project_dir, false)
-}
-
-/// The validated configuration without a discovery lifecycle, which reading two files never needs.
-pub(crate) fn discover_connection_configuration<'py>(
-    py: Python<'py>,
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    loaded_configuration(py, project_dir, true)
-}
-
-fn configuration_inputs<'py>(
+pub(crate) fn configuration_inputs<'py>(
     py: Python<'py>,
     project_dir: &Bound<'py, PyAny>,
     validate_connections: bool,
@@ -50,7 +34,7 @@ fn configuration_inputs<'py>(
     })
 }
 
-fn loaded_configuration<'py>(
+pub(crate) fn loaded_configuration<'py>(
     py: Python<'py>,
     project_dir: &Bound<'py, PyAny>,
     validate_connections: bool,

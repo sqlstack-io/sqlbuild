@@ -35,11 +35,6 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::{ReferenceExtraction, SqlReference};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::SqlTestSettings;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::TestBlockRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::TestCaseRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::TestFileRow;
-use crate::bindings::_helpers::compiled_views::source_views::replaced;
 use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
 use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
 use crate::bindings::_helpers::input_loops::model_loop::compile_error;
@@ -54,6 +49,11 @@ use sqlbuild_python_base::cache::models::SqlTestScanStore;
 use sqlbuild_python_base::compile_context::main::delta::record_test_source_reads::record_test_source_reads;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::render::main::sql_macros::without_with_list_calls::without_with_list_calls;
+use sqlbuild_python_project::compiled_project::models::SqlTestSettings;
+use sqlbuild_python_project::compiled_project::models::TestBlockRow;
+use sqlbuild_python_project::compiled_project::models::TestFileRow;
+use sqlbuild_python_project::compiled_project::types::TestCaseRow;
+use sqlbuild_python_project::resource_views::main::source_views::replaced::replaced;
 
 const MODEL_MODE: &str = "model";
 const MACRO_MODE: &str = "macro";

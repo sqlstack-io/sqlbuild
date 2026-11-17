@@ -4,20 +4,12 @@ use crate::bindings::_helpers::analysis;
 use crate::bindings::_helpers::analysis_session;
 use crate::bindings::_helpers::build_progress;
 use crate::bindings::_helpers::compile_command;
-use crate::bindings::_helpers::compiled_views;
 use crate::bindings::_helpers::compute_logs;
 use crate::bindings::_helpers::dbt_events;
 use crate::bindings::_helpers::dbt_interop;
 use crate::bindings::_helpers::event_exporting;
 use crate::bindings::_helpers::execution_history;
 use crate::bindings::_helpers::freshness::observation::normalize_observation;
-use crate::bindings::_helpers::graph;
-use crate::bindings::_helpers::lineage::lineage_facts::facts_eq;
-use crate::bindings::_helpers::lineage::lineage_facts::facts_getitem;
-use crate::bindings::_helpers::lineage::lineage_facts::facts_iter;
-use crate::bindings::_helpers::lineage::lineage_facts::facts_len;
-use crate::bindings::_helpers::lineage::lineage_facts::facts_projected;
-use crate::bindings::_helpers::lineage::lineage_facts::facts_resource_name;
 use crate::bindings::_helpers::planner_entries;
 use crate::bindings::_helpers::planner_migrations;
 use crate::bindings::_helpers::planner_phases;
@@ -139,6 +131,12 @@ use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
 use sqlbuild_python_base::records::types::ClassProperty;
 use sqlbuild_python_base::records::types::RecordFinish;
+use sqlbuild_python_project::lineage::main::facts_eq::facts_eq;
+use sqlbuild_python_project::lineage::main::facts_getitem::facts_getitem;
+use sqlbuild_python_project::lineage::main::facts_iter::facts_iter;
+use sqlbuild_python_project::lineage::main::facts_len::facts_len;
+use sqlbuild_python_project::lineage::main::facts_projected::facts_projected;
+use sqlbuild_python_project::lineage::main::facts_resource_name::facts_resource_name;
 
 /// Compiler records whose bound values are normalized or validated natively.
 pub(crate) const BEHAVIOUR_FINISHERS: &[(&str, RecordFinish)] = &[
@@ -417,7 +415,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     build_progress::getters::GETTERS,
     compile_command::getters::GETTERS,
     sqlbuild_python_base::compile_context::constants::GETTERS,
-    compiled_views::getters::GETTERS,
+    sqlbuild_python_project::compiled_views::constants::GETTERS,
     compute_logs::getters::GETTERS,
     dbt_events::getters::GETTERS,
     dbt_interop::getters::GETTERS,
@@ -425,7 +423,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     sqlbuild_python_front::discovery::constants::GETTERS,
     event_exporting::getters::GETTERS,
     execution_history::getters::GETTERS,
-    graph::getters::GETTERS,
+    sqlbuild_python_project::graph::constants::GETTERS,
     sqlbuild_python_front::model_config::constants::GETTERS,
     planner_entries::getters::GETTERS,
     planner_migrations::getters::GETTERS,

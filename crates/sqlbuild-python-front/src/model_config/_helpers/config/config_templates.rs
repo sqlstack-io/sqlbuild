@@ -1,26 +1,21 @@
 //! `${...}` templates in authored Python config values and effective vars, expanded natively.
 
+use crate::model_config::main::config::expanded::expanded;
+use crate::model_config::main::config::native_config_error::native_config_error;
+use crate::model_config::main::config::template_error::template_error;
 use crate::model_config::models::PythonHost;
 use crate::model_config::models::Stop;
 use crate::model_config::models::TemplateSources;
 use std::cell::RefCell;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyResult, Python};
-use pyo3::types::{
-    PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyStringMethods, PyTuple,
-    PyTupleMethods,
-};
-use sqlbuild_model_config::errors::ConfigError;
-use sqlbuild_model_config::templates::errors::TemplateError;
-use sqlbuild_model_config::templates::main::expand_template_string::expand_template_string;
-use sqlbuild_model_config::templates::main::template_error_message::template_error_message;
-use sqlbuild_model_config::templates::models::{StringExpansion, TemplateOptions};
+use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyStringMethods, PyTuple};
+use sqlbuild_model_config::templates::models::TemplateOptions;
 use sqlbuild_model_config::templates::types::TemplateHost;
 
-use crate::model_config::_helpers::config::config_errors::native_config_error;
 use crate::model_config::errors::NativeConfigError;
 
-const TEMPLATE_OPEN_TOKEN: &str = "${";
+pub(crate) const TEMPLATE_OPEN_TOKEN: &str = "${";
 pub(crate) const ENVIRONMENT_READ: &str = "env";
 pub(crate) const CONTEXT_READ: &str = "ctx";
 pub(crate) const EFFECTIVE_VARS_LABEL: &str = "effective vars";
@@ -36,11 +31,6 @@ const SURROGATE_PASS: &str = "surrogatepass";
 pub(crate) struct EffectiveVars<'py> {
     pub(crate) resolved: Bound<'py, PyDict>,
     pub(crate) resolving: RefCell<Vec<String>>,
-}
-
-/// The `CompileInputError` Python raises for a template error in the context `label`.
-pub(crate) fn template_error(error: &TemplateError, label: &str) -> ConfigError {
-    ConfigError::compile(template_error_message(error, label))
 }
 
 /// The expanded value, or the native error expansion stopped at, and the reads in order.
@@ -159,53 +149,4 @@ fn outcome<'py>(
         Err(Stop::Python(error)) => return Err(error),
     };
     Ok((value, host.into_reads()))
-}
-
-/// Expand every template in `value` and the containers inside it.
-pub(crate) fn expanded<'py>(
-    host: &PythonHost<'py>,
-    value: &Bound<'py, PyAny>,
-    options: TemplateOptions,
-) -> Result<Bound<'py, PyAny>, Stop> {
-    let py = host.py;
-    if let Ok(text) = value.downcast::<PyString>() {
-        let text = text.to_str().map_err(Stop::Python)?;
-        if !text.contains(TEMPLATE_OPEN_TOKEN) {
-            return Ok(value.clone());
-        }
-        return match expand_template_string(host, text, options) {
-            Ok(StringExpansion::Unchanged) => Ok(PyString::new(py, text).into_any()),
-            Ok(StringExpansion::Value(result)) => Ok(result),
-            Ok(StringExpansion::Text(result)) => Ok(PyString::new(py, &result).into_any()),
-            Err(failure) => Err(host.stop(failure)),
-        };
-    }
-    if let Ok(mapping) = value.downcast::<PyDict>() {
-        let result = PyDict::new(py);
-        for (key, item) in mapping.iter() {
-            result
-                .set_item(key, expanded(host, &item, options)?)
-                .map_err(Stop::Python)?;
-        }
-        return Ok(result.into_any());
-    }
-    if let Ok(items) = value.downcast::<PyList>() {
-        let result = items
-            .iter()
-            .map(|item| expanded(host, &item, options))
-            .collect::<Result<Vec<_>, _>>()?;
-        return PyList::new(py, result)
-            .map(Bound::into_any)
-            .map_err(Stop::Python);
-    }
-    if let Ok(items) = value.downcast::<PyTuple>() {
-        let result = items
-            .iter()
-            .map(|item| expanded(host, &item, options))
-            .collect::<Result<Vec<_>, _>>()?;
-        return PyTuple::new(py, result)
-            .map(Bound::into_any)
-            .map_err(Stop::Python);
-    }
-    Ok(value.clone())
 }

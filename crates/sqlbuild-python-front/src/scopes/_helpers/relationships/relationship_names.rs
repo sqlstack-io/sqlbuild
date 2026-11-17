@@ -1,7 +1,7 @@
 //! Expected-model relationship names and top-level CTEs of SQL tests and scenarios, scanned natively.
 
-use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{PyResult, Python};
+use pyo3::pyfunction;
 use sqlbuild_scopes::relationship_names::main::expected_model_names::expected_model_names;
 use sqlbuild_scopes::relationship_names::main::top_level_ctes::scan_top_level_ctes;
 use sqlbuild_scopes::relationship_names::models::{
@@ -26,7 +26,7 @@ fn source(scenario: bool) -> RelationshipSource {
 
 /// Each `(sql, file label)` body's expected models or the scan's error.
 #[pyfunction]
-fn scope_expected_model_names(
+pub(crate) fn scope_expected_model_names(
     py: Python<'_>,
     texts: Vec<(String, String)>,
     scenario: bool,
@@ -47,7 +47,7 @@ fn scope_expected_model_names(
 
 /// Each `(sql, file label)` test body's top-level CTEs or the scan's error.
 #[pyfunction]
-fn scope_test_ctes(
+pub(crate) fn scope_test_ctes(
     py: Python<'_>,
     texts: Vec<(String, String)>,
     syntax: LexicalSyntaxInput,
@@ -70,10 +70,4 @@ fn scope_test_ctes(
             TopLevelCtes::Failed(message) => (Some(message), Vec::new()),
         })
         .collect())
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(scope_expected_model_names, module)?)?;
-    module.add_function(wrap_pyfunction!(scope_test_ctes, module)?)?;
-    Ok(())
 }

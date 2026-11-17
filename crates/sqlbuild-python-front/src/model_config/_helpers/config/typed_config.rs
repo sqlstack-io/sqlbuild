@@ -1,6 +1,7 @@
 //! Built model config trees retained natively, with Python-authored values converted on first read.
 
-use crate::model_config::models::TypedConfigValues;
+use crate::model_config::main::config::config_node::config_node;
+use crate::model_config::main::config::config_object::config_object;
 use crate::model_config::types::BuiltConfigValues;
 use crate::model_config::types::ConfigValues;
 use std::collections::HashMap;
@@ -8,35 +9,23 @@ use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyString, PyTuple};
+use pyo3::types::PyString;
 use sqlbuild_model_config::config_values::errors::ConfigTypeError;
-use sqlbuild_model_config::config_values::main::checked_cursor_bound::checked_cursor_bound;
-use sqlbuild_model_config::config_values::main::checked_flag::checked_flag;
-use sqlbuild_model_config::config_values::main::checked_integer::checked_integer;
-use sqlbuild_model_config::config_values::main::checked_text::checked_text;
-use sqlbuild_model_config::config_values::main::checked_texts::checked_texts;
 use sqlbuild_model_config::config_values::models::{ConfigNode, CursorBound, HostChildren};
 
-use crate::model_config::_helpers::config::config_nodes::PyConfigEntries;
-use crate::model_config::_helpers::config::config_nodes::config_node;
-use crate::model_config::_helpers::config::config_nodes::config_object;
-use crate::model_config::_helpers::config::config_nodes::is_exact_container;
+use crate::model_config::_helpers::config::config_nodes::{PyConfigEntries, is_exact_container};
 use crate::model_config::_helpers::config::config_values::config_value_type_error;
 use crate::model_config::models::HostHandle;
 use crate::model_config::types::PyConfigNode;
 use sqlbuild_python_base::compile_driver::constants::TYPED_CONFIG_READS;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
-use sqlbuild_python_base::records::main::fields::cached_value::cached_value;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
-use sqlbuild_python_base::records::main::fields::store_cached::store_cached;
-use sqlbuild_python_base::records::models::NativeRecord;
 
-const CONFIG_FIELD: &str = "config";
-const VALUES_FIELD: &str = "values";
+pub(crate) const CONFIG_FIELD: &str = "config";
+pub(crate) const VALUES_FIELD: &str = "values";
 const ISOFORMAT_METHOD: &str = "isoformat";
 /// The config record's cache slot holding its typed values; no Python attribute reads it.
-const TYPED_VALUES_SLOT: &str = "__typed_values__";
+pub(crate) const TYPED_VALUES_SLOT: &str = "__typed_values__";
 const POISONED: &str = "typed config values cache is poisoned";
 
 /// Keep the builder's tree without interpreting custom Python mapping keys natively.
@@ -51,28 +40,8 @@ pub(crate) fn built_values(entries: PyConfigEntries) -> Option<BuiltConfigValues
     Some(Arc::new(values))
 }
 
-/// Attach the built tree to its public record, rather than reconstructing it from that view.
-pub(crate) fn retain_values(
-    config: &Bound<'_, PyAny>,
-    built: Option<&BuiltConfigValues>,
-) -> PyResult<()> {
-    if let Some(built) = built
-        && let Ok(record) = config.cast::<NativeRecord>()
-    {
-        let typed = Bound::new(
-            config.py(),
-            TypedConfigValues {
-                built: Some(Arc::clone(built)),
-                read: Mutex::new(Vec::new()),
-            },
-        )?;
-        store_cached(record, TYPED_VALUES_SLOT, &typed.into_any().unbind())?;
-    }
-    Ok(())
-}
-
 /// `values.get(key)` as a typed node, `None` when absent; each key is converted once.
-fn node(values: &ConfigValues<'_>, key: &str) -> PyResult<Arc<PyConfigNode>> {
+pub(crate) fn node(values: &ConfigValues<'_>, key: &str) -> PyResult<Arc<PyConfigNode>> {
     let (mapping, typed) = values;
     let py: Python<'_> = mapping.py();
     let built = typed.get().built.as_ref().map(|values| values.get(key));
@@ -111,43 +80,6 @@ fn node(values: &ConfigValues<'_>, key: &str) -> PyResult<Arc<PyConfigNode>> {
     Ok(node)
 }
 
-/// A config record's values, their typed nodes kept on the record so each key converts once.
-pub(crate) fn typed_values<'py>(config: &Bound<'py, PyAny>) -> PyResult<ConfigValues<'py>> {
-    let py: Python<'py> = config.py();
-    let values: Bound<'py, PyAny> = native_field(config, VALUES_FIELD)?;
-    let fresh = || {
-        Bound::new(
-            py,
-            TypedConfigValues {
-                built: None,
-                read: Mutex::new(Vec::new()),
-            },
-        )
-    };
-    let Ok(record) = config.cast::<NativeRecord>() else {
-        let typed: Bound<'py, TypedConfigValues> = fresh()?;
-        return Ok((values, typed));
-    };
-    let typed: Bound<'py, TypedConfigValues> = match cached_value(record, TYPED_VALUES_SLOT)? {
-        Some(typed) => typed.into_bound(py).cast_into()?,
-        None => {
-            let typed: Bound<'py, TypedConfigValues> = fresh()?;
-            store_cached(
-                record,
-                TYPED_VALUES_SLOT,
-                &typed.clone().into_any().unbind(),
-            )?;
-            typed
-        }
-    };
-    Ok((values, typed))
-}
-
-/// A model's config values as typed nodes, read key by key.
-pub(crate) fn model_values<'py>(model: &Bound<'py, PyAny>) -> PyResult<ConfigValues<'py>> {
-    typed_values(&native_field(model, CONFIG_FIELD)?)
-}
-
 /// The `ConfigValueTypeError` a typed read raises, naming the value's Python type.
 pub(crate) fn type_error(py: Python<'_>, error: &ConfigTypeError<'_, HostHandle>) -> PyErr {
     let raised = || -> PyResult<PyErr> {
@@ -172,51 +104,6 @@ pub(crate) fn node_text(py: Python<'_>, node: &PyConfigNode) -> PyResult<String>
     }
 }
 
-/// `key`'s string value, or `None` when absent or `None`.
-pub(crate) fn config_text(
-    py: Python<'_>,
-    values: &ConfigValues<'_>,
-    key: &str,
-) -> PyResult<Option<String>> {
-    let node: Arc<PyConfigNode> = node(values, key)?;
-    checked_text(key, Some(&node))
-        .map_err(|error| type_error(py, &error))?
-        .map(|value| node_text(py, value))
-        .transpose()
-}
-
-/// `key`'s string value as its Python object, or `None` when absent or `None`.
-pub(crate) fn config_text_object<'py>(
-    py: Python<'py>,
-    values: &ConfigValues<'_>,
-    key: &str,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let node: Arc<PyConfigNode> = node(values, key)?;
-    checked_text(key, Some(&node))
-        .map_err(|error| type_error(py, &error))?
-        .map(|value| config_object(py, value))
-        .transpose()
-}
-
-/// Whether `key` holds a string equal to `expected`, as Python's `==` compares them.
-pub(crate) fn config_text_is(
-    py: Python<'_>,
-    values: &ConfigValues<'_>,
-    key: &str,
-    expected: &str,
-) -> PyResult<bool> {
-    let node: Arc<PyConfigNode> = node(values, key)?;
-    let text: Option<&PyConfigNode> =
-        checked_text(key, Some(&node)).map_err(|error| type_error(py, &error))?;
-    Ok(match text {
-        Some(ConfigNode::Str(text)) => text == expected,
-        Some(ConfigNode::Host(host)) if host.facts.strict_text => {
-            host.facts.text.as_deref() == Some(expected)
-        }
-        _ => false,
-    })
-}
-
 /// A cursor bound's text object: a string's or integer's `str()`, a date's `isoformat()`.
 pub(crate) fn cursor_bound_object<'py>(
     py: Python<'py>,
@@ -230,73 +117,4 @@ pub(crate) fn cursor_bound_object<'py>(
         }
         CursorBound::Stringified(value) => Ok(config_object(py, value)?.str()?.into_any()),
     }
-}
-
-/// `key`'s cursor bound as text, or `None` when absent or `None`.
-pub(crate) fn config_cursor_bound<'py>(
-    py: Python<'py>,
-    values: &ConfigValues<'_>,
-    key: &str,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let node: Arc<PyConfigNode> = node(values, key)?;
-    checked_cursor_bound(key, Some(&node))
-        .map_err(|error| type_error(py, &error))?
-        .map(|bound| cursor_bound_object(py, bound))
-        .transpose()
-}
-
-/// `values.get(key)` as its Python object, `None` when absent.
-pub(crate) fn config_value<'py>(
-    py: Python<'py>,
-    values: &ConfigValues<'_>,
-    key: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    let value: Arc<PyConfigNode> = node(values, key)?;
-    config_object(py, &value)
-}
-
-/// `values.get(key)` as its typed node, `None` (null) when absent.
-pub(crate) fn config_node_of(values: &ConfigValues<'_>, key: &str) -> PyResult<Arc<PyConfigNode>> {
-    node(values, key)
-}
-
-/// `key`'s boolean value, or `None` when absent or `None`.
-pub(crate) fn config_flag(
-    py: Python<'_>,
-    values: &ConfigValues<'_>,
-    key: &str,
-) -> PyResult<Option<bool>> {
-    let node: Arc<PyConfigNode> = node(values, key)?;
-    checked_flag(key, Some(&node)).map_err(|error| type_error(py, &error))
-}
-
-/// `key`'s integer value as its Python object, or `None` when absent or `None`.
-pub(crate) fn config_integer_object<'py>(
-    py: Python<'py>,
-    values: &ConfigValues<'_>,
-    key: &str,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let node: Arc<PyConfigNode> = node(values, key)?;
-    checked_integer(key, Some(&node))
-        .map_err(|error| type_error(py, &error))?
-        .map(|value| config_object(py, value))
-        .transpose()
-}
-
-/// `key`'s strings as a tuple, or `None` when absent or `None`.
-pub(crate) fn config_text_tuple<'py>(
-    py: Python<'py>,
-    values: &ConfigValues<'_>,
-    key: &str,
-) -> PyResult<Option<Bound<'py, PyTuple>>> {
-    let node: Arc<PyConfigNode> = node(values, key)?;
-    let Some(items) = checked_texts(key, Some(&node)).map_err(|error| type_error(py, &error))?
-    else {
-        return Ok(None);
-    };
-    let objects: Vec<Bound<'py, PyAny>> = items
-        .into_iter()
-        .map(|item| config_object(py, item))
-        .collect::<PyResult<_>>()?;
-    PyTuple::new(py, objects).map(Some)
 }

@@ -1,16 +1,15 @@
 //! Typed values read from raw authored configuration mappings, rejecting the wrong types.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
+use crate::model_config::main::config::config_node::config_node;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::{PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_model_config::config_values::main::checked_cursor_bound::checked_cursor_bound;
 use sqlbuild_model_config::config_values::main::checked_flag::checked_flag;
 use sqlbuild_model_config::config_values::main::checked_integer::checked_integer;
-use sqlbuild_model_config::config_values::main::checked_text::checked_text;
 use sqlbuild_model_config::config_values::main::checked_texts::checked_texts;
 use sqlbuild_model_config::config_values::models::CursorBound;
 
-use crate::model_config::_helpers::config::config_nodes::config_node;
 use crate::model_config::_helpers::config::typed_config::type_error;
 use crate::model_config::types::PyConfigNode;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -47,25 +46,12 @@ pub(crate) fn config_value_type_error<'py>(
 }
 
 /// `values.get(key)` as a config node.
-fn authored_node<'py>(
+pub(crate) fn authored_node<'py>(
     values: &Bound<'py, PyAny>,
     key: &str,
 ) -> PyResult<(PyConfigNode, Bound<'py, PyAny>)> {
     let value = mapping_get(values, key)?;
     Ok((config_node(&value)?, value))
-}
-
-/// An authored string, preserving a present empty string.
-#[pyfunction(name = "get_config_str")]
-#[pyo3(signature = (*, values, key))]
-pub(crate) fn config_str<'py>(
-    values: &Bound<'py, PyAny>,
-    key: &str,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let (node, value) = authored_node(values, key)?;
-    let checked =
-        checked_text(key, Some(&node)).map_err(|error| type_error(values.py(), &error))?;
-    Ok(checked.map(|_| value))
 }
 
 /// An authored boolean, or `None` when the key is absent or `None`.
@@ -126,13 +112,4 @@ pub(crate) fn config_cursor_bound<'py>(
         Some(CursorBound::Dated(_)) => Some(value.call_method0(ISOFORMAT_METHOD)?),
         Some(CursorBound::Stringified(_)) => Some(value.str()?.into_any()),
     })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(config_str, module)?)?;
-    module.add_function(wrap_pyfunction!(config_bool, module)?)?;
-    module.add_function(wrap_pyfunction!(config_string_tuple, module)?)?;
-    module.add_function(wrap_pyfunction!(config_int, module)?)?;
-    module.add_function(wrap_pyfunction!(config_cursor_bound, module)?)?;
-    Ok(())
 }

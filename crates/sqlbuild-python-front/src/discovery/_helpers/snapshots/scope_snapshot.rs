@@ -1,27 +1,23 @@
 //! Tolerant discovery of the scope-relevant authored roots, keeping each independent file fault.
 
+use crate::discovery::main::project::load_local_config_file::load_local_config_file;
+use crate::discovery::main::project::load_project_config_file::load_project_config_file;
+use crate::discovery::main::records::discover_audit_files::discover_audit_files;
+use crate::discovery::main::records::discover_constant_files::discover_constant_files;
+use crate::discovery::main::records::discover_enum_files::discover_enum_files;
+use crate::discovery::main::records::discover_macro_files::discover_macro_files;
+use crate::discovery::main::records::discover_model_schema_files::discover_model_schema_files;
+use crate::discovery::main::records::discover_scenario_files::discover_scenario_files;
+use crate::discovery::main::records::discover_source_files::discover_source_files;
+use crate::discovery::main::records::discover_sql_function_files::discover_sql_function_files;
+use crate::discovery::main::records::discover_sql_hook_files::discover_sql_hook_files;
+use crate::discovery::main::records::discover_test_files::discover_test_files;
+use crate::discovery::main::records::discovered_model_files::discovered_model_files;
 use pyo3::exceptions::{PyOSError, PySyntaxError, PyUnicodeError, PyValueError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::discovery::_helpers::project::project_config::load_local_config_file;
-use crate::discovery::_helpers::project::project_config::load_project_config_file;
-use crate::discovery::_helpers::records::declaration_records::discover_audit_files;
-use crate::discovery::_helpers::records::declaration_records::discover_constant_files;
-use crate::discovery::_helpers::records::declaration_records::discover_enum_files;
-use crate::discovery::_helpers::records::declaration_records::discover_macro_files;
-use crate::discovery::_helpers::records::declaration_records::discover_model_schema_files;
-use crate::discovery::_helpers::records::declaration_records::discover_sql_function_files;
-use crate::discovery::_helpers::records::declaration_records::discover_sql_hook_files;
 use crate::discovery::_helpers::records::declaration_records::path_class;
-use crate::discovery::_helpers::records::model_records::discovered_model_files;
-use crate::discovery::_helpers::records::sql_test_records::discover_scenario_files;
-use crate::discovery::_helpers::records::sql_test_records::discover_test_files;
-use crate::discovery::_helpers::records::yaml_records::discover_source_files;
-use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
 use crate::discovery::models::ModelFileSelection;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -177,7 +173,9 @@ fn chained<'py>(py: Python<'py>, lists: &[&Bound<'py, PyList>]) -> PyResult<Boun
     PyTuple::new(py, items)
 }
 
-fn tolerant_discovery<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn tolerant_discovery<'py>(
+    project_dir: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project_dir.py();
     let faults = Faults {
         project_dir: project_dir.clone(),
@@ -262,17 +260,4 @@ fn tolerant_discovery<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Bound<'p
             ("config_faults", chained(py, &[&config_faults])?.into_any()),
         ],
     )
-}
-
-/// Parse the scope-relevant authored roots while retaining independent file faults.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir))]
-pub(crate) fn discover_scope_snapshot<'py>(
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    in_snapshot(project_dir, || tolerant_discovery(project_dir))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_scope_snapshot, module)?)
 }

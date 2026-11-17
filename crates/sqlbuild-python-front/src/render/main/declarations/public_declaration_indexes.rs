@@ -1,15 +1,24 @@
 //! Every public enum and constant by name, collision-checked.
 
-use crate::render::_helpers::declarations::declaration_indexes;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::render::_helpers::declarations::declaration_indexes::index_declarations;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::PyDict;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Every public enum and constant by name, collision-checked.
-#[inline]
+#[pyfunction]
 pub fn public_declaration_indexes<'py>(
     inputs: Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyDict>, Bound<'py, PyDict>)> {
-    declaration_indexes::public_declaration_indexes(inputs)
+    let py: Python<'py> = inputs.py();
+    let enums: Bound<'py, PyDict> = PyDict::new(py);
+    let constants: Bound<'py, PyDict> = PyDict::new(py);
+    index_declarations(&native_field(&inputs, "enum_files")?, "enum", &enums)?;
+    index_declarations(
+        &native_field(&inputs, "constant_files")?,
+        "constant",
+        &constants,
+    )?;
+    Ok((enums, constants))
 }

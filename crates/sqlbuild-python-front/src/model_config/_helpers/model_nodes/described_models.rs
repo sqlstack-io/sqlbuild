@@ -1,5 +1,8 @@
 //! Which models `[defaults]`, `[path_defaults]` or a reusable model schema describe.
 
+use crate::model_config::main::config::config_node::config_node;
+use crate::model_config::main::config::config_object::config_object;
+use crate::model_config::main::model_nodes::raised_config_error::raised_config_error;
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -11,12 +14,9 @@ use sqlbuild_model_config::path_defaults::main::select_path_default::select_path
 use sqlbuild_model_config::path_defaults::models::PathDefaultChoice;
 use sqlbuild_model_config::types::AuthoredNode;
 
-use crate::model_config::_helpers::config::config_nodes::PyConfigEntries;
-use crate::model_config::_helpers::config::config_nodes::config_entries;
-use crate::model_config::_helpers::config::config_nodes::config_node;
-use crate::model_config::_helpers::config::config_nodes::config_object;
-use crate::model_config::_helpers::config::config_nodes::is_text_node;
-use crate::model_config::_helpers::model_nodes::model_config_builder::raised_config_error;
+use crate::model_config::_helpers::config::config_nodes::{
+    PyConfigEntries, config_entries, is_text_node,
+};
 use crate::model_config::_helpers::model_nodes::project_defaults::project_defaults_mapping;
 use crate::model_config::types::PyConfigNode;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

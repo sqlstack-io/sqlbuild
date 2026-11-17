@@ -22,7 +22,6 @@ use crate::bindings::_helpers::freshness::observation::observe_configured;
 use crate::bindings::_helpers::freshness::observation::strategy;
 use crate::bindings::_helpers::freshness::observation::unknown;
 use crate::bindings::_helpers::freshness::support::text;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::reads::Read;
 use crate::bindings::_helpers::planner_warehouse::synced_reads::PREVIEW_MESSAGE;
@@ -38,6 +37,7 @@ use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::state_rows::main::event_rows::age_policy::age_policy;
 use sqlbuild_python_front::state_rows::main::event_rows::equivalent::equivalent;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavailable";

@@ -35,8 +35,6 @@ use sqlbuild_state::state_tables::main::read_history_sql::read_history_sql;
 use sqlbuild_state::state_tables::models::{HistoryRead, NewestVersions};
 
 use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
-use crate::bindings::_helpers::compiled_project::values::plain_value;
-use crate::bindings::_helpers::fingerprints::latest_rows::row_fingerprint;
 use crate::bindings::_helpers::freshness::state_io::row_record;
 use crate::bindings::_helpers::freshness::support::presumed_utc_datetime;
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
@@ -52,6 +50,8 @@ use sqlbuild_python_base::warehouse_access::main::read_catalog::read_catalog;
 use sqlbuild_python_base::warehouse_access::main::read_statistics::read_statistics;
 use sqlbuild_python_front::authored_values::main::sql_value::sql_value;
 use sqlbuild_python_front::authored_values::models::SqlValueClasses;
+use sqlbuild_python_project::compiled_project::main::plain_value::plain_value;
+use sqlbuild_python_project::fingerprints::main::row_fingerprint::row_fingerprint;
 
 /// A node's builds share these columns, as the control store groups them.
 const FINGERPRINT_IDENTITY_COLUMNS: [&str; 5] = [

@@ -1,11 +1,6 @@
 //! Per-model full-refresh resolution and full-rebuild refusals.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_phases::constants::FULL_REFRESH_DISABLED_REBUILD_CODE;
-use crate::bindings::_helpers::planner_phases::objects::frozenset;
-use crate::bindings::_helpers::planner_phases::objects::planner_error;
-use crate::bindings::_helpers::planner_phases::objects::strings;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyBool;
@@ -14,6 +9,12 @@ use sqlbuild_analysis::planner_warehouse::models::FullRebuildFacts;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::planner_phases::main::frozenset::frozenset;
+use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
+use sqlbuild_python_project::planner_phases::main::strings::strings;
 
 const FULL_REFRESH_KEY: &str = "full_refresh";
 
@@ -39,10 +40,10 @@ pub(crate) fn effectively_full_refreshed_model_names<'py>(
     cli_full_refresh: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let mut names: Vec<_> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         if resolve_model_full_refresh(&model, cli_full_refresh)? {
-            names.push(model_reads::name_object(&model)?);
+            names.push(name_object(&model)?);
         }
     }
     frozenset(project.py(), &names)
@@ -81,7 +82,7 @@ pub(crate) fn check_full_rebuild_allowed(
     {
         return Ok(());
     }
-    let name: String = model_reads::model_name(model)?;
+    let name: String = model_name(model)?;
     Err(planner_error(
         py,
         &format!(

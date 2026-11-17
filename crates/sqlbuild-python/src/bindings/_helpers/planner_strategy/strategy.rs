@@ -1,6 +1,5 @@
 //! Per-model plan actions, schema actions and plan warnings.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_changes::results::native_enum;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyString, PyTuple};
@@ -87,7 +86,10 @@ pub(crate) fn resolve_model_plan_action<'py>(
     let py: Python<'py> = model.py();
     let enabled: Bound<'py, PyAny> = config_value(model, "enabled")?;
     let strategy = ModelStrategy {
-        name: model_reads::model_name(model)?,
+        name:
+            sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name(
+                model,
+            )?,
         disabled: enabled.is_instance_of::<PyBool>() && !enabled.is_truthy()?,
         materialization: model_materialization(model)?,
         incremental_strategy: optional_string(&config_value(model, "incremental_strategy")?)?,

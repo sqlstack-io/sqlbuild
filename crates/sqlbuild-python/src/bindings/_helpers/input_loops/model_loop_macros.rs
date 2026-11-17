@@ -17,9 +17,7 @@ use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_row;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::render::main::expansion::expanded::expanded;
-use sqlbuild_python_front::render::models::ExpansionOutput;
-use sqlbuild_python_front::render::models::NativeMacroExpansion;
-use sqlbuild_python_front::render::models::StateInput;
+use sqlbuild_python_front::render::models::{ExpansionOutput, NativeMacroExpansion, StateInput};
 use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
 
 /// Fields of `_VisibleModelDeclarations` a `DeclarationResolutionContext` is built from.

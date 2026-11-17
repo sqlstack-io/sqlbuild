@@ -23,9 +23,7 @@ use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
-use sqlbuild_python_front::state_rows::constants::COLUMN_KIND;
-use sqlbuild_python_front::state_rows::constants::MODEL_KIND;
-use sqlbuild_python_front::state_rows::constants::OLD_NAME_KIND;
+use sqlbuild_python_front::state_rows::constants::{COLUMN_KIND, MODEL_KIND, OLD_NAME_KIND};
 use sqlbuild_python_front::state_rows::main::migrations::layout::layout;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_views::old_name_views;
 

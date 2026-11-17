@@ -1,5 +1,6 @@
 //! The Python classes native header and YAML parsing build contract objects as.
 
+use crate::model_config::main::model_nodes::contract_classes::contract_classes;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods};
@@ -44,24 +45,11 @@ const YAML_ENTRY_CLASSES: [(&str, RecordId); 9] = [
         RecordId::SourceFreshnessValueKind,
     ),
 ];
-static CONTRACT_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
-static YAML_ENTRY_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
 
-/// The contract classes native header parsing builds columns and audits as.
-pub(crate) fn contract_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
-    CONTRACT_CLASS_TABLE
-        .get_or_try_init(py, || built_contract_classes(py).map(Bound::unbind))
-        .map(|classes| classes.bind(py).clone())
-}
+pub(crate) static CONTRACT_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
+pub(crate) static YAML_ENTRY_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
 
-/// The classes parsed seed and source declarations become.
-pub(crate) fn yaml_entry_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
-    YAML_ENTRY_CLASS_TABLE
-        .get_or_try_init(py, || built_yaml_entry_classes(py).map(Bound::unbind))
-        .map(|classes| classes.bind(py).clone())
-}
-
-fn built_contract_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+pub(crate) fn built_contract_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let classes: Bound<'_, PyDict> = PyDict::new(py);
     for (key, class) in CONTRACT_CLASSES {
         classes.set_item(key, record_class(py, class)?)?;
@@ -77,7 +65,7 @@ fn built_contract_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     Ok(classes)
 }
 
-fn built_yaml_entry_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+pub(crate) fn built_yaml_entry_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let classes: Bound<'_, PyDict> = PyDict::new(py);
     classes.set_item("contracts", contract_classes(py)?)?;
     for (key, class) in YAML_ENTRY_CLASSES {

@@ -1,13 +1,20 @@
 //! The exception a normalization failure raises.
 
-use crate::authored_values::_helpers::sql_values;
-use pyo3::prelude::PyErr;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{PyAnyMethods, PyErr, PyResult, Python};
 use sqlbuild_model_config::sql_values::errors::SqlValueFailure;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
 
 /// The exception a normalization failure raises.
-#[inline]
 pub fn sql_value_error(py: Python<'_>, failure: SqlValueFailure) -> PyResult<PyErr> {
-    sql_values::sql_value_error(py, failure)
+    Ok(match failure {
+        SqlValueFailure::Invalid(message) => PyErr::from_value(
+            native_attr(py, NativeAttr::SqlValueValidationError)?.call1((message,))?,
+        ),
+        SqlValueFailure::DecimalOverflow => {
+            let overflow = py.import("decimal")?.getattr("Overflow")?;
+            let classes = pyo3::types::PyList::new(py, [overflow.clone()])?;
+            PyErr::from_value(overflow.call1((classes,))?)
+        }
+    })
 }

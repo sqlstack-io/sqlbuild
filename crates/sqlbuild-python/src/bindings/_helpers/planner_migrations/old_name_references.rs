@@ -4,10 +4,6 @@ use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::planner_migrations::column_objects::native;
 use crate::bindings::_helpers::planner_migrations::column_objects::text;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::references::explicit_references::hard_coded_relation_remedy;
-use crate::bindings::_helpers::references::explicit_references::old_name_reference_message;
-use crate::bindings::_helpers::references::relations::match_project_relation;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyStringMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -16,6 +12,10 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::references::main::hard_coded_relation_remedy::hard_coded_relation_remedy;
+use sqlbuild_python_project::references::main::match_project_relation::match_project_relation;
+use sqlbuild_python_project::references::main::old_name_reference_message::old_name_reference_message;
 
 fn old_relation<'py>(
     old: &Bound<'py, PyAny>,

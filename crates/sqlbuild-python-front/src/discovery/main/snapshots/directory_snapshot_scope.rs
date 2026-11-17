@@ -1,12 +1,15 @@
 //! Share one directory snapshot across every discovery call for `project_dir` inside the scope.
 
-use crate::discovery::_helpers::snapshots::snapshot;
 use crate::discovery::models::NativeDirectorySnapshotScope;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
+use pyo3::prelude::{Bound, PyAny};
+use pyo3::pyfunction;
 
 /// Share one directory snapshot across every discovery call for `project_dir` inside the scope.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, project_dir))]
 pub fn directory_snapshot_scope(project_dir: Bound<'_, PyAny>) -> NativeDirectorySnapshotScope {
-    snapshot::directory_snapshot_scope(project_dir)
+    NativeDirectorySnapshotScope {
+        project_dir: project_dir.unbind(),
+        token: None,
+    }
 }

@@ -2,12 +2,12 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::semantic_shapes::coverage;
-use crate::bindings::_helpers::semantic_shapes::shapes;
-use crate::bindings::_helpers::semantic_shapes::source_bindings;
+use sqlbuild_python_project::semantic_shapes::main::register_coverage::register_coverage;
+use sqlbuild_python_project::semantic_shapes::main::register_shapes::register_shapes;
+use sqlbuild_python_project::semantic_shapes::main::register_source_bindings::register_source_bindings;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    shapes::register(module)?;
-    coverage::register(module)?;
-    source_bindings::register(module)
+    register_shapes(module)?;
+    register_coverage(module)?;
+    register_source_bindings(module)
 }

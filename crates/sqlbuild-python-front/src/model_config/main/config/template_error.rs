@@ -1,11 +1,10 @@
 //! The `CompileInputError` Python raises for a template error in the context `label`.
 
-use crate::model_config::_helpers::config::config_templates;
 use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::templates::errors::TemplateError;
+use sqlbuild_model_config::templates::main::template_error_message::template_error_message;
 
 /// The `CompileInputError` Python raises for a template error in the context `label`.
-#[inline]
 pub fn template_error(error: &TemplateError, label: &str) -> ConfigError {
-    config_templates::template_error(error, label)
+    ConfigError::compile(template_error_message(error, label))
 }

@@ -1,9 +1,5 @@
 //! Complete missing source metadata in bounded, database-grouped batches.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::planner_phases::objects::text;
-use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::snapshot::columns_for;
 use crate::bindings::_helpers::planner_warehouse::snapshot::list_relations;
@@ -17,6 +13,11 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::references::references;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use std::collections::BTreeSet;
 
 const SQL_ANALYSIS_KEY: &str = "sql_analysis";
@@ -179,16 +180,16 @@ pub(crate) fn semantic_source_columns<'py>(
     }
     let reads = &PlannerReads::passed(reads)?;
     let mut required: BTreeSet<String> = BTreeSet::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         let analysis_off: bool = matches!(
             *config_node_of(&model_values(&model)?, SQL_ANALYSIS_KEY)?,
             ConfigNode::Bool(false)
         );
-        if !selected_keys.contains(model_reads::model_key(&model)?)? || analysis_off {
+        if !selected_keys.contains(model_key(&model)?)? || analysis_off {
             continue;
         }
-        for reference in model_reads::references(&model)?.try_iter()? {
+        for reference in references(&model)?.try_iter()? {
             let reference = reference?;
             if native_field(&reference, "ref_kind")?.eq("source")? {
                 required.insert(native_field(&reference, "ref_name")?.extract()?);

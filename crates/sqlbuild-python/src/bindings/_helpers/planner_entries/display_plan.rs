@@ -1,18 +1,12 @@
 //! Display-only plans for external plan surfaces when warehouse planning cannot resolve.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::graph::keys::KeyCache;
-use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::planner_entries::values::boolean;
 use crate::bindings::_helpers::planner_entries::values::native;
 use crate::bindings::_helpers::planner_entries::values::none;
 use crate::bindings::_helpers::planner_entries::values::planner_model;
 use crate::bindings::_helpers::planner_entries::values::planner_type;
 use crate::bindings::_helpers::planner_entries::values::string;
-use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::resolve_model_full_refresh;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_strategy::strategy::materialization_of;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyFrozenSet, PyTuple};
@@ -22,6 +16,14 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::graph::main::project::edge_dict::edge_dict;
+use sqlbuild_python_project::graph::models::KeyCache;
+use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
+use sqlbuild_python_project::planner_phases::main::object::object;
 
 const VIEW: &str = "view";
 const INCREMENTAL: &str = "incremental";
@@ -63,7 +65,10 @@ fn display_entry<'py>(
         resolve_model_full_refresh(model, boolean(py, full_refresh)?.is_truthy()?)?,
     )?
     .is_truthy()?;
-    let query_sql = model_reads::query_sql(model)?;
+    let query_sql =
+        sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql(
+            model,
+        )?;
     let custom_name = if materialization_type.eq(CUSTOM)? {
         config(model, "materialized")?
     } else {
@@ -73,8 +78,8 @@ fn display_entry<'py>(
         py,
         RecordId::ModelPlanEntry,
         &[
-            ("key", model_reads::model_key(model)?),
-            ("name", model_reads::name_object(model)?),
+            ("key", model_key(model)?),
+            ("name", name_object(model)?),
             ("relative_path", native_field(model, "relative_path")?),
             (
                 "action",
@@ -97,7 +102,7 @@ fn display_entry<'py>(
                     },
                 )?,
             ),
-            ("destination", model_reads::destination(model)?),
+            ("destination", destination(model)?),
             ("fingerprint_query_sql", query_sql.clone()),
             ("resolved_sql", query_sql),
             ("logical_ddl", string(py, "")),
@@ -144,9 +149,9 @@ pub(crate) fn build_display_only_sqlbuild_plan<'py>(
             .collect::<PyResult<Vec<_>>>()?,
     )?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
-        if selected.contains(model_reads::name_object(&model)?)? {
+        if selected.contains(name_object(&model)?)? {
             entries.push(display_entry(&model, full_refresh)?);
         }
     }

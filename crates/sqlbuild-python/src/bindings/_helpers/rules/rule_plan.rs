@@ -7,7 +7,6 @@ use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_rules::project_tree::main::pure_path_posix::pure_path_posix;
 use std::path::Path;
 
-use crate::bindings::_helpers::compiled_views::records::project_with;
 use crate::bindings::_helpers::rules::catalogue::references_custom_rules;
 use crate::bindings::_helpers::rules::catalogue::resolved_ignore_selectors;
 use crate::bindings::_helpers::rules::catalogue::rule_catalogue;
@@ -26,6 +25,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::project::project_with::project_with;
 
 const MODEL_RESOURCE_TYPE: &str = "model";
 

@@ -9,7 +9,6 @@ pub(crate) mod full_refresh;
 pub(crate) mod getters;
 pub(crate) mod identities;
 pub(crate) mod models;
-pub(crate) mod objects;
 pub(crate) mod output_assembly;
 pub(crate) mod registration;
 pub(crate) mod retention;

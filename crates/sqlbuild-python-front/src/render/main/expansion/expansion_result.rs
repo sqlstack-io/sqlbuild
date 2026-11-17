@@ -2,9 +2,7 @@
 
 use crate::render::_helpers::expansion::macro_expansion_result;
 use crate::render::models::ExpansionRequest;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Expansion result.
 #[inline]

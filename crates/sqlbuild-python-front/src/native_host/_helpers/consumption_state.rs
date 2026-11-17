@@ -1,23 +1,23 @@
 //! The consumption table's rows, SQL and locations, and the callbacks a recording build holds.
 
+use crate::native_host::main::fixed_state_table_sql::fixed_state_table_sql;
+use crate::native_host::main::integer_literal::integer_literal;
+use crate::native_host::main::literal::literal;
+use crate::native_host::main::optional_text::optional_text;
+use crate::native_host::main::state_table_name::state_table_name;
 use chrono::{DateTime, NaiveDateTime, Utc};
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyFrozenSet, PyInt, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::{PyInt, PyString};
 use sqlbuild_core::constants::CONSUMPTION_TABLE_NAME;
-use sqlbuild_state::consumption::constants::{
-    CONSUMPTION_COLUMN_TYPES, INTEGER_STATE_VALUE_TYPE, NULLABLE_COLUMNS,
-};
+use sqlbuild_state::consumption::constants::{CONSUMPTION_COLUMN_TYPES, NULLABLE_COLUMNS};
 use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
 use sqlbuild_state::consumption::models::{
     ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
 };
-use sqlbuild_state::freshness::constants::STRING_STATE_VALUE_TYPE;
 
-use crate::state_rows::main::tables::state_table_create_sql::state_table_create_sql;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;
 
 /// Execution IDs per `IN` list when reading executions back by ID.
@@ -31,31 +31,10 @@ pub(crate) fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()
 }
 
-/// The adapter's qualified name of a state table in `(database, schema)`, if it has one.
-pub(crate) fn state_table_name(
-    render_qualified_name: &Bound<'_, PyAny>,
-    (database, schema): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    table: &str,
-) -> PyResult<Option<String>> {
-    let py: Python<'_> = render_qualified_name.py();
-    let name: Bound<'_, PyAny> = call_with(
-        render_qualified_name,
-        &[
-            ("database", database.clone()),
-            ("schema", schema.clone()),
-            ("name", text(py, table)),
-        ],
-    )?;
-    if name.is_none() {
-        return Ok(None);
-    }
-    Ok(Some(name.extract()?))
-}
-
 /// Create-if-missing DDL for the consumption table, with adapter-rendered column types.
 #[pyfunction]
 #[pyo3(signature = (*, database, schema, render_qualified_name, render_framework_type))]
-fn build_consumption_create_table_sql(
+pub(crate) fn build_consumption_create_table_sql(
     database: &Bound<'_, PyAny>,
     schema: &Bound<'_, PyAny>,
     render_qualified_name: &Bound<'_, PyAny>,
@@ -72,43 +51,10 @@ fn build_consumption_create_table_sql(
     )
 }
 
-/// Create-if-missing DDL for a state table with fixed columns, typed by the adapter.
-pub(crate) fn fixed_state_table_sql(
-    (database, schema): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    (render_qualified_name, render_framework_type): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    (table_name, column_types, nullable): (&str, &[(&str, &str)], &[&str]),
-) -> PyResult<String> {
-    let py: Python<'_> = database.py();
-    let Some(table) = state_table_name(render_qualified_name, (database, schema), table_name)?
-    else {
-        return Ok(String::new());
-    };
-    let columns: Bound<'_, PyAny> =
-        PyTuple::new(py, column_types.iter().map(|(column, _)| *column))?.into_any();
-    let types: Bound<'_, PyDict> = PyDict::new(py);
-    for (column, declared) in column_types {
-        types.set_item(column, declared)?;
-    }
-    let required: Vec<&str> = column_types
-        .iter()
-        .map(|(column, _)| *column)
-        .filter(|column| !nullable.contains(column))
-        .collect();
-    state_table_create_sql(
-        &table,
-        (
-            &columns,
-            &types.into_any(),
-            &PyFrozenSet::new(py, &required)?.into_any(),
-        ),
-        render_framework_type,
-    )
-}
-
 /// SQL deleting whole consumption executions beyond the newest `retain_versions` per relation.
 #[pyfunction]
 #[pyo3(signature = (*, database, schema, render_qualified_name, retain_versions))]
-fn build_consumption_prune_sql(
+pub(crate) fn build_consumption_prune_sql(
     database: &Bound<'_, PyAny>,
     schema: &Bound<'_, PyAny>,
     render_qualified_name: &Bound<'_, PyAny>,
@@ -121,13 +67,6 @@ fn build_consumption_prune_sql(
     )?
     .map(|table| prune_executions_sql(&table, retain_versions))
     .unwrap_or_default())
-}
-
-pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    if value.is_none() {
-        return Ok(None);
-    }
-    Ok(Some(value.str()?.extract()?))
 }
 
 fn required_text(value: &Bound<'_, PyAny>) -> PyResult<String> {
@@ -198,29 +137,13 @@ pub(crate) fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
 }
 
 /// A nullable state value as a SQL literal of `declared_type`.
-fn state_literal(
+pub(crate) fn state_literal(
     py: Python<'_>,
     value: Option<Bound<'_, PyAny>>,
     declared_type: &str,
 ) -> PyResult<String> {
     let value: Bound<'_, PyAny> = value.unwrap_or_else(|| py.None().into_bound(py));
     render_state_sql_literal(py, &value, declared_type, None)
-}
-
-pub(crate) fn literal(py: Python<'_>, value: Option<&str>) -> PyResult<String> {
-    state_literal(
-        py,
-        value.map(|value| text(py, value)),
-        STRING_STATE_VALUE_TYPE,
-    )
-}
-
-pub(crate) fn integer_literal(py: Python<'_>, value: Option<i64>) -> PyResult<String> {
-    state_literal(
-        py,
-        value.map(|value| PyInt::new(py, value).into_any()),
-        INTEGER_STATE_VALUE_TYPE,
-    )
 }
 
 pub(crate) fn row_cells(
@@ -245,22 +168,4 @@ pub(crate) fn row_cells(
         literal(py, input.map(|input| input.version.as_str()))?,
         recorded_at.to_owned(),
     ])
-}
-
-/// The recorder's `on_node_complete` and `before_node_write` methods, as build callbacks.
-pub(crate) fn recorder_callbacks<'py>(
-    recorder: &Bound<'py, PyAny>,
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-    Ok((
-        recorder.getattr("on_node_complete")?,
-        recorder.getattr("before_node_write")?,
-    ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(
-        build_consumption_create_table_sql,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(build_consumption_prune_sql, module)?)
 }

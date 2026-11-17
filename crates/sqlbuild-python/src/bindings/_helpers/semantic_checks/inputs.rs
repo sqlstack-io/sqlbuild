@@ -3,17 +3,17 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyTuple};
 
-use crate::bindings::_helpers::analysis::binding_catalog::ignores_quoted_case;
-use crate::bindings::_helpers::analysis::schema_request::SchemaRequestParts;
-use crate::bindings::_helpers::analysis::schema_request::schema_validation_request;
-use crate::bindings::_helpers::analysis_session::stage_functions::infer_native_query_columns;
 use crate::bindings::_helpers::semantic_checks::resource_sql::resource_sql_diagnostics_of;
-use crate::bindings::_helpers::semantic_shapes::declarations::declared_types;
-use crate::bindings::_helpers::semantic_shapes::declarations::function_names;
-use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::analysis::main::ignores_quoted_case::ignores_quoted_case;
+use sqlbuild_python_project::analysis::main::schema_validation_request::schema_validation_request;
+use sqlbuild_python_project::analysis::models::ProjectCatalog;
+use sqlbuild_python_project::analysis::models::SchemaRequestParts;
+use sqlbuild_python_project::analysis_session::main::infer_native_query_columns::infer_native_query_columns;
+use sqlbuild_python_project::semantic_shapes::main::declared_types::declared_types;
+use sqlbuild_python_project::semantic_shapes::main::function_names::function_names;
 
 /// The column names a metadata config value lists: a name, or the names of a list or tuple.
 pub(crate) fn column_names(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {

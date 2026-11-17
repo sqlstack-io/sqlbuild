@@ -1,19 +1,5 @@
 //! Cursor MIN/MAX inspection of selected incremental models and their watermark inputs.
 
-use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::planner_phases::objects::by_name;
-use crate::bindings::_helpers::planner_phases::objects::config_str;
-use crate::bindings::_helpers::planner_phases::objects::model_key;
-use crate::bindings::_helpers::planner_phases::objects::native_member;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_phases::objects::optional_text;
-use crate::bindings::_helpers::planner_phases::objects::planner_model;
-use crate::bindings::_helpers::planner_phases::objects::text;
-use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_resolution::cursor_policies::resolve_start_cursor_config;
 use crate::bindings::_helpers::planner_resolution::cursor_windows::normalize_cursor_snapshot_grain;
 use crate::bindings::_helpers::planner_resolution::cursor_windows::resolve_effective_timestamp_grain;
@@ -31,7 +17,6 @@ use crate::bindings::_helpers::planner_warehouse::reads::Read;
 use crate::bindings::_helpers::planner_warehouse::reads::WarehouseReads;
 use crate::bindings::_helpers::planner_warehouse::snapshot::SnapshotRequest;
 use crate::bindings::_helpers::planner_warehouse::watermarks::validate_watermark_column;
-use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyTuple};
@@ -58,6 +43,21 @@ use sqlbuild_python_front::cursor::main::scalars::to_inclusive::to_inclusive;
 use sqlbuild_python_front::cursor::main::scalars::try_parse::try_parse;
 use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
+use sqlbuild_python_project::planner_phases::main::by_name::by_name;
+use sqlbuild_python_project::planner_phases::main::config_str::config_str;
+use sqlbuild_python_project::planner_phases::main::model_key::model_key;
+use sqlbuild_python_project::planner_phases::main::native_member::native_member;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
+use sqlbuild_python_project::planner_phases::main::planner_model::planner_model;
+use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -218,10 +218,13 @@ fn runtime_producer_names(
         return Ok(names);
     }
     let mut loaded: HashSet<String> = HashSet::new();
-    for source in project_reads::sources(project)?.try_iter()? {
+    for source in sources(project)?.try_iter()? {
         let source = source?;
-        if !native_field(&source_reads::source_entry(&source)?, "loader")?.is_none() {
-            loaded.insert(source_reads::name(&source)?.extract()?);
+        if !native_field(&source_entry(&source)?, "loader")?.is_none() {
+            loaded.insert(
+                sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?
+                    .extract()?,
+            );
         }
     }
     for key in selected.try_iter()? {
@@ -247,7 +250,7 @@ fn upstream_relation<'py>(
     let name_text: String = name.extract()?;
     let is_selected = selected.is_some_and(|names| names.contains(&name_text));
     let qualified = |node: Bound<'py, PyAny>| {
-        native_field(&resource_reads::destination(&node)?, "qualified_name")
+        native_field(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?, "qualified_name")
     };
     if (kind.eq("ref")? || kind.eq("seed")?)
         && !deferred.is_none()
@@ -272,10 +275,7 @@ fn upstream_relation<'py>(
     {
         return object(
             py,
-            render_source_relation(
-                &source_reads::source_entry(&source)?,
-                Some(dialect.as_any()),
-            )?,
+            render_source_relation(&source_entry(&source)?, Some(dialect.as_any()))?,
         );
     }
     Ok(py.None().into_bound(py))
@@ -388,9 +388,9 @@ fn collect_models<'py>(
     };
     let runtime_names = runtime_producer_names(project, &producers)?;
     let mut models: Vec<_> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
-        let name_value = model_reads::name_object(&model)?;
+        let name_value = name_object(&model)?;
         let model_name: String = name_value.extract()?;
         if !inputs.selected_keys.is_none()
             && !inputs.selected_keys.contains(model_key(py, &name_value)?)?
@@ -430,7 +430,7 @@ fn collect_models<'py>(
             None => None,
         };
         let target_info = existing_relations.get_item(&name_value)?;
-        let qualified = native_field(&model_reads::destination(&model)?, "qualified_name")?;
+        let qualified = native_field(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?, "qualified_name")?;
         if let Some(redirected) = redirected.filter(|value| !value.is_none()) {
             target_tag = Some(format!("{model_name}__target__max"));
             target_relation = Some(redirected.extract::<String>()?);

@@ -22,9 +22,9 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::compile_driver::main::reject_invalid_project_configuration::reject_invalid_project_configuration;
 use sqlbuild_python_front::compile_driver::models::ProjectConfiguration;
-use sqlbuild_python_front::discovery::constants::ALLOW_MISSING_SECRETS_ENV;
-use sqlbuild_python_front::discovery::constants::ALLOW_MISSING_SECRETS_SETTING;
-use sqlbuild_python_front::discovery::constants::TRUE_ENV_VALUES;
+use sqlbuild_python_front::discovery::constants::{
+    ALLOW_MISSING_SECRETS_ENV, ALLOW_MISSING_SECRETS_SETTING, TRUE_ENV_VALUES,
+};
 use sqlbuild_python_front::discovery::main::project::load_local_config_file::load_local_config_file;
 use sqlbuild_python_front::discovery::main::project::load_project_config_file::load_project_config_file;
 use sqlbuild_python_front::discovery::main::project::warn_deprecated_settings::warn_deprecated_settings;

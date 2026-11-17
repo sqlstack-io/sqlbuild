@@ -1,7 +1,6 @@
 pub(crate) mod column_lineage_graph;
 pub(crate) mod lineage_cache;
 pub(crate) mod lineage_command;
-pub(crate) mod lineage_facts;
 pub(crate) mod lineage_index;
 pub(crate) mod lineage_objects;
 pub(crate) mod project_lineage;

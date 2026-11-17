@@ -7,22 +7,26 @@ use pyo3::types::PyDict;
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_state::consumption::models::{ForcedRun, InputFact, NodeFacts, NodeKey, RelationKey};
 
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::consumption::relation_reads::Locations;
 use crate::bindings::_helpers::consumption::relation_reads::prefetch_reads;
 use crate::bindings::_helpers::consumption::relation_reads::relation;
 use crate::bindings::_helpers::consumption::relation_reads::sql_reads_undeclared;
-use crate::bindings::_helpers::planner_identity::hashing::baselined_model_query_hash;
-use crate::bindings::_helpers::planner_identity::hashing::graph_key;
 use crate::bindings::_helpers::planner_identity::identities::hook_version_hashes;
 use crate::bindings::_helpers::planner_identity::metadata::function_local_hashes;
 use crate::bindings::_helpers::planner_identity::metadata::model_version_identity_metadata_json;
 use crate::bindings::_helpers::planner_identity::metadata::seed_identity;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_project::compiled_views::main::compiled_models::dep_rows::dep_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::planner_identity::main::baselined_model_query_hash::baselined_model_query_hash;
+use sqlbuild_python_project::planner_identity::main::graph_key::graph_key;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
+use sqlbuild_python_project::resource_views::main::function_reads::language::language;
 
 pub(crate) const MODEL: &str = "model";
 pub(crate) const SEED: &str = "seed";
@@ -51,8 +55,8 @@ enum Compiled<'py> {
 impl<'py> Compiled<'py> {
     fn destination(&self) -> PyResult<Bound<'py, PyAny>> {
         match self {
-            Self::Model(model) => model_reads::destination(model),
-            Self::Seed(seed) => seed_reads::destination(seed),
+            Self::Model(model) => sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(model),
+            Self::Seed(seed) => sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(seed),
         }
     }
 }
@@ -224,41 +228,47 @@ pub(crate) fn build_facts(
 ) -> PyResult<BuildFacts> {
     let py: Python<'_> = plan.py();
     let mut compiled: HashMap<NodeKey, Compiled<'_>> = HashMap::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
         compiled.insert(
-            node_key(MODEL, &model_reads::model_name(&model)?),
+            node_key(MODEL, &model_name(&model)?),
             Compiled::Model(model),
         );
     }
-    for seed in project_reads::seeds(project)?.try_iter()? {
+    for seed in seeds(project)?.try_iter()? {
         let seed: Bound<'_, PyAny> = seed?;
         compiled.insert(
-            node_key(SEED, &seed_reads::name(&seed)?.extract::<String>()?),
+            node_key(
+                SEED,
+                &sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?
+                    .extract::<String>()?,
+            ),
             Compiled::Seed(seed),
         );
     }
     let mut function_deps: HashMap<(String, String), Vec<(String, String)>> = HashMap::new();
     let mut function_bodies: HashMap<(String, String), Option<String>> = HashMap::new();
-    let functions: Bound<'_, PyAny> = project_reads::functions(project)?;
+    let functions: Bound<'_, PyAny> =
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?;
     for function in functions.try_iter()? {
         let function: Bound<'_, PyAny> = function?;
-        let key = graph_key(&function_reads::key(&function)?)?;
+        let key = graph_key(
+            &sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
+        )?;
         function_deps.insert(
             (key.kind.clone(), key.name.clone()),
-            key_rows(&function_reads::deps(&function)?)?,
+            key_rows(&deps(&function)?)?,
         );
-        let body: Option<String> =
-            if enum_text(&function_reads::language(&function)?)? == SQL_LANGUAGE {
-                let body: String = function_reads::body_sql(&function)?.extract()?;
-                Some(if key.kind == UDF {
-                    format!("SELECT ({body})")
-                } else {
-                    body
-                })
+        let body: Option<String> = if enum_text(&language(&function)?)? == SQL_LANGUAGE {
+            let body: String = body_sql(&function)?.extract()?;
+            Some(if key.kind == UDF {
+                format!("SELECT ({body})")
             } else {
-                None
-            };
+                body
+            })
+        } else {
+            None
+        };
         function_bodies.insert((key.kind, key.name), body);
     }
     let mut selected: BTreeMap<NodeKey, Vec<ForcedRun>> = BTreeMap::new();
@@ -316,15 +326,12 @@ pub(crate) fn build_facts(
         };
         let (deps, version_hash) = match node {
             Compiled::Model(model) => (
-                model_reads::dep_rows(model)?,
+                dep_rows(model)?,
                 model_local_identity_hash(
                     &baselined_model_query_hash(
                         py,
                         &key.name,
-                        (
-                            &model_reads::query_sql(model)?.extract::<String>()?,
-                            dialect.as_deref(),
-                        ),
+                        (&query_sql(model)?.extract::<String>()?, dialect.as_deref()),
                         &mapping_get(&recorded_models, &key.name)?,
                     )?,
                     &model_version_identity_metadata_json(
@@ -349,7 +356,7 @@ pub(crate) fn build_facts(
         if let (Compiled::Model(model), Some(_)) = (node, &locations) {
             reads.push(ReadCheck {
                 position: nodes.len(),
-                sql: model_reads::query_sql(model)?.extract()?,
+                sql: query_sql(model)?.extract()?,
                 deps,
             });
         }

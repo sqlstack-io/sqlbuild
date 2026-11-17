@@ -39,11 +39,11 @@ use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::attachments::main::argument_pairs::argument_pairs;
 use sqlbuild_python_front::render::main::declarations::expand_declarations::expand_declarations;
-use sqlbuild_python_front::render::models::DeclarationExpansion;
 use sqlbuild_python_front::render::models::DeclarationExpansionClasses;
-use sqlbuild_python_front::render::models::ExpandedDeclarations;
-use sqlbuild_python_front::render::models::ExpansionConsumer;
 use sqlbuild_python_front::render::models::SqlMacroSource;
+use sqlbuild_python_front::render::models::{
+    DeclarationExpansion, ExpandedDeclarations, ExpansionConsumer,
+};
 use sqlbuild_python_front::sqltext::main::declaration_scan::declaration_scan;
 use sqlbuild_python_front::sqltext::main::interpolated::interpolated;
 use sqlbuild_python_front::sqltext::models::InterpolationSources;

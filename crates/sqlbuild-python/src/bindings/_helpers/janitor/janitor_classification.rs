@@ -36,8 +36,8 @@ use crate::bindings::_helpers::janitor::janitor_keys::timestamp_fields;
 use crate::bindings::_helpers::janitor::janitor_keys::tuple;
 use crate::bindings::_helpers::janitor::janitor_keys::utc_datetime;
 use crate::bindings::_helpers::planner_scenario::artifacts::is_scenario_artifact_physical_name;
-use crate::bindings::_helpers::relation_naming::fitting::shared_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::relation_naming::main::shared_error::shared_error;
 
 /// Protection rules for one plan.
 pub(crate) struct Protection {

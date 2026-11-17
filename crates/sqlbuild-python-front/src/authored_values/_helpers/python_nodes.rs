@@ -1,14 +1,12 @@
 //! Python-node authoring checks: retry policies, audit cases and hook reads, in Python's operators.
 
 use pyo3::exceptions::{PyBaseException, PyTypeError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{
     PyDict, PyDictMethods, PyInt, PyMemoryView, PyString, PyStringMethods, PyTuple, PyType,
 };
 use pyo3::types::{PyTupleMethods, PyTypeMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::identifier_text::main::is_lowercase_identifier::is_lowercase_identifier;
 use sqlbuild_host::entries::models::{FacadeHost, UserCodeHost};
 use sqlbuild_model_config::header_metadata::main::json_meta_problem::json_meta_problem;
@@ -57,7 +55,7 @@ fn exception_class(value: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// The validated `retry_on` exception classes of a retry policy.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn retry_policy_exceptions<'py>(
+pub(crate) fn retry_policy_exceptions<'py>(
     request: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let request: Request<'_, 'py> = Request::new("retry_policy_exceptions", request)?;
@@ -100,7 +98,7 @@ fn retry_policy_exceptions<'py>(
 /// The delay before retry `retry_index`: exponential backoff, capped, and jittered by `random`.
 #[pyfunction]
 #[pyo3(signature = (*, retry_policy, retry_index))]
-fn retry_delay_seconds<'py>(
+pub(crate) fn retry_delay_seconds<'py>(
     retry_policy: &Bound<'py, PyAny>,
     retry_index: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -145,7 +143,7 @@ fn valid_count(value: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// Reject an audit case without a lowercase name, a definition, valid counts, or JSON meta.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn validate_audit_case(request: Option<&Bound<'_, PyDict>>) -> Result<(), PyErr> {
+pub(crate) fn validate_audit_case(request: Option<&Bound<'_, PyDict>>) -> Result<(), PyErr> {
     let request = Request::new("validate_audit_case", request)?;
     let py: Python<'_> = request.py();
     let name: &Bound<'_, PyAny> = &request.get("name")?;
@@ -179,7 +177,9 @@ fn validate_audit_case(request: Option<&Bound<'_, PyDict>>) -> Result<(), PyErr>
 
 /// `@hook(reads=...)` references in first-seen order; a leading invalid `None` is tolerated.
 #[pyfunction]
-fn normalize_hook_reads<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn normalize_hook_reads<'py>(
+    value: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = value.py();
     let reference: Bound<'py, PyAny> = host_entry(py, UserCodeHost::SqlResourceRef)?;
     let reads: Vec<Bound<'py, PyAny>> = if value.is_instance(&reference)? {
@@ -208,12 +208,4 @@ fn normalize_hook_reads<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, P
         }
     }
     PyTuple::new(py, ordered)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(retry_policy_exceptions, module)?)?;
-    module.add_function(wrap_pyfunction!(retry_delay_seconds, module)?)?;
-    module.add_function(wrap_pyfunction!(validate_audit_case, module)?)?;
-    module.add_function(wrap_pyfunction!(normalize_hook_reads, module)?)?;
-    Ok(())
 }

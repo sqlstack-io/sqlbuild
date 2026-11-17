@@ -1,24 +1,23 @@
 //! The Python hook files of every hook role, listed natively for the Python module loader.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_discovery::declaration_files::main::python_hook_files::python_hook_files;
 use sqlbuild_discovery::declaration_files::models::{
     CollectionFailure, DiscoverySession, FileScope,
 };
 use sqlbuild_discovery::tree::models::ProjectTree;
 
-use crate::discovery::_helpers::failures::raised::failure_error;
-use crate::discovery::_helpers::failures::raised::stage_error;
+use crate::discovery::_helpers::failures::raised::{failure_error, stage_error};
 use crate::discovery::_helpers::project::project_files::path_object;
-use crate::discovery::_helpers::records::declaration_records::add_scope_fields;
-use crate::discovery::_helpers::records::declaration_records::discovery_session;
-use crate::discovery::_helpers::records::declaration_records::path_class;
-use crate::discovery::_helpers::snapshots::native_classes::NativeDiscoverySession;
-use crate::discovery::_helpers::snapshots::native_classes::NativeProjectTree;
-use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
-use crate::discovery::_helpers::snapshots::snapshot::project_tree;
+use crate::discovery::_helpers::records::declaration_records::{
+    add_scope_fields, discovery_session, path_class,
+};
+use crate::discovery::_helpers::snapshots::native_classes::{
+    NativeDiscoverySession, NativeProjectTree,
+};
+use crate::discovery::_helpers::snapshots::snapshot::{in_snapshot, project_tree};
 
 /// Each public Python hook file as `file_path`, `relative_path` and its role's scope fields.
 #[pyfunction]
@@ -52,8 +51,4 @@ pub(crate) fn discover_python_hook_files<'py>(
         }
         PyTuple::new(py, files)
     })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_python_hook_files, module)?)
 }

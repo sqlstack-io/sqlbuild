@@ -1,7 +1,5 @@
 //! Existing seed and function plan dataclass construction.
 
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
 use crate::bindings::_helpers::planner_resolution::orchestration::resolve_function_sql;
 use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_UNKNOWN_SEED;
@@ -18,6 +16,9 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::by_attribute::by_attribute;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::resource_views::main::seed_reads::key::key;
+use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 
 pub(super) fn seed_entries<'py>(
     project: &Bound<'py, PyAny>,
@@ -25,7 +26,10 @@ pub(super) fn seed_entries<'py>(
     relations: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py = project.py();
-    let seeds = by_attribute(&project_reads::seeds(project)?, "name")?;
+    let seeds = by_attribute(
+        &sqlbuild_python_project::compiled_views::main::project::seeds::seeds(project)?,
+        "name",
+    )?;
     let fixtures = native_field(graph, "seed_fixture_names")?;
     let mut result: Vec<Bound<'py, PyAny>> = Vec::new();
     for name in native_field(graph, "seed_names")?.try_iter()? {
@@ -53,17 +57,17 @@ pub(super) fn seed_entries<'py>(
             py,
             RecordId::SeedPlanEntry,
             &[
-                ("key", seed_reads::key(&seed)?),
-                ("name", seed_reads::name(&seed)?),
-                ("destination", destination),
+                ("key", key(&seed)?),
                 (
-                    "file_path",
-                    native_field(&seed_reads::seed_file(&seed)?, "file_path")?,
+                    "name",
+                    sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?,
                 ),
+                ("destination", destination),
+                ("file_path", native_field(&seed_file(&seed)?, "file_path")?),
                 ("columns", extract_seed_columns(&seed)?.into_any()),
                 (
                     "csv_settings",
-                    native_field(&seed_reads::schema_entry(&seed)?, "csv_settings")?,
+                    native_field(&schema_entry(&seed)?, "csv_settings")?,
                 ),
             ],
         )?);

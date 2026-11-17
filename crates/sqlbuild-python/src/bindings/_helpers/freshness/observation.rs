@@ -16,7 +16,6 @@ use crate::bindings::_helpers::freshness::support::text;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::reads::Read;
 use crate::bindings::_helpers::planner_warehouse::synced_reads::refused;
-use crate::bindings::_helpers::references::source_relations::render_source_read;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -36,6 +35,7 @@ use sqlbuild_python_front::state_rows::main::event_rows::in_utc::in_utc;
 use sqlbuild_python_front::state_rows::main::event_rows::normalize::normalize;
 use sqlbuild_python_front::state_rows::main::event_rows::offset_aware::offset_aware;
 use sqlbuild_python_front::state_rows::main::event_rows::version_hash::version_hash;
+use sqlbuild_python_project::references::main::render_source_read::render_source_read;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const COLUMN_STRATEGY: &str = "column";

@@ -22,12 +22,6 @@ use sqlbuild_rules::rules::main::selected_sql_codes::selected_sql_codes;
 
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::present;
-use crate::bindings::_helpers::compiled_views::relation_keys::RelationKeyRow;
-use crate::bindings::_helpers::compiled_views::relation_keys::RelationKeys;
-use crate::bindings::_helpers::compiled_views::relation_keys::model_key_row;
-use crate::bindings::_helpers::compiled_views::relation_keys::one_row_seed_names;
-use crate::bindings::_helpers::compiled_views::relation_keys::relation_keys;
-use crate::bindings::_helpers::compiled_views::relation_keys::source_key_input;
 use crate::bindings::_helpers::rules::lint_expansion::LintExpansionSources;
 use crate::bindings::_helpers::rules::lint_expansion::lint_expansion_inputs;
 use crate::bindings::_helpers::rules::lint_inputs::model_lint_expansion;
@@ -45,6 +39,12 @@ use sqlbuild_python_base::native_threads::main::join_interruptibly::join_interru
 use sqlbuild_python_base::native_threads::models::Joined;
 use sqlbuild_python_base::records::main::fields::field::field as record_field;
 use sqlbuild_python_front::render::models::SqlExpansionInputs;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key_row::model_key_row;
+use sqlbuild_python_project::compiled_views::main::compiled_models::one_row_seed_names::one_row_seed_names;
+use sqlbuild_python_project::compiled_views::main::compiled_models::relation_keys::relation_keys;
+use sqlbuild_python_project::compiled_views::main::compiled_models::source_key_input::source_key_input;
+use sqlbuild_python_project::compiled_views::models::RelationKeyRow;
+use sqlbuild_python_project::compiled_views::types::RelationKeys;
 
 /// The lint thresholds used when the project leaves them unset.
 const DEFAULT_MAX_LITERAL_LENGTH: i64 = 100;

@@ -1,23 +1,6 @@
 //! Gather a frozen point-in-time warehouse snapshot for planning.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::fingerprints::latest_rows::select_latest_fingerprints;
-use crate::bindings::_helpers::graph::keys::KeyCache;
-use crate::bindings::_helpers::graph::keys::native_key;
-use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
-use crate::bindings::_helpers::planner_phases::objects::by_name;
-use crate::bindings::_helpers::planner_phases::objects::frozenset;
-use crate::bindings::_helpers::planner_phases::objects::model_key;
-use crate::bindings::_helpers::planner_phases::objects::native;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_phases::objects::text;
-use crate::bindings::_helpers::planner_phases::objects::tuple;
-use crate::bindings::_helpers::planner_scope::loaders::build_upstream_intermediate_source_map;
 use crate::bindings::_helpers::planner_warehouse::constants::FUNCTION_NODE_TYPES;
 use crate::bindings::_helpers::planner_warehouse::constants::METADATA_NAME_FILTER_LIMIT;
 use crate::bindings::_helpers::planner_warehouse::constants::MIGRATE_FROM_CONFIG_KEY;
@@ -46,6 +29,22 @@ use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::references::references;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::fingerprints::main::select_latest_fingerprints::select_latest_fingerprints;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
+use sqlbuild_python_project::graph::models::KeyCache;
+use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
+use sqlbuild_python_project::planner_phases::main::by_name::by_name;
+use sqlbuild_python_project::planner_phases::main::frozenset::frozenset;
+use sqlbuild_python_project::planner_phases::main::model_key::model_key;
+use sqlbuild_python_project::planner_phases::main::native::native;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_phases::main::text::text;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+use sqlbuild_python_project::planner_scope::main::build_upstream_intermediate_source_map::build_upstream_intermediate_source_map;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 use std::collections::{BTreeSet, HashSet};
 
 /// Everything one snapshot gather needs.
@@ -84,9 +83,9 @@ pub(crate) fn destination_nodes<'py>(
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let mut nodes: Vec<_> = Vec::new();
     let collections: [Bound<'py, PyAny>; 3] = [
-        project_reads::models(project)?,
-        project_reads::seeds(project)?,
-        project_reads::functions(project)?,
+        compiled_models(project)?,
+        sqlbuild_python_project::compiled_views::main::project::seeds::seeds(project)?,
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?,
     ];
     for collection in collections {
         for node in collection.try_iter()? {
@@ -97,7 +96,10 @@ pub(crate) fn destination_nodes<'py>(
 }
 
 fn selected_node(selected: &Bound<'_, PyAny>, node: &Bound<'_, PyAny>) -> PyResult<bool> {
-    Ok(selected.is_none() || selected.contains(resource_reads::key(node)?)?)
+    Ok(selected.is_none()
+        || selected.contains(
+            sqlbuild_python_project::resource_views::main::resource_reads::key::key(node)?,
+        )?)
 }
 
 fn relevant_state_keys<'py>(
@@ -127,7 +129,7 @@ fn resolve_database<'py>(
         if !selected_node(selected, &node)? {
             continue;
         }
-        let database = native_field(&resource_reads::destination(&node)?, "database")?;
+        let database = native_field(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?, "database")?;
         if !database.is_none() {
             return Ok(database);
         }
@@ -144,7 +146,7 @@ fn target_schemas(
         if !selected_node(selected, &node)? {
             continue;
         }
-        let schema = native_field(&resource_reads::destination(&node)?, "schema")?;
+        let schema = native_field(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?, "schema")?;
         if !schema.is_none() {
             schemas.insert(schema.extract()?);
         }
@@ -171,7 +173,7 @@ fn model_upstream_names(
     selected_names: &HashSet<String>,
 ) -> PyResult<BTreeSet<String>> {
     let mut names: BTreeSet<String> = BTreeSet::new();
-    for reference in model_reads::references(model)?.try_iter()? {
+    for reference in references(model)?.try_iter()? {
         let reference = reference?;
         let kind = native_field(&reference, "ref_kind")?;
         let name: String = native_field(&reference, "ref_name")?.extract()?;
@@ -209,21 +211,24 @@ fn metadata_name_filter(
         let models = by_name(project, "models")?;
         let seeds = by_name(project, "seeds")?;
         let sources = PyDict::new(py);
-        for source in project_reads::sources(project)?.try_iter()? {
-            let entry = source_reads::source_entry(&source?)?;
+        for source in
+            sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
+                .try_iter()?
+        {
+            let entry = source_entry(&source?)?;
             sources.set_item(native_field(&entry, "name")?, entry)?;
         }
         for key in selected.try_iter()? {
             let name = native_field(&key?, "name")?;
             if let Some(model) = models.get_item(&name)? {
-                names.insert(native_field(&model_reads::destination(&model)?, "name")?.extract()?);
+                names.insert(native_field(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?, "name")?.extract()?);
                 names.extend(model_upstream_names(
                     &model,
                     (&models, &seeds),
                     &selected_names,
                 )?);
             } else if let Some(seed) = seeds.get_item(&name)? {
-                names.insert(native_field(&seed_reads::destination(&seed)?, "name")?.extract()?);
+                names.insert(native_field(&sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(&seed)?, "name")?.extract()?);
             } else if let Some(entry) = sources.get_item(&name)? {
                 names.insert(source_table_name(&entry)?);
             }
@@ -261,10 +266,16 @@ fn prefetch_schemas<'py>(
     for schema in schemas {
         scopes.push(PyTuple::new(py, [database.clone(), text(py, schema)])?.into_any());
     }
-    for source in project_reads::sources(&request.project)?.try_iter()? {
+    for source in
+        sqlbuild_python_project::compiled_views::main::project::sources::sources(&request.project)?
+            .try_iter()?
+    {
         let source = source?;
-        let entry = source_reads::source_entry(&source)?;
-        if (!relevant.is_none() && !relevant.contains(source_reads::key(&source)?)?)
+        let entry = source_entry(&source)?;
+        if (!relevant.is_none()
+            && !relevant.contains(
+                sqlbuild_python_project::resource_views::main::source_reads::key::key(&source)?,
+            )?)
             || !native_field(&entry, "expression")?.is_none()
             || native_field(&entry, "schema")?.is_none()
         {
@@ -343,8 +354,8 @@ fn gather_relations<'py>(
     let logical = PyDict::new(py);
     for node in destination_nodes(&request.project)? {
         logical.set_item(
-            location_identity(&resource_reads::destination(&node)?)?,
-            resource_reads::name(&node)?,
+            location_identity(&sqlbuild_python_project::resource_views::main::resource_reads::destination::destination(&node)?)?,
+            sqlbuild_python_project::resource_views::main::resource_reads::name::name(&node)?,
         )?;
     }
     let result = PyDict::new(py);
@@ -394,7 +405,10 @@ fn gather_columns<'py>(
     let py = request.project.py();
     let mut node_names: HashSet<String> = HashSet::new();
     for node in destination_nodes(&request.project)? {
-        node_names.insert(resource_reads::name(&node)?.extract()?);
+        node_names.insert(
+            sqlbuild_python_project::resource_views::main::resource_reads::name::name(&node)?
+                .extract()?,
+        );
     }
     let mut needed: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)> = Vec::new();
     for (logical, relation) in relations.iter() {
@@ -435,9 +449,9 @@ fn shares_unfiltered(project: &Bound<'_, PyAny>, selected: &Bound<'_, PyAny>) ->
         .collect::<PyResult<_>>()?;
     let mut all_selected = true;
     let mut any_migration = false;
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
-        if !names.contains(&model_reads::model_name(&model)?) {
+        if !names.contains(&model_name(&model)?) {
             all_selected = false;
         }
         if config_node_of(&model_values(&model)?, MIGRATE_FROM_CONFIG_KEY)?.kind() == NodeKind::Str
@@ -794,11 +808,11 @@ pub(crate) fn gather_redirected_cursor_snapshots<'py>(
         if let Some(model) = models.get_item(&name)? {
             result.set_item(
                 name,
-                crate::bindings::_helpers::planner_phases::objects::replace(
+                sqlbuild_python_project::planner_phases::main::replace::replace(
                     &snapshot,
                     &[(
                         "target_relation",
-                        native_field(&model_reads::destination(&model)?, "qualified_name")?,
+                        native_field(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?, "qualified_name")?,
                     )],
                 )?,
             )?;

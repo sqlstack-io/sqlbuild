@@ -4,11 +4,6 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 
-use crate::bindings::_helpers::analysis_session::profile_inputs::dialect_or_generic;
-use crate::bindings::_helpers::analysis_session::session::FamilyRow;
-use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
-use crate::bindings::_helpers::analysis_session::session::PivotRequestRow;
-use crate::bindings::_helpers::analysis_session::session::prove_dynamic_column_contracts;
 use crate::bindings::_helpers::compile_driver::assembly_analysis::AnalysisContext;
 use crate::bindings::_helpers::project_assembly::models::NativeModelFacts;
 use crate::bindings::_helpers::project_assembly::models::NativeProjectFacts;
@@ -24,6 +19,11 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::models::HeaderFamilies;
+use sqlbuild_python_project::analysis_session::main::dialect_or_generic::dialect_or_generic;
+use sqlbuild_python_project::analysis_session::main::prove_dynamic_column_contracts::prove_dynamic_column_contracts;
+use sqlbuild_python_project::analysis_session::models::FamilyRow;
+use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
+use sqlbuild_python_project::analysis_session::models::PivotRequestRow;
 
 /// `NativeProjectFacts` of `inputs`: resources, syntax validity, deps and standalone pivot proofs.
 pub(crate) fn native_project_facts<'py>(

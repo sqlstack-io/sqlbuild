@@ -9,10 +9,9 @@ use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_
 use sqlbuild_state::consumption::models::{ConsumptionAppend, ConsumptionRow};
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
-use crate::native_host::_helpers::consumption_state::{
-    EXECUTION_ID_BATCH, read_row, row_cells, state_table_name,
-};
+use crate::native_host::_helpers::consumption_state::{EXECUTION_ID_BATCH, read_row, row_cells};
 use crate::native_host::constants::ROWS_PER_STATEMENT;
+use crate::native_host::main::state_table_name::state_table_name;
 use crate::native_host::models::Location;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
