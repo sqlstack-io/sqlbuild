@@ -30,6 +30,7 @@ use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
+use sqlbuild_analysis::analysis_route::main::same_column_type::same_column_type;
 use sqlbuild_sqltext::resolution::main::unquoted_column_name::unquoted_column_name;
 
 const BINDING_UNKNOWN_TABLE_INTERNAL_CODE: &str = "B000";
@@ -91,6 +92,7 @@ pub(crate) fn source_binding_diagnostics<'py>(
         && EXACT_UNQUOTED_DIALECTS.contains(&dialect.extract::<String>()?.as_str());
     let folds_upper: bool =
         !dialect.is_none() && dialect.extract::<String>()?.as_str() == UPPERCASE_FOLDING_DIALECT;
+    let type_dialect: Option<String> = dialect.extract()?;
     let mut changed: HashSet<String> = HashSet::new();
     for item in mapping_items(&columns)?.try_iter()? {
         let (name, value): (String, Object<'py>) = item?.extract()?;
@@ -123,12 +125,17 @@ pub(crate) fn source_binding_diagnostics<'py>(
             })
             .collect();
         let known: Option<Object<'py>> = shapes.get_item(&name)?;
+        let same = |declared: &str, listed: &str| {
+            same_column_type(type_dialect.as_deref(), declared, listed)
+        };
         let evidence: bool = if sensitive {
-            adds_physical_evidence(&bound, known.as_ref(), |column| {
-                bound_identity(column, folds_upper)
-            })?
+            adds_physical_evidence(
+                &bound,
+                known.as_ref(),
+                (|column| bound_identity(column, folds_upper), same),
+            )?
         } else {
-            adds_physical_evidence(&physical, known.as_ref(), str::to_owned)?
+            adds_physical_evidence(&physical, known.as_ref(), (str::to_owned, same))?
         };
         if evidence {
             changed.insert(name.clone());
@@ -424,11 +431,11 @@ fn positions<'py>(
     Ok(Bound::new(py, BindingPositions::new(request.extract()?)?)?.into_any())
 }
 
-/// Whether inspected columns differ from the known shape by `identity`; untyped names match any.
+/// Whether inspected columns differ from the known shape by `identity` and stored type `same`.
 fn adds_physical_evidence(
     physical: &[(String, Option<String>)],
     known: Option<&Object<'_>>,
-    identity: impl Fn(&str) -> String,
+    (identity, same): (impl Fn(&str) -> String, impl Fn(&str, &str) -> bool),
 ) -> PyResult<bool> {
     let Some(known) = known else {
         return Ok(true);
@@ -461,7 +468,7 @@ fn adds_physical_evidence(
             .rev()
             .find(|(known_name, _)| known_name == name)
             .map(|(_, known_type)| known_type);
-        if known_type.is_some_and(|known_type| known_type != physical_type) {
+        if known_type.is_some_and(|known_type| !same(known_type, physical_type)) {
             return Ok(true);
         }
     }

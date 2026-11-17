@@ -224,6 +224,20 @@ def test_given_case_sensitive_snowflake_when_rebinding_listed_columns_then_unquo
             expected_codes=("B002",),
         ),
         PhysicalEvidenceCase(
+            "Snowflake default length and precision spellings of the declared types",
+            SnowflakeAdapter,
+            "snowflake",
+            (("order_id", "NUMBER(38,0)"), ("status", "VARCHAR(16777216)")),
+            expected_rebinding=False,
+        ),
+        PhysicalEvidenceCase(
+            "Snowflake shorter listed VARCHAR",
+            SnowflakeAdapter,
+            "snowflake",
+            (("order_id", "NUMBER(38,0)"), ("status", "VARCHAR(10)")),
+            expected_rebinding=True,
+        ),
+        PhysicalEvidenceCase(
             "Snowflake changed column type",
             SnowflakeAdapter,
             "snowflake",
