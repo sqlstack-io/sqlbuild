@@ -1085,6 +1085,7 @@ const R_WAREHOUSE_SNAPSHOT: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::WarehouseFingerprints),
         ),
         FieldSpec::new("cursor_snapshots", FieldDefault::EmptyDict),
+        FieldSpec::new("cursor_inputs_at_run", FieldDefault::False),
         FieldSpec::new(
             "source_freshness_state_schemas",
             FieldDefault::EmptyFrozenset,

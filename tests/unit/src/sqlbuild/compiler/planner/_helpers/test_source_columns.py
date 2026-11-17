@@ -11,6 +11,7 @@ from sqlbuild._native import (
     CompiledProject,
     CompiledResourceType,
     CursorInputRelation,
+    Dialect,
     PlannerInputError,
     PlannerRelationsContext,
     PlannerScope,
@@ -19,6 +20,7 @@ from sqlbuild._native import (
     build_cursor_input_relations,
     build_planner_relations_context,
     gather_source_columns,
+    live_reads,
     runtime_cursor_producer_names,
     validate_source_cursor_input_columns,
 )
@@ -159,7 +161,8 @@ def test_given_sources_when_gathering_columns_then_returns_expected_source_colum
     adapter: _RecordingAdapter = _RecordingAdapter(test_case.adapter_column_names)
 
     result: dict[str, tuple[ColumnInfo, ...]] = gather_source_columns(
-        project=project, adapter=adapter, connection=None
+        project=project,
+        reads=live_reads(adapter=adapter, connection=None),
     )
 
     assert tuple(adapter.queried_sql) == test_case.expected_queried_sql
@@ -200,8 +203,7 @@ def test_given_multi_database_sources_when_gathering_columns_then_matches_curren
 
     result: dict[str, tuple[ColumnInfo, ...]] = gather_source_columns(
         project=project,
-        adapter=adapter,
-        connection=None,
+        reads=live_reads(adapter=adapter, connection=None),
         source_entries=source_entries,
     )
 
@@ -267,8 +269,8 @@ def test_given_known_source_columns_when_building_relations_context_then_reuses_
 
     context: PlannerRelationsContext = build_planner_relations_context(
         project=project,
-        adapter=adapter,
-        connection=None,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=None),
         scope=scope,
         known_source_columns=known_source_columns,
     )
@@ -445,7 +447,7 @@ def test_given_view_filter_and_transitive_watermark_when_planning_then_relation_
 
     relations: tuple[CursorInputRelation, ...] = build_cursor_input_relations(
         model=model,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         model_locations={view_model.name: view_model.destination},
         models_by_name=models_by_name,
         seed_locations={},
@@ -606,7 +608,7 @@ def test_given_table_function_and_transitive_watermark_when_planning_then_source
     )
     relations: tuple[CursorInputRelation, ...] = build_cursor_input_relations(
         model=model,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         model_locations={name: upstream.destination for name, upstream in models_by_name.items()},
         models_by_name=models_by_name,
         functions_by_name=functions_by_name,

@@ -1,5 +1,6 @@
 //! SQL test planning on a native thread, joined by the planner or, at interpreter exit, within a bound.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Mutex, PoisonError};
@@ -153,7 +154,7 @@ impl SqlTestPlanning {
 /// The inputs one planning run reads, owned so they can move to the planning thread.
 pub(crate) struct PlanningRequest {
     pub(crate) project: Py<PyAny>,
-    pub(crate) adapter: Py<PyAny>,
+    pub(crate) dialect: Py<Dialect>,
     pub(crate) selected_keys: Py<PyAny>,
     pub(crate) sql_test_selection: Py<PyAny>,
 }
@@ -163,7 +164,7 @@ fn plan(py: Python<'_>, request: &PlanningRequest) -> Planned {
     compiler_guard(|| {
         plan_selected_sql_tests(
             request.project.bind(py),
-            request.adapter.bind(py),
+            request.dialect.bind(py),
             request.selected_keys.bind(py),
             request.sql_test_selection.bind(py),
         )
@@ -235,7 +236,7 @@ fn start_sql_test_planning<'py>(
         (
             &[
                 "project",
-                "adapter",
+                "dialect",
                 "selected_keys",
                 "sql_test_selection",
                 "enabled",
@@ -247,7 +248,7 @@ fn start_sql_test_planning<'py>(
         py,
         PlanningRequest {
             project: args.value("project")?.unbind(),
-            adapter: args.value("adapter")?.unbind(),
+            dialect: Dialect::passed(args.value("dialect")?)?.unbind(),
             selected_keys: args.value("selected_keys")?.unbind(),
             sql_test_selection: args.value("sql_test_selection")?.unbind(),
         },

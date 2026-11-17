@@ -1,5 +1,7 @@
 //! Materialize column decisions from native proofs and live evidence.
 
+use crate::bindings::_helpers::planner_phases::runtime::runtime_reads;
+use crate::bindings::_helpers::planner_warehouse::reads::Read;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
@@ -14,7 +16,6 @@ use crate::bindings::_helpers::planner_migrations::columns::rename_hints;
 use crate::bindings::_helpers::planner_migrations::constants::{AUTOMATIC, DONE};
 use crate::bindings::_helpers::planner_migrations::models::{CheckedColumns, ColumnCandidate};
 use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::records::construct::{enum_from_value, enum_member};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
@@ -170,19 +171,14 @@ pub(super) fn checked<'py>(
     } else {
         native_field(&destination, "name")?
     };
-    let reason = call_with(
-        &native_field(
-            &native_field(runtime, "adapter")?,
-            "column_rename_unavailable_reason",
-        )?,
-        &[
-            (
-                "connection",
-                runtime_field(runtime, |runtime| &runtime.connection)?,
-            ),
-            ("destination", relation),
-        ],
-    )?;
+    let reason = match runtime_reads(runtime)?
+        .get()
+        .reads()
+        .column_rename_unavailable(runtime.py(), relation)?
+    {
+        Read::Known(reason) => reason,
+        Read::Unknown(_) => runtime.py().None().into_bound(runtime.py()),
+    };
     if reason.is_none() {
         return Ok(CheckedColumns {
             entries,

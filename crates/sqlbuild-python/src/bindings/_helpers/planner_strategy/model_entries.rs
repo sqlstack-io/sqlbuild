@@ -1,5 +1,6 @@
 //! Assemble model plan dataclasses from resolved plan decisions and authored model config.
 
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};
@@ -252,7 +253,7 @@ fn logical_ddl<'py>(
     (warehouse_columns, cursor_bounds): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
 ) -> PyResult<String> {
     let py: Python<'py> = request.model.py();
-    let adapter: &Bound<'py, PyAny> = &request.adapter;
+    let dialect: &Bound<'py, Dialect> = &request.dialect;
     let model: &Bound<'py, PyAny> = &request.model;
     let destination: Bound<'py, PyAny> = model_reads::destination(model)?;
     let qualified: Bound<'py, PyAny> = native_field(&destination, "qualified_name")?;
@@ -307,7 +308,7 @@ fn logical_ddl<'py>(
         }
         _ => return Ok(String::new()),
     };
-    let statements: Vec<String> = call_with(&adapter.getattr(method)?, &pairs)?
+    let statements: Vec<String> = call_with(&dialect.getattr(method)?, &pairs)?
         .try_iter()?
         .map(|statement| statement?.extract())
         .collect::<PyResult<_>>()?;
@@ -345,8 +346,10 @@ fn storage_fields<'py>(
         }
     }
     if !keys.is_empty() {
-        let dialect: Option<String> =
-            native_field(&request.adapter, "sql_analysis_dialect_name")?.extract()?;
+        let dialect: Option<String> = request
+            .dialect
+            .syntax("sql_analysis_dialect_name")?
+            .extract()?;
         if dialect.as_deref() != Some(PHYSICAL_STORAGE_DIALECT) {
             return Err(input_error(
                 py,
@@ -355,7 +358,7 @@ fn storage_fields<'py>(
                     "model '{}' sets {}, but adapter '{}' has no physical table layout settings",
                     model_reads::model_name(&request.model)?,
                     keys.join(", "),
-                    native_field(&request.adapter, "adapter_name")?.str()?
+                    request.dialect.syntax("adapter_name")?.str()?
                 ),
                 Some(PHYSICAL_STORAGE_UNSUPPORTED_CODE),
             ));

@@ -3,6 +3,7 @@
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::compiled_views::model_reads;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_migrations::column_objects::{model, text};
 use crate::bindings::_helpers::planner_migrations::constants::{PENDING_ARCHIVE, PENDING_VIEW};
 use crate::bindings::_helpers::planner_migrations::models::OldNamePlanner;
@@ -12,6 +13,7 @@ use crate::bindings::_helpers::planner_migrations::old_name_objects::{
 use crate::bindings::_helpers::planner_migrations::old_names::declared_column_aliases;
 use crate::bindings::_helpers::planner_migrations::old_names::old_name_view_skip_reason;
 use crate::bindings::_helpers::planner_phases::objects::object;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record, record_class};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -234,9 +236,7 @@ impl<'py> OldNamePlanner<'py> {
                 ),
                 (
                     "grants_supported",
-                    self.runtime
-                        .getattr("adapter")?
-                        .getattr("relation_grants_supported")?,
+                    runtime_dialect(&self.runtime)?.syntax("relation_grants_supported")?,
                 ),
             ]);
         }
@@ -366,9 +366,7 @@ impl<'py> OldNamePlanner<'py> {
                 ),
                 (
                     "grants_supported",
-                    self.runtime
-                        .getattr("adapter")?
-                        .getattr("relation_grants_supported")?,
+                    runtime_dialect(&self.runtime)?.syntax("relation_grants_supported")?,
                 ),
                 (
                     "archived",

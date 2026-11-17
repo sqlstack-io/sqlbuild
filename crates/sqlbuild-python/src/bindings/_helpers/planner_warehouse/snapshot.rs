@@ -1,19 +1,15 @@
 //! Gather a frozen point-in-time warehouse snapshot for planning.
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::fingerprints::latest_rows::select_latest_fingerprints;
-use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::preview_state::preview_of;
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
 use crate::bindings::_helpers::planner_phases::objects::object;
@@ -22,18 +18,14 @@ use crate::bindings::_helpers::planner_phases::objects::{
 };
 use crate::bindings::_helpers::planner_scope::loaders::build_upstream_intermediate_source_map;
 use crate::bindings::_helpers::planner_warehouse::constants::{
-    ACTIVE_CATALOG, FUNCTION_NODE_TYPES, METADATA_NAME_FILTER_LIMIT, MIGRATE_FROM_CONFIG_KEY,
-    RELATIONS_MAIN_COLUMNS, RELATIONS_MAIN_LIST,
+    FUNCTION_NODE_TYPES, METADATA_NAME_FILTER_LIMIT, MIGRATE_FROM_CONFIG_KEY,
 };
 use crate::bindings::_helpers::planner_warehouse::cursors::{CursorInputs, cursor_snapshots};
-use crate::bindings::_helpers::planner_warehouse::state_reads::{
-    preview_columns, preview_fingerprints, preview_relations,
-};
+use crate::bindings::_helpers::planner_warehouse::reads::{FingerprintRead, PlannerReads};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::records::fields::mapping_values;
 use crate::bindings::_helpers::records::ids::RecordId;
-use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
@@ -46,15 +38,13 @@ use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
-use sqlbuild_state::warehouse_state::models::{RelationFilter, StateLocation};
 use std::collections::{BTreeSet, HashSet};
 
 /// Everything one snapshot gather needs.
 pub(crate) struct SnapshotRequest<'py> {
     pub(crate) project: Bound<'py, PyAny>,
-    pub(crate) adapter: Bound<'py, PyAny>,
-    pub(crate) connection: Bound<'py, PyAny>,
-    pub(crate) execute: Bound<'py, PyAny>,
+    pub(crate) dialect: Bound<'py, Dialect>,
+    pub(crate) reads: Bound<'py, PlannerReads>,
     pub(crate) selected_keys: Bound<'py, PyAny>,
     pub(crate) full_refresh: bool,
     pub(crate) full_refresh_model_names: Bound<'py, PyAny>,
@@ -252,35 +242,6 @@ fn metadata_name_filter(
     Ok(Some(names))
 }
 
-/// The inspection catalog open for this connection; a preview reads the synced state, never a catalog.
-pub(crate) fn active_catalog<'py>(
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    if preview_of(connection).is_some() {
-        return Ok(adapter.py().None().into_bound(adapter.py()));
-    }
-    call_with(
-        &host::entry(adapter.py(), ACTIVE_CATALOG)?,
-        &[
-            ("adapter", adapter.clone()),
-            ("connection", connection.clone()),
-        ],
-    )
-}
-
-/// The concurrency of the active inspection catalog, one without a catalog.
-pub(crate) fn inspection_concurrency(
-    adapter: &Bound<'_, PyAny>,
-    connection: &Bound<'_, PyAny>,
-) -> PyResult<i64> {
-    let catalog = active_catalog(adapter, connection)?;
-    if catalog.is_none() {
-        return Ok(1);
-    }
-    native_field(&catalog, "concurrency")?.extract()
-}
-
 fn prefetch_schemas<'py>(
     request: &SnapshotRequest<'py>,
     database: &Bound<'py, PyAny>,
@@ -288,10 +249,6 @@ fn prefetch_schemas<'py>(
     relevant: &Bound<'py, PyAny>,
 ) -> PyResult<()> {
     let py = request.project.py();
-    let catalog = active_catalog(&request.adapter, &request.connection)?;
-    if catalog.is_none() {
-        return Ok(());
-    }
     let mut scopes: Vec<Bound<'py, PyAny>> = Vec::new();
     for schema in schemas {
         scopes.push(PyTuple::new(py, [database.clone(), text(py, schema)])?.into_any());
@@ -316,65 +273,32 @@ fn prefetch_schemas<'py>(
             .into_any(),
         );
     }
-    call_with(
-        &native_field(&catalog, "prefetch_schema_listings")?,
-        &[
-            ("scopes", tuple(py, scopes)?),
-            ("best_effort", true.into_pyobject(py)?.to_owned().into_any()),
-        ],
-    )?;
-    Ok(())
+    request
+        .reads
+        .get()
+        .reads()
+        .prefetch_schema_listings(py, tuple(py, scopes)?)
 }
 
-/// List relations through the inspection catalog wrappers.
+/// The listed relations of `database` narrowed to `schemas` and `names`.
 pub(crate) fn list_relations<'py>(
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    reads: &Bound<'py, PlannerReads>,
     database: &Bound<'py, PyAny>,
     schemas: Bound<'py, PyAny>,
     names: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    if let Some(preview) = preview_of(connection) {
-        let database: Option<String> = database.extract()?;
-        let schemas: Option<Vec<String>> = schemas.extract()?;
-        let names: Option<Vec<String>> = names.extract()?;
-        return Ok(preview_relations(
-            &preview,
-            &RelationFilter {
-                database: database.as_deref(),
-                schemas: schemas.as_deref(),
-                names: names.as_deref(),
-            },
-        )?
-        .into_any());
-    }
-    call_with(
-        &host::entry(adapter.py(), RELATIONS_MAIN_LIST)?,
-        &[
-            ("adapter", adapter.clone()),
-            ("connection", connection.clone()),
-            ("database", database.clone()),
-            ("schemas", schemas),
-            ("names", names),
-        ],
-    )
+    reads
+        .get()
+        .reads()
+        .relations(reads.py(), database, (schemas, names))
 }
 
-/// Columns of the relations through the inspection catalog wrappers.
+/// The columns of each listed relation, keyed by identity.
 pub(crate) fn columns_for<'py>(
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    reads: &Bound<'py, PlannerReads>,
     relations: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    if let Some(preview) = preview_of(connection) {
-        return Ok(preview_columns(&preview, &relations)?.into_any());
-    }
-    call_with(
-        &host::entry(adapter.py(), RELATIONS_MAIN_COLUMNS)?,
-        &[
-            ("adapter", adapter.clone()),
-            ("connection", connection.clone()),
-            ("relations", relations),
-        ],
-    )
+    reads.get().reads().columns(reads.py(), relations)
 }
 
 fn optional_names<'py>(
@@ -407,12 +331,7 @@ fn gather_relations<'py>(
     names: Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyDict>, StateSchemas)> {
     let py = request.project.py();
-    let relations = list_relations(
-        (&request.adapter, &request.connection),
-        database,
-        schemas,
-        names,
-    )?;
+    let relations = list_relations(&request.reads, database, schemas, names)?;
     let logical = PyDict::new(py);
     for node in destination_nodes(&request.project)? {
         logical.set_item(
@@ -480,7 +399,7 @@ fn gather_columns<'py>(
         return Ok(result);
     }
     let all = columns_for(
-        (&request.adapter, &request.connection),
+        &request.reads,
         tuple(
             py,
             needed
@@ -560,7 +479,6 @@ fn gather_fingerprints<'py>(
         .map(|name| text(py, name))
         .collect(),
     )?;
-    let preview = preview_of(&request.connection);
     for schema in schemas {
         let schema_lower = lower(&text(py, schema))?;
         let table_exists: bool = state_schemas.contains(&schema_lower);
@@ -569,58 +487,16 @@ fn gather_fingerprints<'py>(
         } else {
             node_names_value.extract()?
         };
-        let mut set = match &preview {
-            Some(preview) if table_exists => preview_fingerprints(
-                preview,
-                &StateLocation {
-                    database: database.extract()?,
-                    schema: schema.clone(),
-                },
-                (read_names, filtered_types.extract()?),
-            )?,
-            Some(_) => native(
-                py,
-                RecordId::FingerprintSet,
-                &[
-                    ("schema", text(py, schema)),
-                    ("fingerprints", PyDict::new(py).into_any()),
-                ],
-            )?,
-            None => read_latest_fingerprints(Some(&keywords(
-                py,
-                &[
-                    ("connection", request.connection.clone()),
-                    ("execute", request.execute.clone()),
-                    (
-                        "table_exists",
-                        state_schemas
-                            .contains(&schema_lower)
-                            .into_pyobject(py)?
-                            .to_owned()
-                            .into_any(),
-                    ),
-                    ("database", database.clone()),
-                    ("schema", text(py, schema)),
-                    (
-                        "render_qualified_name",
-                        native_field(&request.adapter, "render_qualified_name")?,
-                    ),
-                    (
-                        "render_read_latest_sql",
-                        native_field(&request.adapter, "render_read_latest_fingerprints_sql")?,
-                    ),
-                    (
-                        "node_names",
-                        if read_unfiltered {
-                            py.None().into_bound(py)
-                        } else {
-                            node_names_value.clone()
-                        },
-                    ),
-                    ("filtered_node_types", filtered_types.clone()),
-                ],
-            )?))?,
-        };
+        let mut set = request.reads.get().reads().fingerprints(
+            py,
+            FingerprintRead {
+                database: database.extract()?,
+                schema,
+                table_exists,
+                node_names: read_names,
+                filtered_node_types: filtered_types.extract()?,
+            },
+        )?;
         if read_unfiltered {
             let by_identity = native_field(&set, "fingerprints_by_identity")?;
             let values: Vec<Bound<'py, PyAny>> = if by_identity.is_none() {
@@ -728,7 +604,7 @@ pub(crate) fn warehouse_snapshot<'py>(
     } else {
         native_field(scope, "model_keys")?
     };
-    let cursors = cursor_snapshots(
+    let (cursors, cursor_inputs_at_run) = cursor_snapshots(
         request,
         &relations,
         &CursorInputs {
@@ -763,12 +639,18 @@ pub(crate) fn warehouse_snapshot<'py>(
             ("fingerprints", fingerprints),
             ("cursor_snapshots", cursors.into_any()),
             (
+                "cursor_inputs_at_run",
+                pyo3::types::PyBool::new(py, cursor_inputs_at_run)
+                    .to_owned()
+                    .into_any(),
+            ),
+            (
                 "source_freshness_state_schemas",
                 names_set(py, &states.freshness)?,
             ),
             (
                 "column_dialect",
-                request.adapter.call_method0("sql_analysis_dialect")?,
+                request.dialect.syntax("sql_analysis_dialect")?.call0()?,
             ),
             (
                 "old_name_view_state_schemas",
@@ -794,7 +676,7 @@ pub(crate) fn gather_warehouse_snapshot<'py>(
         "gather_warehouse_snapshot",
         options,
         (
-            &["project", "adapter", "connection", "execute"],
+            &["project", "dialect", "reads"],
             &[
                 "selected_keys",
                 "full_refresh",
@@ -806,9 +688,8 @@ pub(crate) fn gather_warehouse_snapshot<'py>(
         ),
     )?;
     let project = &args.value("project")?;
-    let adapter = &args.value("adapter")?;
-    let connection = &args.value("connection")?;
-    let execute = &args.value("execute")?;
+    let dialect = Dialect::passed(args.value("dialect")?)?;
+    let reads = PlannerReads::passed(args.value("reads")?)?;
     let selected_keys = &args.value("selected_keys")?;
     let full_refresh: bool = args.flag("full_refresh")?;
     let full_refresh_model_names = &args.value("full_refresh_model_names")?;
@@ -818,9 +699,8 @@ pub(crate) fn gather_warehouse_snapshot<'py>(
 
     warehouse_snapshot(&SnapshotRequest {
         project: project.clone(),
-        adapter: adapter.clone(),
-        connection: connection.clone(),
-        execute: execute.clone(),
+        dialect,
+        reads,
         selected_keys: selected_keys.clone(),
         full_refresh,
         full_refresh_model_names: full_refresh_model_names.clone(),
@@ -842,8 +722,8 @@ pub(crate) fn gather_redirected_cursor_snapshots<'py>(
         (
             &[
                 "project",
-                "adapter",
-                "connection",
+                "dialect",
+                "reads",
                 "existing_relations",
                 "target_relations",
                 "cursor_scope",
@@ -853,8 +733,8 @@ pub(crate) fn gather_redirected_cursor_snapshots<'py>(
         ),
     )?;
     let project = &args.value("project")?;
-    let adapter = &args.value("adapter")?;
-    let connection = &args.value("connection")?;
+    let dialect = Dialect::passed(args.value("dialect")?)?;
+    let reads = PlannerReads::passed(args.value("reads")?)?;
     let existing_relations = args.value("existing_relations")?;
     let existing_relations = existing_relations.downcast::<PyDict>()?;
     let target_relations = args.value("target_relations")?.downcast_into::<PyDict>()?;
@@ -872,9 +752,8 @@ pub(crate) fn gather_redirected_cursor_snapshots<'py>(
     }
     let request = SnapshotRequest {
         project: project.clone(),
-        adapter: adapter.clone(),
-        connection: connection.clone(),
-        execute: native_field(adapter, "execute")?,
+        dialect,
+        reads,
         selected_keys: frozenset(py, &keys)?,
         full_refresh: false,
         full_refresh_model_names: full_refresh_model_names.clone(),
@@ -882,7 +761,7 @@ pub(crate) fn gather_redirected_cursor_snapshots<'py>(
         deferred_locations: deferred_locations.clone(),
         cursor_scope: cursor_scope.clone(),
     };
-    let snapshots = cursor_snapshots(
+    let (snapshots, _) = cursor_snapshots(
         &request,
         existing_relations,
         &CursorInputs {

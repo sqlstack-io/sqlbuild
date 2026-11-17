@@ -1,11 +1,12 @@
 //! Preserve adapter overrides when describing migration execution.
 
+use crate::bindings::_helpers::native_host::dialect::Syntax;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_migrations::column_objects::replace;
-use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::records::construct::record_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
@@ -25,15 +26,16 @@ fn migration_promotion<'py>(
     runtime: &Bound<'py, PyAny>,
     decision: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
+    let dialect = runtime_dialect(runtime)?;
     let promotion = record_class(runtime.py(), RecordId::MigrationPromotion)?;
-    if adapter
-        .call_method0("supports_transactional_ddl")?
+    if dialect
+        .syntax("supports_transactional_ddl")?
+        .call0()?
         .is_truthy()?
     {
         return native_field(&promotion, "TRANSACTIONAL_RENAME");
     }
-    if !decision.eq("migrate")? && native_field(&adapter, "adapter_name")?.eq("snowflake")? {
+    if !decision.eq("migrate")? && dialect.syntax("adapter_name")?.eq("snowflake")? {
         return native_field(&promotion, "SWAP");
     }
     native_field(&promotion, "RENAME")
@@ -46,8 +48,8 @@ pub(super) fn migration_with_execution<'py>(
     entry: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = runtime.py();
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
-    let transient = if native_field(&adapter, "adapter_name")?.eq("snowflake")? {
+    let dialect = runtime_dialect(runtime)?;
+    let transient = if dialect.syntax("adapter_name")?.eq("snowflake")? {
         PyBool::new(
             py,
             native_field(
@@ -62,7 +64,7 @@ pub(super) fn migration_with_execution<'py>(
         py.None().into_bound(py)
     };
     let stage = call_with(
-        &native_field(&adapter, "render_migration_stage")?,
+        &dialect.syntax("render_migration_stage")?,
         &[
             ("origin", label(&native_field(entry, "origin")?)?),
             ("stage", label(&native_field(entry, "destination")?)?),

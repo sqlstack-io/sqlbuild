@@ -23,8 +23,9 @@ use uuid::Uuid;
 use crate::bindings::_helpers::consumption::facts::{
     BuildFacts, MODEL, SEED, build_facts, enum_text,
 };
+use crate::bindings::_helpers::native_host::consumption_io::ConsumptionConnection;
 use crate::bindings::_helpers::native_host::consumption_state::{
-    ConsumptionConnection, Location, NodeCompleteHook,
+    ConsumptionReads, Location, NodeCompleteHook,
 };
 use crate::bindings::_helpers::records::fields::field as native_field;
 
@@ -349,28 +350,22 @@ pub(crate) fn prepare<'py>(
 }
 
 /// What `plan --changed` previews: what a build would run now, read without recording anything.
-pub(crate) fn preview_changed(
+pub(crate) fn preview_changed<R: ConsumptionReads + ?Sized>(
     (plan, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    (adapter, connection_config, connection): (
-        &Bound<'_, PyAny>,
-        &Bound<'_, PyAny>,
-        Option<&Bound<'_, PyAny>>,
-    ),
+    reads: &R,
     (policy, full_refresh): (&ChangedPolicy, bool),
 ) -> PyResult<(ChangedDecision, Vec<String>)> {
     let py: Python<'_> = plan.py();
     let facts: BuildFacts = build_facts((plan, project), (true, full_refresh))?;
-    let connection = ConsumptionConnection::planned_through(adapter, connection_config, connection);
     let (history, warnings): (ConsumptionHistory, Vec<String>) =
-        read_history(py, &connection, (&facts, Some(policy)));
-    connection.close(py)?;
+        read_history(py, reads, (&facts, Some(policy)));
     Ok((changed_decision(&facts, &history, policy), warnings))
 }
 
 /// Recent executions the build reads, with older ones read back when deciding needs them.
-fn read_history(
+fn read_history<R: ConsumptionReads + ?Sized>(
     py: Python<'_>,
-    connection: &ConsumptionConnection,
+    connection: &R,
     (facts, policy): (&BuildFacts, Option<&ChangedPolicy>),
 ) -> (ConsumptionHistory, Vec<String>) {
     let mut warnings: Vec<String> = Vec::new();
@@ -428,9 +423,9 @@ fn needs_read_back(policy: &ChangedPolicy) -> bool {
 }
 
 /// `history` plus every older upstream execution its builds read, followed back until none is left.
-fn with_read_back(
+fn with_read_back<R: ConsumptionReads + ?Sized>(
     py: Python<'_>,
-    connection: &ConsumptionConnection,
+    connection: &R,
     history: ConsumptionHistory,
     nodes: &[NodeFacts],
 ) -> (ConsumptionHistory, Vec<String>) {
@@ -444,9 +439,9 @@ fn with_read_back(
 }
 
 /// The rows of these executions; a schema that cannot be read leaves its rebuilds counted.
-fn read_references(
+fn read_references<R: ConsumptionReads + ?Sized>(
     py: Python<'_>,
-    connection: &ConsumptionConnection,
+    connection: &R,
     references: &[(RelationKey, String)],
 ) -> (Vec<ConsumptionRow>, Vec<String>) {
     let mut by_location: BTreeMap<Location, Vec<&str>> = BTreeMap::new();

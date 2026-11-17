@@ -75,8 +75,8 @@ fn read_planner_runtime<'py>(
     };
     Some(match name {
         "project" => (&this.project).into_bound_py_any(py),
-        "adapter" => (&this.adapter).into_bound_py_any(py),
-        "connection" => (&this.connection).into_bound_py_any(py),
+        "dialect" => (&this.dialect).into_bound_py_any(py),
+        "reads" => (&this.reads).into_bound_py_any(py),
         "project_config" => (&this.project_config).into_bound_py_any(py),
         "local_config" => (&this.local_config).into_bound_py_any(py),
         "on_progress" => (&this.on_progress).into_bound_py_any(py),

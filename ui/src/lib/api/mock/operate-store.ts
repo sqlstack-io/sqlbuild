@@ -706,7 +706,7 @@ export class MockOperate {
 		const synced_copy = {
 			synced_at: new Date(Date.now() - 300_000).toISOString(),
 			cursor_window_starts: Object.fromEntries(models.filter((m) => m.materialization_type === 'incremental' && reason !== 'full_refresh').map((m) => [m.name, windowStart])),
-			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas']
+			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas', 'recorded migrations']
 		};
 		return this.#ctx.reply({
 			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision },

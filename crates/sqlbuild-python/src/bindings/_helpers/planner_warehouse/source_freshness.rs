@@ -7,12 +7,14 @@ use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::freshness::planning::{
     build_direct_source_freshness_planning_result, build_direct_source_freshness_propagation_result,
 };
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::preview_state::{PREVIEW_MESSAGE, preview_of};
 use crate::bindings::_helpers::planner_phases::objects::{native, replace, text, tuple};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_SCOPE;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::snapshot::{destination_nodes, lower};
+use crate::bindings::_helpers::planner_warehouse::synced_reads::PREVIEW_MESSAGE;
 use crate::bindings::_helpers::records::construct::enum_member;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
@@ -117,13 +119,16 @@ pub(crate) fn build_planner_source_freshness_result_of<'py>(
         "build_planner_source_freshness_result",
         options,
         (
-            &["project", "adapter", "connection", "scope", "relations"],
+            &["project", "dialect", "reads", "scope", "relations"],
             &["freshness_state_schemas"],
         ),
     )?;
     build_planner_source_freshness_result(
         (&args.value("project")?, &args.value("scope")?),
-        (&args.value("adapter")?, &args.value("connection")?),
+        (
+            &Dialect::passed(args.value("dialect")?)?,
+            &PlannerReads::passed(args.value("reads")?)?,
+        ),
         &args.value("relations")?,
         &args.value("freshness_state_schemas")?,
     )
@@ -132,7 +137,7 @@ pub(crate) fn build_planner_source_freshness_result_of<'py>(
 /// The source freshness evaluation of one inspection scope against the warehouse.
 pub(crate) fn build_planner_source_freshness_result<'py>(
     (project, scope): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (dialect, reads): (&Bound<'py, Dialect>, &Bound<'py, PlannerReads>),
     relations: &Bound<'py, PyAny>,
     freshness_state_schemas: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -145,15 +150,11 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
             lowered_state.insert(schema?.extract()?);
         }
     }
-    let synced_copy = preview_of(connection).is_some();
     let exists = PyDict::new(py);
     for schema in &schemas {
         exists.set_item(
             schema,
-            PyBool::new(
-                py,
-                !synced_copy && lowered_state.contains(&lower(&text(py, schema))?),
-            ),
+            PyBool::new(py, lowered_state.contains(&lower(&text(py, schema))?)),
         )?;
     }
     let sources = tuple(
@@ -171,8 +172,8 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
             call_with(
                 wrap_pyfunction!(build_direct_source_freshness_planning_result, py)?.as_any(),
                 &[
-                    ("adapter", adapter.clone()),
-                    ("connection", connection.clone()),
+                    ("dialect", dialect.clone().into_any()),
+                    ("reads", reads.clone().into_any()),
                     ("sources", sources),
                     ("state_database", state_database(project)?),
                     (
@@ -183,7 +184,7 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
                     ("run_id", text(py, "planning")),
                     (
                         "render_qualified_name",
-                        native_field(adapter, "render_qualified_name")?,
+                        dialect.syntax("render_qualified_name")?,
                     ),
                     ("state_table_exists_by_schema", exists.into_any()),
                     (

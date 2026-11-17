@@ -7,6 +7,8 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::records::compiled_model_record;
 use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_entries::model_entries::plan_model;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_identity::graph::{execution_deps, execution_order};
@@ -57,7 +59,7 @@ pub(crate) fn build_scenario_execution_plan<'py>(
             &[
                 "scenario",
                 "project",
-                "adapter",
+                "dialect",
                 "graph_plan",
                 "relation_plan",
                 "source_lexical_syntax",
@@ -73,7 +75,7 @@ pub(crate) fn build_scenario_execution_plan<'py>(
     let project = args.value("project")?;
     let graph = args.value("graph_plan")?;
     let context = SqlContext {
-        adapter: args.value("adapter")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
         relations: args.value("relation_plan")?,
         syntax: args.value("source_lexical_syntax")?,
         label: source_label(&scenario)?,
@@ -157,7 +159,7 @@ pub(crate) fn build_scenario_execution_plan<'py>(
                     &[
                         ("model", model),
                         ("snapshot", snapshot.clone()),
-                        ("adapter", context.adapter.clone()),
+                        ("dialect", context.dialect.clone().into_any()),
                         ("context", model_context),
                         (
                             "sql_analysis_enabled",
@@ -232,7 +234,7 @@ fn complete_fixtures<'py>(
     let planning = planning_context(project, None)?;
     let completion = complete_relation_fixtures(
         &planning,
-        &context.adapter,
+        &context.dialect,
         (&names, PyTuple::new(py, groups)?.as_any()),
     )?;
     if !completion.diagnostics.is_empty() {
@@ -279,8 +281,9 @@ fn model_context<'py>(
             source_map: native_field(&context.relations, "source_map")?.unbind(),
             source_warehouse_columns: columns.clone().unbind(),
             star_exclude_keyword: context
-                .adapter
-                .call_method0("star_exclude_keyword")?
+                .dialect
+                .syntax("star_exclude_keyword")?
+                .call0()?
                 .unbind(),
             runtime_cursor_producer_names: PyFrozenSet::empty(py)?.into_any().unbind(),
             future_cursor_config: none(),
@@ -311,8 +314,10 @@ fn compared_columns(
         Some(model) => model_reads::inferred_names(&model)?,
         None => None,
     };
-    let dialect: Option<String> =
-        native_field(&context.adapter, "sql_analysis_dialect_name")?.extract()?;
+    let dialect: Option<String> = context
+        .dialect
+        .syntax("sql_analysis_dialect_name")?
+        .extract()?;
     let columns =
         scenario_expected_columns(authored_sql, dialect.as_deref(), model_columns.as_deref());
     let scenario_name: String = native_field(scenario, "name")?.extract()?;

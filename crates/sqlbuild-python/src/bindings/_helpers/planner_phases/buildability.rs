@@ -10,6 +10,7 @@ use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::objects::planner_error;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
+use crate::bindings::_helpers::planner_phases::runtime::{runtime_dialect, runtime_reads};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::source_tables::check_selected_source_tables_exist;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -76,10 +77,7 @@ pub(crate) fn check_selected_scope_buildability<'py>(
     }
     check_selected_source_tables_exist(
         &project,
-        (
-            &runtime_field(runtime, |runtime| &runtime.adapter)?,
-            &runtime_field(runtime, |runtime| &runtime.connection)?,
-        ),
+        (&runtime_dialect(runtime)?, &runtime_reads(runtime)?),
         &selected_scope,
         &warehouse_field(warehouse, |warehouse| &warehouse.inspection_relations)?,
     )

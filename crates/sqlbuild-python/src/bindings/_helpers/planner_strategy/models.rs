@@ -1,5 +1,6 @@
 //! Extension-owned fixture analysis reuse and the project-wide fixture planning context.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
@@ -64,7 +65,7 @@ pub(crate) struct ExpectedTypes<'a> {
 #[derive(Debug)]
 pub(crate) struct ModelEntryDecisions<'py> {
     pub(crate) model: Bound<'py, PyAny>,
-    pub(crate) adapter: Bound<'py, PyAny>,
+    pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) snapshot: Bound<'py, PyAny>,
     pub(crate) change_result: Bound<'py, PyAny>,
     pub(crate) action: Bound<'py, PyAny>,
@@ -104,7 +105,7 @@ pub(crate) struct AuditPlanning<'py> {
     pub(crate) model_locations: Bound<'py, PyAny>,
     pub(crate) seed_locations: Bound<'py, PyAny>,
     pub(crate) source_map: Bound<'py, PyAny>,
-    pub(crate) adapter: Bound<'py, PyAny>,
+    pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) model_materializations: Bound<'py, PyAny>,
     pub(crate) lineage: Py<NativeProjectGraph>,
 }

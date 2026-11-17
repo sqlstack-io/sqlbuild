@@ -1,6 +1,7 @@
 //! Plan output assembly: storage policies, warnings and direct-mode metadata.
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_entries::models::PlanOutputInputs;
 use crate::bindings::_helpers::planner_entries::plan_output::plan_output_fields;
@@ -18,6 +19,7 @@ use crate::bindings::_helpers::planner_phases::objects::{
     native, replace, sorted_names, strings, text, tuple,
 };
 use crate::bindings::_helpers::planner_phases::retention::{plan_retention, plan_table_types};
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
@@ -107,7 +109,7 @@ pub(crate) fn base_plan_output<'py>(
     let mut output = PlanOutputFields {
         fields: plan_output_fields(PlanOutputInputs {
             project: runtime_field(runtime, |runtime| &runtime.project)?,
-            adapter: runtime_field(runtime, |runtime| &runtime.adapter)?,
+            dialect: runtime_dialect(runtime)?,
             scope: execution_scope.clone(),
             snapshot: warehouse_field(warehouse, |warehouse| &warehouse.snapshot)?,
             relations: warehouse_field(warehouse, |warehouse| &warehouse.inspection_relations)?,
@@ -180,7 +182,9 @@ pub(crate) fn add_storage_policies<'py>(
                 &entries,
                 &ModelLookup::Native(scope_data(&scope)?),
                 &warehouse_field(warehouse, |warehouse| &warehouse.migration_fingerprints)?,
-                &native_field(runtime, "adapter")?.call_method0("sql_analysis_dialect")?,
+                &runtime_dialect(runtime)?
+                    .syntax("sql_analysis_dialect")?
+                    .call0()?,
             )?,
         )?;
     }

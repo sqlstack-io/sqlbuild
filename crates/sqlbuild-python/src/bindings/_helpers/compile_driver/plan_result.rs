@@ -1,5 +1,7 @@
 //! Plan a compiled project over an open warehouse connection, and open that connection.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
@@ -40,7 +42,9 @@ type Deferral<'py> = (Bound<'py, PyAny>, Bound<'py, PyAny>);
 pub(crate) struct PlanningInputs<'a, 'py> {
     pub(crate) discovered_inputs: &'a Bound<'py, PyAny>,
     pub(crate) adapter: &'a Bound<'py, PyAny>,
+    /// The live planning connection, `None` when the plan reads a synced state.
     pub(crate) connection: &'a Bound<'py, PyAny>,
+    pub(crate) reads: &'a Bound<'py, PlannerReads>,
 }
 
 /// The selected Python nodes and SQL keys when loading is off: loaders out, their sources in.
@@ -187,8 +191,8 @@ pub(crate) fn pipeline_result<'py>(
             py,
             &[
                 ("project", project.clone()),
-                ("adapter", inputs.adapter.clone()),
-                ("connection", inputs.connection.clone()),
+                ("dialect", Dialect::of(inputs.adapter)?.into_any()),
+                ("reads", inputs.reads.clone().into_any()),
                 ("selection", selection),
                 ("overrides", overrides),
                 ("deferral", deferral),

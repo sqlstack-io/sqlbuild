@@ -1,6 +1,7 @@
 //! Resolve scenario SQL through the shared native scanner and adapter callbacks.
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_scenario::constants::{
     SCENARIO_PLAN_MISSING_RELATION_TARGET, SCENARIO_PLAN_UNRESOLVED_RELATION_MARKER,
@@ -25,7 +26,7 @@ pub(super) fn resolve_sql(
     sql: &str,
     project_sources: bool,
 ) -> PyResult<String> {
-    let py = context.adapter.py();
+    let py = context.dialect.py();
     let syntax: LexicalSyntaxInput = native_field(&context.syntax, "native_mapping")?.extract()?;
     let mut result = sql.to_owned();
     for (kind, field) in [
@@ -48,7 +49,7 @@ pub(super) fn resolve_sql(
         result = replace_markers(&result, kind, Some(syntax.clone().into()), |name, marker| {
             let target = mapping_get(&locations, name)?;
             let target = if target.is_none() {target} else if kind == super::constants::SOURCE_MARKER {
-                object(py, render_source_relation(&target, Some(&context.adapter.clone()).filter(|value| !value.is_none()))?)?
+                object(py, render_source_relation(&target, Some(context.dialect.as_any()))?)?
             } else {native_field(&target, "qualified_name")?};
             if target.is_none() {
                 let marker = string(py, marker).repr()?.to_str()?.to_owned();
@@ -132,7 +133,7 @@ pub(crate) fn resolve_scenario_check_sql(
             &[
                 "sql",
                 "relation_plan",
-                "adapter",
+                "dialect",
                 "source_label",
                 "source_lexical_syntax",
             ],
@@ -140,7 +141,7 @@ pub(crate) fn resolve_scenario_check_sql(
         ),
     )?;
     let context = SqlContext {
-        adapter: args.value("adapter")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
         relations: args.value("relation_plan")?,
         syntax: args.value("source_lexical_syntax")?,
         label: args.value("source_label")?.extract()?,

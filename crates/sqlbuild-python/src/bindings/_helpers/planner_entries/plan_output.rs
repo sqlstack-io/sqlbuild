@@ -5,6 +5,7 @@ use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_entries::model_entries::scope_overlaps;
 use crate::bindings::_helpers::planner_entries::models::PlanOutputInputs;
 use crate::bindings::_helpers::planner_entries::values::{
@@ -334,7 +335,7 @@ fn require_intermediate_loader_targets<'py>(
 /// Build one canonical function entry from resolved relation inputs.
 pub(super) fn function_entry<'py>(
     function: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     relations: &Bound<'py, PyAny>,
     (fingerprint_query_sql, previous_query_sql, reason): (
         Bound<'py, PyAny>,
@@ -348,7 +349,7 @@ pub(super) fn function_entry<'py>(
         Some(keywords(
             py,
             &[
-                ("adapter", adapter.clone()),
+                ("dialect", dialect.clone().into_any()),
                 ("function", function.clone()),
                 (
                     "model_locations",
@@ -406,7 +407,7 @@ pub(super) fn function_entry<'py>(
 }
 
 fn function_entries<'py>(
-    (project, adapter, snapshot): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (project, dialect, snapshot): (&Bound<'py, PyAny>, &Bound<'py, Dialect>, &Bound<'py, PyAny>),
     relations: &Bound<'py, PyAny>,
     changes: &Bound<'py, PyAny>,
     selected_keys: &Bound<'py, PyAny>,
@@ -429,7 +430,7 @@ fn function_entries<'py>(
         };
         entries.push(function_entry(
             &function,
-            adapter,
+            dialect,
             relations,
             (
                 native_field(&change, "fingerprint_sql")?,
@@ -468,7 +469,7 @@ pub(super) struct SelectedTests<'py> {
 
 /// Selected SQL test entries and their warnings, failing on invalid fixtures.
 pub(super) fn selected_test_entries<'py>(
-    (project, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (project, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
     selected_keys: &Bound<'py, PyAny>,
     selection: &Bound<'py, PyAny>,
     case_name: &Bound<'py, PyAny>,
@@ -498,7 +499,7 @@ pub(super) fn selected_test_entries<'py>(
     };
     let results = assemble_sql_test_plans(
         &selected,
-        (project, adapter),
+        (project, dialect),
         &SqlTestAssembly {
             sql_analysis_enabled: analysis,
             validate_fixtures: true,
@@ -534,12 +535,12 @@ pub(super) fn selected_test_entries<'py>(
 /// SQL tests selected by name or overlapping one selection, planned into a reusable result.
 fn planned_sql_tests<'py>(
     project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     selected_keys: &Bound<'py, PyAny>,
     selection: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
-    let selected = selected_test_entries((project, adapter), selected_keys, selection, &none(py))?;
+    let selected = selected_test_entries((project, dialect), selected_keys, selection, &none(py))?;
     native(
         py,
         RecordId::PlannedSqlTests,
@@ -573,7 +574,7 @@ pub(crate) fn plan_output_fields<'py>(
 ) -> PyResult<Vec<(&'static str, Bound<'py, PyAny>)>> {
     let PlanOutputInputs {
         project,
-        adapter,
+        dialect,
         scope,
         snapshot,
         relations,
@@ -608,7 +609,7 @@ pub(crate) fn plan_output_fields<'py>(
     };
     require_intermediate_loader_targets(&project, &snapshot, &source_map, &source_load_entries)?;
     let functions = function_entries(
-        (&project, &adapter, &snapshot),
+        (&project, &dialect, &snapshot),
         &relations,
         &changes,
         &selected_keys,
@@ -626,7 +627,7 @@ pub(crate) fn plan_output_fields<'py>(
             py,
             &[
                 ("project", project.clone()),
-                ("adapter", adapter.clone()),
+                ("dialect", dialect.clone().into_any()),
                 ("scope", scope.clone()),
                 ("relations", relations.clone()),
                 ("model_materializations", materializations.into_any()),
@@ -639,7 +640,7 @@ pub(crate) fn plan_output_fields<'py>(
         || native_field(&planned, "selected_keys")?.ne(&selected_keys)?
         || native_field(&planned, "sql_test_selection")?.ne(&selection)?
     {
-        planned = planned_sql_tests(&project, &adapter, &selected_keys, &selection)?;
+        planned = planned_sql_tests(&project, &dialect, &selected_keys, &selection)?;
     }
     let test_entries = native_field(&planned, "entries")?;
     let mut test_keys: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -741,11 +742,11 @@ pub(crate) fn plan_output_fields<'py>(
 /// Plan SQL tests selected by name or overlapping one selection into a reusable result.
 pub(crate) fn plan_selected_sql_tests<'py>(
     project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     selected_keys: &Bound<'py, PyAny>,
     sql_test_selection: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    planned_sql_tests(project, adapter, selected_keys, sql_test_selection)
+    planned_sql_tests(project, dialect, selected_keys, sql_test_selection)
 }
 
 /// Selected SQL test entries and warnings, optionally narrowed to one parameterized case.
@@ -760,12 +761,15 @@ fn build_selected_test_entries<'py>(
         "build_selected_test_entries",
         kwargs,
         (
-            &["project", "adapter", "selected_keys", "sql_test_selection"],
+            &["project", "dialect", "selected_keys", "sql_test_selection"],
             &["case_name"],
         ),
     )?;
     let selected = selected_test_entries(
-        (&args.value("project")?, &args.value("adapter")?),
+        (
+            &args.value("project")?,
+            &Dialect::passed(args.value("dialect")?)?,
+        ),
         &args.value("selected_keys")?,
         &args.value("sql_test_selection")?,
         &args.value("case_name")?,

@@ -6,11 +6,13 @@ from typing import Any
 import pytest
 
 from sqlbuild._native import (
+    Dialect,
     SourceEntry,
     SourceFreshnessConfig,
     SourceFreshnessObservation,
     SourceFreshnessStrategy,
     SourceFreshnessValueKind,
+    live_reads,
     observe_configured_source_freshness,
 )
 from sqlbuild.adapter.contract.models import QueryResult, TableFreshnessMetadata
@@ -92,8 +94,8 @@ def test_given_adapter_freshness_metadata_when_observing_then_uses_expected_obse
     connection: Any = adapter.connect({"database": ":memory:"})
     try:
         observation: SourceFreshnessObservation = observe_configured_source_freshness(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             source=SourceEntry(
                 name="raw.orders",
                 table="orders",
@@ -145,8 +147,8 @@ def test_given_column_freshness_source_when_observing_then_renders_full_relation
     dispatcher.subscribe_lifecycle(subscriber=record_event, accepts_opaque=False)
     with invocation_scope("freshness-invocation"), dispatcher_scope(dispatcher):
         observe_configured_source_freshness(
-            adapter=adapter,
-            connection=object(),
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=object()),
             source=SourceEntry(
                 name="raw.orders",
                 database=test_case.source_database,
@@ -190,8 +192,8 @@ def test_given_column_freshness_expression_source_when_observing_then_uses_subqu
     adapter: CapturingQueryDuckDbAdapter = CapturingQueryDuckDbAdapter()
 
     observe_configured_source_freshness(
-        adapter=adapter,
-        connection=object(),
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=object()),
         source=SourceEntry(
             name="raw_orders",
             expression=test_case.expression,

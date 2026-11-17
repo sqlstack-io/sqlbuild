@@ -20,6 +20,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     HeldPlanTestCase,
     PlanPreviewTestCase,
     SyncedFreshnessTestCase,
+    UnknownSourceAccessTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
     request_plan,
@@ -136,6 +137,7 @@ _UNKNOWN: list[str] = [
     "retention",
     "column rename support",
     "sources outside mirrored schemas",
+    "recorded migrations",
 ]
 _HELD: str = "Planning from the published compiled project."
 _SYNCED_READING: str = "Reading the synced warehouse state..."
@@ -467,6 +469,51 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
     assert log.count(_HELD) == test_case.expected_held_plans, log
     assert log.count(_SYNCED_READING) == test_case.expected_held_plans + 1, log
     assert "Warehouse connected" not in log, "a synced copy opens no warehouse connection"
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UnknownSourceAccessTestCase(
+            description="a source the synced state does not list is unknown, not probed",
+            added_files={
+                "sources/customers.yml": dedent(
+                    """
+                    sources:
+                      - name: raw_customers
+                        description: Customers loaded outside this project.
+                        schema: main
+                        table: raw_customers
+                        columns:
+                          - name: customer_id
+                            type: INTEGER
+                    """
+                ).strip()
+                + "\n",
+                "models/customers.sql": (
+                    'MODEL (description "Customers.", materialized table);\n'
+                    'SELECT customer_id FROM __source("raw_customers")\n'
+                ),
+            },
+            selection=["model:customers"],
+            expected_unknown="read access to these sources",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_unlisted_source_when_the_location_previews_a_plan_then_its_read_access_is_unknown(
+    test_case: UnknownSourceAccessTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(project_dir=project, files=_PROJECT_FILES)
+    built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
+    assert built.returncode == 0, built.stderr
+    write_files(project_dir=project, files=test_case.added_files)
+
+    _, preview = plan_from_copy(tmp_path, project, test_case.selection, {})
+
+    assert "error" not in preview, preview
+    assert test_case.expected_unknown in preview["synced_copy"]["unknown_until_run"], preview
 
 
 @pytest.mark.parametrize(

@@ -3,8 +3,10 @@
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_migrations::constants::QUALIFIED_RELATION_MAX_PARTS;
 use crate::bindings::_helpers::planner_migrations::models::ModelMigrationRequest;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record_with;
@@ -19,7 +21,7 @@ pub(super) fn location<'py>(
     fields: &[(&str, Bound<'py, PyAny>)],
 ) -> PyResult<Bound<'py, PyAny>> {
     let qualified = call_with(
-        &native_field(&native_field(runtime, "adapter")?, "render_qualified_name")?,
+        &runtime_dialect(runtime)?.syntax("render_qualified_name")?,
         fields,
     )?;
     let mut fields = fields.to_vec();

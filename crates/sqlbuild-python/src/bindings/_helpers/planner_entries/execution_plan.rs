@@ -1,11 +1,10 @@
 //! Top-level planner orchestration producing an execution plan.
 
 use sqlbuild_analysis::planner_scope::constants::MODEL;
-use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, within};
+use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::build_command::support::utc_now;
-use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_changes::actions::resolve_model_actions;
 use crate::bindings::_helpers::planner_changes::detect::detect_changes;
 use crate::bindings::_helpers::planner_entries::test_planning::{
@@ -37,6 +36,7 @@ use crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes;
 use crate::bindings::_helpers::planner_phases::warehouse_state::gather_planner_warehouse_state;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::source_freshness::build_planner_source_freshness_result;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
@@ -45,7 +45,6 @@ use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use std::time::Instant;
 
-const INSPECTION_CATALOG: AdapterHost = AdapterHost::OpenInspectionCatalog;
 /// Selected scopes, and the overrides with cursor overrides typed for the selected models.
 fn scopes_and_cursor_overrides<'py>(
     args: &KeywordArguments<'py>,
@@ -127,8 +126,8 @@ fn deferred_migration_origins<'py>(
     defer_to_migration_origins(
         (
             &args.value("project")?,
-            &args.value("adapter")?,
-            &args.value("connection")?,
+            &Dialect::passed(args.value("dialect")?)?,
+            &PlannerReads::passed(args.value("reads")?)?,
         ),
         (
             locations.downcast::<PyDict>()?,
@@ -169,7 +168,10 @@ fn planned_output<'py>(
     let resolved_actions = resolve_model_actions(&inspection_scope, &changes)?;
     let source_freshness = build_planner_source_freshness_result(
         (&project, &inspection_scope),
-        (&args.value("adapter")?, &args.value("connection")?),
+        (
+            &Dialect::passed(args.value("dialect")?)?,
+            &PlannerReads::passed(args.value("reads")?)?,
+        ),
         &warehouse_field(&warehouse, |warehouse| &warehouse.inspection_relations)?,
         &native_field(&snapshot, "source_freshness_state_schemas")?,
     )?;
@@ -233,7 +235,7 @@ fn planned_output<'py>(
     Ok(plan_output)
 }
 
-/// Build the execution plan for one selection against live warehouse state.
+/// Build the execution plan for one selection through the plan's warehouse reads.
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
 pub(crate) fn build_execution_plan<'py>(
@@ -247,8 +249,8 @@ pub(crate) fn build_execution_plan<'py>(
         (
             &[
                 "project",
-                "adapter",
-                "connection",
+                "dialect",
+                "reads",
                 "selection",
                 "overrides",
                 "deferral",
@@ -258,14 +260,14 @@ pub(crate) fn build_execution_plan<'py>(
         ),
     )?;
     let project = args.value("project")?;
-    let adapter = args.value("adapter")?;
-    let connection = args.value("connection")?;
+    let dialect = Dialect::passed(args.value("dialect")?)?;
+    let reads = PlannerReads::passed(args.value("reads")?)?;
     let runtime = Bound::new(
         py,
         PlannerRuntime {
             project: project.clone().unbind(),
-            adapter: adapter.clone().unbind(),
-            connection: connection.clone().unbind(),
+            dialect: dialect.clone().unbind(),
+            reads: reads.clone().unbind(),
             project_config: args.value("project_config")?.unbind(),
             local_config: args.value("local_config")?.unbind(),
             on_progress: args.value("on_progress")?.unbind(),
@@ -279,21 +281,15 @@ pub(crate) fn build_execution_plan<'py>(
         py,
         PlanningRequest {
             project: project.clone().unbind(),
-            adapter: adapter.clone().unbind(),
+            dialect: dialect.unbind(),
             selected_keys: native_field(&inspection, "selected_keys")?.unbind(),
             sql_test_selection: native_field(&inspection, "sql_test_selection")?.unbind(),
         },
         native_field(&args.value("policies")?, "plan_sql_tests")?.is_truthy()?,
     )?;
-    let planned = (|| {
-        let catalog = call_with(
-            &host::entry(py, INSPECTION_CATALOG)?,
-            &[("adapter", adapter), ("connection", connection)],
-        )?;
-        within(&catalog, |_| {
-            planned_output(&args, &runtime, (&scopes, &overrides), test_planning.get())
-        })
-    })();
+    let planned = reads.get().reads().within_inspection(py, &mut || {
+        planned_output(&args, &runtime, (&scopes, &overrides), test_planning.get())
+    });
     let joined = test_planning.get().result(py);
     let planned = planned?;
     joined?;

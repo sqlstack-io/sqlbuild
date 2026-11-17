@@ -20,6 +20,8 @@ from scripts.fensu_policy.constants import (
     OBSERVATION_STATE_PATTERN,
     PARENTHESIS_CLOSE,
     PARENTHESIS_OPEN,
+    PLANNER_WAREHOUSE_IDENTIFIER_PATTERN,
+    PLANNER_WAREHOUSE_LITERAL_PATTERN,
     POLICY_CONFIG_FILE,
     REASON_SEPARATOR,
     REMOVED_CODE,
@@ -75,6 +77,8 @@ from scripts.fensu_policy.models import EnumVariant, StateDefinition, StateReads
 
 _OBSERVATION_STATE: re.Pattern[str] = re.compile(OBSERVATION_STATE_PATTERN)
 _SYNCED_COPY: re.Pattern[str] = re.compile(SYNCED_COPY_PATTERN)
+_PLANNER_WAREHOUSE_IDENTIFIER: re.Pattern[str] = re.compile(PLANNER_WAREHOUSE_IDENTIFIER_PATTERN)
+_PLANNER_WAREHOUSE_LITERAL: re.Pattern[str] = re.compile(PLANNER_WAREHOUSE_LITERAL_PATTERN)
 _LEXEMES: re.Pattern[str] = re.compile(RUST_LITERAL_PATTERN, re.DOTALL)
 _CONTINUATION: re.Pattern[str] = re.compile(RUST_LINE_CONTINUATION)
 _TEST_MODULE: re.Pattern[str] = re.compile(RUST_TEST_MODULE_PATTERN)
@@ -610,6 +614,25 @@ def synced_copy_reference_lines(*, source: str) -> list[int]:
     """One-based lines whose code, not a line comment, names the plan preview's synced copy."""
 
     return _reference_lines(source=source, pattern=_SYNCED_COPY)
+
+
+def warehouse_access_lines(*, source: str) -> list[int]:
+    """One-based code lines naming the adapter, a connection or a warehouse operation."""
+
+    lines: list[int] = []
+    number: int
+    code: str
+    raw: str
+    for number, (code, raw) in enumerate(
+        zip(code_view(source=source).splitlines(), source.splitlines(), strict=True), start=1
+    ):
+        if REMOVED_CODE in code:
+            continue
+        if _PLANNER_WAREHOUSE_IDENTIFIER.search(code) or _PLANNER_WAREHOUSE_LITERAL.search(
+            raw.partition(RUST_LINE_COMMENT)[0]
+        ):
+            lines.append(number)
+    return lines
 
 
 def _reference_lines(*, source: str, pattern: re.Pattern[str]) -> list[int]:

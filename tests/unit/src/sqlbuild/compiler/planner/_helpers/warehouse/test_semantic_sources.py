@@ -16,6 +16,7 @@ from sqlbuild._native import (
     discover_project_inputs,
     get_semantic_source_columns,
     list_source_candidates,
+    live_reads,
 )
 from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
 from sqlbuild.adapter.relations.main.open_inspection_catalog import open_inspection_catalog
@@ -70,8 +71,7 @@ def test_given_multiple_missing_source_schemas_when_inspecting_then_metadata_is_
         connection.execute("CREATE TABLE orders(id INTEGER); CREATE TABLE customers(id INTEGER)")
         result: dict[str, tuple[ColumnInfo, ...]] = get_semantic_source_columns(
             project=project,
-            adapter=adapter,
-            connection=connection,
+            reads=live_reads(adapter=adapter, connection=connection),
             source_read_map={source.name: source.source_entry for source in project.sources},
             columns={},
             selected_keys=frozenset(model.key for model in project.models),
@@ -128,8 +128,7 @@ def test_given_source_schema_case_differs_when_inspecting_then_columns_are_found
         with scope:
             result: dict[str, tuple[ColumnInfo, ...]] = get_semantic_source_columns(
                 project=project,
-                adapter=adapter,
-                connection=connection,
+                reads=live_reads(adapter=adapter, connection=connection),
                 source_read_map={source.name: source.source_entry for source in project.sources},
                 columns={},
                 selected_keys=frozenset(model.key for model in project.models),
@@ -187,8 +186,7 @@ def test_given_snowflake_source_schema_when_listing_candidates_then_finds_relati
 
     with open_inspection_catalog(adapter=adapter, connection=connection):
         candidates: tuple[RelationInfo, ...] = list_source_candidates(
-            adapter=adapter,
-            connection=connection,
+            reads=live_reads(adapter=adapter, connection=connection),
             database="analytics",
             entries=tuple(
                 SourceEntry(

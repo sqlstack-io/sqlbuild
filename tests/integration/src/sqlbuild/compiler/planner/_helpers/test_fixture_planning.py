@@ -7,6 +7,7 @@ import pytest
 
 from sqlbuild._native import (
     CompiledResourceType,
+    Dialect,
     DiscoveredProjectInputs,
     RelationFixtureCompletion,
     RelationFixturePlanningContext,
@@ -105,7 +106,7 @@ def test_given_partial_fixture_when_compiling_and_planning_then_completes_requir
     entries, warnings = build_selected_test_entries(
         sql_test_selection=SqlTestSelection(),
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         selected_keys=frozenset((project.models[0].key,)),
     )
 
@@ -179,7 +180,7 @@ def test_given_upper_case_reads_through_star_import_when_planning_then_fills_eac
     entries, warnings = build_selected_test_entries(
         sql_test_selection=SqlTestSelection(),
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         selected_keys=frozenset((project.models[0].key,)),
     )
 
@@ -249,7 +250,7 @@ def test_given_untyped_null_fixture_when_planning_then_applies_authoritative_typ
     entries, warnings = build_selected_test_entries(
         sql_test_selection=SqlTestSelection(),
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         selected_keys=frozenset((project.models[0].key,)),
     )
 
@@ -303,7 +304,7 @@ def test_given_source_contract_when_completing_fixture_then_respects_authoritati
     key: tuple[CompiledResourceType, str] = (CompiledResourceType.SOURCE, "raw_orders")
     completed: RelationFixtureCompletion = build_relation_fixture_completion(
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         request=(
             ("orders",),
             ((CompiledResourceType.SOURCE, {"raw_orders": "SELECT 1 AS ORDER_ID, 2 AS extra"}),),

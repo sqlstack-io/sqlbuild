@@ -7,6 +7,7 @@ import pytest
 from sqlbuild._native import (
     CompiledObjectKey,
     CompiledResourceType,
+    Dialect,
     PlannedSqlTests,
     PlannerInputError,
     SqlTestPlanning,
@@ -51,7 +52,7 @@ def test_given_planning_when_joining_then_returns_planned_tests(
     planning: SqlTestPlanning = start_sql_test_planning(
         sql_test_selection=SqlTestSelection(),
         project=SqlTestsProject(read_tests),  # ty: ignore[invalid-argument-type]
-        adapter=object(),  # ty: ignore[invalid-argument-type]
+        dialect=Dialect(object()),  # ty: ignore[invalid-argument-type]
         selected_keys=_KEYS,
         enabled=test_case.enabled,
     )
@@ -82,7 +83,7 @@ def test_given_failing_planning_when_joining_then_raises_original_error(
     planning: SqlTestPlanning = start_sql_test_planning(
         sql_test_selection=SqlTestSelection(),
         project=SqlTestsProject(read_tests),  # ty: ignore[invalid-argument-type]
-        adapter=object(),  # ty: ignore[invalid-argument-type]
+        dialect=Dialect(object()),  # ty: ignore[invalid-argument-type]
         selected_keys=_KEYS,
         enabled=test_case.enabled,
     )
@@ -117,7 +118,7 @@ def test_given_running_planning_when_listing_threads_then_no_python_worker_block
     planning: SqlTestPlanning = start_sql_test_planning(
         sql_test_selection=SqlTestSelection(),
         project=SqlTestsProject(read_tests),  # ty: ignore[invalid-argument-type]
-        adapter=object(),  # ty: ignore[invalid-argument-type]
+        dialect=Dialect(object()),  # ty: ignore[invalid-argument-type]
         selected_keys=_KEYS,
         enabled=test_case.enabled,
     )

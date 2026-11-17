@@ -4,13 +4,7 @@ use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
 use crate::bindings::_helpers::records::ids::RecordId;
 
-pub(crate) const RELATIONS_MAIN_LIST: AdapterHost = AdapterHost::ListRelationsForInspection;
-pub(crate) const RELATIONS_MAIN_COLUMNS: AdapterHost = AdapterHost::GetColumnsForInspection;
-pub(crate) const ACTIVE_CATALOG: AdapterHost = AdapterHost::ActiveInspectionCatalog;
 pub(crate) const RUN_BOUNDED: AdapterHost = AdapterHost::RunBoundedInspections;
-pub(crate) const RECORD_QUERY: AdapterHost = AdapterHost::RecordInspectionQuery;
-pub(crate) const RUN_RECORDED_QUERY: AdapterHost = AdapterHost::RunRecordedInspectionQuery;
-pub(crate) const QUERY_RECORD: AdapterHost = AdapterHost::InspectionQueryRecord;
 pub(crate) const COLUMN_INFO: AdapterHost = AdapterHost::ColumnInfo;
 pub(crate) const RELATION_LOOKUP: AdapterHost = AdapterHost::RelationLookup;
 pub(crate) const LOG_DEBUG_EVENT: ExecutorHost = ExecutorHost::LogDebugEvent;

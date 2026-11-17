@@ -515,6 +515,14 @@ class RulesAtLoadTestCase:
 
 
 @dataclass(frozen=True)
+class UnknownSourceAccessTestCase:
+    description: str
+    added_files: dict[str, str]
+    selection: list[str]
+    expected_unknown: str
+
+
+@dataclass(frozen=True)
 class SyncedFreshnessTestCase:
     description: str
     files: dict[str, str]

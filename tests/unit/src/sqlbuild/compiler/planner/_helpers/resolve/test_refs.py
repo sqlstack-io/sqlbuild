@@ -11,6 +11,7 @@ from sqlbuild._native import (
     CursorBounds,
     DbtCompileReferenceResolver,
     DbtManifestIndex,
+    Dialect,
     apply_deferred_locations,
     build_dbt_manifest_index,
     resolve_dbt_ref_references,
@@ -135,7 +136,7 @@ def test_given_refs_without_cursor_when_resolving_then_returns_expected_sql(
         seed_locations=_SEED_TARGETS,
         cursor_bounds=None,
         cursor_filter_inputs={},
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         cursor_type=None,
         lower_bound_inclusive=True,
     )
@@ -205,7 +206,7 @@ def test_given_refs_with_cursor_when_resolving_then_returns_expected_sql(
         seed_locations=_SEED_TARGETS,
         cursor_bounds=test_case.cursor_bounds,
         cursor_filter_inputs=_CURSOR_INPUTS,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         cursor_type=test_case.cursor_type,
         lower_bound_inclusive=True,
     )
@@ -239,7 +240,7 @@ def test_given_refs_with_exclusive_cursor_when_resolving_then_returns_expected_s
         seed_locations=_SEED_TARGETS,
         cursor_bounds=test_case.cursor_bounds,
         cursor_filter_inputs=_CURSOR_INPUTS,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         cursor_type=test_case.cursor_type,
         lower_bound_inclusive=False,
     )
@@ -326,7 +327,7 @@ def test_given_table_function_marker_when_resolving_then_returns_expected_sql(
     result: str = resolve_table_function_references(
         query_sql=test_case.query_sql,
         function_locations=_FUNCTION_TARGETS,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
     )
 
     assert result == test_case.expected_sql
@@ -366,7 +367,7 @@ def test_given_udf_marker_when_resolving_then_returns_expected_sql(
     result: str = resolve_udf_references(
         query_sql=test_case.query_sql,
         function_locations=_FUNCTION_TARGETS,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
     )
 
     assert result == test_case.expected_sql
@@ -389,7 +390,7 @@ def test_given_custom_adapter_when_resolving_udf_marker_then_uses_adapter_render
     result: str = resolve_udf_references(
         query_sql=test_case.query_sql,
         function_locations=_FUNCTION_TARGETS,
-        adapter=BracketUdfCallAdapter(),
+        dialect=Dialect(BracketUdfCallAdapter()),
     )
 
     assert result == test_case.expected_sql
@@ -412,7 +413,7 @@ def test_given_custom_adapter_when_resolving_table_function_marker_then_uses_ada
     result: str = resolve_table_function_references(
         query_sql=test_case.query_sql,
         function_locations=_FUNCTION_TARGETS,
-        adapter=BracketTableFunctionCallAdapter(),
+        dialect=Dialect(BracketTableFunctionCallAdapter()),
     )
 
     assert result == test_case.expected_sql

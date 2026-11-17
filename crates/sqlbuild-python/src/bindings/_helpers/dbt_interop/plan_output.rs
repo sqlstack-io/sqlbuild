@@ -1,5 +1,7 @@
 //! Plan selected SQLBuild work against the live adapter and attach it to the interop plan.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -198,14 +200,18 @@ pub(crate) fn build_sqlbuild_plan_output<'py>(
             ],
         )?;
         let discovered = native_field(&environment, "discovered_inputs")?;
+        let adapter = native_field(&environment, "adapter")?;
         let result = build_execution_plan(
             py,
             Some(keywords(
                 py,
                 &[
                     ("project", native_field(&environment, "project")?),
-                    ("adapter", native_field(&environment, "adapter")?),
-                    ("connection", connection.clone()),
+                    ("dialect", Dialect::of(&adapter)?.into_any()),
+                    (
+                        "reads",
+                        LiveReads::handle(&adapter, &connection, None)?.into_any(),
+                    ),
                     ("selection", selection),
                     ("overrides", overrides),
                     ("deferral", deferral),

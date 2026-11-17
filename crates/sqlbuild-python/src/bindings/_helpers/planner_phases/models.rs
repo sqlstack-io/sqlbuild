@@ -1,5 +1,7 @@
 //! Plan output fields gathered across the plan phases before the output is built once.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use std::collections::BTreeMap;
 
 use pyo3::prelude::{Bound, Py, PyAny};
@@ -67,8 +69,8 @@ pub(crate) struct PlanWarningContext<'a, 'py> {
 #[derive(Debug)]
 pub(crate) struct PlannerRuntime {
     pub(crate) project: Py<PyAny>,
-    pub(crate) adapter: Py<PyAny>,
-    pub(crate) connection: Py<PyAny>,
+    pub(crate) dialect: Py<Dialect>,
+    pub(crate) reads: Py<PlannerReads>,
     pub(crate) project_config: Py<PyAny>,
     pub(crate) local_config: Py<PyAny>,
     pub(crate) on_progress: Py<PyAny>,

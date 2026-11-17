@@ -1,5 +1,7 @@
 //! Old-name planner object conversions and existing native helper calls.
 
+use crate::bindings::_helpers::native_host::dialect::Syntax;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
@@ -26,7 +28,7 @@ pub(super) fn location<'py>(
         ("name", native_field(relation, "name")?),
     ];
     let qualified = call_with(
-        &native_field(&native_field(runtime, "adapter")?, "render_qualified_name")?,
+        &runtime_dialect(runtime)?.syntax("render_qualified_name")?,
         &fields,
     )?;
     fields.push(("qualified_name", qualified));

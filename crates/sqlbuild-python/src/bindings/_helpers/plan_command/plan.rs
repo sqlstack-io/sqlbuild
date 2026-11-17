@@ -32,10 +32,12 @@ use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line
 use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, preview_changed};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::preview_state::{PreviewConnection, PreviewScope};
+use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use crate::bindings::_helpers::plan_command::changed::{changed_json, changed_text};
 use crate::bindings::_helpers::plan_output::plan_json::{CHANGED_KEY, format_plan_json};
 use crate::bindings::_helpers::plan_output::plan_text::format_plan;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
+use crate::bindings::_helpers::planner_warehouse::synced_reads::SyncedReads;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::new_record;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -87,8 +89,14 @@ struct PlanInvocation<'py> {
     connection_progress: Bound<'py, PyAny>,
     planning_progress: Bound<'py, PyAny>,
     load_sources: Bound<'py, PyAny>,
-    /// Set for a location's plan preview: the connection that answers from the synced state.
-    preview: Option<Bound<'py, PreviewConnection>>,
+    /// Set for a location's plan preview: the reads that answer from the synced state.
+    preview: Option<SyncedPlan<'py>>,
+}
+
+/// A plan preview's reads over the synced state, and the handle the planner reads through.
+struct SyncedPlan<'py> {
+    synced: Arc<SyncedReads>,
+    reads: Bound<'py, PlannerReads>,
 }
 
 /// A plan's project: compiled for the request, or the discovered inputs and compiled phase a location holds.
@@ -101,11 +109,11 @@ pub(crate) enum PlanProject<'a, 'py> {
     },
 }
 
-/// The connection a location's plan preview plans through, over the synced `state`; a preview never defers.
+/// A location preview's reads over the synced `state`, never deferring; other plans read live.
 fn preview<'py>(
     request: &Bound<'py, PyAny>,
     state: Option<&Arc<WarehouseState>>,
-) -> PyResult<Option<Bound<'py, PreviewConnection>>> {
+) -> PyResult<Option<SyncedPlan<'py>>> {
     let py: Python<'py> = request.py();
     let Some(state) = state else {
         return Ok(None);
@@ -120,10 +128,9 @@ fn preview<'py>(
             },
         ));
     }
-    Ok(Some(Bound::new(
-        py,
-        PreviewConnection::new(Arc::clone(state)),
-    )?))
+    let synced: Arc<SyncedReads> = Arc::new(SyncedReads::new(Arc::clone(state)));
+    let reads: Bound<'py, PlannerReads> = Bound::new(py, PlannerReads::new(synced.clone()))?;
+    Ok(Some(SyncedPlan { synced, reads }))
 }
 
 fn resolve_invocation<'py>(
@@ -198,7 +205,7 @@ fn resolve_invocation<'py>(
     } else {
         requested_load
     };
-    let preview: Option<Bound<'py, PreviewConnection>> = preview(request, state)?;
+    let preview: Option<SyncedPlan<'py>> = preview(request, state)?;
     Ok(PlanInvocation {
         project_dir,
         discovered,
@@ -312,7 +319,7 @@ fn compile_pipeline<'py>(
     let preview: Option<Bound<'py, PyAny>> = invocation
         .preview
         .as_ref()
-        .map(|preview| preview.clone().into_any());
+        .map(|preview| preview.reads.clone().into_any());
     planned_project(
         (&invocation.discovered, &adapter),
         (&pipeline_options, connection_hooks(invocation)?),
@@ -336,19 +343,21 @@ fn changed_preview(
     let Some(policy) = changed_policy(&invocation.project_dir, request, &project)? else {
         return Ok(None);
     };
-    let preview: Option<Bound<'_, PyAny>> = invocation
-        .preview
-        .as_ref()
-        .map(|preview| preview.clone().into_any());
-    let (decision, warnings) = preview_changed(
-        (&native_field(pipeline, "plan_output")?, &project),
-        (
+    let plan: (&Bound<'_, PyAny>, &Bound<'_, PyAny>) =
+        (&native_field(pipeline, "plan_output")?, &project);
+    let full_refresh: bool = native_field(request, "full_refresh")?.is_truthy()?;
+    let py = request.py();
+    let reads: Bound<'_, PlannerReads> = match &invocation.preview {
+        Some(preview) => preview.reads.clone(),
+        None => LiveReads::handle(
             &native_field(&invocation.context, "adapter")?,
-            &native_field(&invocation.context, "connection_config")?,
-            preview.as_ref(),
-        ),
-        (&policy, native_field(request, "full_refresh")?.is_truthy()?),
-    )?;
+            &py.None().into_bound(py),
+            Some(&native_field(&invocation.context, "connection_config")?),
+        )?,
+    };
+    let changed = preview_changed(plan, reads.get().reads(), (&policy, full_refresh));
+    reads.get().reads().close_consumption(py)?;
+    let (decision, warnings) = changed?;
     for warning in warnings {
         write_progress(&invocation.stream, &format!("warning: {warning}\n"))?;
     }
@@ -371,7 +380,7 @@ fn write_output(
         if let Some(facade) = &invocation.preview {
             options.push((
                 SYNCED_COPY_KEY,
-                synced_copy_json(py, facade.get())?.into_any(),
+                synced_copy_json(py, &facade.synced)?.into_any(),
             ));
         }
         if let Some(decision) = changed {
@@ -416,16 +425,13 @@ fn write_output(
     let text: String = format_plan(py, Some(keywords(py, &options)?))?;
     print_line(py, &format!("\n{text}"))?;
     if let Some(facade) = &invocation.preview {
-        print_line(py, &synced_copy_text(facade.get()))?;
+        print_line(py, &synced_copy_text(&facade.synced))?;
     }
     Ok(None)
 }
 
 /// The plan JSON's account of the synced copy: when it synced, window starts and unknowns.
-fn synced_copy_json<'py>(
-    py: Python<'py>,
-    facade: &PreviewConnection,
-) -> PyResult<Bound<'py, PyDict>> {
+fn synced_copy_json<'py>(py: Python<'py>, facade: &SyncedReads) -> PyResult<Bound<'py, PyDict>> {
     let synced: Bound<'py, PyDict> = PyDict::new(py);
     synced.set_item("synced_at", facade.synced_at())?;
     synced.set_item("cursor_window_starts", facade.windows())?;
@@ -434,7 +440,7 @@ fn synced_copy_json<'py>(
 }
 
 /// The preview footer: when the copy was synced and what stays unknown until the run.
-fn synced_copy_text(facade: &PreviewConnection) -> String {
+fn synced_copy_text(facade: &SyncedReads) -> String {
     let mut lines: Vec<String> = vec![format!(
         "Planned from the synced copy ({}); the run re-plans live.",
         facade.synced_at().map_or_else(
@@ -482,7 +488,6 @@ pub(crate) fn location_plan<'py>(
         PlanProject::Compiled => false,
     };
     let _rules = RulesAtLoadScope::enter();
-    let _preview = PreviewScope::enter();
     let project: PlanProject<'_, 'py> =
         if external_manifest || native_field(request, "cli_vars")?.is_truthy()? {
             PlanProject::Compiled

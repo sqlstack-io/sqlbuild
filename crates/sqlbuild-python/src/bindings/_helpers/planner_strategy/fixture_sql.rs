@@ -1,5 +1,6 @@
 //! Adapter-bound rendering of fixture completion SQL.
 
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_analysis::planner_fixtures::main::{
@@ -22,7 +23,7 @@ pub(crate) fn fixture_marker(sql: &str) -> PyResult<bool> {
 pub(crate) fn complete_empty_fixture_sql(
     sql: &str,
     relation: Option<&FixtureRelation>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<(String, Option<String>)> {
     if !fixture_marker(sql)? {
         return Ok((sql.into(), None));
@@ -37,8 +38,9 @@ pub(crate) fn complete_empty_fixture_sql(
     }
     Ok((
         render_empty(metadata, |name| {
-            adapter
-                .call_method1("render_identifier", (name,))?
+            dialect
+                .syntax("render_identifier")?
+                .call1((name,))?
                 .extract::<String>()
         })?,
         None,
@@ -55,7 +57,7 @@ pub(crate) struct CompletionSql<'py, 'a> {
 
 pub(crate) fn render_completed(
     input: CompletionSql<'_, '_>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<String> {
     let mut supplied: Vec<SuppliedProjection> = Vec::new();
     if !input.typed_nulls.is_empty() {
@@ -82,7 +84,7 @@ pub(crate) fn render_completed(
             completed: &input.completed,
         },
         |name, exact| {
-            adapter
+            dialect
                 .call_method1(
                     if exact {
                         "render_exact_identifier"
@@ -101,7 +103,7 @@ pub(crate) fn complete_typed_null_columns(
     sql: &str,
     inference: &Bound<'_, PyAny>,
     expected_types: &[(String, String)],
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<String> {
     let py = inference.py();
     let typed_nulls = PyDict::new(py);
@@ -123,6 +125,6 @@ pub(crate) fn complete_typed_null_columns(
             quoted_names: native_field(inference, "quoted_names")?,
             completed: Vec::new(),
         },
-        adapter,
+        dialect,
     )
 }

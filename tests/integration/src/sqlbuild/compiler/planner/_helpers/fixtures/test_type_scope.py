@@ -5,6 +5,7 @@ import pytest
 
 from sqlbuild._native import (
     CompiledResourceType,
+    Dialect,
     RelationFixtureCompletion,
     RelationFixturePlanningContext,
     build_compiled_project,
@@ -65,7 +66,7 @@ def test_given_unrelated_project_types_when_completing_fixture_then_eager_work_i
     fixture_key: tuple[CompiledResourceType, str] = (CompiledResourceType.SOURCE, "raw_orders")
     completed: RelationFixtureCompletion = build_relation_fixture_completion(
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         request=(
             ("orders",),
             ((CompiledResourceType.SOURCE, {"raw_orders": "SELECT 1 AS order_id"}),),

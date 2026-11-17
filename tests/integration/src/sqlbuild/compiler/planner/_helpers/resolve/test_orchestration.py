@@ -10,6 +10,7 @@ from sqlbuild._native import (
     BackfillAction,
     BackfillResult,
     CursorOverridePair,
+    Dialect,
     ModelPlanContext,
     SqlHookEntry,
     WarehouseSnapshot,
@@ -67,7 +68,7 @@ def test_given_compiled_dependencies_when_resolving_then_adapter_overrides_execu
     )
     connection.execute("CREATE TABLE staging.actual_orders AS SELECT 9 AS order_id")
     sql: str = resolve_model_sql(
-        adapter=adapter,
+        dialect=Dialect(adapter),
         model=model,
         snapshot=WarehouseSnapshot(existing_relations={}),
         context=context,
@@ -79,7 +80,7 @@ def test_given_compiled_dependencies_when_resolving_then_adapter_overrides_execu
     assert adapter.calls == test_case.expected_model_calls
     adapter.calls.clear()
     function_sql: str = resolve_function_sql(
-        adapter=adapter,
+        dialect=Dialect(adapter),
         function=project.functions[0],
         model_locations=context.model_locations,
         seed_locations=context.seed_locations,
@@ -93,7 +94,7 @@ def test_given_compiled_dependencies_when_resolving_then_adapter_overrides_execu
     assert adapter.calls == test_case.expected_relation_calls
     adapter.calls.clear()
     pre_hooks, post_hooks = resolve_model_hook_entries(
-        model=model, adapter=adapter, context=context, external_sql_reference_resolver=None
+        model=model, dialect=Dialect(adapter), context=context, external_sql_reference_resolver=None
     )
     assert isinstance(pre_hooks, tuple | list)
     assert len(pre_hooks) == 1

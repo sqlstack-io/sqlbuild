@@ -41,8 +41,8 @@ def observation_display_only(*, project: Project, ctx: RuleContext) -> list[Faul
     slug="synced-copy-preview-only",
     message="only sqb plan previews may plan from the synced copy",
     remediation=(
-        "Plan from the live adapter; only the files in allowed_paths, which define, activate or "
-        "branch on the plan preview's synced copy, may name it."
+        "Plan through WarehouseReads; only the files in allowed_paths, which define or choose "
+        "the plan preview's synced reads, may name them."
     ),
     cacheable=False,
     analyzers=(AnalyzerId.RUST,),

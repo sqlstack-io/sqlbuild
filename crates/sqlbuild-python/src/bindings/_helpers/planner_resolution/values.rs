@@ -2,6 +2,7 @@
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
+use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
 use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -23,7 +24,7 @@ pub(super) fn method<'py>(
 }
 
 pub(super) fn cursor_wrap(
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     filtering: &CursorFiltering<'_>,
     relation: String,
     (name, inject_alias): (&str, bool),
@@ -36,12 +37,12 @@ pub(super) fn cursor_wrap(
     let Some(column) = column else {
         return Ok(relation);
     };
-    let py = adapter.py();
+    let py = dialect.py();
     let cursor_type = &filtering.cursor_type;
     let literal = |bound: &str| -> PyResult<String> {
         let token = sentinel_to_token(&native_field(bounds, bound)?)?;
         method(
-            adapter,
+            dialect,
             "render_cursor_bound_literal",
             &[
                 ("value", string(py, &token)),
@@ -52,10 +53,11 @@ pub(super) fn cursor_wrap(
     };
     let start = literal("start")?;
     let end = literal("end")?;
-    let operand = cursor_operand(adapter, &column, cursor_type)?;
+    let operand = cursor_operand(dialect, &column, cursor_type)?;
     let alias = inject_alias
-        && adapter
-            .call_method0("requires_derived_table_aliases")?
+        && dialect
+            .syntax("requires_derived_table_aliases")?
+            .call0()?
             .is_truthy()?;
     Ok(cursor_subquery(
         &relation,
@@ -72,16 +74,16 @@ pub(super) fn cursor_wrap(
 
 /// The adapter's expression for a cursor column compared with bounds, or the column itself.
 fn cursor_operand(
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     column: &str,
     cursor_type: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
-    let py = adapter.py();
-    if !adapter.hasattr("render_cursor_operand")? {
+    let py = dialect.py();
+    if !dialect.hasattr("render_cursor_operand")? {
         return Ok(column.to_owned());
     }
     method(
-        adapter,
+        dialect,
         "render_cursor_operand",
         &[
             ("expression", string(py, column)),

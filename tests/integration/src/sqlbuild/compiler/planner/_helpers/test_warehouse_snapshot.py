@@ -12,6 +12,7 @@ from sqlbuild._native import (
     CompiledResourceType,
     CursorOverrides,
     CursorSnapshotScope,
+    Dialect,
     Fingerprint,
     ModelCursorSnapshot,
     PlannerInputError,
@@ -22,6 +23,7 @@ from sqlbuild._native import (
     compiled_model_record,
     gather_source_columns,
     gather_warehouse_snapshot,
+    live_reads,
     project_with,
     write_fingerprint,
 )
@@ -254,9 +256,8 @@ def test_given_warehouse_state_when_gathering_snapshot_then_returns_expected(
     )
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=adapter,
-        connection=connection,
-        execute=execute,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection, execute=execute),
         selected_keys=test_case.selected_keys,
     )
 
@@ -294,9 +295,8 @@ def test_given_no_target_schemas_when_gathering_snapshot_then_returns_empty(
     project: CompiledProjectView = build_project_with_targets(model_locations={}, seed_locations={})
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=adapter,
-        connection=connection,
-        execute=execute,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection, execute=execute),
     )
 
     assert len(snapshot.existing_relations) == test_case.expected_relation_count
@@ -333,8 +333,7 @@ def test_given_sources_when_gathering_source_columns_then_filters_metadata_names
 
     columns: dict[str, tuple[ColumnInfo, ...]] = gather_source_columns(
         project=project,
-        adapter=adapter,
-        connection=connection,
+        reads=live_reads(adapter=adapter, connection=connection),
     )
 
     assert frozenset(columns.keys()) == test_case.expected_source_names
@@ -487,9 +486,8 @@ def test_given_incremental_models_when_gathering_cursor_snapshots_then_returns_e
     )
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=adapter,
-        connection=connection,
-        execute=execute,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection, execute=execute),
         selected_keys=test_case.selected_keys,
         full_refresh=test_case.full_refresh,
         on_progress=_track_progress,
@@ -577,9 +575,8 @@ def test_given_deferred_locations_when_gathering_cursor_snapshots_then_resolves_
     )
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=adapter,
-        connection=connection,
-        execute=execute,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection, execute=execute),
         selected_keys=test_case.selected_keys,
         full_refresh=test_case.full_refresh,
         on_progress=_track_progress,
@@ -645,9 +642,8 @@ def test_given_models_sharing_one_source_when_gathering_snapshot_then_executes_o
 
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=adapter,
-        connection=connection,
-        execute=_record_execute,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection, execute=_record_execute),
     )
 
     assert snapshot.cursor_snapshots == {
@@ -700,9 +696,8 @@ def test_given_timezone_cursor_text_when_gathering_snapshot_then_normalizes_ware
 
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=adapter,
-        connection=connection,
-        execute=execute,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection, execute=execute),
     )
 
     assert snapshot.cursor_snapshots["daily_events"] == test_case.expected_cursor_snapshot
@@ -758,9 +753,12 @@ def test_given_explicit_start_when_gathering_snapshot_then_eligible_query_is_nev
 
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=_FailEligibleCursorAdapter(),
-        connection=connection,
-        execute=_fail_eligible_execute,
+        dialect=Dialect(_FailEligibleCursorAdapter()),
+        reads=live_reads(
+            adapter=_FailEligibleCursorAdapter(),
+            connection=connection,
+            execute=_fail_eligible_execute,
+        ),
         cursor_scope=CursorSnapshotScope(
             model_keys=frozenset({daily_events_key}),
             runtime_producer_keys=frozenset({daily_events_key}),
@@ -835,9 +833,8 @@ def test_given_mixed_model_grains_when_gathering_eligibility_then_warehouse_flow
 
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=adapter,
-        connection=connection,
-        execute=_record_execute,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection, execute=_record_execute),
         cursor_scope=CursorSnapshotScope(
             model_keys=frozenset({hourly_key}),
             runtime_producer_keys=frozenset({hourly_key}),
@@ -925,9 +922,8 @@ def test_given_broad_metadata_scope_when_gathering_selected_cursor_then_ignores_
 
     snapshot: WarehouseSnapshot = gather_warehouse_snapshot(
         project=project,
-        adapter=adapter,
-        connection=connection,
-        execute=_record_execute,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection, execute=_record_execute),
         selected_keys=metadata_keys,
         cursor_scope=CursorSnapshotScope(
             model_keys=frozenset({selected_cursor_key}),
@@ -990,9 +986,8 @@ def test_given_selected_invalid_cursor_model_when_gathering_snapshot_then_raises
     with pytest.raises(PlannerInputError, match=test_case.expected_error_fragment) as exc_info:
         gather_warehouse_snapshot(
             project=project,
-            adapter=adapter,
-            connection=connection,
-            execute=execute,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection, execute=execute),
             selected_keys=frozenset(model.key for model in project.models),
             cursor_scope=CursorSnapshotScope(
                 model_keys=frozenset({invalid_cursor_key}),
@@ -1061,9 +1056,8 @@ def test_given_full_refresh_with_time_only_watermark_contract_when_gathering_the
     with pytest.raises(PlannerInputError, match=test_case.expected_error_fragment):
         gather_warehouse_snapshot(
             project=project,
-            adapter=adapter,
-            connection=connection,
-            execute=execute,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection, execute=execute),
             selected_keys=frozenset(model.key for model in project.models),
             full_refresh_model_names=frozenset({"daily_events"}),
             cursor_scope=CursorSnapshotScope(

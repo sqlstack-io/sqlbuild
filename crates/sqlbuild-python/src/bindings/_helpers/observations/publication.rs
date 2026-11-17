@@ -11,15 +11,18 @@ use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KI
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::{model_reads, project_reads};
 use crate::bindings::_helpers::consumption::relation_reads::relation;
-use crate::bindings::_helpers::native_host::consumption_state::{ConsumptionConnection, Location};
+use crate::bindings::_helpers::native_host::consumption_io::ConsumptionConnection;
+use crate::bindings::_helpers::native_host::consumption_state::Location;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::live_reads::bound_task;
 use crate::bindings::_helpers::native_host::observations_state::{
     ObservationAppend, append_observations,
 };
 use crate::bindings::_helpers::observations::source_capture::take_source_capture;
 use crate::bindings::_helpers::planner_phases::objects::config_str;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_BOUNDED;
-use crate::bindings::_helpers::planner_warehouse::cursors::{adapter_cursor_sql, bound_task};
+use crate::bindings::_helpers::planner_warehouse::cursors::dialect_cursor_sql;
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 /// Dependency kind of a source in a model's `dep_rows`.
@@ -72,7 +75,7 @@ fn cursor_reads(
         };
         reads.push(CursorRead {
             location: Location::of(&relation(&destination)?),
-            sql: adapter_cursor_sql(adapter, &query)?,
+            sql: dialect_cursor_sql(&Dialect::of(adapter)?, &query)?,
             cursor_type: query.cursor_type,
             model: name,
         });

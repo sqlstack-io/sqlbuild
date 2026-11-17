@@ -2,6 +2,7 @@
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_migrations::matching::{
     match_migration_fingerprints, migration_destination_fingerprints,
 };
@@ -11,6 +12,7 @@ use crate::bindings::_helpers::planner_migrations::models::{
 use crate::bindings::_helpers::planner_migrations::{
     discovery_events, discovery_models, discovery_requests,
 };
+use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple, PyTupleMethods};
@@ -47,7 +49,9 @@ pub(super) fn discover_model_migrations<'py>(
     let metadata = discovery_models::metadata(&runtime, &models)?;
     let inputs = FingerprintInputs {
         metadata_jsons: metadata.into_any(),
-        dialect: native_field(&runtime, "adapter")?.call_method0("sql_analysis_dialect")?,
+        dialect: runtime_dialect(&runtime)?
+            .syntax("sql_analysis_dialect")?
+            .call0()?,
         fingerprints: cache,
     };
     call_with(

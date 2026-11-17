@@ -1,5 +1,7 @@
 //! Compile the origin and destination environments of a clone and plan it.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -157,8 +159,16 @@ pub(crate) fn timed_clone_pipeline<'py>(
                 ("project", destination_project.clone()),
                 ("select", native_field(&pipeline.options, "select")?),
                 ("exclude", native_field(&pipeline.options, "exclude")?),
-                ("adapter", pipeline.adapter.clone()),
-                ("connection", native_field(&pipeline.connection, "handle")?),
+                ("dialect", Dialect::of(&pipeline.adapter)?.into_any()),
+                (
+                    "reads",
+                    LiveReads::handle(
+                        &pipeline.adapter,
+                        &native_field(&pipeline.connection, "handle")?,
+                        None,
+                    )?
+                    .into_any(),
+                ),
                 ("origin_project", origin_project.clone()),
                 ("origin_source_project", origin_source_project),
                 ("destination_source_project", destination_source_project),

@@ -1,6 +1,7 @@
 //! Materialize fixture SQL plans while preserving adapter and completion boundaries.
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_MISSING_FIXTURE_SQL;
 use crate::bindings::_helpers::planner_scenario::helper_scope::scenario_helper_scope;
 use crate::bindings::_helpers::planner_scenario::{
@@ -169,7 +170,7 @@ pub(crate) fn build_scenario_fixture_plans<'py>(
                 "scenario",
                 "graph_plan",
                 "relation_plan",
-                "adapter",
+                "dialect",
                 "source_lexical_syntax",
             ],
             &["fixture_sql_overrides"],
@@ -177,7 +178,7 @@ pub(crate) fn build_scenario_fixture_plans<'py>(
     )?;
     let scenario = args.value("scenario")?;
     let context = SqlContext {
-        adapter: args.value("adapter")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
         relations: args.value("relation_plan")?,
         syntax: args.value("source_lexical_syntax")?,
         label: source_label(&scenario)?,

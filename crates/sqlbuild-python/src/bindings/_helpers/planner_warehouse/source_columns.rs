@@ -4,12 +4,11 @@ use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::preview_state::preview_of;
-use crate::bindings::_helpers::observations::source_capture::capture_source_columns;
 use crate::bindings::_helpers::planner_phases::objects::{frozenset, text, tuple};
 use crate::bindings::_helpers::planner_warehouse::constants::{
     COLUMN_INFO, METADATA_NAME_FILTER_LIMIT, RELATION_LOOKUP,
 };
+use crate::bindings::_helpers::planner_warehouse::reads::{PlannerReads, Read};
 use crate::bindings::_helpers::planner_warehouse::snapshot::{columns_for, list_relations};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -80,7 +79,7 @@ fn names_tuple<'py>(py: Python<'py>, names: &BTreeSet<String>) -> PyResult<Bound
 /// Source columns and the names of sources the relation listing found.
 pub(crate) fn source_inspection<'py>(
     project: &Bound<'py, PyAny>,
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    reads: &Bound<'py, PlannerReads>,
     source_entries: Option<Bound<'py, PyAny>>,
 ) -> PyResult<(Bound<'py, PyDict>, Bound<'py, PyAny>)> {
     let py = project.py();
@@ -97,32 +96,18 @@ pub(crate) fn source_inspection<'py>(
                 let sql: String = expression.extract()?;
                 let source: Bound<'py, PyAny> = native_field(entry, "name")?;
                 let source_name: String = source.extract()?;
-                let described: Vec<String> = match preview_of(connection) {
-                    Some(facade) => match facade.get().described_columns(&source_name, &sql)? {
-                        Some(described) => described,
-                        None => {
-                            facade.get().mark_unknown(format!(
-                                "query columns of expression source {source_name} (planned as declared)"
-                            ));
-                            native_field(entry, "columns")?
-                                .try_iter()?
-                                .map(|column| native_field(&column?, "name")?.extract())
-                                .collect::<PyResult<_>>()?
-                        }
-                    },
-                    None => {
-                        let names = call_with(
-                            &native_field(adapter, "query_column_names")?,
-                            &[("connection", connection.clone()), ("sql", expression)],
-                        )?;
-                        let described: Vec<String> = names
+                let described: Vec<String> =
+                    match reads
+                        .get()
+                        .reads()
+                        .described_columns(py, &source_name, &sql)?
+                    {
+                        Read::Known(described) => described,
+                        Read::Unknown(_) => native_field(entry, "columns")?
                             .try_iter()?
-                            .map(|name| name?.extract())
-                            .collect::<PyResult<_>>()?;
-                        capture_source_columns(&source_name, &sql, &described);
-                        described
-                    }
-                };
+                            .map(|column| native_field(&column?, "name")?.extract())
+                            .collect::<PyResult<_>>()?,
+                    };
                 let mut columns: Vec<_> = Vec::new();
                 for name in &described {
                     columns.push(call_with(
@@ -182,7 +167,7 @@ pub(crate) fn source_inspection<'py>(
             }
         }
         let relations = list_relations(
-            (adapter, connection),
+            reads,
             &database_value,
             names_tuple(py, &schemas)?,
             match name_filter(&entries, database, &schemas)? {
@@ -216,7 +201,7 @@ pub(crate) fn source_inspection<'py>(
                 chosen.push(relation.clone());
             }
         }
-        let all = columns_for((adapter, connection), tuple(py, chosen)?)?;
+        let all = columns_for(reads, tuple(py, chosen)?)?;
         for (_, name, identity) in &scoped {
             if all.contains(identity)? {
                 result.set_item(name, all.get_item(identity)?)?;
@@ -228,21 +213,19 @@ pub(crate) fn source_inspection<'py>(
 
 pub(crate) fn gather_source_inspection<'py>(
     project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
+    reads: &Bound<'py, PlannerReads>,
     source_entries: Option<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let (columns, listed) = source_inspection(project, (adapter, connection), source_entries)?;
+    let (columns, listed) = source_inspection(project, reads, source_entries)?;
     Ok(PyTuple::new(project.py(), [columns.into_any(), listed])?.into_any())
 }
 
 #[pyfunction]
-#[pyo3(signature = (*, project, adapter, connection, source_entries=None))]
+#[pyo3(signature = (*, project, reads, source_entries=None))]
 pub(crate) fn gather_source_columns<'py>(
     project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
+    reads: &Bound<'py, PlannerReads>,
     source_entries: Option<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    Ok(source_inspection(project, (adapter, connection), source_entries)?.0)
+    Ok(source_inspection(project, reads, source_entries)?.0)
 }

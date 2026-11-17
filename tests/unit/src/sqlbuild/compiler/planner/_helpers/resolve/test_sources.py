@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from sqlbuild._native import CursorBounds, SourceColumnEntry, SourceEntry, resolve_source_references
+from sqlbuild._native import (
+    CursorBounds,
+    Dialect,
+    SourceColumnEntry,
+    SourceEntry,
+    resolve_source_references,
+)
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapter.contract.types import CursorKind
 from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
@@ -335,7 +341,7 @@ def test_given_source_references_when_resolving_then_returns_expected_sql(
         star_exclude_keyword=test_case.star_exclude_keyword,
         cursor_bounds=test_case.cursor_bounds,
         cursor_filter_inputs=test_case.cursor_inputs,
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         cursor_type=test_case.cursor_type,
         lower_bound_inclusive=test_case.lower_bound_inclusive,
     )
@@ -404,7 +410,7 @@ def test_given_adapter_specific_source_references_when_resolving_then_returns_ad
         star_exclude_keyword="EXCEPT",
         cursor_bounds=None,
         cursor_filter_inputs={},
-        adapter=BigQueryAdapter(),
+        dialect=Dialect(BigQueryAdapter()),
         cursor_type=None,
         lower_bound_inclusive=True,
     )
@@ -453,7 +459,7 @@ def test_given_reserved_source_column_when_resolving_then_quotes_contract_projec
         star_exclude_keyword="EXCLUDE",
         cursor_bounds=None,
         cursor_filter_inputs={},
-        adapter=SnowflakeAdapter(),
+        dialect=Dialect(SnowflakeAdapter()),
         cursor_type=None,
         lower_bound_inclusive=True,
     )
@@ -549,7 +555,7 @@ def test_given_sqlserver_alias_required_sources_when_resolving_then_aliases_deri
         star_exclude_keyword=test_case.star_exclude_keyword,
         cursor_bounds=test_case.cursor_bounds,
         cursor_filter_inputs=test_case.cursor_inputs,
-        adapter=SqlServerAdapter(),
+        dialect=Dialect(SqlServerAdapter()),
         cursor_type=test_case.cursor_type,
         lower_bound_inclusive=test_case.lower_bound_inclusive,
     )
@@ -593,7 +599,7 @@ def test_given_sqlserver_timestamp_bounds_when_resolving_then_uses_datetime2_lit
         star_exclude_keyword=test_case.star_exclude_keyword,
         cursor_bounds=test_case.cursor_bounds,
         cursor_filter_inputs=test_case.cursor_inputs,
-        adapter=SqlServerAdapter(),
+        dialect=Dialect(SqlServerAdapter()),
         cursor_type=test_case.cursor_type,
         lower_bound_inclusive=test_case.lower_bound_inclusive,
     )
@@ -630,7 +636,7 @@ def test_given_postgres_sources_when_resolving_then_avoids_unsupported_star_excl
         star_exclude_keyword=test_case.star_exclude_keyword,
         cursor_bounds=test_case.cursor_bounds,
         cursor_filter_inputs=test_case.cursor_inputs,
-        adapter=PostgresAdapter(),
+        dialect=Dialect(PostgresAdapter()),
         cursor_type=test_case.cursor_type,
         lower_bound_inclusive=test_case.lower_bound_inclusive,
     )
@@ -797,7 +803,7 @@ def test_given_invalid_source_references_when_resolving_then_raises_clear_error(
             star_exclude_keyword=test_case.star_exclude_keyword,
             cursor_bounds=None,
             cursor_filter_inputs={},
-            adapter=DuckDbAdapter(),
+            dialect=Dialect(DuckDbAdapter()),
             cursor_type=None,
             lower_bound_inclusive=True,
         )
