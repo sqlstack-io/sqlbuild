@@ -1330,6 +1330,13 @@ pub(crate) fn plan_failure(message: &str) -> serde_json::Value {
     json!({"error": {"code": "plan_failed", "message": message, "help": null}})
 }
 
+/// A plan document that left no diffs out, such as a failure report.
+pub(crate) fn without_diffs(
+    document: serde_json::Value,
+) -> crate::native_commands::types::LocationPlan {
+    (document, std::collections::BTreeMap::new())
+}
+
 /// The plan document of a plan that failed with its own coded error, its texts redacted and bounded.
 pub(crate) fn plan_error(failed: &serde_json::Value) -> serde_json::Value {
     let text = |name: &str| failed[name].as_str().map(redact_error_text);

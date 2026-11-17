@@ -3,6 +3,8 @@ pub(crate) mod event_history;
 pub(crate) mod liveness;
 pub(crate) mod location_heartbeat;
 pub(crate) mod observations;
+pub(crate) mod plan_access;
+pub(crate) mod plan_diffs;
 pub(crate) mod pool_cap_warnings;
 pub(crate) mod problems;
 pub(crate) mod recent_health;

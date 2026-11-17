@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use uuid::Uuid;
 
+use crate::platform::_helpers::plan_diffs::{split_plan_diffs, store_plan_diffs, valid_plan_diffs};
 use crate::platform::constants::PLAN_DOCUMENT_BYTES;
 use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::main::require_instance::require_instance;
@@ -21,7 +22,13 @@ pub async fn complete_location_work(
     (location_id, request_id): (Uuid, Uuid),
     result: &LocationWorkResult,
 ) -> Result<bool, ControlError> {
-    let result = &redacted(result);
+    let (result, diffs) = split_plan_diffs(redacted(result));
+    let result = &result;
+    if !valid_plan_diffs(&diffs) {
+        return Err(ControlError::Invalid(
+            "plan diffs exceed the stored bounds".into(),
+        ));
+    }
     let transaction = begin(store, TransactionMode::Write).await?;
     let (transaction, stored) = read_location_work(transaction, request_id).await?;
     let stored = stored
@@ -64,6 +71,7 @@ pub async fn complete_location_work(
     let (transaction, _) = query(transaction,
         "UPDATE sqb_location_work SET result_json=$2, completed_at=$3 WHERE request_id=$1 AND completed_at IS NULL",
         vec![Parameter::Id(request_id), Parameter::Json(json!(result)), Parameter::Time(now)]).await?;
+    let transaction = store_plan_diffs(transaction, request_id, &diffs).await?;
     commit(transaction).await?;
     Ok(true)
 }
@@ -71,7 +79,7 @@ pub async fn complete_location_work(
 /// Warehouse text in a plan's error and warnings is redacted before it is compared or stored.
 fn redacted(result: &LocationWorkResult) -> LocationWorkResult {
     let mut result = result.clone();
-    if let LocationWorkOutcome::Plan { document } = &mut result.outcome {
+    if let LocationWorkOutcome::Plan { document, .. } = &mut result.outcome {
         let texts = ["/error/message", "/error/help"]
             .into_iter()
             .map(str::to_owned)
@@ -95,7 +103,7 @@ fn valid_outcome(work: &LocationWork, outcome: &LocationWorkOutcome) -> bool {
         (_, LocationWorkOutcome::Superseded {})
         | (LocationWork::CheckConnection {}, LocationWorkOutcome::Connection { .. })
         | (LocationWork::SyncWarehouse {}, LocationWorkOutcome::SyncStarted {}) => true,
-        (LocationWork::Plan { .. }, LocationWorkOutcome::Plan { document }) => {
+        (LocationWork::Plan { .. }, LocationWorkOutcome::Plan { document, .. }) => {
             document
                 .as_object()
                 .is_some_and(|plan| plan.contains_key("models") || plan.contains_key("error"))

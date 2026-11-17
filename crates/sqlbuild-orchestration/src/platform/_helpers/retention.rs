@@ -39,6 +39,10 @@ const PLATFORM_EVENTS: &str = "DELETE FROM recall_events WHERE storage_id IN (SE
     WHERE producer='platform' AND occurred_at<CASE WHEN event_type='platform_heartbeat' \
     THEN $1 ELSE $2 END ORDER BY storage_id LIMIT $3) RETURNING storage_id";
 
+/// The diffs of expired plans go before their work, a page of plans at a time.
+const PLAN_DIFFS: &str = "DELETE FROM sqb_plan_diffs WHERE request_id IN (SELECT w.request_id \
+    FROM sqb_location_work w WHERE w.expires_at<$1 AND EXISTS (SELECT 1 FROM sqb_plan_diffs d \
+    WHERE d.request_id=w.request_id) ORDER BY w.expires_at LIMIT $2) RETURNING request_id";
 /// Expired location work goes first, then instances that no remaining work names.
 const LOCATION_WORK: &str = "DELETE FROM sqb_location_work WHERE request_id IN (SELECT request_id \
     FROM sqb_location_work WHERE expires_at<$1 ORDER BY expires_at LIMIT $2) RETURNING request_id";
@@ -91,7 +95,7 @@ pub(crate) async fn retain(
         ]
     })
     .await?;
-    for sql in [LOCATION_WORK, LOCATION_INSTANCES] {
+    for sql in [PLAN_DIFFS, LOCATION_WORK, LOCATION_INSTANCES] {
         drain(store, sql, |now| {
             vec![Parameter::Time(
                 now - TimeDelta::days(LOCATION_RETENTION_DAYS),

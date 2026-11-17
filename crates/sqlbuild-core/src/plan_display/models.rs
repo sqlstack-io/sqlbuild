@@ -33,21 +33,67 @@ pub struct TimestampGrainFacts {
     pub input_grains: Vec<Option<String>>,
 }
 
-/// A plan document section too large to carry whole, read a page at a time.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A plan section a summary counts and the rows endpoint pages, in the order the plan reads.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PlanPageSection {
+    /// Built models the plan rebuilds in full.
+    FullRefresh,
+    QueryChanged,
+    FunctionChanged,
+    ConfigChanged,
+    SchemaChanged,
+    /// Built models with no recorded build.
+    FirstRun,
+    Renamed,
     /// Built models with no change of their own.
     RoutineModels,
+    Migrations,
+    ColumnMigrations,
+    TableTypeConversions,
+    Retention,
+    LoaderReloads,
+    LoaderLoads,
+    SourceReloads,
+    SourceLoads,
+    /// Functions whose definition changed.
+    ChangedFunctions,
+    /// Functions without a change.
+    Functions,
+    /// Seeds the run loads or reports on.
+    Seeds,
+    PythonNodes,
     /// `--changed` nodes held back for a job's own run.
     HeldBack,
     /// `--changed` nodes that run only when something they read changed.
     Unchanged,
+    Warnings,
 }
 
-/// One page of a plan section, the section's size, and the `--changed` runs of the page's models.
+/// One page of a plan section's rows matching a name filter, with what its models need beside them.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PlanPage {
+    /// Rows matching the filter; the section's size without one.
     pub total: usize,
+    /// Rows in the section, filter or not.
+    pub section_total: usize,
     pub rows: Vec<serde_json::Value>,
     pub runs: Vec<serde_json::Value>,
+    pub warnings: Vec<serde_json::Value>,
+    pub cursor_window_starts: serde_json::Map<String, serde_json::Value>,
+}
+
+/// A unified diff's changed lines, and whether they differ only in whitespace.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DiffStats {
+    pub added: usize,
+    pub removed: usize,
+    /// The removed and added lines read the same with every whitespace character taken out.
+    pub whitespace_only: bool,
+}
+
+/// A planned model's diff text, as `sqb plan` prints it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PlanModelDiff {
+    pub query_diff: Option<Vec<String>>,
+    pub config_diff: Option<Vec<String>>,
 }

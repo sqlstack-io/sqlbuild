@@ -76,7 +76,7 @@ pub(super) async fn report_changed_build(
         }
     };
     report("Planning what changed from the synced warehouse copy...\n");
-    let Some(document) = plan_location(
+    let Some((document, _)) = plan_location(
         (options, runtime),
         (&BTreeSet::new(), &settings),
         (client, session_id, generation),

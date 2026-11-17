@@ -11,7 +11,7 @@ use crate::platform::models::{LocationWorkOutcome, PlanRowSection, PlanRows, Pla
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
-/// The page `query` names of the requester's plan; `None` until the plan exists and is planned.
+/// The page `query` names of the requester's plan, found by name; `None` until the plan exists and is planned.
 pub async fn read_person_plan_rows(
     store: &ControlStore,
     reader: (&AuditContext, Uuid),
@@ -22,19 +22,57 @@ pub async fn read_person_plan_rows(
         .await?
         .and_then(|record| record.result_json)
         .and_then(|result| match result.outcome {
-            LocationWorkOutcome::Plan { document } => Some(document),
+            LocationWorkOutcome::Plan { document, .. } => Some(document),
             _ => None,
         });
     let Some(document) = document else {
         return Ok(None);
     };
-    let section: PlanPageSection = match query.section {
+    let limit: usize = query.limit.unwrap_or(PLAN_ROWS_LIMIT).min(PLAN_ROWS_LIMIT);
+    let page: PlanPage = plan_section_page(
+        &document,
+        page_section(query.section),
+        ((query.offset.unwrap_or(0), limit), query.name.as_deref()),
+    );
+    Ok(Some(PlanRows {
+        total: page.total,
+        section_total: page.section_total,
+        rows: page.rows,
+        runs: page.runs,
+        warnings: page.warnings,
+        cursor_window_starts: page
+            .cursor_window_starts
+            .into_iter()
+            .filter_map(|(model, start)| Some((model, start.as_str()?.to_owned())))
+            .collect(),
+    }))
+}
+
+/// The plan display's section for the API's.
+fn page_section(section: PlanRowSection) -> PlanPageSection {
+    match section {
+        PlanRowSection::FullRefresh => PlanPageSection::FullRefresh,
+        PlanRowSection::QueryChanged => PlanPageSection::QueryChanged,
+        PlanRowSection::FunctionChanged => PlanPageSection::FunctionChanged,
+        PlanRowSection::ConfigChanged => PlanPageSection::ConfigChanged,
+        PlanRowSection::SchemaChanged => PlanPageSection::SchemaChanged,
+        PlanRowSection::FirstRun => PlanPageSection::FirstRun,
+        PlanRowSection::Renamed => PlanPageSection::Renamed,
         PlanRowSection::RoutineModels => PlanPageSection::RoutineModels,
+        PlanRowSection::Migrations => PlanPageSection::Migrations,
+        PlanRowSection::ColumnMigrations => PlanPageSection::ColumnMigrations,
+        PlanRowSection::TableTypeConversions => PlanPageSection::TableTypeConversions,
+        PlanRowSection::Retention => PlanPageSection::Retention,
+        PlanRowSection::LoaderReloads => PlanPageSection::LoaderReloads,
+        PlanRowSection::LoaderLoads => PlanPageSection::LoaderLoads,
+        PlanRowSection::SourceReloads => PlanPageSection::SourceReloads,
+        PlanRowSection::SourceLoads => PlanPageSection::SourceLoads,
+        PlanRowSection::ChangedFunctions => PlanPageSection::ChangedFunctions,
+        PlanRowSection::Functions => PlanPageSection::Functions,
+        PlanRowSection::Seeds => PlanPageSection::Seeds,
+        PlanRowSection::PythonNodes => PlanPageSection::PythonNodes,
         PlanRowSection::HeldBack => PlanPageSection::HeldBack,
         PlanRowSection::Unchanged => PlanPageSection::Unchanged,
-    };
-    let limit: usize = query.limit.unwrap_or(PLAN_ROWS_LIMIT).min(PLAN_ROWS_LIMIT);
-    let PlanPage { total, rows, runs } =
-        plan_section_page(&document, section, (query.offset.unwrap_or(0), limit));
-    Ok(Some(PlanRows { total, rows, runs }))
+        PlanRowSection::Warnings => PlanPageSection::Warnings,
+    }
 }

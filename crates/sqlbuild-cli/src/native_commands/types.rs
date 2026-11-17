@@ -17,3 +17,9 @@ pub(crate) type LoadOutcome = Result<
     (Option<tokio::time::Instant>, Vec<WarehouseStateLocation>),
     Option<LocationRuleFailure>,
 >;
+
+/// A plan document and the model diffs it left out, by model, which the server stores apart.
+pub(crate) type LocationPlan = (
+    serde_json::Value,
+    std::collections::BTreeMap<String, sqlbuild_orchestration::platform::models::PlanModelDiff>,
+);

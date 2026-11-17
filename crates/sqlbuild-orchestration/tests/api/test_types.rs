@@ -271,6 +271,13 @@ pub(crate) struct OlderNodeFinished {
     skipped_because_of: Option<String>,
 }
 
+pub(crate) struct PlanDiffTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The diff of a model the document left out, as it reads back.
+    pub(crate) expected_detached_diff: &'static [&'static str],
+}
+
 pub(crate) struct PlanTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

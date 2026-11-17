@@ -51,23 +51,65 @@ pub(super) struct QueryDiffTestCase {
     pub(super) expected_lines: Vec<&'static str>,
 }
 
-/// A plan document and what its summary carries: changed model names, built names, page counts and kept runs.
-pub(super) struct SummaryTestCase {
+/// A section and the names of all its rows, in plan order.
+pub(super) struct SectionTestCase {
     pub(super) description: &'static str,
-    pub(super) document: fn() -> serde_json::Value,
-    pub(super) expected_models: &'static [&'static str],
-    pub(super) expected_built: &'static [&'static str],
-    pub(super) expected_pages: serde_json::Value,
-    pub(super) expected_runs: serde_json::Value,
+    pub(super) section: PlanPageSection,
+    pub(super) expected_rows: &'static [&'static str],
 }
 
-/// A page read of a plan section and the row names, section size and runs it returns.
+/// A page read of a plan section: its window and name filter, and the row names and totals it returns.
 pub(super) struct PageTestCase {
     pub(super) description: &'static str,
-    pub(super) document: fn() -> serde_json::Value,
     pub(super) section: PlanPageSection,
     pub(super) window: (usize, usize),
-    pub(super) expected_rows: serde_json::Value,
+    pub(super) name: Option<&'static str>,
+    pub(super) expected_rows: &'static [&'static str],
     pub(super) expected_total: usize,
-    pub(super) expected_runs: serde_json::Value,
+    pub(super) expected_section_total: usize,
+}
+
+/// A model page and what it brings beside its rows.
+pub(super) struct ModelPageTestCase {
+    pub(super) description: &'static str,
+    pub(super) section: PlanPageSection,
+    pub(super) expected_stats: Vec<serde_json::Value>,
+    pub(super) expected_runs: &'static [&'static str],
+    pub(super) expected_warnings: &'static [&'static str],
+    pub(super) expected_starts: serde_json::Value,
+}
+
+/// A section of the summary and a note it counts.
+pub(super) struct NoteTestCase {
+    pub(super) description: &'static str,
+    pub(super) section: &'static str,
+    pub(super) expected_note: serde_json::Value,
+}
+
+/// A summary field and the value it carries in place of rows.
+pub(super) struct SummaryFieldTestCase {
+    pub(super) description: &'static str,
+    pub(super) pointer: &'static str,
+    pub(super) expected_value: serde_json::Value,
+}
+
+/// A diff and the counts plan pages report for it.
+pub(super) struct DiffStatsTestCase {
+    pub(super) description: &'static str,
+    pub(super) diff: &'static [&'static str],
+    pub(super) expected_stats: crate::plan_display::models::DiffStats,
+}
+
+/// A model of a document whose diffs were detached, and the diff text kept apart for it.
+pub(super) struct DetachTestCase {
+    pub(super) description: &'static str,
+    pub(super) model: &'static str,
+    pub(super) expected_detached: Option<&'static [&'static str]>,
+}
+
+/// A first build of so many models, and the most bytes its summary may take.
+pub(super) struct SummarySizeTestCase {
+    pub(super) description: &'static str,
+    pub(super) models: usize,
+    pub(super) expected_max_bytes: usize,
 }

@@ -20,8 +20,9 @@ pub async fn read_person_plan_summary(
     };
     let outcome: Option<LocationWorkOutcome> =
         record.result_json.map(|result| match result.outcome {
-            LocationWorkOutcome::Plan { document } => LocationWorkOutcome::Plan {
+            LocationWorkOutcome::Plan { document, diffs } => LocationWorkOutcome::Plan {
                 document: plan_summary(&document),
+                diffs,
             },
             outcome => outcome,
         });
