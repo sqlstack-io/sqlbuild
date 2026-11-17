@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use crate::consumption::constants::{ORDER_SKEW_MICROS, SUCCEEDED_PHASE};
+use crate::consumption::constants::{ORDER_SKEW_MICROS, REPLACED_PHASE, SUCCEEDED_PHASE};
 use crate::consumption::models::{
     ConsumedInput, ConsumptionHistory, ConsumptionRow, Execution, RelationHistory, RelationKey,
 };
@@ -18,7 +18,7 @@ struct ExecutionRows<'a> {
 /// A retried append repeats a row: its execution, phase and the input it records.
 type RowIdentity<'a> = (&'a str, &'a str, Option<(&'a str, &'a str, &'a str)>);
 
-/// Recent executions per relation, from rows read newest first with at most `limit` per relation.
+/// Recent executions per relation (rows newest first, at most `limit` each); a replacement marker counts only while newest.
 pub(crate) fn build_history(rows: &[ConsumptionRow], limit: usize) -> ConsumptionHistory {
     let mut relations: HashMap<RelationKey, RelationHistory> = HashMap::new();
     for (relation, execution) in executions_of(rows) {
@@ -33,6 +33,13 @@ pub(crate) fn build_history(rows: &[ConsumptionRow], limit: usize) -> Consumptio
             (right.started_at, &right.execution_id).cmp(&(left.started_at, &left.execution_id))
         });
         history.truncated = history.executions.len() >= limit;
+        let newest: Option<String> = history
+            .executions
+            .first()
+            .map(|execution| execution.execution_id.clone());
+        history.executions.retain(|execution| {
+            !execution.replaced || Some(&execution.execution_id) == newest.as_ref()
+        });
     }
     ConsumptionHistory {
         relations,
@@ -124,6 +131,7 @@ fn execution(execution_id: &str, rows: &ExecutionRows<'_>) -> Execution {
         execution_id: execution_id.to_owned(),
         started_at: rows.earliest,
         complete,
+        replaced: rows.rows.iter().all(|row| row.row.phase == REPLACED_PHASE),
         version_hash: (versions.len() == 1)
             .then(|| versions.first().map(|version| (*version).to_owned()))
             .flatten(),

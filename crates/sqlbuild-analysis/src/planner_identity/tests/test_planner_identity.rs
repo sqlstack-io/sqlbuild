@@ -10,8 +10,8 @@ use crate::planner_identity::main::missing_upstreams::missing_upstreams;
 use crate::planner_identity::main::stale_upstream_warning_message::stale_upstream_warning_message;
 use crate::planner_identity::main::topological_order::topological_order;
 use crate::planner_identity::models::{
-    AvailableUpstreams, FunctionFingerprintFields, GraphKey, MissingUpstream, StaleWarning,
-    StalenessNames,
+    AvailableUpstreams, FunctionFingerprintFields, GraphKey, MissingUpstream, MissingUpstreamFixes,
+    StaleWarning, StalenessNames,
 };
 use crate::planner_identity::tests::helpers::{
     chain_head_hash, chain_identity_graph, chain_staleness_graph, cyclic_identity_graph,
@@ -406,11 +406,58 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
                 ..AvailableUpstreams::default()
             },
             origins: HashMap::new(),
+            fixes: MissingUpstreamFixes::default(),
             expected_missing: vec![MissingUpstream {
                 key: model("raw"),
                 required_by: vec![model("a"), model("b")],
             }],
-            expected_message: "cannot build selected scope: 1 missing upstream dependencies (raw)",
+            expected_message: concat!(
+                "1 upstream model this build reads doesn't exist in the warehouse\n",
+                "  raw\n",
+                "\n",
+                "  Build it too:  add + before your selection",
+            ),
+        },
+        BuildabilityTestCase {
+            description: "more misses than shown, with clone origins and a non-default target",
+            selected: vec![model("report")],
+            upstream: HashMap::from([(
+                model("report"),
+                ["f", "a", "e", "b", "d", "c"]
+                    .map(model)
+                    .into_iter()
+                    .chain([key("seed", "codes")])
+                    .collect(),
+            )]),
+            available: AvailableUpstreams::default(),
+            origins: HashMap::new(),
+            fixes: MissingUpstreamFixes {
+                target: Some("dev".to_owned()),
+                origins: vec!["prod".to_owned(), "staging".to_owned()],
+                deferrable: vec!["prod".to_owned()],
+                clone_to: Some("dev".to_owned()),
+            },
+            expected_missing: ["a", "b", "c", "d", "e", "f"]
+                .map(model)
+                .into_iter()
+                .chain([key("seed", "codes")])
+                .map(|key| MissingUpstream {
+                    key,
+                    required_by: vec![model("report")],
+                })
+                .collect(),
+            expected_message: concat!(
+                "7 upstream models and seeds this build reads don't exist in target 'dev'\n",
+                "  a\n  b\n  c\n  d\n  e\n",
+                "  ... 2 more (sqb plan --json lists all)\n",
+                "\n",
+                "  If they exist in prod:\n",
+                "    read them from it for this run:  --defer-to prod\n",
+                "    copy them into this target:      sqb clone --from prod --to dev -s a b c d e f codes\n",
+                "  If they exist in staging:\n",
+                "    copy them into this target:      sqb clone --from staging --to dev -s a b c d e f codes\n",
+                "  Or build them too:                 add + before your selection",
+            ),
         },
         BuildabilityTestCase {
             description: "only an audit read requires the upstream",
@@ -421,6 +468,7 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
                 (model("a"), model("lookup")),
                 "audit 'check' on 'a' reads 'lookup'".to_owned(),
             )]),
+            fixes: MissingUpstreamFixes::default(),
             expected_missing: vec![MissingUpstream {
                 key: model("lookup"),
                 required_by: vec![model("a")],
@@ -436,7 +484,7 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
         );
         assert_eq!(
             (
-                missing_upstream_message(&missing, &test_case.origins),
+                missing_upstream_message(&missing, &test_case.origins, &test_case.fixes),
                 missing
             ),
             (

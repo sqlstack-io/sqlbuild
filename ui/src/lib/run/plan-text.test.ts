@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { actionText, changedSections, jobRefreshText, looseWarnings, planSections, warningText } from './plan-text';
+import { actionText, changedSections, cloneCommands, jobRefreshText, looseWarnings, planSections, warningText } from './plan-text';
 
 const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	name,
@@ -184,3 +184,25 @@ describe('plan under --changed', () => {
 	});
 });
 
+
+describe('cloneCommands', () => {
+	it('returns each origin\'s clone command with every missing name, and nothing for other errors', () => {
+		const error = [
+			"S301: 7 upstream models this build reads don't exist in target 'dev'",
+			'  a',
+			'  ... 2 more (sqb plan --json lists all)',
+			'',
+			'  If they exist in prod:',
+			'    read them from it for this run:  --defer-to prod',
+			'    copy them into this target:      sqb clone --from prod --to dev -s a b c d e f g',
+			'  If it exists in staging:',
+			'    copy it into this target:        sqb clone --from staging -s a',
+			'  Or build them too:                 add + before your selection'
+		].join('\n');
+		expect(cloneCommands(error)).toEqual([
+			{ origin: 'prod', command: 'sqb clone --from prod --to dev -s a b c d e f g' },
+			{ origin: 'staging', command: 'sqb clone --from staging -s a' }
+		]);
+		expect(cloneCommands('S007: unknown selector sqb clone --from prod')).toEqual([]);
+	});
+});

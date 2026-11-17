@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::planner_identity::models::{
     AvailableUpstreams, FunctionFingerprintFields, GraphKey, IdentityGraph, MissingUpstream,
-    StaleWarning, StalenessGraph,
+    MissingUpstreamFixes, StaleWarning, StalenessGraph,
 };
 use crate::planner_identity::types::IdentityHashes;
 
@@ -31,6 +31,7 @@ pub(super) struct BuildabilityTestCase {
     pub(super) upstream: HashMap<GraphKey, Vec<GraphKey>>,
     pub(super) available: AvailableUpstreams,
     pub(super) origins: HashMap<(GraphKey, GraphKey), String>,
+    pub(super) fixes: MissingUpstreamFixes,
     pub(super) expected_missing: Vec<MissingUpstream>,
     pub(super) expected_message: &'static str,
 }

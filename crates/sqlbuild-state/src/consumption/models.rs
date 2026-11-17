@@ -152,6 +152,8 @@ pub struct Execution {
     pub started_at: i64,
     /// Whether its `succeeded` rows are present, consistent and complete.
     pub complete: bool,
+    /// Whether its rows only mark the relation as replaced outside a recorded build.
+    pub replaced: bool,
     pub version_hash: Option<String>,
     /// Input versions of a complete execution, keyed by `(kind, name)`.
     pub inputs: Vec<ConsumedInput>,
