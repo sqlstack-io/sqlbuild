@@ -164,13 +164,12 @@ impl Launch {
         host_outcome(spec)
     }
 
-    /// The `run_custom_host_json` request for one host's plan and optional cancellation marker.
-    fn spec(&self, plan: &HostPlan, cancel_marker: Option<&Path>) -> String {
+    /// The host request for one plan and cancel marker; only split hosts detect module state.
+    fn spec(&self, plan: &HostPlan, cancel_marker: &Path, detect_state: bool) -> String {
         let mut payload: Map<String, Value> = self.payload.clone();
         payload.insert("plan".to_owned(), json!(plan));
-        if let Some(marker) = cancel_marker {
-            payload.insert("cancel_marker".to_owned(), json!(text(marker)));
-        }
+        payload.insert("cancel_marker".to_owned(), json!(text(cancel_marker)));
+        payload.insert("detect_state".to_owned(), json!(detect_state));
         json!({
             "program": self.program,
             "arguments": self.arguments,
@@ -189,36 +188,23 @@ fn run_partitions<'py>(
     (input_dir, cancel): (&Path, &HostCancel),
     (write_inputs, abandoned): (impl FnOnce() -> PyResult<()>, &Path),
 ) -> PyResult<Vec<HostSlice>> {
-    if plans.len() == 1 {
-        let spec: String = launch.spec(plan, None);
-        let outcomes: Vec<HostOutcome> = run_hosts(
-            py,
-            (launch, vec![spec]),
-            (write_inputs, abandoned),
-            (None, cancel),
-        )?;
+    let split: bool = plans.len() > 1;
+    let outcomes: Vec<HostOutcome> = run_cancellable(
+        py,
+        (launch, plans, split),
+        (input_dir, cancel),
+        (write_inputs, abandoned),
+    )?;
+    if !split {
         return outcomes
             .into_iter()
             .map(|outcome| outcome.map_err(|message| rules_error(py, message)))
             .collect();
     }
-    let cancel_dir: PathBuf = unique_directory(input_dir, "hosts-")?;
-    let marker: PathBuf = cancel_dir.join(CUSTOM_HOST_CANCELLED_MARKER);
-    let specs: Vec<String> = plans
-        .iter()
-        .map(|partition| launch.spec(partition, Some(&marker)))
-        .collect();
-    let outcomes: PyResult<Vec<HostOutcome>> = run_hosts(
-        py,
-        (launch, specs),
-        (write_inputs, abandoned),
-        (Some(&marker), cancel),
-    );
-    let _removed: std::io::Result<()> = std::fs::remove_dir_all(&cancel_dir);
-    let outcomes: Vec<HostOutcome> = outcomes?;
     interrupted(py, cancel)?;
     if outcomes.iter().any(Result::is_err) {
-        return single_host(py, launch, plan).map(|slice| vec![slice]);
+        return single_host(py, (launch, plan), (input_dir, cancel), abandoned)
+            .map(|slice| vec![slice]);
     }
     let slices: Vec<HostSlice> = outcomes.into_iter().filter_map(Result::ok).collect();
     let stateful: BTreeSet<String> = slices
@@ -239,7 +225,7 @@ fn run_partitions<'py>(
             (code.clone(), subjects)
         })
         .collect();
-    let rerun: HostSlice = single_host(py, launch, &rerun_plan)?;
+    let rerun: HostSlice = single_host(py, (launch, &rerun_plan), (input_dir, cancel), abandoned)?;
     let mut merged: Vec<HostSlice> = slices
         .into_iter()
         .map(|slice| without_codes(slice, &stateful))
@@ -248,11 +234,47 @@ fn run_partitions<'py>(
     Ok(merged)
 }
 
-/// Run one host for `plan` once the payload already exists.
-fn single_host(py: Python<'_>, launch: &Launch, plan: &HostPlan) -> PyResult<HostSlice> {
-    let spec: String = launch.spec(plan, None);
-    py.detach(|| launch.run(&spec))
+/// Run one host for `plan` from its written payload; an interrupt stops its next invocation.
+fn single_host(
+    py: Python<'_>,
+    (launch, plan): (&Launch, &HostPlan),
+    (input_dir, cancel): (&Path, &HostCancel),
+    abandoned: &Path,
+) -> PyResult<HostSlice> {
+    let outcomes: Vec<HostOutcome> = run_cancellable(
+        py,
+        (launch, std::slice::from_ref(plan), false),
+        (input_dir, cancel),
+        (|| Ok(()), abandoned),
+    )?;
+    outcomes
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| Err("custom rule host returned no outcome".to_owned()))
         .map_err(|message| rules_error(py, message))
+}
+
+/// Run one host per plan with a fresh cancel marker that an interrupt or failed host sets.
+fn run_cancellable(
+    py: Python<'_>,
+    (launch, plans, detect_state): (&Launch, &[HostPlan], bool),
+    (input_dir, cancel): (&Path, &HostCancel),
+    (write_inputs, abandoned): (impl FnOnce() -> PyResult<()>, &Path),
+) -> PyResult<Vec<HostOutcome>> {
+    let cancel_dir: PathBuf = unique_directory(input_dir, "hosts-")?;
+    let marker: PathBuf = cancel_dir.join(CUSTOM_HOST_CANCELLED_MARKER);
+    let specs: Vec<String> = plans
+        .iter()
+        .map(|partition| launch.spec(partition, &marker, detect_state))
+        .collect();
+    let outcomes: PyResult<Vec<HostOutcome>> = run_hosts(
+        py,
+        (launch, specs),
+        (write_inputs, abandoned),
+        (&marker, cancel),
+    );
+    let _removed: std::io::Result<()> = std::fs::remove_dir_all(&cancel_dir);
+    outcomes
 }
 
 /// Run every host on its own thread while this thread publishes the payload they wait for.
@@ -260,7 +282,7 @@ fn run_hosts(
     py: Python<'_>,
     (launch, specs): (&Launch, Vec<String>),
     (write_inputs, abandoned): (impl FnOnce() -> PyResult<()>, &Path),
-    (cancel_marker, cancel): (Option<&Path>, &HostCancel),
+    (cancel_marker, cancel): (&Path, &HostCancel),
 ) -> PyResult<Vec<HostOutcome>> {
     std::thread::scope(|scope| {
         let (sender, finished): (Sender<HostStatus>, Receiver<HostStatus>) = channel();
@@ -305,7 +327,7 @@ fn run_hosts(
 fn await_hosts(
     py: Python<'_>,
     (finished, count): (Receiver<HostStatus>, usize),
-    cancel_marker: Option<&Path>,
+    cancel_marker: &Path,
     cancel: &HostCancel,
 ) -> PyResult<()> {
     let finished: Mutex<Receiver<HostStatus>> = Mutex::new(finished);
@@ -341,11 +363,9 @@ fn interrupted(py: Python<'_>, cancel: &HostCancel) -> PyResult<()> {
     Ok(())
 }
 
-/// Stop split hosts at their next invocation; a running invocation still ends or times out.
-fn cancel_hosts(cancel_marker: Option<&Path>) {
-    if let Some(marker) = cancel_marker {
-        let _touched: std::io::Result<()> = touch(marker);
-    }
+/// Stop hosts at their next invocation; a running invocation still ends or times out.
+fn cancel_hosts(cancel_marker: &Path) {
+    let _touched: std::io::Result<()> = touch(cancel_marker);
 }
 
 /// One host run decoded, or the message `RulesError` reports for it.

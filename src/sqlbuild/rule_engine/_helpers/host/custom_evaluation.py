@@ -99,7 +99,7 @@ def evaluate_custom_rules(
         reads=reads,
         rules=custom_rules,
         rules_root=project_dir / "rules",
-        detect_state=partition is not None,
+        detect_state=partition is not None and partition.detect_state,
     )
 
     inputs: _PassInputs = _PassInputs(

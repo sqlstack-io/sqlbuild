@@ -67,6 +67,7 @@ def main() -> int:
         project_dir: Path = Path(str(payload["project_dir"])).resolve()
         dialect: str = str(payload.get("dialect", "generic"))
         verify_determinism: bool = payload.get("verify_determinism") is True
+        detect_state: bool = payload.get("detect_state") is True
         track_reads: bool = payload.get("track_reads") is True
         plan: CustomRulePlan = _decode_plan(payload["plan"])
         os.environ.clear()
@@ -95,7 +96,9 @@ def main() -> int:
                 partition=(
                     None
                     if cancel_marker is None
-                    else CustomHostPartition(cancelled=cancel_marker.exists)
+                    else CustomHostPartition(
+                        cancelled=cancel_marker.exists, detect_state=detect_state
+                    )
                 ),
             )
     except HostCancelledError:
