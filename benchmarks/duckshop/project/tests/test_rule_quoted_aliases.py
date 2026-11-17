@@ -6,8 +6,8 @@ _HEADER = 'MODEL (description "Listings");\n'
 _MIXED_CASE = (
     _HEADER
     + "SELECT\n"
-    + "  l.listing_id AS \"listingId\",\n"
-    + "  l.note AS \"note\",\n"
+    + '  l.listing_id AS "listingId",\n'
+    + '  l.note AS "note",\n'
     + "  'isLive' AS status_label\n"
     + 'FROM __ref("dim_listings") AS l\n'
 )
