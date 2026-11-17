@@ -479,7 +479,8 @@ fn audit_results(options: &DdlOptions) -> String {
     JSONExtract(payload, 'evidence_count', 'Nullable(Int64)') AS evidence_count,
     if(JSONHas(payload, 'evidence_truncated'),
         toUInt8(JSONExtractBool(payload, 'evidence_truncated')), NULL) AS evidence_truncated,
-    JSONExtract(payload, 'sample_digest', 'Nullable(String)') AS sample_digest
+    JSONExtract(payload, 'sample_digest', 'Nullable(String)') AS sample_digest,
+    toUInt8(JSONExtractBool(payload, 'ignored')) AS ignored
 FROM {events}
 WHERE event_type = 'audit_completed'"
     )

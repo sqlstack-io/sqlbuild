@@ -42,6 +42,7 @@
       "result_id": "customers-not-null-1",
       "occurred_at": "2026-02-03T05:05:06Z",
       "outcome": "error",
+      "metadata_json": "{\"ignored\": true}",
       "violation_count": null,
       "executed_sql": "SELECT customer_id FROM customers WHERE customer_id IS NULL",
       "execution_error": "Binder Error: Referenced column \"customer_id\" not found\n\nLINE 1: SELECT customer_id FROM customers WHERE email = 'private@example.com'"

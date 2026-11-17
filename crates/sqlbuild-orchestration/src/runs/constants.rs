@@ -60,6 +60,3 @@ pub(crate) const PUBLICATIONS_PER_TARGET: usize = 2;
 /// Selected keys per page of a selection evaluation, and the most a request may ask for.
 pub(crate) const SELECTION_PAGE_DEFAULT: u32 = 1_000;
 pub(crate) const SELECTION_PAGE_MAX: u32 = 10_000;
-
-/// The `node_counts_json` entry holding how many audit failures a run let through; it counts no nodes.
-pub(crate) const IGNORED_AUDIT_FAILURES_COUNT: &str = "audit_failures_ignored";

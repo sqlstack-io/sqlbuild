@@ -19,7 +19,7 @@ pub(crate) async fn load_group(
     parent_id: Uuid,
 ) -> Result<(ControlTransaction, GroupContext), ControlError> {
     let (transaction, rows) = query(transaction,
-        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r \
+        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.ignored_audit_failures, r.worker_instance FROM sqb_runs r \
          WHERE r.run_id=$1 AND r.kind='group'",
         vec![Parameter::Id(parent_id)]).await?;
     let parent: GroupRun = decode_row(
@@ -28,7 +28,7 @@ pub(crate) async fn load_group(
             .ok_or_else(|| ControlError::Invalid("group run is missing".into()))?,
     )?;
     let (transaction, rows) = query(transaction,
-        &format!("SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r \
+        &format!("SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.ignored_audit_failures, r.worker_instance FROM sqb_runs r \
          WHERE r.parent_run_id=$1 AND NOT {SUPERSEDED_CHILD} ORDER BY r.run_id"),
         vec![Parameter::Id(parent_id)]).await?;
     let children = rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;

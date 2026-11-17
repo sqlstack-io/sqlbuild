@@ -283,13 +283,9 @@ pub struct RunRecord {
     pub ended_at: Option<DateTime<Utc>>,
     pub cancel_requested_at: Option<DateTime<Utc>>,
     pub selection_json: BTreeSet<String>,
-    #[serde(deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::node_counts")]
     pub node_counts_json: BTreeMap<String, i64>,
     /// Error-severity audit failures the run let through; a group sums its members'.
-    #[serde(
-        default,
-        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::ignored_audit_failures"
-    )]
+    #[serde(default)]
     pub ignored_audit_failures: u32,
     pub last_event_storage_id: i64,
     /// How a person narrowed this run of a job, or the run it reruns, as typed; `None` when it runs the whole job.
@@ -715,6 +711,8 @@ pub(crate) struct ChangingRun {
     pub(crate) worker_instance: Option<Uuid>,
     pub(crate) cancel_requested_at: Option<DateTime<Utc>>,
     pub(crate) node_counts_json: BTreeMap<String, i64>,
+    #[serde(default)]
+    pub(crate) ignored_audit_failures: i64,
 }
 
 /// Virtual parents and physical children use the same lifecycle evidence during group progress.

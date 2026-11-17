@@ -420,21 +420,40 @@ fn given_audit_completed_facts_when_projected_then_audit_results_carry_outcome_a
     let env = envelope("audits", NOW);
     let test_cases = [ProjectionTestCase {
         description: "audit outcomes name the audited relation and column",
-        batches: vec![vec![event(
-            &env,
-            ("a0", "audit_completed", 1),
-            r#","run_id":"run""#,
-            r#"{"audit_name":"revenue_positive","audit_definition_name":"positive","evaluation_mode":"violations","outcome":"warn","severity":"warn","run_scope_phase":"model","attachment_kind":"column","target_schema":"analytics","target_name":"daily_revenue","attached_column_name":"total_revenue_cents","violation_count":3,"sql_digest":"ab"}"#,
-        )]],
-        sql: "SELECT audit_name, target_relation, \"column\", outcome, violation_count \
-              FROM audit_results",
-        expected_rows: vec![vec![
-            text("revenue_positive"),
-            text("analytics.daily_revenue"),
-            text("total_revenue_cents"),
-            text("warn"),
-            integer(3),
+        batches: vec![vec![
+            event(
+                &env,
+                ("a0", "audit_completed", 1),
+                r#","run_id":"run""#,
+                r#"{"audit_name":"revenue_positive","audit_definition_name":"positive","evaluation_mode":"violations","outcome":"warn","severity":"warn","run_scope_phase":"model","attachment_kind":"column","target_schema":"analytics","target_name":"daily_revenue","attached_column_name":"total_revenue_cents","violation_count":3,"sql_digest":"ab"}"#,
+            ),
+            event(
+                &env,
+                ("a1", "audit_completed", 2),
+                r#","run_id":"run""#,
+                r#"{"audit_name":"revenue_present","audit_definition_name":"present","evaluation_mode":"violations","outcome":"error","severity":"error","run_scope_phase":"model","attachment_kind":"model","target_schema":"analytics","target_name":"daily_revenue","violation_count":1,"sql_digest":"cd","ignored":true}"#,
+            ),
         ]],
+        sql: "SELECT audit_name, target_relation, \"column\", outcome, violation_count, ignored \
+              FROM audit_results ORDER BY audit_name",
+        expected_rows: vec![
+            vec![
+                text("revenue_positive"),
+                text("analytics.daily_revenue"),
+                text("total_revenue_cents"),
+                text("warn"),
+                integer(3),
+                integer(0),
+            ],
+            vec![
+                text("revenue_present"),
+                text("analytics.daily_revenue"),
+                RecallValue::Null,
+                text("error"),
+                integer(1),
+                integer(1),
+            ],
+        ],
     }];
 
     for test_case in test_cases {

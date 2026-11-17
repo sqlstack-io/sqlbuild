@@ -164,6 +164,7 @@ CREATE TABLE sqb_runs (
     ended_at {time},
     cancel_requested_at {time},
     node_counts_json {json} NOT NULL,
+    ignored_audit_failures BIGINT NOT NULL DEFAULT 0,
     last_event_storage_id BIGINT NOT NULL,
     worker_instance {uuid},
     container_id TEXT,
@@ -412,7 +413,8 @@ CREATE TABLE sqb_warehouse_audit_results (
     record_json {json} NOT NULL,
     received_at {time} NOT NULL,
     scan_id {uuid},
-    binding_key TEXT
+    binding_key TEXT,
+    ignored BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX sqb_audit_results_namespace ON sqb_warehouse_audit_results (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE INDEX sqb_audit_results_binding ON sqb_warehouse_audit_results (location_id,target,binding_key,observed_at,event_id);

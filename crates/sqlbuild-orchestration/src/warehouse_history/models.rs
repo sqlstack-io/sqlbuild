@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::warehouse_history::_helpers::checks::ignored_failure;
 use crate::warehouse_metadata::models::{
     WarehouseAuditRecord, WarehouseJanitorRecord, WarehouseMigrationRecord,
 };
@@ -44,7 +43,7 @@ pub struct CheckResult {
 }
 
 impl CheckResult {
-    pub(crate) fn new(event_id: Uuid, record: WarehouseAuditRecord) -> Self {
+    pub(crate) fn new(event_id: Uuid, record: WarehouseAuditRecord, ignored: bool) -> Self {
         Self {
             event_id,
             binding_key: record.binding_key,
@@ -71,7 +70,7 @@ impl CheckResult {
             evidence_count: record.evidence_count,
             evidence_truncated: record.evidence_truncated,
             reused: record.reused,
-            ignored: ignored_failure(record.metadata_json.as_deref()),
+            ignored,
         }
     }
 }

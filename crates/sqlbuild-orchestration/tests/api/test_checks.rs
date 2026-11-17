@@ -80,7 +80,7 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
 
             let (status, list) = get(&client, (&api.url, &viewer), &base_path).await;
             assert_eq!(status, StatusCode::OK, "{}", test_case.description);
-            let keys: Vec<(&str, &str, &str)> = list
+            let keys: Vec<(&str, &str, &str, bool)> = list
                 .as_array()
                 .expect("checks")
                 .iter()
@@ -89,17 +89,18 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
                         check["binding_key"].as_str().expect("key"),
                         check["outcome"].as_str().expect("outcome"),
                         check["audit_name"].as_str().expect("name"),
+                        check["ignored"].as_bool().expect("ignored"),
                     )
                 })
                 .collect();
             assert_eq!(
                 keys,
                 [
-                    (customers_key, "error", "not_null"),
-                    (orders_key, "pass", "not_null"),
-                    (archived_key, "pass", "not_null")
+                    (customers_key, "error", "not_null", true),
+                    (orders_key, "pass", "not_null", false),
+                    (archived_key, "pass", "not_null", false)
                 ],
-                "one entry per binding key, each its newest result"
+                "one entry per binding key, each its newest result, marked when its build ignored it"
             );
             let (status, nodes) = get(
                 &client,

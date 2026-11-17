@@ -37,3 +37,6 @@ pub(crate) const OUTCOME_RECENT_RUNS: i64 = 25;
 pub(crate) const OUTCOME_FAILURE_WINDOW: i64 = 500;
 /// Records one ingestion transaction applies before committing, so a page never holds the write lock long.
 pub(crate) const INGESTION_CHUNK_RECORDS: usize = 200;
+
+/// The audit result metadata field marking a failure its build let through.
+pub(crate) const IGNORED_KEY: &str = "ignored";
