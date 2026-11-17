@@ -52,6 +52,8 @@ export type SourceFreshness = {
 export type CheckCounts = { total: number; passing: number; warning: number; failing: number };
 
 export type CatalogNode = {
+	/** Set by a page following an active run: the node's state in that run, which outranks its last build. */
+	liveStatus?: 'run' | 'ok' | 'warn' | 'fail';
 	key: string;
 	kind: NodeKind;
 	/** e.g. `table`, `view`, `incremental · merge`, `incremental · microbatch`; null for sources and tasks. */
