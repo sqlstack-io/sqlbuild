@@ -1,5 +1,6 @@
 //! A live plan's warehouse reads: the adapter and planning connection, read only when the planner asks.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -21,7 +22,8 @@ use crate::bindings::_helpers::observations::source_capture::capture_source_colu
 use crate::bindings::_helpers::planner_phases::objects::planner_error;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_BOUNDED;
 use crate::bindings::_helpers::planner_warehouse::reads::{
-    CursorProgress, EligibleCursorQuery, FingerprintRead, PlannerReads, Read, WarehouseReads,
+    CursorBatch, CursorProgress, CursorStatements, EligibleCursorQuery, FingerprintRead,
+    PlannerReads, Read, WarehouseReads,
 };
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::migration_io::{read_events, stored_old_name_columns};
@@ -123,12 +125,12 @@ impl LiveReads {
     }
 }
 
-/// Run one cursor statement; a failure leaves only that relation unavailable.
-fn read_cursor_query<'py>(
+/// Run one cursor statement and record it: `(rows, seconds, error)`, `rows` `None` on failure.
+fn run_cursor_statement<'py>(
     py: Python<'py>,
     sql: &str,
     (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-) -> PyResult<Bound<'py, PyAny>> {
+) -> PyResult<(Bound<'py, PyAny>, f64, Bound<'py, PyAny>)> {
     let started = Instant::now();
     let outcome = call_with(
         execute,
@@ -136,19 +138,10 @@ fn read_cursor_query<'py>(
     )
     .and_then(|result| result.call_method0("fetchall"));
     let elapsed = started.elapsed().as_secs_f64();
-    let (row, error, count) = match outcome {
+    let (rows, error, count) = match outcome {
         Ok(rows) => {
-            let count = rows.len()?;
-            let row = if count > 0 {
-                rows.get_item(0)?
-            } else {
-                py.None().into_bound(py)
-            };
-            (
-                row,
-                py.None().into_bound(py),
-                count.into_pyobject(py)?.into_any(),
-            )
+            let count = rows.len()?.into_pyobject(py)?.into_any();
+            (rows, py.None().into_bound(py), count)
         }
         Err(error) if error.is_instance_of::<PyException>(py) => {
             let value = error.value(py).clone().into_any();
@@ -171,7 +164,58 @@ fn read_cursor_query<'py>(
         ],
     )?;
     call_with(&host::entry(py, RECORD_QUERY)?, &[("record", record)])?;
+    Ok((rows, elapsed, error))
+}
+
+/// Run one cursor statement; a failure leaves only that relation unavailable.
+fn read_cursor_query<'py>(
+    py: Python<'py>,
+    sql: &str,
+    reader: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let (rows, elapsed, error) = run_cursor_statement(py, sql, reader)?;
+    let row = if !rows.is_none() && rows.len()? > 0 {
+        rows.get_item(0)?
+    } else {
+        py.None().into_bound(py)
+    };
     Ok(PyTuple::new(py, [row, PyFloat::new(py, elapsed).into_any(), error])?.into_any())
+}
+
+/// A bounded-inspection task running one batched cursor statement: `(rows, seconds, error)`.
+fn batch_task<'py>(
+    py: Python<'py>,
+    sql: String,
+    (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let connection: Py<PyAny> = connection.clone().unbind();
+    let execute: Py<PyAny> = execute.clone().unbind();
+    Ok(PyCFunction::new_closure(
+        py,
+        None,
+        None,
+        move |args: &Bound<'_, PyTuple>,
+              _kwargs: Option<&Bound<'_, PyDict>>|
+              -> PyResult<Py<PyAny>> {
+            let py = args.py();
+            let (rows, elapsed, error) =
+                run_cursor_statement(py, &sql, (connection.bind(py), execute.bind(py)))?;
+            Ok(
+                PyTuple::new(py, [rows, PyFloat::new(py, elapsed).into_any(), error])?
+                    .into_any()
+                    .unbind(),
+            )
+        },
+    )?
+    .into_any())
+}
+
+/// One read a batch answered, with the batch's row for it (`None` when it returned none).
+struct BatchAnswer<'py> {
+    index: usize,
+    has_min: bool,
+    row: Bound<'py, PyAny>,
+    seconds: f64,
 }
 
 /// A bounded-inspection task running one cursor statement.
@@ -273,6 +317,63 @@ fn run_bounded<'py>(
     call_with(&host::entry(py, RUN_BOUNDED)?, &fields)?
         .try_iter()?
         .collect()
+}
+
+/// Run `batches` at most `concurrency` at a time: the reads answered, and the failed batches' reads.
+fn run_cursor_batches<'py>(
+    py: Python<'py>,
+    batches: &[CursorBatch],
+    reader: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (concurrency, on_complete): (i64, Option<Bound<'py, PyAny>>),
+) -> PyResult<(Vec<BatchAnswer<'py>>, Vec<usize>)> {
+    let tasks: Vec<Bound<'py, PyAny>> = batches
+        .iter()
+        .map(|batch| batch_task(py, batch.sql.clone(), reader))
+        .collect::<PyResult<_>>()?;
+    let results = run_bounded(py, tasks, concurrency.max(1), on_complete)?;
+    let int: Bound<'py, PyAny> = imported(py, "builtins", "int")?;
+    let mut answered: Vec<BatchAnswer<'py>> = Vec::new();
+    let mut failed: Vec<usize> = Vec::new();
+    for (batch, result) in batches.iter().zip(results) {
+        let rows: Bound<'py, PyAny> = result.get_item(0)?;
+        if !result.get_item(2)?.is_none() || rows.is_none() {
+            failed.extend(batch.reads.iter().map(|(index, _)| *index));
+            continue;
+        }
+        let elapsed: f64 = result.get_item(1)?.extract()?;
+        let mut by_read: HashMap<usize, Bound<'py, PyAny>> = HashMap::new();
+        for row in rows.try_iter()? {
+            let row: Bound<'py, PyAny> = row?;
+            let read: usize = int.call1((row.get_item(0)?,))?.extract()?;
+            by_read.insert(read, row);
+        }
+        for (position, (index, has_min)) in batch.reads.iter().enumerate() {
+            let row: Bound<'py, PyAny> = by_read
+                .remove(&position)
+                .unwrap_or_else(|| py.None().into_bound(py));
+            answered.push(BatchAnswer {
+                index: *index,
+                has_min: *has_min,
+                row,
+                seconds: elapsed,
+            });
+        }
+    }
+    Ok((answered, failed))
+}
+
+/// A batch row `(_read, _min, _max)` as the row its read's own statement returns.
+fn bound_row<'py>(row: &Bound<'py, PyAny>, has_min: bool) -> PyResult<Bound<'py, PyAny>> {
+    let py = row.py();
+    if row.is_none() {
+        return Ok(py.None().into_bound(py));
+    }
+    let bounds: Vec<Bound<'py, PyAny>> = if has_min {
+        vec![row.get_item(1)?, row.get_item(2)?]
+    } else {
+        vec![row.get_item(2)?]
+    };
+    Ok(PyTuple::new(py, bounds)?.into_any())
 }
 
 impl WarehouseReads for LiveReads {
@@ -396,35 +497,70 @@ impl WarehouseReads for LiveReads {
     fn cursor_bounds<'py>(
         &self,
         py: Python<'py>,
-        statements: &dyn Fn() -> PyResult<Vec<String>>,
+        statements: &dyn Fn() -> PyResult<CursorStatements>,
         progress: &dyn CursorProgress<'py>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>> {
-        let statements: Vec<String> = statements()?;
+        let CursorStatements { singles, batches } = statements()?;
         let connection: Bound<'py, PyAny> = self.connection(py);
         let execute: Bound<'py, PyAny> = self.method(py, "execute")?;
         let concurrency: i64 = self.inspection_concurrency(py)?;
-        let total: usize = statements.len();
-        if concurrency <= 1 || total <= 1 {
-            let mut outcomes: Vec<Bound<'py, PyAny>> = Vec::with_capacity(total);
-            for (index, sql) in statements.iter().enumerate() {
-                progress.starting(index)?;
-                let outcome = read_cursor_query(py, sql, (&connection, &execute))?;
-                progress.finished(index, &outcome)?;
-                outcomes.push(outcome);
+        let total: usize = singles.len();
+        let mut outcomes: Vec<Option<Bound<'py, PyAny>>> = vec![None; total];
+        let pending: Vec<usize> = if batches.is_empty() || total <= 1 {
+            (0..total).collect()
+        } else {
+            progress.batched(
+                batches.len(),
+                (concurrency.max(1) as usize).min(batches.len()),
+            )?;
+            let sizes: Vec<usize> = batches.iter().map(|batch| batch.reads.len()).collect();
+            let (answered, failed) = run_cursor_batches(
+                py,
+                &batches,
+                (&connection, &execute),
+                (concurrency, Some(progress.batch_callback(py, sizes)?)),
+            )?;
+            for answer in answered {
+                outcomes[answer.index] = Some(
+                    PyTuple::new(
+                        py,
+                        [
+                            bound_row(&answer.row, answer.has_min)?,
+                            PyFloat::new(py, answer.seconds).into_any(),
+                            py.None().into_bound(py),
+                        ],
+                    )?
+                    .into_any(),
+                );
             }
-            return Ok(Read::Known(outcomes));
+            failed
+        };
+        if concurrency <= 1 || pending.len() <= 1 {
+            for index in pending {
+                progress.starting(index)?;
+                let outcome = read_cursor_query(py, &singles[index], (&connection, &execute))?;
+                progress.finished(index, &outcome)?;
+                outcomes[index] = Some(outcome);
+            }
+        } else {
+            if batches.is_empty() {
+                progress.concurrent((concurrency as usize).min(pending.len()))?;
+            }
+            let tasks: Vec<Bound<'py, PyAny>> = pending
+                .iter()
+                .map(|index| bound_task(py, singles[*index].clone(), (&connection, &execute)))
+                .collect::<PyResult<_>>()?;
+            let results = run_bounded(
+                py,
+                tasks,
+                concurrency,
+                Some(progress.completion_callback(py, pending.clone())?),
+            )?;
+            for (index, outcome) in pending.into_iter().zip(results) {
+                outcomes[index] = Some(outcome);
+            }
         }
-        progress.concurrent((concurrency as usize).min(total))?;
-        let tasks: Vec<Bound<'py, PyAny>> = statements
-            .into_iter()
-            .map(|sql| bound_task(py, sql, (&connection, &execute)))
-            .collect::<PyResult<_>>()?;
-        Ok(Read::Known(run_bounded(
-            py,
-            tasks,
-            concurrency,
-            Some(progress.completion_callback(py)?),
-        )?))
+        Ok(Read::Known(outcomes.into_iter().flatten().collect()))
     }
 
     fn eligible_cursor_maxes<'py>(

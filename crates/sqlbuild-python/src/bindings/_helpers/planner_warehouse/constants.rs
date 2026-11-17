@@ -23,3 +23,5 @@ pub(crate) const CURSOR_TYPE_TIMESTAMP: &str = "timestamp";
 pub(crate) const CURSOR_TYPE_INTEGER: &str = "integer";
 pub(crate) const MISSING_SOURCE_TABLE_CODE: &str = "S405";
 pub(crate) const WATERMARK_CONTRACT_CODE: &str = "S302";
+/// Cursor reads one `UNION ALL` statement answers, so a plan runs few statements, each small.
+pub(crate) const CURSOR_BATCH_SIZE: usize = 50;
