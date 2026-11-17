@@ -35,11 +35,13 @@ run `python benchmarks/duckshop-10k/generate.py --update-checksum`.
 
 | | Count |
 |---|---|
-| Models | 10,282 |
-| Staging, intermediate, marts and snapshots | 6,149 (59.8%), 1,961 (19.1%), 2,162 (21.0%), 10 |
+| Models | 10,840 |
+| Staging, intermediate, marts and snapshots | 6,149 (56.7%), 2,519 (23.2%), 2,162 (19.9%), 10 |
+| Incremental models | 583, 112 of them with a capped automatic start and 112 renamed |
+| Python export assets | 433 in 241 modules sharing one helper module |
 | Sources | 2,466 table sources and one expression source |
 | Unit tests and scenarios | 288 and 2 |
-| Dependency depth | 11 at most; 168 models at depth 7 or more |
+| Dependency depth | 11 at most; 170 models at depth 7 or more |
 
 Most models read one to four upstreams; a few dozen wide marts, unions and scorecards read ten or
 more. Staging deduplicates change logs with a change-log macro, types three platform layouts
@@ -50,6 +52,13 @@ unions instances by region and company, converts currencies with `ASOF JOIN`, se
 clickstream events in microbatches and builds customer identity, value and segment models and a
 budget variance chain. Marts give every instance, team and region its reports, and publish facts and
 dimensions with enforced contracts.
+
+A large project also carries planning workload the layers above barely touch, so the generator adds
+it in the proportions such projects have: an incrementally kept history of every third timestamped
+intermediate table, one in five of them capping how far ahead its automatic start may sit and one in
+five renamed from an older name with `migrate_from`, and a Python export asset for every fifth
+published mart, a few per module, all sharing one helper module. A live plan reads a cursor bound for
+each incremental model, plans each rename and discovers each Python node.
 
 The models that use `HASH`, `TIMESTAMP_LTZ` or `CURRENT_TIMESTAMP()` are tagged `known_divergence`,
 because their results depend on the engine or the session.
