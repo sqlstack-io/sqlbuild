@@ -392,6 +392,10 @@ Details:
   due (`sync_at_least_every`). The safety sync tries once; another failure stops it until the
   following one.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
+- When a state table holds two rows with the same ID, such as one check result written twice, the
+  server keeps the row with the earlier time. A server that kept a different row corrects it at the
+  location's next full reread, which runs when the location starts and on the first sync at least
+  5 minutes after the previous full reread.
 
 ## Skip overlapping runs and retry failures
 

@@ -10,7 +10,7 @@ use crate::warehouse_metadata::_helpers::ingestion::{
 };
 use crate::warehouse_metadata::models::{MetadataBatch, StateEventImport, WarehouseSyncResponse};
 
-/// Mirror a state-history page; a source id keeps its earliest row, then its smallest record text in byte order.
+/// Mirror a state-history page; a source id keeps its earliest row, then its smallest record text in byte order. SQLite and PostgreSQL format that text differently, so on an exact tie each store is deterministic but they may keep different rows; a store migration rebuilds the mirror.
 pub(crate) async fn ingest_events(
     store: &ControlStore,
     (location_id, target): (Uuid, &str),
