@@ -5,7 +5,7 @@ use std::time::Duration;
 use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
 use crate::scheduler::main::run_scheduler::run_scheduler;
 use crate::scheduler::models::SchedulerState;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
@@ -77,10 +77,13 @@ fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drain
                     .1
                     .leader
             );
-            let runs =
-                crate::runs::main::list_runs::list_runs(store, (location, "development"), 100)
-                    .await
-                    .expect("queued run");
+            let runs = crate::runs::main::listings::list_runs::list_runs(
+                store,
+                (location, "development"),
+                100,
+            )
+            .await
+            .expect("queued run");
             assert_eq!(runs.len(), test_case.expected_runs);
             let (stop, shutdown) = tokio::sync::watch::channel(false);
             let mut running =

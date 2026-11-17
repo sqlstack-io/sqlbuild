@@ -91,8 +91,8 @@ use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_contr
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
-use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
-use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
+use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
+use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::platform::models::{ConnectionCheckTrigger, WarehouseSyncProgress};
 use sqlbuild_orchestration::platform::models::{
@@ -102,7 +102,7 @@ use sqlbuild_orchestration::platform::models::{
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
-use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
+use sqlbuild_orchestration::snapshots::main::publication::next_remote_generation::next_remote_generation;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;

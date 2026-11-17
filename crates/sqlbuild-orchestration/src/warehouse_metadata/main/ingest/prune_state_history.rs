@@ -5,20 +5,10 @@ use std::collections::BTreeSet;
 use crate::store::errors::ControlError;
 use crate::store::main::{query::query, write::write};
 use crate::store::models::{ControlStore, Parameter};
-use crate::warehouse_metadata::constants::STATE_HISTORY_PRUNE_BATCH;
+use crate::warehouse_metadata::constants::{
+    PRUNE_AUDIT_RESULTS_SQL, PRUNE_FINGERPRINTS_SQL, STATE_HISTORY_PRUNE_BATCH,
+};
 use crate::warehouse_metadata::models::StateHistoryRetention;
-
-/// Builds ranked past the limit within their node, in one state namespace; the newest always stays.
-const FINGERPRINTS: &str = "DELETE FROM sqb_warehouse_fingerprints WHERE event_id IN (SELECT event_id FROM \
-    (SELECT event_id, ROW_NUMBER() OVER (PARTITION BY location_id, target, state_database, state_schema, \
-    node_type, node_name, target_database, target_schema, target_name ORDER BY observed_at DESC, event_id DESC) \
-    AS version FROM sqb_warehouse_fingerprints) ranked WHERE version > $1 LIMIT $2) RETURNING definition_text_hash";
-
-/// Check results ranked past the limit within their check binding, in one state namespace.
-const AUDIT_RESULTS: &str = "DELETE FROM sqb_warehouse_audit_results WHERE event_id IN (SELECT event_id FROM \
-    (SELECT event_id, ROW_NUMBER() OVER (PARTITION BY location_id, target, state_database, state_schema, \
-    COALESCE(binding_key, audit_name) ORDER BY observed_at DESC, event_id DESC) AS version \
-    FROM sqb_warehouse_audit_results) ranked WHERE version > $1 LIMIT $2) RETURNING event_id";
 
 /// Remove one page of builds and of check results past the limit; returns rows deleted and whether more remain.
 pub(crate) async fn prune_state_history(
@@ -30,7 +20,7 @@ pub(crate) async fn prune_state_history(
     let fingerprints = write(store, |transaction| async move {
         let (mut transaction, rows) = query(
             transaction,
-            FINGERPRINTS,
+            PRUNE_FINGERPRINTS_SQL,
             vec![Parameter::Integer(versions), Parameter::Integer(limit)],
         )
         .await?;
@@ -60,7 +50,7 @@ pub(crate) async fn prune_state_history(
     let results = write(store, |transaction| async move {
         let (transaction, rows) = query(
             transaction,
-            AUDIT_RESULTS,
+            PRUNE_AUDIT_RESULTS_SQL,
             vec![Parameter::Integer(versions), Parameter::Integer(limit)],
         )
         .await?;

@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::snapshots::main::connection_details::connection_details;
+use crate::snapshots::main::reads::connection_details::connection_details;
 use crate::snapshots::tests::test_types::ConnectionDetailsTestCase;
 
 #[test]

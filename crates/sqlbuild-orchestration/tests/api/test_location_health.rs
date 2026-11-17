@@ -1,12 +1,12 @@
 use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope, DefaultRole};
-use crate::platform::main::read_person_location_health::read_person_location_health;
-use crate::platform::main::report_remote_location_health::report_remote_location_health;
+use crate::platform::main::health::read_person_location_health::read_person_location_health;
+use crate::platform::main::health::report_remote_location_health::report_remote_location_health;
 use crate::platform::models::{
     ConnectionCheckTrigger, LocationHealth, LocationHealthObservation, LocationHealthReport,
 };
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Parameter, TransactionMode};
@@ -20,7 +20,7 @@ use crate::api::tests::helpers::{pool_capped, start_api, stop_api};
 use crate::api::tests::test_types::{LocationHealthTestCase, PoolCapHealthTestCase};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::models::ServerPoolCaps;
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::runs::tests::helpers::snapshot;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;

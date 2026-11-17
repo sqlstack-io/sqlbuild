@@ -125,13 +125,13 @@ fn schedule(text: &str, raw: Spanned<RawSchedule>) -> Result<ScheduleFile, FileE
 /// A retry key's value under its current name and under its deprecated name.
 type RetryValues = (Option<Spanned<i64>>, Option<Spanned<i64>>);
 
-/// One whole number of a retry table, within the range for its current or deprecated name.
+/// One retry number within its name's range, and the deprecation a deprecated name records.
 fn retry_number<T: TryFrom<i64>>(
     text: &str,
     (table, keys, values): (&str, (&str, &str), RetryValues),
     ranges: ((i64, i64), (i64, i64)),
-    deprecations: &mut Vec<Deprecation>,
-) -> Result<Option<(T, bool)>, FileError> {
+) -> Result<(Option<(T, bool)>, Option<Deprecation>), FileError> {
+    let mut deprecation: Option<Deprecation> = None;
     let (key, value, range) = match values {
         (Some(_), Some(deprecated)) => {
             return Err(error_at(
@@ -145,13 +145,13 @@ fn retry_number<T: TryFrom<i64>>(
         }
         (Some(current), None) => (keys.0, current, ranges.0),
         (None, Some(deprecated)) => {
-            deprecations.push(Deprecation {
+            deprecation = Some(Deprecation {
                 message: format!("`{}` is deprecated; rename it to `{}`", keys.1, keys.0),
                 position: position(text, deprecated.span().start),
             });
             (keys.1, deprecated, ranges.1)
         }
-        (None, None) => return Ok(None),
+        (None, None) => return Ok((None, None)),
     };
     let start: usize = value.span().start;
     let number: i64 = value.into_inner();
@@ -169,16 +169,16 @@ fn retry_number<T: TryFrom<i64>>(
         return Err(invalid());
     }
     T::try_from(number)
-        .map(|number| Some((number, key == keys.1)))
+        .map(|number| (Some((number, key == keys.1)), deprecation))
         .map_err(|_| invalid())
 }
 
-/// `[retry]`, or the deprecated `[on_failure]`, checked; every deprecated name it uses is recorded.
+/// `[retry]`, or the deprecated `[on_failure]`, checked, with every deprecated name it uses.
 fn retry(
     text: &str,
     (current, deprecated): (Option<Spanned<RawRetry>>, Option<Spanned<RawRetry>>),
-    deprecations: &mut Vec<Deprecation>,
-) -> Result<Option<RetryPolicy>, FileError> {
+) -> Result<(Option<RetryPolicy>, Vec<Deprecation>), FileError> {
+    let mut deprecations: Vec<Deprecation> = Vec::new();
     let (table, raw) = match (current, deprecated) {
         (Some(_), Some(deprecated)) => {
             return Err(error_at(
@@ -201,19 +201,19 @@ fn retry(
             });
             (RETRY_TABLE.1, deprecated)
         }
-        (None, None) => return Ok(None),
+        (None, None) => return Ok((None, deprecations)),
     };
     let start: usize = raw.span().start;
     let raw: RawRetry = raw.into_inner();
     let ranges = |range: (u8, u8)| (i64::from(range.0), i64::from(range.1));
-    let attempts: Option<u8> = retry_number::<u8>(
+    let (attempts, attempts_deprecation) = retry_number::<u8>(
         text,
         (table, RETRY_ATTEMPTS_KEY, (raw.attempts, raw.retries)),
         (ranges(ATTEMPTS_RANGE), ranges(RETRIES_RANGE)),
-        deprecations,
-    )?
-    .map(|(number, reruns)| if reruns { number + 1 } else { number });
-    let delay_seconds: Option<u32> = retry_number(
+    )?;
+    let attempts: Option<u8> =
+        attempts.map(|(number, reruns)| if reruns { number + 1 } else { number });
+    let (delay_seconds, delay_deprecation) = retry_number::<u32>(
         text,
         (
             table,
@@ -227,9 +227,9 @@ fn retry(
             );
             (delay, delay)
         },
-        deprecations,
-    )?
-    .map(|(seconds, _)| seconds);
+    )?;
+    let delay_seconds: Option<u32> = delay_seconds.map(|(seconds, _)| seconds);
+    deprecations.extend(attempts_deprecation.into_iter().chain(delay_deprecation));
     let attempts: u8 = attempts.ok_or_else(|| {
         error_at(
             text,
@@ -237,15 +237,17 @@ fn retry(
             format!("{table} needs `{}`", RETRY_ATTEMPTS_KEY.0),
         )
     })?;
-    Ok(Some(RetryPolicy {
-        attempts,
-        delay_seconds: delay_seconds.unwrap_or(RETRY_DELAY_RANGE.0),
-    }))
+    Ok((
+        Some(RetryPolicy {
+            attempts,
+            delay_seconds: delay_seconds.unwrap_or(RETRY_DELAY_RANGE.0),
+        }),
+        deprecations,
+    ))
 }
 
 /// The fields jobs and groups share, checked.
 pub(crate) fn run_file(text: &str, raw: RawRun) -> Result<RunFile, FileError> {
-    let mut deprecations: Vec<Deprecation> = Vec::new();
     let owner: Option<Positioned<String>> = raw
         .owner
         .map(|owner| nonblank(text, owner, "owner"))
@@ -267,18 +269,22 @@ pub(crate) fn run_file(text: &str, raw: RawRun) -> Result<RunFile, FileError> {
         };
         pools.insert(pool, slots);
     }
+    let name: Positioned<String> = nonblank(text, raw.name, "name")?;
+    let description: String = nonblank(text, raw.description, "description")?.value;
+    let scheduled: Option<ScheduleFile> = raw
+        .schedule
+        .map(|value| schedule(text, value))
+        .transpose()?;
+    let (retry, deprecations) = retry(text, (raw.retry, raw.on_failure))?;
     Ok(RunFile {
-        name: nonblank(text, raw.name, "name")?,
-        description: nonblank(text, raw.description, "description")?.value,
+        name,
+        description,
         targets: raw.targets,
         owner: owner.map(|owner| owner.value),
         overlap: raw.overlap,
         pools,
-        schedule: raw
-            .schedule
-            .map(|value| schedule(text, value))
-            .transpose()?,
-        retry: retry(text, (raw.retry, raw.on_failure), &mut deprecations)?,
+        schedule: scheduled,
+        retry,
         deprecations,
     })
 }

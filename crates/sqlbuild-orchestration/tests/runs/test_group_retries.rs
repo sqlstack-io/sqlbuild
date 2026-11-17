@@ -10,8 +10,9 @@ use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::_helpers::lifecycle::reads::list_runs_in;
 use crate::runs::main::{
-    advance_groups::advance_groups, claim_next_run::claim_next_run, list_runs::list_runs,
-    request_job_run::request_job_run, run_execution::run_execution,
+    execution::advance_groups::advance_groups, execution::claim_next_run::claim_next_run,
+    execution::run_execution::run_execution, listings::list_runs::list_runs,
+    requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{JobRunRequest, NodeOutcome, QueueWait, RunOutcome, RunStatus};
 use crate::runs::tests::claim_helpers::{finish, wait_out_retry_delay};
@@ -19,7 +20,7 @@ use crate::runs::tests::helpers::{rows, snapshot};
 use crate::runs::tests::test_types::GroupMemberRetryTestCase;
 use crate::runs::types::RunsListing;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
 use crate::store::models::TransactionMode;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};

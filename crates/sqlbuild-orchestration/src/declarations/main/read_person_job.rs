@@ -11,7 +11,7 @@ use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::declarations::main::published_job::published_job;
 use crate::declarations::models::{JobDetailRecord, ServerPoolCaps};
 use crate::runs::models::RunKind;
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};

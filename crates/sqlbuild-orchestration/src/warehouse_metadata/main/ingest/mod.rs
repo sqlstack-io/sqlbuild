@@ -1,3 +1,4 @@
+pub(crate) mod begin_ingestion;
 pub mod ingest_audit_results;
 pub mod ingest_catalog;
 pub mod ingest_column_migrations;

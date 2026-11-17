@@ -1,8 +1,8 @@
 //! Node states, their versioned in-memory views and the state changes pushed on the change stream.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 use axum::body::Bytes;
 use chrono::{DateTime, Utc};
@@ -80,14 +80,11 @@ pub struct CachedJson {
     pub body: Bytes,
 }
 
-/// Each held target's view, keyed by location and target hash.
-pub(crate) type TargetCaches = Arc<Mutex<HashMap<(Uuid, String), Arc<TargetCache>>>>;
-
 /// This server's views, keyed by location and target; clones share them.
 #[derive(Clone, Debug)]
 pub struct NodeStateCache {
     pub(crate) store: ControlStore,
-    pub(crate) targets: TargetCaches,
+    pub(crate) targets: crate::node_states::types::TargetCaches,
     pub(crate) updates: tokio::sync::broadcast::Sender<NodeStatusUpdate>,
 }
 

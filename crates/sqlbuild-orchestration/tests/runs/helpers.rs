@@ -14,7 +14,7 @@ use crate::runs::models::{
     AdhocCheck, AdhocCheckRequest, AdhocRunRequest, RunCommand, RunKind, RunOrigin, RunRequest,
 };
 use crate::runs::tests::test_types::{AdhocCommandTestCase, AdhocPeople};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -32,7 +32,7 @@ use sqlbuild_recall::records::models::{
 };
 use uuid::Uuid;
 
-use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::models::RunClaim;
 use crate::runs::tests::claim_helpers::succeed;
 use crate::scheduler::models::SchedulerLease;
@@ -477,7 +477,7 @@ pub(crate) async fn cache_lookup(
     (scope, snapshot): (u8, u8),
 ) -> (u8, bool) {
     let built = std::cell::Cell::new(false);
-    let ((), value) = crate::runs::_helpers::publications::cached(
+    let ((), value) = crate::runs::_helpers::lifecycle::publications::cached(
         slots,
         ((cache_id(scope), "development".into()), cache_id(snapshot)),
         (),

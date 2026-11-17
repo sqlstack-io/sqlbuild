@@ -19,17 +19,21 @@ use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
 
 /// Query fingerprints by dialect and SQL text, reused across a plan and a location's later previews.
-static QUERY_FINGERPRINTS: Mutex<Option<QueryFingerprints>> = Mutex::new(None);
+pub(crate) static QUERY_FINGERPRINTS: Mutex<Option<QueryFingerprints>> = Mutex::new(None);
 /// Distinct SQL texts the memo keeps before starting over; a 10K-model project holds about 10K.
 const QUERY_FINGERPRINTS_LIMIT: usize = 100_000;
 
 /// Fingerprint results by `(dialect, SQL text)`.
-type QueryFingerprints = HashMap<(Option<String>, String), Result<String, String>>;
+pub(crate) type QueryFingerprints = HashMap<(Option<String>, String), Result<String, String>>;
 
 /// `compiler_query_fingerprint`, remembered by dialect and SQL text.
-pub(crate) fn query_fingerprint(sql: &str, dialect: Option<&str>) -> Result<String, String> {
+pub(crate) fn query_fingerprint(
+    memo: &Mutex<Option<QueryFingerprints>>,
+    sql: &str,
+    dialect: Option<&str>,
+) -> Result<String, String> {
     let key: (Option<String>, String) = (dialect.map(str::to_owned), sql.to_owned());
-    if let Some(known) = QUERY_FINGERPRINTS
+    if let Some(known) = memo
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .as_ref()
@@ -38,9 +42,7 @@ pub(crate) fn query_fingerprint(sql: &str, dialect: Option<&str>) -> Result<Stri
         return known.clone();
     }
     let fingerprint: Result<String, String> = compiler_query_fingerprint(sql, dialect);
-    let mut memo = QUERY_FINGERPRINTS
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let mut memo = memo.lock().unwrap_or_else(PoisonError::into_inner);
     let entries: &mut QueryFingerprints = memo.get_or_insert_with(HashMap::new);
     if entries.len() > QUERY_FINGERPRINTS_LIMIT {
         entries.clear();
@@ -55,7 +57,7 @@ pub(crate) fn model_query_hash(
     model_name: &str,
     (query_sql, dialect): (&str, Option<&str>),
 ) -> PyResult<String> {
-    py.compiler_detach(|| query_fingerprint(query_sql, dialect))
+    py.compiler_detach(|| query_fingerprint(&QUERY_FINGERPRINTS, query_sql, dialect))
         .map_err(|error| fingerprint_error(py, &format!("Model '{model_name}' SQL"), error))
 }
 

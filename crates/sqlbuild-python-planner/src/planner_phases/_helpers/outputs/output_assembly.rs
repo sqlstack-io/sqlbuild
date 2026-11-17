@@ -5,13 +5,13 @@ use crate::planner_entries::models::PlanOutputInputs;
 use crate::planner_identity::main::build_stale_out_of_selection_warnings::build_stale_out_of_selection_warnings;
 use crate::planner_migrations::main::with_migration_fingerprints::with_migration_fingerprints;
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
 use crate::planner_phases::_helpers::rebuilds::retention::{plan_retention, plan_table_types};
 use crate::planner_phases::constants::AUDIT_ENTRIES;
 use crate::planner_phases::constants::IGNORE_AUDIT_FAILURES;
 use crate::planner_phases::constants::IGNORE_FAILURE;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::models::PlannerIdentityContext;
 use crate::planner_phases::models::{
     PlanOutputContext, PlanOutputFields, PlanWarningContext, PlannedModelEntries,

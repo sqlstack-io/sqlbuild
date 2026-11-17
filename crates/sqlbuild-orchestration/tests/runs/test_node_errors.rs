@@ -6,13 +6,13 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::tests::role_helpers::{credentials, orders_grant, role_fixture};
-use crate::runs::main::change_run::change_run;
-use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::models::{RunAuthority, RunChangeRequest};
 use crate::runs::tests::helpers::{queue, request, rows, snapshot};
 use crate::runs::tests::test_types::RunNodeErrorTestCase;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::Parameter;

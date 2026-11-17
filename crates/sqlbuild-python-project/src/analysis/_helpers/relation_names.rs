@@ -16,23 +16,28 @@ const RELATION_NAMES_CONTEXT: &str = "native relation name extraction";
 const EXTRACTED_LIMIT: usize = 100_000;
 
 /// Extractions by dialect and SQL text, reused by a location's previews of one publication.
-static EXTRACTED: Mutex<Option<ExtractedMemo>> = Mutex::new(None);
+pub(crate) static EXTRACTED: Mutex<Option<ExtractedMemo>> = Mutex::new(None);
 
 /// Extracted rows by `(dialect, SQL text)`.
-type ExtractedMemo = HashMap<(Option<String>, String), ExtractedRows>;
+pub(crate) type ExtractedMemo = HashMap<(Option<String>, String), ExtractedRows>;
 
-pub(crate) fn remembered(dialect: Option<&str>, sql: &str) -> Option<ExtractedRows> {
-    let memo = EXTRACTED.lock().unwrap_or_else(PoisonError::into_inner);
+pub(crate) fn remembered(
+    memo: &Mutex<Option<ExtractedMemo>>,
+    dialect: Option<&str>,
+    sql: &str,
+) -> Option<ExtractedRows> {
+    let memo = memo.lock().unwrap_or_else(PoisonError::into_inner);
     memo.as_ref()?
         .get(&(dialect.map(str::to_owned), sql.to_owned()))
         .cloned()
 }
 
 pub(crate) fn remember(
+    memo: &Mutex<Option<ExtractedMemo>>,
     dialect: Option<&str>,
     extracted: impl IntoIterator<Item = (String, ExtractedRows)>,
 ) {
-    let mut memo = EXTRACTED.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut memo = memo.lock().unwrap_or_else(PoisonError::into_inner);
     let entries = memo.get_or_insert_with(HashMap::new);
     if entries.len() > EXTRACTED_LIMIT {
         entries.clear();

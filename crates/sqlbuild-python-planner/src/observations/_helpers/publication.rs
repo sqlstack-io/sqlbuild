@@ -9,9 +9,9 @@ use sqlbuild_analysis::planner_warehouse::models::CursorTagRequest;
 use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 
 use crate::consumption::main::relation::relation;
-use crate::live_reads::_helpers::bounded::bound_task;
-use crate::planner_warehouse::_helpers::inspection::cursors::dialect_cursor_sql;
+use crate::live_reads::main::bound_task::bound_task;
 use crate::planner_warehouse::constants::RUN_BOUNDED;
+use crate::planner_warehouse::main::inspection::dialect_cursor_sql::dialect_cursor_sql;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::models::Dialect;

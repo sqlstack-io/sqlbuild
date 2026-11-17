@@ -8,15 +8,15 @@ use uuid::Uuid;
 use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
-    advance_groups::advance_groups, claim_next_run::claim_next_run,
-    request_job_run::request_job_run,
+    execution::advance_groups::advance_groups, execution::claim_next_run::claim_next_run,
+    requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{JobRunRequest, NodeOutcome, RunOutcome};
 use crate::runs::tests::claim_helpers::finish;
 use crate::runs::tests::helpers::{snapshot, snapshot_node};
 use crate::runs::tests::test_types::RoundTripGroupTestCase;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;

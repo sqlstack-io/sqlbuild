@@ -1,7 +1,7 @@
 //! `(relations, temporary names)` named in `sql`, or None if unparseable.
 
 use crate::analysis::_helpers::relation_names::{
-    relation_names_error, remember, remembered, rows_of,
+    EXTRACTED, relation_names_error, remember, remembered, rows_of,
 };
 use crate::analysis::types::ExtractedRows;
 use pyo3::prelude::{PyResult, Python};
@@ -15,7 +15,7 @@ pub fn extract_sql_relation_names(
     sql: &str,
     dialect: Option<&str>,
 ) -> PyResult<ExtractedRows> {
-    if let Some(rows) = remembered(dialect, sql) {
+    if let Some(rows) = remembered(&EXTRACTED, dialect, sql) {
         return Ok(rows);
     }
     let extracted = py
@@ -23,6 +23,6 @@ pub fn extract_sql_relation_names(
         .map_err(compiler_error)?
         .map_err(relation_names_error)?;
     let rows: ExtractedRows = rows_of(extracted);
-    remember(dialect, [(sql.to_owned(), rows.clone())]);
+    remember(&EXTRACTED, dialect, [(sql.to_owned(), rows.clone())]);
     Ok(rows)
 }

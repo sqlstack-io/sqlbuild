@@ -1,6 +1,6 @@
 //! Register the live warehouse reads.
 
-use crate::live_reads::main::live_reads::live_reads;
+use crate::live_reads::main::_live_reads::live_reads;
 use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;

@@ -14,7 +14,7 @@ use crate::sensors::models::{
     NodeEventKind, NodeSensorEvent, SensorCursor, SensorEvaluationRequest,
 };
 use crate::sensors::types::SourcePage;
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;

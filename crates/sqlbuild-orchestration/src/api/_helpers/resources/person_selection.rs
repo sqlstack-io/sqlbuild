@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 use crate::api::errors::ApiError;
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
-use crate::runs::main::evaluate_selection::evaluate_selection;
-use crate::runs::main::read_selection_vocabulary::read_selection_vocabulary;
+use crate::runs::main::requests::evaluate_selection::evaluate_selection;
+use crate::runs::main::requests::read_selection_vocabulary::read_selection_vocabulary;
 use crate::runs::models::{SelectionEvaluation, SelectionQuery, SelectionVocabulary};
 use crate::runs::types::CommandPlanner;
 use crate::store::models::ControlStore;

@@ -1,6 +1,6 @@
 //! Preserve adapter overrides when describing migration execution.
 
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::native_host::types::Syntax;
 

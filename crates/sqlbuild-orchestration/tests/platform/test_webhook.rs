@@ -6,8 +6,8 @@ use axum::Router;
 use axum::routing::post;
 use uuid::Uuid;
 
-use crate::platform::main::run_maintenance::run_maintenance;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::platform::main::installation::run_maintenance::run_maintenance;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::webhooks::_helpers::delivery::deliver_webhook;
 use crate::webhooks::main::{connect_webhook::connect_webhook, run_webhook::run_webhook};

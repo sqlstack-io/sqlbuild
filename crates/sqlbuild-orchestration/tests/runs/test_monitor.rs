@@ -3,15 +3,15 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use crate::runs::main::change_run::change_run;
-use crate::runs::main::claim_next_run::claim_next_run;
-use crate::runs::main::heartbeat_run::heartbeat_run;
-use crate::runs::main::list_runs::list_runs;
-use crate::runs::main::monitor_runs::monitor_runs;
+use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
+use crate::runs::main::execution::heartbeat_run::heartbeat_run;
+use crate::runs::main::execution::monitor_runs::monitor_runs;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus};
 use crate::scheduler::models::SchedulerState;
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, scheduler_cycle};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;

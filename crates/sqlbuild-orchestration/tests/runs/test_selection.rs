@@ -4,8 +4,8 @@ use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::credentials::tests::location_helpers::create_location;
-use crate::runs::main::evaluate_selection::evaluate_selection;
-use crate::runs::main::read_selection_vocabulary::read_selection_vocabulary;
+use crate::runs::main::requests::evaluate_selection::evaluate_selection;
+use crate::runs::main::requests::read_selection_vocabulary::read_selection_vocabulary;
 use crate::runs::models::{SelectionQuery, VocabularyEntry};
 use crate::runs::tests::helpers::{
     adhoc_fixture, launch_outcome, owned_selection, selection_outcome,

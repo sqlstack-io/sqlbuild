@@ -15,10 +15,10 @@ use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
 use crate::declarations::models::TriggerChangeRequest;
-use crate::runs::main::check_adhoc_run::check_adhoc_run;
-use crate::runs::main::list_person_runs::list_person_runs;
-use crate::runs::main::request_person_run::request_person_run;
-use crate::runs::main::request_rerun::request_rerun;
+use crate::runs::main::listings::list_person_runs::list_person_runs;
+use crate::runs::main::requests::check_adhoc_run::check_adhoc_run;
+use crate::runs::main::requests::request_person_run::request_person_run;
+use crate::runs::main::requests::request_rerun::request_rerun;
 use crate::runs::models::{
     AdhocCheck, AdhocCheckRequest, AdhocRunRequest, CancelRunRequest, JobRunRequest,
     PersonRunRequest, RerunRequest, RunRecord,

@@ -6,6 +6,8 @@ pub(crate) const DECOMPRESSED_BODY_BYTES: usize = 320 * 1024 * 1024;
 pub(crate) const GZIP_ENCODING: &str = "gzip";
 pub(crate) const IDENTITY_ENCODING: &str = "identity";
 pub(crate) const JSON_MEDIA_TYPE: &str = "application/json";
+/// The `If-None-Match` tag that matches any current representation.
+pub(crate) const ANY_ETAG: &str = "*";
 /// Two 1024-byte passwords can each expand sixfold through JSON escaping.
 pub(crate) const PASSWORD_BODY_BYTES: usize = 16 * 1024;
 pub(crate) const PASSWORD_COOKIE: &str = "__Host-sqb-session";

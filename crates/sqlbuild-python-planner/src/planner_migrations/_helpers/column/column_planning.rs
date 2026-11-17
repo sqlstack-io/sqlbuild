@@ -5,7 +5,7 @@ use crate::planner_migrations::_helpers::column::known_input_columns::KnownInput
 use crate::planner_migrations::models::{
     ColumnMigrationInputs, ColumnMigrationPlanning, MigrationPhase,
 };
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PySet, PySetMethods};

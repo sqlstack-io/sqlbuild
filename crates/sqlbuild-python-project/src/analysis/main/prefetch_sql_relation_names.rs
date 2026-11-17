@@ -1,7 +1,7 @@
 //! Extract every SQL text not extracted yet, off the GIL, so later reads find them.
 
 use crate::analysis::_helpers::relation_names::{
-    relation_names_error, remember, remembered, rows_of,
+    EXTRACTED, relation_names_error, remember, remembered, rows_of,
 };
 use crate::analysis::types::ExtractedRows;
 use pyo3::prelude::{PyResult, Python};
@@ -20,7 +20,7 @@ pub fn prefetch_sql_relation_names(
 ) -> PyResult<()> {
     let missing: Vec<String> = sqls
         .into_iter()
-        .filter(|sql| remembered(dialect, sql).is_none())
+        .filter(|sql| remembered(&EXTRACTED, dialect, sql).is_none())
         .collect();
     let extracted: Vec<Result<Option<ExtractedRelations>, RelationNamesFailure>> = py
         .compiler_detach(|| Ok(extract_all(&missing)))
@@ -29,6 +29,6 @@ pub fn prefetch_sql_relation_names(
     for (sql, extracted) in missing.into_iter().zip(extracted) {
         rows.push((sql, rows_of(extracted.map_err(relation_names_error)?)));
     }
-    remember(dialect, rows);
+    remember(&EXTRACTED, dialect, rows);
     Ok(())
 }

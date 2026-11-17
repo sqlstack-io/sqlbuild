@@ -2,7 +2,7 @@
 
 use crate::state_tables::constants::{EVENT_ID_COLUMN, MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
 use crate::state_tables::constants::{NEWEST_FIRST_COLUMN, NEWEST_VERSION_COLUMN};
-use crate::state_tables::models::HistoryRead;
+use crate::state_tables::models::{HistoryRead, NewestVersions};
 
 /// Rendered cursor values, `None` first; a trailing event ID repeating an `event_id` key is ignored.
 pub fn read_history_sql(
@@ -46,64 +46,18 @@ pub fn read_history_sql(
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let mut greater: Vec<String> = Vec::new();
-    let mut equal: Vec<String> = Vec::new();
-    if let Some(after) = after {
-        for ((column, ordered), value) in columns.iter().zip(&ordered).zip(after) {
-            let literal = value
-                .as_ref()
-                .map(|value| {
-                    if *column == timestamp_column {
-                        Ok(value.clone())
-                    } else {
-                        binary(value, adapter)
-                    }
-                })
-                .transpose()?;
-            let comparison = literal.as_ref().map_or_else(
-                || format!("{column} IS NOT NULL"),
-                |literal| format!("{ordered} > {literal}"),
-            );
-            let prefix = if equal.is_empty() {
-                String::new()
-            } else {
-                format!("{} AND ", equal.join(" AND "))
-            };
-            greater.push(format!("({prefix}{comparison})"));
-            equal.push(literal.as_ref().map_or_else(
-                || format!("{column} IS NULL"),
-                |literal| format!("{ordered} = {literal}"),
-            ));
-        }
-    }
     let mut filters: Vec<String> = Vec::new();
-    if !greater.is_empty() {
-        filters.push(format!("({})", greater.join(" OR ")));
-    }
+    filters.extend(
+        after
+            .map(|after| after_filter((&columns, &ordered), after, (timestamp_column, adapter)))
+            .transpose()?
+            .flatten(),
+    );
     if let Some(since) = observed_since {
         filters.push(format!("{timestamp_column} >= {since}"));
     }
-    let source = match newest {
-        Some(newest) => {
-            let partition = newest.partition.join(", ");
-            let mut order = vec![format!("{NEWEST_FIRST_COLUMN} DESC")];
-            order.extend(
-                newest
-                    .observation
-                    .iter()
-                    .map(|column| format!("{column} DESC")),
-            );
-            filters.push(format!("{NEWEST_VERSION_COLUMN} <= {}", newest.versions));
-            format!(
-                "(SELECT *, DENSE_RANK() OVER (PARTITION BY {partition} ORDER BY {}) AS {NEWEST_VERSION_COLUMN} \
-                 FROM (SELECT *, MIN({timestamp_column}) OVER (PARTITION BY {partition}, {}) AS {NEWEST_FIRST_COLUMN} \
-                 FROM {qualified_name}) AS sqb_observations) AS sqb_versions",
-                order.join(", "),
-                newest.observation.join(", ")
-            )
-        }
-        None => qualified_name.to_owned(),
-    };
+    let (source, versions) = versioned_source(qualified_name, timestamp_column, newest);
+    filters.extend(versions);
     let filter = if filters.is_empty() {
         String::new()
     } else {
@@ -149,4 +103,70 @@ fn binary(value: &str, adapter: &str) -> Result<String, String> {
             ));
         }
     })
+}
+
+/// The table a read pages through, or each partition's newest observations and their filter.
+fn versioned_source(
+    qualified_name: &str,
+    timestamp_column: &str,
+    newest: Option<NewestVersions<'_>>,
+) -> (String, Option<String>) {
+    let Some(newest) = newest else {
+        return (qualified_name.to_owned(), None);
+    };
+    let partition = newest.partition.join(", ");
+    let mut order = vec![format!("{NEWEST_FIRST_COLUMN} DESC")];
+    order.extend(
+        newest
+            .observation
+            .iter()
+            .map(|column| format!("{column} DESC")),
+    );
+    (
+        format!(
+            "(SELECT *, DENSE_RANK() OVER (PARTITION BY {partition} ORDER BY {}) AS {NEWEST_VERSION_COLUMN} \
+             FROM (SELECT *, MIN({timestamp_column}) OVER (PARTITION BY {partition}, {}) AS {NEWEST_FIRST_COLUMN} \
+             FROM {qualified_name}) AS sqb_observations) AS sqb_versions",
+            order.join(", "),
+            newest.observation.join(", ")
+        ),
+        Some(format!("{NEWEST_VERSION_COLUMN} <= {}", newest.versions)),
+    )
+}
+
+/// The rows after a page's last cursor values, in key order; `None` for an empty cursor.
+fn after_filter(
+    (columns, ordered): (&[&str], &[String]),
+    after: &[Option<String>],
+    (timestamp_column, adapter): (&str, &str),
+) -> Result<Option<String>, String> {
+    let mut greater: Vec<String> = Vec::new();
+    let mut equal: Vec<String> = Vec::new();
+    for ((column, ordered), value) in columns.iter().zip(ordered).zip(after) {
+        let literal = value
+            .as_ref()
+            .map(|value| {
+                if *column == timestamp_column {
+                    Ok(value.clone())
+                } else {
+                    binary(value, adapter)
+                }
+            })
+            .transpose()?;
+        let comparison = literal.as_ref().map_or_else(
+            || format!("{column} IS NOT NULL"),
+            |literal| format!("{ordered} > {literal}"),
+        );
+        let prefix = if equal.is_empty() {
+            String::new()
+        } else {
+            format!("{} AND ", equal.join(" AND "))
+        };
+        greater.push(format!("({prefix}{comparison})"));
+        equal.push(literal.as_ref().map_or_else(
+            || format!("{column} IS NULL"),
+            |literal| format!("{ordered} = {literal}"),
+        ));
+    }
+    Ok((!greater.is_empty()).then(|| format!("({})", greater.join(" OR "))))
 }

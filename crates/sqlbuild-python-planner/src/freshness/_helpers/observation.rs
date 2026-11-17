@@ -2,7 +2,7 @@
 
 use crate::freshness::main::presumed_utc_datetime::presumed_utc_datetime;
 use crate::freshness::models::Observer;
-use crate::planner_warehouse::_helpers::synced_reads::refused;
+use crate::planner_warehouse::main::reads::refused_access::refused_access;
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::Read;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -246,7 +246,7 @@ fn single_data_version<'py>(
     let result: Bound<'py, PyAny> = match observer.reads.get().reads().freshness_query(py, sql) {
         Ok(Read::Known(result)) => result,
         Ok(Read::Unknown(_)) => {
-            return Err(refused(&format!("freshness query of source {name}")));
+            return Err(refused_access(&format!("freshness query of source {name}")));
         }
         Err(error) => {
             let Some(message) = exception_text(py, &error)? else {
@@ -397,7 +397,9 @@ fn observe_adapter_source<'py>(
         Read::Known(metadata) => metadata,
         Read::Unknown(_) => {
             let name: String = native_field(source, "name")?.str()?.extract()?;
-            return Err(refused(&format!("freshness metadata of source {name}")));
+            return Err(refused_access(&format!(
+                "freshness metadata of source {name}"
+            )));
         }
     };
     let name: Bound<'py, PyAny> = native_field(source, "name")?;
@@ -485,7 +487,7 @@ fn observe_adapter_batch_inner<'py>(
         .table_freshness(py, unique_requests)?
     {
         Read::Known(metadata) => metadata,
-        Read::Unknown(item) => return Err(refused(&item)),
+        Read::Unknown(item) => return Err(refused_access(&item)),
     };
     let metadata_class: Bound<'py, PyAny> = host_entry(py, AdapterHost::TableFreshnessMetadata)?;
     let observations: Bound<'py, PyDict> = PyDict::new(py);

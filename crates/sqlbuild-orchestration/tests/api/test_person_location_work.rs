@@ -15,13 +15,13 @@ use crate::credentials::models::{
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::{
-    read_location_work::read_location_work,
-    read_person_connection_test::read_person_connection_test,
-    request_location_work::request_location_work,
+    health::read_person_connection_test::read_person_connection_test,
+    work::read_location_work::read_location_work,
+    work::request_location_work::request_location_work,
 };
 use crate::platform::models::{LocationWork, LocationWorkRequest};
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;

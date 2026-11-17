@@ -8,7 +8,7 @@ use crate::planner_migrations::_helpers::planning::matching::migration_destinati
 use crate::planner_migrations::models::DiscoveryRequest;
 use crate::planner_migrations::models::FingerprintInputs;
 use crate::planner_migrations::models::ModelMigrationDiscovery;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use pyo3::prelude::{PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple, PyTupleMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;

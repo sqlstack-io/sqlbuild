@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::runs::models::RunChange;
-use crate::snapshots::main::verify_execution::verify_execution;
+use crate::snapshots::main::publication::verify_execution::verify_execution;
 use crate::snapshots::models::SnapshotInput;
 use crate::worker::_helpers::heartbeat::start_session;
 use crate::worker::errors::WorkerError;

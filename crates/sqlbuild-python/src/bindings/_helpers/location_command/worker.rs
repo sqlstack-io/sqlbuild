@@ -17,7 +17,7 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_orchestration::runs::models::{
     RunChange, RunCommand, RunKind, RunOutcome, RunRequest, RunWindow,
 };
-use sqlbuild_orchestration::snapshots::main::node_hashes::node_hashes;
+use sqlbuild_orchestration::snapshots::main::reads::node_hashes::node_hashes;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::audit_command::command::run_audit;

@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 use crate::credentials::main::locations::create_location::create_location;
 use crate::credentials::models::AuditContext;
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{
     LocationHealth, LocationHealthReport, LocationRuleFailure, LocationRuleFinding,
 };

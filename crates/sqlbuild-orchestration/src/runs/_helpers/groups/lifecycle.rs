@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
 
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::declarations::models::DependencyFailure;
@@ -20,6 +21,7 @@ use crate::runs::models::{
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
 use crate::store::models::{ControlTransaction, Parameter};
+use crate::store::types::Row;
 
 /// Callers have already checked leadership; the surrounding transaction fences the entire advance.
 pub(crate) async fn group_change(
@@ -208,17 +210,13 @@ async fn finish_group(
     let mut latest: BTreeMap<(Uuid, String), (usize, RunNodeRecord)> = BTreeMap::new();
     let previous: BTreeMap<Uuid, Uuid> = rows
         .iter()
-        .filter_map(|row| {
-            let run: Uuid = serde_json::from_value(row.get("run_id")?.clone()).ok()?;
-            let earlier: Uuid =
-                serde_json::from_value(row.get("previous_attempt")?.clone()).ok()?;
-            Some((run, earlier))
-        })
-        .collect();
+        .map(previous_attempt)
+        .filter_map(Result::transpose)
+        .collect::<Result<_, ControlError>>()?;
     let runs: BTreeSet<Uuid> = rows
         .iter()
-        .filter_map(|row| serde_json::from_value(row.get("run_id")?.clone()).ok())
-        .collect();
+        .map(|row| stored_id(&row["run_id"]))
+        .collect::<Result<_, ControlError>>()?;
     for row in rows {
         let run: Uuid = serde_json::from_value(row["run_id"].clone())
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
@@ -329,4 +327,20 @@ async fn finish_group(
         },
     )
     .await
+}
+
+/// A stored run ID column.
+fn stored_id(value: &Value) -> Result<Uuid, ControlError> {
+    serde_json::from_value(value.clone()).map_err(|error| ControlError::Invalid(error.to_string()))
+}
+
+/// A member run and the earlier attempt it reruns, when it reruns one.
+fn previous_attempt(row: &Row) -> Result<Option<(Uuid, Uuid)>, ControlError> {
+    if row["previous_attempt"].is_null() {
+        return Ok(None);
+    }
+    Ok(Some((
+        stored_id(&row["run_id"])?,
+        stored_id(&row["previous_attempt"])?,
+    )))
 }

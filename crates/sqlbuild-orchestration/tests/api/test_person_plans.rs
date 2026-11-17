@@ -13,19 +13,19 @@ use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, BuiltinRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::_helpers::maintenance::retention::retain;
-use crate::platform::main::claim_location_work::claim_location_work;
-use crate::platform::main::complete_location_work::complete_location_work;
-use crate::platform::main::read_person_plan::read_person_plan;
-use crate::platform::main::read_person_plan_diff::read_person_plan_diff;
-use crate::platform::main::read_person_plan_rows::read_person_plan_rows;
-use crate::platform::main::read_person_plan_summary::read_person_plan_summary;
-use crate::platform::main::request_location_work::request_location_work;
+use crate::platform::main::person_reads::read_person_plan::read_person_plan;
+use crate::platform::main::person_reads::read_person_plan_diff::read_person_plan_diff;
+use crate::platform::main::person_reads::read_person_plan_rows::read_person_plan_rows;
+use crate::platform::main::person_reads::read_person_plan_summary::read_person_plan_summary;
+use crate::platform::main::work::claim_location_work::claim_location_work;
+use crate::platform::main::work::complete_location_work::complete_location_work;
+use crate::platform::main::work::request_location_work::request_location_work;
 use crate::platform::models::{
     LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult, PlanModelDiff,
     PlanRequest, PlanRowSection, PlanRowsQuery, PlanTimingStep, PlanTimings,
 };
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};

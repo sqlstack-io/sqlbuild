@@ -11,11 +11,12 @@ use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::declarations::models::OnFailure;
 use crate::runs::_helpers::lifecycle::events::append_run_event;
 use crate::runs::_helpers::requests::rerun::frozen_rerun;
+use crate::runs::constants::NODE_FAILED;
 use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT};
-use crate::runs::main::queue_run::queue_run;
+use crate::runs::main::requests::queue_run::queue_run;
 use crate::runs::models::{RerunRequest, RunCommand, RunOrigin, RunRequest, RunRetry};
 use crate::snapshots::constants::SOURCE_KEY_PREFIX;
-use crate::snapshots::main::job_write_set::job_write_set;
+use crate::snapshots::main::write_sets::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -145,7 +146,7 @@ async fn queue_member_retry(
     let selection: BTreeSet<String> = rows
         .iter()
         .filter(|row| {
-            row["status"] == "failed"
+            row["status"] == NODE_FAILED
                 || row["skipped_because_of"]
                     .as_str()
                     .is_none_or(|cause| source.selection.contains(cause))

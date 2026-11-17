@@ -2,14 +2,14 @@ use std::collections::BTreeMap;
 
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
-use crate::runs::main::change_run::change_run;
-use crate::runs::main::claim_next_run::claim_next_run;
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::{
     NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
 };
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::worker::errors::WorkerError;

@@ -31,8 +31,11 @@ struct HeldState {
 static HELD_STATE: Mutex<Option<HeldState>> = Mutex::new(None);
 
 /// The state a request plans from: the held state at its mirror version, else built from its copy file.
-fn requested_state(request: &Value) -> PyResult<Arc<WarehouseState>> {
-    let mut held = HELD_STATE.lock().unwrap_or_else(PoisonError::into_inner);
+fn requested_state(
+    held_state: &Mutex<Option<HeldState>>,
+    request: &Value,
+) -> PyResult<Arc<WarehouseState>> {
+    let mut held = held_state.lock().unwrap_or_else(PoisonError::into_inner);
     let version: Option<&str> = request["version"].as_str();
     if let Some(current) = held
         .as_ref()
@@ -65,7 +68,7 @@ pub(super) fn runtime_plan<'py>(
     let argv: Vec<String> = serde_json::from_value(request["argv"].clone())
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
     let select: Vec<String> = serde_json::from_value(request["select"].clone()).unwrap_or_default();
-    let state: Arc<WarehouseState> = requested_state(request)?;
+    let state: Arc<WarehouseState> = requested_state(&HELD_STATE, request)?;
     let planned = (|| -> PyResult<(i32, Option<String>)> {
         let argv: Vec<Bound<'_, PyString>> =
             argv.iter().map(|part| PyString::new(py, part)).collect();

@@ -21,7 +21,7 @@ use crate::freshness::_helpers::observation::strategy;
 use crate::freshness::_helpers::observation::unknown;
 use crate::freshness::_helpers::support::text;
 use crate::freshness::models::Observer;
-use crate::planner_warehouse::errors::WarehouseAccessRefusedError;
+use crate::planner_warehouse::main::reads::is_refused_access::is_refused_access;
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::Read;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -42,7 +42,7 @@ const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavai
 
 /// The message of an adapter, freshness observation or preview access error, if it is one.
 fn handled_message<'py>(py: Python<'py>, error: &PyErr) -> PyResult<Option<Bound<'py, PyAny>>> {
-    if error.is_instance_of::<WarehouseAccessRefusedError>(py) {
+    if is_refused_access(py, error) {
         return Ok(Some(text(py, PREVIEW_MESSAGE)));
     }
     let value: Bound<'py, PyAny> = error.value(py).clone().into_any();

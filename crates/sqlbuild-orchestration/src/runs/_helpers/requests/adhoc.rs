@@ -9,7 +9,7 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::decide_person_scopes::decide_person_scopes;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
-use crate::runs::_helpers::publications::{cached_publication, current_publication};
+use crate::runs::_helpers::lifecycle::publications::{cached_publication, current_publication};
 use crate::runs::_helpers::requests::permissions::{authorize_execution, execution_scopes};
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
@@ -21,7 +21,7 @@ use crate::runs::models::{
     RunCommand, RunKind, RunOrigin, RunRequest,
 };
 use crate::runs::types::CommandPlanner;
-use crate::snapshots::main::held_write_set::held_write_set;
+use crate::snapshots::main::write_sets::held_write_set::held_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};

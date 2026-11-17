@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::node_states::_helpers::views::schedule_refresh;
 use crate::node_states::constants::NODE_STATE_UPDATES;
 use crate::node_states::models::{NodeStateCache, TargetCache};
+use crate::store::errors::ControlError;
 use crate::store::models::{ChangeMessage, ChangeTopic, ControlStore};
 
 /// The server's cache and the task that keeps it current; dropping the task stops pending refreshes.
@@ -25,11 +26,16 @@ pub(crate) fn start_node_states(
     let task = {
         let cache = cache.clone();
         async move {
-            let mut refreshes: JoinSet<()> = JoinSet::new();
+            let mut refreshes: JoinSet<Option<ControlError>> = JoinSet::new();
             loop {
                 let message = tokio::select! {
                     message = receiver.recv() => message,
-                    Some(_) = refreshes.join_next(), if !refreshes.is_empty() => continue,
+                    Some(joined) = refreshes.join_next(), if !refreshes.is_empty() => {
+                        if let Ok(Some(error)) = joined {
+                            eprintln!("Node states refresh failed; the next change retries: {error}");
+                        }
+                        continue;
+                    }
                 };
                 let entries = match message {
                     Ok(ChangeMessage::Changed {

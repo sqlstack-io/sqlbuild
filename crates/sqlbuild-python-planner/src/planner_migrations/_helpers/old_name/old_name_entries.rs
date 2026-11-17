@@ -12,7 +12,7 @@ use crate::planner_migrations::_helpers::old_name::old_names::old_name_view_skip
 use crate::planner_migrations::constants::PENDING_ARCHIVE;
 use crate::planner_migrations::constants::PENDING_VIEW;
 use crate::planner_migrations::models::OldNamePlanner;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyBool, PyList, PyTuple};

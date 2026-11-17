@@ -3,7 +3,7 @@
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
-use crate::platform::main::require_instance::require_instance;
+use crate::platform::main::installation::require_instance::require_instance;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Change, ControlStore, ControlTransaction, Parameter, TransactionMode};

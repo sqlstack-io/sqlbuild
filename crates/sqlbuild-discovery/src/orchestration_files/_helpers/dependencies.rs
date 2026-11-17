@@ -29,7 +29,7 @@ pub(crate) fn group_dependencies(
     for (key, value) in entries {
         let name: &str = key.get_ref();
         if [WAIT_FOR_KEY, DEPENDENCY_FAILURE_KEY].contains(&name) {
-            setting(text, (name, value), &mut dependencies.defaults)?;
+            dependencies.defaults = setting(text, (name, value), dependencies.defaults)?;
             continue;
         }
         if !members.contains(name) {
@@ -53,7 +53,7 @@ pub(crate) fn group_dependencies(
                     ),
                 ));
             }
-            setting(text, (setting_name, value), &mut overrides)?;
+            overrides = setting(text, (setting_name, value), overrides)?;
         }
         dependencies.members.insert(name.to_owned(), overrides);
     }
@@ -71,12 +71,12 @@ fn as_table<'a, 'i>(
         .ok_or_else(|| error_at(text, value.span().start, format!("{what} must be a table")))
 }
 
-/// One `wait_for` or `on_failure` value into `settings`.
+/// `settings` with one `wait_for` or `on_failure` value set.
 fn setting(
     text: &str,
     (name, value): (&str, &Spanned<DeValue<'_>>),
-    settings: &mut DependencySettings,
-) -> Result<(), FileError> {
+    settings: DependencySettings,
+) -> Result<DependencySettings, FileError> {
     let allowed: &[&str] = if name == WAIT_FOR_KEY {
         &WAIT_FOR_VALUES
     } else {
@@ -91,19 +91,23 @@ fn setting(
             format!("{name} must be one of {}", quoted.join(", ")),
         ));
     };
+    let failure = |on_failure: DependencyFailure| DependencySettings {
+        on_failure: Some(on_failure),
+        ..settings
+    };
     match chosen {
-        "node" => {
-            return Err(error_at(
-                text,
-                value.span().start,
-                "wait_for = \"node\" is not supported yet; it is planned, so use \"job\" for now"
-                    .to_owned(),
-            ));
-        }
-        "job" => settings.wait_for = Some(WaitFor::Job),
-        "skip" => settings.on_failure = Some(DependencyFailure::Skip),
-        "run" => settings.on_failure = Some(DependencyFailure::Run),
-        _ => settings.on_failure = Some(DependencyFailure::Partial),
+        "node" => Err(error_at(
+            text,
+            value.span().start,
+            "wait_for = \"node\" is not supported yet; it is planned, so use \"job\" for now"
+                .to_owned(),
+        )),
+        "job" => Ok(DependencySettings {
+            wait_for: Some(WaitFor::Job),
+            ..settings
+        }),
+        "skip" => Ok(failure(DependencyFailure::Skip)),
+        "run" => Ok(failure(DependencyFailure::Run)),
+        _ => Ok(failure(DependencyFailure::Partial)),
     }
-    Ok(())
 }

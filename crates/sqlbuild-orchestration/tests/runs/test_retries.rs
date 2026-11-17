@@ -9,8 +9,9 @@ use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::_helpers::lifecycle::reads::list_runs_in;
 use crate::runs::main::{
-    change_run::change_run, claim_next_run::claim_next_run, list_runs::list_runs,
-    request_job_run::request_job_run, request_rerun::request_rerun,
+    execution::change_run::change_run, execution::claim_next_run::claim_next_run,
+    listings::list_runs::list_runs, requests::request_job_run::request_job_run,
+    requests::request_rerun::request_rerun,
 };
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, QueueWait, RerunRequest, RunAuthority, RunChange, RunChangeRequest,
@@ -21,7 +22,7 @@ use crate::runs::tests::helpers::snapshot;
 use crate::runs::tests::test_types::RetryChainTestCase;
 use crate::runs::types::RunsListing;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
 use crate::store::models::TransactionMode;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};

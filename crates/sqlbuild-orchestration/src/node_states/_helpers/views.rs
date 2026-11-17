@@ -149,7 +149,7 @@ fn changed_states(
 /// Mark the target changed and start its debounced refresh unless one is already pending.
 pub(crate) fn schedule_refresh(
     cache: &NodeStateCache,
-    refreshes: &mut tokio::task::JoinSet<()>,
+    refreshes: &mut tokio::task::JoinSet<Option<ControlError>>,
     ((location_id, target), entry): ((Uuid, String), Arc<TargetCache>),
 ) {
     entry.dirty.store(true, Ordering::SeqCst);
@@ -158,6 +158,7 @@ pub(crate) fn schedule_refresh(
     }
     let cache = cache.clone();
     refreshes.spawn(async move {
+        let mut failure: Option<ControlError> = None;
         loop {
             tokio::time::sleep(crate::node_states::constants::NODE_STATES_DEBOUNCE).await;
             entry.dirty.store(false, Ordering::SeqCst);
@@ -166,12 +167,12 @@ pub(crate) fn schedule_refresh(
                 if let Err(error) =
                     refresh_view(&cache, (location_id, &target), (&entry, true)).await
                 {
-                    eprintln!("Node states refresh failed; the next change retries: {error}");
+                    failure = Some(error);
                 }
             }
             entry.scheduled.store(false, Ordering::SeqCst);
             if !entry.dirty.load(Ordering::SeqCst) || entry.scheduled.swap(true, Ordering::SeqCst) {
-                return;
+                return failure;
             }
         }
     });

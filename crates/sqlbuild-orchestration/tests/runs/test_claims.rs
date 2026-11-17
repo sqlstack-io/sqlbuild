@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use crate::runs::main::claim_next_run::claim_next_run;
-use crate::runs::main::list_run_claims::list_run_claims;
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
+use crate::runs::main::listings::list_run_claims::list_run_claims;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::RunStatus;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;
 use uuid::Uuid;

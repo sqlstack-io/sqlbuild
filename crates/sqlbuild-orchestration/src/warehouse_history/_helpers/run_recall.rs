@@ -172,7 +172,7 @@ pub(crate) async fn run_events_in(
         .into_iter()
         .map(|mut row| {
             let payload = row.remove("member_payload").unwrap_or(Value::Null);
-            if let Some(message) = member_message(&payload) {
+            if let Some(message) = member_message(&payload)? {
                 row.insert("message".into(), Value::String(message));
             }
             decode_row(row)
@@ -182,12 +182,18 @@ pub(crate) async fn run_events_in(
 }
 
 /// The scheduler's summary of a member retry or recovery on its group run, from its own payload.
-fn member_message(payload: &Value) -> Option<String> {
+fn member_message(payload: &Value) -> Result<Option<String>, ControlError> {
     let payload: Value = match payload {
-        Value::String(text) => serde_json::from_str(text).ok()?,
-        Value::Null => return None,
+        Value::String(text) => serde_json::from_str(text)
+            .map_err(|error| ControlError::Invalid(format!("member event payload: {error}")))?,
+        Value::Null => return Ok(None),
         other => other.clone(),
     };
+    Ok(member_summary(&payload))
+}
+
+/// The summary a member retry or recovery payload names, when it names a member.
+fn member_summary(payload: &Value) -> Option<String> {
     let member = payload.get("member")?;
     let job_key = member.get("job_key")?.as_str()?;
     let attempt = member.get("attempt")?.as_u64()?;

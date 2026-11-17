@@ -16,12 +16,25 @@ pub const DEFAULT_SQLITE_STATE_HISTORY_VERSIONS: u16 = 5;
 pub const DEFAULT_POSTGRES_STATE_HISTORY_VERSIONS: u16 = 20;
 /// Mirrored state-history rows one pruning transaction deletes, so writers never wait long.
 pub(crate) const STATE_HISTORY_PRUNE_BATCH: usize = 500;
+/// Builds ranked past the limit within their node, in one state namespace; the newest always stays.
+pub(crate) const PRUNE_FINGERPRINTS_SQL: &str = "DELETE FROM sqb_warehouse_fingerprints WHERE event_id IN (SELECT event_id FROM \
+    (SELECT event_id, ROW_NUMBER() OVER (PARTITION BY location_id, target, state_database, state_schema, \
+    node_type, node_name, target_database, target_schema, target_name ORDER BY observed_at DESC, event_id DESC) \
+    AS version FROM sqb_warehouse_fingerprints) ranked WHERE version > $1 LIMIT $2) RETURNING definition_text_hash";
+
+/// Check results ranked past the limit within their check binding, in one state namespace.
+pub(crate) const PRUNE_AUDIT_RESULTS_SQL: &str = "DELETE FROM sqb_warehouse_audit_results WHERE event_id IN (SELECT event_id FROM \
+    (SELECT event_id, ROW_NUMBER() OVER (PARTITION BY location_id, target, state_database, state_schema, \
+    COALESCE(binding_key, audit_name) ORDER BY observed_at DESC, event_id DESC) AS version \
+    FROM sqb_warehouse_audit_results) ranked WHERE version > $1 LIMIT $2) RETURNING event_id";
 /// Free pages, as a share of the SQLite file, above which pruning returns the space to the disk.
 pub(crate) const SQLITE_RECLAIM_FREE_SHARE: f64 = 0.25;
 /// Free pages below this are not worth reclaiming, whatever their share.
 pub(crate) const SQLITE_RECLAIM_MIN_FREE_PAGES: i64 = 1024;
 /// Free pages one incremental vacuum step returns to the disk.
 pub(crate) const SQLITE_RECLAIM_STEP_PAGES: i64 = 4096;
+/// SQLite's `auto_vacuum` value for incremental mode.
+pub(crate) const SQLITE_AUTO_VACUUM_INCREMENTAL: i64 = 2;
 /// Column-lineage node definitions read per query, well under every backend's bound parameter limit.
 pub(crate) const LINEAGE_DEFINITION_BATCH: usize = 1000;
 /// Mirrored tables a plan preview needs synced cleanly; observations only refine it into knowns.

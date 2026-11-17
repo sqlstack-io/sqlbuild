@@ -11,7 +11,7 @@ use crate::runs::tests::helpers::pool_slots;
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::runs::tests::test_types::{PoolAmountTestCase, ProjectLimitTestCase};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;

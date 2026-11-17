@@ -8,9 +8,9 @@ use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::{
     begin_sensor_evaluation::begin_sensor_evaluation,
@@ -18,7 +18,7 @@ use crate::sensors::main::{
 };
 use crate::sensors::tests::helpers::snapshot;
 use crate::sensors::tests::test_types::SensorTestCase;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,

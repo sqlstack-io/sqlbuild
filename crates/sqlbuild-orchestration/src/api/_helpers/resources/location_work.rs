@@ -8,9 +8,9 @@ use crate::api::_helpers::authentication::bearer::require_location;
 use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::credentials::models::TokenIdentity;
-use crate::platform::main::claim_location_work::claim_location_work;
-use crate::platform::main::complete_location_work::complete_location_work;
-use crate::platform::main::location_work::location_work;
+use crate::platform::main::work::claim_location_work::claim_location_work;
+use crate::platform::main::work::complete_location_work::complete_location_work;
+use crate::platform::main::work::location_work::location_work;
 use crate::platform::models::{
     LocationWorkClaim, LocationWorkPoll, LocationWorkRecord, LocationWorkResult,
 };

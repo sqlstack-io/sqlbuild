@@ -8,8 +8,8 @@ use uuid::Uuid;
 use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
-    advance_groups::advance_groups, claim_next_run::claim_next_run, list_runs::list_runs,
-    request_job_run::request_job_run,
+    execution::advance_groups::advance_groups, execution::claim_next_run::claim_next_run,
+    listings::list_runs::list_runs, requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{JobRunRequest, NodeOutcome, RunOutcome, RunStatus};
 use crate::runs::tests::claim_helpers::{finish, member_reactions, publish_dependency_group};

@@ -35,7 +35,7 @@ use sqlbuild_orchestration::runs::models::RunChange;
 use sqlbuild_orchestration::runs::models::RunCommand;
 use sqlbuild_orchestration::runs::models::RunExecution;
 use sqlbuild_orchestration::runs::models::RunOutcome;
-use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
+use sqlbuild_orchestration::snapshots::main::publication::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::worker::errors::WorkerError;

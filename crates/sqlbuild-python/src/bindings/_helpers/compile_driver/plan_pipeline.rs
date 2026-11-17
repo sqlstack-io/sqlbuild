@@ -6,7 +6,7 @@ use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_planner::live_reads::models::LiveReads;
 use sqlbuild_python_planner::planner_phases::constants::COMPILING;
-use sqlbuild_python_planner::planner_phases::main::timed::timed;
+use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_warehouse::models::PlannerReads;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;

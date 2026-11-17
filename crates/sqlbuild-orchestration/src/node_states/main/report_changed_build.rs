@@ -8,7 +8,7 @@ use crate::node_states::models::{ChangedBuildNodes, ChangedBuildReport};
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
 use crate::store::models::{Change, ControlStore, Parameter};
-use crate::warehouse_metadata::_helpers::ingestion::begin_ingestion;
+use crate::warehouse_metadata::main::ingest::begin_ingestion::begin_ingestion;
 
 /// Only the registered reader of the current generation reports; each report replaces the target's last one.
 pub async fn report_changed_build(

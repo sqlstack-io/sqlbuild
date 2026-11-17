@@ -4,8 +4,8 @@ use uuid::Uuid;
 
 use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
-use crate::snapshots::main::read_current_record::read_current_record;
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_current_record::read_current_record;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::commit::commit;
 use crate::store::models::ControlStore;

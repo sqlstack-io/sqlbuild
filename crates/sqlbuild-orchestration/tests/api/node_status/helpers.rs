@@ -8,7 +8,7 @@ use sqlbuild_core::fingerprint_identity::main::recorded_model_local_hash::record
 
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::tests::helpers::{request, request_run, snapshot};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotInput;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::_helpers::statement_count::STATEMENTS;

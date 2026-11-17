@@ -7,18 +7,18 @@ use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use crate::node_states::models::{ChangedBuild, ChangedBuildNodes, NodeState, SnapshotCatalog};
-use crate::snapshots::main::read_current_record::read_current_record;
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_current_record::read_current_record;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::warehouse_history::main::read_node_check_counts::read_node_check_counts;
-use crate::warehouse_metadata::_helpers::catalog_nodes::{
-    catalog_node, last_outcome, latest_attempts,
+use crate::warehouse_metadata::main::node_reads::{
+    catalog_node::catalog_node, definition_evidences::definition_evidences,
+    destination::destination, last_outcome::last_outcome, latest_attempts::latest_attempts,
+    latest_fingerprints::latest_fingerprints,
 };
-use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprints;
-use crate::warehouse_metadata::_helpers::node_status::{definition_evidences, destination};
 use crate::warehouse_metadata::models::{CatalogNodeBuild, DefinitionEvidence, FingerprintQuery};
 
 /// The definition fields node states read: the name and destination of builds, and the planner identity.
@@ -158,7 +158,7 @@ async fn node_states(
             version_hash: record.version_hash,
         });
     }
-    let states = nodes
+    let states: BTreeMap<String, NodeState> = nodes
         .iter()
         .zip(builds.into_iter().zip(changed))
         .map(|((key, node), (last_build, definition_changed))| {

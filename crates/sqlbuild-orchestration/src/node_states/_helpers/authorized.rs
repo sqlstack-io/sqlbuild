@@ -8,7 +8,7 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::node_states::_helpers::views::current_view;
 use crate::node_states::models::{NodeStateCache, TargetView};
-use crate::snapshots::main::read_current_record::read_current_record;
+use crate::snapshots::main::reads::read_current_record::read_current_record;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::TransactionMode;

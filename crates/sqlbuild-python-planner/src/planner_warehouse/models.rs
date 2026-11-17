@@ -14,14 +14,14 @@ use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::connect;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::count_computation;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::package_version;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::sqlite_error;
-use crate::planner_warehouse::_helpers::synced_reads;
-use crate::planner_warehouse::_helpers::synced_reads::refused;
-use crate::planner_warehouse::_helpers::synced_reads::relation_columns;
-use crate::planner_warehouse::_helpers::synced_reads::relation_info;
+use crate::planner_warehouse::_helpers::synced::synced_reads;
+use crate::planner_warehouse::_helpers::synced::synced_reads::refused;
+use crate::planner_warehouse::_helpers::synced::synced_reads::relation_columns;
+use crate::planner_warehouse::_helpers::synced::synced_reads::relation_info;
 use crate::planner_warehouse::constants::CURSOR_INPUTS;
 use crate::planner_warehouse::constants::PREVIEW_MESSAGE;
 use crate::planner_warehouse::constants::PREVIEW_UNKNOWNS;
-use crate::planner_warehouse::main::unknown::unknown;
+use crate::planner_warehouse::main::reads::_unknown::unknown;
 use crate::planner_warehouse::types::CursorProgress;
 use crate::planner_warehouse::types::WarehouseReads;
 use chrono::SecondsFormat;
@@ -372,6 +372,7 @@ pub enum Read<T> {
 }
 
 /// Where to read the newest fingerprints of one state location, narrowed as a filtered read is.
+#[derive(Debug)]
 pub struct FingerprintRead<'a> {
     pub(crate) database: Option<String>,
     pub(crate) schema: &'a str,
@@ -383,6 +384,7 @@ pub struct FingerprintRead<'a> {
 }
 
 /// One target cursor `MAX` at or before the latest allowed start, for one model.
+#[derive(Debug)]
 pub struct EligibleCursorQuery {
     pub(crate) model_name: String,
     pub(crate) target: String,
@@ -392,6 +394,7 @@ pub struct EligibleCursorQuery {
 
 /// The warehouse reads one plan runs through.
 #[pyclass(frozen, module = "sqlbuild._native", name = "WarehouseReads")]
+#[derive(Debug)]
 pub struct PlannerReads {
     reads: Arc<dyn WarehouseReads>,
 }
@@ -428,6 +431,7 @@ impl ConsumptionReads for dyn WarehouseReads + '_ {
 }
 
 /// The reads of one plan preview over a synced state, and what the plan found unknown.
+#[derive(Debug)]
 pub struct SyncedReads {
     state: Arc<WarehouseState>,
     unknowns: Mutex<BTreeSet<String>>,

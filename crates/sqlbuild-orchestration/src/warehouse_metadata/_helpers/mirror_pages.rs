@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::authorization::models::CurrentSnapshotId;
 use crate::platform::constants::LOCATION_RETENTION_DAYS;
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::decompress::decompress;

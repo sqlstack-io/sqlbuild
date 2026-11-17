@@ -16,13 +16,13 @@ use crate::platform::constants::{
 use crate::platform::models::RetentionPolicies;
 use crate::runs::constants::{RUN_LOG_DIGEST_CHUNK, RUN_LOG_RETENTION_BATCH};
 use crate::runs::models::RunLogRetention;
-use crate::snapshots::main::prune_snapshots::prune_snapshots;
+use crate::snapshots::main::publication::prune_snapshots::prune_snapshots;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query, write::write};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::warehouse_metadata::constants::{
-    MAX_HISTORY_RECORDS, SQLITE_RECLAIM_FREE_SHARE, SQLITE_RECLAIM_MIN_FREE_PAGES,
-    SQLITE_RECLAIM_STEP_PAGES,
+    MAX_HISTORY_RECORDS, SQLITE_AUTO_VACUUM_INCREMENTAL, SQLITE_RECLAIM_FREE_SHARE,
+    SQLITE_RECLAIM_MIN_FREE_PAGES, SQLITE_RECLAIM_STEP_PAGES,
 };
 use crate::warehouse_metadata::main::ingest::prune_state_history::prune_state_history;
 use crate::warehouse_metadata::main::ingest::prune_statistics::prune_statistics;
@@ -260,7 +260,7 @@ pub(crate) async fn reclaim_sqlite_space(store: &ControlStore) -> Result<bool, C
         if free == 0 {
             return Ok(false);
         }
-        if pragma("auto_vacuum")? == 2 {
+        if pragma("auto_vacuum")? == SQLITE_AUTO_VACUUM_INCREMENTAL {
             let mut vacuum = connection.prepare(&format!(
                 "PRAGMA incremental_vacuum({SQLITE_RECLAIM_STEP_PAGES})"
             ))?;

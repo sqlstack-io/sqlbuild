@@ -8,9 +8,9 @@ use crate::planner_migrations::main::plan_old_name_views::plan_old_name_views as
 use crate::planner_migrations::models::ColumnMigrationInputs;
 use crate::planner_migrations::models::MigrationPhase;
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
 use crate::planner_phases::models::PlannerWarehouseState;
 use crate::planner_warehouse::main::inspection::warehouse_snapshot::warehouse_snapshot;

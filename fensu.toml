@@ -1680,11 +1680,11 @@ allowed_paths = [
 
 [targets.rust.rule_options.XSB079]
 allowed_paths = [
-    "crates/sqlbuild-python-planner/src/freshness/_helpers/planning.rs=A preview's refused freshness observation leaves the source unknown.",
-    "crates/sqlbuild-python/src/bindings/_helpers/native_host/registration.rs=Registers the preview's refusal error with Python.",
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=Only a location's plan preview plans through the synced reads and reports what they left unknown.",
-    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/synced_reads.rs=Answers the planner's warehouse reads from the synced state.",
-    "crates/sqlbuild-python-planner/src/planner_warehouse/errors.rs=Defines the preview's refusal error.",
+    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/synced/exception_types.rs=Defines the preview's refusal error.",
+    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/synced/synced_reads.rs=Answers the planner's warehouse reads from the synced state.",
+    "crates/sqlbuild-python-planner/src/planner_warehouse/main/reads/is_refused_access.rs=Tells a preview's refused read apart, so freshness planning leaves the source unknown.",
+    "crates/sqlbuild-python-planner/src/planner_warehouse/main/reads/register_exception_types.rs=Registers the preview's refusal error with Python.",
     "crates/sqlbuild-python-planner/src/planner_warehouse/models.rs=Defines the synced reads a plan preview plans through.",
 ]
 
@@ -2605,7 +2605,7 @@ pending_budgets = [
     "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/sources/source_deferral.rs=1",
     "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/sources/source_freshness.rs=5",
     "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/sources/source_tables.rs=1",
-    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/synced_reads.rs=1",
+    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/synced/synced_reads.rs=1",
     "crates/sqlbuild-python-planner/src/planner_warehouse/constants.rs=1",
     "crates/sqlbuild-python-planner/src/planner_warehouse/main/sources/source_freshness_unknown_warnings.rs=1",
     "crates/sqlbuild-python-planner/src/planner_warehouse/models.rs=9",

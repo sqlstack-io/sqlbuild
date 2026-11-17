@@ -8,8 +8,8 @@ use crate::api::_helpers::authentication::bearer::require_location;
 use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::credentials::models::TokenIdentity;
-use crate::platform::main::location_health::location_health;
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::location_health::location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{
     LocationHealthObservation, LocationHealthQuery, LocationHealthReport,
 };

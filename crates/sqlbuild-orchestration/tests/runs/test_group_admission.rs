@@ -5,12 +5,12 @@ use std::num::NonZeroU32;
 
 use crate::credentials::models::AuditContext;
 use crate::runs::main::{
-    advance_groups::advance_groups, claim_next_run::claim_next_run, list_runs::list_runs,
-    request_job_run::request_job_run,
+    execution::advance_groups::advance_groups, execution::claim_next_run::claim_next_run,
+    listings::list_runs::list_runs, requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{JobRunRequest, RunDispatch, RunStatus};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use serde_json::json;
 use uuid::Uuid;

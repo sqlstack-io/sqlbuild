@@ -1,8 +1,7 @@
 //! Public records of live warehouse reads.
 
-use crate::freshness::_helpers::state_io::read_latest;
+use crate::freshness::main::read_latest::read_latest;
 use crate::freshness::models::StateRead;
-use crate::live_reads::_helpers::bounded::bound_task;
 use crate::live_reads::_helpers::bounded::eligible_task;
 use crate::live_reads::_helpers::bounded::read_cursor_query;
 use crate::live_reads::_helpers::bounded::run_bounded;
@@ -12,6 +11,7 @@ use crate::live_reads::constants::EXECUTE;
 use crate::live_reads::constants::INSPECTION_CATALOG;
 use crate::live_reads::constants::RELATIONS_MAIN_COLUMNS;
 use crate::live_reads::constants::RELATIONS_MAIN_LIST;
+use crate::live_reads::main::bound_task::bound_task;
 use crate::observations::main::capture_source_columns::capture_source_columns;
 use crate::planner_warehouse::models::{EligibleCursorQuery, FingerprintRead, PlannerReads, Read};
 use crate::planner_warehouse::types::CursorProgress;
@@ -43,6 +43,7 @@ use sqlbuild_state::consumption::models::ConsumptionRow;
 use std::sync::Arc;
 
 /// The reads of one live plan: its adapter and planning connection, read only when asked.
+#[derive(Debug)]
 pub struct LiveReads {
     adapter: Py<PyAny>,
     connection: Py<PyAny>,

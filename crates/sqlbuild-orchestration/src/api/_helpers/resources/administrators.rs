@@ -22,7 +22,7 @@ use crate::platform::constants::{
     HEARTBEAT_RETENTION_DAYS, LOCATION_RETENTION_DAYS, PLATFORM_ALERT_RETENTION_DAYS,
     SENSOR_EVALUATION_RETENTION_DAYS,
 };
-use crate::platform::main::read_installation::read_installation;
+use crate::platform::main::installation::read_installation::read_installation;
 use crate::store::models::ControlStore;
 
 #[utoipa::path(post, path = "/api/admin/people/{principal_id}", operation_id = "changeAdministrator",

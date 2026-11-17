@@ -1,11 +1,11 @@
 //! Selected-scope buildability validation before change planning.
 
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
 use crate::planner_phases::constants::MISSING_UPSTREAM_CODE;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_warehouse::main::sources::check_selected_source_tables_exist::check_selected_source_tables_exist;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing_upstream_message;

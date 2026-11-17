@@ -254,8 +254,8 @@ pub(super) fn publish_location<'py>(
     if let Some(failure) = load_rules(py, arguments, (&project, &compiled))? {
         return Ok(Err(failure));
     }
-    add_connection(
-        &mut snapshot.input,
+    snapshot.input = add_connection(
+        snapshot.input,
         (&project, &arguments.value("selected_target")?),
     )?;
     let locations: BTreeSet<_> = snapshot

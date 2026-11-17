@@ -4,7 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 
 use crate::compiled_views::main::compiled_models::name_object::name_object;
-use crate::planner_strategy::_helpers::fixtures::fixture_context::planning_context;
+use crate::planner_strategy::main::planning_context::planning_context;
 use crate::planner_strategy::models::RelationFixturePlanningContext;
 use crate::sql_test_glue::_helpers::plan::plan_driver::planned as planned_tests;
 use crate::sql_test_glue::models::SqlTestAssembly;

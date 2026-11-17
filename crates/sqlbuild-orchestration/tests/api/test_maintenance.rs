@@ -9,10 +9,10 @@ use crate::api::tests::test_types::WarehouseMetadataTestCase;
 use crate::api::tests::warehouse_history_helpers::{
     batch, fixture, get, ids, login, records, seed_target, start_password_api,
 };
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest::{

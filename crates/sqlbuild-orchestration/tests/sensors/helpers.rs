@@ -7,8 +7,8 @@ use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::platform::models::PlatformEvent;
 use crate::runs::main::{
-    advance_groups::advance_groups, change_run::change_run, claim_next_run::claim_next_run,
-    request_job_run::request_job_run,
+    execution::advance_groups::advance_groups, execution::change_run::change_run,
+    execution::claim_next_run::claim_next_run, requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,

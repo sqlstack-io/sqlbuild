@@ -19,7 +19,7 @@ use crate::sensors::main::read_person_sensor::read_person_sensor;
 use crate::sensors::models::PersonSensorCursor;
 use crate::sensors::tests::helpers::{append_events, snapshot};
 use crate::sensors::tests::test_types::SensorTestCase;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::{begin::begin, commit::commit, query::query};

@@ -1,6 +1,6 @@
 //! Terminal facts exercise claim release through the public run lifecycle.
 
-use crate::runs::main::change_run::change_run;
+use crate::runs::main::execution::change_run::change_run;
 use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome};
 use crate::scheduler::models::SchedulerLease;
 use crate::store::models::ControlStore;

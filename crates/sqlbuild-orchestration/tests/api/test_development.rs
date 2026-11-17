@@ -13,7 +13,7 @@ use crate::declarations::main::{
 };
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest, TriggerStatus};
 use crate::snapshots::main::{
-    current_snapshot::current_snapshot, publish_snapshot::publish_snapshot,
+    publication::publish_snapshot::publish_snapshot, reads::current_snapshot::current_snapshot,
 };
 use crate::store::main::migrate_store::migrate_store;
 

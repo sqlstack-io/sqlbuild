@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::api::tests::changes_helpers::next_notice;
 use crate::credentials::tests::role_helpers::{SUPPORT_ROLE, orders_grant};
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};

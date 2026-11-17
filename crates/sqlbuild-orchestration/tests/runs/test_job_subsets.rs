@@ -10,12 +10,12 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::role_helpers::{
     SUPPORT_ROLE, credentials, orders_grant, role_fixture,
 };
-use crate::runs::main::change_run::change_run;
-use crate::runs::main::list_person_runs::list_person_runs;
-use crate::runs::main::list_runs::list_runs;
-use crate::runs::main::request_job_run::request_job_run;
-use crate::runs::main::request_person_run::request_person_run;
-use crate::runs::main::request_rerun::request_rerun;
+use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::listings::list_person_runs::list_person_runs;
+use crate::runs::main::listings::list_runs::list_runs;
+use crate::runs::main::requests::request_job_run::request_job_run;
+use crate::runs::main::requests::request_person_run::request_person_run;
+use crate::runs::main::requests::request_rerun::request_rerun;
 use crate::runs::models::{
     JobRunRequest, PersonRunRequest, RerunRequest, RunAuthority, RunChange, RunChangeRequest,
     RunKind, RunNarrowing, RunRequest,
@@ -25,7 +25,7 @@ use crate::runs::tests::test_types::{
     ExactKeyPlanner, JobSubsetTestCase, NamedRerunTestCase, NarrowingDenialTestCase,
 };
 use crate::runs::types::RunsListing;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::Parameter;

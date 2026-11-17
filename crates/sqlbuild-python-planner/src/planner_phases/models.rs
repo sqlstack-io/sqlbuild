@@ -1,7 +1,7 @@
 //! Public records of planner phases.
 
-use crate::planner_phases::_helpers::timings::STEPS;
-use crate::planner_phases::_helpers::timings::timings_of;
+use crate::planner_phases::_helpers::timing::timings::STEPS;
+use crate::planner_phases::_helpers::timing::timings::timings_of;
 use crate::planner_phases::constants::MILLISECONDS;
 use crate::planner_phases::constants::PERCENT;
 use crate::planner_warehouse::models::PlannerReads;
@@ -114,6 +114,7 @@ pub(crate) struct IdentityWork {
 }
 
 /// While held, this thread's planning steps are recorded for one plan command.
+#[derive(Debug)]
 pub struct PlanTimingScope {
     started: Instant,
     previous: Option<Vec<(&'static str, f64)>>,

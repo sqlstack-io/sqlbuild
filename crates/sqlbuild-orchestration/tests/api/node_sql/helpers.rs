@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::api::tests::person_sessions_helpers::request;
 use crate::api::tests::person_sessions_test_types::BrowserSession;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotInput;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, TransactionMode};

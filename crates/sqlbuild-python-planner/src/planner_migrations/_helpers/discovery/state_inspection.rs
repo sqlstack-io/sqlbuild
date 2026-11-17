@@ -1,7 +1,7 @@
 //! Read-only warehouse evidence gathered once for all model migrations in one plan.
 
 use crate::planner_migrations::models::MigrationStateInspection;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
+use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use std::collections::HashSet;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};

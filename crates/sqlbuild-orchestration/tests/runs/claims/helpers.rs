@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use crate::runs::main::change_run::change_run;
-use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::models::{
     NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome,
 };
@@ -172,7 +172,7 @@ pub(crate) async fn publish_dependency_group(
         "jobs": {"staging_job": [], "marts_job": ["staging_job"], "inventory_job": ["staging_job"]},
         "dependency_failure": dependency_failure
     }}));
-    crate::snapshots::main::publish_snapshot::publish_snapshot(store, &input)
+    crate::snapshots::main::publication::publish_snapshot::publish_snapshot(store, &input)
         .await
         .expect("publish");
 }
@@ -189,14 +189,17 @@ pub(crate) async fn member_reactions(
     use crate::runs::tests::test_types::MemberReaction;
     let mut reactions = std::collections::BTreeMap::new();
     for _ in 0..2 {
-        let Some(claim) =
-            crate::runs::main::claim_next_run::claim_next_run(store, lease, limits, Some(scope))
-                .await
-                .expect("claim dependent")
-        else {
+        let Some(claim) = crate::runs::main::execution::claim_next_run::claim_next_run(
+            store,
+            lease,
+            limits,
+            Some(scope),
+        )
+        .await
+        .expect("claim dependent") else {
             break;
         };
-        let execution = crate::runs::main::run_execution::run_execution(
+        let execution = crate::runs::main::execution::run_execution::run_execution(
             store,
             (claim.request.run_id, claim.claim_id),
         )
@@ -230,7 +233,7 @@ pub(crate) async fn member_reactions(
             MemberReaction::Runs(skipped),
         );
     }
-    let runs = crate::runs::main::list_runs::list_runs(store, scope, 100)
+    let runs = crate::runs::main::listings::list_runs::list_runs(store, scope, 100)
         .await
         .expect("runs");
     let unclaimed: Vec<&str> = ["marts_job", "inventory_job"]

@@ -1,6 +1,6 @@
 //! Old-name planner object conversions and existing native helper calls.
 
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_base::native_host::types::Syntax;
 

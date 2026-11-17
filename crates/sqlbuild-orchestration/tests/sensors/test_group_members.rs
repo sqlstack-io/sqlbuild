@@ -10,8 +10,9 @@ use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::runs::main::{
-    advance_groups::advance_groups, change_run::change_run, claim_next_run::claim_next_run,
-    list_runs::list_runs, request_job_run::request_job_run,
+    execution::advance_groups::advance_groups, execution::change_run::change_run,
+    execution::claim_next_run::claim_next_run, listings::list_runs::list_runs,
+    requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunChange, RunChangeRequest, RunOutcome, RunStatus,
@@ -22,7 +23,7 @@ use crate::sensors::tests::helpers::{evaluate_sensors, node_finished};
 use crate::sensors::tests::test_types::{
     GroupMemberSensorTestCase, SensorTestCase, SkippedMemberSensorTestCase,
 };
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;

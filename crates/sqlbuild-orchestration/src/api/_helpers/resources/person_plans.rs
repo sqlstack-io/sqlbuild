@@ -9,15 +9,15 @@ use uuid::Uuid;
 use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::credentials::models::{AuditContext, AuthenticatedPerson};
-use crate::platform::main::read_person_plan::read_person_plan;
-use crate::platform::main::read_person_plan_diff::read_person_plan_diff;
-use crate::platform::main::read_person_plan_rows::read_person_plan_rows;
-use crate::platform::main::read_person_plan_summary::read_person_plan_summary;
+use crate::platform::main::person_reads::read_person_plan::read_person_plan;
+use crate::platform::main::person_reads::read_person_plan_diff::read_person_plan_diff;
+use crate::platform::main::person_reads::read_person_plan_rows::read_person_plan_rows;
+use crate::platform::main::person_reads::read_person_plan_summary::read_person_plan_summary;
 use crate::platform::models::{
     LocationWorkRecord, PlanDiffQuery, PlanDiffRead, PlanRequest, PlanRows, PlanRowsQuery,
     PlanSummaryRead,
 };
-use crate::runs::main::request_person_run::request_person_run;
+use crate::runs::main::requests::request_person_run::request_person_run;
 use crate::runs::models::PersonRunRequest;
 use crate::runs::types::CommandPlanner;
 use crate::store::models::ControlStore;

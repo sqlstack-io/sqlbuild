@@ -5,14 +5,15 @@ use std::num::NonZeroU32;
 
 use crate::credentials::models::AuditContext;
 use crate::runs::main::{
-    advance_groups::advance_groups, change_run::change_run, claim_next_run::claim_next_run,
-    list_runs::list_runs, request_job_run::request_job_run, run_execution::run_execution,
+    execution::advance_groups::advance_groups, execution::change_run::change_run,
+    execution::claim_next_run::claim_next_run, execution::run_execution::run_execution,
+    listings::list_runs::list_runs, requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;
 use serde_json::json;

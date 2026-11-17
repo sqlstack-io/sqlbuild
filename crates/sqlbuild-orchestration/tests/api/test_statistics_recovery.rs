@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::api::tests::changes_helpers::reset_proxy;
 use crate::api::tests::helpers::{start_api, stop_api};
 use crate::api::tests::test_types::WorkerRedirectTestCase;
-use crate::platform::main::run_maintenance::run_maintenance;
+use crate::platform::main::installation::run_maintenance::run_maintenance;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::ControlStore;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};

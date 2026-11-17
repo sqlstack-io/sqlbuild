@@ -5,7 +5,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString};
 use serde_json::{Map, Value};
 use sqlbuild_orchestration::snapshots::constants::CONNECTION_DOCUMENT;
-use sqlbuild_orchestration::snapshots::main::connection_details::connection_details;
+use sqlbuild_orchestration::snapshots::main::reads::connection_details::connection_details;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
@@ -47,18 +47,18 @@ fn text_settings(
 
 /// Add the `connection` document; a connection that cannot be resolved here, such as one naming an unset secret, publishes none.
 pub(super) fn add_connection(
-    input: &mut SnapshotInput,
+    mut input: SnapshotInput,
     (project, selected_target): (&ProjectAdapter<'_>, &Bound<'_, PyAny>),
-) -> PyResult<()> {
+) -> PyResult<SnapshotInput> {
     let py: Python<'_> = selected_target.py();
     let settings = match text_settings(project, selected_target) {
         Ok(settings) => settings,
-        Err(error) if error.is_instance_of::<PyException>(py) => return Ok(()),
+        Err(error) if error.is_instance_of::<PyException>(py) => return Ok(input),
         Err(error) => return Err(error),
     };
     let adapter: String = field(&project.adapter, "adapter_name")?.str()?.extract()?;
     let details = serde_json::to_value(connection_details(&adapter, &settings))
         .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
     input.documents.insert(CONNECTION_DOCUMENT.into(), details);
-    Ok(())
+    Ok(input)
 }

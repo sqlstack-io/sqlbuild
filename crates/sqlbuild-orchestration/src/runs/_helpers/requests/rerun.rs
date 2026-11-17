@@ -11,7 +11,7 @@ use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionSc
 use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::models::{RerunRequest, RunCommand, RunKind, RunOrigin, RunRequest, RunStatus};
 use crate::snapshots::constants::SOURCE_KEY_PREFIX;
-use crate::snapshots::main::job_write_set::job_write_set;
+use crate::snapshots::main::write_sets::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};

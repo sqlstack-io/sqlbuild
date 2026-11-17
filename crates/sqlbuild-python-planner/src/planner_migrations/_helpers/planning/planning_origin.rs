@@ -2,7 +2,7 @@
 
 use crate::planner_migrations::constants::QUALIFIED_RELATION_MAX_PARTS;
 use crate::planner_migrations::models::ModelMigrationRequest;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::PyErr;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};

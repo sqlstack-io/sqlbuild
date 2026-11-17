@@ -1,13 +1,13 @@
 //! Top-level planner orchestration producing an execution plan.
 
-use crate::planner_phases::_helpers::timings::record;
 use crate::planner_phases::constants::ASSEMBLING;
 use crate::planner_phases::constants::BUILDING_ENTRIES;
 use crate::planner_phases::constants::DETECTING_CHANGES;
 use crate::planner_phases::constants::READING_WAREHOUSE;
 use crate::planner_phases::constants::SOURCE_FRESHNESS;
 use crate::planner_phases::constants::TEST_FIXTURES;
-use crate::planner_phases::main::timed::timed;
+use crate::planner_phases::main::timing::record_step::record_step;
+use crate::planner_phases::main::timing::timed::timed;
 use crate::planner_warehouse::models::PlannerReads;
 use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_python_base::native_host::models::Dialect;
@@ -171,7 +171,7 @@ pub(crate) fn planned_output<'py>(
     )?;
     let inspection_scope = class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?;
     let resolved_actions = resolve_model_actions(&inspection_scope, &changes)?;
-    record(DETECTING_CHANGES, changes_started.elapsed().as_secs_f64());
+    record_step(DETECTING_CHANGES, changes_started.elapsed().as_secs_f64());
     let source_freshness = timed(SOURCE_FRESHNESS, || {
         build_planner_source_freshness_result(
             (&project, &inspection_scope),
@@ -196,7 +196,7 @@ pub(crate) fn planned_output<'py>(
         (&inspection_scope, &reconciliation),
         &source_freshness,
     )?;
-    record(BUILDING_ENTRIES, entries_started.elapsed().as_secs_f64());
+    record_step(BUILDING_ENTRIES, entries_started.elapsed().as_secs_f64());
     let planned_sql_tests = timed(TEST_FIXTURES, || test_planning.result(py))?.into_bound(py);
     let assembling_started = Instant::now();
     let output = base_plan_output(
@@ -236,7 +236,7 @@ pub(crate) fn planned_output<'py>(
     let output =
         add_deferred_origin_notes(output, (&project, scopes), (&deferral, &origin_failures))?;
     let plan_output = add_plan_metadata(output, &source_freshness, &policies)?.build(py)?;
-    record(ASSEMBLING, assembling_started.elapsed().as_secs_f64());
+    record_step(ASSEMBLING, assembling_started.elapsed().as_secs_f64());
     let on_progress = args.value("on_progress")?;
     if !on_progress.is_none() {
         on_progress.call1((format!(

@@ -8,7 +8,8 @@ use crate::declarations::_helpers::job_detail::{
     Caps, DeclaredPools, ignores_audit_failures, pool_uses, run_concurrency,
 };
 use crate::declarations::models::{
-    JobRecord, PersonTriggerChange, PoolUse, StoredJob, TriggerChangeRequest, TriggerRecord,
+    JobRecord, PersonTriggerChange, PoolUse, ProviderRecord, StoredJob, TriggerChangeRequest,
+    TriggerRecord,
 };
 use crate::scheduler::models::TickRecord;
 use crate::store::errors::ControlError;
@@ -124,4 +125,27 @@ pub(crate) async fn latest_ticks_in(
          ORDER BY x.scheduled_for DESC LIMIT 1) \
          WHERE t.location_id=$1 AND t.target=$2 AND t.removed_in_snapshot_id IS NULL",
         vec![Parameter::Id(location_id), Parameter::Text(target.into())]).await
+}
+
+/// `provider` with the current jobs that select any of its nodes, and the nodes each selects.
+pub(crate) fn with_provider_jobs(
+    mut provider: ProviderRecord,
+    jobs: &[JobRecord],
+) -> ProviderRecord {
+    provider.jobs.clear();
+    provider.job_nodes.clear();
+    for job in jobs {
+        let selected: std::collections::BTreeSet<&String> = job.selection.iter().collect();
+        let matched: Vec<String> = provider
+            .nodes
+            .iter()
+            .filter(|key| selected.contains(key))
+            .cloned()
+            .collect();
+        if !matched.is_empty() {
+            provider.jobs.push(job.job_key.clone());
+            provider.job_nodes.insert(job.job_key.clone(), matched);
+        }
+    }
+    provider
 }

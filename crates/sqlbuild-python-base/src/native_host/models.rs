@@ -214,6 +214,7 @@ impl std::fmt::Debug for FamilyProjection {
 
 /// The adapter's SQL syntax for a plan; anything that would reach the warehouse is refused.
 #[pyclass(frozen, module = "sqlbuild._native", name = "Dialect")]
+#[derive(Debug)]
 pub struct Dialect {
     adapter: Py<PyAny>,
 }

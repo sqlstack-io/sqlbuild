@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::constants::SUPERSEDED_CHILD;
 use crate::runs::models::{GroupContext, GroupRun};
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
 use crate::store::models::{ControlTransaction, Parameter};

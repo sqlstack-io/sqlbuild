@@ -6,6 +6,7 @@ use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
+use crate::api::constants::ANY_ETAG;
 use crate::api::errors::ApiError;
 use crate::api::models::{
     CostQuery, PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, ServerFacts,
@@ -23,14 +24,14 @@ use crate::declarations::models::{
 use crate::node_states::main::list_person_catalog_nodes::list_person_catalog_nodes;
 use crate::node_states::main::read_person_node_states::read_person_node_states;
 use crate::node_states::models::{CachedJson, NodeStateCache, NodeStatesRecord};
-use crate::platform::main::list_person_platform_events::list_person_platform_events;
-use crate::platform::main::read_person_location_health::read_person_location_health;
-use crate::platform::main::read_person_mirrored_totals::read_person_mirrored_totals;
-use crate::platform::main::read_person_problems::read_person_problems;
+use crate::platform::main::health::read_person_location_health::read_person_location_health;
+use crate::platform::main::person_reads::list_person_platform_events::list_person_platform_events;
+use crate::platform::main::person_reads::read_person_mirrored_totals::read_person_mirrored_totals;
+use crate::platform::main::person_reads::read_person_problems::read_person_problems;
 use crate::platform::models::{
     LocationHealthObservation, MirroredTotal, PersonPlatformEventPage, PlatformProblems,
 };
-use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
+use crate::runs::main::listings::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::{
     NodeRunRecord, RunEventRecord, RunNodeFailure, RunNodeRecord, RunOutput, RunStatementRecord,
     RunStatementSql,
@@ -39,8 +40,9 @@ use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
 use crate::sensors::main::read_person_sensor::read_person_sensor;
 use crate::sensors::models::PersonSensorState;
-use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
+use crate::snapshots::main::reads::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;
+use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_history::main::read_person_cost_summary::read_person_cost_summary;
 use crate::warehouse_history::main::read_person_node_costs::read_person_node_costs;
@@ -101,7 +103,7 @@ pub(crate) async fn nodes(
         default_role,
     )
     .await?;
-    Ok(cached_json(listing, &headers))
+    cached_json(listing, &headers)
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/node-states", operation_id = "readPersonNodeStates",
@@ -122,20 +124,24 @@ pub(crate) async fn node_states(
         default_role,
     )
     .await?;
-    Ok(cached_json(states, &HeaderMap::new()))
+    cached_json(states, &HeaderMap::new())
 }
 
 /// A held JSON body, or 304 when the request already names its ETag.
-fn cached_json(json: CachedJson, headers: &HeaderMap) -> Response {
-    let etag = json.etag.and_then(|etag| HeaderValue::from_str(&etag).ok());
+fn cached_json(json: CachedJson, headers: &HeaderMap) -> Result<Response, ApiError> {
+    let etag: Option<HeaderValue> = json
+        .etag
+        .map(|etag| HeaderValue::from_str(&etag))
+        .transpose()
+        .map_err(|error| ControlError::Invalid(format!("node states ETag: {error}")))?;
     let unchanged = etag.as_ref().is_some_and(|etag| {
         headers
             .get_all(header::IF_NONE_MATCH)
             .iter()
-            .filter_map(|value| value.to_str().ok())
+            .filter_map(header_text)
             .flat_map(|value| value.split(','))
             .map(|tag| tag.trim().trim_start_matches("W/"))
-            .any(|tag| tag == "*" || etag.as_bytes() == tag.as_bytes())
+            .any(|tag| tag == ANY_ETAG || etag.as_bytes() == tag.as_bytes())
     });
     let mut response = if unchanged {
         StatusCode::NOT_MODIFIED.into_response()
@@ -152,7 +158,15 @@ fn cached_json(json: CachedJson, headers: &HeaderMap) -> Response {
     if let Some(etag) = etag {
         response.headers_mut().insert(header::ETAG, etag);
     }
-    response
+    Ok(response)
+}
+
+/// A request header's text; non-ASCII bytes cannot name an ETag this server issued.
+fn header_text(value: &HeaderValue) -> Option<&str> {
+    match value.to_str() {
+        Ok(text) => Some(text),
+        Err(header::ToStrError { .. }) => None,
+    }
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs", operation_id = "listPersonNodeRuns",

@@ -39,8 +39,11 @@ use crate::store::models::{ChangeMessage, ChangeTopic, ControlStore, Transaction
         (status = 403, description = "Location not authorized")), security(("bearer" = [])))]
 pub(crate) async fn subscribe(
     State(store): State<ControlStore>,
-    (Extension(identity), Extension(feed)): (Extension<TokenIdentity>, Extension<ChangeFeed>),
-    Extension(cache): Extension<NodeStateCache>,
+    (Extension(identity), Extension(feed), Extension(cache)): (
+        Extension<TokenIdentity>,
+        Extension<ChangeFeed>,
+        Extension<NodeStateCache>,
+    ),
     Path((location_id, target)): Path<(Uuid, String)>,
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, ControlError>>>, ApiError> {

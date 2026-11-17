@@ -4,9 +4,9 @@ use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
-use crate::platform::main::_read_target_work::read_target_work;
+use crate::platform::main::work::_read_target_work::read_target_work;
 use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkRecord};
-use crate::snapshots::main::holds_on_current_nodes::holds_on_current_nodes;
+use crate::snapshots::main::write_sets::holds_on_current_nodes::holds_on_current_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};

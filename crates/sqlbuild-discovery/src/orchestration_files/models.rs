@@ -41,12 +41,11 @@ pub struct Deprecation {
     pub position: FilePosition,
 }
 
-/// When a group member starts: once the jobs it reads from end (`job`), or node by node (`node`).
+/// When a group member starts: once the jobs it reads from end (`job`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum WaitFor {
     #[default]
     Job,
-    Node,
 }
 
 /// What a group member does when a job it depends on failed.

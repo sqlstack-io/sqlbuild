@@ -8,8 +8,8 @@ use tokio::sync::oneshot;
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
-use crate::runs::_helpers::publications::cached;
-use crate::runs::main::check_adhoc_run::check_adhoc_run;
+use crate::runs::_helpers::lifecycle::publications::cached;
+use crate::runs::main::requests::check_adhoc_run::check_adhoc_run;
 use crate::runs::models::{AdhocCheckRequest, SnapshotSlots};
 use crate::runs::tests::helpers::{
     adhoc_fixture, cache_id, cache_lookup, check_projection, snapshot,
@@ -18,7 +18,7 @@ use crate::runs::tests::test_types::{
     CacheLookupTestCase, ConcurrentLookupTestCase, ExactKeyPlanner, FailedBuildTestCase,
     NewerPublicationTestCase,
 };
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;

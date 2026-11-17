@@ -4,9 +4,9 @@ use crate::planner_entries::main::entries::default_microbatch_limit_action::defa
 use crate::planner_entries::main::entries::plan_entries::plan_entries;
 use crate::planner_entries::models::PlanEntriesRequest;
 use crate::planner_entries::models::PlanEntryBuildInputs;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::models::ChangeReconciliation;
 use crate::planner_phases::models::ModelEntryResults;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};

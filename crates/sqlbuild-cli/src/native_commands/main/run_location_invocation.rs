@@ -4,7 +4,7 @@ use std::path::Path;
 
 use chrono::Utc;
 use serde_json::json;
-use sqlbuild_orchestration::platform::main::connect_location_work::connect_location_work;
+use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::LocationState;
 use uuid::Uuid;
 

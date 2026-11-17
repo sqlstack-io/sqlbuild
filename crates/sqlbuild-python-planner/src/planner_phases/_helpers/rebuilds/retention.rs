@@ -1,12 +1,11 @@
 //! Warehouse-aware time-travel retention and Snowflake table-type planning.
 
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::rebuilds::effective_target_config::effective_target_config;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
 use crate::planner_phases::constants::BIGQUERY_ADAPTER;
 use crate::planner_phases::constants::DECREASE_WARNING;
 use crate::planner_phases::constants::DOWNGRADE_HISTORY_DAYS;
@@ -16,6 +15,7 @@ use crate::planner_phases::constants::RETENTION_INCREASE;
 use crate::planner_phases::constants::RETENTION_MATCH;
 use crate::planner_phases::constants::SNOWFLAKE_ADAPTER;
 use crate::planner_phases::constants::TRANSIENT_TABLE_TYPE;
+use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_warehouse::models::Read;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};

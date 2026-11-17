@@ -5,7 +5,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use sqlbuild_cache::project_snapshot::models::PathStamp;
-use sqlbuild_orchestration::platform::main::connect_location_work::connect_location_work;
+use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::{
     ConnectionCheckTrigger, LocationWorkClient, LocationWorkPoll,
 };

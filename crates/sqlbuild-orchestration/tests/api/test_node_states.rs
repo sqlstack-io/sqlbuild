@@ -18,9 +18,9 @@ use crate::node_states::_helpers::views::{current_view, refresh_view, target_cac
 use crate::node_states::main::report_changed_build::report_changed_build;
 use crate::node_states::main::start_node_states::start_node_states;
 use crate::node_states::models::ChangedBuildReport;
-use crate::runs::main::request_job_run::request_job_run;
+use crate::runs::main::requests::request_job_run::request_job_run;
 use crate::runs::models::JobRunRequest;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
