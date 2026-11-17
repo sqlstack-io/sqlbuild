@@ -3,7 +3,7 @@
 use std::cell::Cell;
 
 use pyo3::exceptions::PyKeyboardInterrupt;
-use pyo3::prelude::{PyResult, Python};
+use pyo3::prelude::{Py, PyAny, PyAnyMethods, PyModule, PyResult, Python};
 
 thread_local! {
     pub(crate) static INTERRUPTED: Cell<bool> = const { Cell::new(false) };
@@ -20,6 +20,22 @@ pub(crate) fn check_signals(py: Python<'_>) -> PyResult<()> {
     py.check_signals()?;
     if interrupted() {
         return Err(PyKeyboardInterrupt::new_err(()));
+    }
+    Ok(())
+}
+
+/// Put `signal`'s previous Python handler back, unless something replaced `installed` meanwhile. Fails when a pending handler raised first, as `signal.signal` runs pending handlers before it changes one.
+pub(crate) fn restore_signal_handler(
+    py: Python<'_>,
+    signal: i64,
+    (installed, previous): (&Py<PyAny>, &Py<PyAny>),
+) -> PyResult<()> {
+    let module: pyo3::Bound<'_, PyModule> = py.import("signal")?;
+    if module
+        .call_method1("getsignal", (signal,))?
+        .is(installed.bind(py))
+    {
+        module.call_method1("signal", (signal, previous.bind(py)))?;
     }
     Ok(())
 }

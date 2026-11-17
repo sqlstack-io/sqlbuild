@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -9,6 +10,7 @@ import pytest
 from sqlbuild._native import COMPILE_REUSE_DISABLE_ENV_VAR as REUSE_DISABLE_ENV_VAR
 from tests.integration.src.sqlbuild.cli.recall._test_types import (
     FailingReplacementTestCase,
+    InterruptedSinkTestCase,
     ReplacementLaunchRecordTestCase,
     ReplacementLifecycleTestCase,
     ReplacementOutputTestCase,
@@ -224,17 +226,17 @@ def test_given_a_lifecycle_sink_slower_than_the_budget_when_building_then_nothin
 @pytest.mark.parametrize(
     "test_case",
     [
-        SlowReplacementTestCase(
+        InterruptedSinkTestCase(
             description="Ctrl-C stops the build while the sink sleeps",
             shutdown_seconds=1.0,
             sink_sleep_seconds="30",
-            expected_max_seconds=10.0,
+            expected_exit_code=-signal.SIGINT,
         ),
     ],
     ids=lambda case: case.description,
 )
 def test_given_a_slow_lifecycle_sink_when_interrupted_then_the_build_stops(
-    test_case: SlowReplacementTestCase, tmp_path: Path
+    test_case: InterruptedSinkTestCase, tmp_path: Path
 ) -> None:
     budget: str = f'\n[recall]\nshutdown_timeout = "{int(test_case.shutdown_seconds * 1000)}ms"\n'
     project_dir: Path = write_sinks(
@@ -242,14 +244,14 @@ def test_given_a_slow_lifecycle_sink_when_interrupted_then_the_build_stops(
         {"recall_events": SLOW_LIFECYCLE_SINK, "event_log": EVENT_LOG_SINK},
     )
 
-    exit_code, stopped_after = interrupted_build(
+    exit_code: int | None = interrupted_build(
         project_dir,
         ORDERS_SINK_SLEEP_SECONDS=test_case.sink_sleep_seconds,
         ORDERS_TASK_SLEEP_SECONDS="60",
     )
 
-    assert exit_code not in (None, 0)
-    assert stopped_after < test_case.expected_max_seconds
+    assert exit_code is not None, "the interrupted build hung"
+    assert exit_code == test_case.expected_exit_code
 
 
 if __name__ == "__main__":

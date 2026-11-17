@@ -1,6 +1,9 @@
+import signal
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+
+from tests.integration.src.sqlbuild.cli.recall.helpers import PYTHON_CLI
 
 
 @dataclass(frozen=True)
@@ -199,6 +202,14 @@ class SlowReplacementTestCase:
 
 
 @dataclass(frozen=True)
+class InterruptedSinkTestCase:
+    description: str
+    shutdown_seconds: float
+    sink_sleep_seconds: str
+    expected_exit_code: int
+
+
+@dataclass(frozen=True)
 class ThirdPartyLogTestCase:
     description: str
     build_arguments: tuple[str, ...]
@@ -369,6 +380,9 @@ class TerminatedCommandTestCase:
     environment: dict[str, str]
     wait_sql: str
     expected_output: bytes
+    unfinished_output: bytes
+    interrupts: signal.Handlers = signal.SIG_DFL
+    program: Path = PYTHON_CLI
 
 
 @dataclass(frozen=True)
