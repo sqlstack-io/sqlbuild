@@ -1684,3 +1684,15 @@ class PreservedTargetRefusalE2ETestCase:
     description: str
     python_files: dict[str, str]
     expected_error: str
+
+
+@dataclass(frozen=True)
+class AdapterDefaultResultsFallbackE2ETestCase:
+    """Results left in the adapter default by an earlier build, and the loader rebuilt after it."""
+
+    description: str
+    target_schema: str
+    rebuilt_loader: str
+    kept_loader: str
+    reading_task: str
+    expected_payload_keys: tuple[str, str]

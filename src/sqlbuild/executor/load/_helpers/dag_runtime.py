@@ -191,6 +191,7 @@ def _execute_ready_dag_source(
             connection=connection,
             database=runtime.default_database,
             schema=runtime.default_schema,
+            target_config=runtime.target_config,
         )
     return execute_source_load(
         source_entry=source,

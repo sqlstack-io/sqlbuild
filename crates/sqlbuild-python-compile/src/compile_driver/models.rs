@@ -1,5 +1,6 @@
 //! Public records of compile driver.
 
+use crate::compile_driver::_helpers::setup::model_free_locations::model_free_locations;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -81,6 +82,22 @@ impl TargetSettingsValues {
     #[must_use]
     pub fn loader_schema(&self) -> Option<&str> {
         self.loader_schema.as_deref()
+    }
+
+    /// Python nodes' `(database, schema)` under these settings, as `model_free_locations` picks.
+    pub fn node_locations<'py>(
+        &self,
+        adapter: &Bound<'py, PyAny>,
+    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+        let py: Python<'py> = adapter.py();
+        model_free_locations(
+            (
+                self.database.as_deref().into_bound_py_any(py)?,
+                self.schema.as_deref().into_bound_py_any(py)?,
+            ),
+            self.loader_schema(),
+            adapter,
+        )
     }
 
     /// The `TargetSettings` record: a `preserve` location reads `None` with its flag set.

@@ -18,6 +18,7 @@ from tests.unit.src.sqlbuild.executor.build._helpers._test_types import (
     BuildSourceNodeResultLocationTestCase,
 )
 from tests.unit.src.sqlbuild.executor.build._helpers.helpers import (
+    NoDefaultSchemaDuckDbAdapter,
     build_discovered_source_loader,
     build_source_load_plan_output,
 )
@@ -89,25 +90,18 @@ def test_given_build_source_node_when_executing_then_runs_loader_runtime(
     assert start_events == [test_case.expected_start_event]
 
 
-class _NoDefaultSchemaAdapter(DuckDbAdapter):
-    """A DuckDB adapter that, like Snowflake, has no default schema."""
-
-    def default_schema(self) -> str | None:
-        return None
-
-
 @pytest.mark.parametrize(
     "test_case",
     [
         BuildSourceNodeResultLocationTestCase(
             description="an adapter without a default schema still records the result",
-            adapter_default_schema=None,
+            adapter_class=NoDefaultSchemaDuckDbAdapter,
             runtime_schema="analytics",
             expected_result_schemas=("analytics",),
         ),
         BuildSourceNodeResultLocationTestCase(
             description="the runtime location wins over the adapter default schema",
-            adapter_default_schema="main",
+            adapter_class=DuckDbAdapter,
             runtime_schema="analytics",
             expected_result_schemas=("analytics",),
         ),
@@ -118,9 +112,7 @@ def test_given_runtime_location_when_executing_source_node_then_result_is_writte
     test_case: BuildSourceNodeResultLocationTestCase,
     tmp_path: Path,
 ) -> None:
-    adapter: DuckDbAdapter = (
-        DuckDbAdapter() if test_case.adapter_default_schema else _NoDefaultSchemaAdapter()
-    )
+    adapter: DuckDbAdapter = test_case.adapter_class()
     connection: object = adapter.connect({"database": str(tmp_path / "source_node.duckdb")})
     try:
         result: LoadExecutionResult = execute_build_source_node(

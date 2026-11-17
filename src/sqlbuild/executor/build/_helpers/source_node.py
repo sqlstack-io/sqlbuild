@@ -62,6 +62,7 @@ def execute_build_source_node(
         connection=connection,
         database=runtime.default_database,
         schema=runtime.default_schema,
+        target_config=runtime.target_config,
     )
     result: LoadExecutionResult = execute_source_load(
         source_entry=source_entry,

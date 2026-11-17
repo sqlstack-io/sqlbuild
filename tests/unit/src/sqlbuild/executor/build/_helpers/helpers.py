@@ -24,6 +24,7 @@ from sqlbuild._native import (
     SourceWriteStrategy,
 )
 from sqlbuild.adapter.contract.classes.retention_adapter import RetentionAdapterMixin
+from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.auditing.types import (
     AuditAttachmentKind,
     AuditOutcome,
@@ -213,3 +214,10 @@ def build_model_key_edges(
     for name, children in edges.items():
         key_edges[model_key(name)] = tuple(model_key(child) for child in children)
     return key_edges
+
+
+class NoDefaultSchemaDuckDbAdapter(DuckDbAdapter):
+    """A DuckDB adapter that, like Snowflake, has no default schema."""
+
+    def default_schema(self) -> str | None:
+        return None

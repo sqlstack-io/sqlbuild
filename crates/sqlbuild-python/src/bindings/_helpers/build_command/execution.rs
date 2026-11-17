@@ -43,7 +43,6 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
-use sqlbuild_python_compile::compile_driver::main::setup::project_model_free_locations::project_model_free_locations;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::cost_context::models::CostContext;
@@ -340,8 +339,7 @@ pub(crate) fn execute_build_plan<'py>(
         &project,
         (&connection_config, &adapter),
     )?;
-    let (default_database, default_schema) =
-        project_model_free_locations(&project, target_config.loader_schema(), &adapter)?;
+    let (default_database, default_schema) = target_config.node_locations(&adapter)?;
     let runtime: Bound<'py, PyAny> = call_with(
         &host_entry(py, ExecutorHost::BuildRuntimeParams)?,
         &[
@@ -641,8 +639,7 @@ fn check_runtime<'py>(
         &project,
         (&context.get("connection_config")?, &adapter),
     )?;
-    let (default_database, default_schema) =
-        project_model_free_locations(&project, target_config.loader_schema(), &adapter)?;
+    let (default_database, default_schema) = target_config.node_locations(&adapter)?;
     call_with(
         &host_entry(py, ExecutorHost::PythonNodeRuntime)?,
         &[

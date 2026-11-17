@@ -28,7 +28,6 @@ use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_key
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
-use sqlbuild_python_compile::compile_driver::main::setup::project_model_free_locations::project_model_free_locations;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
@@ -439,7 +438,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         connection_config: &connection_config,
         project: &project,
         reload: context.request_flag("reload_sources")?,
-        defaults: project_model_free_locations(&project, target_config.loader_schema(), &adapter)?,
+        defaults: target_config.node_locations(&adapter)?,
         target_config,
         relations: (relation_targets, project_relations),
         inputs,

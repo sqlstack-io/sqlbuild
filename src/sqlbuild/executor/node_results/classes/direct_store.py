@@ -27,11 +27,11 @@ class DirectNodeResultStore(NodeResultStore):
         connection: Any,
         database: str | None,
         schema: str | None,
-        previous_location: tuple[str | None, str | None] | None = None,
+        previous_locations: tuple[tuple[str | None, str | None], ...] = (),
     ) -> None:
         self.adapter: BaseAdapter = adapter
         self.connection: Any = connection
-        self.previous_location: tuple[str | None, str | None] | None = previous_location
+        self.previous_locations: tuple[tuple[str | None, str | None], ...] = previous_locations
         super().__init__(database=database, schema=schema)
 
     def write(self, record: NodeResultRecord) -> None:
@@ -57,19 +57,22 @@ class DirectNodeResultStore(NodeResultStore):
         self._cache_record(record=record)
 
     def _read_persisted(self, *, query: NodeResultQuery) -> tuple[NodeResultEnvelope, ...]:
+        """Read this store's location, then each earlier location until one has the node."""
+
         results: tuple[NodeResultEnvelope, ...] = self._read_at(
             database=self.database, schema=self.schema, query=query
         )
-        if results or self.previous_location is None:
-            return results
-        # Results written before this release's location move: read them for one release only,
-        # and remove this fallback with the control-store migrations.
-        database, schema = self.previous_location
-        return self._read_at(
-            database=database,
-            schema=schema,
-            query=replace(query, target_database=database, target_schema=schema),
-        )
+        location: tuple[str | None, str | None]
+        for location in self.previous_locations:
+            if results:
+                break
+            database, schema = location
+            results = self._read_at(
+                database=database,
+                schema=schema,
+                query=replace(query, target_database=database, target_schema=schema),
+            )
+        return results
 
     def _read_at(
         self, *, database: str | None, schema: str | None, query: NodeResultQuery

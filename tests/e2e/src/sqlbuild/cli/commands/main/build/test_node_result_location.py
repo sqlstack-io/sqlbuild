@@ -10,8 +10,14 @@ from pathlib import Path
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
+    AdapterDefaultResultsFallbackE2ETestCase,
     PreservedTargetNodeResultsE2ETestCase,
     PreservedTargetRefusalE2ETestCase,
+)
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
+    node_result_project,
+    node_result_source_yml,
+    node_results_in,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
@@ -19,6 +25,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
 )
 
+_EDGE_CASES: Path = Path("benchmarks/duckshop/edge_cases/loaders")
 _LOADER: str = (
     "from sqlbuild.loaders import loader\n\n\n@loader\n"
     "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
@@ -31,33 +38,22 @@ _TASK: str = (
     '    """Announce the loaded orders."""\n'
     "    return ctx.result(payload={'announced': True})\n"
 )
-
-
-def _source_yml(location: str) -> str:
-    return (
-        "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
-        f"    managed: true\n{location}    write_strategy: table\n"
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
-    )
-
-
-def _project(*, tmp_path: Path, target_lines: str, files: dict[str, str]) -> Path:
-    return prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="orders",
-        repo_files={
-            "sqlbuild_project.toml": (
-                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
-                '[connection]\ndatabase = "dev.duckdb"\n\n'
-                f'[defaults]\ndatabase = "dev"\nschema = "mart"\n\n[targets.dev]\n{target_lines}'
-            ),
-            "models/orders.sql": (
-                "MODEL (description 'Orders.', materialized table);\n\n"
-                'SELECT order_id FROM __source("raw_orders")\n'
-            ),
-        }
-        | files,
-    )
+_CHECK: str = (
+    "from python.tasks.announce import announce_orders\nfrom sqlbuild.checks import check\n\n\n"
+    "@check(depends_on=announce_orders)\n"
+    "def check_orders_announced(ctx):\n"
+    '    """The task announced the orders."""\n'
+    "    announced = ctx.result_of(node_function=announce_orders).payload['announced']\n"
+    "    return ctx.pass_(message='announced') if announced else ctx.fail(message='silent')\n"
+)
+_COPYING_LOADER: str = (
+    "from python.loaders.orders import raw_orders\nfrom sqlbuild.loaders import loader\n\n\n"
+    "@loader\n"
+    "def raw_order_copies(ctx) -> list[dict[str, object]]:\n"
+    '    """One order when the orders loader has a result to read, none otherwise."""\n'
+    "    found = ctx.result_of(node_function=raw_orders, default=None) is not None\n"
+    "    return [{'order_id': 1}] if found else []\n"
+)
 
 
 @pytest.mark.parametrize(
@@ -83,18 +79,28 @@ def _project(*, tmp_path: Path, target_lines: str, files: dict[str, str]) -> Pat
 def test_given_preserved_target_when_building_twice_then_node_results_stay_in_one_real_location(
     test_case: PreservedTargetNodeResultsE2ETestCase, tmp_path: Path
 ) -> None:
-    project_dir: Path = _project(
+    project_dir: Path = node_result_project(
         tmp_path=tmp_path,
         target_lines=test_case.target_lines,
         files={
-            "sources/raw.yml": _source_yml(test_case.source_location),
+            "sources/raw.yml": node_result_source_yml(test_case.source_location),
+            "sources/copies.yml": node_result_source_yml(test_case.source_location).replace(
+                "raw_orders", "raw_order_copies"
+            ),
             "python/loaders/orders.py": _LOADER,
+            "python/loaders/copies.py": _COPYING_LOADER,
             "python/tasks/announce.py": _TASK,
+            "python/checks/orders.py": _CHECK,
         },
     )
 
     results: list[subprocess.CompletedProcess[str]] = [
         run_sqb(command=("--no-color", "build"), project_dir=project_dir) for _ in range(2)
+    ] + [
+        run_sqb(
+            command=("--no-color", "load", "--select", "raw_order_copies"),
+            project_dir=project_dir,
+        )
     ]
 
     for result in results:
@@ -125,9 +131,12 @@ def test_given_preserved_target_when_building_twice_then_node_results_stay_in_on
             "GROUP BY ALL ORDER BY ALL"
         ),
     ) == [
+        ("check", "check_orders_announced", test_case.expected_runs_per_node),
+        ("loader", "raw_order_copies", test_case.expected_runs_per_node),
         ("loader", "raw_orders", test_case.expected_runs_per_node),
         ("task", "announce_orders", test_case.expected_runs_per_node),
     ]
+    assert query_duckdb(db_path=db_path, sql="SELECT order_id FROM raw.raw_order_copies") == [(1,)]
 
 
 @pytest.mark.parametrize(
@@ -168,21 +177,22 @@ def test_given_preserved_schema_without_loader_schema_when_compiling_then_python
     assert test_case.expected_error in result.stderr
 
 
-_EDGE_CASES: Path = Path("benchmarks/duckshop/edge_cases/loaders")
-
-
-def _results(*, db_path: Path, schema: str, node_type: str) -> list[tuple[str, str, str]]:
-    return query_duckdb(
-        db_path=db_path,
-        sql=(
-            f"SELECT node_name, run_id, payload_json_b64 FROM {schema}._sqlbuild_node_results "
-            f"WHERE node_type = '{node_type}' ORDER BY node_name"
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AdapterDefaultResultsFallbackE2ETestCase(
+            description="a task reads a rebuilt loader and one whose result is only in main",
+            target_schema="mart",
+            rebuilt_loader="raw_order_events",
+            kept_loader="raw_customer_events",
+            reading_task="announce_events",
+            expected_payload_keys=("orders", "customers"),
         ),
-    )
-
-
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_results_in_the_adapter_default_when_one_loader_rebuilds_then_both_are_still_read(
-    tmp_path: Path,
+    test_case: AdapterDefaultResultsFallbackE2ETestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
@@ -202,28 +212,45 @@ def test_given_results_in_the_adapter_default_when_one_loader_rebuilds_then_both
     )
     assert first.returncode == 0, first.stdout + first.stderr
     old_runs: dict[str, str] = {
-        name: run for name, run, _ in _results(db_path=db_path, schema="main", node_type="loader")
+        name: run
+        for name, run, _ in node_results_in(db_path=db_path, schema="main", node_type="loader")
     }
     toml: Path = project_dir / "sqlbuild_project.toml"
-    toml.write_text(toml.read_text(encoding="utf-8") + 'schema = "mart"\n', encoding="utf-8")
+    toml.write_text(
+        toml.read_text(encoding="utf-8") + f'schema = "{test_case.target_schema}"\n',
+        encoding="utf-8",
+    )
 
     second: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "build", "--select", "raw_order_events", "announce_events"),
+        command=(
+            "--no-color",
+            "build",
+            "--select",
+            test_case.rebuilt_loader,
+            test_case.reading_task,
+        ),
         project_dir=project_dir,
     )
 
     assert second.returncode == 0, second.stdout + second.stderr
     new_runs: dict[str, str] = {
-        name: run for name, run, _ in _results(db_path=db_path, schema="mart", node_type="loader")
+        name: run
+        for name, run, _ in node_results_in(
+            db_path=db_path, schema=test_case.target_schema, node_type="loader"
+        )
     }
-    assert set(new_runs) == {"raw_order_events"}
-    assert new_runs["raw_order_events"] != old_runs["raw_order_events"]
-    [(_, task_run, payload)] = _results(db_path=db_path, schema="mart", node_type="task")
-    assert task_run == new_runs["raw_order_events"]
+    assert set(new_runs) == {test_case.rebuilt_loader}
+    assert new_runs[test_case.rebuilt_loader] != old_runs[test_case.rebuilt_loader]
+    [(_, task_run, payload)] = node_results_in(
+        db_path=db_path, schema=test_case.target_schema, node_type="task"
+    )
+    assert task_run == new_runs[test_case.rebuilt_loader]
+    rebuilt_key, kept_key = test_case.expected_payload_keys
     assert json.loads(base64.b64decode(payload)) == {
-        "orders": new_runs["raw_order_events"],
-        "customers": old_runs["raw_customer_events"],
+        rebuilt_key: new_runs[test_case.rebuilt_loader],
+        kept_key: old_runs[test_case.kept_loader],
     }
     assert {
-        name: run for name, run, _ in _results(db_path=db_path, schema="main", node_type="loader")
+        name: run
+        for name, run, _ in node_results_in(db_path=db_path, schema="main", node_type="loader")
     } == old_runs

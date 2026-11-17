@@ -99,6 +99,7 @@ def execute_ingress_python_loader_nodes(
                 connection=runtime.connection,
                 database=runtime.default_database,
                 schema=runtime.default_schema,
+                target_config=runtime.target_config,
             )
             if runtime.persist_node_results
             else None
