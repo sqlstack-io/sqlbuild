@@ -68,7 +68,7 @@ executable = "/usr/local/bin/sqb"
 | `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`) |
 | `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`; see [Set retention](#set-retention) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
-| `[trusted_proxy]` | `origin`, `trusted_peers`, and optionally `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
+| `[trusted_proxy]` | `origin`, and optionally `trusted_peers` (`127.0.0.1` and `::1`), `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
 | `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
 | `[[launchers.local]]` | `location`, `target`, `server_url`, `max_workers`, absolute `project_dir` and `executable` paths, and an optional `pool_caps` table |
 
@@ -102,16 +102,16 @@ Connections to `localhost`, `127.0.0.1` or `::1` print no warning.
 
 A reverse proxy such as Apache or nginx can sign people in and tell the server who they are in a
 request header. The server trusts that header only on requests whose socket peer is listed in
-`trusted_peers`, so it never trusts a header that a browser sends straight to the server:
+`trusted_peers`, so it never trusts a header that a browser sends straight to the server. With the
+proxy on the same host, bind the server to loopback so that only local processes reach it:
 
 ```toml
 [server]
-host = "0.0.0.0"
+host = "127.0.0.1"
 port = 8000
 
 [trusted_proxy]
 origin = "https://control.example.com"
-trusted_peers = ["127.0.0.1"]
 username_header = "X-SQB-User"
 display_name_header = "X-SQB-Display-Name"
 proxy_logout_url = "https://sign-in.example.com/logout"
@@ -120,35 +120,48 @@ proxy_logout_url = "https://sign-in.example.com/logout"
 | Key | Meaning |
 | --- | --- |
 | `origin` | The URL people open, such as `https://control.example.com`. `http://` works too: the server warns at start-up, and `https://` is recommended. |
-| `trusted_peers` | The proxy's IP addresses. With the proxy on the same host as the server, this is `127.0.0.1`. |
+| `trusted_peers` | The proxy's IP addresses. Without this key the server trusts `127.0.0.1` and `::1`, for a proxy on the same host that connects to `localhost` over either IPv4 or IPv6. |
 | `username_header` | The header naming the signed-in person, `X-SQB-User` by default. |
 | `display_name_header`, `email_header` | Optional headers whose values the UI shows. The server doesn't store them. |
 | `unknown_users` | `provision_viewer` (default) gives a person signing in for the first time an account with the `viewer` role; `reject` refuses them. |
 | `proxy_logout_url` | Where the UI's **Sign out** link goes. Only the proxy can end its own sign-in, so without this key the UI shows no sign-out link. |
 | `[trusted_proxy.identities]` | Optional: binds a username to a principal you already created with `sqb admin create-principal`. |
 
-The proxy must authenticate every request, then set the username header itself, replacing any value
-the browser sent. With Apache on the same host, forwarding port 80 to the server on port 8000:
+The proxy must authenticate every request, then set every identity header you configured itself.
+A header the proxy leaves alone passes through from the browser, so set the username header and
+set or unset the display name and email headers on every request. With Apache on the same host,
+forwarding port 80 to the server on port 8000:
 
 ```apache
 <Location "/">
     # Your authentication: AuthType, AuthName, providers and Require valid-user
     RequestHeader set X-SQB-User "expr=%{REMOTE_USER}"
+    # Set this from your provider's display name, or unset it when you have none
+    RequestHeader unset X-SQB-Display-Name
 </Location>
 ProxyPass "/" "http://127.0.0.1:8000/"
 ProxyPassReverse "/" "http://127.0.0.1:8000/"
 ```
 
-- **Usernames.** The server trims and lowercases the username, which must be 1 to 128 characters of
-  `a`-`z`, `0`-`9`, `.`, `_`, `@`, `+` or `-`, starting with a letter or digit. A provisioned person
-  is named after their username, and an administrator grants more roles in the UI. A username that
-  already names another principal is refused rather than taken over; bind it under
-  `[trusted_proxy.identities]` to sign that person in. A disabled person stays refused.
-- **Host header.** A proxy that doesn't pass on the browser's `Host` header, as Apache's
-  `mod_proxy` does by default, sends the browser's host in `X-Forwarded-Host`. The server accepts
-  that header from trusted peers, so no `ProxyPreserveHost` setting is needed.
-- **Writes.** The server accepts a browser write only when its `Origin` header is exactly `origin`,
-  whether that is `http://` or `https://`.
+- **Who can sign in.** Any process that can connect to the server from a trusted peer address can
+  sign in as anyone by sending the username header. Keep the server's port reachable only from the
+  proxy: bind it to `127.0.0.1` when they share a host, or firewall it.
+- **Usernames are case-insensitive.** The server trims and lowercases the username, so `Admin` and
+  `admin` are one person; your identity provider must treat them as the same account. A username
+  must be 1 to 128 characters of `a`-`z`, `0`-`9`, `.`, `_`, `@`, `+` or `-`, starting with a
+  letter or digit. Keys under `[trusted_proxy.identities]` are lowercased too; before this release
+  they matched the header's exact text, so check that no two keys now differ only in case.
+- **New people.** A provisioned person is named after their username, and an administrator grants
+  more roles in the UI. A username that matches another principal's name in any case is refused
+  rather than taken over; bind it under `[trusted_proxy.identities]` to sign that person in.
+- **Removing people.** `unknown_users = "reject"` stops new people from being provisioned; it
+  doesn't remove people already provisioned. Disable a principal to remove their access.
+  Removing someone at the proxy doesn't end their `sqb login` sessions: they last until they expire
+  or the principal is disabled.
+- **Host names and writes.** The proxy can serve the UI under any host name, such as a short name,
+  the full name or an IP address. A browser write is accepted when it carries the `X-SQB-CSRF`
+  header, which the UI always sends and which a page on another site cannot send, or when its
+  `Origin` header is exactly `origin`. The server allows no cross-origin requests.
 - **Finding the proxy's address.** When a request carrying the username header comes from a peer
   that is not in `trusted_peers`, the server ignores the header and logs the peer once, without the
   header's value:
@@ -170,9 +183,10 @@ ProxyPassReverse "/" "http://127.0.0.1:8000/"
   browser request waits on it.
 
 `[trusted_proxy]` cannot be combined with `password_origin` or `[oidc]`. The server refuses to
-start when they are combined, when the username, display name and email headers are not distinct,
-or when one of them is a header that browsers, proxies or the server set, such as `Cookie`, `Host`,
-`Origin` or `X-Forwarded-For`.
+start when they are combined, when `trusted_peers` is an empty list, when the username, display
+name and email headers are not distinct, or when one of them is a header that browsers, proxies or
+the server set, such as `Cookie`, `Host`, `Origin`, `Via`, `X-Forwarded-For`, `X-Real-IP` or any
+`Sec-` header.
 
 To check that streaming passes through the proxy unchanged, sign in through it in a browser, open
 the developer tools' Network tab, select a location, and inspect the `changes` request. Its type is
