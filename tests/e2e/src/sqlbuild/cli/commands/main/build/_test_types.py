@@ -1668,13 +1668,14 @@ class CtxTargetSchemaE2ETestCase:
 
 @dataclass(frozen=True)
 class PreservedTargetNodeResultsE2ETestCase:
-    """A target that keeps its database or schema, and where two builds' node results land."""
+    """A target's location settings, and where two builds' and a load's node results land."""
 
     description: str
     target_lines: str
     source_location: str
     expected_results_schema: str
     expected_runs_per_node: int
+    cli_args: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -149,6 +149,7 @@ class PythonNodeContextTestResultStore:
     def __init__(self, results: dict[tuple[str, str], tuple[NodeResultEnvelope, ...]]) -> None:
         self._results: dict[tuple[str, str], tuple[NodeResultEnvelope, ...]] = results
         self.written_records: list[NodeResultRecord] = []
+        self.connection: object = object()
         self.database: str | None = None
         self.schema: str | None = "default_schema"
 

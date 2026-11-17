@@ -10,7 +10,6 @@ use pyo3::prelude::{
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyFrozenSetMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::warehouse_access::main::adapter_default_location::adapter_default_location;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
 use sqlbuild_python_project::graph::main::python_nodes::resolve_python_check_excludes::resolve_python_check_excludes;
 use sqlbuild_python_project::planner_phases::main::object::object;
@@ -447,13 +446,11 @@ fn read_side_references<'py>(
 fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = inputs.adapter.py();
     let project: Bound<'py, PyAny> = native_field(&inputs.pipeline_result, "project")?;
-    let (default_database, default_schema) = match &inputs.target_config {
-        Some(settings) => settings.node_locations(&inputs.adapter)?,
-        None => (
-            adapter_default_location(&inputs.adapter, "default_database")?,
-            adapter_default_location(&inputs.adapter, "default_schema")?,
-        ),
-    };
+    let (default_database, default_schema) = inputs
+        .target_config
+        .clone()
+        .unwrap_or_default()
+        .node_locations(&inputs.adapter)?;
     call_with(
         &host_entry(py, ExecutorHost::PythonNodeRuntime)?,
         &[

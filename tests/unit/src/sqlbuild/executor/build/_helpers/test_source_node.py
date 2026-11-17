@@ -18,7 +18,6 @@ from tests.unit.src.sqlbuild.executor.build._helpers._test_types import (
     BuildSourceNodeResultLocationTestCase,
 )
 from tests.unit.src.sqlbuild.executor.build._helpers.helpers import (
-    NoDefaultSchemaDuckDbAdapter,
     build_discovered_source_loader,
     build_source_load_plan_output,
 )
@@ -95,13 +94,13 @@ def test_given_build_source_node_when_executing_then_runs_loader_runtime(
     [
         BuildSourceNodeResultLocationTestCase(
             description="an adapter without a default schema still records the result",
-            adapter_class=NoDefaultSchemaDuckDbAdapter,
+            adapter_default_schema=None,
             runtime_schema="analytics",
             expected_result_schemas=("analytics",),
         ),
         BuildSourceNodeResultLocationTestCase(
             description="the runtime location wins over the adapter default schema",
-            adapter_class=DuckDbAdapter,
+            adapter_default_schema="main",
             runtime_schema="analytics",
             expected_result_schemas=("analytics",),
         ),
@@ -111,8 +110,10 @@ def test_given_build_source_node_when_executing_then_runs_loader_runtime(
 def test_given_runtime_location_when_executing_source_node_then_result_is_written_there(
     test_case: BuildSourceNodeResultLocationTestCase,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adapter: DuckDbAdapter = test_case.adapter_class()
+    adapter: DuckDbAdapter = DuckDbAdapter()
+    monkeypatch.setattr(adapter, "default_schema", lambda: test_case.adapter_default_schema)
     connection: object = adapter.connect({"database": str(tmp_path / "source_node.duckdb")})
     try:
         result: LoadExecutionResult = execute_build_source_node(

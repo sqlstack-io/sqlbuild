@@ -73,10 +73,18 @@ _COPYING_LOADER: str = (
             expected_results_schema="analytics",
             expected_runs_per_node=2,
         ),
+        PreservedTargetNodeResultsE2ETestCase(
+            description="a schema set by --vars holds the node results build and load share",
+            target_lines='schema = "${results_schema}"\n\n[vars]\nresults_schema = "mart"\n',
+            source_location="    schema: raw\n",
+            expected_results_schema="ops",
+            expected_runs_per_node=2,
+            cli_args=("--vars", json.dumps({"results_schema": "ops"})),
+        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_preserved_target_when_building_twice_then_node_results_stay_in_one_real_location(
+def test_given_target_location_when_building_and_loading_then_node_results_stay_in_one_place(
     test_case: PreservedTargetNodeResultsE2ETestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = node_result_project(
@@ -95,10 +103,11 @@ def test_given_preserved_target_when_building_twice_then_node_results_stay_in_on
     )
 
     results: list[subprocess.CompletedProcess[str]] = [
-        run_sqb(command=("--no-color", "build"), project_dir=project_dir) for _ in range(2)
+        run_sqb(command=("--no-color", "build", *test_case.cli_args), project_dir=project_dir)
+        for _ in range(2)
     ] + [
         run_sqb(
-            command=("--no-color", "load", "--select", "raw_order_copies"),
+            command=("--no-color", "load", "--select", "raw_order_copies", *test_case.cli_args),
             project_dir=project_dir,
         )
     ]

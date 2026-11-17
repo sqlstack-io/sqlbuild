@@ -19,10 +19,10 @@ from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.executor.build.models import BuildCallbacks, BuildRuntimeParams
 from sqlbuild.executor.load.main._execute import execute_source_load
+from sqlbuild.executor.load.main._persist_result import persist_loader_result
 from sqlbuild.executor.load.models import LoadExecutionResult, LoadRuntimeParams
 from sqlbuild.executor.node_results.classes.direct_store import DirectNodeResultStore
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
-from sqlbuild.executor.node_results.models import NodeResultRecord
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind
 
 
@@ -101,42 +101,10 @@ def execute_build_source_node(
         resource_name=loader_name,
         phase="finalize",
     ):
-        _persist_loader_result(
+        persist_loader_result(
             loader_name=loader_name,
             result=timed_result,
             run_id=runtime.run_id,
             result_store=result_store,
         )
     return timed_result
-
-
-def _persist_loader_result(
-    *,
-    loader_name: str,
-    result: LoadExecutionResult,
-    run_id: str,
-    result_store: DirectNodeResultStore,
-) -> None:
-    if result_store.connection is None:
-        return
-    result_store.write(
-        NodeResultRecord(
-            node_type="loader",
-            node_name=loader_name,
-            target_database=result_store.database,
-            target_schema=result_store.schema,
-            target_name=None,
-            run_id=run_id,
-            status=result.status.value,
-            payload=result.result_payload,
-            metadata={
-                "source_name": result.source_name,
-                "loader_name": result.loader_name,
-                "rows_loaded": result.rows_loaded,
-                "target": result.target,
-                **result.result_metadata,
-            },
-            error_message=result.error_message or result.skip_reason,
-            materialized=result.result_materialized,
-        )
-    )

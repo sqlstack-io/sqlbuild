@@ -10,7 +10,6 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapter.contract.models import RelationInfo
 from sqlbuild.adapter.contract.types import RetentionChangePhase
-from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.build.types import BuildStatus
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind
@@ -127,7 +126,7 @@ class BuildSourceNodeResultLocationTestCase:
     """Where a scheduled loader's result goes for an adapter default and a runtime location."""
 
     description: str
-    adapter_class: type[DuckDbAdapter]
+    adapter_default_schema: str | None
     runtime_schema: str
     expected_result_schemas: tuple[str, ...]
 

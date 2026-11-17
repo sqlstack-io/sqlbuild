@@ -68,8 +68,8 @@ impl InputsRequest {
     }
 }
 
-/// The active target's locations as SQLBuild resolves them; `preserve` stays as written until `record`.
-#[derive(Debug, Clone)]
+/// The active target's locations as SQLBuild resolves them (default: unset); `preserve` stays as written until `record`.
+#[derive(Debug, Clone, Default)]
 pub struct TargetSettingsValues {
     pub(crate) name: Option<String>,
     pub(crate) database: Option<String>,
@@ -90,11 +90,23 @@ impl TargetSettingsValues {
         adapter: &Bound<'py, PyAny>,
     ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
         let py: Python<'py> = adapter.py();
-        model_free_locations(
+        self.node_locations_from(
             (
-                self.database.as_deref().into_bound_py_any(py)?,
-                self.schema.as_deref().into_bound_py_any(py)?,
+                &self.database.as_deref().into_bound_py_any(py)?,
+                &self.schema.as_deref().into_bound_py_any(py)?,
             ),
+            adapter,
+        )
+    }
+
+    /// `node_locations` from a caller-resolved `(database, schema)`, such as `sqb load`'s, which applies CLI vars.
+    pub fn node_locations_from<'py>(
+        &self,
+        (database, schema): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+        adapter: &Bound<'py, PyAny>,
+    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+        model_free_locations(
+            (database.clone(), schema.clone()),
             self.loader_schema(),
             adapter,
         )
