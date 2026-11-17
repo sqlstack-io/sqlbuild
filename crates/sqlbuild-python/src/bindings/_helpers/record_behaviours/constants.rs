@@ -68,7 +68,7 @@ use crate::bindings::_helpers::record_behaviours::scopes::{
 use crate::bindings::_helpers::record_behaviours::values::{
     finish_fingerprint_set, logical_type_display_name, sql_value_kind,
 };
-use crate::bindings::_helpers::{dbt_events, dbt_interop, event_exporting, execution_history};
+use crate::bindings::_helpers::{dbt_events, dbt_interop, event_exporting};
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
 use sqlbuild_python_base::records::types::ClassProperty;
@@ -365,7 +365,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     sqlbuild_python_base::diagnostics::constants::GETTERS,
     sqlbuild_python_front::discovery::constants::GETTERS,
     event_exporting::getters::GETTERS,
-    execution_history::getters::GETTERS,
+    sqlbuild_python_front::execution_history::constants::GETTERS,
     sqlbuild_python_project::graph::constants::GETTERS,
     sqlbuild_python_front::model_config::constants::GETTERS,
     sqlbuild_python_planner::planner_entries::constants::GETTERS,
