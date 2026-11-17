@@ -302,23 +302,10 @@ pub(crate) fn list_relations<'py>(
     schemas: Bound<'py, PyAny>,
     names: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-<<<<<<< ours
     reads
         .get()
         .reads()
         .relations(reads.py(), database, (schemas, names))
-=======
-    call_with(
-        &host_entry(adapter.py(), RELATIONS_MAIN_LIST)?,
-        &[
-            ("adapter", adapter.clone()),
-            ("connection", connection.clone()),
-            ("database", database.clone()),
-            ("schemas", schemas),
-            ("names", names),
-        ],
-    )
->>>>>>> theirs
 }
 
 /// The columns of each listed relation, keyed by identity.
@@ -326,18 +313,7 @@ pub(crate) fn columns_for<'py>(
     reads: &Bound<'py, PlannerReads>,
     relations: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-<<<<<<< ours
     reads.get().reads().columns(reads.py(), relations)
-=======
-    call_with(
-        &host_entry(adapter.py(), RELATIONS_MAIN_COLUMNS)?,
-        &[
-            ("adapter", adapter.clone()),
-            ("connection", connection.clone()),
-            ("relations", relations),
-        ],
-    )
->>>>>>> theirs
 }
 
 fn optional_names<'py>(

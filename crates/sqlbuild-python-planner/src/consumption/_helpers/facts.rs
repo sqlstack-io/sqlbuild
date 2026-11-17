@@ -363,25 +363,7 @@ pub(crate) fn build_facts(
             }
         }
         let destination: Bound<'_, PyAny> = node.destination()?;
-<<<<<<< ours
         if native_field(&destination, "schema")?.is_none() {
-=======
-        let relation: Option<RelationKey> = (!native_field(&destination, "schema")?.is_none())
-            .then(|| relation(&destination))
-            .transpose()?;
-        if let (Compiled::Model(model), Some(locations), Some(function_checks)) =
-            (node, &locations, &mut function_checks)
-            && (sql_reads_undeclared(
-                py,
-                query_sql(model)?.extract()?,
-                (&node_inputs, relation.as_ref()),
-                (locations, dialect.as_deref()),
-            )? || function_checks.undeclared(py, &deps)?)
-        {
-            forced.push(ForcedRun::InputsNotEnumerable);
-        }
-        let Some(relation) = relation else {
->>>>>>> theirs
             continue;
         }
         if let (Compiled::Model(model), Some(_)) = (node, &locations) {

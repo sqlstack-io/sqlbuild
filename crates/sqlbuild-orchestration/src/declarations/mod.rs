@@ -10,8 +10,4 @@ pub mod models;
 
 #[cfg(test)]
 #[path = "../../tests/declarations/test_contracts.rs"]
-<<<<<<< ours
-mod tests;
-=======
 pub(crate) mod tests;
->>>>>>> theirs

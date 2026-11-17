@@ -8,16 +8,8 @@ use crate::planner_warehouse::models::PlannerReads;
 /// Read only fingerprint state required by selected direct seeds.
 #[inline]
 pub fn read_selected_seed_fingerprints<'py>(
-<<<<<<< ours
     reads: &Bound<'py, PlannerReads>,
     seeds: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     command_plans::read_selected_seed_fingerprints(reads, seeds)
-=======
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
-    seeds: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyDict>> {
-    command_plans::read_selected_seed_fingerprints(adapter, connection, seeds)
->>>>>>> theirs
 }

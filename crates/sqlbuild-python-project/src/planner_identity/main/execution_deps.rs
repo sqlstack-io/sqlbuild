@@ -20,41 +20,5 @@ use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Execution dependencies kept native until a public graph or plan asks for its dict view.
 pub fn execution_deps(project: &Bound<'_, PyAny>) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
-<<<<<<< ours
     execution_deps_with(project, &native_execution_gate_edges(project)?)
-=======
-    let mut resources: Vec<(ObjectKey, Vec<ObjectKey>)> = Vec::new();
-    let collections: [Bound<'_, PyAny>; 4] = [
-        compiled_models(project)?,
-        sources(project)?,
-        seeds(project)?,
-        functions(project)?,
-    ];
-    for collection in collections {
-        for resource in collection.try_iter()? {
-            let row = graph_row(&resource?)?;
-            resources.push((row.key, row.deps));
-        }
-    }
-    let mut tests: Vec<ExecutionTest> = Vec::new();
-    for test in sql_tests(project)?.try_iter()? {
-        let test = test?;
-        tests.push(ExecutionTest {
-            key: native_key(&native_field(&test, "key")?)?,
-            scope_deps: native_field(&test, "scope_deps")?
-                .try_iter()?
-                .map(|key| native_key(&key?))
-                .collect::<PyResult<_>>()?,
-            table_function: native_field(&test, "mode")?.str()?.extract::<String>()?
-                == TABLE_FN_TEST_MODE,
-        });
-    }
-    let (gates, hooks): (Vec<GateRow>, Vec<HookRow>) = native_execution_gate_edges(project)?;
-    let injected: Vec<_> = gates
-        .into_iter()
-        .map(|gate| (gate.gated, gate.read))
-        .chain(hooks.into_iter().map(|hook| (hook.gated, hook.read)))
-        .collect();
-    Ok(execution_upstream(resources, &tests, &injected))
->>>>>>> theirs
 }

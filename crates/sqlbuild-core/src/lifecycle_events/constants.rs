@@ -223,12 +223,8 @@ pub const OPERATION_KINDS: [&str; 10] = [
     "warehouse",
 ];
 
-<<<<<<< ours
-pub const OPERATION_NAMES: [&str; 55] = [
-=======
 /// Includes retired names, such as the removed dlt and ingestr loads, so stored history still decodes.
 pub const OPERATION_NAMES: [&str; 57] = [
->>>>>>> theirs
     "adbc_driver_install",
     "audit_evaluation",
     "clone_execution",
@@ -246,6 +242,8 @@ pub const OPERATION_NAMES: [&str; 57] = [
     "discovery_project_assembly",
     "discovery_python_import",
     "external_manifest_discovery",
+    "external_source_load",
+    "ingestr_command",
     "janitor_candidate_planning",
     "janitor_cleanup_action",
     "janitor_execution",

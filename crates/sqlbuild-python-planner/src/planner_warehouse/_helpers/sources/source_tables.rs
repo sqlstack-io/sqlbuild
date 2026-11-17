@@ -141,7 +141,6 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     if unlisted.is_empty() {
         return Ok(());
     }
-<<<<<<< ours
     let relations = || -> PyResult<Vec<Bound<'py, PyAny>>> {
         unlisted
             .iter()
@@ -151,33 +150,6 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     let Read::Known(probes) = reads.get().reads().read_access(py, &relations)? else {
         return Ok(());
     };
-=======
-    let probe = native_field(adapter, "probe_relation_read")?;
-    let mut tasks: Vec<_> = Vec::new();
-    for (_, entry, _) in &unlisted {
-        let fields = keywords(
-            py,
-            &[
-                ("connection", connection.clone()),
-                ("relation", read_relation(adapter, entry)?),
-            ],
-        )?;
-        tasks.push(imported(py, "functools", "partial")?.call((&probe,), Some(&fields))?);
-    }
-    let concurrency: i64 = imported(py, "builtins", "int")?
-        .call1((native_field(adapter, "metadata_inspection_concurrency")?,))?
-        .extract()?;
-    let probes = call_with(
-        &host_entry(py, RUN_BOUNDED)?,
-        &[
-            ("tasks", tuple(py, tasks)?),
-            (
-                "concurrency",
-                concurrency.max(1).into_pyobject(py)?.into_any(),
-            ),
-        ],
-    )?;
->>>>>>> theirs
     let mut missing: Vec<_> = Vec::new();
     let mut entries: Vec<_> = Vec::new();
     for ((source, entry, read_by), probe) in unlisted.into_iter().zip(probes) {

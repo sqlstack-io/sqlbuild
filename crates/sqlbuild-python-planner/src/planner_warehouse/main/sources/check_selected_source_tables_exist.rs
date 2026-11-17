@@ -13,14 +13,5 @@ pub fn check_selected_source_tables_exist<'py>(
     scope: &Bound<'py, PyAny>,
     relations: &Bound<'py, PyAny>,
 ) -> PyResult<()> {
-<<<<<<< ours
     source_tables::check_selected_source_tables_exist(project, (dialect, reads), scope, relations)
-=======
-    source_tables::check_selected_source_tables_exist(
-        project,
-        (adapter, connection),
-        scope,
-        relations,
-    )
->>>>>>> theirs
 }

@@ -203,7 +203,7 @@ pub(crate) struct DiscoveryRequest<'py> {
 
 /// Relations, fingerprints and migration events for one planning database.
 #[pyclass(module = "sqlbuild._native", name = "MigrationStateInspection")]
-<<<<<<< ours
+#[derive(Debug)]
 pub struct MigrationStateInspection {
     reads: Py<PlannerReads>,
     database: Py<PyAny>,
@@ -222,41 +222,11 @@ pub struct MigrationStateInspection {
     old_name_schemas: HashSet<String>,
     old_name_moves: Vec<Py<PyAny>>,
     old_name_facts: Vec<Py<PyAny>>,
-=======
-#[derive(Debug)]
-pub struct MigrationStateInspection {
-    pub(crate) adapter: Py<PyAny>,
-    pub(crate) connection: Py<PyAny>,
-    pub(crate) database: Py<PyAny>,
-    pub(crate) known_fingerprints: Py<PyAny>,
-    pub(crate) read_schemas: HashSet<String>,
-    /// Model fingerprints per lowercased schema, in first-read order.
-    pub(crate) fingerprints: Vec<(String, Vec<Py<PyAny>>)>,
-    pub(crate) events: Vec<Py<PyAny>>,
-    pub(crate) event_schemas: HashSet<String>,
-    pub(crate) relations: HashMap<RelationKey, Py<PyAny>>,
-    pub(crate) columns: HashMap<RelationKey, Py<PyAny>>,
-    pub(crate) column_event_schemas: HashSet<String>,
-    pub(crate) column_events: Vec<Py<PyAny>>,
-    pub(crate) old_name_schemas: HashSet<String>,
-    pub(crate) old_name_moves: Vec<Py<PyAny>>,
-    pub(crate) old_name_facts: Vec<Py<PyAny>>,
->>>>>>> theirs
 }
 
 impl MigrationStateInspection {
-<<<<<<< ours
     fn reads<'py>(&self, py: Python<'py>) -> Bound<'py, PlannerReads> {
         self.reads.bind(py).clone()
-=======
-    pub(crate) fn access<'py>(&self, py: Python<'py>) -> PyResult<StateAccess<'py>> {
-        let adapter: &Bound<'py, PyAny> = self.adapter.bind(py);
-        Ok(StateAccess {
-            connection: self.connection.bind(py).clone(),
-            execute: native_field(adapter, "execute")?,
-            render_qualified_name: native_field(adapter, "render_qualified_name")?,
-        })
->>>>>>> theirs
     }
 
     pub(crate) fn list_relations<'py>(
@@ -265,29 +235,16 @@ impl MigrationStateInspection {
         schemas: Vec<Bound<'py, PyAny>>,
         names: Bound<'py, PyAny>,
     ) -> PyResult<Vec<Bound<'py, PyAny>>> {
-<<<<<<< ours
         list_relations(
             self.reads.bind(py),
             self.database.bind(py),
             PyTuple::new(py, schemas)?.into_any(),
             names,
-=======
-        call_with(
-            &host_entry(py, LIST_RELATIONS_FOR_INSPECTION)?,
-            &[
-                ("adapter", self.adapter.bind(py).clone()),
-                ("connection", self.connection.bind(py).clone()),
-                ("database", self.database.bind(py).clone()),
-                ("schemas", PyTuple::new(py, schemas)?.into_any()),
-                ("names", names),
-            ],
->>>>>>> theirs
         )?
         .try_iter()?
         .collect()
     }
 
-<<<<<<< ours
     /// The listed migration state tables of `schemas`, or `None` when the reads do not know them.
     fn migration_state_tables<'py>(
         &self,
@@ -318,9 +275,6 @@ impl MigrationStateInspection {
     }
 
     fn model_fingerprints<'py>(
-=======
-    pub(crate) fn model_fingerprints<'py>(
->>>>>>> theirs
         &self,
         py: Python<'py>,
         schema: &Bound<'py, PyAny>,
@@ -363,16 +317,9 @@ impl MigrationStateInspection {
 #[pymethods]
 impl MigrationStateInspection {
     #[new]
-<<<<<<< ours
     #[pyo3(signature = (*, reads, database, known_fingerprints = None))]
     pub(crate) fn new(
         reads: &Bound<'_, PlannerReads>,
-=======
-    #[pyo3(signature = (*, adapter, connection, database, known_fingerprints = None))]
-    pub(crate) fn new(
-        adapter: &Bound<'_, PyAny>,
-        connection: &Bound<'_, PyAny>,
->>>>>>> theirs
         database: &Bound<'_, PyAny>,
         known_fingerprints: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
@@ -684,27 +631,10 @@ impl MigrationStateInspection {
         let columns: Bound<'_, PyAny> = if matched.is_empty() {
             PyDict::new(py).into_any()
         } else {
-<<<<<<< ours
             let reads: Bound<'_, PlannerReads> = slf.borrow().reads(py);
             columns_for(
                 &reads,
                 PyTuple::new(py, matched.iter().map(|(_, relation)| relation))?.into_any(),
-=======
-            let this: PyRef<'_, Self> = slf.borrow();
-            let adapter: Bound<'_, PyAny> = this.adapter.bind(py).clone();
-            let connection: Bound<'_, PyAny> = this.connection.bind(py).clone();
-            drop(this);
-            call_with(
-                &host_entry(py, GET_COLUMNS_FOR_INSPECTION)?,
-                &[
-                    ("adapter", adapter),
-                    ("connection", connection),
-                    (
-                        "relations",
-                        PyTuple::new(py, matched.iter().map(|(_, relation)| relation))?.into_any(),
-                    ),
-                ],
->>>>>>> theirs
             )?
         };
         let empty: Bound<'_, PyTuple> = PyTuple::empty(py);

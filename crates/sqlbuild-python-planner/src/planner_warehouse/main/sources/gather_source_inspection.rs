@@ -5,10 +5,7 @@ use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyTuple;
 use crate::planner_warehouse::models::PlannerReads;
 
-<<<<<<< ours
-=======
 /// Gather source inspection.
->>>>>>> theirs
 pub fn gather_source_inspection<'py>(
     project: &Bound<'py, PyAny>,
     reads: &Bound<'py, PlannerReads>,

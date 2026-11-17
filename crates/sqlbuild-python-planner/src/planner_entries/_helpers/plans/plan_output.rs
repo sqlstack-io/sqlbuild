@@ -491,11 +491,7 @@ pub(crate) struct SelectedTests<'py> {
 
 /// Selected SQL test entries and their warnings, failing on invalid fixtures.
 pub(crate) fn selected_test_entries<'py>(
-<<<<<<< ours
     (project, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
-=======
-    (project, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
->>>>>>> theirs
     selected_keys: &Bound<'py, PyAny>,
     selection: &Bound<'py, PyAny>,
     case_name: &Bound<'py, PyAny>,

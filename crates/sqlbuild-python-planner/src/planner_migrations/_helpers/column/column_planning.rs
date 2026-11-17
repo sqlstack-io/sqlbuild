@@ -68,13 +68,8 @@ pub(crate) fn plan_column_migrations<'py>(
     let py = phase.runtime.py();
     let runtime = phase.runtime.clone();
     let snapshot = phase.snapshot.clone();
-<<<<<<< ours
     let dialect = runtime_dialect(&runtime)?;
-    let candidates = super::column_candidates::candidates(
-=======
-    let adapter = runtime_field(&runtime, |runtime| &runtime.adapter)?;
     let candidates = crate::planner_migrations::_helpers::column::column_candidates::candidates(
->>>>>>> theirs
         (phase, columns),
         &dialect.syntax("sql_analysis_dialect")?.call0()?,
     )?;
@@ -119,10 +114,6 @@ pub(crate) fn plan_column_migrations<'py>(
             &inputs,
         )?;
         let physical = mapping_get(&columns.physical_relations, name_object(&candidate.model)?)?;
-<<<<<<< ours
-        let checked = super::column_entries::checked(&runtime, candidate, decided, &physical)?;
-        for hint in super::column_entries::hints(candidate, &checked.entries)?.try_iter()? {
-=======
         let checked = crate::planner_migrations::_helpers::column::column_entries::checked(
             &runtime, candidate, decided, &physical,
         )?;
@@ -132,7 +123,6 @@ pub(crate) fn plan_column_migrations<'py>(
         )?
         .try_iter()?
         {
->>>>>>> theirs
             hints.push(hint?);
         }
         entries.extend(checked.entries);

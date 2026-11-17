@@ -26,11 +26,7 @@ pub(crate) fn method<'py>(
 }
 
 pub(crate) fn cursor_wrap(
-<<<<<<< ours
     dialect: &Bound<'_, Dialect>,
-=======
-    adapter: &Bound<'_, PyAny>,
->>>>>>> theirs
     filtering: &CursorFiltering<'_>,
     relation: String,
     (name, inject_alias): (&str, bool),

@@ -13,15 +13,11 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         "HOST_ENTRIES",
         PyTuple::new(module.py(), host_entry_labels())?,
     )?;
-<<<<<<< ours
     module.add(
         "WarehouseAccessRefusedError",
         module.py().get_type::<WarehouseAccessRefusedError>(),
     )?;
     module.add_class::<Dialect>()?;
     register_live_reads(module)?;
-=======
-    register_synced_copy(module)?;
->>>>>>> theirs
     sqlbuild_python_base::orchestration_reads::main::register_orchestration_declarations::register_orchestration_declarations(module)
 }

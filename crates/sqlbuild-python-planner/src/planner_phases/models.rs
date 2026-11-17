@@ -73,7 +73,6 @@ pub struct PlanWarningContext<'a, 'py> {
 #[pyclass(module = "sqlbuild._native", frozen, get_all)]
 #[derive(Debug)]
 pub struct PlannerRuntime {
-<<<<<<< ours
     pub(crate) project: Py<PyAny>,
     pub(crate) dialect: Py<Dialect>,
     pub(crate) reads: Py<PlannerReads>,
@@ -81,15 +80,6 @@ pub struct PlannerRuntime {
     pub(crate) local_config: Py<PyAny>,
     pub(crate) on_progress: Py<PyAny>,
     pub(crate) invocation_time: Py<PyAny>,
-=======
-    pub project: Py<PyAny>,
-    pub adapter: Py<PyAny>,
-    pub connection: Py<PyAny>,
-    pub project_config: Py<PyAny>,
-    pub local_config: Py<PyAny>,
-    pub on_progress: Py<PyAny>,
-    pub invocation_time: Py<PyAny>,
->>>>>>> theirs
 }
 
 /// Warehouse snapshot, inspection relations and migration plans gathered once per plan.

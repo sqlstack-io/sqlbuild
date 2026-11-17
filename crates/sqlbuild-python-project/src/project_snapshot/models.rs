@@ -119,15 +119,9 @@ impl NativeOrchestrationSnapshot {
 #[derive(Debug)]
 pub struct WorkerBuild {
     pub worker: Py<NativeOrchestrationWorker>,
-<<<<<<< ours
-    execution: RunExecution,
-    completed: Mutex<BTreeMap<String, NodeOutcome>>,
-    checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
-=======
     pub(crate) execution: RunExecution,
     pub(crate) completed: Mutex<BTreeMap<String, NodeOutcome>>,
     pub(crate) checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
->>>>>>> theirs
     /// The snapshot's audits and SQL tests, each with the node keys it checks.
     pub(crate) attached: BTreeMap<String, Vec<String>>,
     /// Each SQL test with every node a failure of it blocks in a build: its expected, assertion and reference models and the functions it checks.
@@ -145,13 +139,9 @@ pub struct WorkerBuild {
     /// Whether the command returned, having run every check it planned, rather than being refused or raising.
     pub(crate) returned: AtomicBool,
     /// Why the worker refused the run before executing anything, reported as the run's status reason.
-<<<<<<< ours
-    refusal: Mutex<Option<String>>,
-    /// Error-severity audit failures the build let through, reported before the run finishes.
-    ignored_audit_failures: AtomicU32,
-=======
     pub(crate) refusal: Mutex<Option<String>>,
->>>>>>> theirs
+    /// Error-severity audit failures the build let through, reported before the run finishes.
+    pub(crate) ignored_audit_failures: AtomicU32,
 }
 
 impl WorkerBuild {

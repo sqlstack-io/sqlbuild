@@ -171,11 +171,7 @@ fn quoted_names<'py>(
 
 /// Complete one chain's fixture groups, building the planning context when none is given.
 #[pyfunction]
-<<<<<<< ours
 #[pyo3(signature = (*, project, dialect, request, planning_context = None))]
-=======
-#[pyo3(signature = (*, project, adapter, request, planning_context = None))]
->>>>>>> theirs
 pub(crate) fn build_relation_fixture_completion<'py>(
     project: &Bound<'py, PyAny>,
     dialect: &Bound<'py, Dialect>,

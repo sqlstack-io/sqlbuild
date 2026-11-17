@@ -15,11 +15,7 @@ pub fn build_planner_source_freshness_result<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     source_freshness::build_planner_source_freshness_result(
         (project, scope),
-<<<<<<< ours
         (dialect, reads),
-=======
-        (adapter, connection),
->>>>>>> theirs
         relations,
         freshness_state_schemas,
     )

@@ -58,14 +58,9 @@ pub struct ModelSqlRequest<'py> {
 }
 
 /// What resolving one model's, hook's or function's references reads.
-<<<<<<< ours
-pub struct Resolution<'py> {
-    pub(crate) dialect: Bound<'py, Dialect>,
-=======
 #[derive(Debug)]
 pub struct Resolution<'py> {
-    pub adapter: Bound<'py, PyAny>,
->>>>>>> theirs
+    pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) external: Bound<'py, PyAny>,
     pub(crate) source_map: Bound<'py, PyAny>,
     pub(crate) source_warehouse_columns: Bound<'py, PyAny>,
@@ -77,11 +72,7 @@ pub struct Resolution<'py> {
 impl<'py> Resolution<'py> {
     /// Resolution against a `ModelPlanContext`'s relations.
     pub fn of_context(
-<<<<<<< ours
         dialect: Bound<'py, Dialect>,
-=======
-        adapter: Bound<'py, PyAny>,
->>>>>>> theirs
         context: &Bound<'py, PyAny>,
         external: Bound<'py, PyAny>,
     ) -> PyResult<Self> {
@@ -99,11 +90,7 @@ impl<'py> Resolution<'py> {
     }
 
     pub(crate) fn resolve(&self, sql: &str, filtering: &CursorFiltering<'py>) -> PyResult<String> {
-<<<<<<< ours
         let py = self.dialect.py();
-=======
-        let py = self.adapter.py();
->>>>>>> theirs
         let resolved: String = resolve_sources(
             sql,
             (&self.source_map, &self.source_warehouse_columns),
@@ -127,11 +114,7 @@ impl<'py> Resolution<'py> {
     }
 
     pub(crate) fn assert_resolved(&self, sql: &str, label: &str) -> PyResult<()> {
-<<<<<<< ours
         let py = self.dialect.py();
-=======
-        let py = self.adapter.py();
->>>>>>> theirs
         assert_no_unresolved_sql_markers(
             py,
             &PyString::new(py, sql),
@@ -140,11 +123,7 @@ impl<'py> Resolution<'py> {
     }
 
     pub(crate) fn unbounded(&self, sql: Bound<'py, PyAny>, label: &str) -> PyResult<String> {
-<<<<<<< ours
         let py = self.dialect.py();
-=======
-        let py = self.adapter.py();
->>>>>>> theirs
         let resolved = self.resolve(
             &sql.extract::<String>()?,
             &CursorFiltering {

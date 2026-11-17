@@ -16,11 +16,7 @@ use sqlbuild_python_base::native_host::models::Dialect;
 
 /// Project selected audits from canonical static state.
 #[pyfunction]
-<<<<<<< ours
 #[pyo3(signature = (*, project, dialect, scope, relations))]
-=======
-#[pyo3(signature = (*, project, adapter, scope, relations))]
->>>>>>> theirs
 pub fn build_audit_command_plan<'py>(
     project: &Bound<'py, PyAny>,
     dialect: &Bound<'py, Dialect>,

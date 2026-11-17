@@ -7,11 +7,8 @@ use crate::assembly::project::types::ObjectKey;
 pub struct LifecycleNode {
     /// `task`, `asset`, `loader` or `check`.
     pub kind: String,
-<<<<<<< ours
     /// The SQL resources the node reads, in authored order.
     pub sql_deps: Vec<ObjectKey>,
-=======
->>>>>>> theirs
 }
 
 /// Selected Python nodes split into ingress and read-side regions, each sorted.

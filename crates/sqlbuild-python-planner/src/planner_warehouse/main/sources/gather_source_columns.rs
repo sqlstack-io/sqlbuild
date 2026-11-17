@@ -7,11 +7,7 @@ use pyo3::types::PyDict;
 use crate::planner_warehouse::models::PlannerReads;
 
 #[pyfunction]
-<<<<<<< ours
 #[pyo3(signature = (*, project, reads, source_entries=None))]
-=======
-#[pyo3(signature = (*, project, adapter, connection, source_entries=None))]
->>>>>>> theirs
 pub fn gather_source_columns<'py>(
     project: &Bound<'py, PyAny>,
     reads: &Bound<'py, PlannerReads>,

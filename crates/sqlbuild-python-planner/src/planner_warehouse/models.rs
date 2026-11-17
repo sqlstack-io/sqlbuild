@@ -76,7 +76,7 @@ use std::sync::{Mutex, PoisonError};
 
 /// Reuse migration fingerprints across rename maps, planning phases and invocations.
 #[pyclass(module = "sqlbuild._native")]
-<<<<<<< ours
+#[derive(Debug)]
 pub struct MigrationFingerprintCache {
     ref_names: HashMap<(String, String), Vec<String>>,
     fingerprints: HashMap<MemoKey, Option<String>>,
@@ -85,17 +85,6 @@ pub struct MigrationFingerprintCache {
     store_opened: bool,
     pending: Vec<(String, String)>,
     shared_digest: String,
-=======
-#[derive(Debug)]
-pub struct MigrationFingerprintCache {
-    pub(crate) ref_names: HashMap<(String, String), Vec<String>>,
-    pub(crate) fingerprints: HashMap<MemoKey, Option<String>>,
-    pub(crate) database_path: Option<Py<PyAny>>,
-    pub(crate) connection: Option<Py<PyAny>>,
-    pub(crate) connection_opened: bool,
-    pub(crate) pending: Vec<(String, String)>,
-    pub(crate) shared_digest: String,
->>>>>>> theirs
 }
 
 impl MigrationFingerprintCache {
@@ -144,18 +133,9 @@ impl MigrationFingerprintCache {
         .map_err(|error| PyValueError::new_err(format!("{error:?}")))
     }
 
-<<<<<<< ours
     fn open_store(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         if self.store_opened {
             return Ok(self.store.as_ref().map(|store| store.clone_ref(py)));
-=======
-    pub(crate) fn open_connection(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
-        if self.connection_opened {
-            return Ok(self
-                .connection
-                .as_ref()
-                .map(|connection| connection.clone_ref(py)));
->>>>>>> theirs
         }
         self.store_opened = true;
         let Some(path) = &self.database_path else {
@@ -175,17 +155,8 @@ impl MigrationFingerprintCache {
         Ok(self.store.as_ref().map(|store| store.clone_ref(py)))
     }
 
-<<<<<<< ours
     fn stored(&mut self, py: Python<'_>, cache_key: &str) -> PyResult<Option<Option<String>>> {
         let Some(store) = self.open_store(py)? else {
-=======
-    pub(crate) fn stored(
-        &mut self,
-        py: Python<'_>,
-        cache_key: &str,
-    ) -> PyResult<Option<Option<String>>> {
-        let Some(connection) = self.open_connection(py)? else {
->>>>>>> theirs
             return Ok(None);
         };
         let row = store
@@ -382,7 +353,7 @@ pub(crate) struct FingerprintWork {
 }
 
 /// Everything one snapshot gather needs.
-<<<<<<< ours
+#[derive(Debug)]
 pub struct SnapshotRequest<'py> {
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
@@ -393,20 +364,6 @@ pub struct SnapshotRequest<'py> {
     pub(crate) on_progress: Bound<'py, PyAny>,
     pub(crate) deferred_locations: Bound<'py, PyAny>,
     pub(crate) cursor_scope: Bound<'py, PyAny>,
-=======
-#[derive(Debug)]
-pub struct SnapshotRequest<'py> {
-    pub project: Bound<'py, PyAny>,
-    pub adapter: Bound<'py, PyAny>,
-    pub connection: Bound<'py, PyAny>,
-    pub execute: Bound<'py, PyAny>,
-    pub selected_keys: Bound<'py, PyAny>,
-    pub full_refresh: bool,
-    pub full_refresh_model_names: Bound<'py, PyAny>,
-    pub on_progress: Bound<'py, PyAny>,
-    pub deferred_locations: Bound<'py, PyAny>,
-    pub cursor_scope: Bound<'py, PyAny>,
->>>>>>> theirs
 }
 
 /// One warehouse read's answer: what the warehouse holds, or the item a plan reports as unknown.

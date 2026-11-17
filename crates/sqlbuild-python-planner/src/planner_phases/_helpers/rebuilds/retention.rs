@@ -162,16 +162,10 @@ pub(crate) fn plan_table_types<'py>(
             continue;
         }
         let downgrade = actual == Some(false) && desired_transient;
-<<<<<<< ours
         let destination = destination(&model)?;
         let limit: i64 = dialect
             .syntax("maximum_identifier_length")?
             .call0()?
-=======
-        let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
-        let limit: i64 = adapter
-            .call_method0("maximum_identifier_length")?
->>>>>>> theirs
             .extract()?;
         let target_name: String = native_field(&destination, "name")?.extract()?;
         entries.push(planner_model(

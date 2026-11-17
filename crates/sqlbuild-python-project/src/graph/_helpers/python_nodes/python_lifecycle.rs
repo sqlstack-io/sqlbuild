@@ -6,7 +6,6 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 
 pub(crate) fn lifecycle_node(node: &Bound<'_, PyAny>) -> PyResult<LifecycleNode> {
-<<<<<<< ours
     let mut sql_deps: Vec<ObjectKey> = Vec::new();
     for reference in native_field(node, "sql_deps")?.try_iter()? {
         let reference: Bound<'_, PyAny> = reference?;
@@ -18,9 +17,5 @@ pub(crate) fn lifecycle_node(node: &Bound<'_, PyAny>) -> PyResult<LifecycleNode>
     Ok(LifecycleNode {
         kind: native_field(node, "kind")?.extract()?,
         sql_deps,
-=======
-    Ok(LifecycleNode {
-        kind: native_field(node, "kind")?.extract()?,
->>>>>>> theirs
     })
 }

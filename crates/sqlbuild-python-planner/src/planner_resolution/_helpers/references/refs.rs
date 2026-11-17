@@ -77,14 +77,10 @@ pub(crate) fn resolve_refs(
             } else {
                 let relation: String = call_with(
                     &host_entry(py, AdapterHost::ResolveRelationLocationQualifiedName)?,
-<<<<<<< ours
                     &[
                         ("adapter", dialect.clone().into_any()),
                         ("location", target),
                     ],
-=======
-                    &[("adapter", adapter.clone()), ("location", target)],
->>>>>>> theirs
                 )?
                 .extract()?;
                 let char_end = sql[..span.end].chars().count();

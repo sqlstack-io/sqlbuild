@@ -72,11 +72,7 @@ pub(crate) struct ExpectedTypes<'a> {
 #[derive(Debug)]
 pub struct ModelEntryDecisions<'py> {
     pub model: Bound<'py, pyo3::types::PyAny>,
-<<<<<<< ours
     pub dialect: Bound<'py, Dialect>,
-=======
-    pub adapter: Bound<'py, pyo3::types::PyAny>,
->>>>>>> theirs
     pub snapshot: Bound<'py, pyo3::types::PyAny>,
     pub change_result: Bound<'py, pyo3::types::PyAny>,
     pub action: Bound<'py, pyo3::types::PyAny>,
@@ -125,11 +121,7 @@ pub struct AuditPlanning<'py> {
     pub model_locations: Bound<'py, pyo3::types::PyAny>,
     pub seed_locations: Bound<'py, pyo3::types::PyAny>,
     pub source_map: Bound<'py, pyo3::types::PyAny>,
-<<<<<<< ours
     pub dialect: Bound<'py, Dialect>,
-=======
-    pub adapter: Bound<'py, pyo3::types::PyAny>,
->>>>>>> theirs
     pub model_materializations: Bound<'py, pyo3::types::PyAny>,
     pub lineage: Py<NativeProjectGraph>,
 }

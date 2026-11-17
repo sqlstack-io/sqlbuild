@@ -284,14 +284,7 @@ fn upstream_relation<'py>(
     {
         return object(
             py,
-<<<<<<< ours
             render_source_relation(&source_entry(&source)?, Some(dialect.as_any()))?,
-=======
-            render_source_relation(
-                &source_entry(&source)?,
-                Some(adapter).filter(|value| !value.is_none()),
-            )?,
->>>>>>> theirs
         );
     }
     Ok(py.None().into_bound(py))
@@ -744,7 +737,6 @@ fn execute_queries<'py>(
     queries: &[PhysicalCursorQuery],
 ) -> PyResult<Option<(Values<'py>, HashSet<String>)>> {
     let py = request.project.py();
-<<<<<<< ours
     let statements = || -> PyResult<Vec<String>> {
         queries
             .iter()
@@ -760,52 +752,6 @@ fn execute_queries<'py>(
             .cursor_bounds(py, &statements, &progress)?
     else {
         return Ok(None);
-=======
-    let total = queries.len();
-    let on_progress = &request.on_progress;
-    let handles = (&request.connection, &request.execute);
-    let outcomes: Vec<Bound<'py, PyAny>> = if concurrency <= 1 || total <= 1 {
-        let mut outcomes: Vec<_> = Vec::new();
-        for (position, query) in queries.iter().enumerate() {
-            let identity = cursor_query_identity(query, (position + 1, total));
-            if !on_progress.is_none() {
-                on_progress.call1((format!("Inspecting cursor bounds {identity}..."),))?;
-            }
-            let outcome =
-                read_cursor_query(py, &adapter_cursor_sql(&request.adapter, query)?, handles)?;
-            report_cursor_query(py, query, (&outcome, &identity), on_progress)?;
-            outcomes.push(outcome);
-        }
-        outcomes
-    } else {
-        if !on_progress.is_none() {
-            on_progress.call1((format!(
-                "Inspecting cursor bounds for {total} relations ({} concurrent)...",
-                (concurrency as usize).min(total)
-            ),))?;
-        }
-        let mut tasks: Vec<_> = Vec::new();
-        for query in queries {
-            tasks.push(bound_task(
-                py,
-                adapter_cursor_sql(&request.adapter, query)?,
-                handles,
-            )?);
-        }
-        call_with(
-            &host_entry(py, RUN_BOUNDED)?,
-            &[
-                ("tasks", tuple(py, tasks)?),
-                ("concurrency", concurrency.into_pyobject(py)?.into_any()),
-                (
-                    "on_complete",
-                    completion_reporter(py, queries.to_vec(), on_progress)?,
-                ),
-            ],
-        )?
-        .try_iter()?
-        .collect::<PyResult<_>>()?
->>>>>>> theirs
     };
     let mut values = Values::new();
     let mut failed: HashSet<_> = HashSet::new();
@@ -956,7 +902,6 @@ fn eligible_target_maxes<'py>(
             sql: sql.extract()?,
         });
     }
-<<<<<<< ours
     let Read::Known(rows_by_request) = request
         .reads
         .get()
@@ -966,22 +911,6 @@ fn eligible_target_maxes<'py>(
         return Ok(values);
     };
     for ((info, _), rows) in requests.iter().zip(rows_by_request) {
-=======
-    let rows_by_request = call_with(
-        &host_entry(py, RUN_BOUNDED)?,
-        &[
-            ("tasks", tuple(py, tasks)?),
-            (
-                "concurrency",
-                inspection_concurrency(&request.adapter, &request.connection)?
-                    .into_pyobject(py)?
-                    .into_any(),
-            ),
-        ],
-    )?;
-    for ((info, _), rows) in requests.iter().zip(rows_by_request.try_iter()?) {
-        let rows = rows?;
->>>>>>> theirs
         if !rows.is_truthy()? {
             continue;
         }

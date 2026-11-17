@@ -169,11 +169,7 @@ pub(crate) fn prepare<'py>(
 }
 
 /// Recent executions the build reads, with older ones read back when deciding needs them.
-<<<<<<< ours
 pub(crate) fn read_history<R: ConsumptionReads + ?Sized>(
-=======
-pub(crate) fn read_history(
->>>>>>> theirs
     py: Python<'_>,
     connection: &R,
     (facts, policy): (&BuildFacts, Option<&ChangedPolicy>),

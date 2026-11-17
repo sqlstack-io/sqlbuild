@@ -1,12 +1,16 @@
 //! Find the group members that wait on each other, name a cycle among them, and say why each waits.
 
 use std::collections::{BTreeMap, BTreeSet};
-use crate::declarations::constants::SEED_KEY_PREFIX;
+
+use crate::declarations::constants::{
+    LOADER_KIND, SEED_KEY_PREFIX, SOURCE_KIND, SOURCE_LOADER_POINTER,
+};
 use crate::declarations::models::GroupCycle;
-use crate::declarations::constants::{LOADER_KIND, SOURCE_KIND, SOURCE_LOADER_POINTER};
 use crate::snapshots::models::SnapshotInput;
 
-/// Each member `name` waits for, with the first lineage edge that makes it wait: the node and the upstream it reads.
+/// The members that build the first nodes `name` reaches upstream, and no further, each with the
+/// first lineage edge that makes it wait: the node and the upstream it reads. Those members wait for
+/// whatever their own nodes read; a node `name` builds itself, such as a shared function, is walked past.
 pub(crate) fn member_waits(
     (name, selection): (&str, &BTreeSet<String>),
     deps: &BTreeMap<String, BTreeSet<String>>,
@@ -20,15 +24,15 @@ pub(crate) fn member_waits(
             continue;
         }
         for upstream in deps.get(key).into_iter().flatten() {
-            let builders: Option<&BTreeSet<&str>> = owners.get(upstream.as_str());
-            for owner in builders
-                .filter(|builders| !builders.contains(name))
-                .into_iter()
-                .flatten()
+            if let Some(builders) = owners.get(upstream.as_str())
+                && !builders.contains(name)
             {
-                waits
-                    .entry((*owner).to_owned())
-                    .or_insert_with(|| (key.to_owned(), upstream.clone()));
+                for owner in builders {
+                    waits
+                        .entry((*owner).to_owned())
+                        .or_insert_with(|| (key.to_owned(), upstream.clone()));
+                }
+                continue;
             }
             if !seen.contains(upstream.as_str()) {
                 pending.push(upstream);
@@ -119,36 +123,6 @@ pub(crate) fn named_cycle(
         description: waits.join("; "),
         shared_read,
     }
-}
-
-/// Every job left waits on another, so following first dependencies from any of them closes a cycle.
-pub(crate) fn describe_cycle(
-    remaining: &BTreeMap<String, BTreeSet<String>>,
-    reasons: &BTreeMap<(String, String), String>,
-) -> String {
-    let mut path: Vec<&str> = Vec::new();
-    let mut current = remaining.keys().next().map(String::as_str);
-    while let Some(name) = current {
-        if let Some(start) = path.iter().position(|seen| *seen == name) {
-            path.drain(..start);
-            break;
-        }
-        path.push(name);
-        current = remaining
-            .get(name)
-            .and_then(|deps| deps.iter().next())
-            .map(String::as_str);
-    }
-    path.iter()
-        .zip(path.iter().cycle().skip(1))
-        .map(|(job, dependency)| {
-            let reason = reasons
-                .get(&((*job).to_owned(), (*dependency).to_owned()))
-                .map_or("", String::as_str);
-            format!("{job} waits for {dependency} ({reason})")
-        })
-        .collect::<Vec<_>>()
-        .join("; ")
 }
 
 /// A node's published `deps`, and for a source its loader, whose upstream Python it waits for too.

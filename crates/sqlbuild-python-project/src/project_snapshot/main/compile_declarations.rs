@@ -14,24 +14,16 @@ use sqlbuild_orchestration::declarations::models::ResolvedConcurrency;
 pub fn compile_declarations(
     py: Python<'_>,
     input: SnapshotInput,
-<<<<<<< ours
     ((project_dir, graph, selected), concurrency): (
         (&Path, &ProjectGraph, &ProjectSelection),
         ResolvedConcurrency,
     ),
-=======
-    (project_dir, graph, selected): (&Path, &ProjectGraph, &ProjectSelection),
->>>>>>> theirs
     (inventory, declarations): (&OrchestrationInventory, Vec<Bound<'_, PyAny>>),
 ) -> PyResult<SnapshotInput> {
     snapshot_declarations::compile_declarations(
         py,
         input,
-<<<<<<< ours
         ((project_dir, graph, selected), concurrency),
-=======
-        (project_dir, graph, selected),
->>>>>>> theirs
         (inventory, declarations),
     )
 }

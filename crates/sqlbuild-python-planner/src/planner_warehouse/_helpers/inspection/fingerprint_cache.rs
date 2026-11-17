@@ -69,13 +69,8 @@ pub(crate) fn sqlite_error(py: Python<'_>, error: &PyErr) -> PyResult<bool> {
     Ok(error.is_instance(py, &imported(py, "sqlite3", "DatabaseError")?))
 }
 
-<<<<<<< ours
 pub(crate) fn close(py: Python<'_>, store: Option<Py<PyAny>>) -> PyResult<()> {
     let Some(store) = store else {
-=======
-pub(crate) fn close(py: Python<'_>, connection: Option<Py<PyAny>>) -> PyResult<()> {
-    let Some(connection) = connection else {
->>>>>>> theirs
         return Ok(());
     };
     match store.bind(py).call_method0("close") {

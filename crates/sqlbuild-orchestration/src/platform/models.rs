@@ -72,7 +72,9 @@ pub enum LocationHealth {
         failure: Option<WarehouseSyncFailure>,
         records_sent: u64,
         elapsed_millis: u64,
-<<<<<<< ours
+        /// A failed read's warehouse error, redacted and bounded; absent otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
         /// Why a read failed, in closed terms; the location's log has the warehouse's message.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         read_failure: Option<WarehouseReadFailure>,
@@ -85,11 +87,6 @@ pub enum LocationHealth {
         /// On the report that completes a sync, when the next safety sync is due unless a run ends first; absent otherwise and from older locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         next_sync_at: Option<DateTime<Utc>>,
-=======
-        /// A failed read's warehouse error, redacted and bounded; absent otherwise.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        error: Option<String>,
->>>>>>> theirs
     },
 }
 

@@ -99,12 +99,7 @@ pub(crate) fn inspection<'py>(
     known_fingerprints: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let state = MigrationStateInspection::new(
-<<<<<<< ours
         &runtime_reads(runtime)?,
-=======
-        &runtime_field(runtime, |runtime| &runtime.adapter)?,
-        &runtime_field(runtime, |runtime| &runtime.connection)?,
->>>>>>> theirs
         &crate::planner_migrations::_helpers::planning::planning_origin::planning_database(
             runtime,
         )?,

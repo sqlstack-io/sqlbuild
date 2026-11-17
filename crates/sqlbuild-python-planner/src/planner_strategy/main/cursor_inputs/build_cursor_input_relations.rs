@@ -9,17 +9,9 @@ use sqlbuild_python_base::native_host::models::Dialect;
 /// Cursor-bearing input relations of an incremental model, for runtime range discovery.
 #[inline]
 pub fn build_cursor_input_relations<'py>(
-<<<<<<< ours
     (model, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
     cursor_column: &Bound<'py, PyAny>,
     lookups: &CursorInputLookups<'py>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     cursor_inputs::build_cursor_input_relations((model, dialect), cursor_column, lookups)
-=======
-    (model, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    cursor_column: &Bound<'py, PyAny>,
-    lookups: &CursorInputLookups<'py>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    cursor_inputs::build_cursor_input_relations((model, adapter), cursor_column, lookups)
->>>>>>> theirs
 }

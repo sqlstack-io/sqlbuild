@@ -393,15 +393,10 @@ impl NativeProjectGraph {
 }
 
 /// A compiled project's sources and discovered Python nodes, which publication resolves selectors over.
-<<<<<<< ours
-pub struct ProjectSelection {
-    sources: Vec<(String, Option<String>)>,
-    allow_warehouse_round_trips: bool,
-=======
 #[derive(Debug)]
 pub struct ProjectSelection {
     pub(crate) sources: Vec<(String, Option<String>)>,
->>>>>>> theirs
+    pub(crate) allow_warehouse_round_trips: bool,
     pub nodes: PythonSelectionGraph,
 }
 

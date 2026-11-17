@@ -184,11 +184,7 @@ fn unresolved_bounds_error(py: Python<'_>, name: &str, cause: Option<&str>) -> P
 }
 
 #[pyfunction]
-<<<<<<< ours
 #[pyo3(signature = (*, model, dialect, context, external_sql_reference_resolver))]
-=======
-#[pyo3(signature = (*, model, adapter, context, external_sql_reference_resolver))]
->>>>>>> theirs
 pub(crate) fn resolve_model_hook_entries<'py>(
     model: &Bound<'py, PyAny>,
     dialect: Bound<'py, Dialect>,

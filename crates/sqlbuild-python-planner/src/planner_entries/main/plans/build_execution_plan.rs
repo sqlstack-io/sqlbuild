@@ -71,21 +71,9 @@ pub fn build_execution_plan<'py>(
         },
         native_field(&args.value("policies")?, "plan_sql_tests")?.is_truthy()?,
     )?;
-<<<<<<< ours
     let planned = reads.get().reads().within_inspection(py, &mut || {
         planned_output(&args, &runtime, (&scopes, &overrides), test_planning.get())
     });
-=======
-    let planned = (|| {
-        let catalog = call_with(
-            &host_entry(py, INSPECTION_CATALOG)?,
-            &[("adapter", adapter), ("connection", connection)],
-        )?;
-        within(&catalog, |_| {
-            planned_output(&args, &runtime, (&scopes, &overrides), test_planning.get())
-        })
-    })();
->>>>>>> theirs
     let joined = test_planning.get().result(py);
     let planned = planned?;
     joined?;

@@ -48,11 +48,7 @@ pub(crate) fn resolve_sql(
         result = replace_markers(&result, kind, Some(syntax.clone().into()), |name, marker| {
             let target = mapping_get(&locations, name)?;
             let target = if target.is_none() {target} else if kind == crate::planner_scenario::constants::SOURCE_MARKER {
-<<<<<<< ours
                 object(py, render_source_relation(&target, Some(context.dialect.as_any()))?)?
-=======
-                object(py, render_source_relation(&target, Some(&context.adapter.clone()).filter(|value| !value.is_none()))?)?
->>>>>>> theirs
             } else {native_field(&target, "qualified_name")?};
             if target.is_none() {
                 let marker = string(py, marker).repr()?.to_str()?.to_owned();

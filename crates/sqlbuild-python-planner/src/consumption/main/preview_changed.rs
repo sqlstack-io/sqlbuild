@@ -10,11 +10,7 @@ use sqlbuild_state::consumption::models::{ChangedPolicy, ConsumptionHistory};
 use sqlbuild_python_front::native_host::types::ConsumptionReads;
 
 /// What `plan --changed` previews: what a build would run now, read without recording anything.
-<<<<<<< ours
 pub fn preview_changed<R: ConsumptionReads + ?Sized>(
-=======
-pub fn preview_changed(
->>>>>>> theirs
     (plan, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     reads: &R,
     (policy, full_refresh): (&ChangedPolicy, bool),

@@ -58,7 +58,6 @@ pub(crate) fn run_compile_pipeline<'py>(
         options,
         (&["discovered_inputs", "adapter"], &["options", "hooks"]),
     )?;
-<<<<<<< ours
     planned_project(
         (
             &arguments.value("discovered_inputs")?,
@@ -67,37 +66,6 @@ pub(crate) fn run_compile_pipeline<'py>(
         (&arguments.value("options")?, arguments.value("hooks")?),
         (None, None),
     )
-=======
-    let discovered: Bound<'py, PyAny> = arguments.value("discovered_inputs")?;
-    let adapter: Bound<'py, PyAny> = arguments.value("adapter")?;
-    let options: Bound<'py, PyAny> =
-        apply_unit_test_selectors(&arguments.value("options")?, &discovered)?;
-    let hooks: Bound<'py, PyAny> = arguments.value("hooks")?;
-    let hooks: Bound<'py, PyAny> = if hooks.is_none() {
-        host_entry(py, ExecutorHost::ConnectionHooks)?.call0()?
-    } else {
-        hooks
-    };
-    let on_progress: Bound<'py, PyAny> = native_field(&hooks, "on_progress")?;
-    let expansion_reuse: Bound<'py, EarlySqlLint> =
-        Bound::new(py, EarlySqlLint::new(false, false))?;
-    let on_inputs_ready: Bound<'py, PyAny> =
-        EarlySqlLint::inputs_ready_hook(&expansion_reuse, GENERIC_DIALECT, &adapter);
-    let compiled: Bound<'py, PyAny> = compiled_phase(
-        (&discovered, &adapter),
-        &options,
-        &on_progress,
-        Some(&on_inputs_ready),
-    )?;
-    let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
-    let graph: Bound<'py, PyAny> = project_graph(&project)?;
-    run_rules_gate(
-        (&discovered, &adapter, expansion_reuse.as_any()),
-        (&options, &on_progress),
-        (&project, &graph),
-    )?;
-    planned((&discovered, &adapter), (&options, &hooks), &compiled)
->>>>>>> theirs
 }
 
 /// Run the configured rules and stop the command when any of them finds a fault.
@@ -115,59 +83,7 @@ fn run_rules_gate<'py>(
         (options, on_progress),
         (project, graph),
     )?
-<<<<<<< ours
     else {
-=======
-    .into_bound(py);
-    progress(on_progress, "Evaluating configured rules...")?;
-    let started: f64 = monotonic(py)?;
-    let dialect: Bound<'py, PyAny> = adapter.call_method0("sql_analysis_dialect")?;
-    let dialect: Bound<'py, PyAny> = if dialect.is_truthy()? {
-        dialect
-    } else {
-        GENERIC_DIALECT.into_pyobject(py)?.into_any()
-    };
-    let selected_keys: Bound<'py, PyAny> =
-        resolve_configured_rule_selection(options, discovered, project)?;
-    let result: Bound<'py, PyAny> = evaluate_rules(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("graph", graph.clone()),
-                ("discovered_inputs", discovered.clone()),
-                ("config", config.clone()),
-                ("project_dir", project_dir),
-                ("dialect", dialect),
-                ("selected_keys", selected_keys),
-                ("early_lint", expansion_reuse.clone()),
-                (
-                    "no_sql_analysis",
-                    native_field(options, "no_sql_validation")?,
-                ),
-            ],
-        )?),
-    )?;
-    if !on_progress.is_none() {
-        let elapsed: f64 = monotonic(py)? - started;
-        let message: String = rules_progress(elapsed, &result, true)?;
-        let note: Option<String> = format_skipped_models(
-            &native_field(&result, "skipped_models")?.extract::<Vec<_>>()?,
-            native_field(options, "verbose")?.is_truthy()?,
-        );
-        for line in std::iter::once(message).chain(note.map(|note| format!("note: {note}"))) {
-            on_progress.call1((line,))?;
-        }
-    }
-    let mut failing: Vec<Bound<'py, PyAny>> = Vec::new();
-    for finding in native_field(&result, "findings")?.try_iter()? {
-        let finding: Bound<'py, PyAny> = finding?;
-        if counts_toward_exit(&native_field(&finding, "code")?.extract::<String>()?) {
-            failing.push(finding);
-        }
-    }
-    if failing.is_empty() {
->>>>>>> theirs
         return Ok(());
     };
     let notice: Vec<(&str, String)> = notice
@@ -374,7 +290,13 @@ pub(crate) fn configured_rule_failures<'py>(
     if !on_progress.is_none() {
         let elapsed: f64 = monotonic(py)? - started;
         let message: String = rules_progress(elapsed, &result, true)?;
-        on_progress.call1((message,))?;
+        let note: Option<String> = format_skipped_models(
+            &native_field(&result, "skipped_models")?.extract::<Vec<_>>()?,
+            native_field(options, "verbose")?.is_truthy()?,
+        );
+        for line in std::iter::once(message).chain(note.map(|note| format!("note: {note}"))) {
+            on_progress.call1((line,))?;
+        }
     }
     let mut failing: Vec<Bound<'py, PyAny>> = Vec::new();
     for finding in native_field(&result, "findings")?.try_iter()? {

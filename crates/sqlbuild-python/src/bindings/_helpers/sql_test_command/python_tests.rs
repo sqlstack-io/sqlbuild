@@ -124,11 +124,7 @@ pub(crate) fn selected_python_tests(
             (
                 Some(PYTHON_TESTS_INPUT_CODE),
                 Some(
-<<<<<<< ours
                     "add test_*.py modules under tests/python/, tests/providers/ or tests/orchestration/, mirroring the code they test",
-=======
-                    "add test_*.py modules under tests/python/ or tests/providers/, mirroring the code they test",
->>>>>>> theirs
                 ),
             ),
         ));
