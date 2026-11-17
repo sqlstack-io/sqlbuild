@@ -4,28 +4,29 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python, pyclass, pymethods};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString};
 use sqlbuild_core::event_export::constants::TIMEOUT_ERROR_TYPE;
 use sqlbuild_core::event_export::main::drop_lifecycle_attempts::drop_lifecycle_attempts;
 use sqlbuild_core::event_export::main::retain_outcome_events::retain_outcome_events;
 use sqlbuild_core::event_export::main::take_lifecycle_event::take_lifecycle_event;
-use sqlbuild_core::event_export::models::{EventQueue, ExportSnapshot, QueuedEvent};
+use sqlbuild_core::event_export::models::{EventQueue, ExportSnapshot};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::event_exporting::dispatcher::{Exporter, Queued, Shared, State};
+use crate::event_exporting::_helpers::dispatcher::Exporter;
+use crate::event_exporting::_helpers::dispatcher::Queued;
+use crate::event_exporting::_helpers::dispatcher::Shared;
+use crate::event_exporting::_helpers::dispatcher::State;
+use crate::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::event_exporting::constants::CHARGE_LIMIT_SECONDS;
 use sqlbuild_python_base::event_exporting::constants::INVOCATION_THREAD_PREFIX;
 use sqlbuild_python_base::event_exporting::constants::LANE_WINDOW;
-use sqlbuild_python_base::event_exporting::constants::NO_SECONDS;
-use sqlbuild_python_base::event_exporting::constants::POLL_SECONDS;
 use sqlbuild_python_base::event_exporting::main::error_type_of::error_type_of;
 use sqlbuild_python_base::event_exporting::models::EventExportSummary;
 use sqlbuild_python_base::event_exporting::models::EventExporterFailure;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 
 /// Which long-lived dispatcher thread a worker runs.
 #[derive(Clone, Copy)]
@@ -35,17 +36,11 @@ pub(crate) enum WorkerRole {
     Health,
 }
 
-/// A long-lived dispatcher thread's target.
-#[pyclass(module = "sqlbuild._native", frozen)]
-pub(crate) struct DispatcherWorker {
-    shared: Arc<Shared>,
-    role: WorkerRole,
-}
-
 /// Outcome events held for blocked exporters, each with its exporter index.
 type HeldOutcomes = Vec<(usize, Queued)>;
 
 /// One attempt handed to a lane and not yet reported.
+#[derive(Debug)]
 pub(crate) struct Attempt {
     token: u64,
     queued: Queued,
@@ -53,6 +48,7 @@ pub(crate) struct Attempt {
 }
 
 /// One exporter's long-lived delivery thread, its call queue and the attempts it still owes.
+#[derive(Debug)]
 pub(crate) struct Lane {
     calls: Py<PyAny>,
     thread: Py<PyAny>,
@@ -64,12 +60,12 @@ pub(crate) struct Lane {
 /// What one dispatch round reads from the dispatcher besides its state.
 #[derive(Clone, Copy)]
 pub(crate) struct Round<'a> {
-    shared: &'a Shared,
-    diagnostics: Option<usize>,
+    pub(crate) shared: &'a Shared,
+    pub(crate) diagnostics: Option<usize>,
 }
 
 /// The next thing the notification thread delivers.
-enum Notification {
+pub(crate) enum Notification {
     Periodic(ExportSnapshot),
     Final(Py<EventExportSummary>),
     Failure(EventExporterFailure),
@@ -123,7 +119,7 @@ impl Lane {
 
 impl State {
     /// Account reported attempts against their lanes, returning whether a diagnostic was queued.
-    fn record_reports(
+    pub(crate) fn record_reports(
         &mut self,
         py: Python<'_>,
         reports: Vec<(u64, Option<String>)>,
@@ -213,7 +209,7 @@ impl State {
     }
 
     /// Retire `index`'s lane: claimed calls fail as timed out and block it until they return.
-    fn abandon_lane(
+    pub(crate) fn abandon_lane(
         &mut self,
         py: Python<'_>,
         (index, timed_out): (usize, bool),
@@ -259,7 +255,7 @@ impl State {
     }
 
     /// Abandon lanes whose started call outlived `timeout`, charging each round at most `CHARGE_LIMIT_SECONDS`.
-    fn expire_lanes(
+    pub(crate) fn expire_lanes(
         &mut self,
         py: Python<'_>,
         timeout: Duration,
@@ -293,7 +289,11 @@ impl State {
     }
 
     /// Drop every queued and lane-waiting event that is not an outcome, counting each attempt.
-    fn reserve_for_outcomes(&mut self, py: Python<'_>, claims: &Py<PyDict>) -> PyResult<()> {
+    pub(crate) fn reserve_for_outcomes(
+        &mut self,
+        py: Python<'_>,
+        claims: &Py<PyDict>,
+    ) -> PyResult<()> {
         let capacity: usize = self.queue.capacity;
         let (queue, dropped) = retain_outcome_events(std::mem::replace(
             &mut self.queue,
@@ -323,7 +323,7 @@ impl State {
     }
 
     /// Move queued events onto exporter lanes while every eligible lane has room.
-    fn feed(&mut self, py: Python<'_>, round: Round<'_>) -> PyResult<bool> {
+    pub(crate) fn feed(&mut self, py: Python<'_>, round: Round<'_>) -> PyResult<bool> {
         let mut notify: bool = false;
         while !self.queue.items.is_empty() {
             let capacity: usize = self.queue.capacity;
@@ -422,7 +422,7 @@ impl State {
     }
 
     /// Whether any lane still owes a reported attempt.
-    fn busy(&self) -> bool {
+    pub(crate) fn busy(&self) -> bool {
         self.lanes
             .iter()
             .flatten()
@@ -430,7 +430,7 @@ impl State {
     }
 
     /// End every lane once it has run what was queued before, keeping its thread to join.
-    fn retire_lanes(&mut self, py: Python<'_>) -> PyResult<()> {
+    pub(crate) fn retire_lanes(&mut self, py: Python<'_>) -> PyResult<()> {
         let lanes: Vec<Lane> = self.lanes.drain(..).flatten().collect();
         for lane in lanes {
             lane.retire(py)?;
@@ -454,7 +454,7 @@ fn cancel(claims: &Bound<'_, PyDict>, token: u64) -> PyResult<()> {
 }
 
 /// Warn once per stall that a sink call outlived its timeout; best-effort, ignoring write errors.
-fn warn_blocked(py: Python<'_>, name: &str, timeout: Duration) {
+pub(crate) fn warn_blocked(py: Python<'_>, name: &str, timeout: Duration) {
     drop(write_stderr(
         py,
         &format!(
@@ -463,231 +463,4 @@ fn warn_blocked(py: Python<'_>, name: &str, timeout: Duration) {
             timeout.as_secs_f64()
         ),
     ));
-}
-
-impl DispatcherWorker {
-    pub(crate) fn new(shared: Arc<Shared>, role: WorkerRole) -> Self {
-        Self { shared, role }
-    }
-
-    /// The state this worker's dispatcher shares.
-    pub(crate) fn shared(&self) -> &Shared {
-        &self.shared
-    }
-
-    /// Wait until bound, returning `false` when stopped first.
-    fn await_bound(&self, py: Python<'_>) -> PyResult<bool> {
-        let shared = &self.shared;
-        let _held = shared.hold(py)?;
-        loop {
-            let state = shared.locked()?;
-            if state.bound {
-                return Ok(true);
-            }
-            if state.stopping || state.force_stop {
-                return Ok(false);
-            }
-            drop(state);
-            shared.wait(py, POLL_SECONDS)?;
-        }
-    }
-
-    fn run_dispatch(&self, py: Python<'_>) -> PyResult<()> {
-        let result = (|| -> PyResult<()> {
-            if !self.await_bound(py)? {
-                return Ok(());
-            }
-            while self.dispatch_round(py)? {}
-            Ok(())
-        })();
-        let retired: PyResult<()> = (|| {
-            let _held = self.shared.hold(py)?;
-            self.shared.locked()?.retire_lanes(py)
-        })();
-        self.shared.dispatcher_finished(py)?;
-        retired?;
-        result
-    }
-
-    /// Record reported outcomes, expire, trim and feed lanes, then wait; `false` once delivery stops.
-    fn dispatch_round(&self, py: Python<'_>) -> PyResult<bool> {
-        let shared = &self.shared;
-        let round = Round {
-            shared,
-            diagnostics: shared.diagnostics(),
-        };
-        let _held = shared.hold(py)?;
-        let reports: Vec<(u64, Option<String>)> = self.reported(py)?;
-        let mut state = shared.locked()?;
-        let mut notify: bool = state.record_reports(py, reports, round)?;
-        let stopped: bool = if Shared::past_deadline(&state) || state.force_stop {
-            let drained: Vec<QueuedEvent<Queued>> = std::mem::take(&mut state.queue.items);
-            for item in &drained {
-                state.counts = drop_lifecycle_attempts(
-                    std::mem::take(&mut state.counts),
-                    &item.eligible_exporters,
-                );
-            }
-            for index in 0..state.lanes.len() {
-                notify |= state.abandon_lane(py, (index, false), round)?;
-            }
-            for (index, _) in std::mem::take(&mut state.held) {
-                state.counts = drop_lifecycle_attempts(std::mem::take(&mut state.counts), &[index]);
-            }
-            drop(drained);
-            true
-        } else {
-            notify |= state.expire_lanes(py, shared.invocation_timeout, round)?;
-            if !state.reserved && state.reserve_at.is_some_and(|at| Instant::now() >= at) {
-                state.reserved = true;
-                state.reserve_for_outcomes(py, &shared.claims)?;
-            }
-            notify |= state.feed(py, round)?;
-            state.stopping && !state.busy() && state.queue.items.is_empty() && state.held.is_empty()
-        };
-        let blocked: Vec<String> = std::mem::take(&mut state.newly_blocked);
-        drop(state);
-        for name in blocked {
-            warn_blocked(py, &name, shared.invocation_timeout);
-        }
-        if notify {
-            shared.notify_all(py)?;
-        }
-        if !stopped {
-            shared.wait(py, POLL_SECONDS)?;
-        }
-        Ok(!stopped)
-    }
-
-    /// Every `(token, sanitized error type)` delivery threads reported since the last round.
-    fn reported(&self, py: Python<'_>) -> PyResult<Vec<(u64, Option<String>)>> {
-        let results: &Bound<'_, PyAny> = self.shared.results.bind(py);
-        let mut reports: Vec<(u64, Option<String>)> = Vec::new();
-        while !results.call_method0("empty")?.is_truthy()? {
-            let (token, error): (u64, Bound<'_, PyAny>) =
-                results.call_method0("get_nowait")?.extract()?;
-            let error_type: Option<String> =
-                (!error.is_none()).then(|| error_type_of(py, &PyErr::from_value(error)));
-            reports.push((token, error_type));
-        }
-        Ok(reports)
-    }
-
-    fn next_notification(&self, py: Python<'_>) -> PyResult<Notification> {
-        let shared = &self.shared;
-        let _held = shared.hold(py)?;
-        loop {
-            let mut state = shared.locked()?;
-            if let Some(snapshot) = state.pending_periodic.take() {
-                state.periodic_inflight = Some(snapshot.health_signature());
-                return Ok(Notification::Periodic(snapshot));
-            }
-            state.periodic_inflight = None;
-            if !state.final_delivered
-                && let Some(summary) = &state.final_notification
-            {
-                return Ok(Notification::Final(summary.clone_ref(py)));
-            }
-            if let Some(failure) = state.failures.pop_front() {
-                return Ok(Notification::Failure(failure));
-            }
-            if state.notification_stopping {
-                return Ok(Notification::Stop);
-            }
-            drop(state);
-            shared.wait(py, POLL_SECONDS)?;
-        }
-    }
-
-    fn run_notifications(&self, py: Python<'_>) -> PyResult<()> {
-        let shared = &self.shared;
-        loop {
-            match self.next_notification(py)? {
-                Notification::Periodic(snapshot) => {
-                    let signature: [u64; 7] = snapshot.health_signature();
-                    if let Some(callback) = &shared.summary_callback {
-                        let summary = EventExportSummary::object(py, snapshot)?;
-                        drop(callback.bind(py).call1((summary,)));
-                    }
-                    let _held = shared.hold(py)?;
-                    let mut state = shared.locked()?;
-                    state.last_published_periodic = signature;
-                    state.periodic_inflight = None;
-                }
-                Notification::Final(summary) => {
-                    if let Some(callback) = &shared.summary_callback {
-                        drop(callback.bind(py).call1((summary,)));
-                    }
-                    let released = {
-                        let _held = shared.hold(py)?;
-                        let mut state = shared.locked()?;
-                        state.final_delivered = true;
-                        state.final_notification.take()
-                    };
-                    drop(released);
-                    return Ok(());
-                }
-                Notification::Failure(failure) => {
-                    if let Some(callback) = &shared.failure_callback {
-                        let failure = Py::new(py, failure)?;
-                        drop(callback.bind(py).call1((failure,)));
-                    }
-                }
-                Notification::Stop => return Ok(()),
-            }
-        }
-    }
-
-    /// Wait one health interval, returning `false` once health publication stops.
-    fn await_interval(&self, py: Python<'_>) -> PyResult<bool> {
-        let shared = &self.shared;
-        let deadline: Instant = Instant::now() + shared.health_interval;
-        let _held = shared.hold(py)?;
-        loop {
-            if shared.locked()?.health_stopping {
-                return Ok(false);
-            }
-            let remaining: f64 = deadline
-                .saturating_duration_since(Instant::now())
-                .as_secs_f64();
-            if remaining <= NO_SECONDS {
-                return Ok(true);
-            }
-            shared.wait(py, remaining)?;
-        }
-    }
-
-    fn run_health(&self, py: Python<'_>) -> PyResult<()> {
-        let shared = &self.shared;
-        while self.await_interval(py)? {
-            let snapshot: ExportSnapshot = shared.current_snapshot(py)?;
-            let signature: [u64; 7] = snapshot.health_signature();
-            let _held = shared.hold(py)?;
-            let mut state = shared.locked()?;
-            if state.health_stopping || state.final_notification.is_some() {
-                return Ok(());
-            }
-            if signature == state.last_published_periodic
-                || state.periodic_inflight == Some(signature)
-            {
-                state.pending_periodic = None;
-                continue;
-            }
-            state.pending_periodic = Some(snapshot);
-            drop(state);
-            shared.notify_all(py)?;
-        }
-        Ok(())
-    }
-}
-
-#[pymethods]
-impl DispatcherWorker {
-    fn __call__(&self, py: Python<'_>) -> PyResult<()> {
-        match self.role {
-            WorkerRole::Dispatch => self.run_dispatch(py),
-            WorkerRole::Notify => self.run_notifications(py),
-            WorkerRole::Health => self.run_health(py),
-        }
-    }
 }
