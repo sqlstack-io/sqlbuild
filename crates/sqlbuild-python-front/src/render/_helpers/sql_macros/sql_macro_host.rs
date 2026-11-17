@@ -17,13 +17,13 @@ use sqlbuild_analysis::sql_macros::errors::SqlMacroError;
 use sqlbuild_analysis::sql_macros::main::bare_macro_calls::bare_macro_calls;
 use sqlbuild_analysis::sql_macros::main::byte_text_splices::byte_text_splices;
 use sqlbuild_analysis::sql_macros::main::declaration_visible_from_macro::declaration_visible_from_macro;
-use sqlbuild_analysis::sql_macros::main::expand_sql_macro_call::expand_sql_macro_call;
+use sqlbuild_analysis::sql_macros::main::expand_sql_macro_calls::expand_sql_macro_calls;
 use sqlbuild_analysis::sql_macros::main::parse_sql_macro::parse_sql_macro;
 use sqlbuild_analysis::sql_macros::main::render_inline_collection::render_inline_collection;
 use sqlbuild_analysis::sql_macros::main::sql_macro_calls::sql_macro_calls;
 use sqlbuild_analysis::sql_macros::models::{
-    ExpandedText, InsertedNames, RenderedDeclarations, SqlMacroCall, SqlMacroCheck,
-    SqlMacroDefinition, SqlMacroLocation, TextContext, TextSplice,
+    ExpandedText, RenderedDeclarations, SqlMacroCall, SqlMacroCheck, SqlMacroDefinition,
+    SqlMacroLocation, TextContext, TextSplice,
 };
 use sqlbuild_analysis::sql_macros::types::{ConstantShape, SqlMacroHost, SqlMacroScope};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
@@ -68,6 +68,10 @@ struct PyHost<'r, 'a, 'py> {
     request: &'r DeclarationExpansion<'a, 'py>,
     source: SqlMacroSource<'a, 'py>,
     facts: RefCell<SqlMacroFacts<'py>>,
+    /// The byte of the authored file where its query starts, once per pass rather than per call.
+    query_byte: usize,
+    /// Each macro this pass parsed, by name, path and source, so repeated calls parse it once.
+    definitions: RefCell<HashMap<String, Arc<SqlMacroDefinition>>>,
     adapter: String,
     analysis_dialect: Option<String>,
 }
@@ -100,6 +104,8 @@ pub(crate) fn expanded_sql_macro_calls<'py>(
         request,
         source,
         facts: RefCell::new(SqlMacroFacts::default()),
+        query_byte: source.origin.map_or(0, query_start),
+        definitions: RefCell::new(HashMap::new()),
         adapter: request.rendering.adapter_name(request.context.py()),
         analysis_dialect: request.rendering.analysis_dialect(request.context.py())?,
     };
@@ -110,59 +116,61 @@ pub(crate) fn expanded_sql_macro_calls<'py>(
         stack: &[],
         owner: &owner,
     };
-    let mut inserted: InsertedNames = InsertedNames::default();
-    let mut replacements: Vec<ExpandedText> = Vec::with_capacity(starts.len());
-    for start in starts {
-        let Some(call) = by_char.get(start) else {
-            return Err(macro_error(
-                request,
-                &SqlMacroError {
-                    code: UNKNOWN_CODE,
-                    message: "a SQL macro call could not be read".to_owned(),
-                    locations: Vec::new(),
-                    help: None,
-                },
-            ));
-        };
-        match expand_sql_macro_call(&host, &context, inserted, call) {
-            Ok((text, updated)) => {
-                replacements.push(text);
-                inserted = updated;
-            }
-            Err(ExpansionFailure::Host(error)) => return Err(error),
-            Err(ExpansionFailure::Macro(error)) => {
-                let located: SqlMacroError = match host.call_location((call.start, call.end)) {
-                    Some(location) if is_macro_file_error(&error) => error.at(location),
-                    Some(location) => error.at_call(location),
-                    None => error,
-                };
-                return Err(macro_error(request, &located));
-            }
+    let read: Vec<&SqlMacroCall> = starts
+        .iter()
+        .map_while(|start| by_char.get(start).copied())
+        .collect();
+    let replacements: Vec<ExpandedText> = match expand_sql_macro_calls(&host, &context, &read) {
+        Ok(replacements) => replacements,
+        Err((_, ExpansionFailure::Host(error))) => return Err(error),
+        Err((index, ExpansionFailure::Macro(error))) => {
+            let call: &SqlMacroCall = read[index];
+            let located: SqlMacroError = match host.call_location((call.start, call.end)) {
+                Some(location) if is_macro_file_error(&error) => error.at(location),
+                Some(location) => error.at_call(location),
+                None => error,
+            };
+            return Err(macro_error(request, &located));
         }
+    };
+    if read.len() < starts.len() {
+        return Err(macro_error(
+            request,
+            &SqlMacroError {
+                code: UNKNOWN_CODE,
+                message: "a SQL macro call could not be read".to_owned(),
+                locations: Vec::new(),
+                help: None,
+            },
+        ));
     }
     Ok((replacements, host.facts.into_inner()))
 }
 
+/// The byte of the authored file `origin` where its query starts.
+fn query_start(origin: SqlCallOrigin<'_>) -> usize {
+    if origin.contents.ends_with(origin.query) {
+        origin.contents.len() - origin.query.len()
+    } else {
+        origin.contents.find(origin.query).unwrap_or(0)
+    }
+}
+
 /// Where the call spanning bytes `span` of `sql` starts in the authored file `origin`.
 fn authored_location(
-    origin: SqlCallOrigin<'_>,
+    (origin, query_byte): (SqlCallOrigin<'_>, usize),
     sql: &str,
     span: (usize, usize),
 ) -> SqlMacroLocation {
-    authored_span(origin, sql, span).0
+    authored_span((origin, query_byte), sql, span).0
 }
 
 /// Where the call at bytes `start..end` of `sql` starts and ends in the authored file `origin`.
 fn authored_span(
-    origin: SqlCallOrigin<'_>,
+    (origin, query_byte): (SqlCallOrigin<'_>, usize),
     sql: &str,
     (start, end): (usize, usize),
 ) -> (SqlMacroLocation, (usize, usize)) {
-    let query_byte: usize = if origin.contents.ends_with(origin.query) {
-        origin.contents.len() - origin.query.len()
-    } else {
-        origin.contents.find(origin.query).unwrap_or(0)
-    };
     let snippet: &str = &sql[start..end];
     let authored: usize = if sql == origin.query {
         query_byte + start
@@ -219,7 +227,7 @@ pub(crate) fn reject_bare_macro_calls(request: &DeclarationExpansion<'_, '_>) ->
         "write @sql.{name}(...) to call a SQL macro or @py.{name}(...) to call a Python macro"
     ))
     .at_call(authored_location(
-        origin,
+        (origin, query_start(origin)),
         request.sql,
         (start, start + 1 + name.len()),
     ));
@@ -302,7 +310,7 @@ impl<'py> PyHost<'_, '_, 'py> {
     /// The authored location of the call spanning bytes `span` of the caller's text.
     fn call_location(&self, span: (usize, usize)) -> Option<SqlMacroLocation> {
         Some(authored_location(
-            self.source.origin?,
+            (self.source.origin?, self.query_byte),
             self.request.sql,
             span,
         ))
@@ -458,7 +466,18 @@ impl<'py> SqlMacroHost for PyHost<'_, '_, 'py> {
             ));
         }
         let source: String = host(field_text(&loaded, "raw_source"))?;
-        let definition: Arc<SqlMacroDefinition> = Arc::new(parse_sql_macro(name, &path, &source)?);
+        let key: String = format!("{name}\n{path}\n{source}");
+        let known: Option<Arc<SqlMacroDefinition>> = self.definitions.borrow().get(&key).cloned();
+        let definition: Arc<SqlMacroDefinition> = match known {
+            Some(definition) => definition,
+            None => {
+                let parsed = Arc::new(parse_sql_macro(name, &path, &source)?);
+                self.definitions
+                    .borrow_mut()
+                    .insert(key, Arc::clone(&parsed));
+                parsed
+            }
+        };
         host(self.record_use(name))?;
         Ok(definition)
     }
@@ -594,7 +613,7 @@ impl<'py> SqlMacroHost for PyHost<'_, '_, 'py> {
         let Some(origin) = self.source.origin else {
             return;
         };
-        let (location, end) = authored_span(origin, self.request.sql, call);
+        let (location, end) = authored_span((origin, self.query_byte), self.request.sql, call);
         self.facts.borrow_mut().checks.push(SqlMacroCheck {
             call: Some((location, end)),
             ..check

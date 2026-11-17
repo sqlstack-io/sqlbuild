@@ -5,6 +5,7 @@ use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_s
 use crate::sql_macros::tests::helpers::{adapter_parses, expanded_for};
 use crate::sql_macros::tests::test_types::{
     AsciiArguments, ExpansionErrorTestCase, ExpansionTestCase, PythonArgumentTestCase,
+    ReturnsSequenceTestCase,
 };
 
 const CENTS_TO_DOLLARS: (&str, &str) = (
@@ -136,6 +137,10 @@ const ORDER_KEY: (&str, &str) = (
 const SHOUTED_WRONG: (&str, &str) = (
     "shouted",
     "MACRO (description \"Shouted\", arguments (value VARCHAR), returns BIGINT);\n\nUPPER(@value)\n",
+);
+const SHOUTED_TEXT: (&str, &str) = (
+    "shouted",
+    "MACRO (description \"Shouted\", arguments (value VARCHAR), returns VARCHAR);\n\nUPPER(@value)\n",
 );
 const SHOUTED_UNTYPED: (&str, &str) = (
     "shouted",
@@ -818,6 +823,38 @@ fn given_a_body_whose_type_breaks_its_declaration_when_expanding_then_the_error_
             test_case.description,
             error.message
         );
+    }
+}
+
+#[test]
+fn given_one_body_under_different_returns_when_expanding_in_turn_then_each_returns_is_checked() {
+    let test_cases = [
+        ReturnsSequenceTestCase {
+            description: "a fitting declaration, then a breaking one, alternating",
+            definitions: &[SHOUTED_TEXT, SHOUTED_WRONG, SHOUTED_TEXT, SHOUTED_WRONG],
+            sql: "SELECT @sql.shouted(o.status) FROM orders AS o",
+            expected_codes: &[None, Some("P024"), None, Some("P024")],
+        },
+        ReturnsSequenceTestCase {
+            description: "a breaking declaration, then a fitting one",
+            definitions: &[SHOUTED_WRONG, SHOUTED_TEXT],
+            sql: "SELECT @sql.shouted(o.status) FROM orders AS o",
+            expected_codes: &[Some("P024"), None],
+        },
+    ];
+
+    for test_case in test_cases {
+        let codes: Vec<Option<&str>> = test_case
+            .definitions
+            .iter()
+            .map(|definition| {
+                expanded_for("duckdb", &[*definition], test_case.sql)
+                    .err()
+                    .map(|error| error.code)
+            })
+            .collect();
+
+        assert_eq!(codes, test_case.expected_codes, "{}", test_case.description);
     }
 }
 
