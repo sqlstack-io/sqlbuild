@@ -1,93 +1,59 @@
-// A compact card's title, fitted to the card once: the largest font that fits the card, wrapped at
-// name separators onto as many lines as fit, and shortened in the middle when even the smallest font
-// doesn't fit. Pure apart from the default text measurer; worked out once per card, never per zoom step.
+// Text measured to fit a card: the status line's parts, and a zoomed-out pill's name. A pill's name is
+// sized on screen, as large as fits between `PILL.minFont` and `PILL.maxFont`, then cut with an
+// ellipsis at its end. Worked out once per compact level, never per zoom step.
 
-/** The width of `text` at `font` px (and `weight`, 600 by default), in px. */
+import { CARD_WIDTH } from '$lib/lineage/fit';
+
+/** The width of `text` at `font` px (and `weight`), in px. */
 export type Measure = (text: string, font: number, weight?: number) => number;
 
-export type TitleBox = {
-	/** Room for the title, in the card's own px. */
-	width: number;
-	height: number;
-	/** The smallest font, in the card's px, and the largest the title may grow to. */
-	minFont: number;
-	maxFont: number;
-};
+/** A zoomed-out pill's parts, in px on screen. */
+export const PILL = { height: 30, ring: 20, padLeft: 5, gap: 8, padRight: 14, border: 1, minFont: 12, maxFont: 14, weight: 500 } as const;
 
-export type TitleFit = { font: number; lines: string[] };
-
-export const LINE_HEIGHT = 1.15;
-const ELLIPSIS = '…';
-
-/** Splits after each separator a name may wrap at: `_`, `.`, `/`, `-` and spaces. */
-function tokens(text: string): string[] {
-	return text.split(/(?<=[_./\- ])/).filter(Boolean);
+/** Room for a pill's name on screen at `zoom`: the card's width less the pill's ring and padding. */
+export function pillRoom(zoom: number): number {
+	return CARD_WIDTH * zoom - 2 * PILL.border - PILL.padLeft - PILL.ring - PILL.gap - PILL.padRight;
 }
 
-/**
- * `text` wrapped greedily at its separators, or anywhere in a part too wide for a line; with `soft`,
- * null instead when a part is too wide.
- */
-export function wrap(text: string, width: number, font: number, measure: Measure, soft = false): string[] | null {
-	const lines: string[] = [];
-	let line = '';
-	for (const token of tokens(text)) {
-		if (measure(line + token, font) <= width) {
-			line += token;
-			continue;
-		}
-		if (line) lines.push(line);
-		line = token;
-		if (soft && measure(line, font) > width) return null;
-		while (line.length > 1 && measure(line, font) > width) {
-			let n = line.length - 1;
-			while (n > 1 && measure(line.slice(0, n), font) > width) n--;
-			lines.push(line.slice(0, n));
-			line = line.slice(n);
-		}
-	}
-	if (line) lines.push(line);
-	return lines;
+/** The largest size, in quarter px from `PILL.maxFont` down to `PILL.minFont`, at which `text` fits `room`. */
+export function pillFont(text: string, room: number, measure: Measure): number {
+	const { minFont, maxFont, weight } = PILL;
+	const widest = measure(text, maxFont, weight);
+	if (widest <= room) return maxFont;
+	// Width grows with the size, so start near where it fits and step down to be sure.
+	let font = Math.max(minFont, Math.min(maxFont, Math.floor(((maxFont * room) / widest) * 4) / 4));
+	while (font > minFont && measure(text, font, weight) > room) font -= 0.25;
+	return font;
 }
 
-/** `text` shortened in the middle to `kept` characters and an ellipsis. */
-function middle(text: string, kept: number): string {
-	const head = Math.ceil(kept / 2);
-	return text.slice(0, head) + ELLIPSIS + text.slice(text.length - (kept - head));
-}
-
-export function fitTitle(text: string, box: TitleBox, measure: Measure = measureText): TitleFit {
-	const fits = (lines: string[] | null, font: number): lines is string[] => !!lines && lines.length * font * LINE_HEIGHT <= box.height;
-	// The largest font at which the title wraps only at its separators; failing that, at the smallest
-	// font, broken anywhere; failing that, shortened in the middle.
-	const fonts = [];
-	for (let font = box.maxFont; font > box.minFont; font = Math.ceil(font) - 1) fonts.push(font);
-	for (const font of [...fonts, box.minFont]) {
-		const lines = wrap(text, box.width, font, measure, true);
-		if (fits(lines, font)) return { font, lines };
-	}
-	const font = box.minFont;
-	const lines = wrap(text, box.width, font, measure);
-	if (fits(lines, font)) return { font, lines };
-	const most = Math.max(1, Math.floor(box.height / (font * LINE_HEIGHT)));
-	// The most characters kept that still fit `most` lines.
-	let [lo, hi] = [1, text.length - 1];
-	while (lo < hi) {
-		const mid = Math.ceil((lo + hi) / 2);
-		if (wrap(middle(text, mid), box.width, font, measure)!.length <= most) lo = mid;
-		else hi = mid - 1;
-	}
-	return { font, lines: wrap(middle(text, lo), box.width, font, measure)!.slice(0, most) };
-}
-
-// The cards' title font. Measured with a canvas once the font has loaded; before that (and outside a
-// browser), estimated generously, so a title fitted early errs on the short side.
-const FAMILY = '"Inter Variable", sans-serif';
 let context: CanvasRenderingContext2D | null | undefined;
-export const measureText: Measure = (text, font, weight = 600) => {
-	const spec = `${weight} ${font}px ${FAMILY}`;
-	if (context === undefined) context = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
-	if (!context || !document.fonts?.check(spec)) return text.length * font * 0.64;
-	context.font = spec;
-	return context.measureText(text).width;
-};
+const loading = new Set<string>();
+/** A measurer in `family` (or the family `family()` names when it is measured), estimating generously until the font has loaded. */
+function measureIn(family: () => string, fallback: number): Measure {
+	return (text, font, weight = 600) => {
+		const spec = `${weight} ${font}px ${family()}`;
+		if (context === undefined) context = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+		if (!context) return text.length * font * fallback;
+		if (!document.fonts?.check(spec)) {
+			// Ask for the font, so it loads (and the text is fitted again) even before it first shows.
+			const face = `${weight} 16px ${family()}`;
+			if (!loading.has(face)) {
+				loading.add(face);
+				void document.fonts?.load(face).catch(() => {});
+			}
+			return text.length * font * fallback;
+		}
+		context.font = spec;
+		return context.measureText(text).width;
+	};
+}
+
+/** The cards' own font, Inter, as the status line measures it. */
+export const measureText: Measure = measureIn(() => '"Inter Variable", sans-serif', 0.64);
+
+/** The pills' name font: whatever the page sets `--font-node-compact` to. */
+function compactFamily(): string {
+	if (typeof document === 'undefined') return 'sans-serif';
+	return getComputedStyle(document.documentElement).getPropertyValue('--font-node-compact').trim() || 'sans-serif';
+}
+export const measureCompact: Measure = measureIn(compactFamily, 0.66);

@@ -11,6 +11,8 @@
 
 /* Refined SQLBuild light theme: crisp white chrome over a restrained cool-grey canvas. */
 :root {
+	/* Zoomed-out graph pills' names, at weight 500: one line to change the font. */
+	--font-node-compact: var(--font-mono);
 	/* experiment: panels are outlined in light mode, filled (borderless) in dark mode */
 	/* light: the card edge is the strongest line on the page; lines inside cards stay quieter */
 	--panel-border: rgba(28, 32, 38, 0.2);

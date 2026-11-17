@@ -28,16 +28,14 @@ export const WHOLE_FIT_CARDS = 150;
 export const LABEL_MIN_ZOOM = 0.35;
 
 /**
- * Below this zoom cards take their compact form: the whole card is its title on its state's colour,
- * since the cards' detail lines (11 px) would show under 9 px. Above it cards are drawn in full.
+ * Below this zoom cards take their compact form, a one-line pill (CompactFace), since the cards' detail
+ * lines (11 px) would show under 9 px. Above it cards are drawn in full.
  */
 export const COMPACT_ZOOM = 0.82;
-/** The largest a compact title shows on screen, so a short name doesn't shout. */
-export const MAX_TITLE_PX = 16;
 /**
- * The compact levels' lowest zooms. A card's title is fitted once per level, at that level's lowest zoom,
+ * The compact levels' lowest zooms. A pill's name is fitted once per level, at that level's lowest zoom,
  * and keeps its size on screen through the level (`--sb-title-unzoom`); the last level runs on down,
- * the title shrinking with the card below `LABEL_MIN_ZOOM`.
+ * the pill shrinking with the card below `LABEL_MIN_ZOOM`.
  */
 export const COMPACT_LEVELS = [0.6, 0.45, LABEL_MIN_ZOOM] as const;
 
