@@ -74,7 +74,8 @@ fn name_rows(mapping: &Bound<'_, PyAny>) -> PyResult<NameRows> {
     Ok(rows)
 }
 
-fn selection_node(node: &Bound<'_, PyAny>) -> PyResult<PythonSelectionNode> {
+/// The `(kind, name)` keys of the SQL resources a Python node reads, in authored order.
+pub(crate) fn sql_deps(node: &Bound<'_, PyAny>) -> PyResult<Vec<ObjectKey>> {
     let mut sql_deps: Vec<ObjectKey> = Vec::new();
     for reference in native_field(node, "sql_deps")?.try_iter()? {
         let reference: Bound<'_, PyAny> = reference?;
@@ -85,10 +86,14 @@ fn selection_node(node: &Bound<'_, PyAny>) -> PyResult<PythonSelectionNode> {
             native_field(&reference, "name")?.extract()?,
         ));
     }
+    Ok(sql_deps)
+}
+
+fn selection_node(node: &Bound<'_, PyAny>) -> PyResult<PythonSelectionNode> {
     Ok(PythonSelectionNode {
         name: native_field(node, "name")?.extract()?,
         kind: native_field(node, "kind")?.getattr("value")?.extract()?,
-        sql_deps,
+        sql_deps: sql_deps(node)?,
     })
 }
 
