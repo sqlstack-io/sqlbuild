@@ -1,5 +1,9 @@
 use crate::resource_costs::main::refresh_candidates::refresh_candidates;
-use crate::resource_costs::tests::helpers::{NOW, observation_id, run};
+use sqlbuild_core::cost_command::constants::{
+    INCOMPLETE_HISTORY_LIMITATION, MISSING_METADATA_LIMITATION,
+};
+
+use crate::resource_costs::tests::helpers::{NOW, fully_observed, observation_id, run};
 use crate::resource_costs::tests::test_types::{ObservationIdTestCase, RefreshTestCase};
 
 const HOUR: i64 = 3_600;
@@ -17,6 +21,30 @@ fn given_latest_run_rows_when_choosing_refreshes_then_only_bounded_recent_incomp
                 run("unavailable", 1, "unavailable", HOUR),
             ],
             expected_runs: vec!["pending", "partial"],
+        },
+        RefreshTestCase {
+            description: "a partial run that saw every statement is final unless history can still fill in",
+            latest: vec![
+                fully_observed(
+                    "permanent",
+                    &[
+                        "Concurrency sharing includes only queries visible to the executing Snowflake role.",
+                        "Snowflake query-history result limit was reached.",
+                    ],
+                ),
+                fully_observed("still_running", &[INCOMPLETE_HISTORY_LIMITATION]),
+                fully_observed("recent_metadata", &[MISSING_METADATA_LIMITATION]),
+                run("unseen_statement", 1, "partial", 2 * HOUR),
+            ],
+            expected_runs: vec!["recent_metadata", "still_running", "unseen_statement"],
+        },
+        RefreshTestCase {
+            description: "a run that ended under two minutes ago has not settled yet",
+            latest: vec![
+                run("just_ended", 1, "pending", 150),
+                run("settled", 1, "pending", 180),
+            ],
+            expected_runs: vec!["settled"],
         },
         RefreshTestCase {
             description: "a failed collection is retried until its third attempt, not after",

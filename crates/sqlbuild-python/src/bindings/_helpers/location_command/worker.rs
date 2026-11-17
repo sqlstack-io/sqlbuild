@@ -29,6 +29,7 @@ use crate::bindings::_helpers::cli::dispatch::warehouse_scope;
 use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
 use crate::bindings::_helpers::command_runtime::warehouses::configured_warehouses;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
+use crate::bindings::_helpers::cost_report::deferred::collect_deferred_cost_after_finish;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::command::compile_snapshot;
 use crate::bindings::_helpers::location_command::constants::CHANGED_SETTING;
@@ -396,7 +397,9 @@ pub(super) fn execute_worker<'py>(
     let outcome = if recall.is_some() {
         worker.outcome(py, code)?
     } else {
-        worker.finish(py, code)?
+        let outcome = worker.finish(py, code)?;
+        collect_deferred_cost_after_finish(py, &worker);
+        outcome
     };
     result.map(|code| {
         if matches!(outcome, RunOutcome::Success | RunOutcome::Warn) {

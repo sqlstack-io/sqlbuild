@@ -1,5 +1,6 @@
 pub mod append_observations;
 pub mod append_replaced_consumption;
+pub mod elapsed_seconds;
 pub mod execute;
 pub mod fixed_state_table_sql;
 pub mod integer_literal;
@@ -9,4 +10,6 @@ pub mod recorder_callbacks;
 pub mod register_audit_results_state;
 pub mod register_consumption_state;
 pub mod register_observations_state;
+pub mod reports_cost_capability;
+pub mod seconds_since;
 pub mod state_table_name;

@@ -35,6 +35,7 @@ use crate::bindings::_helpers::cli::termination::{
 use sqlbuild_python_compile::compile_command::constants::COMPILE_COMMAND_NAME;
 use sqlbuild_python_compile::compile_command::main::invocation::format_compile_error_json::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
+use crate::bindings::_helpers::cost_report::deferred::collect_deferred_cost_after_finish;
 use crate::bindings::_helpers::diff_report::output::render_diff_error_json;
 use sqlbuild_python_base::native_host::models::InterruptHandler;
 use sqlbuild_python_base::native_host::main::interrupted::interrupted;
@@ -933,6 +934,7 @@ fn execute_parsed_invocation<'py>(
             py,
             &format!("Worker execution completed: {}\n", outcome.as_str()),
         )?;
+        collect_deferred_cost_after_finish(py, &worker);
         if !matches!(outcome, RunOutcome::Success | RunOutcome::Warn) {
             dispatched?;
             finished?;
