@@ -10,6 +10,7 @@ import type {
 	SelectionVocabulary,
 	PlanResult,
 	PlanPage,
+	PlanDiff,
 	PlanPageSection,
 	AdhocRunRequest,
 	Bootstrap,
@@ -361,7 +362,15 @@ export class MockApiClient implements ApiClient {
 		this.#location(scope);
 		recordPlanRows(section, offset, limit);
 		void requestId;
-		return { total: 0, rows: [], runs: [] };
+		return { total: 0, section_total: 0, rows: [], runs: [], warnings: [], cursor_window_starts: {} };
+	}
+
+	/** The mock's plans carry their diffs whole, so none is read apart. */
+	async planDiff(scope: Scope, requestId: string, model: string): Promise<PlanDiff | null> {
+		this.#location(scope);
+		void requestId;
+		void model;
+		return null;
 	}
 
 	async listJobs(scope: Scope): Promise<Job[]> {

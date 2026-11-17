@@ -334,9 +334,23 @@ describe('mergePlanPage', () => {
 			section: 'unchanged' as const,
 			page: { total: 3, rows: ['model:payments'], runs: [] },
 			expected: { models: ['orders'], runs: ['model:orders'], unchanged: ['model:payments'], pages: { routine_models: 2, unchanged: 3 } }
+		},
+		{
+			description: 'a first-run page adds its models, counts what it loaded and keeps the section total, not the filter matches',
+			section: 'first_run' as const,
+			page: { total: 1, section_total: 672, rows: [{ name: 'daily_orders', reason: 'first_run' }], runs: [], warnings: [], cursor_window_starts: {} },
+			expected: { models: ['orders', 'daily_orders'], runs: ['model:orders'], unchanged: [], pages: { routine_models: 2, unchanged: 3, first_run: 672 } }
 		}
 	])('$description', ({ section, page, expected }) => {
 		const merged = mergePlanPage(summary, section, page as never);
 		expect({ models: merged.models.map((m) => m.name), runs: merged.changed?.runs.map((r) => r.node), unchanged: merged.changed?.unchanged, pages: merged.pages }).toEqual(expected);
+		expect(merged.loaded?.[section]).toBe(page.rows.length);
+	});
+	it("keeps a warning once when a model's page and the warnings section both bring it, and adds the page's window starts", () => {
+		const warning = { severity: 'warning', message: 'orders: already-built dates keep their old results' };
+		const withCopy = { ...summary, synced_copy: { synced_at: null, cursor_window_starts: {}, unknown_until_run: [] } };
+		const page = { total: 1, section_total: 1, rows: [{ name: 'orders', reason: 'query_changed' }], runs: [], warnings: [warning], cursor_window_starts: { orders: '2026-11-01' } };
+		const once = mergePlanPage(mergePlanPage(withCopy, 'query_changed', page as never), 'warnings', { ...page, rows: [warning], warnings: [], cursor_window_starts: {} } as never);
+		expect({ warnings: once.warnings, starts: once.synced_copy?.cursor_window_starts }).toEqual({ warnings: [warning], starts: { orders: '2026-11-01' } });
 	});
 });

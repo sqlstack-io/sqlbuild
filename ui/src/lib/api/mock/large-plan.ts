@@ -3,7 +3,7 @@
 // first runs, renames, loads, Python nodes, repeated warnings and 1,507 routine models. Served as the
 // server does: a summary, with routine models, held-back and skipped nodes a page at a time. Pure.
 
-import type { PlanDocument, PlanModel, PlanPage, PlanPageSection } from '../types';
+import type { PlanDiff, PlanDocument, PlanModel, PlanPage, PlanPageSection, PlanSectionCount, PlanSectionNote, PlanWarning } from '../types';
 
 const DOMAINS = ['orders', 'customers', 'inventory', 'payments', 'shipping', 'returns', 'pricing', 'suppliers', 'regions', 'finance', 'marketing', 'support'];
 const LAYERS = ['stg', 'int', 'mart'];
@@ -82,29 +82,113 @@ export function largePlanDocument(changed: boolean): PlanDocument {
 	};
 }
 
-const ROUTINE = new Set(['no_change', 'normal_incremental']);
+const MODEL_SECTIONS: PlanPageSection[] = ['full_refresh', 'query_changed', 'function_changed', 'config_changed', 'schema_changed', 'first_run', 'renamed'];
+/** Every section in plan order, as the server counts them. */
+const SECTIONS: PlanPageSection[] = [...MODEL_SECTIONS, 'routine_models', 'migrations', 'column_migrations', 'table_type_conversions', 'retention', 'loader_reloads', 'loader_loads', 'source_reloads', 'source_loads', 'changed_functions', 'functions', 'seeds', 'python_nodes', 'held_back', 'unchanged', 'warnings'];
+const ROW_LISTS = ['models', 'seeds', 'source_loads', 'functions', 'python_nodes', 'warnings', 'migrations', 'column_migrations', 'table_type_conversions', 'retention'] as const;
+const keyName = (key: string) => key.slice(key.indexOf(':') + 1);
 
-/** The server's summary of `doc`: everything but its large sections, which it counts. */
+/** The section's rows in plan order, as the server's plan rows read finds them. */
+function sectionRows(doc: PlanDocument, section: PlanPageSection): { rows: unknown[]; name: (row: unknown) => string } {
+	const runs = doc.changed && new Set(doc.changed.runs.map((r) => r.node));
+	const runsNode = (key: string) => !runs || runs.has(key);
+	const named = (rows: { name: string }[]) => ({ rows, name: (row: unknown) => (row as { name: string }).name });
+	const byModel = (rows: { model: string }[]) => ({ rows, name: (row: unknown) => (row as { model: string }).model });
+	if (MODEL_SECTIONS.includes(section) || section === 'routine_models') {
+		const built = doc.models.filter((m) => m.action !== 'skip' && runsNode(`model:${m.name}`));
+		return named(built.filter((m) => (MODEL_SECTIONS.includes(m.reason as PlanPageSection) ? m.reason === section : section === 'routine_models')));
+	}
+	const loads = (kind: string, reload: boolean) => named(doc.source_loads.filter((l) => l.kind === kind && l.is_reload === reload));
+	const changedFunction = (f: PlanDocument['functions'][number]) => !!f.reason && f.reason !== 'no_change';
+	switch (section) {
+		case 'migrations':
+			return byModel(doc.migrations);
+		case 'column_migrations':
+			return byModel(doc.column_migrations);
+		case 'table_type_conversions':
+			return byModel(doc.table_type_conversions);
+		case 'retention':
+			return byModel(doc.retention);
+		case 'loader_reloads':
+			return loads('loader', true);
+		case 'loader_loads':
+			return loads('loader', false);
+		case 'source_reloads':
+			return loads('source', true);
+		case 'source_loads':
+			return loads('source', false);
+		case 'changed_functions':
+			return named(doc.functions.filter(changedFunction));
+		case 'functions':
+			return named(doc.functions.filter((f) => !changedFunction(f)));
+		case 'seeds':
+			return named(doc.seeds.filter((s) => runsNode(`seed:${s.name}`)));
+		case 'python_nodes':
+			return named(doc.python_nodes);
+		case 'held_back':
+			return { rows: doc.changed?.held_back ?? [], name: (row) => keyName((row as { node: string }).node) };
+		case 'unchanged':
+			return { rows: doc.changed?.unchanged ?? [], name: (row) => keyName(row as string) };
+		default:
+			return { rows: doc.warnings, name: (row) => `${(row as PlanWarning).model_name ?? ''} ${(row as PlanWarning).message}` };
+	}
+}
+
+/** The notes of a section's model rows the mock counts: why `--changed` runs each. */
+function runNotes(doc: PlanDocument, rows: unknown[]): PlanSectionNote[] {
+	const runs = new Map((doc.changed?.runs ?? []).map((r) => [r.node, r]));
+	const counts = new Map<string, PlanSectionNote>();
+	for (const row of rows) {
+		const run = runs.get(`model:${(row as { name: string }).name}`);
+		if (!run) continue;
+		const [kind, value] = run.downstream_of ? ['reads', keyName(run.downstream_of)] : ['run_reason', run.reason];
+		const note = counts.get(`${kind}\u0000${value}`) ?? { kind, value, count: 0 };
+		note.count++;
+		counts.set(`${kind}\u0000${value}`, note);
+	}
+	return [...counts.values()].sort((a, b) => b.count - a.count);
+}
+
+/** The server's summary of `doc`: its facts, every row list empty, and each section counted. */
 export function planSummary(doc: PlanDocument): PlanDocument {
-	const routine = doc.models.filter((m) => ROUTINE.has(m.reason));
-	const routineKeys = new Set(routine.map((m) => `model:${m.name}`));
+	const sections: PlanSectionCount[] = SECTIONS.flatMap((section) => {
+		const { rows } = sectionRows(doc, section);
+		const models = MODEL_SECTIONS.includes(section) || section === 'routine_models';
+		return rows.length ? [{ section, total: rows.length, notes: models ? runNotes(doc, rows) : [] }] : [];
+	});
+	const empty = Object.fromEntries(ROW_LISTS.map((list) => [list, []]));
 	return {
 		...doc,
-		models: doc.models.filter((m) => !ROUTINE.has(m.reason)),
-		built_model_names: doc.models.map((m) => m.name),
-		pages: { routine_models: routine.length, ...(doc.changed ? { held_back: doc.changed.held_back.length, unchanged: doc.changed.unchanged.length } : {}) },
-		changed: doc.changed && { ...doc.changed, runs: doc.changed.runs.filter((r) => !routineKeys.has(r.node)), held_back: [], unchanged: [] }
+		...empty,
+		sections,
+		pages: Object.fromEntries(sections.map((s) => [s.section, s.total])),
+		changed: doc.changed && { ...doc.changed, runs: [], held_back: [], unchanged: [] },
+		synced_copy: doc.synced_copy && { ...doc.synced_copy, cursor_window_starts: {} }
 	};
 }
 
-/** One page of a large section, as the server's plan rows read returns it. */
-export function planPage(doc: PlanDocument, section: PlanPageSection, offset: number, limit = 50): PlanPage {
-	if (section === 'routine_models') {
-		const routine = doc.models.filter((m) => ROUTINE.has(m.reason));
-		const rows = routine.slice(offset, offset + limit);
-		const keys = new Set(rows.map((m) => `model:${m.name}`));
-		return { total: routine.length, rows, runs: (doc.changed?.runs ?? []).filter((r) => keys.has(r.node)) };
-	}
-	const all: unknown[] = section === 'held_back' ? (doc.changed?.held_back ?? []) : (doc.changed?.unchanged ?? []);
-	return { total: all.length, rows: all.slice(offset, offset + limit), runs: [] };
+/** One page of a section's rows whose name contains `name`, as the server's plan rows read returns it. */
+export function planPage(doc: PlanDocument, section: PlanPageSection, offset: number, limit = 50, name?: string): PlanPage {
+	const { rows: all, name: nameOf } = sectionRows(doc, section);
+	const wanted = name?.toLowerCase();
+	const matching = wanted ? all.filter((row) => nameOf(row).toLowerCase().includes(wanted)) : all;
+	const rows = matching.slice(offset, offset + limit);
+	const models = MODEL_SECTIONS.includes(section) || section === 'routine_models';
+	const names = new Set(models ? rows.map((row) => (row as { name: string }).name) : []);
+	const starts = doc.synced_copy?.cursor_window_starts ?? {};
+	return {
+		total: matching.length,
+		section_total: all.length,
+		rows,
+		runs: (doc.changed?.runs ?? []).filter((r) => names.has(keyName(r.node))),
+		warnings: doc.warnings.filter((w) => names.has(w.model_name ?? w.message.split(':', 1)[0])),
+		cursor_window_starts: Object.fromEntries(Object.entries(starts).filter(([model]) => names.has(model)))
+	};
+}
+
+/** A model's diff text from the whole document, as the server's plan diff read returns it. */
+export function planModelDiff(doc: PlanDocument, model: string): PlanDiff | null {
+	const found = doc.models.find((m) => m.name === model);
+	if (!found || !(found.query_diff || found.config_diff)) return null;
+	return { model, ...(found.query_diff ? { query_diff: found.query_diff } : {}), ...(found.config_diff ? { config_diff: found.config_diff } : {}) };
 }

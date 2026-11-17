@@ -5,7 +5,7 @@
 
 import type { ApiClient } from '../client';
 import type { PlanDocument, PlanPage, PlanResult } from '../types';
-import { largePlanDocument, planPage, planSummary } from './large-plan';
+import { largePlanDocument, planModelDiff, planPage, planSummary } from './large-plan';
 import { recordPlanRows } from './plan-rows-log';
 import type { CatalogNode } from '../types';
 
@@ -54,12 +54,18 @@ export function largeProject(client: ApiClient): ApiClient {
 				};
 			}
 			if (prop === 'planRows') {
-				return async (...[scope, requestId, section, offset, limit]: Parameters<ApiClient['planRows']>): Promise<PlanPage> => {
+				return async (...[scope, requestId, section, offset, limit, name]: Parameters<ApiClient['planRows']>): Promise<PlanPage> => {
 					const doc = plans.get(requestId);
-					if (!doc) return target.planRows(scope, requestId, section, offset, limit);
+					if (!doc) return target.planRows(scope, requestId, section, offset, limit, name);
 					recordPlanRows(section, offset, limit);
 					await new Promise((resolve) => setTimeout(resolve, 120));
-					return planPage(doc, section, offset, limit);
+					return planPage(doc, section, offset, limit, name);
+				};
+			}
+			if (prop === 'planDiff') {
+				return async (...[scope, requestId, model]: Parameters<ApiClient['planDiff']>) => {
+					const doc = plans.get(requestId);
+					return doc ? planModelDiff(doc, model) : target.planDiff(scope, requestId, model);
 				};
 			}
 			if (prop !== 'listCatalogNodes') return typeof value === 'function' ? value.bind(target) : value;

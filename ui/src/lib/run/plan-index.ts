@@ -3,7 +3,7 @@
 
 import type { PlanDocument, PlanPageSection, PlanWarning } from '$lib/api';
 import { plural } from '$lib/format/plural';
-import { changedSections, looseWarnings, planSections, sectionSize, type PlanEntry, type PlanSection } from './plan-text';
+import { changedSections, loadedRows, looseWarnings, planSections, sectionSize, type PlanEntry, type PlanSection } from './plan-text';
 
 /** The groups in the index, in its order; the ones after the divider are the bulky, quiet ones. */
 export type PlanGroupKey = 'full_refresh' | 'changed' | 'renames' | 'first_run' | 'loads' | 'python' | 'held_back' | 'warnings' | 'unchanged' | 'skipped';
@@ -297,7 +297,13 @@ export function planGroups(plan: PlanDocument, refresh: (job: string) => string 
 	}
 	const warnings = looseWarnings(plan, sections);
 	const grouped = warnings.length ? groupWarnings(warnings) : [];
-	if (warnings.length) group('warnings').count = warnings.length;
+	// A server summary pages the warnings like any section: its count stands until they load.
+	const warningTotal = plan.pages?.warnings;
+	if (warnings.length || warningTotal) {
+		const g = group('warnings');
+		g.count = warningTotal ?? warnings.length;
+		if (warningTotal !== undefined) g.pages.push({ section: 'warnings', loaded: loadedRows(plan, 'warnings'), total: warningTotal });
+	}
 	return ORDER.flatMap((key) => {
 		const g = byKey.get(key);
 		if (!g || !g.count) return [];

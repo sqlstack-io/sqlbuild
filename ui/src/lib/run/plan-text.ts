@@ -29,7 +29,7 @@ export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolea
 export const sectionSize = (s: PlanSection) => s.total ?? s.entries.length;
 
 /** The change reasons that get their own section, in the CLI's order. */
-const REASON_GROUPS: [string, string][] = [
+const REASON_GROUPS: [PlanPageSection, string][] = [
 	['full_refresh', 'Full refresh'],
 	['query_changed', 'Query changed'],
 	['function_changed', 'Function changed'],
@@ -50,8 +50,7 @@ export function builtModels(plan: PlanDocument): PlanModel[] {
 
 /** Rows of a paged section the plan holds so far, which is the offset of its next page. */
 export function loadedRows(plan: PlanDocument, section: PlanPageSection): number {
-	if (section === 'routine_models') return plan.models.filter((m) => ROUTINE.has(m.reason)).length;
-	return section === 'held_back' ? (plan.changed?.held_back.length ?? 0) : (plan.changed?.unchanged.length ?? 0);
+	return plan.loaded?.[section] ?? 0;
 }
 
 /** The names of every model the run builds, including routine ones a server summary has not loaded yet. */
@@ -147,25 +146,25 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 		if (entries.length || total) sections.push({ title, entries, changed, ...(page && total !== undefined ? { page, total } : {}) });
 	};
 	// Work that runs before any model builds comes first, as in the CLI.
-	add('Migrations', plan.migrations.map((r) => ({ name: r.model, value: [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · '), detail: [] })), true);
-	add('Column migrations', plan.column_migrations.map((r) => ({ name: r.model, value: `${r.origin_column} → ${r.destination_column} · ${r.decision}`, detail: [] })), true);
-	add('Table type changes', plan.table_type_conversions.map((r) => ({ name: r.model, value: [r.actual_type, r.desired_type].filter(Boolean).join(' → '), detail: [] })), true);
-	add('Retention', plan.retention.map((r) => ({ name: r.model, value: r.action ?? '', detail: [] })), true);
+	add('Migrations', plan.migrations.map((r) => ({ name: r.model, value: [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · '), detail: [] })), true, 'migrations');
+	add('Column migrations', plan.column_migrations.map((r) => ({ name: r.model, value: `${r.origin_column} → ${r.destination_column} · ${r.decision}`, detail: [] })), true, 'column_migrations');
+	add('Table type changes', plan.table_type_conversions.map((r) => ({ name: r.model, value: [r.actual_type, r.desired_type].filter(Boolean).join(' → '), detail: [] })), true, 'table_type_conversions');
+	add('Retention', plan.retention.map((r) => ({ name: r.model, value: r.action ?? '', detail: [] })), true, 'retention');
 	for (const kind of ['loader', 'source'] as const) {
 		const loads = plan.source_loads.filter((s) => s.kind === kind);
 		const label = kind === 'loader' ? 'Loaders' : 'Sources';
-		add(`${label} to reload`, loads.filter((s) => s.is_reload).map((s) => ({ name: s.name, value: s.write_strategy ?? '', detail: [] })));
-		add(`${label} to load`, loads.filter((s) => !s.is_reload).map((s) => ({ name: s.name, value: s.write_strategy ?? '', detail: s.cursor_column ? [`cursor: ${s.cursor_column}`] : [] })));
+		add(`${label} to reload`, loads.filter((s) => s.is_reload).map((s) => ({ name: s.name, value: s.write_strategy ?? '', detail: [] })), false, `${kind}_reloads`);
+		add(`${label} to load`, loads.filter((s) => !s.is_reload).map((s) => ({ name: s.name, value: s.write_strategy ?? '', detail: s.cursor_column ? [`cursor: ${s.cursor_column}`] : [] })), false, `${kind}_loads`);
 	}
 	const functionEntry = (f: PlanDocument['functions'][number]) => ({ name: f.name, value: f.language, detail: [] });
-	add('Changed functions', plan.functions.filter((f) => f.reason && f.reason !== 'no_change').map(functionEntry), true);
+	add('Changed functions', plan.functions.filter((f) => f.reason && f.reason !== 'no_change').map(functionEntry), true, 'changed_functions');
 	if (isFullRefresh(plan)) {
 		const counts = new Map<string, number>();
 		for (const m of active) counts.set(m.materialization_type, (counts.get(m.materialization_type) ?? 0) + 1);
 		add('Full refresh', [...counts].map(([kind, n]) => ({ name: kind, value: `${plural(n, 'model')}`, detail: [] })), true);
 	} else {
 		const starts = plan.synced_copy?.cursor_window_starts ?? {};
-		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason, starts[m.name])), true);
+		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason, starts[m.name])), true, reason);
 		// Under --changed a routine model runs because something it reads changed, or for its own reason, such as no completed record.
 		const why = changedRuns(plan);
 		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => {
@@ -173,10 +172,10 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 			return { name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(run ? [run.downstream_of ? `reads ${keyName(run.downstream_of)}` : run.reason] : [])] };
 		}), false, 'routine_models');
 	}
-	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry));
+	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry), false, 'functions');
 	const seedLabel: Record<string, string> = { first_run: 'first_run', config_changed: 'seed_changed', no_change: 'current' };
-	add('Seeds', builtSeeds(plan).map((s) => ({ name: s.name, value: seedLabel[s.reason] ?? '', detail: [] })));
-	add('Python', plan.python_nodes.map((p) => ({ name: p.name, value: `${p.kind} · ${p.identity_status}`, detail: [] })));
+	add('Seeds', builtSeeds(plan).map((s) => ({ name: s.name, value: seedLabel[s.reason] ?? '', detail: [] })), false, 'seeds');
+	add('Python', plan.python_nodes.map((p) => ({ name: p.name, value: `${p.kind} · ${p.identity_status}`, detail: [] })), false, 'python_nodes');
 	// A planner warning names its model in `model_name`, or opens its message with it as the CLI prints it; it shows once, with the first entry for that model.
 	const claimed = new Set<PlanWarning>();
 	for (const entry of sections.filter((s) => s.changed).flatMap((s) => s.entries)) {

@@ -189,6 +189,7 @@ describe('plan from a server summary', () => {
 	const summary = plan([model('orders', { reason: 'query_changed' }), model('customers')], {
 		built_model_names: ['orders', 'customers', 'payments', 'refunds'],
 		pages: { routine_models: 3, unchanged: 120 },
+		loaded: { routine_models: 1, unchanged: 1 },
 		changed: { counts: ['definition'], reach: 'all', runs: [{ node: 'model:orders', reason: 'definition changed', downstream_of: null }, { node: 'model:customers', reason: 'upstream changed', downstream_of: 'model:orders' }], held_back: [], unchanged: ['model:events'] }
 	});
 	it.each([

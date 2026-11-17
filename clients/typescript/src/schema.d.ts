@@ -674,6 +674,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlanDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/rows": {
         parameters: {
             query?: never;
@@ -2257,6 +2273,13 @@ export interface components {
             kind: "sensor_evaluation";
             outcome: components["schemas"]["CustomSensorOutcome"];
         } | {
+            /**
+             * @description Model diff text the document left out to stay under its size cap, by model; the server
+             *     stores it apart and never returns it in the outcome.
+             */
+            diffs?: {
+                [key: string]: components["schemas"]["PlanModelDiff"];
+            };
             document: Record<string, never>;
             /** @enum {string} */
             kind: "plan";
@@ -2721,17 +2744,34 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description A planned model's diff text, from the plan document or, where the document left it out, apart from it. */
+        PlanDiffRead: components["schemas"]["PlanModelDiff"] & {
+            model: string;
+        };
+        /** @description One planned model's diff text, as `sqb plan` prints it. */
+        PlanModelDiff: {
+            config_diff?: string[] | null;
+            query_diff?: string[] | null;
+        };
         /** @description A person's build command to plan on the location; the server freezes it like an ad-hoc run. */
         PlanRequest: {
             command: string[];
             /** Format: uuid */
             request_id: string;
         };
-        /** @description A page of a plan section, how many rows the section holds, and the `--changed` runs of its models. */
+        /** @description A page of a plan section with the `--changed` runs, warnings and cursor window starts of its models. */
         PlanRows: {
+            cursor_window_starts: {
+                [key: string]: string;
+            };
+            /** @description Model rows carry `diff_stats` in place of their diff text, which `plans/{request_id}/diff` serves. */
             rows: Record<string, never>[];
             runs: Record<string, never>[];
+            /** @description Rows in the section, filter or not. */
+            section_total: number;
+            /** @description Rows matching the name filter; the section's size without one. */
             total: number;
+            warnings: Record<string, never>[];
         };
         /** @description A plan request's state with its summary: changed models in full, large sections as counts to page. */
         PlanSummaryRead: {
@@ -5860,15 +5900,65 @@ export interface operations {
             };
         };
     };
+    readPlanDiff: {
+        parameters: {
+            query: {
+                /** @description The planned model whose diff to read */
+                model: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDiffRead"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description No diff of that model, or no view.sql on every current node */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     readPlanRows: {
         parameters: {
             query: {
                 /** @description The section to page */
-                section: "routine_models" | "held_back" | "unchanged";
+                section: "full_refresh" | "query_changed" | "function_changed" | "config_changed" | "schema_changed" | "first_run" | "renamed" | "routine_models" | "migrations" | "column_migrations" | "table_type_conversions" | "retention" | "loader_reloads" | "loader_loads" | "source_reloads" | "source_loads" | "changed_functions" | "functions" | "seeds" | "python_nodes" | "held_back" | "unchanged" | "warnings";
                 /** @description Rows to skip; 0 by default */
                 offset?: number;
                 /** @description At most this many rows, capped at 1000 */
                 limit?: number;
+                /** @description Only rows whose name contains this, ignoring case */
+                name?: string;
             };
             header?: never;
             path: {

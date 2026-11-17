@@ -22,7 +22,7 @@ import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -99,7 +99,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'checkAdhocRun',
 	'launchAdhocRun',
 	'planBuild',
-	'planRows'
+	'planRows',
+	'planDiff'
 ]);
 
 /** How often a connection test asks for the location's answer, and the longest it waits. */
@@ -320,16 +321,27 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		samples.set(key, { records, after });
 		return records;
 	}
-	/** One page of a plan section, under the plan's authorization. */
-	async function planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number): Promise<PlanPage> {
+	/** One page of a plan section, its rows found by `name` when given, under the plan's authorization. */
+	async function planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number, name?: string): Promise<PlanPage> {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/rows', {
-			params: { path: { location_id: locationId, target, request_id: requestId }, query: { section, offset, limit } }
+			params: { path: { location_id: locationId, target, request_id: requestId }, query: { section, offset, limit, ...(name ? { name } : {}) } }
 		});
 		if (response.status === 401) onUnauthorized();
 		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		if (!data) throw new ApiError('The plan request disappeared', 404);
 		return data as unknown as PlanPage;
+	}
+	/** One planned model's diff text; null without one, or without view.sql on the target. */
+	async function planDiff(scope: Scope, requestId: string, model: string): Promise<PlanDiff | null> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/diff', {
+			params: { path: { location_id: locationId, target, request_id: requestId }, query: { model } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (response.status === 404) return null;
+		if (!response.ok || !data) throw new ApiError(errorText(error, response), response.status);
+		return { model: data.model, ...(data.query_diff ? { query_diff: data.query_diff } : {}), ...(data.config_diff ? { config_diff: data.config_diff } : {}) };
 	}
 
 	const implemented = {
@@ -597,6 +609,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			}
 		},
 		planRows,
+		planDiff,
 		async listSnapshotChanges(scope: Scope, query: { limit?: number } = {}): Promise<SnapshotChange[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const [snapshots, runs] = await Promise.all([
