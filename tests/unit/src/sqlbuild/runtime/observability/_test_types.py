@@ -133,6 +133,7 @@ class RetiredOperationCase:
     description: str
     operation_kind: str
     operation_name: str
+    expected_operation_name: str
 
 
 @dataclass(frozen=True)

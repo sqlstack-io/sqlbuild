@@ -153,8 +153,15 @@ def test_given_known_event_when_serializing_and_decoding_then_round_trips(
 @pytest.mark.parametrize(
     "test_case",
     [
-        RetiredOperationCase("a stored dlt or callable load", "loader", "external_source_load"),
-        RetiredOperationCase("a stored ingestr subprocess", "subprocess", "ingestr_command"),
+        RetiredOperationCase(
+            "a stored dlt or callable load",
+            "loader",
+            "external_source_load",
+            "external_source_load",
+        ),
+        RetiredOperationCase(
+            "a stored ingestr subprocess", "subprocess", "ingestr_command", "ingestr_command"
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -181,7 +188,7 @@ def test_given_operation_from_a_removed_integration_when_decoding_history_then_i
     decoded: LifecycleEvent | OpaqueLifecycleEvent = lifecycle_event_from_json(stored)
 
     assert isinstance(decoded, LifecycleEvent)
-    assert decoded.payload["operation_name"] == test_case.operation_name
+    assert decoded.payload["operation_name"] == test_case.expected_operation_name
 
 
 @pytest.mark.parametrize(
