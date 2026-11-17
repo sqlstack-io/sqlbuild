@@ -14,6 +14,16 @@ pub struct LocationAccess {
     pub actions: Vec<Action>,
 }
 
+/// What a trusted proxy's username resolves to; a concurrent first sign-in resolves to the same person.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ProxyPerson {
+    Person(uuid::Uuid),
+    /// Unknown with provisioning off, bound to a missing person, or disabled.
+    Refused,
+    /// Unknown, and its name already belongs to another principal, which is not taken over.
+    NameTaken,
+}
+
 /// The person's name, the actions allowed server-wide, and the location targets they can view.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct PersonAccess {

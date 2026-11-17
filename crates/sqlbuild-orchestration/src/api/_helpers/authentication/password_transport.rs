@@ -9,9 +9,14 @@ use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::constants::{PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER};
+use crate::api::constants::{
+    EVENT_STREAM_MEDIA_TYPE, FORWARDED_HOST_HEADER, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE,
+    PASSWORD_CSRF_HEADER, STREAM_BUFFERING_HEADER, STREAM_CACHE_CONTROL,
+};
 use crate::api::errors::ApiError;
-use crate::api::models::{AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse};
+use crate::api::models::{
+    AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse, ForwardedHostPeers,
+};
 use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
 use crate::credentials::main::sessions::authenticate_session::authenticate_session;
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, IssuedSession, SessionAccess};
@@ -38,8 +43,14 @@ pub(crate) async fn guard(
         request_id: Uuid::now_v7(),
         ip_address: Some(peer.ip().to_canonical()),
     };
-    let valid_host = single_header(request.headers(), header::HOST.as_str())
-        == origin.0.strip_prefix("https://");
+    let authority = origin.0.split_once("://").map(|(_, authority)| authority);
+    let forwarded_by_proxy = request
+        .extensions()
+        .get::<ForwardedHostPeers>()
+        .is_some_and(|ForwardedHostPeers(peers)| peers.contains(&peer.ip().to_canonical()));
+    let valid_host = single_header(request.headers(), header::HOST.as_str()) == authority
+        || forwarded_by_proxy
+            && single_header(request.headers(), FORWARDED_HOST_HEADER) == authority;
     let valid_origin = match single_header(request.headers(), header::ORIGIN.as_str()) {
         Some(value) => value == origin.0,
         None => request.method().is_safe() && !request.headers().contains_key(header::ORIGIN),
@@ -50,14 +61,34 @@ pub(crate) async fn guard(
         request.extensions_mut().insert(context);
         next.run(request).await
     };
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    private_cache_control(&mut response);
     response.headers_mut().insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
     Ok(response)
+}
+
+/// Never store authenticated responses; let no proxy cache, compress or buffer an event stream.
+pub(crate) fn private_cache_control(response: &mut Response) {
+    let streamed = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .is_some_and(|value| {
+            value
+                .as_bytes()
+                .starts_with(EVENT_STREAM_MEDIA_TYPE.as_bytes())
+        });
+    let headers = response.headers_mut();
+    if streamed {
+        headers.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static(STREAM_CACHE_CONTROL),
+        );
+        headers.insert(STREAM_BUFFERING_HEADER, HeaderValue::from_static("no"));
+    } else {
+        headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    }
 }
 
 pub(crate) async fn authenticate(

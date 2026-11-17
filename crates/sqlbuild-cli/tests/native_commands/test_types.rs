@@ -52,6 +52,14 @@ pub(crate) struct ProxyCliTestCase {
     pub(crate) expected_statuses: [reqwest::StatusCode; 3],
 }
 
+pub(crate) struct ProxyStartupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) configuration: &'static str,
+    /// The username the untrusted requests carry, which the log must never show.
+    pub(crate) username: &'static str,
+    pub(crate) expected_warnings: &'static [(&'static str, usize)],
+}
+
 pub(crate) struct ServerConfigurationTestCase {
     pub(crate) description: &'static str,
     pub(crate) configuration: &'static str,

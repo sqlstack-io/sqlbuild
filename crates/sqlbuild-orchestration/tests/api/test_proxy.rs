@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::api::models::{
     ApiAuthentication, AuthenticationDenial, HumanLogin, TrustedProxyAuthentication,
+    UnknownProxyUsers,
 };
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::ProxyApiTestCase;
@@ -68,6 +69,11 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                     (value("subject").into(), person),
                     (value("absent_subject").into(), Uuid::now_v7()),
                 ]),
+                username_header: "X-SQB-User".into(),
+                display_name_header: None,
+                email_header: None,
+                unknown_users: UnknownProxyUsers::Reject,
+                proxy_logout_url: None,
             };
             let api = start_api_with_authentication(
                 store,
