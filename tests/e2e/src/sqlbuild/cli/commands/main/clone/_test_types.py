@@ -74,3 +74,13 @@ class CloneTimingsE2ETestCase:
 
     description: str
     expected_phases: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CloneChangedPlanE2ETestCase:
+    """Commands run after building both targets, and what `plan --changed` says after them."""
+
+    description: str
+    commands: tuple[tuple[str, ...], ...]
+    expected_fragments: tuple[str, ...]
+    unexpected_fragments: tuple[str, ...] = ()

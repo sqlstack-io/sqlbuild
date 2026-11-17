@@ -9,6 +9,7 @@ from textwrap import dedent
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.clone._test_types import (
+    CloneChangedPlanE2ETestCase,
     CloneDeferredSourceFunctionE2ETestCase,
     CloneE2ETestCase,
     CloneFunctionGraphE2ETestCase,
@@ -16,10 +17,13 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clone._test_types import (
     ClonePythonFunctionE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    REPO_ROOT,
     prepare_inline_project,
     query_duckdb,
     run_sqb,
 )
+
+_CHANGED_CLONE_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_clone"
 
 
 @pytest.mark.parametrize(
@@ -879,3 +883,88 @@ def test_given_denied_clone_policy_when_running_then_error_identifies_configurat
     assert result.returncode != 0
     assert test_case.expected_error_code in combined_output
     assert test_case.expected_policy_key in combined_output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CloneChangedPlanE2ETestCase(
+            description="a cloned table rebuilds and an untouched one stays skipped",
+            commands=(("clone", "--from", "prod", "--select", "fact_orders"),),
+            expected_fragments=("no completed record", "Unchanged (1): skipped by --changed"),
+        ),
+        CloneChangedPlanE2ETestCase(
+            description="a cloned table rebuilds only once",
+            commands=(
+                ("clone", "--from", "prod", "--select", "fact_orders"),
+                ("build", "--changed", "--select", "fact_orders", "dim_customers"),
+            ),
+            expected_fragments=("Unchanged (2): skipped by --changed",),
+            unexpected_fragments=("no completed record",),
+        ),
+        CloneChangedPlanE2ETestCase(
+            description="an upstream a build clones for its deferral rebuilds",
+            commands=(("build", "--select", "orders_report", "--defer-clone-from", "prod"),),
+            expected_fragments=("Prephase  defer clone", "no completed record"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_cloned_table_when_planning_changed_then_it_rebuilds(
+    test_case: CloneChangedPlanE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="clone_changed_project",
+        repo_files={
+            "sqlbuild_project.toml": dedent(
+                """
+                name = "clone_changed_project"
+                adapter = "duckdb"
+                default_target = "dev"
+
+                [connection]
+                database = "clone.duckdb"
+
+                [targets.prod]
+                schema = "prod"
+
+                [targets.prod.clone]
+                allow_as_clone_origin = true
+
+                [targets.dev]
+                schema = "dev"
+
+                [targets.dev.clone]
+                allow_as_clone_destination = true
+                """
+            ).strip()
+            + "\n",
+            **{
+                str(path.relative_to(_CHANGED_CLONE_FIXTURE)): path.read_text(encoding="utf-8")
+                for path in sorted(_CHANGED_CLONE_FIXTURE.glob("models/*.sql"))
+            },
+        },
+    )
+    for command in (
+        ("build", "--target", "dev"),
+        ("build", "--target", "prod"),
+        *test_case.commands,
+    ):
+        result: subprocess.CompletedProcess[str] = run_sqb(
+            command=("--no-color", *command), project_dir=project_dir
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        output: str = result.stdout
+
+    plan: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", "--changed", "--select", "fact_orders", "dim_customers"),
+        project_dir=project_dir,
+    )
+
+    assert plan.returncode == 0, plan.stdout + plan.stderr
+    for fragment in test_case.expected_fragments:
+        assert fragment in output + plan.stdout, output + plan.stdout
+    for fragment in test_case.unexpected_fragments:
+        assert fragment not in plan.stdout, plan.stdout
