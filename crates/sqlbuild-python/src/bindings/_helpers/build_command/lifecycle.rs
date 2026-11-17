@@ -669,7 +669,10 @@ pub(crate) struct SourceLoadGate {
 
 #[pymethods]
 impl SourceLoadGate {
-    /// Why a round-trip load is skipped: `hard` after a failed or hard-skipped upstream, `soft` after a soft skip or when it never ran.
+    /// Why a round-trip load is skipped, by the Python fan-in rule over its gating upstreams.
+    ///
+    /// A failed or hard-skipped upstream skips it `hard`. Otherwise it runs when any upstream
+    /// succeeded, and skips `soft`, naming the first upstream, when every one soft-skipped or never ran.
     fn __call__(
         &self,
         py: Python<'_>,
@@ -694,23 +697,40 @@ impl SourceLoadGate {
                 ),
             );
         }
+        let mut succeeded: bool = false;
+        let mut soft_reason: Option<String> = None;
         for (kind, name) in gates {
             let status = statuses
                 .get(name)
                 .map(|(status, mode)| (status.as_str(), mode.as_deref()));
-            let (outcome, mode): (&str, &'static str) = match status {
-                Some((SUCCESS_STATUS, _)) => continue,
-                Some((SKIPPED_STATUS, Some(SOFT_SKIP))) => ("was skipped", SOFT_SKIP),
-                Some((SKIPPED_STATUS, _)) => ("was skipped", HARD_SKIP),
-                Some(_) => ("failed", HARD_SKIP),
-                None if !lifecycle.include_python => (
-                    "did not run; --no-python skips read-side tasks and assets",
-                    SOFT_SKIP,
-                ),
-                None => ("did not run; the SQL it reads was not rebuilt", SOFT_SKIP),
+            let outcome: &str = match status {
+                Some((SUCCESS_STATUS, _)) => {
+                    succeeded = true;
+                    continue;
+                }
+                Some((SKIPPED_STATUS, Some(SOFT_SKIP))) => "was skipped",
+                Some((SKIPPED_STATUS, _)) => {
+                    return Ok(Some((
+                        format!("Upstream {kind} '{name}' was skipped"),
+                        HARD_SKIP,
+                    )));
+                }
+                Some(_) => {
+                    return Ok(Some((
+                        format!("Upstream {kind} '{name}' failed"),
+                        HARD_SKIP,
+                    )));
+                }
+                None if !lifecycle.include_python => {
+                    "did not run; --no-python skips read-side tasks and assets"
+                }
+                None => "did not run; the SQL it reads was not rebuilt",
             };
-            return Ok(Some((format!("Upstream {kind} '{name}' {outcome}"), mode)));
+            soft_reason.get_or_insert_with(|| format!("Upstream {kind} '{name}' {outcome}"));
         }
-        Ok(None)
+        if succeeded {
+            return Ok(None);
+        }
+        Ok(soft_reason.map(|reason| (reason, SOFT_SKIP)))
     }
 }

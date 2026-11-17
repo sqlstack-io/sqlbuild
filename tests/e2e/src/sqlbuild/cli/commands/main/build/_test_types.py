@@ -1723,3 +1723,4 @@ class ChangedRoundTripE2ETestCase:
     expected_scored_rows: tuple[tuple[object, ...], ...]
     build_flags: tuple[str, ...] = ("--changed",)
     task_body: str | None = None
+    extra_files: dict[str, str] = field(default_factory=dict)
