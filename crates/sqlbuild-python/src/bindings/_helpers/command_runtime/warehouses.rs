@@ -34,9 +34,17 @@ use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_
 use sqlbuild_python_front::discovery::main::project::discover_project_configuration::discover_project_configuration;
 use sqlbuild_python_front::model_config::main::config::expanded_template_data::expanded_template_data;
 
-/// The `WarehouseGroup` whose warehouse is a target's `warehouses.build`; any other reads `query`.
 const BUILD_GROUP: &str = "build";
 const QUERY_GROUP: &str = "query";
+const SYNC_GROUP: &str = "sync";
+/// The target warehouses each group reads, in order, before the connection's own warehouse.
+const GROUP_WAREHOUSES: [(&str, &[&str]); 3] = [
+    (BUILD_GROUP, &[BUILD_GROUP]),
+    (QUERY_GROUP, &[QUERY_GROUP]),
+    (SYNC_GROUP, &[SYNC_GROUP, QUERY_GROUP]),
+];
+/// The target warehouse a sync falls back to only when the connection names none, so it can still run.
+const SYNC_LAST_RESORT: &str = BUILD_GROUP;
 
 const RESOLVE_OPTIONS: (&[&str], &[&str]) = (
     &[
@@ -115,15 +123,10 @@ fn resolved_warehouse<'py>(
     )
 }
 
-fn group_value(target: &Bound<'_, PyAny>, group_name: &str) -> PyResult<Option<String>> {
+fn group_value(target: &Bound<'_, PyAny>, attribute: &str) -> PyResult<Option<String>> {
     if target.is_none() {
         return Ok(None);
     }
-    let attribute: &str = if group_name == BUILD_GROUP {
-        BUILD_GROUP
-    } else {
-        QUERY_GROUP
-    };
     optional_text(&native_field(
         &native_field(target, "warehouses")?,
         attribute,
@@ -135,8 +138,27 @@ pub(crate) fn find_authored(
     inputs: WarehouseInputs<'_, '_>,
     group: &Bound<'_, PyAny>,
 ) -> PyResult<Option<AuthoredWarehouse>> {
-    let group_name: String = native_field(group, "value")?.extract()?;
-    authored_group(inputs, &group_name)
+    authored_group(inputs, &group_name(group)?)
+}
+
+/// The name of a command group, such as `sync`.
+fn group_name(group: &Bound<'_, PyAny>) -> PyResult<String> {
+    native_field(group, "value")?.extract()
+}
+
+/// The target warehouse `group` uses before the connection's; a sync uses `build` only when the connection names none.
+fn group_authored(
+    inputs: WarehouseInputs<'_, '_>,
+    group: &Bound<'_, PyAny>,
+    connection_config: &Bound<'_, PyAny>,
+) -> PyResult<Option<AuthoredWarehouse>> {
+    if let Some(found) = find_authored(inputs, group)? {
+        return Ok(Some(found));
+    }
+    if group_name(group)? == SYNC_GROUP && connection_warehouse(connection_config)?.is_none() {
+        return authored_group(inputs, SYNC_LAST_RESORT);
+    }
+    Ok(None)
 }
 
 /// The active target's authored, unexpanded warehouse for the group named `group_name`.
@@ -163,11 +185,20 @@ fn authored_group<'py>(
     let project_target: Bound<'py, PyAny> =
         native_field(&project_config, "targets")?.call_method1("get", (&target_name,))?;
     let target_name: String = target_name.extract()?;
-    Ok(authored_warehouse(
-        (&target_name, group_name),
-        group_value(&local_target, group_name)?,
-        group_value(&project_target, group_name)?,
-    ))
+    let attributes: &[&str] = GROUP_WAREHOUSES
+        .iter()
+        .find(|(group, _)| *group == group_name)
+        .map_or(&[QUERY_GROUP], |(_, attributes)| attributes);
+    for attribute in attributes {
+        if let Some(found) = authored_warehouse(
+            (&target_name, attribute),
+            group_value(&local_target, attribute)?,
+            group_value(&project_target, attribute)?,
+        ) {
+            return Ok(Some(found));
+        }
+    }
+    Ok(None)
 }
 
 /// The group warehouse with `${...}` templates expanded, checked as an identifier.
@@ -236,7 +267,7 @@ pub(crate) fn resolve_warehouse(
     }
     if let Some(inputs) = inputs
         && !group.is_none()
-        && let Some(found) = find_authored(inputs, group)?
+        && let Some(found) = group_authored(inputs, group, connection_config)?
     {
         let warehouse: String = expand_authored(&found, inputs, cli_vars)?;
         return Ok((Some(warehouse), found.source()));
@@ -247,14 +278,14 @@ pub(crate) fn resolve_warehouse(
     })
 }
 
-/// Every warehouse the target configures: its `build` and `query` group warehouses and its connection warehouse.
+/// Every warehouse the target configures: its `build`, `query` and `sync` group warehouses and its connection warehouse.
 pub(crate) fn configured_warehouses(
     inputs: WarehouseInputs<'_, '_>,
     connection_config: &Bound<'_, PyAny>,
 ) -> PyResult<std::collections::BTreeSet<String>> {
     let none: Bound<'_, PyAny> = none(connection_config.py());
     let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    for group_name in [BUILD_GROUP, QUERY_GROUP] {
+    for group_name in [BUILD_GROUP, QUERY_GROUP, SYNC_GROUP] {
         if let Some(authored) = authored_group(inputs, group_name)? {
             names.insert(expand_authored(&authored, inputs, &none)?);
         }
@@ -328,7 +359,9 @@ pub(crate) fn apply_warehouse<'py>(
     let py: Python<'py> = config.py();
     let scope: CommandScope<'py> = command_scope(py)?;
     let authored: bool = match inputs {
-        Some(inputs) if !scope.group.is_none() => find_authored(inputs, &scope.group)?.is_some(),
+        Some(inputs) if !scope.group.is_none() => {
+            group_authored(inputs, &scope.group, config)?.is_some()
+        }
         _ => false,
     };
     if scope.cli_warehouse.is_none() && !authored {
@@ -398,7 +431,12 @@ pub(crate) fn describe_connection_warehouse<'py>(
     let found: Option<AuthoredWarehouse> = if scope.group.is_none() {
         None
     } else {
-        find_authored(inputs, &scope.group)?
+        match find_authored(inputs, &scope.group)? {
+            None if group_name(&scope.group)? == SYNC_GROUP => {
+                authored_group(inputs, SYNC_LAST_RESORT)?
+            }
+            found => found,
+        }
     };
     if let Some(found) = found {
         let expands_to: bool = match expand_authored(&found, inputs, &scope.cli_vars) {

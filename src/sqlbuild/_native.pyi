@@ -11742,6 +11742,7 @@ class WarehouseGroup(StrEnum):
 
     BUILD = "build"
     QUERY = "query"
+    SYNC = "sync"
 
 class SourceWriteStrategy(StrEnum):
     APPEND = "append"
@@ -11954,10 +11955,12 @@ class TargetWarehousesConfig(NativeRecord):
 
     build: str | None
     query: str | None
+    sync: str | None
     def __init__(
         self,
         build: str | None = ...,
         query: str | None = ...,
+        sync: str | None = ...,
     ) -> None: ...
 
 class TargetConfig(NativeRecord):
