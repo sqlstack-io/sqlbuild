@@ -1,7 +1,8 @@
 //! The source texts a changed Python node's identity diffs compare.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
+use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods};
+use sqlbuild_python_base::boundary::main::text_item::text_item;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DEPENDENCY_HEADER_SEPARATOR: &str = " :: ";
@@ -28,18 +29,10 @@ fn json_object<'py>(raw_json: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, 
     Ok(Some(payload))
 }
 
-/// `payload[key]` when it is a string.
-fn string_field(payload: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<String>> {
-    match payload.get_item(key)? {
-        Some(value) if value.is_instance_of::<PyString>() => Ok(Some(value.extract()?)),
-        _ => Ok(None),
-    }
-}
-
 /// The recorded definition's `source_text`.
 pub(crate) fn definition_source_text(raw_json: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     match json_object(raw_json)? {
-        Some(payload) => string_field(&payload, "source_text"),
+        Some(payload) => text_item(&payload, "source_text"),
         None => Ok(None),
     }
 }
@@ -63,7 +56,7 @@ pub(crate) fn dependency_source_text(raw_json: &Bound<'_, PyAny>) -> PyResult<Op
         };
         let mut key: [String; 3] = Default::default();
         for (slot, field) in key.iter_mut().zip(HEADER_FIELDS) {
-            *slot = string_field(&dependency, field)?.unwrap_or_default();
+            *slot = text_item(&dependency, field)?.unwrap_or_default();
         }
         keyed.push((key, Some(dependency)));
     }
@@ -73,7 +66,7 @@ pub(crate) fn dependency_source_text(raw_json: &Bound<'_, PyAny>) -> PyResult<Op
         let Some(dependency) = dependency else {
             continue;
         };
-        let Some(source_text) = string_field(&dependency, "source_text")? else {
+        let Some(source_text) = text_item(&dependency, "source_text")? else {
             continue;
         };
         let parts: Vec<&str> = key

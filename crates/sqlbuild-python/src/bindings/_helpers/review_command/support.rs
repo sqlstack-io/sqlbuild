@@ -1,23 +1,23 @@
 //! Errors and progress lines shared by the `sqb review` phases.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::time::Instant;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyTypeMethods};
+use pyo3::types::PyTypeMethods;
 use sqlbuild_analysis::janitor_planning::models::ArchiveTimestamp;
 use sqlbuild_analysis::review_command::errors::ReviewPlanError;
 use sqlbuild_analysis::review_command::models::ReviewFailure;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::clone::clone_progress::write_line;
-use crate::bindings::_helpers::execution_history::conversion::optional_text;
+use crate::bindings::_helpers::execution_history::conversion::nullable_text;
 use crate::bindings::_helpers::janitor::janitor_keys::now_utc;
 use crate::bindings::_helpers::janitor::janitor_keys::timestamp_fields;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
@@ -28,16 +28,12 @@ const UNEXPLAINED_FAILURE: &str = "review failed";
 
 /// `class(message, code=code, help=help)`.
 fn raised(py: Python<'_>, class: ErrorId, failure: &ReviewFailure) -> PyErr {
-    let instance = (|| -> PyResult<Bound<'_, PyAny>> {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("code", failure.code.as_str())?;
-        keywords.set_item("help", failure.help.as_deref())?;
-        error_class(py, class)?.call((failure.message.as_str(),), Some(&keywords))
-    })();
-    match instance {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        class,
+        &failure.message,
+        (Some(&failure.code), failure.help.as_deref()),
+    )
 }
 
 /// `CliUserError(message, code=code, help=help)`.
@@ -152,5 +148,5 @@ pub(crate) fn invocation_id(py: Python<'_>) -> PyResult<Option<String>> {
     if identity.is_none() {
         return Ok(None);
     }
-    optional_text(&native_field(&identity, "invocation_id")?)
+    nullable_text(&native_field(&identity, "invocation_id")?)
 }

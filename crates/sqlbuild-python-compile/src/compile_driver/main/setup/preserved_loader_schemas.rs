@@ -2,7 +2,6 @@
 
 use crate::compile_attachment::main::resolved_target::resolved_target;
 use crate::compile_driver::_helpers::setup::targets::planner_error;
-use crate::compile_driver::_helpers::setup::targets::text_or_none;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_analysis::assembly::target_checks::constants::{
     MANAGED_WRITE_SCHEMA_CODE, PRESERVE_TARGET_VALUE,
@@ -10,6 +9,7 @@ use sqlbuild_analysis::assembly::target_checks::constants::{
 use sqlbuild_analysis::assembly::target_checks::errors::TargetError;
 use sqlbuild_analysis::assembly::target_checks::main::target_error_message::target_error_message;
 use sqlbuild_core::text::main::python_strip::python_strip;
+use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::HashSet;
 
@@ -24,7 +24,7 @@ pub fn preserved_loader_schemas(
     if target_name.is_none() {
         return Ok(());
     }
-    if !text_or_none(&native_field(&target_config, "schema")?)?
+    if !optional_text(&native_field(&target_config, "schema")?)?
         .is_some_and(|schema| python_strip(&schema) == PRESERVE_TARGET_VALUE)
     {
         return Ok(());
@@ -32,7 +32,7 @@ pub fn preserved_loader_schemas(
     for loader in native_field(discovered, "loader_functions")?.try_iter()? {
         let loader: Bound<'_, PyAny> = loader?;
         let name: String = native_field(&loader, "name")?.extract()?;
-        let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
+        let destination: Option<String> = optional_text(&native_field(&loader, "destination")?)?;
         if !loaders.contains(&name) || destination.as_deref().is_some_and(|d| d.contains('.')) {
             continue;
         }

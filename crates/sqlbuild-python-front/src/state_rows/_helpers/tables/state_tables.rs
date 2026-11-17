@@ -6,6 +6,7 @@ use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString, PyStringMethods};
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_python_base::records::main::construct::exception_from::exception_from;
 use sqlbuild_state::freshness::constants::{
     SOURCE_FRESHNESS_COLUMN_TYPES, SOURCE_FRESHNESS_EVENT_ID, STRING_STATE_VALUE_TYPE,
     TEXT_TIMESTAMP_STATE_VALUE_TYPE,
@@ -83,15 +84,11 @@ pub(crate) fn render_create_sql(request: Option<&Bound<'_, PyDict>>) -> PyResult
 }
 
 fn adapter_user_error(py: Python<'_>, message: &str) -> PyErr {
-    match host_entry(py, AdapterHost::AdapterUserError).and_then(|class| {
-        call_with(
-            &class,
-            &[("message", PyString::new(py, message).into_any())],
-        )
-    }) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    exception_from(
+        host_entry(py, AdapterHost::AdapterUserError),
+        message,
+        (None, None),
+    )
 }
 
 /// Render DML that appends source freshness records.

@@ -1,5 +1,6 @@
 //! `sqb clone`: copy or clone selected relations from an origin target into a destination target.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::collections::BTreeSet;
 use std::time::Instant;
 
@@ -39,7 +40,6 @@ use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cl
 use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -74,15 +74,7 @@ pub(crate) struct Invocation<'py> {
 }
 
 fn user_error(py: Python<'_>, (code, message): (&str, &str)) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", code)?;
-        error_class(py, ErrorId::CliUser)?.call((message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(py, ErrorId::CliUser, message, (Some(code), None))
 }
 
 fn target_error(py: Python<'_>, error: CloneTargetError) -> PyErr {

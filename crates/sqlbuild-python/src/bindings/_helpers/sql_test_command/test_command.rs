@@ -63,8 +63,7 @@ use sqlbuild_python_base::build_progress::main::progress::current_native_progres
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::types::ReadResult;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
-use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -304,15 +303,12 @@ impl TestCallbackRelay {
 }
 
 fn unknown_case(py: Python<'_>, message: String) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", UNKNOWN_CASE_CODE)?;
-        error_class(py, ErrorId::PlannerInput)?.call((message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        ErrorId::PlannerInput,
+        &message,
+        (Some(UNKNOWN_CASE_CODE), None),
+    )
 }
 
 /// Compile the selected tests and refuse a `--case` that matched none of them.
@@ -713,28 +709,30 @@ pub(crate) fn run_test<'py>(
     let (worker, discovered) = verified.unzip();
     let inspect_only: bool = native_field(request, "inspect")?.is_truthy()?;
     if native_field(request, "python_only")?.is_truthy()? && worker.is_some() {
-        return Err(new_helped_error(
+        return Err(new_error(
             py,
             ErrorId::PlannerInput,
+            "--python cannot run on a server location",
             (
-                "--python cannot run on a server location".to_owned(),
-                PYTHON_TESTS_INPUT_CODE,
+                Some(PYTHON_TESTS_INPUT_CODE),
+                Some(
+                    "runs on a server location run SQL tests only; run `sqb test --python` locally",
+                ),
             ),
-            Some("runs on a server location run SQL tests only; run `sqb test --python` locally"),
         ));
     }
     if native_field(request, "python_only")?.is_truthy()?
         && (inspect_only || !native_field(request, "since")?.is_none())
     {
-        return Err(new_helped_error(
+        return Err(new_error(
             py,
             ErrorId::PlannerInput,
+            "--python cannot be combined with --inspect or --since",
             (
-                "--python cannot be combined with --inspect or --since".to_owned(),
-                PYTHON_TESTS_INPUT_CODE,
-            ),
-            Some(
-                "--inspect and --since apply to SQL tests only; run `sqb test --python` without them",
+                Some(PYTHON_TESTS_INPUT_CODE),
+                Some(
+                    "--inspect and --since apply to SQL tests only; run `sqb test --python` without them",
+                ),
             ),
         ));
     }

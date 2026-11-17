@@ -1,6 +1,7 @@
 //! The compile-input model loop: each model's steps run in the attachment's order, natively.
 
 use crate::input_loops::models::LoopSwitches;
+use sqlbuild_python_base::records::main::construct::exception_from::exception_from;
 
 use pyo3::FromPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -43,8 +44,6 @@ pub(crate) const UNMANAGED_ATTRIBUTE: &str = "unmanaged";
 pub(crate) const TABLE_TYPE_ATTRIBUTE: &str = "table_type";
 pub(crate) const DECLARED_ATTRIBUTE: &str = "declared";
 pub(crate) const VALIDATE_METHOD: &str = "validate";
-const HELP_ARGUMENT: &str = "help";
-const CODE_ARGUMENT: &str = "code";
 pub(crate) const ANALYSIS_CONFLICT: &str =
     "MODEL sql_analysis conflicts with legacy sql_validation";
 pub(crate) const ANALYSIS_CONFLICT_CODE: &str = "P003";
@@ -269,17 +268,7 @@ pub(crate) fn record_reads(
 
 /// `CompileInputError(message, code=...)`, raised as the attachment raises it.
 pub(crate) fn compile_error(classes: &LoopClasses<'_>, message: &str, code: Option<&str>) -> PyErr {
-    let raised = (|| {
-        let keywords: Bound<'_, PyDict> = PyDict::new(classes.compile_error.py());
-        if let Some(code) = code {
-            keywords.set_item(CODE_ARGUMENT, code)?;
-        }
-        classes.compile_error.call((message,), Some(&keywords))
-    })();
-    match raised {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(failure) => failure,
-    }
+    exception_from(Ok(classes.compile_error.clone()), message, (code, None))
 }
 
 /// `CompileInputError(message, help=help)`.
@@ -288,15 +277,7 @@ pub(crate) fn helped_compile_error(
     message: &str,
     help: Option<&str>,
 ) -> PyErr {
-    let raised = (|| {
-        let keywords: Bound<'_, PyDict> = PyDict::new(classes.compile_error.py());
-        keywords.set_item(HELP_ARGUMENT, help)?;
-        classes.compile_error.call((message,), Some(&keywords))
-    })();
-    match raised {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(failure) => failure,
-    }
+    exception_from(Ok(classes.compile_error.clone()), message, (None, help))
 }
 
 /// The Python exception a native config error raises as, given the values it names.

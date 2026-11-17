@@ -5,13 +5,14 @@ use crate::compiled_views::types::LineageInput;
 use sqlbuild_project::models as project_models;
 use sqlbuild_project::models::DestinationFact;
 use sqlbuild_project::types::InferredRow;
+use sqlbuild_python_base::boundary::main::text_item::text_item;
 use sqlbuild_python_front::model_config::models::HeaderAudits;
 use std::sync::Arc;
 
 use pyo3::FromPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
-use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::types::{PyDict, PyTuple};
 
 use sqlbuild_analysis::assembly::analysis_session::models::LineageRow;
 
@@ -113,9 +114,9 @@ pub(crate) fn compiled_record(
     Ok(CompiledRecord {
         deps,
         destination: DestinationFact {
-            database: text_value(&values, DATABASE_KEY)?,
-            schema: text_value(&values, SCHEMA_KEY)?,
-            name: text_value(&values, ALIAS_KEY)?.unwrap_or_else(|| name.to_owned()),
+            database: text_item(&values, DATABASE_KEY)?,
+            schema: text_item(&values, SCHEMA_KEY)?,
+            name: text_item(&values, ALIAS_KEY)?.unwrap_or_else(|| name.to_owned()),
             qualified_name: None,
             logical_schema: native_field(config, LOGICAL_SCHEMA_ATTRIBUTE)?.extract()?,
             logical_database: native_field(config, LOGICAL_DATABASE_ATTRIBUTE)?.extract()?,
@@ -124,15 +125,6 @@ pub(crate) fn compiled_record(
         macro_deps,
         host: CompiledProjections::default(),
     })
-}
-
-fn text_value(values: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<String>> {
-    match values.get_item(key)? {
-        Some(value) if value.is_instance_of::<pyo3::types::PyString>() => {
-            Ok(Some(value.extract()?))
-        }
-        _ => Ok(None),
-    }
 }
 
 /// A lineage row's output column with its `(resource name, column)` sources.

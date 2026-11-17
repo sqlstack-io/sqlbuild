@@ -2,15 +2,15 @@
 
 use crate::project_assembly::main::sql_entry_label::sql_entry_label;
 use crate::project_assembly::main::syntax_error_message::syntax_error_message;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
-use pyo3::types::{PyDict, PyList, PyString, PyTuple};
+use pyo3::types::{PyList, PyString, PyTuple};
 use sqlbuild_analysis::assembly::project::main::sql_analysis_opt_out_help::sql_analysis_opt_out_help;
 use sqlbuild_analysis::assembly::project::models::{SyntaxCheck, SyntaxMode};
 
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -37,14 +37,12 @@ pub(crate) struct HookSite<'a, 'py> {
 
 /// `CompileInputError(message, help=sql_analysis_opt_out_help(model_owned=True))`.
 pub(crate) fn syntax_error(py: Python<'_>, message: String) -> PyErr {
-    let raised = || -> PyResult<PyErr> {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("help", sql_analysis_opt_out_help(true))?;
-        let error: Bound<'_, PyAny> =
-            error_class(py, ErrorId::CompileInput)?.call((message,), Some(&keywords))?;
-        Ok(PyErr::from_value(error))
-    };
-    raised().unwrap_or_else(|error| error)
+    new_error(
+        py,
+        ErrorId::CompileInput,
+        &message,
+        (None, Some(&sql_analysis_opt_out_help(true))),
+    )
 }
 
 /// The parser's message for `sql`, or `None` where it parses.

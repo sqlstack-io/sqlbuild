@@ -1,5 +1,6 @@
 //! Shared `sqb scenario` preparation: project, namespace, adapters, compile and selection.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::path::PathBuf;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -31,7 +32,6 @@ use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
@@ -58,16 +58,12 @@ pub(crate) fn optional_text<'py>(py: Python<'py>, value: Option<&str>) -> Bound<
 
 /// `CliUserError(message, code=..., help=...)`.
 pub(crate) fn cli_user_error(py: Python<'_>, error: ScenarioCommandError) -> PyErr {
-    let raised: PyResult<Bound<'_, PyAny>> = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", error.code)?;
-        options.set_item("help", error.help)?;
-        error_class(py, ErrorId::CliUser)?.call((error.message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        ErrorId::CliUser,
+        &error.message,
+        (Some(error.code), error.help.as_deref()),
+    )
 }
 
 /// The progress stream: `write` then `flush`.

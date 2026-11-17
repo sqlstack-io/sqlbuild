@@ -5,6 +5,7 @@ use pyo3::prelude::{
     wrap_pyfunction,
 };
 use pyo3::types::PyTuple;
+use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use sqlbuild_state::execution_history::main::project_runs::project_runs;
 use sqlbuild_state::execution_history::main::validate_filter::validate_filter;
 use sqlbuild_state::execution_history::main::validate_page::validate_page;
@@ -21,7 +22,6 @@ use crate::bindings::_helpers::execution_history::conversion::projection_facts;
 use crate::bindings::_helpers::execution_history::conversion::run_filter_spec;
 use crate::bindings::_helpers::execution_history::conversion::run_records;
 use crate::bindings::_helpers::execution_history::conversion::run_rows;
-use crate::bindings::_helpers::execution_history::conversion::text_of;
 use crate::bindings::_helpers::execution_history::conversion::utc_zone;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
@@ -77,7 +77,7 @@ fn append_and_project<'py>(
 fn validate_stored_history_event(record: &Bound<'_, PyAny>) -> Result<(), PyErr> {
     let py: Python<'_> = record.py();
     let storage_order: i64 = native_field(record, "storage_order")?.extract()?;
-    let cursor: String = text_of(&native_field(record, "cursor")?)?.unwrap_or_default();
+    let cursor: String = optional_text(&native_field(record, "cursor")?)?.unwrap_or_default();
     let received_at_is_utc: bool = utc_zone(&native_field(record, "received_at")?)?;
     checked(
         py,
@@ -111,9 +111,9 @@ fn validate_history_page(page: &Bound<'_, PyAny>, is_event_page: bool) -> Result
     let records: Bound<'_, PyAny> = native_field(page, "records")?;
     let has_records: bool = records.is_truthy()?;
     let next_cursor: Bound<'_, PyAny> = native_field(page, "next_cursor")?;
-    let next_text: Option<String> = text_of(&next_cursor)?;
+    let next_text: Option<String> = optional_text(&next_cursor)?;
     let last_text: Option<String> = if is_event_page && has_records {
-        text_of(&native_field(&records.get_item(-1)?, "cursor")?)?
+        optional_text(&native_field(&records.get_item(-1)?, "cursor")?)?
     } else {
         None
     };

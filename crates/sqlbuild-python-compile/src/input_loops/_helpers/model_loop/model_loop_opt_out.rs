@@ -1,9 +1,10 @@
 //! Rejected `sql_analysis false` opt-outs, and native-route analysis skipped on a parser gap.
 
+use crate::input_loops::_helpers::model::model_loop::helped_compile_error;
 use std::path::Path;
 use std::sync::mpsc::{Receiver, Sender, channel};
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyBoolMethods, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use sqlbuild_analysis::analysis_route::main::aligned_offset::aligned_offset;
 use sqlbuild_analysis::analysis_route::main::native_gap::native_gap;
@@ -35,7 +36,7 @@ use crate::input_loops::models::NativeModelLoop;
 use crate::project_assembly::main::sql_entry_label::sql_entry_label;
 use crate::project_assembly::main::syntax_error_message::syntax_error_message;
 use crate::project_assembly::main::syntax_valid::syntax_valid;
-use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -57,7 +58,6 @@ const PATH_CLASS: &str = "Path";
 const PATH_FIELD: &str = "path";
 const LINE_FIELD: &str = "line";
 const COLUMN_FIELD: &str = "column";
-const HELP_ARGUMENT: &str = "help";
 const MODEL_RESOURCE: &str = "model";
 const RELATIVE_PATH_ATTRIBUTE: &str = "relative_path";
 
@@ -316,11 +316,11 @@ fn settle_gap(
 ) -> PyResult<bool> {
     match outcome.map_err(|message| compile_error(context.classes, &message, None))? {
         None => Ok(false),
-        Some((true, code, message)) => Err(new_helped_error(
+        Some((true, code, message)) => Err(new_error(
             context.host.py(),
             ErrorId::CompileInput,
-            (message, code),
-            Some(&context.classes.syntax_help),
+            &message,
+            (Some(code), Some(&context.classes.syntax_help)),
         )),
         Some((false, code, message)) => {
             report_skip(settings, context, model, (code, message))?;
@@ -382,11 +382,11 @@ fn report_skip(
     let py: Python<'_> = context.host.py();
     let help: &str = &context.classes.syntax_help;
     if settings.require_sql_analysis {
-        return Err(new_helped_error(
+        return Err(new_error(
             py,
             ErrorId::CompileInput,
-            (message, code),
-            Some(help),
+            &message,
+            (Some(code), Some(help)),
         ));
     }
     let diagnostic: Bound<'_, PyAny> = new_record_with(
@@ -499,13 +499,10 @@ pub(crate) fn reject_unparseable_query(
         "SQL syntax error in model '{}' ({}): {error}",
         model.name, model.file_path
     );
-    let keywords: Bound<'_, PyDict> = PyDict::new(model.config.py());
-    keywords.set_item(HELP_ARGUMENT, &context.classes.syntax_help)?;
-    Err(PyErr::from_value(
-        context
-            .classes
-            .compile_error
-            .call((message,), Some(&keywords))?,
+    Err(helped_compile_error(
+        context.classes,
+        &message,
+        Some(&context.classes.syntax_help),
     ))
 }
 

@@ -22,7 +22,7 @@ use crate::bindings::_helpers::diff_report::command::target_max_full_rows;
 use crate::bindings::_helpers::diff_report::facts::diff_facts;
 use crate::bindings::_helpers::diff_report::support::error_text;
 use crate::bindings::_helpers::diff_report::support::matches_class;
-use crate::bindings::_helpers::execution_history::conversion::optional_text;
+use crate::bindings::_helpers::execution_history::conversion::nullable_text;
 use crate::bindings::_helpers::execution_history::statements::fetch_one;
 use crate::bindings::_helpers::review_command::planning::ReviewSettings;
 use crate::bindings::_helpers::review_command::support::review_error;
@@ -557,7 +557,7 @@ pub(crate) fn prepare_sides<'py>(
         right: pipeline.get_item(1)?,
         left,
         limits,
-        bounded: optional_text(&native_field(context.request, "bounded")?)?,
+        bounded: nullable_text(&native_field(context.request, "bounded")?)?,
         against_has,
     }))
 }

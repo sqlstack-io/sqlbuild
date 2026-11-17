@@ -3,6 +3,7 @@
 use crate::state_rows::main::event_rows::in_utc::in_utc;
 use crate::state_rows::main::event_rows::offset_aware::offset_aware;
 use crate::state_rows::main::event_rows::presumed_utc::presumed_utc;
+use sqlbuild_python_base::records::main::construct::exception_from::exception_from;
 use std::cell::RefCell;
 
 use pyo3::exceptions::PyOverflowError;
@@ -58,10 +59,7 @@ pub(crate) fn record_event_id(record: &Bound<'_, PyAny>) -> PyResult<String> {
 }
 
 pub(crate) fn raised(py: Python<'_>, class: NativeAttr, message: String) -> PyErr {
-    match native_attr(py, class).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    exception_from(native_attr(py, class), &message, (None, None))
 }
 
 pub(crate) fn python_error(py: Python<'_>, error: FreshnessError) -> PyErr {

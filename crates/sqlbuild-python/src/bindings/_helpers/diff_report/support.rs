@@ -6,6 +6,7 @@ use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_cli::diff_report::errors::DiffUserError;
 use sqlbuild_cli::diff_report::models::DiffRequestFacts;
 use sqlbuild_host::entries::models::HostId;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -38,17 +39,12 @@ pub(crate) fn object<'py, T: pyo3::IntoPyObjectExt<'py>>(
 
 /// `class(message, code=code, help=help)` from the CLI exceptions module.
 pub(crate) fn cli_error(py: Python<'_>, class: ErrorId, error: &DiffUserError) -> PyErr {
-    let raised = (|| -> PyResult<Bound<'_, PyAny>> {
-        let help: Bound<'_, PyAny> = object(py, error.help.as_deref())?;
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("code", error.code.as_str())?;
-        keywords.set_item("help", help)?;
-        error_class(py, class)?.call((error.message.as_str(),), Some(&keywords))
-    })();
-    match raised {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(failure) => failure,
-    }
+    new_error(
+        py,
+        class,
+        &error.message,
+        (Some(&error.code), error.help.as_deref()),
+    )
 }
 
 /// The `message`, `code` and `help` of a raised `CliUserError`.

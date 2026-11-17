@@ -127,10 +127,3 @@ pub(crate) fn log_warning_message(py: Python<'_>, logger: &str, message: &str) -
         .call_method1("warning", (message,))
         .map(|_| ())
 }
-
-/// The host exception class `id` raised with `message`, or the error looking it up or raising it.
-pub(crate) fn host_error(py: Python<'_>, id: impl Into<HostId>, message: &str) -> PyErr {
-    entry(py, id)
-        .and_then(|class| class.call1((message,)))
-        .map_or_else(|error| error, PyErr::from_value)
-}

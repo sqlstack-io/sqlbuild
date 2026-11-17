@@ -7,12 +7,12 @@ use crate::compiled_project::constants::INCREMENTAL_MODE_KEY;
 use crate::compiled_project::main::config_values::config_values;
 use crate::compiled_project::main::declarations::declarations;
 use crate::compiled_project::main::materialization::materialization;
-use crate::compiled_project::main::text_value::text_value;
 use crate::compiled_project::models::ModelInputPy;
 use pyo3::prelude::PyResult;
 use sqlbuild_analysis::compiled_project::models::{
     CompiledModelFacts, ModelConfigFacts, ModelReferenceFact,
 };
+use sqlbuild_python_base::boundary::main::text_item::text_item;
 
 /// Model facts.
 pub fn model_facts(model: ModelInputPy<'_>) -> PyResult<CompiledModelFacts> {
@@ -41,9 +41,9 @@ pub fn model_facts(model: ModelInputPy<'_>) -> PyResult<CompiledModelFacts> {
             encoding_error: config_values.1,
             header_keys,
             layer_schema,
-            contract: text_value(&values, CONTRACT_KEY)?,
+            contract: text_item(&values, CONTRACT_KEY)?,
             materialized: materialization(&values)?,
-            incremental_mode: text_value(&values, INCREMENTAL_MODE_KEY)?,
+            incremental_mode: text_item(&values, INCREMENTAL_MODE_KEY)?,
         },
         references: references
             .into_iter()

@@ -1,5 +1,6 @@
 //! `sqb lineage`: load or build the relation graph, select lineage, and print it.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -103,16 +104,12 @@ fn keywords<'py>(
 
 /// `CliUserError(message, code=..., help=...)`.
 fn user_error(py: Python<'_>, error: LineageError) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", error.code)?;
-        options.set_item("help", error.help)?;
-        error_class(py, ErrorId::CliUser)?.call((error.message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        ErrorId::CliUser,
+        &error.message,
+        (Some(error.code), error.help.as_deref()),
+    )
 }
 
 fn strings(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
