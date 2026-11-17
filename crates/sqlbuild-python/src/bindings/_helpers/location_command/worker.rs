@@ -34,8 +34,6 @@ use crate::bindings::_helpers::location_command::constants::{
     SQL_TEST_NODE_KIND,
 };
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
-use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::seed_command::command::run_seed;
 use crate::bindings::_helpers::sql_test_command::test_command::run_test;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -47,6 +45,8 @@ use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
+use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
+use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;

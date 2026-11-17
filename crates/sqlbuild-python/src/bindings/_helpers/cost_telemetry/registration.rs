@@ -2,13 +2,16 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::cost_telemetry::{allocation, health, ledger, snowflake};
 use sqlbuild_python_front::cost_context::main::register_cost_context::register_cost_context;
+use sqlbuild_python_output::cost_telemetry::main::register_allocation::register_allocation;
+use sqlbuild_python_output::cost_telemetry::main::register_health::register_health;
+use sqlbuild_python_output::cost_telemetry::main::register_ledger::register_ledger;
+use sqlbuild_python_output::cost_telemetry::main::register_snowflake::register_snowflake;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    allocation::register(module)?;
+    register_allocation(module)?;
     register_cost_context(module)?;
-    health::register(module)?;
-    ledger::register(module)?;
-    snowflake::register(module)
+    register_health(module)?;
+    register_ledger(module)?;
+    register_snowflake(module)
 }

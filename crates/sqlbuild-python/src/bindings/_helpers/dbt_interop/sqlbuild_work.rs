@@ -11,13 +11,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{BuildExecutionResult, BuildStatus};
 
 use crate::bindings::_helpers::build_command::policies::enforce_plan_safety_policies_binding;
-use crate::bindings::_helpers::build_progress::build_callbacks::{
-    BuildProgressCallbacks, batch_complete_callback,
-};
-use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
-use crate::bindings::_helpers::build_progress::progress_text::format_execution_header;
-use crate::bindings::_helpers::build_progress::result_text::build_result_text;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -36,6 +29,12 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_outputs::main::write_runtime_target::write_runtime_target;
+use sqlbuild_python_output::build_progress::main::batch_complete_callback::batch_complete_callback;
+use sqlbuild_python_output::build_progress::main::build_result_text::build_result_text;
+use sqlbuild_python_output::build_progress::main::format_build_footer_with::format_build_footer_with;
+use sqlbuild_python_output::build_progress::main::format_execution_header::format_execution_header;
+use sqlbuild_python_output::build_progress::models::BuildProgressCallbacks;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 
 const WORK_OPTIONS: (&[&str], &[&str]) = (
     &[

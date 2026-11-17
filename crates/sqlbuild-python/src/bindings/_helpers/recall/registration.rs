@@ -2,9 +2,9 @@
 
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 
-use crate::bindings::_helpers::recall::sinks::RecallLifecycleSink;
-use crate::bindings::_helpers::recall::writer::RecallWriter;
 use sqlbuild_python_front::discovery::main::python_files::install_recall_writer::install_recall_writer;
+use sqlbuild_python_output::recall::models::RecallLifecycleSink;
+use sqlbuild_python_output::recall::models::RecallWriter;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RecallLifecycleSink>()?;

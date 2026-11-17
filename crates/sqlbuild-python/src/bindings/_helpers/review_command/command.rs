@@ -25,7 +25,6 @@ use sqlbuild_analysis::review_command::models::{
 use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 
 use crate::bindings::_helpers::clone::clone_progress::write_line;
-use crate::bindings::_helpers::recall::console::{write_stderr, write_stdout_bytes};
 use crate::bindings::_helpers::review_command::comparison::{
     ComparisonContext, Comparisons, Sides, compare_models, prepare_sides,
 };
@@ -45,6 +44,8 @@ use crate::bindings::_helpers::review_command::support::{
     error_parts, failed_error, invocation_id, phase, plan_error, progress_stream, utc_now_compact,
 };
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
+use sqlbuild_python_output::recall::main::write_stdout_bytes::write_stdout_bytes;
 
 const SUCCESS_STATUS: &str = "success";
 const SKIPPED_STATUS: &str = "skipped";

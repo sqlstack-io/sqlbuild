@@ -8,7 +8,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::dbt_cli::main::dbt_debug_args::dbt_debug_args;
 use std::time::Instant;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::dbt_interop::cli::resolve_dbt_config;
 use crate::bindings::_helpers::dbt_interop::execution::build_failed_sqlbuild_model_names;
 use crate::bindings::_helpers::dbt_interop::execution::build_merged_dbt_execution_argv;
@@ -34,6 +33,7 @@ use sqlbuild_python_base::records::types::NativeAttr;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::plan_has_executable_work::plan_has_executable_work;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 
 const PLAN_OPTIONS: (&[&str], &[&str]) = (
     &["project_dir", "args"],

@@ -3,10 +3,8 @@
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
-use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -33,6 +31,8 @@ use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
 use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
+use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
+use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 use sqlbuild_python_planner::planner_entries::main::plans::build_relation_command_plan::build_relation_command_plan;
 use sqlbuild_python_project::graph::main::nodes::sql_ref_key::sql_ref_key;
 use sqlbuild_python_project::graph::main::nodes::transitive_closure_many::transitive_closure_many;
@@ -49,13 +49,13 @@ use crate::bindings::_helpers::check::check_results::{
     check_result_text, results_json, write_results,
 };
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
-use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_outputs::main::write_python_check_runtime_target::write_python_check_runtime_target;
+use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_names::python_node_names;
 
