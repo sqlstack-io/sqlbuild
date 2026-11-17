@@ -1,7 +1,6 @@
 //! A scoped HTTP reader mirrors immutable warehouse observations, including external runs.
 
 use chrono::{DateTime, Duration, Utc};
-use futures_util::future::BoxFuture;
 use reqwest::StatusCode;
 use serde_json::json;
 use sqlbuild_core::constants::STATE_TABLE_NAMES;
@@ -12,7 +11,9 @@ use crate::api::tests::helpers::{start_api, stop_api};
 use crate::api::tests::test_types::{
     MirrorConflictTestCase, StateTableClassificationTestCase, WarehouseMetadataTestCase,
 };
-use crate::api::tests::warehouse_history_helpers::{batch, fixture, seed_target};
+use crate::api::tests::warehouse_history_helpers::{
+    audit_page, batch, cost_page, fixture, seed_target,
+};
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
@@ -21,20 +22,15 @@ use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::store::errors::ControlError;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::TransactionMode;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_metadata::main::ingest::ingest_audit_results::ingest_audit_results;
-use crate::warehouse_metadata::main::ingest::ingest_resource_costs::ingest_resource_costs;
-use crate::warehouse_metadata::models::{
-    MetadataBatch, WarehouseHistoryKind, WarehouseSyncResponse,
-};
+use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
 
 #[test]
 fn given_state_tables_when_classified_then_each_is_mirrored_by_exactly_one_kind() {
@@ -653,20 +649,4 @@ fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_
             close_test_store(fixture_store).await;
         });
     }
-}
-
-fn audit_page<'a>(
-    store: &'a ControlStore,
-    scope: (Uuid, &'a str),
-    page: &'a MetadataBatch,
-) -> BoxFuture<'a, Result<WarehouseSyncResponse, ControlError>> {
-    Box::pin(ingest_audit_results(store, scope, page))
-}
-
-fn cost_page<'a>(
-    store: &'a ControlStore,
-    scope: (Uuid, &'a str),
-    page: &'a MetadataBatch,
-) -> BoxFuture<'a, Result<WarehouseSyncResponse, ControlError>> {
-    Box::pin(ingest_resource_costs(store, scope, page))
 }
