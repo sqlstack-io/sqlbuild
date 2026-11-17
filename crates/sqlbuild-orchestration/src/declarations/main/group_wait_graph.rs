@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::declarations::_helpers::group_waits::{cycle_path, record_wait, strongly_connected};
+use crate::declarations::_helpers::group_waits::{cycle_path, strongly_connected};
 use crate::declarations::models::{GroupCycle, GroupWaits};
 
 /// `selections` maps each member job to the node keys it builds; `deps` maps a node key to the keys it reads.
@@ -21,7 +21,7 @@ pub fn group_wait_graph(
     let mut edges: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut reasons: BTreeMap<(String, String), (String, String)> = BTreeMap::new();
     for (name, selection) in selections {
-        let mut dependencies: BTreeSet<String> = BTreeSet::new();
+        let mut dependencies: BTreeSet<&str> = BTreeSet::new();
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         let mut pending: Vec<&str> = selection.iter().map(String::as_str).collect();
         while let Some(key) = pending.pop() {
@@ -32,17 +32,25 @@ pub fn group_wait_graph(
                 if let Some(owners) = owners.get(upstream.as_str())
                     && !owners.contains(name.as_str())
                 {
+                    // The first lineage edge that makes a wait is its reason.
                     for owner in owners {
-                        dependencies.insert((*owner).to_owned());
-                        reasons = record_wait(reasons, (name, owner), || {
-                            (key.to_owned(), upstream.clone())
-                        });
+                        if dependencies.insert(owner) {
+                            reasons.insert(
+                                (name.clone(), (*owner).to_owned()),
+                                (key.to_owned(), upstream.clone()),
+                            );
+                        }
                     }
                 }
-                pending.push(upstream);
+                if !seen.contains(upstream.as_str()) {
+                    pending.push(upstream);
+                }
             }
         }
-        edges.insert(name.clone(), dependencies);
+        edges.insert(
+            name.clone(),
+            dependencies.into_iter().map(str::to_owned).collect(),
+        );
     }
     let cycles: Vec<GroupCycle> = strongly_connected(&edges)
         .iter()

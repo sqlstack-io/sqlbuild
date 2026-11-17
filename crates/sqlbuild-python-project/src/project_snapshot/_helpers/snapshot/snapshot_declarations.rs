@@ -40,7 +40,7 @@ fn file_site(path: &str, position: FilePosition) -> Option<DeclaredAt> {
 }
 
 /// Whether a declaration with `targets` applies to `target`.
-fn declared_for(targets: &[String], target: &str) -> bool {
+pub(crate) fn declared_for(targets: &[String], target: &str) -> bool {
     targets.is_empty() || targets.iter().any(|name| name == target)
 }
 

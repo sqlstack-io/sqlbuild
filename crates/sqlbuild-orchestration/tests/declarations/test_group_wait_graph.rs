@@ -111,3 +111,44 @@ fn given_group_members_and_node_lineage_when_deriving_waits_then_every_cycle_is_
         );
     }
 }
+
+#[test]
+fn given_a_large_group_on_a_long_chain_when_deriving_waits_then_one_cycle_is_reported_within_the_time_limit()
+ {
+    const MEMBERS: usize = 50;
+    const NODES_PER_MEMBER: usize = 200;
+    let node = |index: usize| format!("model:m{index}");
+    let last = MEMBERS * NODES_PER_MEMBER - 1;
+    let mut selections: BTreeMap<String, BTreeSet<String>> = (0..MEMBERS)
+        .map(|member| {
+            let first = member * NODES_PER_MEMBER;
+            (
+                format!("job_{member:03}"),
+                (first..first + NODES_PER_MEMBER).map(node).collect(),
+            )
+        })
+        .collect();
+    // An acyclic chain of 10,000 nodes: each reads the one before it, and the first job also builds
+    // a tail that reads the last node, so every member reaches every other through lineage.
+    selections
+        .get_mut("job_000")
+        .expect("first member")
+        .insert("model:tail".to_owned());
+    let mut deps: BTreeMap<String, BTreeSet<String>> = (1..=last)
+        .map(|index| (node(index), BTreeSet::from([node(index - 1)])))
+        .collect();
+    deps.insert("model:tail".to_owned(), BTreeSet::from([node(last)]));
+
+    let started = std::time::Instant::now();
+    let waits = group_wait_graph(&selections, &deps);
+    let elapsed = started.elapsed();
+
+    assert_eq!(waits.cycles.len(), 1);
+    assert_eq!(waits.edges["job_000"].len(), MEMBERS - 1);
+    assert_eq!(waits.edges[&format!("job_{:03}", MEMBERS - 1)].len(), MEMBERS - 1);
+    assert!(
+        elapsed < std::time::Duration::from_secs(2),
+        "deriving waits for {MEMBERS} members over {} nodes took {elapsed:?}",
+        last + 2
+    );
+}

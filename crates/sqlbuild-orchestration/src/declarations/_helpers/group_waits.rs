@@ -1,18 +1,6 @@
-//! Record why one group member waits for another, find the members that wait on each other, and name a cycle among them.
+//! Find the group members that wait on each other, and name a cycle among them.
 
 use std::collections::{BTreeMap, BTreeSet};
-
-/// Keep the first reason found for a wait: the first lineage edge, as the node and the upstream it reads.
-pub(crate) fn record_wait(
-    mut reasons: BTreeMap<(String, String), (String, String)>,
-    (job, dependency): (&str, &str),
-    reason: impl FnOnce() -> (String, String),
-) -> BTreeMap<(String, String), (String, String)> {
-    reasons
-        .entry((job.to_owned(), dependency.to_owned()))
-        .or_insert_with(reason);
-    reasons
-}
 
 /// Groups of two or more members that each reach every other through waits, in name order.
 pub(crate) fn strongly_connected(

@@ -47,6 +47,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 
@@ -437,6 +438,34 @@ impl ProjectSelection {
             .rev()
             .find(|node| node.name == name)
             .map(|node| format!("{}:{name}", node.kind))
+    }
+
+    /// Each Python node's published key and the keys it reads: its upstream Python nodes and its SQL deps.
+    pub fn node_deps(&self) -> Vec<(String, BTreeSet<String>)> {
+        let upstream: BTreeMap<&str, &[String]> = self
+            .nodes
+            .upstream
+            .iter()
+            .map(|(name, names)| (name.as_str(), names.as_slice()))
+            .collect();
+        self.nodes
+            .nodes
+            .iter()
+            .map(|node| {
+                let deps: BTreeSet<String> = upstream
+                    .get(node.name.as_str())
+                    .into_iter()
+                    .flat_map(|names| names.iter())
+                    .filter_map(|name| self.node_key(name))
+                    .chain(
+                        node.sql_deps
+                            .iter()
+                            .map(|(kind, name)| format!("{kind}:{name}")),
+                    )
+                    .collect();
+                (format!("{}:{}", node.kind, node.name), deps)
+            })
+            .collect()
     }
 
     /// The key a selected Python node's run reports under; a loader reports as the source it writes.
