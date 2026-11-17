@@ -3,8 +3,8 @@ import { zoomTo } from './zoom';
 
 // Zoomed out, cards take their compact form: a one-line pill, a ring in the colour of the card's state
 // holding its kind's icon, then the part of its name that tells it apart from its siblings. The name
-// never wraps, shows at 12 px or more on screen, shrinks to fit before it is cut, and is cut only at its
-// end. Cards are drawn in full down to 0.82.
+// never wraps, shows at 12 px or more on screen, shrinks to fit before it is cut, and is cut at its
+// start, keeping the end that tells it apart. Cards are drawn in full down to 0.82.
 // With SHOTS set, each graph is also photographed at each zoom: SHOTS=/some/dir npx playwright test e2e/compact.spec.ts
 const shots = process.env.SHOTS;
 
@@ -57,18 +57,20 @@ function pillProblems(): string[] {
 			problems.push(`${full}: no name shown`);
 			continue;
 		}
-		visible.push(`${pill.dataset.parent ?? ''} / ${name.textContent ?? ''}`);
+		// Down to 0.5 what each shows tells siblings apart; further out, about four characters can't, so their tails must.
+		visible.push(`${pill.dataset.parent ?? ''} / ${zoom >= 0.49 ? (name.textContent ?? '') : (name.dataset.tail ?? '')}`);
 		const px = parseFloat(getComputedStyle(name).fontSize) * zoom;
 		if (px < 11.95) problems.push(`${full}: its name shows at ${px.toFixed(2)} px`);
 		if (Math.abs(box.height - 30) > 1) problems.push(`${full}: its pill is ${box.height.toFixed(1)} px tall`);
 		// One line: never wrapped, one line box.
 		if (getComputedStyle(name).whiteSpace !== 'nowrap' || name.getClientRects().length !== 1 || name.getBoundingClientRect().height > px * 1.6) problems.push(`${full}: its name wraps`);
-		// Cut only once it can shrink no further, and then at its end.
-		if (name.scrollWidth > name.clientWidth + 0.5) {
-			if (px > 12.05) problems.push(`${full}: cut at ${px.toFixed(2)} px, before shrinking to 12`);
-			if (getComputedStyle(name).textOverflow !== 'ellipsis') problems.push(`${full}: cut without an ellipsis at its end`);
-		}
-		if (!full.endsWith(name.textContent ?? '\0')) problems.push(`${full}: shows "${name.textContent}", not an ending of its name`);
+		// It fits; cut only once it can shrink no further, and then in its middle, keeping both ends.
+		const text = name.textContent ?? '';
+		const tail = name.dataset.tail ?? '';
+		const [head, end = ''] = text.split('…');
+		if (name.scrollWidth > name.clientWidth + 0.5) problems.push(`${full}: "${text}" overflows its pill`);
+		if (text.includes('…') && px > 12.05) problems.push(`${full}: cut at ${px.toFixed(2)} px, before shrinking to 12`);
+		if (!full.endsWith(tail) || !tail.startsWith(head) || !tail.endsWith(end)) problems.push(`${full}: shows "${text}", not its tail "${tail}" cut in the middle`);
 		const ring = pill.querySelector<HTMLElement>('.ring')!;
 		const want = expected(card);
 		if (want && getComputedStyle(ring).borderTopColor !== want) problems.push(`${full}: its ring is ${getComputedStyle(ring).borderTopColor}, its state ${want}`);
@@ -128,4 +130,21 @@ test('a job pill’s play triangle sits in the middle of its ring', async ({ pag
 			expect(Math.abs(o.dy), `vertically, at ${zoom}`).toBeLessThanOrEqual(0.5);
 		}
 	}
+});
+
+test('a selected pill stands out from the rest', async ({ page }) => {
+	await page.goto('/lineage?mock');
+	await page.locator('.graph-canvas:not(.unfitted) .svelte-flow__node').first().waitFor({ timeout: 20_000 });
+	await page.waitForTimeout(800);
+	await zoomTo(page, 0.5);
+	const pills = page.locator('.cface .pill');
+	const looks = (i: number) => pills.nth(i).evaluate((p) => ({ border: getComputedStyle(p).borderTopColor, ring: getComputedStyle(p).boxShadow, fill: getComputedStyle(p).backgroundColor }));
+	const before = await looks(1);
+	await pills.nth(1).click();
+	const [selected, other] = [await looks(1), await looks(2)];
+	const primary = await page.evaluate(() => { const i = document.body.appendChild(document.createElement('i')); i.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary'); const c = getComputedStyle(i).color; i.remove(); return c; });
+	expect(selected.border).toBe(primary);
+	expect(selected.ring).not.toBe('none');
+	expect(selected.fill).not.toBe(before.fill);
+	expect(other.border).not.toBe(primary);
 });
