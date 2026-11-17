@@ -434,6 +434,7 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
             fixes: MissingUpstreamFixes {
                 target: Some("dev".to_owned()),
                 origins: vec!["prod".to_owned(), "staging".to_owned()],
+                deferrable: vec!["prod".to_owned()],
                 clone_to: Some("dev".to_owned()),
             },
             expected_missing: ["a", "b", "c", "d", "e", "f"]
@@ -454,7 +455,6 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
                 "    read them from it for this run:  --defer-to prod\n",
                 "    copy them into this target:      sqb clone --from prod --to dev -s a b c d e f codes\n",
                 "  If they exist in staging:\n",
-                "    read them from it for this run:  --defer-to staging\n",
                 "    copy them into this target:      sqb clone --from staging --to dev -s a b c d e f codes\n",
                 "  Or build them too:                 add + before your selection",
             ),

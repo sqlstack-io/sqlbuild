@@ -94,6 +94,8 @@ pub struct MissingUpstreamFixes {
     pub target: Option<String>,
     /// Targets the active target may clone from, to defer to or clone the upstreams from.
     pub origins: Vec<String>,
+    /// The origins `--defer-to` accepts: project targets, offered only when this plan does not defer already.
+    pub deferrable: Vec<String>,
     /// The clone command's `--to`, needed when the active target is not the default one.
     pub clone_to: Option<String>,
 }

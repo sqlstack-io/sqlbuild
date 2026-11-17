@@ -7,7 +7,11 @@ import subprocess
 from pathlib import Path
 from textwrap import dedent
 
-from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
+from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    execute_duckdb,
+    prepare_inline_project,
+    run_sqb,
+)
 
 PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": dedent(
@@ -245,3 +249,51 @@ def plan_missing_upstreams(
         plan_command,
         run_sqb(command=plan_command, project_dir=project_dir),
     )
+
+
+def defer_clone_with_missing_origin(
+    *, tmp_path: Path, dropped_origin_table: str
+) -> tuple[subprocess.CompletedProcess[str], subprocess.CompletedProcess[str]]:
+    """Defer-clone `report` with one of its boundaries dropped in `prod`, then `plan --changed`."""
+
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="partial_defer_clone_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "partial_defer_clone_project"\nadapter = "duckdb"\n'
+                'default_target = "dev"\n\n[connection]\ndatabase = "shop.duckdb"\n\n'
+                '[targets.prod]\nschema = "prod"\n\n'
+                "[targets.prod.clone]\nallow_as_clone_origin = true\n\n"
+                '[targets.dev]\nschema = "dev"\n\n'
+                "[targets.dev.clone]\nallow_as_clone_destination = true\n"
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n\nSELECT 1 AS id\n"
+            ),
+            "models/customers.sql": (
+                "MODEL (description 'Customers.', materialized table);\n\nSELECT 1 AS id\n"
+            ),
+            "models/report.sql": (
+                "MODEL (description 'Report.', materialized table);\n\n"
+                'SELECT o.id FROM __ref("orders") AS o JOIN __ref("customers") AS c USING (id)\n'
+            ),
+        },
+    )
+    for target in ("dev", "prod"):
+        built: subprocess.CompletedProcess[str] = run_sqb(
+            command=("--no-color", "build", "--target", target), project_dir=project_dir
+        )
+        assert built.returncode == 0, built.stdout + built.stderr
+    execute_duckdb(
+        db_path=project_dir / "shop.duckdb", sql=f"DROP TABLE prod.{dropped_origin_table}"
+    )
+    cloned: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", "--select", "report", "--defer-clone-from", "prod"),
+        project_dir=project_dir,
+    )
+    planned: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", "--changed", "--select", "orders", "customers"),
+        project_dir=project_dir,
+    )
+    return cloned, planned

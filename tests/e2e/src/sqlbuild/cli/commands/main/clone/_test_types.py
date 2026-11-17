@@ -104,3 +104,12 @@ class MissingUpstreamFixesE2ETestCase:
     destination_allowed: bool
     expected_fragments: tuple[str, ...]
     unexpected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PartialDeferCloneE2ETestCase:
+    """A defer clone with one boundary missing in the origin, and what `plan --changed` says."""
+
+    description: str
+    dropped_origin_table: str
+    expected_fragments: tuple[str, ...]

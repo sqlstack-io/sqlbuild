@@ -108,10 +108,12 @@ fn lineage_text(
         .unwrap_or_default();
     for origin in &fixes.origins {
         lines.push(format!("  If {exists} in {origin}:"));
-        lines.push(format!(
-            "    {read_label:<0$}  --defer-to {origin}",
-            width - 4
-        ));
+        if fixes.deferrable.contains(origin) {
+            lines.push(format!(
+                "    {read_label:<0$}  --defer-to {origin}",
+                width - 4
+            ));
+        }
         lines.push(format!(
             "    {copy_label:<0$}  sqb clone --from {origin}{to} -s {1}",
             width - 4,
