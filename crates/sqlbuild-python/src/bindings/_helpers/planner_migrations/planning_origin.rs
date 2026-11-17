@@ -14,7 +14,7 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use pyo3::PyErr;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PySet, PySetMethods};
+use pyo3::types::{PyDict, PyDictMethods, PySet, PySetMethods};
 
 pub(super) fn location<'py>(
     runtime: &Bound<'py, PyAny>,
@@ -29,19 +29,29 @@ pub(super) fn location<'py>(
     new_record_with(runtime.py(), RecordId::CompiledRelationLocation, &fields)
 }
 
-fn named<'py>(
-    name: &Bound<'py, PyAny>,
-    destination: &Bound<'py, PyAny>,
-    runtime: &Bound<'py, PyAny>,
-    state: &Bound<'py, PyAny>,
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+/// The project's models by name, the first model of a name winning, to resolve origins by name.
+pub(super) fn models_by_name<'py>(runtime: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+    let models: Bound<'py, PyDict> = PyDict::new(runtime.py());
     for item in
         project_reads::models(&runtime_field(runtime, |runtime| &runtime.project)?)?.try_iter()?
     {
         let item = item?;
-        if model_reads::name_object(&item)?.eq(name)? {
-            return Ok((native_field(&item, "destination")?, name.clone()));
+        let name = model_reads::name_object(&item)?;
+        if !models.contains(&name)? {
+            models.set_item(name, item)?;
         }
+    }
+    Ok(models)
+}
+
+fn named<'py>(
+    name: &Bound<'py, PyAny>,
+    destination: &Bound<'py, PyAny>,
+    (runtime, models): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
+    state: &Bound<'py, PyAny>,
+) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+    if let Some(item) = models.get_item(name)? {
+        return Ok((native_field(&item, "destination")?, name.clone()));
     }
     let fingerprint = call_with(
         &native_field(state, "named_fingerprint")?,
@@ -131,7 +141,7 @@ pub(super) fn require_same_database(
 /// The origin location and origin model name of one migration request.
 pub(super) fn resolve_origin<'py>(
     request: &ModelMigrationRequest<'py>,
-    runtime: &Bound<'py, PyAny>,
+    (runtime, models): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
     state: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let py = runtime.py();
@@ -167,7 +177,7 @@ pub(super) fn resolve_origin<'py>(
         )?);
     }
     if parts.len() == 1 {
-        return named(&parts[0], &destination, runtime, state);
+        return named(&parts[0], &destination, (runtime, models), state);
     }
     let database = if parts.len() == maximum {
         parts[0].clone()

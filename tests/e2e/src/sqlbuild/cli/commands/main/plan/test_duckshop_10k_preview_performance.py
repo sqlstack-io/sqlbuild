@@ -80,7 +80,7 @@ def duckshop_10k(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[Pat
             built_share=1.0,
             expected_unbuilt=(0, 0),
             expected_definition_changes=(40, 200),
-            expected_max_warm_seconds=30.0,
+            expected_max_warm_seconds=10.0,
             expected_max_warm_to_publish=0.45,
             expected_max_check_seconds=0.5,
             expected_max_live_to_warm=6.0,
@@ -92,7 +92,7 @@ def duckshop_10k(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[Pat
             built_share=0.95,
             expected_unbuilt=(300, 700),
             expected_definition_changes=(40, 200),
-            expected_max_warm_seconds=30.0,
+            expected_max_warm_seconds=10.0,
             expected_max_warm_to_publish=0.45,
             expected_max_check_seconds=0.5,
             expected_max_live_to_warm=6.0,
@@ -180,7 +180,9 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
         <= definition_changes
         <= test_case.expected_definition_changes[1]
     ), "only the edited models changed definition: the synced hashes match the planner's"
-    assert warm < test_case.expected_max_warm_seconds
+    assert warm < test_case.expected_max_warm_seconds, (
+        "a warm preview of 10K models must stay under ten seconds"
+    )
     assert warm_to_publish < test_case.expected_max_warm_to_publish, (
         "planning grew faster than compiling: look for a lookup over every model or relation"
     )
