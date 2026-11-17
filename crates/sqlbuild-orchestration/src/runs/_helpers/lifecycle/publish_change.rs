@@ -1,6 +1,6 @@
 //! Publish facts atomically; launch observations never project state or release physical ownership.
 
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::platform::models::PlatformEvent;
 use crate::runs::_helpers::lifecycle::events::append_run_event;
@@ -13,6 +13,20 @@ use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::query::query;
 use crate::store::models::{ControlEvent, ControlTransaction, Parameter};
 
+/// A change's event payload; node and check events also name their node for Recall's resource columns.
+fn change_payload(request: &RunChangeRequest) -> Value {
+    let mut payload = json!({"change": request});
+    if let Some((kind, name)) = request
+        .change
+        .node_key()
+        .and_then(|key| key.split_once(':'))
+    {
+        payload["resource_kind"] = json!(kind);
+        payload["resource_name"] = json!(name);
+    }
+    payload
+}
+
 pub(crate) async fn publish_change(
     transaction: ControlTransaction,
     request: &RunChangeRequest,
@@ -22,7 +36,7 @@ pub(crate) async fn publish_change(
         transaction,
         (request.run_id, request.event_id),
         request.change.event_type(),
-        json!({"change": request}),
+        change_payload(request),
     )
     .await?;
     if let (RunChange::LaunchFailed { code }, Some(claim_id)) = (&request.change, request.claim_id)
