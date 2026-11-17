@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.239.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.2...v0.239.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* the dlt and ingestr integrations are removed. A project that declares `dlt_sources` or a source `ingestr` block no longer compiles; declare the source with `managed: true` and load it with a Python `@loader` named after the source. The `dlt` and `ingestr` package extras no longer exist.
+
+### Features
+
+* remove the dlt and ingestr integrations ([#1554](https://github.com/sqlstack-io/sqlbuild/issues/1554)) ([75d213e](https://github.com/sqlstack-io/sqlbuild/commit/75d213e7d6ba694520467855060bdbf3bb151142))
+
 ## [0.238.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.1...v0.238.2) (2026-11-17)
 
 
