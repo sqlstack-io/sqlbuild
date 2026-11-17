@@ -19,8 +19,10 @@ use crate::bindings::_helpers::compile_driver::stage_work::{
 };
 use crate::bindings::_helpers::contracts::contract_diagnostics::evaluate_model_contracts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use crate::bindings::_helpers::graph::python_selection::project_graph_error;
 use crate::bindings::_helpers::lineage::project_lineage::build_project_column_lineage;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::planner_identity::graph::execution_cycle;
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
@@ -33,6 +35,8 @@ use crate::bindings::_helpers::rules::early_sql_lint::EarlySqlLint;
 use crate::bindings::_helpers::rules::results::rules_progress;
 use crate::bindings::_helpers::rules::rule_dispatch::evaluate_rules;
 use crate::bindings::_helpers::rules::rules_config::load_rules_config_with_cache;
+use sqlbuild_analysis::graph::constants::PLANNER_DEFAULT_CODE;
+use sqlbuild_analysis::graph::errors::SelectorError;
 
 const RICH_LINEAGE: &str = "rich";
 const FAST_LINEAGE: &str = "fast";
@@ -235,10 +239,16 @@ fn analyzed<'py>(
     )?)?)?;
     let selected_keys: Bound<'py, PyAny> =
         select_project_graph(&graph, &driver.select, &driver.exclude)?.into_any();
+    let boundary: Vec<Bound<'py, PyAny>> = if graph_failed {
+        Vec::new()
+    } else {
+        boundary_diagnostics(&graph, &discovered)?
+    };
     let core_diagnostics: Bound<'py, PyTuple> = PyTuple::new(
         py,
         native_field(&project, "diagnostics")?
             .try_iter()?
+            .chain(boundary.into_iter().map(Ok))
             .chain(native_field(&contracts.result, "diagnostics")?.try_iter()?)
             .collect::<PyResult<Vec<_>>>()?,
     )?;
@@ -550,6 +560,51 @@ impl<'py> Driver<'_, 'py> {
         self.status.complete(&progress)?;
         Ok(result)
     }
+}
+
+/// Compile errors for what every plan refuses: an execution-order cycle and the first SQL/Python boundary error.
+fn boundary_diagnostics<'py>(
+    graph: &Bound<'py, PyAny>,
+    discovered: &Bound<'py, PyAny>,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    let py: Python<'py> = graph.py();
+    let mut refusals: Vec<SelectorError> = Vec::new();
+    if let Some(message) = execution_cycle(&native_field(graph, "project")?)? {
+        refusals.push(SelectorError {
+            code: PLANNER_DEFAULT_CODE,
+            message,
+            help: None,
+        });
+    }
+    refusals.extend(project_graph_error(graph, discovered)?);
+    let none: Bound<'py, PyAny> = py.None().into_bound(py);
+    refusals
+        .into_iter()
+        .map(|refusal| {
+            new_record_with(
+                py,
+                RecordId::CompilerDiagnostic,
+                &[
+                    (
+                        "phase",
+                        enum_member(py, RecordId::DiagnosticPhase, "COMPILE")?,
+                    ),
+                    (
+                        "severity",
+                        enum_member(py, RecordId::DiagnosticSeverity, "ERROR")?,
+                    ),
+                    ("code", PyString::new(py, refusal.code).into_any()),
+                    ("message", PyString::new(py, &refusal.message).into_any()),
+                    ("path", none.clone()),
+                    ("line", none.clone()),
+                    ("column", none.clone()),
+                    ("help", refusal.help.into_pyobject(py)?.into_any()),
+                    ("notes", PyTuple::empty(py).into_any()),
+                    ("affected_rules", PyTuple::empty(py).into_any()),
+                ],
+            )
+        })
+        .collect()
 }
 
 /// The core diagnostics followed by one rule-phase error per rule finding; lint-unavailable ones only warn.

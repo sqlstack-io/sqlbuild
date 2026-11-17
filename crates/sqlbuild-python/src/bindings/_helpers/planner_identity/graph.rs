@@ -90,9 +90,20 @@ pub(crate) fn build_execution_upstream_deps<'py>(
     edge_dict(&KeyCache::new(project.py())?, &execution_deps(project)?)
 }
 
+/// The audit-gate and hook-read edges a plan injects, which both execution readers need.
+pub(crate) type ExecutionGates = (Vec<GateRow>, Vec<HookRow>);
+
 /// Execution dependencies kept native until a public graph or plan asks for its dict view.
 pub(crate) fn execution_deps(
     project: &Bound<'_, PyAny>,
+) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
+    execution_deps_with(project, &native_execution_gate_edges(project)?)
+}
+
+/// [`execution_deps`] over gate edges already computed for this project.
+pub(crate) fn execution_deps_with(
+    project: &Bound<'_, PyAny>,
+    (gates, hooks): &ExecutionGates,
 ) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
     let mut resources: Vec<(ObjectKey, Vec<ObjectKey>)> = Vec::new();
     let collections: [Bound<'_, PyAny>; 4] = [
@@ -120,11 +131,14 @@ pub(crate) fn execution_deps(
                 == TABLE_FN_TEST_MODE,
         });
     }
-    let (gates, hooks): (Vec<GateRow>, Vec<HookRow>) = native_execution_gate_edges(project)?;
     let injected: Vec<_> = gates
-        .into_iter()
-        .map(|gate| (gate.gated, gate.read))
-        .chain(hooks.into_iter().map(|hook| (hook.gated, hook.read)))
+        .iter()
+        .map(|gate| (gate.gated.clone(), gate.read.clone()))
+        .chain(
+            hooks
+                .iter()
+                .map(|hook| (hook.gated.clone(), hook.read.clone())),
+        )
         .collect();
     Ok(execution_upstream(resources, &tests, &injected))
 }
@@ -147,6 +161,14 @@ pub(crate) fn build_execution_edge_origins<'py>(
 pub(crate) fn execution_origins(
     project: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<((ObjectKey, ObjectKey), String)>> {
+    execution_origins_with(project, &native_execution_gate_edges(project)?)
+}
+
+/// [`execution_origins`] over gate edges already computed for this project.
+pub(crate) fn execution_origins_with(
+    project: &Bound<'_, PyAny>,
+    (gates, hooks): &ExecutionGates,
+) -> PyResult<Vec<((ObjectKey, ObjectKey), String)>> {
     let mut origins: Vec<((ObjectKey, ObjectKey), String)> = Vec::new();
     for test in project_reads::sql_tests(project)?.try_iter()? {
         let test = test?;
@@ -161,7 +183,6 @@ pub(crate) fn execution_origins(
             ));
         }
     }
-    let (gates, hooks): (Vec<GateRow>, Vec<HookRow>) = native_execution_gate_edges(project)?;
     let lineage = native_field(project, "lineage_graph")?;
     let lineage = lineage.cast::<NativeProjectGraph>()?.borrow();
     let is_lineage = |gated: &ObjectKey, read: &ObjectKey| {
@@ -173,7 +194,7 @@ pub(crate) fn execution_origins(
         target,
         gated,
         read,
-    } in &gates
+    } in gates
     {
         if is_lineage(gated, read) || !seen.insert((gated.clone(), read.clone())) {
             continue;
@@ -189,7 +210,7 @@ pub(crate) fn execution_origins(
         read,
         hook_type: kind,
         ..
-    } in &hooks
+    } in hooks
     {
         if is_lineage(gated, read) || !seen.insert((gated.clone(), read.clone())) {
             continue;
@@ -213,6 +234,23 @@ pub(crate) fn execution_order(
     upstream: &[(ObjectKey, Vec<ObjectKey>)],
     origins: &[((ObjectKey, ObjectKey), String)],
 ) -> PyResult<Vec<ObjectKey>> {
+    ordered_keys(upstream, origins).map_err(|message| planner_input_error(py, message))
+}
+
+/// The cycle every plan refuses with, since plans order the whole execution graph before selecting.
+pub(crate) fn execution_cycle(project: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    let gates: ExecutionGates = native_execution_gate_edges(project)?;
+    Ok(ordered_keys(
+        &execution_deps_with(project, &gates)?,
+        &execution_origins_with(project, &gates)?,
+    )
+    .err())
+}
+
+fn ordered_keys(
+    upstream: &[(ObjectKey, Vec<ObjectKey>)],
+    origins: &[((ObjectKey, ObjectKey), String)],
+) -> Result<Vec<ObjectKey>, String> {
     let key = |(kind, name): &ObjectKey| GraphKey {
         kind: kind.clone(),
         name: name.clone(),
@@ -225,8 +263,7 @@ pub(crate) fn execution_order(
         .iter()
         .map(|((gated, read), origin)| ((key(gated), key(read)), origin.clone()))
         .collect();
-    Ok(topological_order(&edges, &origins)
-        .map_err(|message| planner_input_error(py, message))?
+    Ok(topological_order(&edges, &origins)?
         .into_iter()
         .map(|key| (key.kind, key.name))
         .collect())

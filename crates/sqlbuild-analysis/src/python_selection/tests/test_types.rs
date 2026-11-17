@@ -43,3 +43,13 @@ pub(super) type RoundTripNodeSpec = (
     &'static [&'static str],
     &'static [(&'static str, &'static str)],
 );
+
+pub(super) struct CycleTestCase {
+    pub(super) description: &'static str,
+    /// `(name, kind, upstream Python nodes, SQL reads)` of each Python node.
+    pub(super) nodes: &'static [RoundTripNodeSpec],
+    /// Whether the `partner_scores` source names `partner_scores` as its loader.
+    pub(super) filled: bool,
+    pub(super) allow_warehouse_round_trips: bool,
+    pub(super) expected_error: Option<&'static str>,
+}

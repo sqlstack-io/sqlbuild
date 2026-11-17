@@ -7,7 +7,7 @@ use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::native_host::model_lookup::ModelHandle;
 use crate::bindings::_helpers::planner_identity::graph::{
-    execution_deps, execution_order, execution_origins,
+    ExecutionGates, execution_deps_with, execution_order, execution_origins_with,
 };
 use crate::bindings::_helpers::planner_scope::retained::ScopeData;
 use crate::bindings::_helpers::planner_scope::values::{keys, project_graph};
@@ -16,6 +16,7 @@ use crate::bindings::_helpers::planner_selection::selectors::resolve_graph_keys;
 use crate::bindings::_helpers::records::construct::new_record;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
+use crate::bindings::_helpers::references::explicit_references::native_execution_gate_edges;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
@@ -51,7 +52,8 @@ pub(crate) fn build_planner_scope<'py>(
     let select = default_tuple(&args.value("select")?);
     let exclude = default_tuple(&args.value("exclude")?);
     let auto_load = args.value("auto_load_sources")?.is_truthy()?;
-    let mut upstream = execution_deps(&project)?;
+    let gates: ExecutionGates = native_execution_gate_edges(&project)?;
+    let mut upstream = execution_deps_with(&project, &gates)?;
     let lineage: Bound<'py, NativeProjectGraph> =
         native_field(&project, "lineage_graph")?.cast_into()?;
     let lineage = lineage.borrow();
@@ -105,7 +107,7 @@ pub(crate) fn build_planner_scope<'py>(
         .filter(|key| key.0 == SOURCE && (!auto_load || named_sources.contains(key)))
         .cloned()
         .collect();
-    let order = execution_order(py, &upstream, &execution_origins(&project)?)?;
+    let order = execution_order(py, &upstream, &execution_origins_with(&project, &gates)?)?;
     let selected: HashSet<_> = selected.into_iter().collect();
     let mut models: std::collections::HashMap<String, ModelHandle> =
         std::collections::HashMap::new();
