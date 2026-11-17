@@ -1,10 +1,13 @@
+use sqlquack_semantics::lineage::types::LineageSchema;
+
+use crate::sql_macros::_helpers::typing::probes::ProbeSchema;
 use crate::sql_macros::main::typed_analysis_sql::typed_analysis_sql;
 use crate::sql_macros::main::untyped_call_outputs::untyped_call_outputs;
 use crate::sql_macros::models::{ExpandedText, TypedCall};
 use crate::sql_macros::tests::helpers::{expanded_text_for, shown_typed_calls, untyped_calls};
 use crate::sql_macros::tests::test_types::{
-    ExpandedAnalysisTestCase, ReservedNameTestCase, TypedAnalysisTestCase, TypedCallTestCase,
-    UntypedOutputsTestCase,
+    ExpandedAnalysisTestCase, ProbeSchemaLookupTestCase, ReservedNameTestCase,
+    TypedAnalysisTestCase, TypedCallTestCase, UntypedOutputsTestCase,
 };
 
 const SHOUT: (&str, &str) = (
@@ -277,5 +280,65 @@ fn given_a_returns_type_of_call_when_building_the_analysis_text_then_it_asserts_
         let (typed, _) = typed_analysis_sql(&expanded.sql, &expanded.calls, "duckdb");
 
         assert_eq!(typed, test_case.expected_sql, "{}", test_case.description);
+    }
+}
+
+#[test]
+fn given_bound_relations_when_a_probe_names_one_then_the_first_relation_ending_in_that_name_answers()
+ {
+    let relation = |name: &str, column: &str| {
+        (
+            name.to_owned(),
+            vec![(column.to_owned(), "BIGINT".to_owned())],
+        )
+    };
+    let schema: ProbeSchema = ProbeSchema::new(&[
+        relation("warehouse.sales.orders", "sales_order_id"),
+        relation("archive.orders", "archived_order_id"),
+        relation("\"Customers\"", "customer_id"),
+    ]);
+    let test_cases = [
+        ProbeSchemaLookupTestCase {
+            description: "a bare name answers to the first relation it ends",
+            relation: "orders",
+            expected_column: Some("sales_order_id"),
+        },
+        ProbeSchemaLookupTestCase {
+            description: "trailing parts match without regard to case",
+            relation: "SALES.Orders",
+            expected_column: Some("sales_order_id"),
+        },
+        ProbeSchemaLookupTestCase {
+            description: "a full name picks its own relation",
+            relation: "archive.orders",
+            expected_column: Some("archived_order_id"),
+        },
+        ProbeSchemaLookupTestCase {
+            description: "a quoted relation answers to its unquoted name",
+            relation: "customers",
+            expected_column: Some("customer_id"),
+        },
+        ProbeSchemaLookupTestCase {
+            description: "the end of a name part is not a trailing part",
+            relation: "rders",
+            expected_column: None,
+        },
+        ProbeSchemaLookupTestCase {
+            description: "a name with an extra leading part matches nothing",
+            relation: "other.customers",
+            expected_column: None,
+        },
+    ];
+    for test_case in test_cases {
+        let found: Option<&str> = schema
+            .columns(test_case.relation)
+            .and_then(|columns| columns.first())
+            .map(|column| column.name.as_str());
+
+        assert_eq!(
+            found, test_case.expected_column,
+            "{}",
+            test_case.description
+        );
     }
 }

@@ -1,49 +1,16 @@
-use crate::bindings::_helpers::analysis_session;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::pymodule;
-use sqlbuild_rules::constants::{API_VERSION, NATIVE_BUILD_IDENTITY};
+use sqlbuild_rules::constants::API_VERSION;
 
-use crate::bindings::_helpers::attachments;
-use crate::bindings::_helpers::auditing;
-use crate::bindings::_helpers::authored_values;
-use crate::bindings::_helpers::cache;
-use crate::bindings::_helpers::cli;
-use crate::bindings::_helpers::compile_attachment;
-use crate::bindings::_helpers::compile_command;
-use crate::bindings::_helpers::compile_driver;
-use crate::bindings::_helpers::compile_outputs;
-use crate::bindings::_helpers::compiled_project;
-use crate::bindings::_helpers::contracts;
-use crate::bindings::_helpers::cursor;
-use crate::bindings::_helpers::dag_artifact;
-use crate::bindings::_helpers::diagnostics;
-use crate::bindings::_helpers::discovery;
-use crate::bindings::_helpers::exported_constants;
-use crate::bindings::_helpers::fingerprints;
-use crate::bindings::_helpers::frontier;
-use crate::bindings::_helpers::graph;
-use crate::bindings::_helpers::lifecycle_events;
-use crate::bindings::_helpers::lineage;
-use crate::bindings::_helpers::macro_bridge;
-use crate::bindings::_helpers::manifest;
-use crate::bindings::_helpers::microbatches;
-use crate::bindings::_helpers::model_config;
-use crate::bindings::_helpers::native_host;
-use crate::bindings::_helpers::plan_output;
-use crate::bindings::_helpers::planner_registration;
-use crate::bindings::_helpers::project_assembly;
-use crate::bindings::_helpers::record_behaviours;
-use crate::bindings::_helpers::refactor;
-use crate::bindings::_helpers::references;
-use crate::bindings::_helpers::render;
-use crate::bindings::_helpers::rules;
-use crate::bindings::_helpers::scopes;
-use crate::bindings::_helpers::semantic_checks;
-use crate::bindings::_helpers::semantic_shapes;
-use crate::bindings::_helpers::sql_test_glue;
-use crate::bindings::_helpers::sqltext;
-use crate::bindings::_helpers::state_rows;
-use crate::bindings::_helpers::type_system;
+use crate::bindings::_helpers::{
+    analysis_session, attachments, auditing, authored_values, cache, cli, compile_attachment,
+    compile_command, compile_driver, compile_outputs, compiled_project, contracts, cursor,
+    dag_artifact, diagnostics, discovery, exported_constants, fingerprints, frontier, graph,
+    lifecycle_events, lineage, macro_bridge, manifest, microbatches, model_config, native_host,
+    plan_output, planner_registration, project_assembly, record_behaviours, refactor, references,
+    render, rules, scopes, semantic_checks, semantic_shapes, sql_test_glue, sqltext, state_rows,
+    type_system,
+};
 use sqlbuild_python_base::boundary::main::register_expected_errors::register_expected_errors;
 use sqlbuild_python_base::boundary::main::register_native_compiler_error::register_native_compiler_error;
 use sqlbuild_python_base::boundary::main::register_oracles::register_oracles;
@@ -84,7 +51,6 @@ pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     register_project_stages(module)?;
     register_analysis_stages(module)?;
     module.add("API_VERSION", API_VERSION)?;
-    module.add("BUILD_IDENTITY", NATIVE_BUILD_IDENTITY)?;
     verify_attributes(module)
 }
 

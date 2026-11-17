@@ -29,6 +29,7 @@ use pyo3::prelude::pymethods;
 use pyo3::types::PyDict;
 use pyo3::types::PyFloat;
 use sqlbuild_core::command_output::constants::COMMAND_OUTPUT_RECORD_TYPE;
+use sqlbuild_core::event_export::constants::INVOCATION_START_EVENT_TYPE;
 use sqlbuild_core::event_export::constants::INVOCATION_TERMINAL_EVENT_TYPES;
 use sqlbuild_core::event_export::constants::OUTCOME_EVENT_TYPES;
 use sqlbuild_core::event_export::constants::OUTCOME_RESERVE_FRACTION;
@@ -218,6 +219,10 @@ impl EventExporterDispatcher {
         if self.withheld_kinds.contains(&policy.kind) {
             return Ok(());
         }
+        let invocation_id: Option<String> = match native_field(event, "invocation_id") {
+            Ok(value) => value.extract()?,
+            Err(_) => None,
+        };
         let shared = &self.shared;
         let _held = shared.hold(py)?;
         let mut state = shared.locked()?;
@@ -253,6 +258,8 @@ impl EventExporterDispatcher {
                 priority: policy.priority,
                 invocation_terminal: INVOCATION_TERMINAL_EVENT_TYPES.contains(&event_type.as_str()),
                 outcome: OUTCOME_EVENT_TYPES.contains(&event_type.as_str()),
+                invocation_id,
+                invocation_start: event_type == INVOCATION_START_EVENT_TYPE,
                 eligible_exporters: eligible,
             },
         );

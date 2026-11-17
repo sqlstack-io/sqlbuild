@@ -91,6 +91,7 @@ def execute_python_check_nodes(
                 connection=connection,
                 database=default_database,
                 schema=default_schema,
+                target_config=runtime.target_config,
             )
             if runtime.persist_node_results
             else None
@@ -165,6 +166,7 @@ def _execute_one_python_check(
                 statement_recorder=StatementRecorder(),
                 run_state=run_state,
                 result_store=result_store,
+                target_config=runtime.target_config,
                 default_database=runtime.default_database,
                 default_schema=runtime.default_schema,
                 relation_targets=runtime.resolved_relation_targets,

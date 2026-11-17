@@ -9,7 +9,10 @@ use pyo3::pyfunction;
 use pyo3::types::PyDict;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Detect changes and build a plan entry and warnings for a single model.
@@ -27,7 +30,11 @@ pub fn plan_model<'py>(
             &[
                 "model",
                 "snapshot",
+<<<<<<< HEAD
                 "dialect",
+=======
+                "adapter",
+>>>>>>> origin/main
                 "context",
                 "sql_analysis_enabled",
                 "query_change_tracking",
@@ -61,7 +68,11 @@ pub fn plan_model<'py>(
         snapshot,
         context: &ContextReads::of(
             args.value("context")?,
+<<<<<<< HEAD
             Dialect::passed(args.value("dialect")?)?,
+=======
+            args.value("adapter")?,
+>>>>>>> origin/main
             args.value("external_sql_reference_resolver")?,
         )?,
         sql_analysis_enabled: args.flag("sql_analysis_enabled")?,

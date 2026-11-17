@@ -11,8 +11,7 @@ use sqlbuild_analysis::review_command::models::ReviewFailure;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::clone::clone_progress::write_line;
-use crate::bindings::_helpers::janitor::janitor_keys::now_utc;
-use crate::bindings::_helpers::janitor::janitor_keys::timestamp_fields;
+use crate::bindings::_helpers::janitor::janitor_keys::{now_utc, timestamp_fields};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;

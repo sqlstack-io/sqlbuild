@@ -40,7 +40,11 @@ pub(in crate::native_commands) fn next_work_check(
 
 /// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
+<<<<<<< HEAD
     (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
+=======
+    (options, script, connected): (&LocationServe, &Path, bool),
+>>>>>>> origin/main
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -77,7 +81,11 @@ pub(super) async fn run_location_work(
         };
         let copy = (client, poll.session_id, claim.generation);
         let checked = perform_work(
+<<<<<<< HEAD
             (options, script, runtime),
+=======
+            (options, script, connected),
+>>>>>>> origin/main
             claim.request.work,
             copy,
             expires,
@@ -156,9 +164,13 @@ pub(super) async fn run_location_work(
     }))
 }
 
-/// One named operation; `None` means it stopped at shutdown or its lease ended.
+/// One named operation; `None` means it stopped at shutdown or its lease ended; `sqb dev` never signs in here.
 async fn perform_work(
+<<<<<<< HEAD
     (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
+=======
+    (options, script, connected): (&LocationServe, &Path, bool),
+>>>>>>> origin/main
     work: LocationWork,
     copy: (&LocationWorkClient, Uuid, i64),
     expires: impl Future<Output = Result<(), ControlError>>,
@@ -172,9 +184,11 @@ async fn perform_work(
     drop(write_output(&[(Stream::Stderr, message)]));
     Ok(match work {
         LocationWork::SyncWarehouse {} => Some((LocationWorkOutcome::SyncStarted {}, Vec::new())),
-        LocationWork::CheckConnection {} => check_location_connection(options, script, expires)
-            .await?
-            .map(|(healthy, _, files)| (LocationWorkOutcome::Connection { healthy }, files)),
+        LocationWork::CheckConnection {} => {
+            check_location_connection((options, script, connected), expires)
+                .await?
+                .map(|(healthy, _, files)| (LocationWorkOutcome::Connection { healthy }, files))
+        }
         LocationWork::EvaluateSensor { evaluation } => {
             evaluate_location_sensor(options, script, &evaluation, expires)
                 .await?

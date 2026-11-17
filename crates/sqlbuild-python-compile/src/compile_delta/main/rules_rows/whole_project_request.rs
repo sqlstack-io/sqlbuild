@@ -7,8 +7,8 @@ use sqlbuild_python_base::compile_context::main::delta::delta_unsupported::delta
 use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 use sqlbuild_python_base::compile_context::models::BaseRules;
 use sqlbuild_python_base::compile_context::models::PendingRules;
-use sqlbuild_rules::models::EvaluateRequest;
-use sqlbuild_rules::models::Model;
+use sqlbuild_rules::engine::main::needs_json_grains::needs_json_grains;
+use sqlbuild_rules::models::{EvaluateRequest, Model};
 use std::collections::HashMap;
 
 /// In a delta, the whole project's rules request with the rerun rows taken from `request`.
@@ -16,6 +16,11 @@ pub fn whole_project_request(request: EvaluateRequest) -> PyResult<EvaluateReque
     let Some(injection) = injection() else {
         return Ok(request);
     };
+    if needs_json_grains(&request).unwrap_or(true) {
+        return Err(delta_unsupported(
+            "SQBRPERFORMANCE102 compares keys and readers across models",
+        ));
+    }
     let taken: Option<BaseRules> = injection
         .rules
         .lock()

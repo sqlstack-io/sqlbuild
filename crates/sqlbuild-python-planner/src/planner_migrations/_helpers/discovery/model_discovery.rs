@@ -3,6 +3,7 @@
 use crate::planner_migrations::_helpers::discovery::discovery_events::renames;
 use crate::planner_migrations::_helpers::discovery::discovery_models::ordered;
 use crate::planner_migrations::_helpers::discovery::discovery_requests::automatic;
+<<<<<<< HEAD
 use crate::planner_migrations::_helpers::planning::matching::match_migration_fingerprints;
 use crate::planner_migrations::_helpers::planning::matching::migration_destination_fingerprints;
 use crate::planner_migrations::models::DiscoveryRequest;
@@ -13,6 +14,17 @@ use pyo3::prelude::{PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple, PyTupleMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::types::Syntax;
+=======
+use crate::planner_migrations::_helpers::planning::matching::{
+    match_migration_fingerprints, migration_destination_fingerprints,
+};
+use crate::planner_migrations::models::{
+    DiscoveryRequest, FingerprintInputs, ModelMigrationDiscovery,
+};
+use pyo3::prelude::{PyAnyMethods, PyResult};
+use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple, PyTupleMethods};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use std::collections::BTreeSet;

@@ -26,9 +26,7 @@ use sqlbuild_recall::store::main::resolve_invocation::resolve_invocation;
 use sqlbuild_recall::store::models::{OpenMode, SqliteStore};
 
 use crate::bindings::_helpers::query_command::query::run_query_command;
-use crate::bindings::_helpers::recall::rendering::QueryContext;
-use crate::bindings::_helpers::recall::rendering::render_result;
-use crate::bindings::_helpers::recall::rendering::render_schema;
+use crate::bindings::_helpers::recall::rendering::{QueryContext, render_result, render_schema};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::types::ErrorId;

@@ -58,9 +58,9 @@ use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::compiled_views::main::compiled_models::output_proven::output_proven;
 use sqlbuild_python_project::compiled_views::main::compiled_models::project_relation_keys::project_relation_keys;
-use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
-use sqlbuild_python_project::compiled_views::models::SqlRuleInputs;
-use sqlbuild_python_project::compiled_views::models::SqlRuleKey;
+use sqlbuild_python_project::compiled_views::models::{
+    NativeCompiledModel, SqlRuleInputs, SqlRuleKey,
+};
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const JSON_MODULE: &str = "json";

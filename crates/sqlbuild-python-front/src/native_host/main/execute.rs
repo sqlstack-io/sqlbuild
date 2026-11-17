@@ -1,9 +1,9 @@
 //! Execute.
 
-use crate::native_host::_helpers::consumption_io;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::native_host::_helpers::consumption_state::text;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Execute.
 pub fn execute<'py>(
@@ -11,5 +11,11 @@ pub fn execute<'py>(
     connection: &Bound<'py, PyAny>,
     sql: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
-    consumption_io::execute(adapter, connection, sql)
+    call_with(
+        &native_field(adapter, "execute")?,
+        &[
+            ("connection", connection.clone()),
+            ("sql", text(adapter.py(), sql)),
+        ],
+    )
 }

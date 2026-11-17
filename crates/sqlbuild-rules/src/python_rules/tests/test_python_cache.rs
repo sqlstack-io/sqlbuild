@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use fensu_native::NativeProjectQuery;
@@ -13,6 +14,7 @@ const ANNOTATED: &str = "def send(count: int) -> None:\n    pass\n";
 
 #[test]
 fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_evaluated() {
+    install_test_identity();
     let test_cases = [
         PythonCacheTestCase {
             description: "an unchanged project is answered from the cache",

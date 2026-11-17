@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::engine::tests::helpers::published_layer_faults;
@@ -6,6 +7,7 @@ use crate::engine::tests::test_types::PublishedLayerTestCase;
 #[test]
 fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_match()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         PublishedLayerTestCase {
             description: "a consumer variant reads its own domain's published model",

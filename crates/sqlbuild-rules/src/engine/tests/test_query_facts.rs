@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::engine::tests::helpers;
@@ -8,10 +9,17 @@ const ENUM_RULE: &[&str] = &["SQBRDECLARATION101"];
 const NUMERIC_RULE: &[&str] = &["SQBRDECLARATION102"];
 const OUTPUT_TYPE_RULE: &[&str] = &["SQBRCONTRACT105"];
 const STATUS: &[&str] = &["status"];
+const FLATTEN_RULE: &[&str] = &["SQBRPERFORMANCE101"];
+macro_rules! orders_flattened {
+    () => {
+        "FROM __ref(\"raw_orders\") r, LATERAL FLATTEN(input => r.payload:orders) o, LATERAL FLATTEN(o.value:lines) l"
+    };
+}
 
 #[test]
 fn given_dialect_sql_when_reading_query_facts_then_findings_match_the_authored_sql()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         QueryFactsTestCase {
             description: "a Snowflake // comment holds no dependency call",
@@ -302,6 +310,147 @@ fn given_dialect_sql_when_reading_query_facts_then_findings_match_the_authored_s
             enum_columns: &[],
             columns: json!([]),
             expected_faults: &[("SQBRDECLARATION102", 1, 64, "amount < 9")],
+        },
+        QueryFactsTestCase {
+            description: "the parent element copied whole onto each line is flagged at the column",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT l.value:sku::string AS sku, o.value AS order_json\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[(
+                "SQBRPERFORMANCE101",
+                1,
+                36,
+                "order_json copies o.value whole onto every row flattened from o.value:lines",
+            )],
+        },
+        QueryFactsTestCase {
+            description: "a field read from the parent is fine",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT o.value:customer_id::string AS customer_id, l.value:sku::string AS sku\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[],
+        },
+        QueryFactsTestCase {
+            description: "the parent without its flattened child array is fine",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT OBJECT_DELETE(o.value, 'lines') AS order_json, l.value:sku AS sku\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[],
+        },
+        QueryFactsTestCase {
+            description: "removing a different key still copies the child array",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT OBJECT_DELETE(o.value, 'notes') AS order_json\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[("SQBRPERFORMANCE101", 1, 8, "copies o.value whole")],
+        },
+        QueryFactsTestCase {
+            description: "the parent embedded in a built object is flagged",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT OBJECT_CONSTRUCT('order', o.value, 'sku', l.value:sku) AS line_json\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[("SQBRPERFORMANCE101", 1, 8, "line_json copies o.value whole")],
+        },
+        QueryFactsTestCase {
+            description: "a function that only reads the parent, such as a hash, copies nothing",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT MD5(TO_VARCHAR(o.value)) AS line_hash, TYPEOF(o.value) AS kind\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[],
+        },
+        QueryFactsTestCase {
+            description: "the parent serialized to JSON text is still a whole copy",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT TO_JSON(o.value) AS line_text, TO_CHAR(OBJECT_DELETE(o.value, 'lines')) AS trimmed\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[("SQBRPERFORMANCE101", 1, 8, "line_text copies o.value whole")],
+        },
+        QueryFactsTestCase {
+            description: "the parent cast and wrapped in an array is still a whole copy",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT ARRAY_CONSTRUCT((o.value::object)) AS line_json\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[("SQBRPERFORMANCE101", 1, 8, "line_json copies o.value whole")],
+        },
+        QueryFactsTestCase {
+            description: "an element no deeper FLATTEN reads is fine",
+            dialect: "snowflake",
+            query_sql: "SELECT o.value AS order_json FROM __ref(\"raw_orders\") r, LATERAL FLATTEN(input => r.payload:orders) o",
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[],
+        },
+        QueryFactsTestCase {
+            description: "TABLE(FLATTEN(...)) and GET paths are read the same way",
+            dialect: "snowflake",
+            query_sql: "SELECT o.value AS order_json\nFROM __ref(\"raw_orders\") r, TABLE(FLATTEN(r.payload:orders)) o, TABLE(FLATTEN(GET(o.value, 'lines'))) l",
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[("SQBRPERFORMANCE101", 1, 8, "flattened from o.value:lines")],
+        },
+        QueryFactsTestCase {
+            description: "a copy inside a CTE is flagged where it is made",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "WITH lines AS (\n  SELECT o.value AS order_json, l.value AS line_json\n  ",
+                orders_flattened!(),
+                "\n)\nSELECT line_json FROM lines"
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[("SQBRPERFORMANCE101", 2, 10, "order_json copies o.value")],
+        },
+        QueryFactsTestCase {
+            description: "the child element itself is not a parent copy",
+            dialect: "snowflake",
+            query_sql: concat!("SELECT l.value AS line_json\n", orders_flattened!()),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[],
         },
     ];
     for test_case in test_cases {

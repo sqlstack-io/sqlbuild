@@ -1,3 +1,5 @@
+pub mod adapter_cursor_sql;
+pub mod bound_task;
 pub mod gather_redirected_cursor_snapshots;
 pub mod gather_warehouse_snapshot_function;
 pub mod migration_fingerprint_work_info_function;

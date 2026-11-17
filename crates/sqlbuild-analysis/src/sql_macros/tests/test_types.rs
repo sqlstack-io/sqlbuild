@@ -22,6 +22,13 @@ pub(super) struct ExpansionErrorTestCase {
     pub(super) expected_message: &'static str,
 }
 
+pub(super) struct ReturnsSequenceTestCase {
+    pub(super) description: &'static str,
+    pub(super) definitions: &'static [(&'static str, &'static str)],
+    pub(super) sql: &'static str,
+    pub(super) expected_codes: &'static [Option<&'static str>],
+}
+
 pub(super) struct DefinitionErrorTestCase {
     pub(super) description: &'static str,
     pub(super) source: &'static str,
@@ -121,4 +128,10 @@ pub(super) struct LexicalRulesCallsTestCase {
     pub(super) syntax: sqlbuild_sqltext::sql_scan::models::LexicalSyntax,
     pub(super) sql: &'static str,
     pub(super) expected_calls: &'static [&'static str],
+}
+
+pub(crate) struct ProbeSchemaLookupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) relation: &'static str,
+    pub(crate) expected_column: Option<&'static str>,
 }

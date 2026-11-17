@@ -55,13 +55,19 @@ impl MappedSql {
         }
     }
 
-    fn slice(&self, start: usize, end: usize) -> Self {
-        let first = self.sql[..start].chars().count();
-        let last = first + self.sql[start..end].chars().count();
+    /// The text from byte `start` to `end`, with `cursor` counting characters along `self.sql`.
+    fn slice(&self, cursor: &mut CharCursor, start: usize, end: usize) -> Self {
+        let first: usize = cursor.at(&self.sql, start);
+        let last: usize = cursor.at(&self.sql, end);
         Self {
             sql: self.sql[start..end].to_owned(),
             offsets: self.offsets[first..=last].to_vec(),
         }
+    }
+
+    /// The source offset of the character at byte `byte`.
+    fn anchor(&self, cursor: &mut CharCursor, byte: usize) -> usize {
+        self.offsets[cursor.at(&self.sql, byte)]
     }
 
     fn generated(text: String, anchor: usize) -> Self {
@@ -81,15 +87,32 @@ impl MappedSql {
         if edits.is_empty() {
             return self;
         }
-        let mut result = self.slice(0, 0);
+        let mut cursor: CharCursor = CharCursor::default();
+        let mut result = self.slice(&mut cursor, 0, 0);
         let mut previous = 0;
         for (start, end, replacement) in edits {
-            result.append(self.slice(previous, start));
+            result.append(self.slice(&mut cursor, previous, start));
             result.append(replacement);
             previous = end;
         }
-        result.append(self.slice(previous, self.sql.len()));
+        result.append(self.slice(&mut cursor, previous, self.sql.len()));
         result
+    }
+}
+
+/// The character index of byte offsets read in increasing order, counted on from the last one read.
+#[derive(Default)]
+struct CharCursor {
+    byte: usize,
+    chars: usize,
+}
+
+impl CharCursor {
+    /// The number of characters of `sql` before byte `byte`, which is at or after the last one read.
+    fn at(&mut self, sql: &str, byte: usize) -> usize {
+        self.chars += sql[self.byte..byte].chars().count();
+        self.byte = byte;
+        self.chars
     }
 }
 
@@ -101,6 +124,7 @@ pub(super) fn normalize(
 ) -> Result<MappedSql, String> {
     let mut result = MappedSql::new(sql);
     let mut edits: Vec<Edit> = Vec::new();
+    let mut cursor: CharCursor = CharCursor::default();
     for captures in REFERENCES
         .as_ref()
         .map_err(Clone::clone)?
@@ -111,15 +135,16 @@ pub(super) fn normalize(
         let replacement = if &captures[1] != DBT_REF && stubs.contains_key(name.as_str()) {
             MappedSql::generated(
                 stubs[name.as_str()].clone(),
-                result.offsets[result.sql[..name.start()].chars().count()],
+                result.anchor(&mut cursor, name.start()),
             )
         } else {
-            result.slice(name.start(), name.end())
+            result.slice(&mut cursor, name.start(), name.end())
         };
         edits.push((whole.start(), whole.end(), replacement));
     }
     result = result.edits(edits);
     let mut edits: Vec<Edit> = Vec::new();
+    let mut cursor: CharCursor = CharCursor::default();
     let mut consumed_until = 0;
     let non_code: Vec<(usize, usize)> =
         dialect_non_code_ranges(&result.sql, &dialect_lexical_syntax(dialect));
@@ -157,7 +182,7 @@ pub(super) fn normalize(
         edits.push((
             start,
             end,
-            MappedSql::generated(stub, result.offsets[result.sql[..start].chars().count()]),
+            MappedSql::generated(stub, result.anchor(&mut cursor, start)),
         ));
         consumed_until = end;
     }
@@ -166,6 +191,7 @@ pub(super) fn normalize(
         result = normalize_variant(result)?;
     }
     let mut edits: Vec<Edit> = Vec::new();
+    let mut cursor: CharCursor = CharCursor::default();
     for captures in PLACEHOLDERS
         .as_ref()
         .map_err(Clone::clone)?
@@ -176,10 +202,7 @@ pub(super) fn normalize(
             edits.push((
                 whole.start(),
                 whole.end(),
-                MappedSql::generated(
-                    value.clone(),
-                    result.offsets[result.sql[..whole.start()].chars().count()],
-                ),
+                MappedSql::generated(value.clone(), result.anchor(&mut cursor, whole.start())),
             ));
         }
     }
@@ -213,10 +236,11 @@ pub(crate) fn normalize_native_sql_mapped(
     placeholders: &[(String, String)],
 ) -> Result<(String, Vec<usize>), String> {
     let native: MappedSql = native_mapped(sql, dialect, stub_prefix, &HashMap::new())?;
+    let mut cursor: CharCursor = CharCursor::default();
     let edits: Vec<Edit> = placeholder_default_edits(&native.sql, placeholders)
         .into_iter()
         .map(|(start, end, default)| {
-            let anchor: usize = native.offsets[native.sql[..start].chars().count()];
+            let anchor: usize = native.anchor(&mut cursor, start);
             (start, end, MappedSql::generated(default.to_owned(), anchor))
         })
         .collect();
@@ -237,6 +261,7 @@ fn native_mapped(
     let non_code: Vec<(usize, usize)> =
         dialect_non_code_ranges(&normalized.sql, &dialect_lexical_syntax(dialect));
     let mut edits: Vec<Edit> = Vec::new();
+    let mut cursor: CharCursor = CharCursor::default();
     for captures in stubs.captures_iter(&normalized.sql) {
         let whole = captures.get(0).ok_or("missing stub match")?;
         let quoted: bool = non_code
@@ -255,7 +280,7 @@ fn native_mapped(
             (None, Some(parameter)) => format!("'{HOOK_PARAMETER_PREFIX}{}'", parameter.as_str()),
             (None, None) => continue,
         };
-        let anchor: usize = normalized.offsets[normalized.sql[..whole.start()].chars().count()];
+        let anchor: usize = normalized.anchor(&mut cursor, whole.start());
         edits.push((
             whole.start(),
             whole.end(),
@@ -337,6 +362,8 @@ fn matching_bracket(sql: &str, start: usize) -> Result<Option<usize>, String> {
 fn normalize_variant(input: MappedSql) -> Result<MappedSql, String> {
     let sql = &input.sql;
     let mut edits: Vec<Edit> = Vec::new();
+    let mut cursor: CharCursor = CharCursor::default();
+    let mut key_cursor: CharCursor = CharCursor::default();
     let mut index = 0;
     while index < sql.len() {
         if let Some(end) = skip_non_code(sql, index)? {
@@ -359,7 +386,7 @@ fn normalize_variant(input: MappedSql) -> Result<MappedSql, String> {
             index = close + 1;
             continue;
         }
-        let key = normalize_variant(input.slice(index + 1, close))?;
+        let key = normalize_variant(input.slice(&mut key_cursor, index + 1, close))?;
         let mut base_end = index;
         loop {
             base_end = sql[..base_end].trim_end().len();
@@ -376,17 +403,17 @@ fn normalize_variant(input: MappedSql) -> Result<MappedSql, String> {
             .map_err(Clone::clone)?
             .find(&sql[..base_end])
         {
-            let anchor = input.offsets[sql[..base.start()].chars().count()];
+            let anchor = input.anchor(&mut cursor, base.start());
             let mut replacement = MappedSql::generated("GET(".to_owned(), anchor);
-            replacement.append(input.slice(base.start(), index));
+            replacement.append(input.slice(&mut cursor, base.start(), index));
             replacement.append(MappedSql::generated(
                 ", ".to_owned(),
-                input.offsets[sql[..index].chars().count()],
+                input.anchor(&mut cursor, index),
             ));
             replacement.append(key);
             replacement.append(MappedSql::generated(
                 ")".to_owned(),
-                input.offsets[sql[..close].chars().count()],
+                input.anchor(&mut cursor, close),
             ));
             edits.push((base.start(), close + 1, replacement));
         } else if key.sql != sql[index + 1..close] {

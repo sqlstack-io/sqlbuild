@@ -1,7 +1,6 @@
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::compiled_views;
-use crate::bindings::_helpers::input_loops;
+use crate::bindings::_helpers::{compiled_views, input_loops};
 use sqlbuild_python_project::compiled_project::main::register_project::register_project;
 use sqlbuild_python_project::project_snapshot::main::register_snapshot::register_snapshot;
 

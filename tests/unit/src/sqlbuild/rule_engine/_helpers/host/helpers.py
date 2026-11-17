@@ -1,10 +1,8 @@
 """Builders for custom-rule host partitioning tests."""
 
-import _thread
 import os
 import random
 import shutil
-import threading
 import time
 from collections.abc import Callable
 from operator import attrgetter
@@ -38,6 +36,8 @@ _RULES_MODULE: str = f'''from sqlbuild.rules import Finding, Model, Project, Rul
 
 @rule(code="{_MODEL_RULE}", message="order models need an even suffix", remediation="Rename it.")
 def even_suffix(*, model: Model, ctx: RuleContext) -> list[Finding]:
+    if STARTED_DIR:
+        os.mkdir(Path(STARTED_DIR) / f"{{model.name}}.{{os.getpid()}}")
     if model.name in FAILING:
         raise ValueError(f"cannot inspect {{model.name}}")
     time.sleep(DELAY_SECONDS)
@@ -68,13 +68,19 @@ def write_order_rules(
     records_module_state: bool = False,
     detects_duplicates: bool = False,
     delay_seconds: float = 0.0,
+    started_dir: Path | str = "",
 ) -> None:
-    """Write one model rule and one project rule with optional failures, state, or delays."""
+    """Write one model rule and one project rule with optional failures, state, or delays.
+
+    With `started_dir`, each model invocation first creates the folder `<model>.<host pid>` there;
+    the host's hermeticity guard refuses opening files but allows creating folders."""
 
     rules: Path = root / "rules" / "orders.py"
     rules.parent.mkdir(parents=True, exist_ok=True)
     rules.write_text(
-        f"import time\n\nFAILING = {set(failing)!r}\nRECORD_SEEN = {records_module_state!r}\n"
+        "import os\nimport time\nfrom pathlib import Path\n\n"
+        f"STARTED_DIR = {str(started_dir)!r}\n"
+        f"FAILING = {set(failing)!r}\nRECORD_SEEN = {records_module_state!r}\n"
         f"DETECT_DUPLICATES = {detects_duplicates!r}\nDELAY_SECONDS = {delay_seconds!r}\n"
         f"SEEN: dict[str, bool] = {{}}\n{_RULES_MODULE}",
         encoding="utf-8",
@@ -188,14 +194,10 @@ def failed_publish_without_directory(
     return fail, failures
 
 
-def interrupting_publish(delay_seconds: float) -> Callable[[Path], None]:
-    """Return a hook that interrupts the main thread once hosts have run for a while."""
+def started_hosts(started_dir: Path) -> int:
+    """Return how many host processes started an invocation, from `<model>.<host pid>` folders."""
 
-    def interrupt(path: Path) -> None:
-        del path
-        threading.Timer(delay_seconds, _thread.interrupt_main).start()
-
-    return interrupt
+    return len({path.suffix for path in started_dir.iterdir()})
 
 
 def record_signals(*, monkeypatch: pytest.MonkeyPatch) -> list[tuple[int, int]]:

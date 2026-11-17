@@ -22,6 +22,7 @@ use sqlbuild_core::debug_report::models::{
     DebugReport, DebugRuntime, WarehouseCheck,
 };
 
+<<<<<<< HEAD
 use crate::bindings::_helpers::cli::failure_cause::FailureCause;
 use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
 use crate::bindings::_helpers::command_runtime::connection::local_database_files;
@@ -39,6 +40,21 @@ use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+=======
+use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
+use crate::bindings::_helpers::command_runtime::connection::{
+    local_database_files, project_connection_config,
+};
+use crate::bindings::_helpers::command_runtime::runtime_errors::{
+    expected_resolution_error, resolution_message,
+};
+use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
+use crate::bindings::_helpers::command_runtime::warehouses::{
+    CommandScope, WarehouseInputs, apply_warehouse, command_scope, find_authored, resolve_warehouse,
+};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+>>>>>>> origin/main
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
@@ -49,9 +65,15 @@ use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+<<<<<<< HEAD
 use sqlbuild_python_compile::compile_attachment::main::build_effective_target_namespace::build_effective_target_namespace;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+=======
+use sqlbuild_python_compile::compile_attachment::main::effective_target_namespace::effective_target_namespace;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::discovery::main::project::discover_configured_providers::discover_configured_providers;
+>>>>>>> origin/main
 use sqlbuild_python_front::discovery::models::SecretPolicy;
 
 const DEBUG_OPTIONS: (&[&str], &[&str]) = (
@@ -282,19 +304,8 @@ fn build_report(
 ) -> PyResult<DebugReport> {
     let project_dir_object: Bound<'_, PyAny> =
         imported(py, "pathlib", "Path")?.call1((project_dir,))?;
-    let discovered_inputs: Bound<'_, PyAny> = discover_project_inputs(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("project_dir", project_dir_object.clone()),
-                (
-                    "secret_policy",
-                    PyString::new(py, SecretPolicy::Defer.name()).into_any(),
-                ),
-            ],
-        )?),
-    )?;
+    let discovered_inputs: Bound<'_, PyAny> =
+        discover_configured_providers(py, &project_dir_object, SecretPolicy::Defer)?;
     let files: DebugConfigFiles = debug_config_files(project_dir);
     let adapter_name: Bound<'_, PyAny> = resolve_effective_adapter_name(
         &native_field(&discovered_inputs, "project_config")?,
@@ -321,41 +332,14 @@ fn build_report(
     })?;
     let connection_config: Bound<'_, PyDict> =
         effective_connection(&context, (&adapter_name, &base_connection))?.cast_into()?;
-    let namespace_adapter: String = adapter_name.str()?.extract()?;
-    let namespaceless: bool = NAMESPACELESS_ADAPTERS.contains(&namespace_adapter.as_str());
-    let namespace: Bound<'_, PyTuple> = build_effective_target_namespace(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("discovered_inputs", context.discovered_inputs.clone()),
-                ("selected_target", context.selected_target.clone()),
-                (
-                    "connection_database",
-                    connection_config
-                        .get_item("database")?
-                        .filter(|_| !namespaceless)
-                        .unwrap_or_else(|| py.None().into_bound(py)),
-                ),
-                (
-                    "connection_schema",
-                    connection_config
-                        .get_item("schema")?
-                        .unwrap_or_else(|| py.None().into_bound(py)),
-                ),
-                (
-                    "default_database",
-                    context.adapter.call_method0("default_database")?,
-                ),
-                (
-                    "default_schema",
-                    context.adapter.call_method0("default_schema")?,
-                ),
-            ],
-        )?),
-    )
-    .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?
-    .cast_into()?;
+    let namespace: Bound<'_, PyTuple> = effective_target_namespace(
+        (&context.discovered_inputs, &context.selected_target),
+        (
+            &adapter_name.str()?.extract::<String>()?,
+            connection_config.as_any(),
+            &context.adapter,
+        ),
+    )?;
     let target_config: Bound<'_, PyAny> = namespace.get_item(1)?;
     let connection_name: Option<String> = if target_config.is_none() {
         None

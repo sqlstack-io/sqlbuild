@@ -7,12 +7,18 @@ use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_referenc
 use sqlbuild_analysis::relation_names::main::extract_relation_names::extract_relation_names;
 use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 
+<<<<<<< HEAD
 use sqlbuild_python_base::native_threads::main::pooled::pooled;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_front::native_host::main::optional_text::optional_text;
 use sqlbuild_python_project::analysis::main::extract_sql_relation_names::extract_sql_relation_names;
+<<<<<<< HEAD
 use sqlbuild_python_project::analysis::main::prefetch_sql_relation_names::prefetch_sql_relation_names;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_project::analysis::types::RelationRow;
 
 /// Function calls, `__udf("name")(...)`, parsed as plain calls; their reads are declared inputs.

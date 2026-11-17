@@ -1,10 +1,17 @@
 //! Public records of compile driver.
 
+use crate::compile_driver::_helpers::setup::model_free_locations::model_free_locations;
+use pyo3::IntoPyObjectExt;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
 use pyo3::prelude::PyResult;
+use pyo3::prelude::Python;
+use pyo3::types::PyBool;
+use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Semantic analysis cache outcome counts for one invocation.
 #[derive(Debug)]
@@ -58,5 +65,86 @@ impl InputsRequest {
             resolved_connection: arguments.value("resolved_connection")?.unbind(),
             no_cache: arguments.value_or_false("no_cache")?.unbind(),
         })
+    }
+}
+
+/// The active target's locations as SQLBuild resolves them (default: unset); `preserve` stays as written until `record`.
+#[derive(Debug, Clone, Default)]
+pub struct TargetSettingsValues {
+    pub(crate) name: Option<String>,
+    pub(crate) database: Option<String>,
+    pub(crate) schema: Option<String>,
+    pub(crate) loader_schema: Option<String>,
+}
+
+impl TargetSettingsValues {
+    /// The resolved schema managed loader data goes to.
+    #[must_use]
+    pub fn loader_schema(&self) -> Option<&str> {
+        self.loader_schema.as_deref()
+    }
+
+    /// Python nodes' `(database, schema)` under these settings, as `model_free_locations` picks.
+    pub fn node_locations<'py>(
+        &self,
+        adapter: &Bound<'py, PyAny>,
+    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+        let py: Python<'py> = adapter.py();
+        self.node_locations_from(
+            (
+                &self.database.as_deref().into_bound_py_any(py)?,
+                &self.schema.as_deref().into_bound_py_any(py)?,
+            ),
+            adapter,
+        )
+    }
+
+    /// `node_locations` from a caller-resolved `(database, schema)`, such as `sqb load`'s, which applies CLI vars.
+    pub fn node_locations_from<'py>(
+        &self,
+        (database, schema): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+        adapter: &Bound<'py, PyAny>,
+    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+        model_free_locations(
+            (database.clone(), schema.clone()),
+            self.loader_schema(),
+            adapter,
+        )
+    }
+
+    /// The `TargetSettings` record: a `preserve` location reads `None` with its flag set.
+    pub fn record<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let located = |value: &Option<String>| -> PyResult<Bound<'py, PyAny>> {
+            value
+                .as_deref()
+                .filter(|value| *value != PRESERVE_TARGET_VALUE)
+                .into_bound_py_any(py)
+        };
+        let preserved = |value: &Option<String>| -> Bound<'py, PyAny> {
+            PyBool::new(py, value.as_deref() == Some(PRESERVE_TARGET_VALUE))
+                .to_owned()
+                .into_any()
+        };
+        new_record_with(
+            py,
+            RecordId::TargetSettings,
+            &[
+                ("name", self.name.clone().into_bound_py_any(py)?),
+                ("database", located(&self.database)?),
+                ("schema", located(&self.schema)?),
+                ("loader_schema", located(&self.loader_schema)?),
+                ("database_preserved", preserved(&self.database)),
+                ("schema_preserved", preserved(&self.schema)),
+            ],
+        )
+    }
+
+    /// The `ctx` a provider's `setup` receives in a command with these settings.
+    pub fn setup_context<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        new_record_with(
+            py,
+            RecordId::ProviderSetupContext,
+            &[("target_config", self.record(py)?)],
+        )
     }
 }

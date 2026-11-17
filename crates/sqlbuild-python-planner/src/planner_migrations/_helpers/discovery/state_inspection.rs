@@ -1,7 +1,10 @@
 //! Read-only warehouse evidence gathered once for all model migrations in one plan.
 
 use crate::planner_migrations::models::MigrationStateInspection;
+<<<<<<< HEAD
 use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
+=======
+>>>>>>> origin/main
 use std::collections::HashSet;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -9,6 +12,10 @@ use pyo3::types::{PyString, PyTuple};
 use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
 use sqlbuild_state::events::models::{EventRelation, FingerprintKey, FingerprintOrder};
 
+<<<<<<< HEAD
+=======
+use crate::planner_phases::main::inputs::runtime_field::runtime_field;
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// A lowercased schema and relation name.
@@ -100,7 +107,12 @@ pub(crate) fn inspection<'py>(
     known_fingerprints: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let state = MigrationStateInspection::new(
+<<<<<<< HEAD
         &runtime_reads(runtime)?,
+=======
+        &runtime_field(runtime, |runtime| &runtime.adapter)?,
+        &runtime_field(runtime, |runtime| &runtime.connection)?,
+>>>>>>> origin/main
         &crate::planner_migrations::_helpers::planning::planning_origin::planning_database(
             runtime,
         )?,

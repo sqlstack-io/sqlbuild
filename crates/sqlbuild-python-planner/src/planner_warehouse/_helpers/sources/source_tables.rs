@@ -1,9 +1,16 @@
 //! Selected-scope validation that external source tables exist in the warehouse.
 
+<<<<<<< HEAD
 use crate::planner_warehouse::constants::MISSING_SOURCE_TABLE_CODE;
 use crate::planner_warehouse::constants::WILDCARD_TABLE_CHARACTER;
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::Read;
+=======
+use crate::planner_warehouse::constants::{
+    MISSING_SOURCE_TABLE_CODE, RUN_BOUNDED, WILDCARD_TABLE_CHARACTER,
+};
+use pyo3::IntoPyObject;
+>>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
@@ -13,12 +20,26 @@ use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_help::missing_source_tables_help;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_message::missing_source_tables_message;
 use sqlbuild_analysis::planner_warehouse::models::MissingSourceTable;
+<<<<<<< HEAD
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_front::discovery::main::project::yaml_entry_line::yaml_entry_line;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
+=======
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+use sqlbuild_python_front::discovery::main::project::yaml_entry_line::yaml_entry_line;
+use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+>>>>>>> origin/main
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
@@ -131,6 +152,7 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     if unlisted.is_empty() {
         return Ok(());
     }
+<<<<<<< HEAD
     let relations = || -> PyResult<Vec<Bound<'py, PyAny>>> {
         unlisted
             .iter()
@@ -140,6 +162,33 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     let Read::Known(probes) = reads.get().reads().read_access(py, &relations)? else {
         return Ok(());
     };
+=======
+    let probe = native_field(adapter, "probe_relation_read")?;
+    let mut tasks: Vec<_> = Vec::new();
+    for (_, entry, _) in &unlisted {
+        let fields = keywords(
+            py,
+            &[
+                ("connection", connection.clone()),
+                ("relation", read_relation(adapter, entry)?),
+            ],
+        )?;
+        tasks.push(imported(py, "functools", "partial")?.call((&probe,), Some(&fields))?);
+    }
+    let concurrency: i64 = imported(py, "builtins", "int")?
+        .call1((native_field(adapter, "metadata_inspection_concurrency")?,))?
+        .extract()?;
+    let probes = call_with(
+        &host_entry(py, RUN_BOUNDED)?,
+        &[
+            ("tasks", tuple(py, tasks)?),
+            (
+                "concurrency",
+                concurrency.max(1).into_pyobject(py)?.into_any(),
+            ),
+        ],
+    )?;
+>>>>>>> origin/main
     let mut missing: Vec<_> = Vec::new();
     let mut entries: Vec<_> = Vec::new();
     for ((source, entry, read_by), probe) in unlisted.into_iter().zip(probes) {

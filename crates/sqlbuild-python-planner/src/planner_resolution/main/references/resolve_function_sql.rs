@@ -5,7 +5,10 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
 
 #[pyfunction]
@@ -20,7 +23,11 @@ pub fn resolve_function_sql<'py>(
         kwargs,
         (
             &[
+<<<<<<< HEAD
                 "dialect",
+=======
+                "adapter",
+>>>>>>> origin/main
                 "function",
                 "model_locations",
                 "seed_locations",
@@ -33,7 +40,11 @@ pub fn resolve_function_sql<'py>(
         ),
     )?;
     let resolution = Resolution {
+<<<<<<< HEAD
         dialect: Dialect::passed(args.value("dialect")?)?,
+=======
+        adapter: args.value("adapter")?,
+>>>>>>> origin/main
         external: py.None().into_bound(py),
         source_map: args.value("source_map")?,
         source_warehouse_columns: args.value("source_warehouse_columns")?,

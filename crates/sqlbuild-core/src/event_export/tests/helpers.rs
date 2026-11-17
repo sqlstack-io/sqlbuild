@@ -11,7 +11,21 @@ pub(crate) fn queued(
         priority,
         invocation_terminal,
         outcome: false,
+        invocation_id: None,
+        invocation_start: false,
         eligible_exporters: vec![0],
+    }
+}
+
+/// A queued event with `sequence` and `(priority, invocation start, invocation)`.
+pub(crate) fn invocation_event(
+    sequence: u64,
+    (priority, invocation_start, invocation): (u8, bool, &str),
+) -> QueuedEvent<()> {
+    QueuedEvent {
+        invocation_id: Some(invocation.to_owned()),
+        invocation_start,
+        ..queued(sequence, (priority, false))
     }
 }
 

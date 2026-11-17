@@ -24,7 +24,6 @@ from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.build.constants import (
     BUILD_CUSTOM_MATERIALIZATION_MISSING_CODE,
     BUILD_SOURCE_FRESHNESS_BLOCKED_CODE,
-    BUILD_WORKER_FAILED_CODE,
     INCREMENTAL_ACTIONS,
 )
 from sqlbuild.executor.build.models import (
@@ -63,20 +62,6 @@ def _build_worker_success_completion(
     *, key: CompiledObjectKey, result: _BuildWorkerResult
 ) -> NodeCompletion:
     return NodeCompletion(key=key, result=result)
-
-
-def _build_worker_failure_completion(
-    *, key: CompiledObjectKey, error: BaseException
-) -> NodeCompletion:
-    return NodeCompletion(
-        key=key,
-        result=ModelExecutionResult(
-            model_name=key.name,
-            status=ExecutionStatus.FAILED,
-            error_code=BUILD_WORKER_FAILED_CODE,
-            error_message=str(error),
-        ),
-    )
 
 
 def _dispatch_model(

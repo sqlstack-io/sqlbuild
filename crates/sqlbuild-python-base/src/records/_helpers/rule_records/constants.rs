@@ -108,6 +108,7 @@ const R_RULES_RUN_RESULT: RecordSpec = RecordSpec {
         FieldSpec::new("cache_misses", FieldDefault::Int(0)),
         FieldSpec::new("skipped_type_proof_rules", FieldDefault::EmptyTuple),
         FieldSpec::new("custom_rule_timings", FieldDefault::EmptyTuple),
+        FieldSpec::new("skipped_models", FieldDefault::EmptyTuple),
     ],
 };
 const R_NATIVE_RULES_EVALUATION: RecordSpec = RecordSpec {
@@ -121,6 +122,7 @@ const R_NATIVE_RULES_EVALUATION: RecordSpec = RecordSpec {
         FieldSpec::required("cache_misses"),
         FieldSpec::required("built_in_ms"),
         FieldSpec::required("reused"),
+        FieldSpec::new("skipped_models", FieldDefault::EmptyTuple),
     ],
 };
 const R_CUSTOM_RULES_OUTCOME: RecordSpec = RecordSpec {
@@ -298,6 +300,7 @@ const R_RULES_RESULT: RecordSpec = RecordSpec {
         FieldSpec::new("custom_ms", FieldDefault::Int(0)),
         FieldSpec::new("custom_cpu_ms", FieldDefault::Int(0)),
         FieldSpec::new("custom_rule_timings", FieldDefault::EmptyTuple),
+        FieldSpec::new("skipped_models", FieldDefault::EmptyTuple),
     ],
 };
 const R_RULE_FILE: RecordSpec = RecordSpec {
@@ -364,8 +367,11 @@ const R_CUSTOM_RULE_RUN: RecordSpec = RecordSpec {
 };
 const R_CUSTOM_HOST_PARTITION: RecordSpec = RecordSpec {
     name: "CustomHostPartition",
-    doc: "How one host of a split run detects module state and learns the run was cancelled.",
-    fields: &[FieldSpec::required("cancelled")],
+    doc: "How a host learns of a cancelled run and whether it detects module state.",
+    fields: &[
+        FieldSpec::required("cancelled"),
+        FieldSpec::new("detect_state", FieldDefault::False),
+    ],
 };
 
 /// The rule engine value records.

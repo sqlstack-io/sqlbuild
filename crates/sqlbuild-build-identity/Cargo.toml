@@ -1,0 +1,18 @@
+[package]
+name = "sqlbuild-build-identity"
+version.workspace = true
+description = "The content identity of this native build, which local caches key on so they notice source changes."
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+# The build script hashes the sources of every workspace crate, so this crate rebuilds after any
+# source edit, and so does every crate that depends on it. Only the top-level crates that are
+# rebuilt anyway (sqlbuild-python and sqlbuild-cli) depend on it; they install the identity into
+# sqlbuild-rules at startup.
+[build-dependencies]
+sha2.workspace = true
+
+[lints]
+workspace = true

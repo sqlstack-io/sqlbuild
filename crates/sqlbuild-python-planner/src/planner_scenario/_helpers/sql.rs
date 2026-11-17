@@ -12,7 +12,10 @@ use sqlbuild_analysis::planner_scenario::{
     errors::MarkerError, main::replace_markers::replace_markers,
 };
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
@@ -48,7 +51,11 @@ pub(crate) fn resolve_sql(
         result = replace_markers(&result, kind, Some(syntax.clone().into()), |name, marker| {
             let target = mapping_get(&locations, name)?;
             let target = if target.is_none() {target} else if kind == crate::planner_scenario::constants::SOURCE_MARKER {
+<<<<<<< HEAD
                 object(py, render_source_relation(&target, Some(context.dialect.as_any()))?)?
+=======
+                object(py, render_source_relation(&target, Some(&context.adapter.clone()).filter(|value| !value.is_none()))?)?
+>>>>>>> origin/main
             } else {native_field(&target, "qualified_name")?};
             if target.is_none() {
                 let marker = string(py, marker).repr()?.to_str()?.to_owned();

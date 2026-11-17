@@ -2477,3 +2477,13 @@ def prepare_since_repository(*, tmp_path: Path, extra_files: Mapping[str, str]) 
     )
     commit_project_on_main(repository=project)
     return project
+
+
+def statement_summary_test_file(name: str, doubled: int) -> str:
+    """Return a SQL test of the `orders` model expecting `doubled` for an amount of 5."""
+
+    return (
+        f'TEST (name "{name}");\n\nWITH\n'
+        "__source__raw_orders AS (\n  SELECT 1 AS order_id, 5 AS amount\n),\n"
+        f"__expected__orders AS (\n  SELECT 1 AS order_id, {doubled} AS doubled\n)\nSELECT 1\n"
+    )

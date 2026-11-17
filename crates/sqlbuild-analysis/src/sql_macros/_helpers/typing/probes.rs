@@ -1,5 +1,7 @@
 //! Probe queries that read the caller's column types at each SQL macro call, and their verdicts.
 
+use std::collections::HashMap;
+
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 use sqlquack_semantics::lineage::types::LineageSchema;
 
@@ -521,20 +523,12 @@ fn shown_type(inferred: &str) -> &str {
     }
 }
 
-/// Each model's probes' output columns, inferred against that model's bound relations.
-pub(crate) fn analysed_probes(
-    dialect: &str,
-    models: &[(&[String], &RelationShapes)],
-) -> Vec<Vec<ProbeColumns>> {
-    let mut analysed: Vec<Vec<ProbeColumns>> = Vec::with_capacity(models.len());
-    for (probes, schema) in models {
-        analysed.push(model_probes(dialect, probes, schema));
-    }
-    analysed
-}
-
 /// One model's probes' output columns, inferred against its bound relations by the native route.
-fn model_probes(dialect: &str, probes: &[String], schema: &RelationShapes) -> Vec<ProbeColumns> {
+pub(crate) fn model_probes(
+    dialect: &str,
+    probes: &[String],
+    schema: &RelationShapes,
+) -> Vec<ProbeColumns> {
     let AnalysisRoute::Native(parser) = analysis_route(Some(dialect)) else {
         return vec![None; probes.len()];
     };
@@ -549,29 +543,36 @@ fn model_probes(dialect: &str, probes: &[String], schema: &RelationShapes) -> Ve
 /// The relations a probe reads, by name; each also answers to the trailing parts of its name.
 #[derive(Debug)]
 pub(crate) struct ProbeSchema {
-    relations: Vec<(String, Vec<SchemaColumn>)>,
+    relations: Vec<Vec<SchemaColumn>>,
+    /// Each lower-cased name and dotted suffix of one, to the first relation it names.
+    by_name: HashMap<String, usize>,
 }
 
 impl ProbeSchema {
     /// Each relation with its `(column, type)` list; an unknown type leaves the column untyped.
     pub(crate) fn new(relations: &RelationShapes) -> Self {
+        let mut by_name: HashMap<String, usize> = HashMap::new();
+        for (index, (name, _)) in relations.iter().enumerate() {
+            let name: String = unquoted_parts(name);
+            let suffixes = name.match_indices('.').map(|(dot, _)| &name[dot + 1..]);
+            for key in std::iter::once(name.as_str()).chain(suffixes) {
+                by_name.entry(key.to_owned()).or_insert(index);
+            }
+        }
         Self {
             relations: relations
                 .iter()
-                .map(|(name, columns)| (unquoted_parts(name), schema_columns(columns)))
+                .map(|(_, columns)| schema_columns(columns))
                 .collect(),
+            by_name,
         }
     }
 }
 
 impl LineageSchema for ProbeSchema {
     fn columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
-        let relation: String = relation.to_ascii_lowercase();
-        let suffix: String = format!(".{relation}");
-        self.relations
-            .iter()
-            .find(|(name, _)| *name == relation || name.ends_with(&suffix))
-            .map(|(_, columns)| columns.as_slice())
+        let index: usize = *self.by_name.get(&relation.to_ascii_lowercase())?;
+        self.relations.get(index).map(Vec::as_slice)
     }
 }
 

@@ -1,14 +1,20 @@
 //! Public records of planner entries.
 
+<<<<<<< HEAD
 use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+use pyo3::prelude::{Bound, Py, PyAny};
+use pyo3::pyclass;
+>>>>>>> origin/main
 use sqlbuild_python_project::native_host::models::ModelLookup;
 
 /// What resolving relation locations and source metadata for one scope reads.
 #[derive(Debug)]
 pub struct RelationsRequest<'py> {
+<<<<<<< HEAD
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
     /// The warehouse reads, or `None` to resolve from canonical static state only.
@@ -19,11 +25,23 @@ pub struct RelationsRequest<'py> {
     pub(crate) local_config: Bound<'py, PyAny>,
     pub(crate) known_source_columns: Bound<'py, PyAny>,
     pub(crate) relation_keys: Bound<'py, PyAny>,
+=======
+    pub project: Bound<'py, PyAny>,
+    pub adapter: Bound<'py, PyAny>,
+    pub connection: Bound<'py, PyAny>,
+    pub scope: Bound<'py, PyAny>,
+    pub deferral: Bound<'py, PyAny>,
+    pub project_config: Bound<'py, PyAny>,
+    pub local_config: Bound<'py, PyAny>,
+    pub known_source_columns: Bound<'py, PyAny>,
+    pub relation_keys: Bound<'py, PyAny>,
+>>>>>>> origin/main
 }
 
 /// What building model plan entries for one execution scope reads.
 #[derive(Debug)]
 pub struct PlanEntriesRequest<'py> {
+<<<<<<< HEAD
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) scope: Bound<'py, PyAny>,
@@ -35,11 +53,25 @@ pub struct PlanEntriesRequest<'py> {
     pub(crate) build_inputs: Bound<'py, PyAny>,
     /// The effective worker limit execution will use.
     pub(crate) concurrency: i64,
+=======
+    pub project: Bound<'py, PyAny>,
+    pub adapter: Bound<'py, PyAny>,
+    pub scope: Bound<'py, PyAny>,
+    pub snapshot: Bound<'py, PyAny>,
+    pub relations: Bound<'py, PyAny>,
+    pub resolved_models: Bound<'py, PyAny>,
+    pub cursor_overrides: Bound<'py, PyAny>,
+    pub full_refresh: bool,
+    pub build_inputs: Bound<'py, PyAny>,
+    /// The effective worker limit execution will use.
+    pub concurrency: i64,
+>>>>>>> origin/main
 }
 
 /// What assembling the plan output's fields reads.
 #[derive(Debug)]
 pub struct PlanOutputInputs<'py> {
+<<<<<<< HEAD
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) scope: Bound<'py, PyAny>,
@@ -50,6 +82,18 @@ pub struct PlanOutputInputs<'py> {
     pub(crate) model_warnings: Vec<Bound<'py, PyAny>>,
     pub(crate) reload_sources: Bound<'py, PyAny>,
     pub(crate) extras: Bound<'py, PyAny>,
+=======
+    pub project: Bound<'py, PyAny>,
+    pub adapter: Bound<'py, PyAny>,
+    pub scope: Bound<'py, PyAny>,
+    pub snapshot: Bound<'py, PyAny>,
+    pub relations: Bound<'py, PyAny>,
+    pub changes: Bound<'py, PyAny>,
+    pub model_entries: Vec<Bound<'py, PyAny>>,
+    pub model_warnings: Vec<Bound<'py, PyAny>>,
+    pub reload_sources: Bound<'py, PyAny>,
+    pub extras: Bound<'py, PyAny>,
+>>>>>>> origin/main
 }
 
 /// Resolved relation and source inputs for plan entry construction.

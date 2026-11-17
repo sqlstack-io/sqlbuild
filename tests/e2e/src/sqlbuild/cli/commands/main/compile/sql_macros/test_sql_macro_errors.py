@@ -10,6 +10,7 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros._test_types import (
     SqlMacroErrorTestCase,
     SqlMacroRecompileTestCase,
+    SqlMacroWaveTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import (
     AUDIT_COLUMNS,
@@ -23,6 +24,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     orders_model,
     output,
     run_project,
+    wave_models,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
 
@@ -839,3 +841,32 @@ def test_given_a_compiled_project_when_a_macro_signature_changes_then_the_next_c
     assert second.returncode == 1, printed
     assert f"error[{test_case.expected_code}]" in printed, printed
     assert test_case.expected_fragment in printed, printed
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlMacroWaveTestCase(
+            description="six_waves_each_with_one_wrong_typed_call",
+            files={**CENTS_TO_DOLLARS, **wave_models(6)},
+            wave_count=6,
+            expected_finding=(
+                "argument amount_cents of macro cents_to_dollars() expects BIGINT; "
+                "o.status is VARCHAR"
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_typed_calls_in_every_wave_when_compiling_then_each_model_reports_its_own(
+    test_case: SqlMacroWaveTestCase, tmp_path: Path
+) -> None:
+    _, result = run_project(
+        tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
+    )
+    printed: str = output(result)
+
+    assert result.returncode == 1, printed
+    assert printed.count(test_case.expected_finding) == test_case.wave_count, printed
+    for level in range(1, test_case.wave_count + 1):
+        assert f"models/marts/level_{level}.sql:5:3" in printed, printed

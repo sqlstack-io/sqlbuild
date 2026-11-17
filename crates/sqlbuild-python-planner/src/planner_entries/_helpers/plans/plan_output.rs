@@ -13,7 +13,10 @@ use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
@@ -489,7 +492,11 @@ pub(crate) struct SelectedTests<'py> {
 
 /// Selected SQL test entries and their warnings, failing on invalid fixtures.
 pub(crate) fn selected_test_entries<'py>(
+<<<<<<< HEAD
     (project, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
+=======
+    (project, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+>>>>>>> origin/main
     selected_keys: &Bound<'py, PyAny>,
     selection: &Bound<'py, PyAny>,
     case_name: &Bound<'py, PyAny>,

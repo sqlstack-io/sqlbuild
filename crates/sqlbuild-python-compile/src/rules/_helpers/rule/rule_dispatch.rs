@@ -556,6 +556,7 @@ fn rules_result<'py>(
                 "custom_rule_timings",
                 field(&custom, "custom_rule_timings")?,
             ),
+            ("skipped_models", field(&native_result, "skipped_models")?),
         ],
     )
 }

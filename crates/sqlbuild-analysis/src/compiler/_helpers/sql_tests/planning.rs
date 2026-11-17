@@ -118,8 +118,22 @@ pub(crate) struct SqlTestPatterns {
     pub(crate) identifier: Regex,
 }
 
+/// The SQL-test patterns, compiled once; each scenario and test clones them with its syntax.
+static COMPILED_PATTERNS: OnceLock<Result<SqlTestPatterns, String>> = OnceLock::new();
+
 impl SqlTestPatterns {
     pub(crate) fn new(lexical: LexicalSyntax) -> Result<Self, String> {
+        let compiled: &Self = COMPILED_PATTERNS
+            .get_or_init(|| Self::compiled(LexicalSyntax::default()))
+            .as_ref()
+            .map_err(Clone::clone)?;
+        Ok(Self {
+            lexical,
+            ..compiled.clone()
+        })
+    }
+
+    fn compiled(lexical: LexicalSyntax) -> Result<Self, String> {
         Ok(Self {
             reference: compile_pattern(r#"(?i)__ref\(\"([^\"]+)\"\)"#)?,
             source: compile_pattern(r#"(?i)__source\(\"([^\"]+)\"\)"#)?,

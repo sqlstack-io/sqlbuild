@@ -2,7 +2,10 @@
 
 use crate::planner_strategy::main::complete_fixtures::complete_fixtures;
 use crate::planner_strategy::models::FixtureCompletion;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+>>>>>>> origin/main
 use std::collections::HashSet;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -173,7 +176,11 @@ fn quoted_names<'py>(
 
 /// Complete one chain's fixture groups, building the planning context when none is given.
 #[pyfunction]
+<<<<<<< HEAD
 #[pyo3(signature = (*, project, dialect, request, planning_context = None))]
+=======
+#[pyo3(signature = (*, project, adapter, request, planning_context = None))]
+>>>>>>> origin/main
 pub(crate) fn build_relation_fixture_completion<'py>(
     project: &Bound<'py, PyAny>,
     dialect: &Bound<'py, Dialect>,

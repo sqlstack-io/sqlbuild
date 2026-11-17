@@ -17,10 +17,9 @@ use sqlbuild_core::dbt_process::main::run_dbt_process::run_dbt_process;
 use sqlbuild_core::dbt_process::models::DbtProcessOutput;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::dbt_interop::cli::argv;
-use crate::bindings::_helpers::dbt_interop::cli::ls_nodes;
-use crate::bindings::_helpers::dbt_interop::cli::resolve_dbt_executable;
-use crate::bindings::_helpers::dbt_interop::cli::sequence;
+use crate::bindings::_helpers::dbt_interop::cli::{
+    argv, ls_nodes, resolve_dbt_executable, sequence,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;

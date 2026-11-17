@@ -50,6 +50,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [Findings and exceptions](concepts/rules/findings-and-exceptions.md) (`concepts/rules/findings-and-exceptions`) - Understand Rule diagnostics and record intentional exceptions safely.
 - [Python Rules](concepts/rules/python-rules.md) (`concepts/rules/python-rules`) - Check the project's Python for annotations, imports, function shape and the layout of python/.
 - [Orchestration Rules](concepts/rules/orchestration-rules.md) (`concepts/rules/orchestration-rules`) - Keep job and sensor selections from listing nodes one by one.
+- [Performance Rules](concepts/rules/performance-rules.md) (`concepts/rules/performance-rules`) - Catch semi-structured payloads that repeat on every row and multiply storage and scan cost.
 - [Execution and caching](concepts/rules/execution-and-caching.md) (`concepts/rules/execution-and-caching`) - Understand Rule enforcement order, focused runs, and dependency-aware reuse.
 
 ## Ship

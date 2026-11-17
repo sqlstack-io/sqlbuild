@@ -608,6 +608,40 @@ pub struct Model {
     /// Whether this row's SQL text was dropped, so only a cached result may stand for it.
     #[serde(skip)]
     pub stripped: bool,
+    /// SQBRPERFORMANCE102's grain facts, present only when that rule is selected.
+    pub json_grain: Option<JsonGrain>,
+}
+
+/// What SQBRPERFORMANCE102 compares: the model's keys, each output's type and lineage inputs, and the inputs' keys.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct JsonGrain {
+    /// Column sets each proving one row per value in this model.
+    pub model_keys: Vec<Vec<String>>,
+    pub columns: Vec<GrainColumn>,
+    /// Each lineage input's keys by `kind:name`, such as `ref:orders`.
+    pub input_keys: BTreeMap<String, Vec<Vec<String>>>,
+    /// The models that read this one.
+    pub readers: Vec<String>,
+    /// Why the comparison cannot run, such as missing lineage; the model is then skipped, not flagged.
+    pub skipped: Option<String>,
+}
+
+/// One lineage output column: the `(resource type, name)` relations it reads and whether it aggregates them.
+#[derive(Clone, Debug, Default)]
+pub struct LineageColumn {
+    pub output: String,
+    pub sources: Vec<(String, String)>,
+    pub aggregated: bool,
+}
+
+/// One output column's inferred type and the relations its lineage reads, by `kind:name`.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct GrainColumn {
+    pub name: String,
+    pub data_type: Option<String>,
+    pub inputs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -918,6 +952,23 @@ impl fensu_policy::policy::types::PolicyRule for RuleMetadata {
     }
 }
 
+/// What places a model's expanded query in its file, mapped only when a rule reports a node.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ModelQueryPlace {
+    /// The authored query below the model's header; `None` when the model has none.
+    pub authored_query: Option<AuthoredQuery>,
+    /// The expansion passes from the authored query to the expanded query; empty when unknown.
+    pub passes: Vec<Vec<crate::lint_text::models::ExpansionSpan>>,
+}
+
+/// A model's authored query: its byte range in the model file, or its text when the file lacks it.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthoredQuery {
+    Range(usize, usize),
+    Text(String),
+}
+
 /// The expansion passes from a model's authored query to `query_sql`, and the query's file place.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AuthoredQueryMap {
@@ -957,6 +1008,8 @@ pub struct ModelRow {
     pub typed_calls: Vec<TypedCall>,
     /// Whether analysis was skipped because the dialect's native parser cannot read the model.
     pub sql_analysis_skipped: bool,
+    /// SQBRPERFORMANCE102's grain facts, present only when that rule is selected.
+    pub json_grain: Option<JsonGrain>,
 }
 
 /// A model's declared schema entry.

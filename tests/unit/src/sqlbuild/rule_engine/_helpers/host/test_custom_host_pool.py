@@ -22,6 +22,7 @@ from tests.unit.src.sqlbuild.rule_engine._helpers.host._test_types import (
     HostInputsTestCase,
     HostInterruptTestCase,
     HostPartitionTestCase,
+    SingleHostInterruptTestCase,
 )
 from tests.unit.src.sqlbuild.rule_engine._helpers.host.helpers import (
     child_processes,
@@ -30,12 +31,16 @@ from tests.unit.src.sqlbuild.rule_engine._helpers.host.helpers import (
     failed_publish,
     failed_publish_without_directory,
     host_inputs_left,
-    interrupting_publish,
     orders_project,
     record_signals,
+    started_hosts,
     touch_files,
     use_hosts,
     write_order_rules,
+)
+from tests.unit.src.sqlbuild.rule_engine._helpers.host.interrupts.helpers import (
+    default_interrupt_handling,
+    interrupt_when,
 )
 
 
@@ -233,8 +238,8 @@ def test_given_failing_host_when_others_are_busy_then_they_stop_before_later_inv
             model_count=60,
             hosts=3,
             delay_seconds=1.0,
-            interrupt_after_seconds=1.5,
-            expected_max_seconds=10.0,
+            interrupt_at_hosts=3,
+            expected_host_launches=3,
         ),
     ],
     ids=lambda case: case.description,
@@ -242,21 +247,142 @@ def test_given_failing_host_when_others_are_busy_then_they_stop_before_later_inv
 def test_given_busy_split_hosts_when_interrupted_then_hosts_stop_and_no_process_remains(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, test_case: HostInterruptTestCase
 ) -> None:
-    write_order_rules(root=tmp_path, delay_seconds=test_case.delay_seconds)
+    started: Path = tmp_path / "started"
+    started.mkdir()
+    write_order_rules(root=tmp_path, delay_seconds=test_case.delay_seconds, started_dir=started)
     project: CompiledProjectView = orders_project(model_count=test_case.model_count)
     children_before: frozenset[int] = child_processes()
-    hosts: CustomHostObserver = use_hosts(
-        monkeypatch=monkeypatch,
-        hosts=test_case.hosts,
-        publish_inputs=interrupting_publish(test_case.interrupt_after_seconds),
-    )
-    started: float = time.monotonic()
+    hosts: CustomHostObserver = use_hosts(monkeypatch=monkeypatch, hosts=test_case.hosts)
 
-    with pytest.raises(KeyboardInterrupt):
+    with (
+        default_interrupt_handling(),
+        interrupt_when(lambda: started_hosts(started) >= test_case.interrupt_at_hosts) as sent,
+        pytest.raises(KeyboardInterrupt),
+    ):
         _ = evaluate_order_rules(project=project, root=tmp_path)
 
-    assert time.monotonic() - started < test_case.expected_max_seconds
-    assert len(hosts.launches()) == test_case.hosts
+    assert sent.is_set()
+    assert len(hosts.launches()) == test_case.expected_host_launches
+    assert len(tuple(started.iterdir())) < test_case.model_count
+    assert child_processes() <= children_before
+    assert not host_inputs_left(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        HostInterruptTestCase(
+            description="interrupt while the single-host fallback runs",
+            model_count=30,
+            hosts=3,
+            delay_seconds=0.2,
+            interrupt_at_hosts=4,
+            expected_host_launches=4,
+            failing=("orders_029",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_interrupt_while_hosts_are_busy_when_the_run_ends_then_the_interrupt_is_raised(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, test_case: HostInterruptTestCase
+) -> None:
+    started: Path = tmp_path / "started"
+    started.mkdir()
+    write_order_rules(
+        root=tmp_path,
+        delay_seconds=test_case.delay_seconds,
+        started_dir=started,
+        failing=test_case.failing,
+    )
+    project: CompiledProjectView = orders_project(model_count=test_case.model_count)
+    hosts: CustomHostObserver = use_hosts(monkeypatch=monkeypatch, hosts=test_case.hosts)
+    outcomes: list[str] = []
+
+    with default_interrupt_handling():
+        try:
+            with interrupt_when(
+                lambda: started_hosts(started) >= test_case.interrupt_at_hosts
+            ) as sent:
+                try:
+                    _ = evaluate_order_rules(project=project, root=tmp_path, cache_enabled=False)
+                except RulesError:
+                    outcomes.append("RulesError")
+                for _ in range(100):
+                    time.sleep(0.01)  # a pending interrupt is raised between bytecodes
+        except KeyboardInterrupt:
+            outcomes.append("KeyboardInterrupt")
+
+    assert sent.is_set()
+    assert len(hosts.launches()) == test_case.expected_host_launches
+    assert outcomes[-1:] == ["KeyboardInterrupt"]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SingleHostInterruptTestCase(
+            description="one host stops after the invocation in flight",
+            model_count=12,
+            hosts=1,
+            delay_seconds=0.3,
+            interrupt_after=3,
+            expected_host_launches=1,
+            expected_max_started_after_interrupt=1,
+        ),
+        SingleHostInterruptTestCase(
+            description="the single-host fallback stops after the invocation in flight",
+            model_count=30,
+            hosts=3,
+            delay_seconds=0.2,
+            interrupt_after=33,
+            expected_host_launches=4,
+            expected_max_started_after_interrupt=1,
+            failing=("orders_029",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_single_host_run_when_interrupted_then_it_stops_after_the_invocation_in_flight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, test_case: SingleHostInterruptTestCase
+) -> None:
+    started: Path = tmp_path / "started"
+    started.mkdir()
+    write_order_rules(
+        root=tmp_path,
+        delay_seconds=test_case.delay_seconds,
+        started_dir=started,
+        failing=test_case.failing,
+    )
+    project: CompiledProjectView = orders_project(model_count=test_case.model_count)
+    children_before: frozenset[int] = child_processes()
+    hosts: CustomHostObserver = use_hosts(monkeypatch=monkeypatch, hosts=test_case.hosts)
+    started_at_interrupt: list[int] = []
+
+    def ready() -> bool:
+        started_at_interrupt[:] = [len(tuple(started.iterdir()))]
+        return started_at_interrupt[0] >= test_case.interrupt_after
+
+    outcomes: list[str] = []
+
+    with default_interrupt_handling():
+        try:
+            with interrupt_when(ready) as sent:
+                try:
+                    _ = evaluate_order_rules(project=project, root=tmp_path, cache_enabled=False)
+                except RulesError:
+                    outcomes.append("RulesError")
+                for _ in range(100):
+                    time.sleep(0.01)  # a pending interrupt is raised between bytecodes
+        except KeyboardInterrupt:
+            outcomes.append("KeyboardInterrupt")
+
+    assert sent.is_set()
+    assert outcomes == ["KeyboardInterrupt"]
+    assert len(hosts.launches()) == test_case.expected_host_launches
+    assert (
+        len(tuple(started.iterdir())) - started_at_interrupt[0]
+        <= test_case.expected_max_started_after_interrupt
+    )
     assert child_processes() <= children_before
     assert not host_inputs_left(tmp_path)
 

@@ -110,6 +110,11 @@ class EvaluationRuleContext:
         path: Path
         if isinstance(subject, Model):
             path = subject.path
+            if node is not None and line is None and column is None:
+                in_file: tuple[int, int] | None = self.sql.for_model(
+                    subject
+                ).expanded.file_position(node=node)
+                line, column = in_file or (None, None)
         elif isinstance(subject, ProjectPath):
             path = Path(subject.value)
         else:

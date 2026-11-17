@@ -48,5 +48,10 @@ pub fn target_error_message(error: &TargetError) -> String {
              '{PRESERVE_TARGET_VALUE}'. The target's schema '{PRESERVE_TARGET_VALUE}' keeps each \
              model's own schema, and a loader has none, so its destination must name a schema."
         ),
+        TargetError::PreservedNodeResults(target) => format!(
+            "Target '{target}' keeps each model's own schema, so it has no schema for the \
+             results of loaders, tasks, assets and checks. Set targets.{target}.loader_schema; \
+             Python node results are kept there."
+        ),
     }
 }

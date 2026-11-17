@@ -1,21 +1,15 @@
 //! Adapter-aware target namespace validation of a compile.
 
+use crate::compile_driver::main::setup::expanded_loader_namespace::expanded_loader_namespace;
 use crate::compile_driver::main::setup::managed_write_schema::managed_write_schema;
-use sqlbuild_model_config::templates::models::TemplateOptions;
+use crate::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_base::boundary::main::optional_text::optional_text;
-use sqlbuild_python_front::model_config::main::config::expanded_template_data::expanded_template_data;
 use std::collections::{HashMap, HashSet};
 
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyAnyMethods;
-use pyo3::prelude::PyErr;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::exceptions::PyException;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
-use pyo3::types::PyDict;
-use pyo3::types::PyString;
-use pyo3::types::PyStringMethods;
+use pyo3::types::{PyDict, PyString, PyStringMethods};
 
 use sqlbuild_analysis::assembly::target_checks::constants::{
     LOADER_COLLISION_CODE, MISSING_TARGET_PARTS_CODE, NAMED_TARGET_SCHEMA_CODE,
@@ -48,12 +42,14 @@ pub(crate) const DEFAULTS_HELP_PURPOSE: &str = "to set project-wide defaults";
 const NAMED_TARGET_HELP_PURPOSE: &str = "to build this target into that schema";
 use crate::compile_attachment::main::resolved_target::resolved_target;
 use pyo3::IntoPyObjectExt;
+
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
-use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::{ErrorId, RecordId};
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
@@ -344,7 +340,10 @@ fn target_namespaces(
     let mut namespaces: Vec<Namespace> = Vec::new();
     for source_entry in managed_sources {
         let namespace: Namespace = managed_source_namespace(
-            source_entry,
+            (
+                native_field(source_entry, "database")?,
+                native_field(source_entry, "schema")?,
+            ),
             (&target_config, &connection, &effective_vars),
             adapter,
         )?;
@@ -368,28 +367,28 @@ fn first_truthy<'py>(
     fallback()
 }
 
-/// `_managed_source_namespace`: the database and schema a managed source loads into.
-fn managed_source_namespace(
-    source_entry: &Bound<'_, PyAny>,
+/// `_managed_source_namespace`: the database and schema a managed source with these own values loads into.
+fn managed_source_namespace<'py>(
+    (source_database, source_schema): (Bound<'py, PyAny>, Bound<'py, PyAny>),
     (target_config, connection, effective_vars): (
-        &Bound<'_, PyAny>,
-        &Bound<'_, PyAny>,
-        &Bound<'_, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
     ),
-    adapter: &Bound<'_, PyAny>,
+    adapter: &Bound<'py, PyAny>,
 ) -> PyResult<Namespace> {
-    let py: Python<'_> = source_entry.py();
-    let database: Bound<'_, PyAny> = first_truthy(
+    let py: Python<'py> = adapter.py();
+    let database: Bound<'py, PyAny> = first_truthy(
         &[
-            native_field(source_entry, "database")?,
+            source_database,
             native_field(target_config, "database")?,
             mapping_get(connection, "database")?,
         ],
         || adapter.call_method0("default_database"),
     )?;
-    let schema: Bound<'_, PyAny> = first_truthy(
+    let schema: Bound<'py, PyAny> = first_truthy(
         &[
-            native_field(source_entry, "schema")?,
+            source_schema,
             native_field(target_config, "loader_schema")?,
             native_field(target_config, "schema")?,
             mapping_get(connection, "schema")?,
@@ -410,23 +409,43 @@ fn managed_source_namespace(
     Ok((part("database")?, part("schema")?))
 }
 
-/// A managed source's `database` and `schema` with project vars expanded and no context templates.
-pub(crate) fn expanded_loader_namespace<'py>(
-    value: &Bound<'py, PyAny>,
-    effective_vars: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    expanded_template_data(
-        value,
-        (effective_vars.downcast()?, &PyDict::new(value.py())),
-        (
-            TemplateOptions {
-                allow_context: false,
-                preserve_context_tokens: false,
-                preserve_unknown_context: false,
-            },
-            LOADER_NAMESPACE_LABEL,
-        ),
-    )
+/// The target `target_name` with its resolved locations; `loader_schema` is `None` when it resolves only inside a model, such as a `${CTX:...}` schema.
+pub(crate) fn target_settings<'py>(
+    (discovered, target_name): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (database, schema): (Option<String>, Option<String>),
+    (connection, effective_vars, adapter): (
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+    ),
+) -> PyResult<TargetSettingsValues> {
+    let py: Python<'py> = adapter.py();
+    let target_config: Bound<'py, PyAny> = if target_name.is_none() {
+        new_record(py, RecordId::TargetConfig, (), None)?
+    } else {
+        resolve_target_config(
+            py,
+            &native_field(discovered, "project_config")?,
+            &native_field(discovered, "local_config")?,
+            target_name,
+        )?
+    };
+    let none: Bound<'py, PyAny> = py.None().into_bound(py);
+    let loader_schema: Option<String> = match managed_source_namespace(
+        (none.clone(), none),
+        (&target_config, connection, effective_vars),
+        adapter,
+    ) {
+        Ok((_, schema)) => schema,
+        Err(error) if error.is_instance_of::<PyException>(py) => None,
+        Err(error) => return Err(error),
+    };
+    Ok(TargetSettingsValues {
+        name: target_name.extract()?,
+        database,
+        schema,
+        loader_schema,
+    })
 }
 
 /// Validate compiled model and seed locations for the effective adapter.

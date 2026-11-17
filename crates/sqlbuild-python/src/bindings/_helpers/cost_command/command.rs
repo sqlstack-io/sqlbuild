@@ -13,8 +13,7 @@ use sqlbuild_core::cost_command::main::validate_cost_request::validate_cost_requ
 use sqlbuild_core::cost_command::models::{CostReport, CostReportOptions};
 use sqlbuild_core::cost_report::main::cost_timestamp::cost_timestamp;
 
-use crate::bindings::_helpers::cost_command::bounds::parse_bound;
-use crate::bindings::_helpers::cost_command::bounds::parse_since;
+use crate::bindings::_helpers::cost_command::bounds::{parse_bound, parse_since};
 use crate::bindings::_helpers::cost_command::refresh::refresh_pending_cost_run;
 use crate::bindings::_helpers::cost_command::refusal::cost_error;
 use crate::bindings::_helpers::cost_report::store;

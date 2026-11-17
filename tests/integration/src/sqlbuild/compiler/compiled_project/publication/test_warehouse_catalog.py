@@ -113,7 +113,11 @@ def test_given_case_distinct_postgres_relations_when_reading_catalog_then_column
             _ = adapter.execute(connection=connection, sql=sql)
         adapter.close(connection)
         page: Any = warehouse_history_page(project, "catalog")
+<<<<<<< HEAD
         assert ("records" in page) is test_case.expected_page_delivered
+=======
+        assert ("failed" not in page) is test_case.expected_page_delivered
+>>>>>>> origin/main
         assert page == {"records": fixture["postgres_records"], "next_after": None}
 
 
@@ -167,10 +171,18 @@ def test_given_non_authoritative_adapter_scope_when_reading_catalog_then_no_page
         check=False,
     )
     assert result.returncode == 0, result.stderr
+<<<<<<< HEAD
     reply: dict[str, Any] = json.loads(result.stdout)
     assert ("records" in reply) is test_case.expected_page_delivered
     if not test_case.expected_page_delivered:
         assert "scan incomplete" in reply["error"], "a failed read returns its cause"
+=======
+    assert ("failed" not in json.loads(result.stdout)) is test_case.expected_page_delivered
+    assert (
+        "Warehouse metadata read (catalog) failed: ValueError: catalog listing is not "
+        "authoritative for this namespace; scan incomplete. No page delivered."
+    ) in result.stderr
+>>>>>>> origin/main
 
 
 @pytest.mark.parametrize(

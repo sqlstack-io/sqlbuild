@@ -1,5 +1,5 @@
 use crate::cli_text::models::CliStyle;
-use crate::progress::models::{ProgressEvent, ProgressSettings};
+use crate::progress::models::{ProgressEvent, ProgressSettings, StatementSummary, StatementTiming};
 use crate::terminal_events::models::TerminalRequest;
 
 pub(super) struct ProjectionTestCase {
@@ -56,4 +56,19 @@ pub(super) struct AuditRowTestCase {
     pub(super) terminal_event: &'static str,
     pub(super) recorded_outcomes: Vec<(&'static str, &'static str)>,
     pub(super) expected_lines: Vec<&'static str>,
+}
+
+pub(super) struct StatementCountTestCase {
+    pub(super) description: &'static str,
+    pub(super) events: Vec<ProgressEvent>,
+    pub(super) expected_by_kind: Vec<(&'static str, u64)>,
+    pub(super) expected_query_ids: Vec<&'static str>,
+}
+
+pub(super) struct StatementSummaryTextTestCase {
+    pub(super) description: &'static str,
+    pub(super) summary: StatementSummary,
+    pub(super) timing: StatementTiming,
+    pub(super) expected_line: Option<&'static str>,
+    pub(super) expected_json: serde_json::Value,
 }

@@ -8,7 +8,10 @@ publish.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+<<<<<<< HEAD
 chrono.workspace = true
+=======
+>>>>>>> origin/main
 pyo3.workspace = true
 serde_json.workspace = true
 sqlbuild-analysis.workspace = true

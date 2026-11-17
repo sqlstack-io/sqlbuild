@@ -2,9 +2,12 @@
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::PyString;
+<<<<<<< HEAD
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::PoisonError;
+=======
+>>>>>>> origin/main
 
 use sqlbuild_analysis::planner_identity::constants::{FINGERPRINT_HELP, QUERY_FINGERPRINT_FAILED};
 use sqlbuild_analysis::sql_tokens::main::baseline_fingerprint::baseline_fingerprint;
@@ -18,6 +21,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
 
+<<<<<<< HEAD
 /// Query fingerprints by dialect and SQL text: the text alone decides them, and every plan computes
 /// each model's several times, as do a location's later previews of the same publication.
 static QUERY_FINGERPRINTS: Mutex<Option<QueryFingerprints>> = Mutex::new(None);
@@ -50,13 +54,19 @@ pub(crate) fn query_fingerprint(sql: &str, dialect: Option<&str>) -> Result<Stri
     fingerprint
 }
 
+=======
+>>>>>>> origin/main
 /// The query fingerprint of a model, or the planner input error naming the model.
 pub(crate) fn model_query_hash(
     py: Python<'_>,
     model_name: &str,
     (query_sql, dialect): (&str, Option<&str>),
 ) -> PyResult<String> {
+<<<<<<< HEAD
     py.compiler_detach(|| query_fingerprint(query_sql, dialect))
+=======
+    py.compiler_detach(|| compiler_query_fingerprint(query_sql, dialect))
+>>>>>>> origin/main
         .map_err(|error| fingerprint_error(py, &format!("Model '{model_name}' SQL"), error))
 }
 

@@ -1,7 +1,10 @@
 //! Load the project and local configuration files into their Python config objects.
 
+<<<<<<< HEAD
 use sqlbuild_config::project::main::load_pool_limits::load_pool_limits;
 use sqlbuild_config::project::models::PoolLimits;
+=======
+>>>>>>> origin/main
 use std::path::PathBuf;
 
 use pyo3::IntoPyObjectExt;
@@ -173,6 +176,7 @@ pub(crate) fn configured<T>(
     let files: Files<'_> = files(project_dir)?;
     load(&files.native).or_else(|failure| Err(load_error(project_dir.py(), &failure, &files)?))
 }
+<<<<<<< HEAD
 
 /// `[pools]` of `project_dir` and each target's pool limits.
 pub(crate) fn project_pool_limits(
@@ -182,3 +186,5 @@ pub(crate) fn project_pool_limits(
     let files = files(project_dir)?;
     load_pool_limits(&files.native).or_else(|failure| Err(load_error(py, &failure, &files)?))
 }
+=======
+>>>>>>> origin/main

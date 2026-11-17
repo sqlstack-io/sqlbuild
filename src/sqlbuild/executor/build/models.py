@@ -19,6 +19,7 @@ from sqlbuild._native import (
     SourceEntry,
     SourceLoadPlanEntry,
     SqlTestPlanEntry,
+    TargetSettings,
 )
 from sqlbuild.adapter.contract.models import LifeCycleEvent, RelationInfo
 from sqlbuild.adapter.contract.types import TablePromotionMode
@@ -79,6 +80,9 @@ class BuildRuntimeParams:
     start_cursor_int: int | None = None
     end_cursor_int: int | None = None
     target: str = ""
+    target_config: TargetSettings | None = None
+    default_database: str | None = None
+    default_schema: str | None = None
     effective_vars: dict[str, object] | None = None
     use_color: bool = False
     providers: ProviderContainer | None = None
@@ -199,7 +203,7 @@ class BuildIndexes:
 
 @dataclass(frozen=True)
 class NodeCompletion:
-    """Result of a single node execution passed back from a worker to the scheduler."""
+    """A node's result, or the error that escaped it, passed back from a worker."""
 
     key: CompiledObjectKey
     result: (
@@ -208,7 +212,13 @@ class NodeCompletion:
         | FunctionExecutionResult
         | SqlTestExecutionResult
         | LoadExecutionResult
+<<<<<<< HEAD
     )
+=======
+        | None
+    ) = None
+    error: BaseException | None = None
+>>>>>>> origin/main
 
 
 @dataclass(frozen=True)

@@ -661,6 +661,12 @@ class NativeSqlTestArtifact(NativeRecord):
     ) -> None: ...
     def __replace__(self, **changes: Any) -> NativeSqlTestArtifact: ...
 
+class ProviderSetupContext(NativeRecord):
+    """What a provider's setup receives: the active target's resolved settings."""
+
+    target_config: TargetSettings | None
+    def __init__(self, target_config: TargetSettings | None = ...) -> None: ...
+
 class RelationFixtureDiagnostic(NativeRecord):
     """One statically provable invalid fixture condition."""
 
@@ -1432,6 +1438,8 @@ class NativeCompiledModel:
     def fast_lineage_star_resolved(self) -> bool: ...
     @property
     def authored_sql(self) -> str: ...
+    @property
+    def query_place(self) -> str: ...
     @property
     def authored_query_sql(self) -> str: ...
     @property
@@ -2857,6 +2865,7 @@ class EventExporterDispatcher:
         health_interval_seconds: float | None = None,
         failure_callback: Callable[[EventExporterFailure], object] | None = None,
         summary_callback: Callable[[EventExportSummary], object] | None = None,
+        withheld_kinds: Sequence[str] | None = None,
     ) -> None: ...
     @property
     def thread(self) -> threading.Thread: ...
@@ -2894,6 +2903,7 @@ class EventExporterCommandScope:
         providers: tuple[DiscoveredProvider, ...],
         event_exporters: tuple[DiscoveredEventExporter, ...],
         command_output_sinks: tuple[DiscoveredCommandOutputSink, ...] | None = None,
+        setup_context: ProviderSetupContext | None = None,
     ) -> None: ...
     def cached_extensions(
         self, *, project_dir: Path
@@ -4317,8 +4327,11 @@ class SqlDocument:
     """One SQL text a custom rule reads, parsed on first use by its dialect's SQLQuack parser."""
 
     source: str
-    def __init__(self, *, source: str, dialect: str) -> None: ...
+    def __init__(
+        self, *, source: str, dialect: str, place: str | None = None, file: str | None = None
+    ) -> None: ...
     def ast(self) -> SqlTreeNode: ...
+    def file_position(self, *, node: object) -> tuple[int, int] | None: ...
     def nodes(self, *, kind: str) -> tuple[SqlNode, ...]: ...
     def ctes(self) -> tuple[SqlNode, ...]: ...
     def joins(self) -> tuple[SqlNode, ...]: ...
@@ -4331,6 +4344,14 @@ class SqlTreeNode:
     kind: str
     line: int
     column: int
+    name: str | None
+    quoted: bool | None
+    qualifier: tuple[str, ...] | None
+    value: str | None
+    literal_type: str | None
+    end_line: int | None
+    end_column: int | None
+    span: tuple[int, int] | None
     children: tuple[SqlTreeNode, ...]
     def walk(self) -> list[SqlTreeNode]: ...
 
@@ -10199,6 +10220,7 @@ class CompilePipelineOptions(NativeRecord):
     external_sql_reference_resolver: ExternalSqlReferenceResolver | None
     resolve_python_run_selectors: bool
     no_cache: bool
+    verbose: bool
     max_microbatches: int | None
     concurrency: int | None
     selection_diagnostics: bool
@@ -10226,6 +10248,7 @@ class CompilePipelineOptions(NativeRecord):
         external_sql_reference_resolver: ExternalSqlReferenceResolver | None = ...,
         resolve_python_run_selectors: bool = ...,
         no_cache: bool = ...,
+        verbose: bool = ...,
         max_microbatches: int | None = ...,
         concurrency: int | None = ...,
         selection_diagnostics: bool = ...,
@@ -10966,6 +10989,7 @@ class RulesRunResult(NativeRecord):
     cache_misses: int
     skipped_type_proof_rules: tuple[str, ...]
     custom_rule_timings: tuple[tuple[str, int], ...]
+    skipped_models: tuple[tuple[str, str], ...]
     def __init__(
         self,
         findings: tuple[Finding, ...],
@@ -10978,6 +11002,7 @@ class RulesRunResult(NativeRecord):
         cache_misses: int = ...,
         skipped_type_proof_rules: tuple[str, ...] = ...,
         custom_rule_timings: tuple[tuple[str, int], ...] = ...,
+        skipped_models: tuple[tuple[str, str], ...] = ...,
     ) -> None: ...
 
 class CustomRulesOutcome(NativeRecord):
@@ -11900,6 +11925,25 @@ class TargetDiffConfig(NativeRecord):
     def __init__(
         self,
         max_full_rows: int | Literal["unlimited"] | None = ...,
+    ) -> None: ...
+
+class TargetSettings(NativeRecord):
+    """The active target's database and schemas, resolved as SQLBuild uses them."""
+
+    name: str | None
+    database: str | None
+    schema: str | None
+    loader_schema: str | None
+    database_preserved: bool
+    schema_preserved: bool
+    def __init__(
+        self,
+        name: str | None = ...,
+        database: str | None = ...,
+        schema: str | None = ...,
+        loader_schema: str | None = ...,
+        database_preserved: bool = ...,
+        schema_preserved: bool = ...,
     ) -> None: ...
 
 class TargetWarehousesConfig(NativeRecord):
@@ -13979,6 +14023,7 @@ class ModelPlanEntry(NativeRecord):
     start_cursor_config: StartCursorsConfig | None
     invocation_time: datetime | None
     unique_key: tuple[str, ...]
+    replace_key: tuple[str, ...]
     merge_exclude_columns: tuple[str, ...]
     snapshot_strategy: str | None
     updated_at_column: str | None
@@ -14067,6 +14112,7 @@ class ModelPlanEntry(NativeRecord):
         start_cursor_config: StartCursorsConfig | None = ...,
         invocation_time: datetime | None = ...,
         unique_key: tuple[str, ...] = ...,
+        replace_key: tuple[str, ...] = ...,
         merge_exclude_columns: tuple[str, ...] = ...,
         snapshot_strategy: str | None = ...,
         updated_at_column: str | None = ...,
@@ -16112,6 +16158,7 @@ class RulesResult(NativeRecord):
     custom_ms: int
     custom_cpu_ms: int
     custom_rule_timings: tuple[tuple[str, int], ...]
+    skipped_models: tuple[tuple[str, str], ...]
     def __init__(
         self,
         findings: tuple[Finding, ...],
@@ -16123,6 +16170,7 @@ class RulesResult(NativeRecord):
         custom_ms: int = ...,
         custom_cpu_ms: int = ...,
         custom_rule_timings: tuple[tuple[str, int], ...] = ...,
+        skipped_models: tuple[tuple[str, str], ...] = ...,
     ) -> None: ...
 
 class RuleFile(NativeRecord):
@@ -16221,10 +16269,12 @@ class CustomRuleRun(NativeRecord):
     ) -> None: ...
 
 class CustomHostPartition(NativeRecord):
-    """How one host of a split run detects module state and learns the run was cancelled."""
+    """How a host learns of a cancelled run and whether it detects module state."""
 
     cancelled: Callable[[], bool]
+    detect_state: bool
     def __init__(
         self,
         cancelled: Callable[[], bool],
+        detect_state: bool = ...,
     ) -> None: ...

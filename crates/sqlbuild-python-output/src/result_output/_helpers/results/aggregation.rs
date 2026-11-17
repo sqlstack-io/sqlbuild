@@ -1,10 +1,16 @@
 //! Build `BuildExecutionResult` with aggregate counts and overall status from typed results.
 
+<<<<<<< HEAD
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict;
 use sqlbuild_core::build_aggregate::constants::IGNORED_AUDIT_FAILURE;
+=======
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::PyDict;
+use pyo3::{IntoPyObjectExt, pyfunction};
+>>>>>>> origin/main
 use sqlbuild_core::build_aggregate::main::aggregate_build_counts::aggregate_build_counts;
 use sqlbuild_core::build_aggregate::models::{BuildCounts, BuildResultFacts, ModelResultFacts};
 use sqlbuild_host::entries::models::ExecutorHost;

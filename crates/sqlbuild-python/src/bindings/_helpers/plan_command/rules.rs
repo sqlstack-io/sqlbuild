@@ -28,6 +28,7 @@ use sqlbuild_python_compile::rules::main::rule::run_rules::run_rules;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
+use sqlbuild_rules::rule_results::main::format_skipped_models::format_skipped_models;
 
 const LIST_ACTION: &str = "list";
 const SHOW_ACTION: &str = "show";
@@ -235,6 +236,12 @@ fn run_rule_selection(
     )?;
     if let Some(note) = format_skipped_type_proof_rules(
         native_field(&result, "skipped_type_proof_rules")?.extract()?,
+    ) {
+        print_line(py, &format!("note: {note}"), true)?;
+    }
+    if let Some(note) = format_skipped_models(
+        &native_field(&result, "skipped_models")?.extract::<Vec<_>>()?,
+        false,
     ) {
         print_line(py, &format!("note: {note}"), true)?;
     }

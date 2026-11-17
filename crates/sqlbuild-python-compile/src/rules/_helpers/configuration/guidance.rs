@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use pyo3::exceptions::PyOSError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
-use sqlbuild_rules::constants::NATIVE_BUILD_IDENTITY;
+use sqlbuild_rules::build_identity::main::native_build_identity::native_build_identity;
 use sqlbuild_rules::errors::{SkillInstallError, SkillInstallErrorKind};
 use sqlbuild_rules::models::RulesConfig;
 use sqlbuild_rules::rule_catalogue::main::render_skills_body::render_skills_body;
@@ -104,7 +104,7 @@ fn fingerprint_rule(
         implementation_hash: if custom {
             custom_rule_implementation_fingerprint(rule, project_dir, None)?
         } else {
-            NATIVE_BUILD_IDENTITY.to_owned()
+            native_build_identity().to_owned()
         },
     })
 }

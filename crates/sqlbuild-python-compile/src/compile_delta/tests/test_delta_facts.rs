@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::compile_delta::tests::helpers::names;
-use crate::compile_delta::tests::helpers::strings;
+use crate::compile_delta::tests::helpers::{names, strings};
 use crate::compile_delta::tests::test_types::DeltaFactTestCase;
 use crate::rules::_helpers::fact::fact_replay::delta_safe_fact;
 

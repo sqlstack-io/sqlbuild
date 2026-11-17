@@ -751,8 +751,12 @@ export class MockPlatformApi implements PlatformApi {
 					details: mockConnectionDetails(c),
 					stateLocation: { database: typeof c.values.database === 'string' ? c.values.database : null, schema: 'sqlbuild' },
 					lastTest: this.#connectionTests.get(`${l.id}/${c.name}`) ?? c.lastTest,
+<<<<<<< HEAD
 					nextSyncAt: new Date(Date.now() + 26 * 60_000).toISOString(),
 					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, waiting: false, lastSyncedAt: synced, mirroredTotal: 4_800 * (i + 1) }))
+=======
+					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, error: null, waiting: false, lastSyncedAt: synced }))
+>>>>>>> origin/main
 				}))
 		);
 		return this.#ctx.reply(structuredClone(connections));

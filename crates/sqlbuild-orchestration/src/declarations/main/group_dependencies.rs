@@ -2,8 +2,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+<<<<<<< HEAD
 use crate::declarations::_helpers::group_waits::{describe_cycle, record_wait, upstream_keys};
 use crate::declarations::models::{GroupWaits, JobDefinition};
+=======
+use crate::declarations::main::group_cycle_message::group_cycle_message;
+use crate::declarations::main::group_wait_graph::group_wait_graph;
+use crate::declarations::models::JobDefinition;
+>>>>>>> origin/main
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
 
@@ -15,10 +21,33 @@ pub fn group_dependencies(
     if members.is_empty() || members.iter().any(|name| !jobs.contains_key(name)) {
         return Err(ControlError::Invalid("group needs known jobs".into()));
     }
-    let waits = lineage_dependencies(input, jobs, members);
-    ensure_acyclic(group, &waits.edges, &waits.reasons)?;
+    let selections: BTreeMap<String, BTreeSet<String>> = members
+        .iter()
+        .map(|name| (name.clone(), jobs[name].selection.clone()))
+        .collect();
+    let deps: BTreeMap<String, BTreeSet<String>> = input
+        .nodes
+        .iter()
+        .map(|(key, node)| {
+            let upstream: BTreeSet<String> = node
+                .definition
+                .get("deps")
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .collect();
+            (key.clone(), upstream)
+        })
+        .collect();
+    let waits = group_wait_graph(&selections, &deps);
+    if let Some(message) = group_cycle_message(group, &waits.cycles) {
+        return Err(ControlError::Invalid(message));
+    }
     Ok(waits.edges)
 }
+<<<<<<< HEAD
 
 /// Each member waits for the members that build the first nodes it reaches upstream, and no further:
 /// those members wait for whatever their own nodes read. A job that builds a node itself, such as a
@@ -89,3 +118,5 @@ fn ensure_acyclic(
     }
     Ok(())
 }
+=======
+>>>>>>> origin/main

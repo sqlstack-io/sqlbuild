@@ -20,11 +20,9 @@ use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inpu
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 
 use crate::bindings::_helpers::dbt_interop::reference_resolver::DbtCompileReferenceResolver;
-use crate::bindings::_helpers::dbt_interop::runtime_config::interop_adapter;
-use crate::bindings::_helpers::dbt_interop::runtime_config::manifest_path;
-use crate::bindings::_helpers::dbt_interop::runtime_config::parse_dbt_execution_args;
-use crate::bindings::_helpers::dbt_interop::runtime_config::plan_options;
-use crate::bindings::_helpers::dbt_interop::runtime_config::vars_mapping;
+use crate::bindings::_helpers::dbt_interop::runtime_config::{
+    interop_adapter, manifest_path, parse_dbt_execution_args, plan_options, vars_mapping,
+};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

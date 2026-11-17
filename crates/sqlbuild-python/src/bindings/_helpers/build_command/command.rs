@@ -8,19 +8,16 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cli::person_login::main::sync_after_build::sync_after_build;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::build_command::completion::complete_direct_build;
-use crate::bindings::_helpers::build_command::completion::finalize_exceptional_cost;
-use crate::bindings::_helpers::build_command::completion::finalize_no_work_with_timings;
-use crate::bindings::_helpers::build_command::completion::record_pending_cost;
-use crate::bindings::_helpers::build_command::completion::write_partial_timings;
+use crate::bindings::_helpers::build_command::completion::{
+    complete_direct_build, finalize_exceptional_cost, finalize_no_work_with_timings,
+    record_pending_cost, write_partial_timings,
+};
 use crate::bindings::_helpers::build_command::execution::execute_direct_build;
-use crate::bindings::_helpers::build_command::invocation::BuildContext;
-use crate::bindings::_helpers::build_command::invocation::resolve_build_context;
-use crate::bindings::_helpers::build_command::planning::compile_build_plan;
-use crate::bindings::_helpers::build_command::planning::enforce_build_plan_policies;
-use crate::bindings::_helpers::build_command::planning::run_defer_clone_prephase;
-use crate::bindings::_helpers::build_command::planning::write_compile_target;
-use crate::bindings::_helpers::build_command::planning::write_plan_text;
+use crate::bindings::_helpers::build_command::invocation::{BuildContext, resolve_build_context};
+use crate::bindings::_helpers::build_command::planning::{
+    compile_build_plan, enforce_build_plan_policies, run_defer_clone_prephase,
+    write_compile_target, write_plan_text,
+};
 use crate::bindings::_helpers::check::check_core::relevant_check_functions;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -29,6 +26,9 @@ use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::diagnostics::models::BuildPhaseTimingTracker;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_compile::compile_driver::main::setup::selected_target_settings::selected_target_settings;
+use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
+use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
 use sqlbuild_python_front::discovery::main::sources::provider_uses::provider_uses;
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
@@ -41,12 +41,31 @@ use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
 fn run_with_providers(context: &BuildContext<'_>) -> PyResult<i32> {
     let py: Python<'_> = context.py();
+    let discovered: Bound<'_, PyAny> = context.get("discovered_inputs")?;
+    let selected_target: Bound<'_, PyAny> = native_field(&context.request, "selected_target")?;
+    let (_, effective_vars, _): (Bound<'_, PyAny>, Bound<'_, PyAny>, Bound<'_, PyAny>) =
+        build_effective_runtime_config(
+            &discovered,
+            Some(selected_target.clone()).filter(|value| !value.is_none()),
+            Some(native_field(&context.request, "cli_vars")?).filter(|value| !value.is_none()),
+        )
+        .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?
+        .extract()?;
+    let target_config: TargetSettingsValues = selected_target_settings(
+        (&discovered, &selected_target),
+        &context.get("adapter_name")?.extract::<String>()?,
+        (
+            &context.get("connection_config")?,
+            &effective_vars,
+            &context.get("adapter")?,
+        ),
+    )?;
     let session: Bound<'_, PyAny> = call_with(
         &host_entry(py, UserCodeHost::BuildProviderSession)?,
-        &[(
-            "discovered_providers",
-            context.get("discovered_inputs")?.getattr("providers")?,
-        )],
+        &[
+            ("discovered_providers", discovered.getattr("providers")?),
+            ("setup_context", target_config.setup_context(py)?),
+        ],
     )?;
     let built: PyResult<i32> = run_planned_build(context, &native_field(&session, "providers")?);
     let closed: PyResult<Bound<'_, PyAny>> = session.call_method0("close");

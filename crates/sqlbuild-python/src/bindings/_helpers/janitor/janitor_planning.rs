@@ -2,9 +2,11 @@
 
 use std::collections::HashSet;
 
+use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
+use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_analysis::janitor_planning::constants::OLD_NAME_VIEW_REASON;
 use sqlbuild_analysis::janitor_planning::main::build_archive_name::build_archive_name;
 use sqlbuild_analysis::janitor_planning::main::query_diff_artifact_name::query_diff_artifact_name;
@@ -12,6 +14,7 @@ use sqlbuild_analysis::janitor_planning::main::query_diff_artifact_parts::query_
 use sqlbuild_analysis::review_command::constants::LEFTOVER_REVIEW_SCHEMA_AGE_DAYS;
 use sqlbuild_host::entries::models::ExecutorHost;
 
+<<<<<<< HEAD
 use crate::bindings::_helpers::janitor::janitor_classification::Candidate;
 use crate::bindings::_helpers::janitor::janitor_classification::Policy;
 use crate::bindings::_helpers::janitor::janitor_classification::Protection;
@@ -40,6 +43,22 @@ use crate::bindings::_helpers::janitor::janitor_keys::union_exact;
 use crate::bindings::_helpers::janitor::janitor_old_names::OldNamePlanning;
 use crate::bindings::_helpers::janitor::janitor_old_names::pending_migration_origins;
 use crate::bindings::_helpers::janitor::janitor_old_names::plan_old_name_views;
+=======
+use crate::bindings::_helpers::janitor::janitor_classification::{
+    Candidate, Policy, Protection, SchemaClassification, classify_target_schemas, plan_archives,
+};
+use crate::bindings::_helpers::janitor::janitor_facts::{
+    Warehouse, WarehouseFacts, collect_target_schemas, direct_state_prune_candidates,
+    gather_warehouse_facts, query_diff_artifact_candidates,
+};
+use crate::bindings::_helpers::janitor::janitor_keys::{
+    Folded, Key, SchemaKey, archive_timestamp, days, dedupe_schema_keys, integer, now_utc, record,
+    sorted_schemas, timestamp_fields, tuple, union_exact,
+};
+use crate::bindings::_helpers::janitor::janitor_old_names::{
+    OldNamePlanning, pending_migration_origins, plan_old_name_views,
+};
+>>>>>>> origin/main
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -137,6 +156,13 @@ fn candidate_records<'py>(candidates: &[Candidate<'py>]) -> PyResult<Vec<Bound<'
     candidates.iter().map(Candidate::to_python).collect()
 }
 
+/// The active target's database or schema as a location: `preserve` names none, since each model keeps its own.
+fn target_location(project: &Bound<'_, PyAny>, field: &str) -> PyResult<Option<String>> {
+    Ok(native_field(project, field)?
+        .extract::<Option<String>>()?
+        .filter(|value| value != PRESERVE_TARGET_VALUE))
+}
+
 /// Review schemas whose markers the active target schema holds and that outlived any review run.
 fn review_schema_candidates<'py>(
     project: &Bound<'py, PyAny>,
@@ -144,10 +170,9 @@ fn review_schema_candidates<'py>(
     now: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let py: Python<'py> = warehouse.py();
-    let schema: Bound<'py, PyAny> = native_field(project, "effective_target_schema")?;
-    if schema.is_none() {
+    let Some(schema) = target_location(project, "effective_target_schema")? else {
         return Ok(Vec::new());
-    }
+    };
     let max_age: Bound<'py, PyAny> = days(py, LEFTOVER_REVIEW_SCHEMA_AGE_DAYS)?;
     let leftovers: Bound<'py, PyAny> = call_with(
         &host_entry(py, ExecutorHost::LeftoverReviewSchemas)?,
@@ -156,9 +181,9 @@ fn review_schema_candidates<'py>(
             ("connection", warehouse.connection.clone()),
             (
                 "database",
-                native_field(project, "effective_target_database")?,
+                target_location(project, "effective_target_database")?.into_bound_py_any(py)?,
             ),
-            ("schema", schema),
+            ("schema", schema.into_bound_py_any(py)?),
             ("now", now.clone()),
             ("max_age", max_age),
         ],
@@ -222,11 +247,9 @@ pub(crate) fn build_plan<'py>(
             push_artifact_schema(database.clone(), schema.clone());
         }
     }
-    if let Some(schema) =
-        native_field(project, "effective_target_schema")?.extract::<Option<String>>()?
-    {
+    if let Some(schema) = target_location(project, "effective_target_schema")? {
         push_artifact_schema(
-            native_field(project, "effective_target_database")?.extract()?,
+            target_location(project, "effective_target_database")?,
             schema,
         );
     }

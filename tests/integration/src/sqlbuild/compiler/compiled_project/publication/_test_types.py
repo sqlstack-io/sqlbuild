@@ -111,7 +111,7 @@ class WorkerExecutionTestCase:
     model_sql: str
     warehouse_query: str
     expected_status: str
-    expected_rows: list[tuple[int]]
+    expected_rows: list[tuple[int] | tuple[str]]
     expected_node_count: int = 1
     # Node counts by status when the nodes don't all share the run's status.
     expected_node_counts: dict[str, int] | None = None
@@ -302,6 +302,28 @@ class DevelopmentTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentDiscoveryTestCase:
+    description: str
+    expected_imports: int
+
+
+@dataclass(frozen=True)
+class DevelopmentWarningTestCase:
+    description: str
+    expected_line: str
+    hidden_line: str
+
+
+@dataclass(frozen=True)
+class DevelopmentTerminalTestCase:
+    description: str
+    environment: dict[str, str]
+    unset: frozenset[str]
+    expected_ready: str
+    expected_sign_ins: list[str]
+
+
+@dataclass(frozen=True)
 class ComposeDeploymentTestCase:
     description: str
     expected_warehouse_rows: list[list[int]]
@@ -328,6 +350,14 @@ class CatalogInspectionTestCase:
 class CatalogBoundaryTestCase:
     description: str
     expected_page_delivered: bool
+
+
+@dataclass(frozen=True)
+class ReadFailureTestCase:
+    description: str
+    table: str
+    expected_stderr: str
+    expected_reply: dict[str, Any]
 
 
 @dataclass(frozen=True)

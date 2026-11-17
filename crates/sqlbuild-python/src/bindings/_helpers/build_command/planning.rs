@@ -10,9 +10,13 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::build_command::defer_clone::run_defer_clone_boundary_prephase;
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
+<<<<<<< HEAD
 use crate::bindings::_helpers::build_command::policies::enforce_plan_policies;
 use crate::bindings::_helpers::build_command::policies::model_limit;
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
+=======
+use crate::bindings::_helpers::build_command::policies::{enforce_plan_policies, model_limit};
+>>>>>>> origin/main
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -58,6 +62,7 @@ fn request_options<'py>(context: &BuildContext<'py>) -> PyResult<Bound<'py, PyAn
         &[
             ("no_sql_validation", field("no_sql_validation")?),
             ("no_cache", field("no_cache")?),
+            ("verbose", field("verbose")?),
             ("selected_target", field("selected_target")?),
             ("defer_to", field("defer_to")?),
             ("defer_sources_to", field("defer_sources_to")?),

@@ -52,6 +52,7 @@ use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
 use sqlbuild_python_base::records::types::NativeAttr;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
+use sqlbuild_rules::rule_results::main::format_skipped_models::format_skipped_models;
 
 const BYPASS_OUTCOME: &str = "bypass";
 
@@ -314,9 +315,16 @@ fn compiled_with_status<'py>(
         }
     }
     close_status(status)?;
-    if let Some(skipped_note) = format_skipped_type_proof_rules(
-        native_field(&analysis, "skipped_type_proof_rules")?.extract()?,
-    ) {
+    let skipped_notes = [
+        format_skipped_type_proof_rules(
+            native_field(&analysis, "skipped_type_proof_rules")?.extract()?,
+        ),
+        format_skipped_models(
+            &native_field(&analysis, "skipped_models")?.extract::<Vec<_>>()?,
+            false,
+        ),
+    ];
+    for skipped_note in skipped_notes.into_iter().flatten() {
         output.call_method1("print_stderr_line", (format!("note: {skipped_note}"),))?;
     }
     let dag_artifact_path: Bound<'py, PyAny> =

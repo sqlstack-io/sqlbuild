@@ -23,10 +23,9 @@ use sqlbuild_core::dbt_process::main::stop_dbt_process::stop_dbt_process;
 use sqlbuild_core::dbt_process::models::DbtJsonProcess;
 
 use crate::bindings::_helpers::dbt_events::stream::DbtEventStream;
-use crate::bindings::_helpers::dbt_interop::runner::dbt_command_lifecycle;
-use crate::bindings::_helpers::dbt_interop::runner::launch_failure;
-use crate::bindings::_helpers::dbt_interop::runner::launch_os_error;
-use crate::bindings::_helpers::dbt_interop::runner::report_exit;
+use crate::bindings::_helpers::dbt_interop::runner::{
+    dbt_command_lifecycle, launch_failure, launch_os_error, report_exit,
+};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

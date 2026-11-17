@@ -11,9 +11,9 @@ use sqlbuild_python_base::native_host::main::host_error::host_error;
 
 use crate::bindings::_helpers::dbt_interop::cli::resolved_path;
 use crate::bindings::_helpers::dbt_interop::profile::normalize_dbt_profile_connection;
-use crate::bindings::_helpers::dbt_interop::profile_load::default_profiles_dir;
-use crate::bindings::_helpers::dbt_interop::profile_load::load_dbt_project_metadata;
-use crate::bindings::_helpers::dbt_interop::profile_load::load_selected_dbt_profile_output;
+use crate::bindings::_helpers::dbt_interop::profile_load::{
+    default_profiles_dir, load_dbt_project_metadata, load_selected_dbt_profile_output,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

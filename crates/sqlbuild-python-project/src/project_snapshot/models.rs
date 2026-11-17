@@ -48,7 +48,10 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
+<<<<<<< HEAD
 use std::sync::atomic::AtomicU32;
+=======
+>>>>>>> origin/main
 use std::sync::atomic::Ordering;
 use uuid::Uuid;
 
@@ -119,29 +122,39 @@ impl NativeOrchestrationSnapshot {
 #[derive(Debug)]
 pub struct WorkerBuild {
     pub worker: Py<NativeOrchestrationWorker>,
+<<<<<<< HEAD
     execution: RunExecution,
     completed: Mutex<BTreeMap<String, NodeOutcome>>,
     checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
+=======
+    pub(crate) execution: RunExecution,
+    pub(crate) completed: Mutex<BTreeMap<String, NodeOutcome>>,
+    pub(crate) checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
+>>>>>>> origin/main
     /// The snapshot's audits and SQL tests, each with the node keys it checks.
-    attached: BTreeMap<String, Vec<String>>,
+    pub(crate) attached: BTreeMap<String, Vec<String>>,
     /// Each SQL test with every node a failure of it blocks in a build: its expected, assertion and reference models and the functions it checks.
-    blocked: BTreeMap<String, Vec<String>>,
+    pub(crate) blocked: BTreeMap<String, Vec<String>>,
     /// How many of each function's planned tests have still to report; a function is built before its tests run.
-    untested: Mutex<BTreeMap<String, usize>>,
+    pub(crate) untested: Mutex<BTreeMap<String, usize>>,
     /// A built function's result, held until its tests report so a failing one can fail it instead.
-    held: Mutex<BTreeMap<String, Completion>>,
+    pub(crate) held: Mutex<BTreeMap<String, Completion>>,
     /// Each snapshot node's direct upstream node keys, for naming what a skipped node waited on.
-    upstream: BTreeMap<String, Vec<String>>,
+    pub(crate) upstream: BTreeMap<String, Vec<String>>,
     /// The failed node each finished node traces back to: itself when it failed, its cause when skipped.
-    causes: Mutex<BTreeMap<String, String>>,
+    pub(crate) causes: Mutex<BTreeMap<String, String>>,
     /// The worst attached outcome of each node, for commands that only run tests or audits.
-    checked: Mutex<BTreeMap<String, NodeOutcome>>,
+    pub(crate) checked: Mutex<BTreeMap<String, NodeOutcome>>,
     /// Whether the command returned, having run every check it planned, rather than being refused or raising.
-    returned: AtomicBool,
+    pub(crate) returned: AtomicBool,
     /// Why the worker refused the run before executing anything, reported as the run's status reason.
+<<<<<<< HEAD
     refusal: Mutex<Option<String>>,
     /// Error-severity audit failures the build let through, reported before the run finishes.
     ignored_audit_failures: AtomicU32,
+=======
+    pub(crate) refusal: Mutex<Option<String>>,
+>>>>>>> origin/main
 }
 
 impl WorkerBuild {
@@ -189,7 +202,7 @@ impl WorkerBuild {
     }
 
     /// Test and audit runs execute only attached checks, so their nodes take the checks' outcome.
-    fn checks_only(&self) -> bool {
+    pub(crate) fn checks_only(&self) -> bool {
         matches!(self.command(), RunCommand::Test | RunCommand::Audit)
     }
 
@@ -274,7 +287,7 @@ impl WorkerBuild {
     }
 
     /// Count each function's tests this build plans, so a built function waits only for tests that will report.
-    fn count_planned_tests(&self, plan: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub(crate) fn count_planned_tests(&self, plan: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut untested = self.untested.lock().map_err(|_| poisoned())?;
         for entry in field(plan, "test_entries")?.try_iter()? {
             let test = format!("{SQL_TEST_KEY_PREFIX}{}", field(&entry?, "name")?.str()?);
@@ -312,7 +325,7 @@ impl WorkerBuild {
     }
 
     /// A skip in a build names the failed node upstream of it; a test or audit run that raised skips what it never checked, with no cause.
-    fn complete(
+    pub(crate) fn complete(
         &self,
         py: Python<'_>,
         key: &str,
@@ -485,7 +498,7 @@ impl WorkerBuild {
     }
 
     /// The failed node nearest upstream of `key` in this run, or the cause a skipped one carries.
-    fn failed_upstream(&self, key: &str) -> PyResult<Option<String>> {
+    pub(crate) fn failed_upstream(&self, key: &str) -> PyResult<Option<String>> {
         let causes = self.causes.lock().map_err(|_| poisoned())?;
         let mut seen: BTreeSet<&str> = BTreeSet::from([key]);
         let mut pending: VecDeque<&str> = VecDeque::from([key]);
@@ -503,7 +516,7 @@ impl WorkerBuild {
     }
 
     /// A selected SQL test completes itself; a failing one, found by its compiled name such as `parent [case]`, fails the nodes it blocks; each test that reports releases a function waiting on its tests.
-    fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub(crate) fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
         let py = result.py();
         let outcome: String = field(result, "outcome")?.str()?.extract()?;
         let passed = SqlTestOutcome::from_value(&outcome) == Some(SqlTestOutcome::Pass);
@@ -537,7 +550,7 @@ impl WorkerBuild {
     }
 
     /// Count `test` as reported for each function it checks, and publish a held function once none of its tests is left.
-    fn release_tested(&self, py: Python<'_>, test: &str) -> PyResult<()> {
+    pub(crate) fn release_tested(&self, py: Python<'_>, test: &str) -> PyResult<()> {
         let mut released: Vec<(String, Completion)> = Vec::new();
         {
             let mut untested = self.untested.lock().map_err(|_| poisoned())?;
@@ -561,7 +574,12 @@ impl WorkerBuild {
     }
 
     /// Publish a node's result, or hold a built function's while its tests have still to report.
-    fn complete_or_hold(&self, py: Python<'_>, key: &str, completion: Completion) -> PyResult<()> {
+    pub(crate) fn complete_or_hold(
+        &self,
+        py: Python<'_>,
+        key: &str,
+        completion: Completion,
+    ) -> PyResult<()> {
         let waiting = !self.checks_only()
             && matches!(completion.0, NodeOutcome::Success | NodeOutcome::Warn)
             && self
@@ -678,7 +696,12 @@ impl WorkerBuild {
         self.finish_check(result.py(), &key, outcome)
     }
 
-    fn finish_check(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
+    pub(crate) fn finish_check(
+        &self,
+        py: Python<'_>,
+        key: &str,
+        outcome: NodeOutcome,
+    ) -> PyResult<()> {
         self.worker.bind(py).get().change(
             py,
             &format!("check-finished/{key}"),

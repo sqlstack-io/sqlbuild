@@ -241,6 +241,13 @@ pub struct LineageRow {
     pub expression_range: Option<(usize, usize)>,
 }
 
+impl LineageRow {
+    /// Whether the column aggregates its sources rather than carrying one source row's value.
+    pub fn aggregated(&self) -> bool {
+        self.transform_code == crate::assembly::analysis_session::constants::TRANSFORM_AGGREGATION
+    }
+}
+
 /// Where a model's lineage facts live.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LineageFacts {

@@ -1,11 +1,15 @@
 //! Warehouse-aware time-travel retention and Snowflake table-type planning.
 
+<<<<<<< HEAD
 use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+=======
+>>>>>>> origin/main
 use crate::planner_phases::main::rebuilds::effective_target_config::effective_target_config;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
+<<<<<<< HEAD
 use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
 use crate::planner_phases::constants::BIGQUERY_ADAPTER;
 use crate::planner_phases::constants::DECREASE_WARNING;
@@ -17,6 +21,13 @@ use crate::planner_phases::constants::RETENTION_MATCH;
 use crate::planner_phases::constants::SNOWFLAKE_ADAPTER;
 use crate::planner_phases::constants::TRANSIENT_TABLE_TYPE;
 use crate::planner_warehouse::models::Read;
+=======
+use crate::planner_phases::constants::{
+    BIGQUERY_ADAPTER, DECREASE_WARNING, DOWNGRADE_HISTORY_DAYS, PERMANENT_TABLE_TYPE,
+    RETENTION_DECREASE, RETENTION_INCREASE, RETENTION_MATCH, SNOWFLAKE_ADAPTER,
+    TRANSIENT_TABLE_TYPE,
+};
+>>>>>>> origin/main
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -29,9 +40,15 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+<<<<<<< HEAD
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::typed_values::typed_values;
 use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+=======
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::typed_values::typed_values;
+>>>>>>> origin/main
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
@@ -157,10 +174,16 @@ pub(crate) fn plan_table_types<'py>(
             continue;
         }
         let downgrade = actual == Some(false) && desired_transient;
+<<<<<<< HEAD
         let destination = destination(&model)?;
         let limit: i64 = dialect
             .syntax("maximum_identifier_length")?
             .call0()?
+=======
+        let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
+        let limit: i64 = adapter
+            .call_method0("maximum_identifier_length")?
+>>>>>>> origin/main
             .extract()?;
         let target_name: String = native_field(&destination, "name")?.extract()?;
         entries.push(planner_model(

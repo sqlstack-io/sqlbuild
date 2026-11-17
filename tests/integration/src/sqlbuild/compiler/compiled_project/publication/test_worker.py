@@ -1463,6 +1463,64 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
     "test_case",
     [
         WorkerExecutionTestCase(
+            "a rejected start report stops the run at concurrency 2",
+            "SELECT count(*) AS amount FROM range(500000000) t(value) WHERE value % 7 = 0",
+            "SELECT table_name FROM duckdb_tables() "
+            "WHERE table_name IN ('orders', 'refunds', 'returns') ORDER BY table_name",
+            "partial",
+            [("orders",)],
+            files={
+                "sqlbuild_project.toml": (
+                    'name = "orders"\nadapter = "duckdb"\n'
+                    '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                    '[targets.development]\nschema = "main"\nconcurrency = 2\n'
+                ),
+                "models/refunds.sql": (
+                    "MODEL (description 'Refunds.', materialized table);\nSELECT 2 AS amount\n"
+                ),
+                "models/returns.sql": (
+                    "MODEL (description 'Returns.', materialized table);\n"
+                    'SELECT amount FROM __ref("orders")\n'
+                ),
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders, refunds and returns."\n'
+                    'select = "orders refunds returns"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                    'starts_at = "2000-01-01T00:00:00Z" }\n'
+                ),
+            },
+            store_setup=(
+                "CREATE TRIGGER test_reject_refunds_start BEFORE UPDATE OF started_at "
+                "ON sqb_run_nodes WHEN NEW.node_key = 'model:refunds' "
+                "AND NEW.started_at IS NOT NULL BEGIN "
+                "SELECT RAISE(ABORT, 'synthetic rejection of the refunds start'); END;\n"
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_rejected_node_report_when_concurrent_then_the_run_stops_before_later_nodes(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, bool]] = control.execute(
+                "SELECT node_key, status, started_at IS NOT NULL FROM sqb_run_nodes "
+                "WHERE run_id=? AND kind='node' ORDER BY node_key",
+                (run["run_id"],),
+            ).fetchall()
+        assert ("model:returns", "skipped", False) in nodes, (nodes, worker.log.read_text())
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
             "parent cancellation interrupts its active child and cancels its waiting child",
             "SELECT sum(sin(value)) AS amount FROM range(10000000000) t(value)",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('orders','totals')",

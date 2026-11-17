@@ -150,6 +150,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::UserCode,
     },
     HostEntry {
+        name: "python_identity_pass",
+        kind: HostKind::Function,
+        edge: HostEdge::UserCode,
+    },
+    HostEntry {
         name: "python_node_identity",
         kind: HostKind::Function,
         edge: HostEdge::UserCode,

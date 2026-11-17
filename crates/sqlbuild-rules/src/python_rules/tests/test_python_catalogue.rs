@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use fensu_native::rules::constants as fensu;
 
 use crate::python_rules::tests::helpers::{
@@ -6,12 +7,13 @@ use crate::python_rules::tests::helpers::{
 use crate::python_rules::tests::test_types::{
     CatalogueTestCase, CoreRuleTestCase, OptionsTestCase, SelectionTestCase, SourceKeyTestCase,
 };
-use crate::rules::_helpers::catalogue::catalogue;
+use crate::rules::_helpers::dispatch::catalogue::catalogue;
 use crate::rules::main::builtin_options::builtin_options;
 use crate::rules::models::BuiltinOptionKind;
 
 #[test]
 fn given_the_catalogue_when_listing_python_rules_then_each_has_its_own_project_wide_code() {
+    install_test_identity();
     let test_cases = [
         CatalogueTestCase {
             description: "21 SQLBuild layout, unit, provider, orchestration and test placement rules and 86 Fensu core and test rules have distinct codes",
@@ -36,6 +38,7 @@ fn given_the_catalogue_when_listing_python_rules_then_each_has_its_own_project_w
 
 #[test]
 fn given_python_selectors_when_selecting_then_opt_in_rules_need_their_exact_code() {
+    install_test_identity();
     let test_cases = [
         SelectionTestCase {
             description: "the family selects a default rule",
@@ -177,6 +180,7 @@ fn given_python_rules_when_reading_their_options_then_fensu_thresholds_are_whole
 
 #[test]
 fn given_a_python_edit_when_preparing_rules_then_only_python_selections_see_it() {
+    install_test_identity();
     const ORIGINAL: &str = "def total(amount: int) -> int:\n    return amount\n";
     let test_cases = [
         SourceKeyTestCase {

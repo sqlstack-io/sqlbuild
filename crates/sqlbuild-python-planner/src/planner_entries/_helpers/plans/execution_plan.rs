@@ -47,6 +47,10 @@ use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use std::time::Instant;
 
+<<<<<<< HEAD
+=======
+pub(crate) const INSPECTION_CATALOG: AdapterHost = AdapterHost::OpenInspectionCatalog;
+>>>>>>> origin/main
 /// Selected scopes, and the overrides with cursor overrides typed for the selected models.
 pub(crate) fn scopes_and_cursor_overrides<'py>(
     args: &KeywordArguments<'py>,

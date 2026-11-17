@@ -20,7 +20,10 @@ use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;
 use sqlbuild_python_base::build_command::main::emit::emit;
 use sqlbuild_python_base::build_command::main::frozenset::frozenset;
+<<<<<<< HEAD
 use sqlbuild_python_base::build_command::main::or_none::or_none;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -31,8 +34,14 @@ use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_key
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
+<<<<<<< HEAD
 use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
 use sqlbuild_python_project::graph::main::python_nodes::native_run_lifecycle::native_run_lifecycle;
+=======
+use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
+use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
+use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
+>>>>>>> origin/main
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::planner_scope::main::build_intermediate_source_map::build_intermediate_source_map;
 
@@ -338,6 +347,7 @@ struct RuntimeParts<'a, 'py> {
     project: &'a Bound<'py, PyAny>,
     reload: bool,
     defaults: (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    target_config: TargetSettingsValues,
     relations: (Bound<'py, PyAny>, Bound<'py, PyAny>),
     inputs: &'a LifecycleInputs<'py>,
 }
@@ -361,6 +371,7 @@ fn node_runtime<'py>(
             ),
             ("vars", native_field(parts.project, "effective_vars")?),
             ("is_reload", boolean(py, parts.reload)),
+            ("target_config", parts.target_config.record(py)?),
             ("default_database", parts.defaults.0.clone()),
             ("default_schema", parts.defaults.1.clone()),
             ("start_cursor_ts", start_ts.clone()),
@@ -511,19 +522,15 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         )?),
     )
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
+    let target_config: TargetSettingsValues =
+        project_target_settings(&discovered, &project, (&connection_config, &adapter))?;
     let parts: RuntimeParts<'_, 'py> = RuntimeParts {
         adapter: &adapter,
         connection_config: &connection_config,
         project: &project,
         reload: context.request_flag("reload_sources")?,
-        defaults: (
-            or_none(native_field(&project, "effective_target_database")?, || {
-                adapter.call_method0("default_database")
-            })?,
-            or_none(native_field(&project, "effective_target_schema")?, || {
-                adapter.call_method0("default_schema")
-            })?,
-        ),
+        defaults: target_config.node_locations(&adapter)?,
+        target_config,
         relations: (relation_targets, project_relations),
         inputs,
     };

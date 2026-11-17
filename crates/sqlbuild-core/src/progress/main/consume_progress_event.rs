@@ -6,7 +6,7 @@ use crate::progress::_helpers::operations::{
 use crate::progress::_helpers::resources::{consume_resource_start, consume_resource_terminal};
 use crate::progress::_helpers::statements::{
     consume_statement_start, consume_statement_submitted, consume_statement_terminal,
-    statement_heartbeat_line,
+    count_statement, statement_heartbeat_line,
 };
 use crate::progress::constants::{
     OPERATION_START, RESOURCE_START, RETRY_SCHEDULED, STATEMENT_COMPLETED, STATEMENT_FAILED,
@@ -46,7 +46,7 @@ pub fn consume_progress_event(
         let line: Option<String> = statement_heartbeat_line(&projection, event);
         (projection, line)
     } else if event_type == STATEMENT_COMPLETED || event_type == STATEMENT_FAILED {
-        consume_statement_terminal(projection, event)
+        consume_statement_terminal(count_statement(projection, event), event)
     } else {
         (projection, None)
     };

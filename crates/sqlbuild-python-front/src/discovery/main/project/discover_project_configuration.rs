@@ -8,5 +8,5 @@ pub fn discover_project_configuration<'py>(
     py: Python<'py>,
     project_dir: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    configuration_inputs(py, project_dir, false)
+    configuration_inputs(py, project_dir, |_| Ok(()))
 }

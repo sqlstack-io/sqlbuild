@@ -3,11 +3,19 @@
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
 use crate::planner_warehouse::_helpers::inspection::cursors::{CursorInputs, cursor_snapshots};
 use crate::planner_warehouse::constants::{
+<<<<<<< HEAD
     FUNCTION_NODE_TYPES, METADATA_NAME_FILTER_LIMIT, MIGRATE_FROM_CONFIG_KEY,
 };
 use crate::planner_warehouse::models::FingerprintRead;
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::SnapshotRequest;
+=======
+    ACTIVE_CATALOG, FUNCTION_NODE_TYPES, METADATA_NAME_FILTER_LIMIT, MIGRATE_FROM_CONFIG_KEY,
+    RELATIONS_MAIN_COLUMNS, RELATIONS_MAIN_LIST,
+};
+use crate::planner_warehouse::models::SnapshotRequest;
+use pyo3::IntoPyObject;
+>>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
@@ -20,9 +28,16 @@ use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
+<<<<<<< HEAD
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::native_host::types::Syntax;
+=======
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
@@ -32,6 +47,10 @@ use sqlbuild_python_front::model_config::main::config::model_values::model_value
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::compiled_views::main::compiled_models::references::references;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+<<<<<<< HEAD
+=======
+use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
+>>>>>>> origin/main
 use sqlbuild_python_project::fingerprints::main::select_latest_fingerprints::select_latest_fingerprints;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::models::KeyCache;
@@ -242,6 +261,34 @@ fn metadata_name_filter(
     Ok(Some(names))
 }
 
+<<<<<<< HEAD
+=======
+fn active_catalog<'py>(
+    adapter: &Bound<'py, PyAny>,
+    connection: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    call_with(
+        &host_entry(adapter.py(), ACTIVE_CATALOG)?,
+        &[
+            ("adapter", adapter.clone()),
+            ("connection", connection.clone()),
+        ],
+    )
+}
+
+/// The concurrency of the active inspection catalog, one without a catalog.
+pub(crate) fn inspection_concurrency(
+    adapter: &Bound<'_, PyAny>,
+    connection: &Bound<'_, PyAny>,
+) -> PyResult<i64> {
+    let catalog = active_catalog(adapter, connection)?;
+    if catalog.is_none() {
+        return Ok(1);
+    }
+    native_field(&catalog, "concurrency")?.extract()
+}
+
+>>>>>>> origin/main
 fn prefetch_schemas<'py>(
     request: &SnapshotRequest<'py>,
     database: &Bound<'py, PyAny>,
@@ -293,10 +340,23 @@ pub(crate) fn list_relations<'py>(
     schemas: Bound<'py, PyAny>,
     names: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
+<<<<<<< HEAD
     reads
         .get()
         .reads()
         .relations(reads.py(), database, (schemas, names))
+=======
+    call_with(
+        &host_entry(adapter.py(), RELATIONS_MAIN_LIST)?,
+        &[
+            ("adapter", adapter.clone()),
+            ("connection", connection.clone()),
+            ("database", database.clone()),
+            ("schemas", schemas),
+            ("names", names),
+        ],
+    )
+>>>>>>> origin/main
 }
 
 /// The columns of each listed relation, keyed by identity.
@@ -304,7 +364,18 @@ pub(crate) fn columns_for<'py>(
     reads: &Bound<'py, PlannerReads>,
     relations: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
+<<<<<<< HEAD
     reads.get().reads().columns(reads.py(), relations)
+=======
+    call_with(
+        &host_entry(adapter.py(), RELATIONS_MAIN_COLUMNS)?,
+        &[
+            ("adapter", adapter.clone()),
+            ("connection", connection.clone()),
+            ("relations", relations),
+        ],
+    )
+>>>>>>> origin/main
 }
 
 fn optional_names<'py>(

@@ -78,6 +78,7 @@ def run_checkout_generator(
     arguments: tuple[str, ...],
     environment: dict[str, str],
     library_paths: tuple[Path, ...],
+    timeout_seconds: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run another checkout's generator with `python`, importing `library_paths` before its own."""
 
@@ -91,6 +92,7 @@ def run_checkout_generator(
             PYTHONPATH_KEY: os.pathsep.join(str(path) for path in (checkout, *library_paths)),
         },
         check=False,
+        timeout=timeout_seconds,
     )
 
 

@@ -45,12 +45,12 @@ use sqlbuild_python_compile::compile_delta::constants::DELTA_DISABLE_ENV_VAR;
 use sqlbuild_python_compile::compile_delta::constants::DELTA_VERIFY_ENV_VAR;
 use sqlbuild_python_compile::frontier::constants::CAPTURE_DIR_ENV_VAR;
 use sqlbuild_python_compile::rules::constants::CUSTOM_HOST_RUNTIME_VERSION;
-use sqlbuild_python_front::attachments::constants::MICROBATCH_END_SENTINEL;
-use sqlbuild_python_front::attachments::constants::MICROBATCH_START_SENTINEL;
+use sqlbuild_python_front::attachments::constants::{
+    MICROBATCH_END_SENTINEL, MICROBATCH_START_SENTINEL,
+};
 use sqlbuild_python_front::state_rows::constants::MIGRATION_WRITE_ATTEMPTS;
 use sqlbuild_python_output::result_output::constants::RESULT_PATH_ENV;
-use sqlbuild_python_project::semantic_shapes::constants::VALID_FROM_DEFAULT;
-use sqlbuild_python_project::semantic_shapes::constants::VALID_TO_DEFAULT;
+use sqlbuild_python_project::semantic_shapes::constants::{VALID_FROM_DEFAULT, VALID_TO_DEFAULT};
 
 /// Text constants exported under their Python names.
 pub(crate) const EXPORTED_TEXTS: &[(&str, &str)] = &[

@@ -13,10 +13,7 @@ use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use crate::bindings::_helpers::dbt_command::init_project::build_dbt_init_project;
 use crate::bindings::_helpers::dbt_command::init_project::validate_dbt_init_project;
-use crate::bindings::_helpers::dbt_command::support::color_enabled;
-use crate::bindings::_helpers::dbt_command::support::flag;
-use crate::bindings::_helpers::dbt_command::support::path;
-use crate::bindings::_helpers::dbt_command::support::stream;
+use crate::bindings::_helpers::dbt_command::support::{color_enabled, flag, path, stream};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

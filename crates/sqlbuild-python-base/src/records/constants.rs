@@ -1083,6 +1083,7 @@ const COMPILE_ANALYSIS: RecordSpec = RecordSpec {
         FieldSpec::new("rule_cache_misses", FieldDefault::Int(0)),
         FieldSpec::new("skipped_type_proof_rules", FieldDefault::EmptyTuple),
         FieldSpec::new("custom_rule_timings", FieldDefault::EmptyTuple),
+        FieldSpec::new("skipped_models", FieldDefault::EmptyTuple),
     ],
 };
 

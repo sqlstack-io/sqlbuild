@@ -10,8 +10,9 @@ use sqlbuild_core::clone_text::models::FingerprintProgress;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::clone::clone_command::Invocation;
-use crate::bindings::_helpers::clone::clone_progress::CloneFingerprintReporter;
-use crate::bindings::_helpers::clone::clone_progress::CloneItemPrinter;
+use crate::bindings::_helpers::clone::clone_progress::{
+    CloneFingerprintReporter, CloneItemPrinter,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

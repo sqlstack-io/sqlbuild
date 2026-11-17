@@ -119,12 +119,15 @@ jobs:
           RELEASE_BRANCH: ${{ steps.release_branch.outputs.name }}
         # Release Please only bumps the sqlbuild-cli and sqlbuild-python crate versions, so updating
         # the workspace entries of Cargo.lock is enough and needs no compile; metadata --locked
-        # proves the lock is complete.
+        # proves the lock is complete. The sync proves every locked third-party package for this
+        # platform installs; it skips sqlbuild and sqlbuild-cli, which would compile both native
+        # packages (~15 min).
         run: |
           cargo update --workspace
           cargo metadata --locked --format-version 1 > /dev/null
           uv lock --python 3.12
-          uv sync --locked --all-groups --all-extras --python 3.12
+          uv sync --locked --all-groups --all-extras --python 3.12 \
+            --no-install-package sqlbuild --no-install-package sqlbuild-cli
           if git diff --quiet -- Cargo.lock uv.lock; then
             exit 0
           fi
@@ -185,6 +188,7 @@ jobs:
           RELEASE_PR: ${{ needs.release-please.outputs.release_pr }}
           REQUEST_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
+          set -uo pipefail
           head_sha="$(git rev-parse HEAD)"
           recovery="rerun the failed Release Please job to re-check"
           post_status() {
@@ -231,15 +235,18 @@ jobs:
             workflow="${workflows[${index}]}"
             context="${contexts[${index}]}"
             run_id=""
-            for _ in {1..30}; do
+            # A dispatched run can take minutes to appear in the run list, and a failed lookup
+            # is retried rather than read as "not started yet".
+            for _ in {1..60}; do
               run_id="$(gh run list --workflow "${workflow}" --branch "${RELEASE_BRANCH}" \
                 --event workflow_dispatch --limit 50 \
                 --json databaseId,headSha,displayTitle,createdAt \
-                --jq ".[] | select(.headSha == \"${head_sha}\"
+                --jq "[.[] | select(.headSha == \"${head_sha}\"
                   and (.displayTitle | endswith(\" [${REQUEST_ID}]\"))
-                  and .createdAt >= \"${dispatched_after}\") | .databaseId" | head -n 1)"
+                  and .createdAt >= \"${dispatched_after}\") | .databaseId] | first // empty")" \
+                || run_id=""
               [[ -n "${run_id}" ]] && break
-              sleep 2
+              sleep 10
             done
             if [[ -z "${run_id}" ]]; then
               post_status failure "${context}" "Trusted release check did not start"

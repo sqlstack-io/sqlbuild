@@ -820,6 +820,14 @@ class PythonRootHelperIdentityTestCase:
 
 
 @dataclass(frozen=True)
+class RestoredPythonPackageIdentityTestCase:
+    description: str
+    unrelated_files: dict[str, str]
+    project_files: dict[str, str]
+    expected_dependency_path: str
+
+
+@dataclass(frozen=True)
 class UnrelatedPythonPackageTestCase:
     description: str
     unrelated_files: dict[str, str]

@@ -1,5 +1,131 @@
 # Changelog
 
+## [0.239.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.2...v0.239.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* the dlt and ingestr integrations are removed. A project that declares `dlt_sources` or a source `ingestr` block no longer compiles; declare the source with `managed: true` and load it with a Python `@loader` named after the source. The `dlt` and `ingestr` package extras no longer exist.
+
+### Features
+
+* remove the dlt and ingestr integrations ([#1554](https://github.com/sqlstack-io/sqlbuild/issues/1554)) ([75d213e](https://github.com/sqlstack-io/sqlbuild/commit/75d213e7d6ba694520467855060bdbf3bb151142))
+
+## [0.238.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.1...v0.238.2) (2026-11-17)
+
+
+### Performance Improvements
+
+* **compile:** stop repeating per-call SQL macro work ([#1549](https://github.com/sqlstack-io/sqlbuild/issues/1549)) ([4740e84](https://github.com/sqlstack-io/sqlbuild/commit/4740e84b4533d1459d03dafa0e820bffd1b4f814))
+
+## [0.238.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.0...v0.238.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **rules:** report custom rule node findings at model file positions ([#1546](https://github.com/sqlstack-io/sqlbuild/issues/1546)) ([48e4132](https://github.com/sqlstack-io/sqlbuild/commit/48e4132371aa42374dc2b41cf98ee4f6d7519031))
+
+## [0.238.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.237.0...v0.238.0) (2026-11-17)
+
+
+### Features
+
+* **rules:** give syntax tree nodes names, literal values and source extents ([#1544](https://github.com/sqlstack-io/sqlbuild/issues/1544)) ([b318adc](https://github.com/sqlstack-io/sqlbuild/commit/b318adc07f2e08ced440b64747786348432e6b5a))
+
+## [0.237.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.4...v0.237.0) (2026-11-17)
+
+
+### Features
+
+* report job group cycles at compile and deliver invocation starts first ([#1539](https://github.com/sqlstack-io/sqlbuild/issues/1539)) ([1dce3d9](https://github.com/sqlstack-io/sqlbuild/commit/1dce3d9581bdf832022dd13cdf9a977241e68945))
+
+## [0.236.4](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.3...v0.236.4) (2026-11-17)
+
+
+### Bug Fixes
+
+* keep the earliest row per source id in state history mirrors ([#1532](https://github.com/sqlstack-io/sqlbuild/issues/1532)) ([4708af5](https://github.com/sqlstack-io/sqlbuild/commit/4708af5069e7cb000c03187bc6207ed072c6ced6))
+* stop a single custom-rule host at its next invocation when interrupted ([#1535](https://github.com/sqlstack-io/sqlbuild/issues/1535)) ([fce05cd](https://github.com/sqlstack-io/sqlbuild/commit/fce05cdbab676fc95d6db27d714c551b51c8ffdb))
+
+## [0.236.3](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.2...v0.236.3) (2026-11-17)
+
+
+### Bug Fixes
+
+* stop on SIGTERM when started with SIGINT ignored, and event-driven interrupt tests ([#1531](https://github.com/sqlstack-io/sqlbuild/issues/1531)) ([f113542](https://github.com/sqlstack-io/sqlbuild/commit/f1135424aa6dfbf47339583cf5bb1bb520bfc8c7))
+
+## [0.236.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.1...v0.236.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* give Python node results and provider setup the selected target ([#1529](https://github.com/sqlstack-io/sqlbuild/issues/1529)) ([c024aea](https://github.com/sqlstack-io/sqlbuild/commit/c024aeaf61731bea5c23032a23f217b49b5bef2c))
+
+## [0.236.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.0...v0.236.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* give the refused FULL backfill of a cursor-intrinsic model its own code S204 ([#1525](https://github.com/sqlstack-io/sqlbuild/issues/1525)) ([f33eb8d](https://github.com/sqlstack-io/sqlbuild/commit/f33eb8deebc8fb3bd7d49ee0fff0ba1fd2213f8f))
+
+## [0.236.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.235.0...v0.236.0) (2026-11-16)
+
+
+### Features
+
+* target settings for Python nodes and providers, and statement summaries for sqb test ([#1522](https://github.com/sqlstack-io/sqlbuild/issues/1522)) ([28e341a](https://github.com/sqlstack-io/sqlbuild/commit/28e341a94cbc22f647d553ba07a0e7a9f1606896))
+
+## [0.235.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.234.0...v0.235.0) (2026-11-16)
+
+
+### Features
+
+* replace_key for delete_insert and templates inside quoted config arguments ([#1518](https://github.com/sqlstack-io/sqlbuild/issues/1518)) ([7155c2d](https://github.com/sqlstack-io/sqlbuild/commit/7155c2dd0ee7a2968a1c69e66b4170853c0ad19f))
+
+## [0.234.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.233.1...v0.234.0) (2026-11-16)
+
+
+### Features
+
+* built-in Snowflake performance rules for JSON copied onto finer rows ([#1515](https://github.com/sqlstack-io/sqlbuild/issues/1515)) ([f450b25](https://github.com/sqlstack-io/sqlbuild/commit/f450b25f5fe323c7a7536a469545cc06dfa1b5ca))
+
+## [0.233.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.233.0...v0.233.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* stabilise Recall tests, janitor preserve targets and helper-class identity ([#1512](https://github.com/sqlstack-io/sqlbuild/issues/1512)) ([9ca1f7a](https://github.com/sqlstack-io/sqlbuild/commit/9ca1f7a3fb838373a0ace63ea5b26b7a2c19511d))
+
+
+### Performance Improvements
+
+* keep the build identity out of sqlbuild-rules so edits stop rebuilding it ([#1510](https://github.com/sqlstack-io/sqlbuild/issues/1510)) ([2172ec1](https://github.com/sqlstack-io/sqlbuild/commit/2172ec189430c85a2f773c8c1513f5ec2baec858))
+
+## [0.233.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.232.1...v0.233.0) (2026-11-16)
+
+
+### Features
+
+* sqb dev terminal screen, one foreground sign-in and bounded warehouse read retries ([#1509](https://github.com/sqlstack-io/sqlbuild/issues/1509)) ([7d35d90](https://github.com/sqlstack-io/sqlbuild/commit/7d35d9020ab1c5c7bb95b0d82b7bfb96cdb4c540))
+
+## [0.232.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.232.0...v0.232.1) (2026-11-15)
+
+
+### Performance Improvements
+
+* **analysis:** check SQL-macro arguments on the analysis pool and drop duplicate work ([#1506](https://github.com/sqlstack-io/sqlbuild/issues/1506)) ([d94e5b7](https://github.com/sqlstack-io/sqlbuild/commit/d94e5b73efdf72783c7dc2430364c04f96355f78))
+
+## [0.232.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.231.0...v0.232.0) (2026-11-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* share Python identity work per discovery pass and keep compile phases out of sinks ([#1501](https://github.com/sqlstack-io/sqlbuild/issues/1501))
+
+### Performance Improvements
+
+* share Python identity work per discovery pass and keep compile phases out of sinks ([#1501](https://github.com/sqlstack-io/sqlbuild/issues/1501)) ([d15ee25](https://github.com/sqlstack-io/sqlbuild/commit/d15ee25919dedb6abde6e1b1c6ad8b5a46cf322b))
+
 ## [0.231.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.230.1...v0.231.0) (2026-11-15)
 
 

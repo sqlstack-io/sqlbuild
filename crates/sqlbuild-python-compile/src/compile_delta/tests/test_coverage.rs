@@ -1,12 +1,8 @@
 use std::collections::BTreeSet;
 
 use crate::compile_delta::_helpers::driver::names_uncompiled_model;
-use crate::compile_delta::tests::helpers::coverage;
-use crate::compile_delta::tests::helpers::names;
-use crate::compile_delta::tests::helpers::order;
-use crate::compile_delta::tests::helpers::strings;
-use crate::compile_delta::tests::test_types::CoverageTestCase;
-use crate::compile_delta::tests::test_types::UncompiledModelTestCase;
+use crate::compile_delta::tests::helpers::{coverage, names, order, strings};
+use crate::compile_delta::tests::test_types::{CoverageTestCase, UncompiledModelTestCase};
 use sqlbuild_python_base::compile_context::main::coverage::coverage_reasons::coverage_reasons;
 use sqlbuild_python_base::compile_context::main::coverage::merged_coverage::merged_coverage;
 use sqlbuild_python_base::compile_context::main::coverage::merged_order::merged_order;

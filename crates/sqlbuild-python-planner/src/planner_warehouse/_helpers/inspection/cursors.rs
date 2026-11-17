@@ -5,16 +5,26 @@ use crate::planner_resolution::main::cursor::resolve_effective_timestamp_grain::
 use crate::planner_resolution::main::cursor::resolve_start_cursor_config::resolve_start_cursor_config;
 use crate::planner_resolution::main::safety::maximum_allowed_start::maximum_allowed_start;
 use crate::planner_strategy::main::lineage::resolve_lineage_reference::resolve_lineage_reference;
+<<<<<<< HEAD
+=======
+use crate::planner_warehouse::_helpers::inspection::snapshot::inspection_concurrency;
+>>>>>>> origin/main
 use crate::planner_warehouse::_helpers::inspection::watermarks::validate_watermark_column;
 use crate::planner_warehouse::constants::{
     CURSOR_ALGEBRA_ERROR, CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, DATE_VALUE, LOG_DEBUG_EVENT,
     PLANNER_LOGGER,
 };
+<<<<<<< HEAD
 use crate::planner_warehouse::models::EligibleCursorQuery;
 use crate::planner_warehouse::models::Read;
 use crate::planner_warehouse::models::SnapshotRequest;
 use crate::planner_warehouse::types::CursorProgress;
 use crate::planner_warehouse::types::WarehouseReads;
+=======
+use crate::planner_warehouse::main::inspection::adapter_cursor_sql::adapter_cursor_sql;
+use crate::planner_warehouse::main::inspection::bound_task::bound_task;
+use crate::planner_warehouse::models::SnapshotRequest;
+>>>>>>> origin/main
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyTuple};
@@ -22,18 +32,24 @@ use sqlbuild_analysis::planner_changes::constants::FORWARD_ONLY_POLICY;
 use sqlbuild_analysis::planner_warehouse::main::cursor_bounds::cursor_bounds;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_query_groups;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_identity::cursor_query_identity;
-use sqlbuild_analysis::planner_warehouse::main::cursor_query_sql::cursor_query_sql;
 use sqlbuild_analysis::planner_warehouse::models::{CursorTagRequest, PhysicalCursorQuery};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::native_host::types::Syntax;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
+<<<<<<< HEAD
+=======
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+>>>>>>> origin/main
 use sqlbuild_python_front::cursor::main::intervals::partition::partition;
 use sqlbuild_python_front::cursor::main::scalars::compare_values::compare_values;
 use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
@@ -51,12 +67,19 @@ use sqlbuild_python_project::planner_phases::main::model_key::model_key;
 use sqlbuild_python_project::planner_phases::main::native_member::native_member;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
+<<<<<<< HEAD
+=======
+use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
+>>>>>>> origin/main
 use sqlbuild_python_project::planner_phases::main::planner_model::planner_model;
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
+<<<<<<< HEAD
 use std::cell::RefCell;
+=======
+>>>>>>> origin/main
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -273,7 +296,14 @@ fn upstream_relation<'py>(
     {
         return object(
             py,
+<<<<<<< HEAD
             render_source_relation(&source_entry(&source)?, Some(dialect.as_any()))?,
+=======
+            render_source_relation(
+                &source_entry(&source)?,
+                Some(adapter).filter(|value| !value.is_none()),
+            )?,
+>>>>>>> origin/main
         );
     }
     Ok(py.None().into_bound(py))
@@ -576,6 +606,60 @@ fn physical_queries(models: &[CursorModel<'_>]) -> Vec<PhysicalCursorQuery> {
     cursor_query_groups(&requests)
 }
 
+<<<<<<< HEAD
+=======
+/// Run one physical cursor statement; a failure leaves only that relation unavailable.
+pub(crate) fn read_cursor_query<'py>(
+    py: Python<'py>,
+    sql: &str,
+    (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let started = Instant::now();
+    let outcome = call_with(
+        execute,
+        &[("connection", connection.clone()), ("sql", text(py, sql))],
+    )
+    .and_then(|result| result.call_method0("fetchall"));
+    let elapsed = started.elapsed().as_secs_f64();
+    let (row, error, count) = match outcome {
+        Ok(rows) => {
+            let count = rows.len()?;
+            let row = if count > 0 {
+                rows.get_item(0)?
+            } else {
+                py.None().into_bound(py)
+            };
+            (
+                row,
+                py.None().into_bound(py),
+                count.into_pyobject(py)?.into_any(),
+            )
+        }
+        Err(error) if error.is_instance_of::<PyException>(py) => {
+            let value = error.value(py).clone().into_any();
+            (py.None().into_bound(py), value, py.None().into_bound(py))
+        }
+        Err(error) => return Err(error),
+    };
+    let error_text = if error.is_none() {
+        py.None().into_bound(py)
+    } else {
+        error.str()?.into_any()
+    };
+    let record = call_with(
+        &host_entry(py, QUERY_RECORD)?,
+        &[
+            ("sql", text(py, sql)),
+            ("elapsed_seconds", PyFloat::new(py, elapsed).into_any()),
+            ("row_count", count),
+            ("error", error_text),
+        ],
+    )?;
+    call_with(&host_entry(py, RECORD_QUERY)?, &[("record", record)])?;
+    Ok(PyTuple::new(py, [row, PyFloat::new(py, elapsed).into_any(), error])?.into_any())
+}
+
+>>>>>>> origin/main
 fn report_cursor_query(
     py: Python<'_>,
     query: &PhysicalCursorQuery,
@@ -669,12 +753,16 @@ fn fan_out<'py>(query: &PhysicalCursorQuery, row: &Bound<'py, PyAny>) -> PyResul
     Ok(values)
 }
 
+<<<<<<< HEAD
 /// The values the statements read and the failed tags; `None` when inputs are left to the run.
+=======
+>>>>>>> origin/main
 fn execute_queries<'py>(
     request: &SnapshotRequest<'py>,
     queries: &[PhysicalCursorQuery],
 ) -> PyResult<Option<(Values<'py>, HashSet<String>)>> {
     let py = request.project.py();
+<<<<<<< HEAD
     let statements = || -> PyResult<Vec<String>> {
         queries
             .iter()
@@ -690,6 +778,52 @@ fn execute_queries<'py>(
             .cursor_bounds(py, &statements, &progress)?
     else {
         return Ok(None);
+=======
+    let total = queries.len();
+    let on_progress = &request.on_progress;
+    let handles = (&request.connection, &request.execute);
+    let outcomes: Vec<Bound<'py, PyAny>> = if concurrency <= 1 || total <= 1 {
+        let mut outcomes: Vec<_> = Vec::new();
+        for (position, query) in queries.iter().enumerate() {
+            let identity = cursor_query_identity(query, (position + 1, total));
+            if !on_progress.is_none() {
+                on_progress.call1((format!("Inspecting cursor bounds {identity}..."),))?;
+            }
+            let outcome =
+                read_cursor_query(py, &adapter_cursor_sql(&request.adapter, query)?, handles)?;
+            report_cursor_query(py, query, (&outcome, &identity), on_progress)?;
+            outcomes.push(outcome);
+        }
+        outcomes
+    } else {
+        if !on_progress.is_none() {
+            on_progress.call1((format!(
+                "Inspecting cursor bounds for {total} relations ({} concurrent)...",
+                (concurrency as usize).min(total)
+            ),))?;
+        }
+        let mut tasks: Vec<_> = Vec::new();
+        for query in queries {
+            tasks.push(bound_task(
+                py,
+                adapter_cursor_sql(&request.adapter, query)?,
+                handles,
+            )?);
+        }
+        call_with(
+            &host_entry(py, RUN_BOUNDED)?,
+            &[
+                ("tasks", tuple(py, tasks)?),
+                ("concurrency", concurrency.into_pyobject(py)?.into_any()),
+                (
+                    "on_complete",
+                    completion_reporter(py, queries.to_vec(), on_progress)?,
+                ),
+            ],
+        )?
+        .try_iter()?
+        .collect::<PyResult<_>>()?
+>>>>>>> origin/main
     };
     let mut values = Values::new();
     let mut failed: HashSet<_> = HashSet::new();
@@ -702,6 +836,68 @@ fn execute_queries<'py>(
     }
     Ok(Some((values, failed)))
 }
+<<<<<<< HEAD
+=======
+
+fn eligible_task<'py>(
+    py: Python<'py>,
+    (model_name, target, cursor_column): (String, String, String),
+    sql: String,
+    (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let connection: Py<PyAny> = connection.clone().unbind();
+    let execute: Py<PyAny> = execute.clone().unbind();
+    Ok(PyCFunction::new_closure(
+        py,
+        None,
+        None,
+        move |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| -> PyResult<Py<PyAny>> {
+            let py = args.py();
+            let run_connection = connection.clone_ref(py);
+            let run_execute = execute.clone_ref(py);
+            let run_sql = sql.clone();
+            let run = PyCFunction::new_closure(
+                py,
+                None,
+                None,
+                move |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| -> PyResult<Py<PyAny>> {
+                    let py = args.py();
+                    Ok(run_execute
+                        .bind(py)
+                        .call((), Some(&keywords(py, &[
+                            ("connection", run_connection.bind(py).clone()),
+                            ("sql", text(py, &run_sql)),
+                        ])?))?
+                        .call_method0("fetchall")?
+                        .unbind())
+                },
+            )?;
+            let rows = call_with(
+                &host_entry(py, RUN_RECORDED_QUERY)?,
+                &[("sql", text(py, &sql)), ("run", run.into_any())],
+            );
+            match rows {
+                Ok(rows) => Ok(rows.unbind()),
+                Err(error) if error.is_instance_of::<PyException>(py) => {
+                    let wrapped: PyErr = planner_error(
+                        py,
+                        &format!(
+                            "model '{model_name}': failed to query highest eligible target cursor for {target}.{cursor_column}: {}",
+                            error.value(py).str()?
+                        ),
+                        (None, None),
+                    );
+                    wrapped.set_cause(py, Some(error));
+                    Err(wrapped)
+                }
+                Err(error) => Err(error),
+            }
+        },
+    )?
+    .into_any())
+}
+
+>>>>>>> origin/main
 fn eligible_target_maxes<'py>(
     request: &SnapshotRequest<'py>,
     models: &[CursorModel<'py>],
@@ -781,6 +977,7 @@ fn eligible_target_maxes<'py>(
             sql: sql.extract()?,
         });
     }
+<<<<<<< HEAD
     let Read::Known(rows_by_request) = request
         .reads
         .get()
@@ -790,6 +987,22 @@ fn eligible_target_maxes<'py>(
         return Ok(values);
     };
     for ((info, _), rows) in requests.iter().zip(rows_by_request) {
+=======
+    let rows_by_request = call_with(
+        &host_entry(py, RUN_BOUNDED)?,
+        &[
+            ("tasks", tuple(py, tasks)?),
+            (
+                "concurrency",
+                inspection_concurrency(&request.adapter, &request.connection)?
+                    .into_pyobject(py)?
+                    .into_any(),
+            ),
+        ],
+    )?;
+    for ((info, _), rows) in requests.iter().zip(rows_by_request.try_iter()?) {
+        let rows = rows?;
+>>>>>>> origin/main
         if !rows.is_truthy()? {
             continue;
         }

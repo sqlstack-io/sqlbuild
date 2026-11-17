@@ -12,13 +12,14 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::BuildStatus;
 
-use crate::bindings::_helpers::build_command::execution::Outcome;
-use crate::bindings::_helpers::build_command::execution::Preparation;
-use crate::bindings::_helpers::build_command::execution::write_run_context;
+use crate::bindings::_helpers::build_command::execution::{
+    Outcome, Preparation, write_run_context,
+};
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::check::check_results::check_result_text;
-use crate::bindings::_helpers::cost_report::degradation::finalize_build_cost as finalize_cost;
-use crate::bindings::_helpers::cost_report::degradation::render_build_cost;
+use crate::bindings::_helpers::cost_report::degradation::{
+    finalize_build_cost as finalize_cost, render_build_cost,
+};
 use crate::bindings::_helpers::cost_report::functions::cost_output_payload;
 use sqlbuild_core::build_progress::models::PythonNodeText;
 use sqlbuild_core::check_command::models::{CheckResultText, CheckStatus};

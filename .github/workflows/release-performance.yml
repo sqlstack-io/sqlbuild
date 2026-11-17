@@ -4,7 +4,9 @@ run-name: >-
 
 # Every push to main compares main with the latest release on the same runner. A regression fails
 # the run and opens or updates one issue labelled performance-regression; it does not gate the
-# release pull request. Pull requests that change the comparison itself run it too.
+# release pull request. A main run that does not finish, such as one that errors, loses its runner
+# or times out, opens or updates one issue labelled release-performance-unfinished. Pull requests
+# that change the comparison itself run it too.
 on:
   push:
     branches:
@@ -45,7 +47,9 @@ jobs:
   compare:
     name: Compare with the previous release
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # A backstop above the slowest normal install and build (about 51 minutes together) plus the
+    # comparison's own limit, so a hung comparison stops at its step and still uploads evidence.
+    timeout-minutes: 130
     outputs:
       regressed: ${{ steps.compare.outputs.regressed }}
     steps:
@@ -89,8 +93,10 @@ jobs:
         run: git fetch --tags --force --quiet origin
       # Temporary: one-model edit compiles use MAX_EDIT_COMPILE_TIME_RATIO (1.35x) because an edited
       # model recompiles uncached; tighten it back to 1.15x once native rendering is the default.
+      # Comparisons take 10 to 21 minutes, plus up to 30 while a new baseline reaches PyPI.
       - name: Compare candidate and previous release on this runner
         id: compare
+        timeout-minutes: 65
         env:
           BASELINE: ${{ inputs.baseline }}
           EVENT_NAME: ${{ github.event_name }}
@@ -150,27 +156,33 @@ jobs:
           exit 1
 
   report:
-    name: Report regression
+    name: Report regression or unfinished comparison
     needs: compare
-    if: ${{ always() && github.event_name == 'push' && needs.compare.outputs.regressed == 'true' }}
+    if: ${{ always() && github.event_name == 'push' && needs.compare.result != 'success' }}
     runs-on: ubuntu-24.04
-    # Overlapping main runs report one at a time so they update a single regression issue.
+    # Overlapping main runs report one at a time so they update a single issue.
     concurrency:
       group: release-performance-report
       cancel-in-progress: false
     permissions:
+      actions: read
+      checks: read
+      contents: read
       issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/download-artifact@v4
+        if: needs.compare.outputs.regressed == 'true'
         with:
           name: release-performance-${{ github.run_id }}-${{ github.run_attempt }}
           path: evidence
       - name: Open or update the performance regression issue
+        if: needs.compare.outputs.regressed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
           LABEL: performance-regression
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           {
             echo "Release performance regressed at ${GITHUB_SHA} on main."
@@ -188,5 +200,51 @@ jobs:
             echo "Updated issue #${issue}" >> "${GITHUB_STEP_SUMMARY}"
           else
             gh issue create --title "Release performance regression on main" \
+              --label "${LABEL}" --body-file report.md
+          fi
+      - uses: actions/checkout@v4
+        if: needs.compare.outputs.regressed != 'true'
+        with:
+          sparse-checkout: scripts
+      # A failed compare job, or one stopped by its own timeout, did not finish. A run cancelled by
+      # a newer run or by hand is also `cancelled`, but without the timeout annotation, so the
+      # script prints nothing for it.
+      - name: Open or update the unfinished comparison issue
+        if: needs.compare.outputs.regressed != 'true'
+        env:
+          LABEL: release-performance-unfinished
+          RESULT: ${{ needs.compare.result }}
+          REGRESSED: ${{ needs.compare.outputs.regressed }}
+        run: |
+          job="$(gh api "repos/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" \
+            --jq '.jobs[] | select(.name == "Compare with the previous release") | .id')"
+          if [[ -z "${job}" ]]; then
+            echo "::error::The compare job is not listed in run attempt ${GITHUB_RUN_ATTEMPT}"
+            exit 1
+          fi
+          gh api "repos/${GH_REPO}/check-runs/${job}/annotations" > annotations.json
+          reason="$(python3 -m scripts.report_unfinished_release_performance \
+            --result "${RESULT}" --regressed "${REGRESSED}" --annotations annotations.json)"
+          if [[ -z "${reason}" ]]; then
+            echo "The comparison was cancelled by a newer run or by hand; nothing to report." \
+              >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          {
+            echo "The release performance comparison did not finish at ${GITHUB_SHA} on main."
+            echo
+            echo "Comparison run: ${RUN_URL} (its job summary lists the phases that started)"
+            echo
+            echo "${reason}"
+          } > report.md
+          gh label create "${LABEL}" --color FBCA04 \
+            --description "A main release performance comparison did not finish" 2>/dev/null || true
+          issue="$(gh issue list --label "${LABEL}" --state open --limit 1 \
+            --json number --jq '.[0].number // empty')"
+          if [[ -n "${issue}" ]]; then
+            gh issue comment "${issue}" --body-file report.md
+            echo "Updated issue #${issue}" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            gh issue create --title "Release performance comparison did not finish on main" \
               --label "${LABEL}" --body-file report.md
           fi

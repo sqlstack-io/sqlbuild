@@ -7,7 +7,7 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{PyBool, PyString, PyTuple, PyTupleMethods};
+use pyo3::types::{PyBool, PyList, PyString, PyTuple, PyTupleMethods};
 use pyo3::{IntoPyObjectExt, pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_cli::dispatch::main::closing_status::closing_status;
 use sqlbuild_cli::dispatch::main::event_export_warning::event_export_warning;
@@ -15,6 +15,7 @@ use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
+use crate::bindings::_helpers::native_host::setup_context::invocation_setup_context;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -36,6 +37,9 @@ use sqlbuild_python_output::result_output::models::TerminalEventIndex;
 const OBSERVABILITY_LOGGER: &str = "sqlbuild.cli.observability";
 const DEBUG_COMMAND: &str = "debug";
 const LINEAGE_COMMAND: &str = "lineage";
+/// Compile's phase operations stay out of project lifecycle sinks; its invocation events do not.
+const COMPILE_COMMAND: &str = "compile";
+const COMPILE_WITHHELD_KINDS: &[&str] = &["operation"];
 const INVOCATION_COMPLETED: &str = "invocation_completed";
 const INVOCATION_FAILED: &str = "invocation_failed";
 /// What an incomplete-export notice says is the only thing affected.
@@ -373,12 +377,18 @@ impl Observed {
                     timeout.extract::<f64>()?
                 };
                 let timeout: Bound<'_, PyAny> = timeout.into_bound_py_any(py)?;
+                let withheld: &[&str] = if native_field(args, "command")?.eq(COMPILE_COMMAND)? {
+                    COMPILE_WITHHELD_KINDS
+                } else {
+                    &[]
+                };
                 let delivery: Bound<'_, PyAny> = EventExporterDispatcher::new(
                     py,
                     Some(keywords(
                         py,
                         &[
                             ("shutdown_timeout_seconds", timeout),
+                            ("withheld_kinds", PyList::new(py, withheld)?.into_any()),
                             (
                                 "failure_callback",
                                 wrap_pyfunction!(log_exporter_failure, py)?.into_any(),
@@ -398,13 +408,16 @@ impl Observed {
                 )
                 .map(pyo3::Bound::into_any)?;
                 self.exporter_scope = Some(scope.clone().unbind());
+                let providers: Bound<'_, PyAny> = native_field(&extensions, "providers")?;
+                let setup_context = invocation_setup_context(args, (project_dir, &providers))?;
                 call_with(
                     &native_field(&scope, "configure_extensions")?,
                     &[
                         ("project_dir", project_dir.clone()),
-                        ("providers", native_field(&extensions, "providers")?),
+                        ("providers", providers),
                         ("event_exporters", event_exporters),
                         ("command_output_sinks", sinks),
+                        ("setup_context", setup_context),
                     ],
                 )?;
                 self.unsubscribe_exporters =

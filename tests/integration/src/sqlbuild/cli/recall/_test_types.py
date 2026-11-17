@@ -1,6 +1,9 @@
+import signal
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+
+from tests.integration.src.sqlbuild.cli.recall.helpers import PYTHON_CLI
 
 
 @dataclass(frozen=True)
@@ -97,6 +100,11 @@ class HeldLockTestCase:
     shutdown_seconds: float
     builds_before_lock: int
     expected_exit_code: int
+    expected_notice: str
+    expected_failed_records: int
+    expected_recorded_builds: int
+    #: Far beyond the budget; only a build that waits for the lock itself reaches it.
+    hang_guard_seconds: float
 
 
 @dataclass(frozen=True)
@@ -193,6 +201,14 @@ class SlowReplacementTestCase:
     shutdown_seconds: float
     sink_sleep_seconds: str
     expected_max_seconds: float
+
+
+@dataclass(frozen=True)
+class InterruptedSinkTestCase:
+    description: str
+    shutdown_seconds: float
+    sink_sleep_seconds: str
+    expected_exit_code: int
 
 
 @dataclass(frozen=True)
@@ -366,6 +382,9 @@ class TerminatedCommandTestCase:
     environment: dict[str, str]
     wait_sql: str
     expected_output: bytes
+    unfinished_output: bytes
+    interrupts: signal.Handlers = signal.SIG_DFL
+    program: Path = PYTHON_CLI
 
 
 @dataclass(frozen=True)

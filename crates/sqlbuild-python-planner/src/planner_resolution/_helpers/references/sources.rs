@@ -1,9 +1,15 @@
 //! Source contract validation and adapter-controlled projection rendering.
 
+<<<<<<< HEAD
 use crate::planner_resolution::_helpers::references::values::cursor_wrap;
 use crate::planner_resolution::_helpers::references::values::filtering_of;
 use crate::planner_resolution::_helpers::references::values::method;
 use crate::planner_resolution::_helpers::references::values::string;
+=======
+use crate::planner_resolution::_helpers::references::values::{
+    cursor_wrap, filtering_of, method, string,
+};
+>>>>>>> origin/main
 use crate::planner_resolution::models::CursorFiltering;
 use crate::planner_strategy::main::values::input_error::input_error;
 use pyo3::IntoPyObject;
@@ -11,8 +17,11 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyTuple};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::native_host::types::Syntax;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;

@@ -57,6 +57,7 @@
 					<DatabaseIcon size={15} strokeWidth={1.75} />
 					<span class="name">{g.users.length === 1 ? `${g.users[0].location} · ${g.users[0].target}` : `${g.users.length} targets`}</span>
 				</div>
+<<<<<<< HEAD
 				<dl class="details" class:pending={!g.details}>
 					{#each detailRows(g.details) as row (row.label)}
 						<div><dt>{row.label}</dt><dd class:faint={row.value === null}>{row.value ?? '—'}</dd></div>
@@ -79,6 +80,31 @@
 							</tr>
 					{/snippet}
 				</DataTable>
+=======
+				{#if c.tables.length}
+					<table class="sb-list">
+						<thead><tr><th>Synced table</th><th>Newest sync</th><th>Records</th><th>Took</th><th>Last clean sync</th></tr></thead>
+						<tbody>
+							{#each c.tables as t (t.table)}
+								<tr>
+									<td><code>{t.table}</code></td>
+									<td>
+										<span title={formatStamp(t.at)}>
+											{#if t.failure}<StatusLabel tone={t.waiting ? 'var(--sb-warning)' : 'var(--sb-error)'} label={t.failure} />{:else}<StatusLabel tone="var(--sb-success)" label="synced {formatAgo(t.at, app.now)}" />{/if}
+										</span>
+										{#if t.error}<p class="sync-error">{t.error}</p>{/if}
+									</td>
+									<td>{formatNumber(t.recordsSent)}</td>
+									<td>{formatMs(t.elapsedMs)}</td>
+									<td class="muted" title={t.lastSyncedAt ? formatStamp(t.lastSyncedAt) : undefined}>{t.lastSyncedAt ? formatAgo(t.lastSyncedAt, app.now) : 'never'}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{:else}
+					<p class="muted">No warehouse sync reported yet.</p>
+				{/if}
+>>>>>>> origin/main
 			</div>
 		</Panel>
 
@@ -130,10 +156,22 @@
 		color: var(--muted-foreground);
 		font-size: 12.5px;
 	}
+<<<<<<< HEAD
 	.faint {
 		color: var(--sb-text-faint);
 	}
 	.card {
+=======
+	.sync-error {
+		max-width: 60ch;
+		margin: 4px 0 0 15px;
+		color: var(--muted-foreground);
+		font-size: 12px;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+	.connection {
+>>>>>>> origin/main
 		display: flex;
 		flex-direction: column;
 		gap: 12px;

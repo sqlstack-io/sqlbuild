@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import sqlite3
+import subprocess
 import sys
 import time
 from contextlib import closing
@@ -42,8 +43,12 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     AutomaticHistoryTestCase,
     CatalogConnectionTestCase,
     FingerprintHistoryTestCase,
+<<<<<<< HEAD
     NewestVersionsTestCase,
     PageBytesTestCase,
+=======
+    ReadFailureTestCase,
+>>>>>>> origin/main
     StateEventsTestCase,
     SyncPacingTestCase,
     WarehouseHistoryTestCase,
@@ -76,8 +81,48 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_warehouse_sync_health,
     warehouse_history_page,
     warehouse_history_pages,
+    warehouse_history_read,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ReadFailureTestCase(
+            "Unopenable warehouse file",
+            "migrations",
+            "Warehouse connection for metadata reads failed: OperationalError: "
+            "unable to open database file\n"
+            "Warehouse metadata read (migrations) failed: OperationalError: "
+            "unable to open database file. No page delivered.\n",
+            {
+                "failed": {
+                    "reason": "OperationalError: unable to open database file",
+                    "page_size": False,
+                }
+            },
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_unreachable_warehouse_when_reading_history_then_the_driver_error_is_reported(
+    test_case: ReadFailureTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "sqlite"\n'
+                '[connections.local]\npath = "missing/warehouse.db"\n'
+                '[targets.development]\nschema = "main"\n'
+            )
+        },
+    )
+    result: subprocess.CompletedProcess[str] = warehouse_history_read(project, test_case.table)
+    assert (result.returncode, json.loads(result.stdout)) == (0, test_case.expected_reply)
+    assert test_case.expected_stderr in result.stderr
 
 
 @pytest.mark.parametrize(
@@ -763,7 +808,11 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
     }
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
+<<<<<<< HEAD
     assert "records" not in page() and "metadata reads failed" in page()["error"]
+=======
+    assert page()["failed"]["page_size"] is False
+>>>>>>> origin/main
     assert not (project / "warehouse.db").exists()
 
 
@@ -1337,7 +1386,11 @@ def test_given_fingerprint_history_when_read_in_isolated_pages_then_legacy_retri
             assert predecessor.execute("PRAGMA journal_mode").fetchone() == (journal_mode,)
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
+<<<<<<< HEAD
     assert "records" not in page() and "metadata reads failed" in page()["error"]
+=======
+    assert page()["failed"]["page_size"] is False
+>>>>>>> origin/main
     assert not (project / "warehouse.db").exists()
 
 

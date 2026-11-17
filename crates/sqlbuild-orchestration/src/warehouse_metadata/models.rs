@@ -443,6 +443,12 @@ impl WarehouseHistoryKind {
     pub const fn mirror_table(self) -> &'static str {
         self.names().1
     }
+
+    /// Two builds refreshing one run's cost estimate at once write the same source id and the warehouse's latest row is current, so cost mirrors keep the latest row; every other kind keeps the earliest.
+    #[must_use]
+    pub const fn mirror_keeps_latest(self) -> bool {
+        matches!(self, Self::ResourceCosts)
+    }
 }
 
 /// Derive progress from committed mirror rows, scoped to the active physical reader.
@@ -708,6 +714,15 @@ pub struct WarehouseHistoryPage {
     /// interval syncs.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub wakes_compute: bool,
+}
+
+/// A location runtime's failed history read: its redacted error, and whether a smaller page could succeed.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseHistoryFailure {
+    pub reason: String,
+    /// The read ran out of memory or time, so a smaller page may succeed; any other error repeats.
+    pub page_size: bool,
 }
 
 /// Typed import columns are selected by code, never from location-supplied field names.

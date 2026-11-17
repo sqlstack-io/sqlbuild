@@ -5,12 +5,18 @@ use crate::discovery::main::project::validation_error::validation_error;
 use crate::discovery::main::sources::orchestration_declarations::orchestration_declarations;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
+<<<<<<< HEAD
 use sqlbuild_discovery::orchestration_files::models::{FilePosition, OrchestrationInventory};
+=======
+>>>>>>> origin/main
 use sqlbuild_discovery::project_validation::main::validate_project_inputs::validate_project_inputs;
 use sqlbuild_discovery::project_validation::models::ProjectFacts;
 
 use crate::discovery::models::NodeRow;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::main::write_console::write_console;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(crate) const CSV_MODULE: &str = "csv";
@@ -36,6 +42,7 @@ pub(crate) fn validate_discovered_project_inputs(
     let mut facts: ProjectFacts = project_facts(py, &inputs, nodes)?;
     let project_dir: Bound<'_, PyAny> = native_field(&inputs, "project_dir")?;
     if !project_dir.is_none() {
+<<<<<<< HEAD
         let inventory = orchestration_declarations(&project_dir)?;
         warn_deprecated_orchestration(py, &inventory)?;
         facts.orchestration = inventory.names();
@@ -70,3 +77,9 @@ fn warn_deprecated_orchestration(
     }
     Ok(())
 }
+=======
+        facts.orchestration = orchestration_declarations(&project_dir)?.names();
+    }
+    validate_project_inputs(&facts).map_err(|failure| validation_error(py, failure))
+}
+>>>>>>> origin/main

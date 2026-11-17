@@ -1,6 +1,7 @@
 //! One native analysis shared by the models of a wave whose analyses differ only in names.
 
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 
 use rayon::ThreadPool;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -436,11 +437,23 @@ fn share_key(
         name_order(&names, |name| name.to_owned()),
         name_order(&names, str::to_ascii_uppercase),
     ];
-    let mut hasher: Sha256 = Sha256::new();
-    hasher.update(sql.len().to_le_bytes());
-    hasher.update(sql.as_bytes());
-    hasher.update(format!("{:?}", (shaped, names.len(), name_orders)).as_bytes());
-    Some(hasher.finalize().into())
+    let mut hasher: DigestHasher = DigestHasher(Sha256::new());
+    (sql, shaped, names.len(), name_orders).hash(&mut hasher);
+    Some(hasher.0.finalize().into())
+}
+
+/// Feeds `Hash` output into a SHA-256 digest, so a key hashes its fields without formatting them.
+struct DigestHasher(Sha256);
+
+impl Hasher for DigestHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        self.0.update(bytes);
+    }
+
+    /// Unused: the key is the digest, read with `finalize`.
+    fn finish(&self) -> u64 {
+        0
+    }
 }
 
 /// The positions of `names` sorted by each name as `spelled`.

@@ -22,21 +22,13 @@ use crate::bindings::_helpers::command_runtime::connection::resolve_target_conne
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::diff_report::facts::diff_facts;
 use crate::bindings::_helpers::diff_report::output::publish_diff_output;
-use crate::bindings::_helpers::diff_report::query::execute_query_diff;
-use crate::bindings::_helpers::diff_report::query::execution_options;
-use crate::bindings::_helpers::diff_report::query::prepare_query_diff;
-use crate::bindings::_helpers::diff_report::query::project_adapter;
-use crate::bindings::_helpers::diff_report::support::call;
-use crate::bindings::_helpers::diff_report::support::caused;
-use crate::bindings::_helpers::diff_report::support::cli_error;
-use crate::bindings::_helpers::diff_report::support::error_text;
-use crate::bindings::_helpers::diff_report::support::is_exception;
-use crate::bindings::_helpers::diff_report::support::matches_class;
-use crate::bindings::_helpers::diff_report::support::matches_native;
-use crate::bindings::_helpers::diff_report::support::none;
-use crate::bindings::_helpers::diff_report::support::object;
-use crate::bindings::_helpers::diff_report::support::request_facts;
-use crate::bindings::_helpers::diff_report::support::user_error_parts;
+use crate::bindings::_helpers::diff_report::query::{
+    execute_query_diff, execution_options, prepare_query_diff, project_adapter,
+};
+use crate::bindings::_helpers::diff_report::support::{
+    call, caused, cli_error, error_text, is_exception, matches_class, matches_native, none, object,
+    request_facts, user_error_parts,
+};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::frontier::main::emit_error::emit_error;

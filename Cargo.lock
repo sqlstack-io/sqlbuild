@@ -1408,9 +1408,9 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "fensu-facts"
-version = "0.31.0"
+version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbaaeb4fa29af8fa378ebd826e8a28655dfd13ed7acb98919dbe64f882681fef"
+checksum = "8ca6517dd7fb6fd5ec99d7c25be8ca860e4d753afb081cc0ab6a065aac40d0a8"
 dependencies = [
  "dunce",
  "get-size2",
@@ -1426,9 +1426,9 @@ dependencies = [
 
 [[package]]
 name = "fensu-native"
-version = "0.31.0"
+version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8053936f5ea33f32a301649d2178fad69cee1fe8aff7f17b35d56ba88d85024b"
+checksum = "dbba81e35d514d8c889ef10287202e6c7920bdf43094ceb925616fded7cd5b92"
 dependencies = [
  "fensu-facts",
  "globset",
@@ -4248,6 +4248,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlbuild-build-identity"
+version = "0.0.0"
+dependencies = [
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "sqlbuild-cache"
 version = "0.0.0"
 dependencies = [
@@ -4262,7 +4269,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.231.0"
+version = "0.239.0"
 dependencies = [
  "blake3",
  "chrono",
@@ -4278,6 +4285,7 @@ dependencies = [
  "serde_json",
  "sqlbuild-analysis",
  "sqlbuild-build-features",
+ "sqlbuild-build-identity",
  "sqlbuild-cache",
  "sqlbuild-config",
  "sqlbuild-core",
@@ -4425,7 +4433,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.231.0"
+version = "0.239.0"
 dependencies = [
  "chrono",
  "fensu-policy",
@@ -4466,7 +4474,6 @@ dependencies = [
  "chrono",
  "mimalloc",
  "pyo3",
- "rayon",
  "rusqlite",
  "rustc-hash",
  "serde",
@@ -4568,7 +4575,6 @@ dependencies = [
 name = "sqlbuild-python-planner"
 version = "0.0.0"
 dependencies = [
- "chrono",
  "pyo3",
  "serde_json",
  "sqlbuild-analysis",
@@ -4689,6 +4695,7 @@ dependencies = [
  "sqlquack-parse",
  "sqlquack-syntax",
  "stacker",
+ "stats_alloc",
  "tempfile",
  "toml",
 ]
@@ -5015,6 +5022,12 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stats_alloc"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c0e04424e733e69714ca1bbb9204c1a57f09f5493439520f9f68c132ad25eec"
 
 [[package]]
 name = "stringprep"

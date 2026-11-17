@@ -178,7 +178,7 @@ A target is a named build context - the database and schema you build into, plus
 | Field | Description |
 |-------|-------------|
 | `schema` | Schema for all models in this target; required for named targets |
-| `loader_schema` | Default write schema for managed source loaders; falls back to `schema` |
+| `loader_schema` | Default write schema for managed source loaders; falls back to `schema`. Required when `schema` is `preserve` and the project has loaders, tasks, assets or checks, because their [results](python-nodes/overview.md#result-persistence) go there |
 | `database` | Database for all models in this target |
 | `connection` | Name from `[connections.<name>]` used for endpoint, authentication, and compute; optional when exactly one named connection is defined |
 | `vars` | Target-specific project variables |

@@ -10,6 +10,7 @@ pub(crate) const DEFER_SETTING_PREFIX: &str = "defer_";
 /// How many due times a person's trigger listing gives for each running schedule.
 pub(crate) const UPCOMING_TIMES: usize = 5;
 
+<<<<<<< HEAD
 /// The published kind of a source node, which group ordering follows to its loader.
 pub(crate) const SOURCE_KIND: &str = "source";
 /// The published kind of a loader node.
@@ -20,3 +21,12 @@ pub(crate) const SOURCE_LOADER_POINTER: &str = "/entry/loader";
 pub(crate) const CONCURRENCY_SETTING: &str = "concurrency";
 /// A job setting that lets its runs go on past failing audits.
 pub(crate) const IGNORE_AUDIT_FAILURES_SETTING: &str = "ignore_audit_failures";
+=======
+/// The key prefix of seed nodes, which a job that loads them builds for every reader.
+pub(crate) const SEED_KEY_PREFIX: &str = "seed:";
+
+/// Added under a job group's cycles when one of their waits reads a seed or a node several members build.
+pub const SHARED_READ_HINT: &str = "hint: a wait in this cycle reads a seed or a node that more than one \
+member builds, so every member that reads it waits for all of its builders; give seeds and shared nodes \
+their own job that runs first";
+>>>>>>> origin/main

@@ -11,6 +11,7 @@ use pyo3::types::PyDict;
 use sqlbuild_core::constants::PYTHON_NODE_ROOT;
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
 use sqlbuild_python_base::records::types::RecordId;
 
 /// Decorated Python DAG node functions under python/.
@@ -39,7 +40,8 @@ pub fn discover_python_node_functions<'py>(
                 ("project_dir", project.path.clone()),
             ],
         )?;
-        let discovered_nodes: PyResult<()> = buckets.discover_nodes(&project, &providers);
+        let discovered_nodes: PyResult<()> =
+            within_identity_pass(py, || buckets.discover_nodes(&project, &providers));
         call_with(
             &shim(py, UserCodeHost::RestorePythonRootModules)?,
             &[("saved_modules", saved)],

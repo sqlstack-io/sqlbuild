@@ -2,7 +2,10 @@
 
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::GraphIndexes;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+>>>>>>> origin/main
 
 use crate::planner_strategy::_helpers::audits::{
     attachment, outside_target_lineage, resolve_effective_run_scope,
@@ -40,10 +43,16 @@ use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+<<<<<<< HEAD
 use sqlbuild_python_project::planner_strategy::constants::AUDIT_TYPES_MODULE;
 use sqlbuild_python_project::planner_strategy::constants::COMPILE_TYPES_MODULE;
 use sqlbuild_python_project::planner_strategy::constants::MODEL_ATTACHMENT;
 use sqlbuild_python_project::planner_strategy::constants::SOURCE_ATTACHMENT;
+=======
+use sqlbuild_python_project::planner_strategy::constants::{
+    AUDIT_TYPES_MODULE, COMPILE_TYPES_MODULE, MODEL_ATTACHMENT, SOURCE_ATTACHMENT,
+};
+>>>>>>> origin/main
 use sqlbuild_python_project::planner_strategy::models::AuditPlanning;
 
 /// One attribute read of a compiled audit.

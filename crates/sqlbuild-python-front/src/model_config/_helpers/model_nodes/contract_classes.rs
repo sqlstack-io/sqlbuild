@@ -45,10 +45,16 @@ const YAML_ENTRY_CLASSES: [(&str, RecordId); 9] = [
         RecordId::SourceFreshnessValueKind,
     ),
 ];
+<<<<<<< HEAD
 
 pub(crate) static CONTRACT_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
 pub(crate) static YAML_ENTRY_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
 
+=======
+pub(crate) static CONTRACT_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
+pub(crate) static YAML_ENTRY_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
+
+>>>>>>> origin/main
 pub(crate) fn built_contract_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let classes: Bound<'_, PyDict> = PyDict::new(py);
     for (key, class) in CONTRACT_CLASSES {

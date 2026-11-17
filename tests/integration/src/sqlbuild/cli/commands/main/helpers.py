@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import _thread
 import json
 import os
 import shutil
@@ -8,7 +7,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 from collections.abc import Callable
 from itertools import takewhile
@@ -918,16 +916,6 @@ def write_custom_host_project(*, project_dir: Path, model_count: int, rule_body:
         f"{body}",
         encoding="utf-8",
     )
-
-
-def interrupt_main_after(delay_seconds: float) -> Callable[[Path], None]:
-    """Return a host publish hook that interrupts the main thread after a delay."""
-
-    def interrupt(path: Path) -> None:
-        del path
-        threading.Timer(delay_seconds, _thread.interrupt_main).start()
-
-    return interrupt
 
 
 def child_processes() -> frozenset[int]:

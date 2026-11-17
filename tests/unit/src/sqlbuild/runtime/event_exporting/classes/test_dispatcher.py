@@ -738,25 +738,40 @@ def test_given_idle_dispatcher_when_intervals_repeat_then_no_duplicate_periodic_
 def test_given_periodic_health_callback_when_published_then_it_never_reenters_exporter_queue(
     test_case: EventExporterDispatcherTestCase,
 ) -> None:
-    periodic_received: threading.Event = threading.Event()
+    delivered: threading.Event = threading.Event()
+    published: threading.Condition = threading.Condition()
     summaries: list[EventExportSummary] = []
     exported: list[LifecycleEvent] = []
 
+    def export(*, event: LifecycleEvent) -> None:
+        exported.append(event)
+        delivered.set()
+
     def summary_callback(summary: EventExportSummary) -> None:
-        summaries.append(summary)
-        periodic_received.set()
+        with published:
+            summaries.append(summary)
+            published.notify_all()
 
     dispatcher: EventExporterDispatcher = EventExporterDispatcher(
-        exporters=(BoundEventExporter("publish", lambda *, event: exported.append(event), {}),),
+        exporters=(BoundEventExporter("publish", export, {}),),
         summary_callback=summary_callback,
         health_interval_seconds=0.01,
     )
     dispatcher.enqueue(lifecycle_event())
 
-    assert periodic_received.wait(timeout=0.2)
+    assert delivered.wait(timeout=10)
+    with published:
+        assert published.wait_for(
+            lambda: any(summary.delivered == 1 for summary in summaries), timeout=10
+        )
+    final_summary: EventExportSummary = dispatcher.shutdown()
+
     assert len(exported) == test_case.expected_delivered
+    assert (final_summary.accepted, final_summary.delivered) == (
+        test_case.expected_delivered,
+        test_case.expected_delivered,
+    )
     assert summaries[0].accepted == 1
-    dispatcher.shutdown()
 
 
 @pytest.mark.parametrize(

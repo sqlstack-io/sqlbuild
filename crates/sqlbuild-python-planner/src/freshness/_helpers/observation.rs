@@ -2,9 +2,12 @@
 
 use crate::freshness::main::presumed_utc_datetime::presumed_utc_datetime;
 use crate::freshness::models::Observer;
+<<<<<<< HEAD
 use crate::planner_warehouse::_helpers::synced_reads::refused;
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::Read;
+=======
+>>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
@@ -477,6 +480,7 @@ fn observe_adapter_batch_inner<'py>(
     for request in requests.values() {
         unique.set_item(request, py.None())?;
     }
+<<<<<<< HEAD
     let unique_requests: Bound<'py, PyAny> = PyTuple::new(py, unique.keys())?.into_any();
     let metadata_by_request: Bound<'py, PyAny> = match observer
         .reads
@@ -487,6 +491,15 @@ fn observe_adapter_batch_inner<'py>(
         Read::Known(metadata) => metadata,
         Read::Unknown(item) => return Err(refused(&item)),
     };
+=======
+    let metadata_by_request: Bound<'py, PyAny> = call_with(
+        &native_field(&observer.adapter, "get_tables_freshness_metadata")?,
+        &[
+            ("connection", observer.connection.clone()),
+            ("requests", PyTuple::new(py, unique.keys())?.into_any()),
+        ],
+    )?;
+>>>>>>> origin/main
     let metadata_class: Bound<'py, PyAny> = host_entry(py, AdapterHost::TableFreshnessMetadata)?;
     let observations: Bound<'py, PyDict> = PyDict::new(py);
     for (name, request) in requests.iter() {
@@ -561,10 +574,17 @@ pub(crate) fn observation_record<'py>(
 
 /// Observe one source freshness config and return a comparable data version.
 #[pyfunction]
+<<<<<<< HEAD
 #[pyo3(signature = (*, dialect, reads, source, observed_at))]
 pub(crate) fn observe_configured_source_freshness<'py>(
     dialect: Bound<'py, Dialect>,
     reads: Bound<'py, PlannerReads>,
+=======
+#[pyo3(signature = (*, adapter, connection, source, observed_at))]
+pub(crate) fn observe_configured_source_freshness<'py>(
+    adapter: Bound<'py, PyAny>,
+    connection: Bound<'py, PyAny>,
+>>>>>>> origin/main
     source: &Bound<'py, PyAny>,
     observed_at: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -578,10 +598,17 @@ pub(crate) fn observe_configured_source_freshness<'py>(
 
 /// Observe adapter metadata freshness per source, batching the warehouse lookups.
 #[pyfunction]
+<<<<<<< HEAD
 #[pyo3(signature = (*, dialect, reads, sources, observed_at))]
 pub(crate) fn observe_adapter_sources_freshness<'py>(
     dialect: Bound<'py, Dialect>,
     reads: Bound<'py, PlannerReads>,
+=======
+#[pyo3(signature = (*, adapter, connection, sources, observed_at))]
+pub(crate) fn observe_adapter_sources_freshness<'py>(
+    adapter: Bound<'py, PyAny>,
+    connection: Bound<'py, PyAny>,
+>>>>>>> origin/main
     sources: &Bound<'py, PyAny>,
     observed_at: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {

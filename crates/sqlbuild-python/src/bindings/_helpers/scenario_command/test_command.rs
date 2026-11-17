@@ -18,46 +18,26 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
 use sqlbuild_host::types::ResultEnum;
 
-use crate::bindings::_helpers::change_selection::base_snapshot::BaseComparison;
-use crate::bindings::_helpers::change_selection::base_snapshot::base_comparison;
-use crate::bindings::_helpers::change_selection::base_snapshot::base_variant;
-use crate::bindings::_helpers::change_selection::selection::ChangedProject;
-use crate::bindings::_helpers::change_selection::selection::changed_project;
-use crate::bindings::_helpers::change_selection::selection::tests_and_models;
-use crate::bindings::_helpers::change_selection::selection::with_since_section;
+use crate::bindings::_helpers::change_selection::base_snapshot::{
+    BaseComparison, base_comparison, base_variant,
+};
+use crate::bindings::_helpers::change_selection::selection::{
+    ChangedProject, changed_project, tests_and_models, with_since_section,
+};
+use crate::bindings::_helpers::native_host::statement_report::{StatementReport, StatementSource};
 use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
-use crate::bindings::_helpers::scenario_command::presentation::CompletionKind;
-use crate::bindings::_helpers::scenario_command::presentation::RelayContext;
-use crate::bindings::_helpers::scenario_command::presentation::SectionStatus;
-use crate::bindings::_helpers::scenario_command::presentation::activity;
-use crate::bindings::_helpers::scenario_command::presentation::begin_section;
-use crate::bindings::_helpers::scenario_command::presentation::connection_hooks;
-use crate::bindings::_helpers::scenario_command::presentation::progress_relay;
-use crate::bindings::_helpers::scenario_command::presentation::write_completion;
-use crate::bindings::_helpers::scenario_command::setup::CompileInputs;
-use crate::bindings::_helpers::scenario_command::setup::ScenarioProject;
-use crate::bindings::_helpers::scenario_command::setup::boolean;
-use crate::bindings::_helpers::scenario_command::setup::cli_user_error;
-use crate::bindings::_helpers::scenario_command::setup::compile;
-use crate::bindings::_helpers::scenario_command::setup::discover_project;
-use crate::bindings::_helpers::scenario_command::setup::flush;
-use crate::bindings::_helpers::scenario_command::setup::int;
-use crate::bindings::_helpers::scenario_command::setup::optional_text;
-use crate::bindings::_helpers::scenario_command::setup::project_adapter_name;
-use crate::bindings::_helpers::scenario_command::setup::project_connection_config;
-use crate::bindings::_helpers::scenario_command::setup::require_capture_dialect;
-use crate::bindings::_helpers::scenario_command::setup::require_sql_analysis;
-use crate::bindings::_helpers::scenario_command::setup::resolve_adapter;
-use crate::bindings::_helpers::scenario_command::setup::selected_scenarios;
-use crate::bindings::_helpers::scenario_command::setup::style;
-use crate::bindings::_helpers::scenario_command::setup::text;
-use crate::bindings::_helpers::scenario_command::setup::write;
-use crate::bindings::_helpers::scenario_command::setup::write_headers;
-use crate::bindings::_helpers::scenario_command::snapshot_sync::LocalSync;
-use crate::bindings::_helpers::scenario_command::snapshot_sync::sync_local_snapshots;
+use crate::bindings::_helpers::scenario_command::presentation::{
+    CompletionKind, RelayContext, SectionStatus, activity, begin_section, connection_hooks,
+    progress_relay, write_completion,
+};
+use crate::bindings::_helpers::scenario_command::setup::{
+    CompileInputs, ScenarioProject, boolean, cli_user_error, compile, discover_project, flush, int,
+    optional_text, project_adapter_name, project_connection_config, require_capture_dialect,
+    require_sql_analysis, resolve_adapter, selected_scenarios, style, text, write, write_headers,
+};
+use crate::bindings::_helpers::scenario_command::snapshot_sync::{LocalSync, sync_local_snapshots};
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
-use crate::bindings::_helpers::sql_test_command::timeouts::TimeoutKind;
-use crate::bindings::_helpers::sql_test_command::timeouts::resolve_run_timeout;
+use crate::bindings::_helpers::sql_test_command::timeouts::{TimeoutKind, resolve_run_timeout};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -189,6 +169,18 @@ fn finish(
     if !failures.is_empty() {
         write(&run.stream, &format!("{failures}\n"))?;
     }
+    let report: Option<StatementReport> = StatementReport::read(
+        py,
+        &StatementSource {
+            adapter_name: &run.adapter_name,
+            adapter: &run.adapter,
+            connection_config: &run.connection_config,
+            started,
+        },
+    )?;
+    if let Some(line) = report.as_ref().and_then(StatementReport::line) {
+        write(&run.stream, &format!("{line}\n"))?;
+    }
     flush(&run.stream)?;
     write_completion(&run.stream, (&run.project.namespace, succeeded))?;
     let namespace: &ScenarioNamespace = &run.project.namespace;
@@ -215,7 +207,11 @@ fn finish(
                 )?),
             )?,
             run.since_json.as_deref(),
-        )?,
+        )
+        .and_then(|payload| match &report {
+            Some(report) => report.with_section(&payload),
+            None => Ok(payload),
+        })?,
     )
     .into_any();
     write_execution_json_output(

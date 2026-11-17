@@ -172,13 +172,32 @@ pub(crate) struct FaultStep {
     pub(crate) cycles: [bool; 2],
 }
 
-pub(crate) struct SchedulerLatencyTestCase {
+/// One scheduler cycle at a set database clock, by the leader (0) or the standby (1).
+pub(crate) struct ClockCycleStep {
+    pub(crate) holder: usize,
+    pub(crate) at_seconds: i64,
+    pub(crate) expected_leader: bool,
+    pub(crate) expected_ticks: usize,
+    /// The cycle's wait to the next due time, capped at one renewal interval.
+    pub(crate) expected_wait: std::time::Duration,
+}
+
+pub(crate) struct SchedulerClockTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Calendar times, in seconds after the test's base time.
+    pub(crate) calendar: &'static [i64],
+    pub(crate) steps: &'static [ClockCycleStep],
+    /// Due times that ticked, in seconds after the base time.
+    pub(crate) expected_ticked: &'static [i64],
+}
+
+pub(crate) struct SchedulerWakeTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_ticks: usize,
-    pub(crate) expected_ticks_after_failover: usize,
-    pub(crate) expected_max_wake_after_due: chrono::TimeDelta,
-    pub(crate) expected_max_failover_wake: chrono::TimeDelta,
-    /// Work after the cycle's next-due read, which must not delay the wake.
+    /// Only a hang misses this: a healthy scheduler decides the time within milliseconds.
+    pub(crate) expected_max_decision_delay: chrono::TimeDelta,
+    /// Work after the cycle's next-due read, which must not delay the decision past its bound.
     pub(crate) launcher_poll: std::time::Duration,
 }

@@ -2,8 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::bindings::_helpers::change_selection::base_cache::cache_key_with;
 
-use crate::bindings::_helpers::cli::failure_cause::FailureCause;
-use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
+use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
 
 /// A connection failure's cause, as `sqb debug` reports it.
 pub(crate) fn connection_cause() -> FailureCause {

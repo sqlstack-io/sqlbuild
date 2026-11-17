@@ -1,7 +1,7 @@
 //! The `${CTX:key}` and `${name}` placeholders of a deferred target's schema or database.
 
 /// The deferred-target context marker inside `${...}`.
-const CONTEXT_PREFIX: &str = "CTX:";
+pub(crate) const CONTEXT_PREFIX: &str = "CTX:";
 /// The opening of a `${...}` placeholder.
 pub(crate) const PLACEHOLDER_OPEN: &str = "${";
 const PLACEHOLDER_CLOSE: char = '}';

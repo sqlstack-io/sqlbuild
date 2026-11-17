@@ -17,6 +17,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
     ReadOnlyProviderE2ETestCase,
     SharedSinkProviderE2ETestCase,
     SlowSinkExitE2ETestCase,
+    SnowflakeKeyWarningE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
@@ -631,3 +632,66 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert tuple(setup_log.read_text(encoding="utf-8").splitlines()) == test_case.expected_setups
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        SnowflakeKeyWarningE2ETestCase(description="build", command=("build",)),
+        SnowflakeKeyWarningE2ETestCase(description="query", command=("query", "SELECT 1")),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_keys_and_a_sink_provider_when_running_then_warns_once(
+    test_case: SnowflakeKeyWarningE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="snowflake_keys_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "snowflake_keys_project"\nadapter = "duckdb"\n\n'
+                '[connection]\ndatabase = "snowflake_keys_project.duckdb"\nwarehouse = "orders_wh"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Test model orders.', materialized table);\n\n"
+                "SELECT 1 AS order_id\n"
+            ),
+            "providers/probe.py": dedent(
+                """
+                from sqlbuild.providers import Provider
+
+
+                class Probe(Provider):
+                    '''Test provider Probe.'''
+
+                    def setup(self, ctx):
+                        del ctx
+                """
+            ).strip()
+            + "\n",
+            "sinks/events.py": dedent(
+                """
+                from providers.probe import Probe
+                from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+
+
+                @lifecycle_event_sink
+                def export_event(event: LifecycleEvent, probe: Probe) -> None:
+                    del event, probe
+                """
+            ).strip()
+            + "\n",
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project_dir
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    # Startup and the command both resolve the connection; the warning still prints once.
+    assert (result.stdout + result.stderr).count(
+        "Snowflake-like keys: warehouse."
+    ) == test_case.expected_warnings, result.stderr

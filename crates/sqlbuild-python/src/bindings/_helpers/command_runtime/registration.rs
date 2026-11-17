@@ -2,10 +2,9 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::command_runtime::connection;
-use crate::bindings::_helpers::command_runtime::preview_target;
-use crate::bindings::_helpers::command_runtime::warehouse_scope;
-use crate::bindings::_helpers::command_runtime::warehouses;
+use crate::bindings::_helpers::command_runtime::{
+    connection, preview_target, warehouse_scope, warehouses,
+};
 use sqlbuild_python_base::command_runtime::main::register_adapters::register_adapters;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

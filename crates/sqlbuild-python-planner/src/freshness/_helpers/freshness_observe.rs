@@ -1,8 +1,11 @@
 //! Observe the current freshness of selected sources and compare it with previous state.
 
 use crate::freshness::models::PreviousState;
+<<<<<<< HEAD
 use crate::live_reads::models::LiveReads;
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+>>>>>>> origin/main
 use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::{PyException, PyValueError};
@@ -13,11 +16,17 @@ use sqlbuild_core::freshness_text::main::freshness_json::freshness_json;
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
+<<<<<<< HEAD
 use crate::freshness::_helpers::observation::observation_record;
 use crate::freshness::_helpers::observation::observation_source;
 use crate::freshness::_helpers::observation::observe_adapter_batch;
 use crate::freshness::_helpers::observation::observe_configured;
 use crate::freshness::_helpers::observation::strategy;
+=======
+use crate::freshness::_helpers::observation::{
+    observation_record, observation_source, observe_adapter_batch, observe_configured, strategy,
+};
+>>>>>>> origin/main
 use crate::freshness::models::Observer;
 use sqlbuild_core::freshness_text::main::freshness_status::freshness_status;
 use sqlbuild_core::freshness_text::models::{

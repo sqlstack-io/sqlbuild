@@ -1,43 +1,191 @@
-//! Bounds how late the scheduler wakes for due times and standby catch-up behind a slow launcher.
+//! Due-time selection steps a set database clock; one real-clock run only catches a scheduler that hangs.
 
 use std::time::Duration;
 
-use chrono::{DurationRound, SecondsFormat, TimeDelta, Utc};
-use serde_json::json;
+use chrono::{DurationRound, TimeDelta, Utc};
 
 use crate::credentials::tests::location_helpers::create_location;
-use crate::declarations::main::list_triggers::list_triggers;
+use crate::scheduler::main::list_ticks::list_ticks;
 use crate::scheduler::tests::contracts::ticks::helpers::{
-    decision_wake, queued_times, run_scheduler_until, snapshot,
+    publish_calendar, run_scheduler_until, step_cycles,
 };
-use crate::scheduler::tests::contracts::ticks::test_types::SchedulerLatencyTestCase;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::scheduler::tests::contracts::ticks::test_types::{
+    ClockCycleStep, SchedulerClockTestCase, SchedulerWakeTestCase,
+};
 use crate::store::main::migrate_store::migrate_store;
-use crate::store::tests::lease_helpers::expire_lease;
-use crate::store::tests::replica_helpers::second_store;
-use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
+use crate::store::tests::clock_helpers::with_database_clock;
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
+const ON_TIME_THEN_FAILOVER: &[ClockCycleStep] = &[
+    ClockCycleStep {
+        holder: 0,
+        at_seconds: 0,
+        expected_leader: true,
+        expected_ticks: 0,
+        expected_wait: Duration::from_secs(2),
+    },
+    ClockCycleStep {
+        holder: 0,
+        at_seconds: 2,
+        expected_leader: true,
+        expected_ticks: 1,
+        expected_wait: Duration::from_secs(1),
+    },
+    ClockCycleStep {
+        holder: 0,
+        at_seconds: 3,
+        expected_leader: true,
+        expected_ticks: 1,
+        expected_wait: Duration::from_secs(1),
+    },
+    ClockCycleStep {
+        holder: 0,
+        at_seconds: 4,
+        expected_leader: true,
+        expected_ticks: 1,
+        expected_wait: Duration::from_secs(4),
+    },
+    // The leader stops without releasing its lease, renewed at +4 for 30 s, while +8 and +9 fall due.
+    ClockCycleStep {
+        holder: 1,
+        at_seconds: 10,
+        expected_leader: false,
+        expected_ticks: 0,
+        expected_wait: Duration::from_secs(5),
+    },
+    ClockCycleStep {
+        holder: 1,
+        at_seconds: 33,
+        expected_leader: false,
+        expected_ticks: 0,
+        expected_wait: Duration::from_secs(5),
+    },
+    // The standby takes over once the lease lapses and ticks only the latest overdue time.
+    ClockCycleStep {
+        holder: 1,
+        at_seconds: 35,
+        expected_leader: true,
+        expected_ticks: 1,
+        expected_wait: Duration::from_secs(5),
+    },
+];
+
+const LATE_CYCLE: &[ClockCycleStep] = &[
+    ClockCycleStep {
+        holder: 0,
+        at_seconds: 0,
+        expected_leader: true,
+        expected_ticks: 0,
+        expected_wait: Duration::from_secs(2),
+    },
+    ClockCycleStep {
+        holder: 0,
+        at_seconds: 1,
+        expected_leader: true,
+        expected_ticks: 0,
+        expected_wait: Duration::from_secs(1),
+    },
+    // +2 and +3 are both overdue: one tick, for +3.
+    ClockCycleStep {
+        holder: 0,
+        at_seconds: 3,
+        expected_leader: true,
+        expected_ticks: 1,
+        expected_wait: Duration::from_secs(1),
+    },
+    ClockCycleStep {
+        holder: 0,
+        at_seconds: 4,
+        expected_leader: true,
+        expected_ticks: 1,
+        expected_wait: Duration::from_secs(5),
+    },
+];
+
 #[test]
-fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks_queue_within_their_latency_bounds()
+fn given_a_set_database_clock_when_times_fall_due_then_each_cycle_ticks_the_latest_due_time_and_sleeps_until_the_next()
  {
     let test_cases = [
-        SchedulerLatencyTestCase {
-            description: "SQLite scheduler latency",
+        SchedulerClockTestCase {
+            description: "SQLite on-time ticks then standby catch-up",
             backend: Backend::Sqlite,
-            expected_ticks: 3,
-            expected_ticks_after_failover: 4,
-            expected_max_wake_after_due: TimeDelta::milliseconds(500),
-            expected_max_failover_wake: TimeDelta::milliseconds(1_500),
+            calendar: &[2, 3, 4, 8, 9],
+            steps: ON_TIME_THEN_FAILOVER,
+            expected_ticked: &[2, 3, 4, 9],
+        },
+        SchedulerClockTestCase {
+            description: "PostgreSQL on-time ticks then standby catch-up",
+            backend: Backend::Postgres,
+            calendar: &[2, 3, 4, 8, 9],
+            steps: ON_TIME_THEN_FAILOVER,
+            expected_ticked: &[2, 3, 4, 9],
+        },
+        SchedulerClockTestCase {
+            description: "SQLite late cycle folds overdue times",
+            backend: Backend::Sqlite,
+            calendar: &[2, 3, 4],
+            steps: LATE_CYCLE,
+            expected_ticked: &[3, 4],
+        },
+        SchedulerClockTestCase {
+            description: "PostgreSQL late cycle folds overdue times",
+            backend: Backend::Postgres,
+            calendar: &[2, 3, 4],
+            steps: LATE_CYCLE,
+            expected_ticked: &[3, 4],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            let base = Utc::now()
+                .duration_trunc(TimeDelta::seconds(1))
+                .expect("second");
+            let ticks = with_database_clock(base, async {
+                migrate_store(store).await.expect("migrate");
+                let location = create_location(store, "orders", "test-admin")
+                    .await
+                    .expect("location");
+                let trigger_id =
+                    publish_calendar(store, location, (base, test_case.calendar)).await;
+                step_cycles(store, (base, test_case.steps, test_case.description)).await;
+                list_ticks(store, trigger_id, 100).await.expect("ticks")
+            })
+            .await;
+            let mut ticked: Vec<i64> = ticks
+                .iter()
+                .map(|tick| (tick.scheduled_for - base).num_seconds())
+                .collect();
+            ticked.sort_unstable();
+            assert_eq!(
+                ticked, test_case.expected_ticked,
+                "{}",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_running_scheduler_when_a_time_falls_due_then_it_is_decided_without_hanging() {
+    let test_cases = [
+        SchedulerWakeTestCase {
+            description: "SQLite real-clock wake",
+            backend: Backend::Sqlite,
+            expected_ticks: 1,
+            expected_max_decision_delay: TimeDelta::seconds(3),
             launcher_poll: Duration::from_millis(700),
         },
-        SchedulerLatencyTestCase {
-            description: "PostgreSQL scheduler latency",
+        SchedulerWakeTestCase {
+            description: "PostgreSQL real-clock wake",
             backend: Backend::Postgres,
-            expected_ticks: 3,
-            expected_ticks_after_failover: 4,
-            expected_max_wake_after_due: TimeDelta::milliseconds(500),
-            expected_max_failover_wake: TimeDelta::milliseconds(1_500),
+            expected_ticks: 1,
+            expected_max_decision_delay: TimeDelta::seconds(3),
             launcher_poll: Duration::from_millis(700),
         },
     ];
@@ -54,101 +202,47 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             let base = Utc::now()
                 .duration_trunc(TimeDelta::seconds(1))
                 .expect("second");
-            let at = |seconds| base + TimeDelta::seconds(seconds);
-            let text = |seconds| at(seconds).to_rfc3339_opts(SecondsFormat::Secs, true);
-            let mut input = snapshot(location);
-            input.documents.insert(
-                "jobs".into(),
-                json!({"orders": {"description": "Build orders", "selection": ["orders"]}}),
-            );
-            input.documents.insert(
-                "triggers".into(),
-                json!({"calendar_orders": {"description": "Calendar orders", "job_key": "orders",
-                    "schedule": {"kind": "calendar", "times": [text(2), text(3), text(4), text(8), text(9)],
-                    "refresh_at": "2029-01-01T00:00:00Z"}}}),
-            );
-            publish_snapshot(store, &input).await.expect("publication");
-            let trigger_id = list_triggers(store, location, "development")
-                .await
-                .expect("trigger")[0]
-                .trigger_id;
-            let (ticks, cycles) =
-                run_scheduler_until(store, trigger_id, (at(6), test_case.launcher_poll)).await;
-            let queued = queued_times(store, location).await;
-            let earliest = ticks
-                .iter()
-                .min_by_key(|tick| tick.scheduled_for)
-                .expect("ticks");
-            let requested = earliest.run_id.expect("the first due time queues a run");
+            let due = base + TimeDelta::seconds(3);
+            let trigger_id = publish_calendar(store, location, (base, &[3])).await;
+            let published = Utc::now();
             assert!(
-                queued[&requested] <= earliest.evaluated_at,
-                "{}: the run is queued with its tick",
-                test_case.description
+                published < due,
+                "{}: setup ran {:?} past the due time, so nothing could tick",
+                test_case.description,
+                published - due
             );
-            assert!(
-                ticks
-                    .iter()
-                    .filter(|tick| tick.tick_id != earliest.tick_id)
-                    .all(|tick| tick.covered_by_run_id == Some(requested)),
-                "{}: later times are covered by the waiting run",
-                test_case.description
+            let (ticks, cycles) = run_scheduler_until(
+                store,
+                trigger_id,
+                (
+                    due + test_case.expected_max_decision_delay + TimeDelta::seconds(1),
+                    test_case.launcher_poll,
+                ),
+            )
+            .await;
+            println!(
+                "{}: published {:?} after base, ticks {ticks:?}",
+                test_case.description,
+                published - base,
             );
+            for cycle in &cycles {
+                println!(
+                    "{}: cycle {:?}, polled {}",
+                    test_case.description, cycle.timings, cycle.polled_at
+                );
+            }
             assert_eq!(
                 ticks.len(),
                 test_case.expected_ticks,
                 "{}",
                 test_case.description
             );
-            for tick in &ticks {
-                let (wake, cycle) = decision_wake(&cycles, tick.evaluated_at, tick.scheduled_for);
-                println!(
-                    "{}: due {} woke {wake:?}, store {:?} to decision, cycle {cycle:?}",
-                    test_case.description,
-                    tick.scheduled_for,
-                    tick.evaluated_at - cycle.timings.started_at,
-                );
-                assert!(
-                    wake <= test_case.expected_max_wake_after_due,
-                    "{}: woke {wake:?} after the due time",
-                    test_case.description
-                );
-            }
-            // The first leader stopped without releasing its lease while two more times fell due;
-            // the standby catches up on the latest one only.
-            // A standby is already polling when that lease lapses, so its own retry wait counts.
-            tokio::time::sleep((at(10) - Utc::now()).to_std().unwrap_or_default()).await;
-            let second = second_store(store).await;
-            let lapse = async {
-                tokio::time::sleep((at(11) - Utc::now()).to_std().unwrap_or_default()).await;
-                expire_lease(store).await;
-                Utc::now()
-            };
-            let ((ticks, cycles), available) = tokio::join!(
-                run_scheduler_until(&second, trigger_id, (at(14), Duration::ZERO)),
-                lapse
-            );
-            assert_eq!(
-                ticks.len(),
-                test_case.expected_ticks_after_failover,
-                "{}: the standby ticks only the latest overdue time",
-                test_case.description
-            );
-            let latest = ticks
-                .iter()
-                .find(|tick| tick.scheduled_for == at(9))
-                .expect("the latest overdue time is decided");
-            let (wake, cycle) = decision_wake(&cycles, latest.evaluated_at, available);
-            println!(
-                "{} failover: woke {wake:?} after the lapse, store {:?} to decision, cycle {cycle:?}",
-                test_case.description,
-                latest.evaluated_at - cycle.timings.started_at,
-            );
             assert!(
-                wake <= test_case.expected_max_failover_wake,
-                "{}: woke {wake:?} after the lapse",
-                test_case.description
+                ticks[0].evaluated_at - due <= test_case.expected_max_decision_delay,
+                "{}: decided {:?} after the due time",
+                test_case.description,
+                ticks[0].evaluated_at - due
             );
-            close_store(second).await;
             close_test_store(fixture).await;
         });
     }

@@ -158,6 +158,13 @@ const SYNC_STAGE: Record<Exclude<Wire['WarehouseSyncFailure'], 'busy'>, string> 
 	delivery: 'sending results to the server'
 };
 
+<<<<<<< HEAD
+=======
+/** What held up a table's newest sync, with a failed read's warehouse error; a build holding the warehouse file is a wait, not a failure. */
+const syncProblemOf = (failure: Wire['WarehouseSyncFailure'], error?: string | null) =>
+	failure === 'busy' ? 'Waiting for a build that holds the warehouse file' : `Failed while ${SYNC_STAGE[failure]}${error ? `: ${error}` : ''}`;
+
+>>>>>>> origin/main
 type Sync = Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: 'warehouse_sync' }> } };
 type SyncHealth = Sync['report']['health'];
 
@@ -209,7 +216,12 @@ export function toWarehouseConnection(
 			at: received_at,
 			recordsSent: health.records_sent,
 			elapsedMs: health.elapsed_millis,
+<<<<<<< HEAD
 			failure: health.failure ? syncProblemOf({ ...health, failure: health.failure }) : null,
+=======
+			failure: health.failure ? syncProblemOf(health.failure) : null,
+			error: health.error ?? null,
+>>>>>>> origin/main
 			waiting: health.failure === 'busy',
 			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null,
 			mirroredTotal: totals ? (totals.find((t) => t.table === health.table)?.records ?? 0) : null
@@ -233,9 +245,13 @@ export function toWarehouseConnection(
 export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][]): WarehouseSync | null {
 	const { syncs, newest } = syncsOf(observations);
 	if (!syncs.length) return null;
+<<<<<<< HEAD
 	const failing = [...newest.values()].flatMap(({ report: { health } }) => (health.failure && health.failure !== 'busy' ? [`${health.table}: failed while ${SYNC_STAGE[health.failure]}${readCauseOf(health)}`] : []));
 	const running = syncs[0].report.health;
 	const done = syncs.find((s) => s.report.health.progress?.completed);
+=======
+	const failing = [...newest.values()].flatMap(({ report: { health } }) => (health.failure && health.failure !== 'busy' ? [`${health.table}: ${syncProblemOf(health.failure, health.error).replace(/^F/, 'f')}`] : []));
+>>>>>>> origin/main
 	return {
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,
 		lastError: failing.length ? failing.sort().join('\n') : null,

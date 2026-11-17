@@ -1,6 +1,7 @@
 //! Python check planning: run-state recording, dependency relations and read-side preflight.
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
+use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 
 use pyo3::IntoPyObject;
 use pyo3::prelude::{
@@ -263,6 +264,7 @@ pub(crate) struct ReadSideInputs<'py> {
     pub(crate) validation_refs: Bound<'py, PyAny>,
     pub(crate) project_relations: Bound<'py, PyAny>,
     pub(crate) providers: Bound<'py, PyAny>,
+    pub(crate) target_config: Option<TargetSettingsValues>,
 }
 
 fn reference_kind(reference: &Bound<'_, PyAny>) -> PyResult<String> {
@@ -444,6 +446,11 @@ fn read_side_references<'py>(
 fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = inputs.adapter.py();
     let project: Bound<'py, PyAny> = native_field(&inputs.pipeline_result, "project")?;
+    let (default_database, default_schema) = inputs
+        .target_config
+        .clone()
+        .unwrap_or_default()
+        .node_locations(&inputs.adapter)?;
     call_with(
         &host_entry(py, ExecutorHost::PythonNodeRuntime)?,
         &[
@@ -455,13 +462,14 @@ fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>
             ("vars", native_field(&project, "effective_vars")?),
             ("is_reload", false.into_pyobject(py)?.to_owned().into_any()),
             (
-                "default_database",
-                inputs.adapter.call_method0("default_database")?,
+                "target_config",
+                match &inputs.target_config {
+                    Some(settings) => settings.record(py)?,
+                    None => py.None().into_bound(py),
+                },
             ),
-            (
-                "default_schema",
-                inputs.adapter.call_method0("default_schema")?,
-            ),
+            ("default_database", default_database),
+            ("default_schema", default_schema),
             ("relation_targets", inputs.relation_targets.clone()),
             ("project_relations", inputs.project_relations.clone()),
             ("providers", inputs.providers.clone()),
@@ -541,6 +549,7 @@ fn run_check_read_side_dependencies<'py>(
         validation_refs: arguments.value("validation_refs")?,
         project_relations: arguments.value("project_relations")?,
         providers: arguments.value("providers")?,
+        target_config: None,
     })
 }
 

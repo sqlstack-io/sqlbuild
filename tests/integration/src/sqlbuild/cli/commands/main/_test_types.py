@@ -215,8 +215,7 @@ class CustomHostInterruptIntegrationTestCase:
     description: str
     model_count: int
     hosts: int
-    interrupt_after_seconds: float
-    expected_max_seconds: float
+    expected_host_launches: int
 
 
 @dataclass(frozen=True)
@@ -924,13 +923,14 @@ class SqlReadabilityTestCase:
 
 @dataclass(frozen=True)
 class ExpressionMacroFormatTestCase:
-    """A Snowflake expression macro in one location, and the file formatting leaves."""
+    """An expression macro in one location, and the file formatting leaves on an adapter."""
 
     description: str
     macro_directory: str
     consumer_folders: tuple[str, ...]
     authored_macro: str
     expected_macro: str
+    adapter: str = "snowflake"
 
 
 @dataclass(frozen=True)
@@ -1172,6 +1172,15 @@ class SqlRuleCacheSequenceTestCase:
     description: str
     steps: tuple[tuple[str, str], ...]
     expected_hits_and_misses: tuple[tuple[int, int], ...]
+
+
+@dataclass(frozen=True)
+class PerformanceRulesIntegrationTestCase:
+    """One compile of the DuckShop performance-rules fixture, optionally with one model added."""
+
+    description: str
+    extra_models: dict[str, str]
+    expected_findings: tuple[tuple[str, str, int, int], ...]
 
 
 @dataclass(frozen=True)

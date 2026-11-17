@@ -157,6 +157,22 @@ def run_project(
     return project_dir, result
 
 
+def wave_models(count: int) -> dict[str, str]:
+    """`count` chained models; each reads the previous one and calls the macro right and wrong."""
+
+    files: dict[str, str] = {}
+    upstreams: list[str] = ["stg_orders", *(f"level_{level}" for level in range(1, count))]
+    for level, upstream in enumerate(upstreams, start=1):
+        files[f"models/marts/level_{level}.sql"] = (
+            f'MODEL (description "Level {level}");\n\n'
+            "SELECT o.order_id, o.status, o.amount_cents,\n"
+            f"  @sql.cents_to_dollars(o.amount_cents) AS dollars_{level},\n"
+            f"  @sql.cents_to_dollars(o.status) AS wrong_{level}\n"
+            f'FROM __ref("{upstream}") AS o\n'
+        )
+    return files
+
+
 def output(result: subprocess.CompletedProcess[str]) -> str:
     """Everything one command printed."""
 

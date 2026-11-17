@@ -109,10 +109,15 @@ reports a job or sensor `select` that names more than three nodes one by one; se
 ## Group jobs
 
 A job group runs its jobs as one run. A job waits for another job in the group when it reads a node
+<<<<<<< HEAD
 that job builds, directly or through nodes no job in the group builds. It waits only for the
 nearest such jobs: what they read is their own wait, so a node further upstream, such as a function
 many jobs build, adds no more waits. A job never waits for the other jobs that build a node it
 builds itself.
+=======
+that job builds. Jobs that wait on each other, directly or through other members, are a cycle, and
+`sqb compile` reports every cycle in the group as one `D017` error.
+>>>>>>> origin/main
 
 ```toml
 # orchestration/job_groups/daily_orders_job_group.toml
@@ -126,6 +131,7 @@ A group takes `name`, `description` and `jobs`, and the same `targets`, `owner`,
 `pools`, `schedule` and `[retry]` as a job. Its members are jobs, never other
 groups.
 
+<<<<<<< HEAD
 When a location publishes, it records why each member waits, node by node: a node of the earlier
 job feeds a node of the waiting job, directly or through nodes no member selects, such as a source
 between a loader job and the models that read it. The job's page shows these reasons.
@@ -167,6 +173,10 @@ on_failure = "skip"
   [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures).
 - `wait_for = "node"`, which will start each node as soon as the nodes it reads are built, is
   planned but not available yet; `sqb compile` refuses it, so use `"job"` for now.
+=======
+A job that reads a seed or a node that several members build waits for all of those members. Give
+seeds and shared nodes their own job, so the jobs that read them wait only for that job.
+>>>>>>> origin/main
 
 ## Schedule a job
 
@@ -284,6 +294,7 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | `job 'nightly_orders_job' uses pool 'warehouse_hevy', which [pools] in sqlbuild_project.toml does not declare` | Fix the name, or declare the pool in [`[pools]`](project-configuration.md#pools) |
 | `job 'nightly_orders_job' takes 2 slots of pool 'supplier_api', more than its limit of 1 on target 'production'` | Take fewer slots, or raise the limit in `[targets.production.pools]` |
 | `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
+| `group dependencies contain a cycle in job group daily_orders_job_group: orders_marts_job waits for staging_orders_job (model:orders reads model:stg_orders); staging_orders_job waits for orders_marts_job (model:stg_orders reads seed:regions)` | Move each node to one job, and give seeds and nodes that several members read their own job that runs first |
 
 Details:
 

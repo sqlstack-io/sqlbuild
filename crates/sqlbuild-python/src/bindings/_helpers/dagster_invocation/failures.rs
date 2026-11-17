@@ -9,12 +9,10 @@ use sqlbuild_core::dagster_invocation::main::failure_summary::failure_summary;
 use sqlbuild_core::dagster_invocation::models::{AssetFailure, FailedCheck};
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::dagster_invocation::access::constant_contains;
-use crate::bindings::_helpers::dagster_invocation::access::get;
-use crate::bindings::_helpers::dagster_invocation::access::items;
-use crate::bindings::_helpers::dagster_invocation::access::text_of;
-use crate::bindings::_helpers::dagster_invocation::results::SKIPPED_CHECK_STATUS;
-use crate::bindings::_helpers::dagster_invocation::results::warn_severity;
+use crate::bindings::_helpers::dagster_invocation::access::{
+    constant_contains, get, items, text_of,
+};
+use crate::bindings::_helpers::dagster_invocation::results::{SKIPPED_CHECK_STATUS, warn_severity};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 

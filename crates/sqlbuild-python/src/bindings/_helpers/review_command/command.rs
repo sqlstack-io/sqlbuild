@@ -25,37 +25,24 @@ use sqlbuild_analysis::review_command::models::{
 use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 
 use crate::bindings::_helpers::clone::clone_progress::write_line;
-use crate::bindings::_helpers::review_command::comparison::ComparisonContext;
-use crate::bindings::_helpers::review_command::comparison::Comparisons;
-use crate::bindings::_helpers::review_command::comparison::Sides;
-use crate::bindings::_helpers::review_command::comparison::compare_models;
-use crate::bindings::_helpers::review_command::comparison::prepare_sides;
-use crate::bindings::_helpers::review_command::execution::BuildOutcome;
-use crate::bindings::_helpers::review_command::execution::RunInputs;
-use crate::bindings::_helpers::review_command::execution::build_validated;
-use crate::bindings::_helpers::review_command::execution::incremental_starts;
-use crate::bindings::_helpers::review_command::execution::run_changed_tests;
+use crate::bindings::_helpers::review_command::comparison::{
+    ComparisonContext, Comparisons, Sides, compare_models, prepare_sides,
+};
+use crate::bindings::_helpers::review_command::execution::{
+    BuildOutcome, RunInputs, build_validated, incremental_starts, run_changed_tests,
+};
 use crate::bindings::_helpers::review_command::impact::affected_columns;
-use crate::bindings::_helpers::review_command::planning::Compiled;
-use crate::bindings::_helpers::review_command::planning::ReviewProject;
-use crate::bindings::_helpers::review_command::planning::ReviewSettings;
-use crate::bindings::_helpers::review_command::planning::discover;
-use crate::bindings::_helpers::review_command::planning::review_project;
-use crate::bindings::_helpers::review_command::planning::review_settings;
-use crate::bindings::_helpers::review_command::planning::selected_tokens;
-use crate::bindings::_helpers::review_command::schema::ReviewSchema;
-use crate::bindings::_helpers::review_command::schema::connection_config;
-use crate::bindings::_helpers::review_command::schema::create_review_schema;
-use crate::bindings::_helpers::review_command::schema::drop_review_schema;
-use crate::bindings::_helpers::review_command::schema::review_schema;
-use crate::bindings::_helpers::review_command::schema::with_review_target;
-use crate::bindings::_helpers::review_command::support::error_parts;
-use crate::bindings::_helpers::review_command::support::failed_error;
-use crate::bindings::_helpers::review_command::support::invocation_id;
-use crate::bindings::_helpers::review_command::support::phase;
-use crate::bindings::_helpers::review_command::support::plan_error;
-use crate::bindings::_helpers::review_command::support::progress_stream;
-use crate::bindings::_helpers::review_command::support::utc_now_compact;
+use crate::bindings::_helpers::review_command::planning::{
+    Compiled, ReviewProject, ReviewSettings, discover, review_project, review_settings,
+    selected_tokens,
+};
+use crate::bindings::_helpers::review_command::schema::{
+    ReviewSchema, connection_config, create_review_schema, drop_review_schema, review_schema,
+    with_review_target,
+};
+use crate::bindings::_helpers::review_command::support::{
+    error_parts, failed_error, invocation_id, phase, plan_error, progress_stream, utc_now_compact,
+};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::recall::main::write_stdout_bytes::write_stdout_bytes;

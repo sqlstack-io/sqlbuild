@@ -27,6 +27,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
     DiscoverTaskAssetFunctionsTestCase,
     PythonRootHelperIdentityTestCase,
     PythonRootProjectIsolationTestCase,
+    RestoredPythonPackageIdentityTestCase,
     UnrelatedPythonPackageTestCase,
 )
 
@@ -546,6 +547,111 @@ def test_given_python_root_helper_edit_when_rediscovering_then_node_identity_cha
         dependency.source_path for dependency in after.dependencies
     }
     assert test_case.edited_text in after.metadata_json
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RestoredPythonPackageIdentityTestCase(
+            description="helper imported through the project package stays a dependency",
+            unrelated_files={"site/python/__init__.py": "", "site/python/orders.py": "X = 1\n"},
+            project_files=_HELPER_PACKAGE_FILES,
+            expected_dependency_path="python/helpers/clean.py",
+        ),
+        RestoredPythonPackageIdentityTestCase(
+            description="helper called from a helper class method stays a dependency",
+            unrelated_files={"site/python/__init__.py": "", "site/python/orders.py": "X = 1\n"},
+            project_files={
+                "python/helpers/__init__.py": "",
+                "python/helpers/text.py": """
+def strip_status(value):
+    return value.strip().lower()
+""",
+                "python/helpers/cleaner.py": """
+from .text import strip_status
+
+
+class Cleaner:
+    def run(self, value):
+        return strip_status(value)
+""",
+                "python/orders.py": """
+import python.helpers.cleaner
+from sqlbuild.tasks import task
+
+
+@task
+def orders(ctx):
+    return python.helpers.cleaner.Cleaner().run(" Shipped ")
+""",
+            },
+            expected_dependency_path="python/helpers/text.py",
+        ),
+        RestoredPythonPackageIdentityTestCase(
+            description="a class attribute whose attribute lookup loops does not stop identity",
+            unrelated_files={"site/python/__init__.py": "", "site/python/orders.py": "X = 1\n"},
+            project_files={
+                "python/helpers/__init__.py": "",
+                "python/helpers/text.py": """
+def strip_status(value):
+    return value.strip().lower()
+""",
+                "python/helpers/cleaner.py": """
+from .text import strip_status
+
+
+class Lazy:
+    def __getattr__(self, name):
+        return self
+
+
+class Cleaner:
+    lazy = Lazy()
+
+    def run(self, value):
+        return strip_status(value)
+""",
+                "python/orders.py": """
+import python.helpers.cleaner
+from sqlbuild.tasks import task
+
+
+@task
+def orders(ctx):
+    return python.helpers.cleaner.Cleaner().run(" Shipped ")
+""",
+            },
+            expected_dependency_path="python/helpers/text.py",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_unrelated_python_package_restored_when_building_identity_then_helpers_are_dependencies(
+    test_case: RestoredPythonPackageIdentityTestCase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    project_dir: Path = tmp_path / "project"
+    write_repo_files(tmp_path, test_case.unrelated_files)
+    write_repo_files(project_dir, test_case.project_files)
+    monkeypatch.delitem(sys.modules, "python", raising=False)
+    monkeypatch.delitem(sys.modules, "python.orders", raising=False)
+    monkeypatch.syspath_prepend(str(tmp_path / "site"))
+    monkeypatch.setitem(sys.modules, "python", importlib.import_module("python"))
+    monkeypatch.setitem(sys.modules, "python.orders", importlib.import_module("python.orders"))
+
+    task: DiscoveredTaskFunction = discover_python_node_functions(project_dir=project_dir).tasks[0]
+    identity: PythonNodeIdentity = build_python_node_identity(
+        node_type="task",
+        node_name=task.name,
+        function=task.function,
+        project_dir=project_dir,
+    )
+
+    assert test_case.expected_dependency_path in {
+        dependency.source_path for dependency in identity.dependencies
+    }
 
 
 @pytest.mark.parametrize(

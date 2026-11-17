@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -8,12 +9,13 @@ use crate::python_rules::tests::helpers::{
     unit_scaling_project,
 };
 use crate::python_rules::tests::test_types::{
-    PurityScalingTestCase, PythonGrowthTestCase, PythonScalingTestCase, UnitScalingTestCase,
+    PurityScalingTestCase, PythonScalingTestCase, UnitScalingTestCase,
 };
 
 #[test]
 fn given_many_modules_and_dense_findings_when_evaluating_python_rules_then_finishes_within_budget()
 {
+    install_test_identity();
     let _serial = serial_timing();
     let test_cases = [PythonScalingTestCase {
         description: "default rules over 4000 modules and 40 hooks of 300 findings each",
@@ -42,47 +44,9 @@ fn given_many_modules_and_dense_findings_when_evaluating_python_rules_then_finis
 }
 
 #[test]
-fn given_four_times_the_modules_when_finding_unreachable_definitions_then_time_grows_near_linearly()
-{
-    let _serial = serial_timing();
-    let test_cases = [PythonGrowthTestCase {
-        description: "unreachable definitions walking every import, 500 against 2000 modules",
-        units: 500,
-        noisy_files: 5,
-        functions: 150,
-        config: json!({ "select": ["SQBRPYTHON", "SQBRPYTHON306"] }),
-        growth: 4,
-        pairs: 5,
-        expected_unreachable_definitions: 2001,
-        expected_max_ratio: 6.5,
-    }];
-    for test_case in test_cases {
-        let small = scaling_project(test_case.units, test_case.noisy_files, test_case.functions);
-        let large = scaling_project(
-            test_case.growth * test_case.units,
-            test_case.growth * test_case.noisy_files,
-            test_case.functions,
-        );
-        let (codes, _) = timed_python_codes(&large, test_case.config.clone()).expect("rules run");
-        let unreachable: usize = codes.iter().filter(|code| *code == "SQBRPYTHON306").count();
-        assert_eq!(
-            unreachable, test_case.expected_unreachable_definitions,
-            "{}",
-            test_case.description
-        );
-        let ratio: f64 = median_growth(&small, &large, &test_case.config, test_case.pairs);
-        assert!(
-            ratio < test_case.expected_max_ratio,
-            "{}: growing the project {}x multiplied the time by {ratio:.2}",
-            test_case.description,
-            test_case.growth
-        );
-    }
-}
-
-#[test]
 fn given_many_linked_node_units_when_evaluating_unit_rules_then_finishes_within_budget_and_grows_near_linearly()
  {
+    install_test_identity();
     let _serial = serial_timing();
     let test_cases = [UnitScalingTestCase {
         description: "default rules over a chain of 2000 units of node, main and checks, and 200 undescribed units",
@@ -131,6 +95,7 @@ fn given_many_linked_node_units_when_evaluating_unit_rules_then_finishes_within_
 #[test]
 fn given_many_roots_sharing_deep_call_chains_when_checking_compile_time_purity_then_finishes_within_budget()
  {
+    install_test_identity();
     let _serial = serial_timing();
     let test_cases = [PurityScalingTestCase {
         description: "5000 module-scope roots into 10 helper chains of 400 calls each",

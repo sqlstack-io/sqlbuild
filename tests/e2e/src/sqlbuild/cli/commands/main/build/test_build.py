@@ -13,6 +13,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     BuildE2ETestCase,
+    CtxTargetSchemaE2ETestCase,
     DeferCloneBuildE2ETestCase,
     DirectChangesOnlyBuildE2ETestCase,
     DirectPythonBuildHardeningE2ETestCase,
@@ -20,8 +21,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     PythonLoaderPersistedResultBuildE2ETestCase,
     PythonLoaderStatusResultBuildE2ETestCase,
     PythonPersistedResultBuildE2ETestCase,
+    PythonTargetConfigBuildE2ETestCase,
     PythonTargetIsolationBuildE2ETestCase,
     SelectionAwareStalenessBuildE2ETestCase,
+    UnresolvedTargetSinkE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     assert_defer_clone_build_case,
@@ -34,6 +37,22 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
     table_exists,
+)
+
+_TARGET_CONFIG_RECORDER: str = (
+    "import dataclasses, json\n"
+    "from pathlib import Path\n\n"
+    "def record(ctx, node):\n"
+    "    line = {'node': node, **dataclasses.asdict(ctx.target_config)}\n"
+    "    with Path(__file__).parents[1].joinpath('target_config.jsonl').open('a') as out:\n"
+    "        out.write(json.dumps(line) + '\\n')\n"
+)
+_TARGET_PROBE_SINK: str = (
+    "from providers.target_probe import TargetProbe\n"
+    "from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink\n\n"
+    "@lifecycle_event_sink\n"
+    "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
+    "    del event, target_probe\n"
 )
 
 
@@ -1805,6 +1824,323 @@ def test_given_loader_status_result_when_building_then_persists_loader_status_ro
             )
         )
         == test_case.expected_rows
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonTargetConfigBuildE2ETestCase(
+            description="local override of schema and loader_schema",
+            project_target_lines='schema = "dev"\nloader_schema = "raw_dev"\n',
+            local_target_lines='schema = "dev_local"\nloader_schema = "raw_local"\n',
+            expected_settings={
+                "name": "dev",
+                "database": None,
+                "schema": "dev_local",
+                "loader_schema": "raw_local",
+                "database_preserved": False,
+                "schema_preserved": False,
+            },
+        ),
+        PythonTargetConfigBuildE2ETestCase(
+            description="a lifecycle sink shares the provider and its target",
+            project_target_lines='schema = "dev"\nloader_schema = "raw_dev"\n',
+            local_target_lines='schema = "dev_local"\nloader_schema = "raw_local"\n',
+            expected_settings={
+                "name": "dev",
+                "database": None,
+                "schema": "dev_local",
+                "loader_schema": "raw_local",
+                "database_preserved": False,
+                "schema_preserved": False,
+            },
+            extra_files=(("sinks/events.py", _TARGET_PROBE_SINK),),
+        ),
+        PythonTargetConfigBuildE2ETestCase(
+            description="loader_schema falls back to the target schema",
+            project_target_lines='schema = "dev"\n',
+            local_target_lines='schema = "dev_local"\n',
+            expected_settings={
+                "name": "dev",
+                "database": None,
+                "schema": "dev_local",
+                "loader_schema": "dev_local",
+                "database_preserved": False,
+                "schema_preserved": False,
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_local_target_override_when_running_python_then_every_context_sees_resolved_target(
+    test_case: PythonTargetConfigBuildE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="python_target_config_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "python_target_config_project"\n'
+                'adapter = "duckdb"\n'
+                'default_target = "dev"\n\n'
+                "[connection]\n"
+                'database = "python_target_config_project.duckdb"\n\n'
+                "[targets.dev]\n" + test_case.project_target_lines
+            ),
+            "python/recorder.py": _TARGET_CONFIG_RECORDER,
+            "providers/target_probe.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.providers import Provider\n\n"
+                "class TargetProbe(Provider):\n"
+                "    '''Test provider TargetProbe.'''\n\n"
+                "    def setup(self, ctx):\n"
+                "        record(ctx, 'provider')\n"
+            ),
+            "python/tasks/configured.py": (
+                "from providers.target_probe import TargetProbe\n"
+                "from python.recorder import record\n"
+                "from sqlbuild.tasks import task\n\n"
+                "@task\n"
+                "def configured_task(ctx, target_probe: TargetProbe):\n"
+                "    '''Test task configured_task.'''\n"
+                "    record(ctx, 'task')\n"
+                "    return ctx.result()\n"
+            ),
+            "python/loaders/raw.py": (
+                "from providers.target_probe import TargetProbe\n"
+                "from python.recorder import record\n"
+                "from sqlbuild.loaders import loader\n\n"
+                "@loader\n"
+                "def raw_orders(ctx, target_probe: TargetProbe):\n"
+                "    '''Test loader raw_orders.'''\n"
+                "    record(ctx, 'loader')\n"
+                "    return [{'order_id': 1}]\n"
+            ),
+            "python/checks/configured.py": (
+                "from providers.target_probe import TargetProbe\n"
+                "from python.recorder import record\n"
+                "from python.tasks.configured import configured_task\n"
+                "from sqlbuild.checks import check\n\n"
+                "@check(depends_on=configured_task)\n"
+                "def configured_check(ctx, target_probe: TargetProbe):\n"
+                "    '''Test check configured_check.'''\n"
+                "    record(ctx, 'check')\n"
+                "    return ctx.pass_(message='recorded')\n"
+            ),
+            "sources/raw.yml": (
+                "sources:\n"
+                "  - name: raw_orders\n    description: Test source raw_orders.\n"
+                "    managed: true\n"
+                "    write_strategy: table\n"
+                "    columns:\n"
+                "      - name: order_id\n"
+                "        type: INTEGER\n"
+            ),
+            **dict(test_case.extra_files),
+        },
+    )
+    (project_dir / "sqlbuild_local.toml").write_text(
+        "[targets.dev]\n" + test_case.local_target_lines, encoding="utf-8"
+    )
+
+    results: list[subprocess.CompletedProcess[str]] = [
+        run_sqb(command=("--no-color", *command), project_dir=project_dir)
+        for command in (
+            ("build", "--select", "configured_task", "raw_orders"),
+            ("load", "--select", "raw_orders"),
+            ("check", "--select", "configured_check"),
+        )
+    ]
+
+    for result in results:
+        assert result.returncode == 0, result.stdout + result.stderr
+    recorded: list[dict[str, object]] = [
+        json.loads(line)
+        for line in (project_dir / "target_config.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    # Each command (build, load, check) sets the provider up once, before its first node runs.
+    assert [str(line.pop("node")) for line in recorded] == [
+        "provider",
+        "task",
+        "loader",
+        "check",
+        "provider",
+        "loader",
+        "provider",
+        "check",
+    ]
+    assert all(line == test_case.expected_settings for line in recorded), recorded
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UnresolvedTargetSinkE2ETestCase(
+            description="build fails before any sink provider is set up",
+            command=("build",),
+            expected_returncode=1,
+            expected_output="Unknown connection 'warehouse' selected by target",
+            expected_setups=[],
+        ),
+        UnresolvedTargetSinkE2ETestCase(
+            description="compile also needs the target and fails before provider setup",
+            command=("compile",),
+            expected_returncode=1,
+            expected_output="Unknown connection 'warehouse' selected by target",
+            expected_setups=[],
+        ),
+        UnresolvedTargetSinkE2ETestCase(
+            description="format needs no target and sets the provider up with None",
+            command=("format", "--check"),
+            expected_returncode=0,
+            expected_output="Completed.",
+            expected_setups=[None],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_free_commands_run(
+    test_case: UnresolvedTargetSinkE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="unresolved_target_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "unresolved_target_project"\n'
+                'adapter = "duckdb"\n'
+                'default_target = "dev"\n\n'
+                "[targets.dev]\n"
+                'connection = "warehouse"\n'
+                'schema = "dev"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Test model orders.', materialized table);\n\n"
+                "SELECT 1 AS order_id\n"
+            ),
+            "providers/target_probe.py": (
+                "import json\n"
+                "from pathlib import Path\n"
+                "from sqlbuild.providers import Provider\n\n"
+                "class TargetProbe(Provider):\n"
+                '    """Test provider TargetProbe."""\n\n'
+                "    def setup(self, ctx):\n"
+                "        line = None if ctx is None else ctx.target_config.name\n"
+                "        with Path(__file__).parents[1].joinpath('setups.jsonl').open('a') as out:\n"
+                "            out.write(json.dumps(line) + '\\n')\n"
+            ),
+            "sinks/events.py": _TARGET_PROBE_SINK,
+            "setups.jsonl": "",
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project_dir
+    )
+
+    assert result.returncode == test_case.expected_returncode, result.stdout + result.stderr
+    assert test_case.expected_output in result.stdout + result.stderr
+    setups: list[object] = [
+        json.loads(line)
+        for line in (project_dir / "setups.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert setups == test_case.expected_setups
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CtxTargetSchemaE2ETestCase(
+            description="a per-model schema has no loader location and fails no command",
+            target_schema="s_${CTX:model.name}",
+            expected_model_schema="s_orders",
+            expected_loader_schema=None,
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_loader_schema(
+    test_case: CtxTargetSchemaE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="ctx_target_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "ctx_target_project"\n'
+                'adapter = "duckdb"\n'
+                'default_target = "dev"\n\n'
+                "[connection]\n"
+                'database = "ctx_target_project.duckdb"\n\n'
+                "[targets.dev]\n"
+                f'schema = "{test_case.target_schema}"\n'
+            ),
+            "models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
+            "python/recorder.py": _TARGET_CONFIG_RECORDER,
+            "python/loaders/raw.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.loaders import loader\n\n"
+                "@loader\n"
+                "def raw_orders(ctx):\n"
+                '    """Test loader raw_orders."""\n'
+                "    record(ctx, 'loader')\n"
+                "    return [{'order_id': 1}]\n"
+            ),
+            "python/tasks/configured.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.tasks import task\n\n"
+                "@task\n"
+                "def configured_task(ctx):\n"
+                '    """Test task configured_task."""\n'
+                "    record(ctx, 'task')\n"
+                "    return ctx.result()\n"
+            ),
+            "sources/raw.yml": (
+                "sources:\n"
+                "  - name: raw_orders\n    description: Test source raw_orders.\n"
+                "    managed: true\n"
+                "    schema: raw\n"
+                "    write_strategy: table\n"
+                "    columns:\n"
+                "      - name: order_id\n"
+                "        type: INTEGER\n"
+            ),
+        },
+    )
+
+    results: list[subprocess.CompletedProcess[str]] = [
+        run_sqb(command=("--no-color", *command), project_dir=project_dir)
+        for command in (("build",), ("load",), ("check",))
+    ]
+
+    for result in results:
+        assert result.returncode == 0, result.stdout + result.stderr
+    db_path: Path = project_dir / "ctx_target_project.duckdb"
+    assert table_exists(
+        db_path=db_path, table_name="orders", schema=test_case.expected_model_schema
+    )
+    assert table_exists(db_path=db_path, table_name="raw_orders", schema="raw")
+    recorded: list[dict[str, object]] = [
+        json.loads(line)
+        for line in (project_dir / "target_config.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [(line["node"], line["name"], line["loader_schema"]) for line in recorded] == [
+        ("loader", "dev", test_case.expected_loader_schema),
+        ("task", "dev", test_case.expected_loader_schema),
+        ("loader", "dev", test_case.expected_loader_schema),
+    ], recorded
+    # Python node results land in the adapter's default schema; no schema keeps the template.
+    assert table_exists(db_path=db_path, table_name="_sqlbuild_node_results", schema="main")
+    assert (
+        query_duckdb(
+            db_path=db_path,
+            sql="SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE '%${%'",
+        )
+        == []
     )
 
 

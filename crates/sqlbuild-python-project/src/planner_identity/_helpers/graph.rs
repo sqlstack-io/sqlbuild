@@ -1,5 +1,6 @@
 //! Planner execution edges, their injected origins, stable execution order and buildability over compiled keys.
 
+<<<<<<< HEAD
 use crate::compiled_views::main::project::compiled_models::compiled_models;
 use crate::compiled_views::main::project::functions::functions;
 use crate::compiled_views::main::project::seeds::seeds;
@@ -18,6 +19,11 @@ use sqlbuild_analysis::graph::main::edge_keys::edge_keys;
 use sqlbuild_analysis::graph::models::EdgeDirection;
 use sqlbuild_analysis::planner_identity::main::execution_upstream::execution_upstream;
 use sqlbuild_analysis::planner_identity::models::ExecutionTest;
+=======
+use crate::planner_identity::main::execution_deps::execution_deps;
+use crate::planner_identity::main::execution_origins::execution_origins;
+use crate::planner_identity::main::graph_key::graph_key;
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::collections::{HashMap, HashSet};
 
@@ -287,6 +293,7 @@ pub(crate) fn missing_upstream_message<'py>(
         self::edge_origins(edge_origins, &mut objects)?;
     Ok(PyString::new(missing.py(), &message_of(&rows, &origins)))
 }
+<<<<<<< HEAD
 
 /// The audit-gate and hook-read edges a plan injects, which both execution readers need.
 pub(crate) type ExecutionGates = (Vec<GateRow>, Vec<HookRow>);
@@ -419,3 +426,5 @@ pub(crate) fn ordered_keys(
         .map(|key| (key.kind, key.name))
         .collect())
 }
+=======
+>>>>>>> origin/main

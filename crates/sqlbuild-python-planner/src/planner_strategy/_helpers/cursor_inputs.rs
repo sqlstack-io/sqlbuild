@@ -26,12 +26,19 @@ use sqlbuild_python_front::model_config::main::config::config_text_object::confi
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
+<<<<<<< HEAD
 use sqlbuild_python_project::planner_strategy::constants::ENFORCED_CONTRACT;
 use sqlbuild_python_project::planner_strategy::constants::INCREMENTAL_MATERIALIZATION;
 use sqlbuild_python_project::planner_strategy::constants::MODEL_REFERENCE;
 use sqlbuild_python_project::planner_strategy::constants::SEED_REFERENCE;
 use sqlbuild_python_project::planner_strategy::constants::SOURCE_REFERENCE;
 use sqlbuild_python_project::planner_strategy::constants::TIMESTAMP_CURSOR;
+=======
+use sqlbuild_python_project::planner_strategy::constants::{
+    ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
+    SOURCE_REFERENCE, TIMESTAMP_CURSOR,
+};
+>>>>>>> origin/main
 use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 

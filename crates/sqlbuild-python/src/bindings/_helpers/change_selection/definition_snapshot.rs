@@ -18,10 +18,9 @@ use sqlbuild_analysis::definition_changes::main::sql_definition_digest::sql_defi
 use sqlbuild_analysis::definition_changes::main::sql_macro_definition_digest::sql_macro_definition_digest;
 use sqlbuild_analysis::definition_changes::models::{DefinitionSnapshot, NodeDefinition};
 
-use crate::bindings::_helpers::change_selection::fingerprints::Fingerprinting;
-use crate::bindings::_helpers::change_selection::fingerprints::directory_digest;
-use crate::bindings::_helpers::change_selection::fingerprints::file_digest;
-use crate::bindings::_helpers::change_selection::fingerprints::text_of;
+use crate::bindings::_helpers::change_selection::fingerprints::{
+    Fingerprinting, directory_digest, file_digest, text_of,
+};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_planner::planner_identity::main::function_local_hashes::function_local_hashes;
 use sqlbuild_python_planner::planner_identity::main::seed_identity::seed_identity;

@@ -7,9 +7,9 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::query_command::main::render_dag_summary::render_dag_summary;
 
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::query_command::project::ProjectAdapter;
-use crate::bindings::_helpers::query_command::project::ProjectInputs;
-use crate::bindings::_helpers::query_command::project::project_adapter;
+use crate::bindings::_helpers::query_command::project::{
+    ProjectAdapter, ProjectInputs, project_adapter,
+};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

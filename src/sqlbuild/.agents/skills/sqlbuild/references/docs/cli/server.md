@@ -405,7 +405,19 @@ Details:
   reasons never syncs extra.
 - A sync reads the warehouse and never writes to it. On Snowflake, it skips state tables that
   haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
+- When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
+  or time retries a smaller page. Any other error, such as a missing permission or table, retries
+  after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
+  the sync stops until you request one, the location publishes again, or the next safety sync is
+  due (`sync_at_least_every`). The safety sync tries once; another failure stops it until the
+  following one.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
+- When a state table holds two rows with the same ID, such as one check result written twice, the
+  server keeps the row with the earlier time. Estimated query costs are the exception: when two
+  builds refresh the same estimate at once, they can write the same ID, and the server keeps the
+  later row, the one the warehouse treats as current. A server that kept a different row corrects it
+  at the location's next full reread, which runs when the location starts and on the first sync at
+  least 5 minutes after the previous full reread.
 
 ### Warehouse cost of an always-on location
 

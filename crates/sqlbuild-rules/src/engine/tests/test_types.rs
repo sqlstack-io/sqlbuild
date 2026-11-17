@@ -1,5 +1,7 @@
 use serde_json::Value;
 
+use crate::models::JsonGrain;
+
 use sqlbuild_sqltext::sql_scan::models::Unclosed;
 
 pub(crate) struct NativeEvaluationTestCase {
@@ -101,17 +103,6 @@ pub(crate) struct ThresholdEvaluationTestCase {
     pub(crate) query_sql: &'static str,
     pub(crate) references: Value,
     pub(crate) expected_codes: &'static [&'static str],
-}
-
-pub(crate) struct BuildIdentityTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) expected_hash_length: usize,
-}
-
-pub(crate) struct HashedWorkspaceFileTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) workspace_file: &'static str,
-    pub(crate) expected_hashed: bool,
 }
 
 pub(crate) struct ThresholdFingerprintTestCase {
@@ -280,6 +271,23 @@ pub(crate) struct QueryFactsTestCase {
     pub(crate) enum_columns: &'static [&'static str],
     pub(crate) columns: Value,
     pub(crate) expected_faults: &'static [(&'static str, u64, u64, &'static str)],
+}
+
+pub(crate) struct JsonGrainTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) name: &'static str,
+    pub(crate) select: &'static [&'static str],
+    pub(crate) query_sql: &'static str,
+    pub(crate) json_grain: Value,
+    pub(crate) expected_faults: &'static [(&'static str, u64, u64, &'static str)],
+}
+
+/// One model's grain after `json_grains` builds the four order models.
+pub(crate) struct JsonGrainsBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) row_name: &'static str,
+    pub(crate) expected_grain: Option<JsonGrain>,
 }
 
 /// A retained request evaluated again without SQL, with or without the cached findings.

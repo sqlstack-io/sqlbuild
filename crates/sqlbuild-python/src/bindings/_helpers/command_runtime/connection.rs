@@ -2,6 +2,7 @@
 
 use sqlbuild_python_base::native_host::main::host_error::host_error;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -18,8 +19,7 @@ use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
-use crate::bindings::_helpers::command_runtime::warehouses::apply_warehouse;
+use crate::bindings::_helpers::command_runtime::warehouses::{WarehouseInputs, apply_warehouse};
 use crate::bindings::_helpers::dbt_interop::profile_connection::resolve_raw_dbt_profile_connection;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -54,6 +54,8 @@ const TARGET_CONNECTION_OPTIONS: (&[&str], &[&str]) = (
     &["discovered_inputs", "project_dir", "target_name"],
     &["cli_vars"],
 );
+/// A command resolves its connection more than once, so the Snowflake-like keys warning prints once per process.
+static SNOWFLAKE_KEY_WARNED: AtomicBool = AtomicBool::new(false);
 const DBT_PROFILE_REQUIRES_PROJECT: &str =
     "connection.source = 'dbt_profile' requires project configuration";
 
@@ -308,7 +310,9 @@ fn connection_config<'py>(
             keys.push(key.extract()?);
         }
     }
-    if let Some(warning) = snowflake_key_warning(&adapter, &keys) {
+    if let Some(warning) = snowflake_key_warning(&adapter, &keys)
+        && !SNOWFLAKE_KEY_WARNED.swap(true, Ordering::Relaxed)
+    {
         warn(py, &warning)?;
     }
     anchor_local_database_path(&config, (project_dir, &adapter))?;

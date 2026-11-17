@@ -12,10 +12,7 @@ use sqlbuild_core::dbt_command::main::render_dbt_auto_init::render_dbt_auto_init
 use sqlbuild_core::dbt_command::models::ForwardedArg;
 
 use crate::bindings::_helpers::dbt_command::init_project::build_dbt_init_project;
-use crate::bindings::_helpers::dbt_command::support::color_enabled;
-use crate::bindings::_helpers::dbt_command::support::flag;
-use crate::bindings::_helpers::dbt_command::support::path;
-use crate::bindings::_helpers::dbt_command::support::stream;
+use crate::bindings::_helpers::dbt_command::support::{color_enabled, flag, path, stream};
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_output::build_progress::models::DbtInitProgressReporter;
 

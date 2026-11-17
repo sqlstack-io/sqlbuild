@@ -12,6 +12,7 @@ use crate::store::main::open_sqlite_store::open_sqlite_store;
 use crate::store::main::query_store::query_store;
 use crate::store::main::read_output_transcript::read_output_transcript;
 use crate::store::models::OpenMode;
+use crate::writer::_helpers::delivery::locked;
 use crate::writer::_helpers::queue::WriterState;
 use crate::writer::main::start_recall_session::start_recall_session;
 use crate::writer::models::{
@@ -175,8 +176,8 @@ pub(crate) fn unwritable_session() -> (bool, bool) {
     )
 }
 
-/// Seconds `close` took and whether delivery degraded, while another connection holds the write lock.
-pub(crate) fn close_under_held_lock(shutdown: Duration) -> (f64, bool) {
+/// While another connection holds the write lock: whether closing set its deadline exactly the budget after it began, the degraded reason, and the seconds `close` took.
+pub(crate) fn close_under_held_lock(shutdown: Duration) -> (bool, Option<String>, f64) {
     let directory = tempfile::tempdir().expect("a temporary directory can be created");
     let path = directory.path().join("logs/recall.sqlite3");
     let warm = start_recall_session(config(path.clone(), "warm"));
@@ -191,10 +192,19 @@ pub(crate) fn close_under_held_lock(shutdown: Duration) -> (f64, bool) {
     });
     session.append_output(OutputStream::Stdout, b"waiting\n");
     let started = std::time::Instant::now();
+    session.begin_close();
+    let began = std::time::Instant::now();
+    let deadline = locked(&session.shared.state)
+        .deadline
+        .expect("closing sets a deadline");
     let summary = session.close();
     let elapsed = started.elapsed().as_secs_f64();
     drop(holder);
-    (elapsed, summary.degraded_reason.is_some())
+    (
+        started + shutdown <= deadline && deadline <= began + shutdown,
+        summary.degraded_reason,
+        elapsed,
+    )
 }
 
 /// The notices and resulting store state after starting on a file that is not a database.

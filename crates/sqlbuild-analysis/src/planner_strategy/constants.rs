@@ -86,6 +86,8 @@ pub const PERMANENT_TABLE_TYPE: &str = "permanent";
 pub const TRANSIENT_TABLE_DDL: &str = "TRANSIENT TABLE";
 /// The permanent table DDL replacing the transient keyword.
 pub const PERMANENT_TABLE_DDL: &str = "TABLE";
+/// SQL dialects whose `delete_insert` cannot replace several rows per key.
+pub const GROUP_REPLACEMENT_UNSUPPORTED_DIALECTS: [&str; 1] = ["bigquery"];
 /// The warning code of an incremental model whose table keeps an outdated physical layout.
 pub const PHYSICAL_LAYOUT_PENDING_WARNING_CODE: &str = "PHYSICAL_LAYOUT_PENDING";
 /// Model config keys of a table's physical layout, in the order warnings name them.

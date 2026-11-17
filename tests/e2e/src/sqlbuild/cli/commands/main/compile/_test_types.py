@@ -287,7 +287,6 @@ class DenseDeltaEditLoopGuardTestCase:
     edited_model_index: int
     full_pairs: int
     expected_max_full_seconds: float
-    expected_max_delta_seconds: float
     expected_max_delta_cpu_ratio: float
     expected_max_fallback_cpu_ratio: float
     expected_max_rss_bytes: int
@@ -744,7 +743,7 @@ class CompileReuseRedirectTestCase:
 
 @dataclass(frozen=True)
 class CompileReuseEventTestCase:
-    """A lifecycle sink that must still receive invocation events on a reuse hit."""
+    """A lifecycle sink and the compile events it must receive."""
 
     description: str
     sink_name: str
@@ -1447,6 +1446,7 @@ class ManagedSourceLoaderLocationTestCase:
 
 
 @dataclass(frozen=True)
+<<<<<<< HEAD
 class GraphBoundaryCompileTestCase:
     """A round-trip project edited into a graph every plan refuses, and what compile reports."""
 
@@ -1455,3 +1455,9 @@ class GraphBoundaryCompileTestCase:
     edited_files: dict[str, str]
     expected_exit_code: int
     expected_output_fragments: tuple[str, ...]
+=======
+class JobGroupCyclesCase:
+    description: str
+    fixed_group_toml: str
+    expected_messages: tuple[str, ...]
+>>>>>>> origin/main

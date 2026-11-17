@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/sqlbuild-build-features",
+    "crates/sqlbuild-build-identity",
     "crates/sqlbuild-core",
     "crates/sqlbuild-cursor",
     "crates/sqlbuild-process-ownership",
@@ -38,6 +39,7 @@ resolver = "2"
 [workspace.metadata.native-layers]
 order = [
     "sqlbuild-build-features",
+    "sqlbuild-build-identity",
     "sqlbuild-core",
     "sqlbuild-cursor",
     "sqlbuild-process-ownership",
@@ -89,8 +91,8 @@ tower-http = { version = "0.6", default-features = false, features = ["compressi
 fensu-policy = "=0.22.0"
 # Fensu's Python facts and core rules without their Python bindings: the default `python`
 # feature adds PyO3, rusqlite, flate2 and sha2.
-fensu-facts = { version = "=0.31.0", default-features = false }
-fensu-native = { version = "=0.31.0", default-features = false }
+fensu-facts = { version = "=0.31.1", default-features = false }
+fensu-native = { version = "=0.31.1", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 # `sqb` names compute log captures with random ids, as `uuid.uuid4().hex`.
 getrandom = "0.4"
@@ -148,7 +150,7 @@ errno = "0.3"
 windows-sys = { version = "0.61", default-features = false, features = ["Win32_System_Diagnostics_Debug"] }
 # Recall's local store: SQLite compiled in, so every build has the same engine version.
 rusqlite = { version = "0.37", features = ["bundled", "column_decltype"] }
-rustix = { version = "1.1.4", default-features = false, features = ["fs", "process", "std", "termios"] }
+rustix = { version = "1.1.4", default-features = false, features = ["fs", "process", "std", "stdio", "termios"] }
 saphyr-parser = "0.1"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
@@ -172,6 +174,7 @@ utoipa = { version = "5", features = ["chrono", "uuid"] }
 sqlbuild-analysis = { path = "crates/sqlbuild-analysis" }
 sqlbuild-attachments = { path = "crates/sqlbuild-attachments" }
 sqlbuild-build-features = { path = "crates/sqlbuild-build-features" }
+sqlbuild-build-identity = { path = "crates/sqlbuild-build-identity" }
 sqlbuild-cache = { path = "crates/sqlbuild-cache" }
 sqlbuild-cli = { path = "crates/sqlbuild-cli" }
 sqlbuild-config = { path = "crates/sqlbuild-config" }
@@ -215,6 +218,8 @@ sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git"
 sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
 sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
 stacker = "0.1"
+# Counts heap allocations in growth tests, which measure work instead of time.
+stats_alloc = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 subtle = "2"
 tempfile = "3"

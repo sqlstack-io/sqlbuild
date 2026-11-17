@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import platform
 import re
@@ -24,6 +23,7 @@ from scripts.release_performance.constants import (
     PYPI_SIMPLE_JSON,
     PYPI_SIMPLE_URL,
     RELEASE_TAG_PREFIX,
+    SETUP_COMMAND_TIMEOUT_SECONDS,
     STDERR_TAIL_CHARACTERS,
     UNIVERSAL_WHEEL_MACHINE,
     WHEEL_MACHINE_ALIASES,
@@ -107,21 +107,33 @@ def release_source(*, version: str, repo_dir: Path, destination: Path) -> Path:
     """Extract the source tree of release tag v<version> from repo_dir into destination."""
 
     tag: str = RELEASE_TAG_PREFIX + version
-    completed: subprocess.CompletedProcess[bytes] = subprocess.run(
-        ["git", "-C", str(repo_dir), "archive", "--format=tar", tag],
-        capture_output=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        raise ReleasePerformanceError(
-            f"Release tag {tag} is not available in {repo_dir}, so the baseline's own benchmark "
-            "generator cannot be used; fetch the release tags or pass --baseline-source: "
-            + _tail(completed.stderr.decode("utf-8", errors="replace"))
-        )
     shutil.rmtree(destination, ignore_errors=True)
     destination.mkdir(parents=True)
-    with tarfile.open(fileobj=io.BytesIO(completed.stdout)) as archive:
-        archive.extractall(destination, filter="data")
+    tar: Path = destination.with_name(destination.name + ".tar")
+    try:
+        completed: subprocess.CompletedProcess[str] = run_setup_command(
+            command=[
+                "git",
+                "-C",
+                str(repo_dir),
+                "archive",
+                "--format=tar",
+                "--output",
+                str(tar),
+                tag,
+            ],
+            phase=f"Extracting release tag {tag}",
+        )
+        if completed.returncode != 0:
+            raise ReleasePerformanceError(
+                f"Release tag {tag} is not available in {repo_dir}, so the baseline's own "
+                "benchmark generator cannot be used; fetch the release tags or pass "
+                "--baseline-source: " + _tail(completed.stderr)
+            )
+        with tarfile.open(tar) as archive:
+            archive.extractall(destination, filter="data")
+    finally:
+        tar.unlink(missing_ok=True)
     return destination
 
 
@@ -143,7 +155,9 @@ def install_published(*, version: str, venv_dir: Path, python: str, wait_seconds
     deadline: float = time.monotonic() + wait_seconds
     while True:
         attempt: subprocess.CompletedProcess[str] = _uv_pip_install(
-            venv_dir=venv_dir, requirements=(f"{PACKAGE_NAME}=={version}",)
+            venv_dir=venv_dir,
+            requirements=(f"{PACKAGE_NAME}=={version}",),
+            phase=f"Installing {PACKAGE_NAME} {version} from the index",
         )
         if attempt.returncode == 0:
             return _sqb(venv_dir=venv_dir)
@@ -174,6 +188,7 @@ def install_wheel(*, wheel: Path, venv_dir: Path, python: str) -> Path:
     completed: subprocess.CompletedProcess[str] = _uv_pip_install(
         venv_dir=venv_dir,
         requirements=("--find-links", str(wheel.resolve().parent), str(wheel.resolve())),
+        phase=f"Installing {wheel.name}",
     )
     if completed.returncode != 0:
         raise ReleasePerformanceError(f"Installing {wheel} failed: {_tail(completed.stderr)}")
@@ -183,8 +198,8 @@ def install_wheel(*, wheel: Path, venv_dir: Path, python: str) -> Path:
 def installed_version(*, sqb: Path) -> str:
     """Return the version an installed sqb reports."""
 
-    completed: subprocess.CompletedProcess[str] = subprocess.run(
-        [str(sqb), "--version"], capture_output=True, text=True, check=False
+    completed: subprocess.CompletedProcess[str] = run_setup_command(
+        command=[str(sqb), "--version"], phase=f"Reading the version of {sqb}"
     )
     match: re.Match[str] | None = _RELEASE_VERSION.search(completed.stdout)
     if completed.returncode != 0 or match is None:
@@ -195,8 +210,9 @@ def installed_version(*, sqb: Path) -> str:
 def library_paths(*, python: Path) -> tuple[Path, ...]:
     """Return the package directories of `python`'s environment, which must match this Python."""
 
-    completed: subprocess.CompletedProcess[str] = subprocess.run(
-        [str(python), "-c", _LIBRARY_PATHS_PROBE], capture_output=True, text=True, check=False
+    completed: subprocess.CompletedProcess[str] = run_setup_command(
+        command=[str(python), "-c", _LIBRARY_PATHS_PROBE],
+        phase=f"Reading the package directories of {python}",
     )
     if completed.returncode != 0:
         raise ReleasePerformanceError(
@@ -211,6 +227,29 @@ def library_paths(*, python: Path) -> tuple[Path, ...]:
             f"{sys.version_info.major}.{sys.version_info.minor}"
         )
     return tuple(dict.fromkeys(Path(str(path)) for path in probe["paths"]))
+
+
+def run_setup_command(*, command: list[str], phase: str) -> subprocess.CompletedProcess[str]:
+    """Run a setup command; one that hangs is stopped and fails with the phase it blocked."""
+
+    try:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=SETUP_COMMAND_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        raise setup_timeout_error(phase=phase) from None
+
+
+def setup_timeout_error(*, phase: str) -> ReleasePerformanceError:
+    """Return the error for a setup phase that exceeded SETUP_COMMAND_TIMEOUT_SECONDS."""
+
+    return ReleasePerformanceError(
+        f"{phase} did not finish within {SETUP_COMMAND_TIMEOUT_SECONDS:g}s and was stopped"
+    )
 
 
 def existing_sqb(*, venv_dir: Path) -> Path:
@@ -247,6 +286,7 @@ def _install_from_wheel_urls(*, version: str, venv_dir: Path) -> bool:
     completed: subprocess.CompletedProcess[str] = _uv_pip_install(
         venv_dir=venv_dir,
         requirements=("--find-links", str(download_dir), f"{PACKAGE_NAME}=={version}"),
+        phase=f"Installing {PACKAGE_NAME} {version} from its wheel URLs",
     )
     if completed.returncode != 0:
         print(f"Wheel URL install failed: {_tail(completed.stderr)}", file=sys.stderr)
@@ -280,11 +320,9 @@ def _platform_matches(*, platform_tag: str, machine: str, system: str) -> bool:
 
 def _create_venv(*, venv_dir: Path, python: str) -> None:
     shutil.rmtree(venv_dir, ignore_errors=True)
-    completed: subprocess.CompletedProcess[str] = subprocess.run(
-        [_uv(), "venv", "--quiet", "--python", python, str(venv_dir)],
-        capture_output=True,
-        text=True,
-        check=False,
+    completed: subprocess.CompletedProcess[str] = run_setup_command(
+        command=[_uv(), "venv", "--quiet", "--python", python, str(venv_dir)],
+        phase=f"Creating the Python {python} environment {venv_dir}",
     )
     if completed.returncode != 0:
         raise ReleasePerformanceError(
@@ -293,10 +331,10 @@ def _create_venv(*, venv_dir: Path, python: str) -> None:
 
 
 def _uv_pip_install(
-    *, venv_dir: Path, requirements: tuple[str, ...]
+    *, venv_dir: Path, requirements: tuple[str, ...], phase: str
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [
+    return run_setup_command(
+        command=[
             _uv(),
             "pip",
             "install",
@@ -305,9 +343,7 @@ def _uv_pip_install(
             str(venv_dir / "bin" / "python"),
             *requirements,
         ],
-        capture_output=True,
-        text=True,
-        check=False,
+        phase=phase,
     )
 
 

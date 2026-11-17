@@ -11,31 +11,16 @@ use sqlbuild_core::scenario_command::models::SqlAnalysisCommand;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::scenario_command::conversions::succeeded;
-use crate::bindings::_helpers::scenario_command::presentation::CompletionKind;
-use crate::bindings::_helpers::scenario_command::presentation::RelayContext;
-use crate::bindings::_helpers::scenario_command::presentation::SectionStatus;
-use crate::bindings::_helpers::scenario_command::presentation::activity;
-use crate::bindings::_helpers::scenario_command::presentation::begin_section;
-use crate::bindings::_helpers::scenario_command::presentation::connection_hooks;
-use crate::bindings::_helpers::scenario_command::presentation::progress_relay;
-use crate::bindings::_helpers::scenario_command::presentation::write_completion;
-use crate::bindings::_helpers::scenario_command::setup::CompileInputs;
-use crate::bindings::_helpers::scenario_command::setup::ScenarioProject;
-use crate::bindings::_helpers::scenario_command::setup::capture_limits;
-use crate::bindings::_helpers::scenario_command::setup::capture_settings;
-use crate::bindings::_helpers::scenario_command::setup::cli_user_error;
-use crate::bindings::_helpers::scenario_command::setup::compile;
-use crate::bindings::_helpers::scenario_command::setup::discover_project;
-use crate::bindings::_helpers::scenario_command::setup::flush;
-use crate::bindings::_helpers::scenario_command::setup::project_adapter_name;
-use crate::bindings::_helpers::scenario_command::setup::project_connection_config;
-use crate::bindings::_helpers::scenario_command::setup::require_capture_dialect;
-use crate::bindings::_helpers::scenario_command::setup::require_sql_analysis;
-use crate::bindings::_helpers::scenario_command::setup::resolve_adapter;
-use crate::bindings::_helpers::scenario_command::setup::selected_scenarios;
-use crate::bindings::_helpers::scenario_command::setup::style;
-use crate::bindings::_helpers::scenario_command::setup::write;
-use crate::bindings::_helpers::scenario_command::setup::write_headers;
+use crate::bindings::_helpers::scenario_command::presentation::{
+    CompletionKind, RelayContext, SectionStatus, activity, begin_section, connection_hooks,
+    progress_relay, write_completion,
+};
+use crate::bindings::_helpers::scenario_command::setup::{
+    CompileInputs, ScenarioProject, capture_limits, capture_settings, cli_user_error, compile,
+    discover_project, flush, project_adapter_name, project_connection_config,
+    require_capture_dialect, require_sql_analysis, resolve_adapter, selected_scenarios, style,
+    write, write_headers,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

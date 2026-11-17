@@ -27,20 +27,16 @@ use sqlbuild_python_project::analysis_session::main::case_sensitive_shapes::case
 use sqlbuild_python_project::analysis_session::main::profile_dialect::profile_dialect;
 use sqlbuild_python_project::analysis_session::main::return_types::return_types;
 use sqlbuild_python_project::analysis_session::main::shape_rows::shape_rows;
-use sqlbuild_python_project::analysis_session::models::CacheStatsRow;
-use sqlbuild_python_project::analysis_session::models::FamilyRow;
-use sqlbuild_python_project::analysis_session::models::ModelRow;
-use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
-use sqlbuild_python_project::analysis_session::models::RequestRow;
+use sqlbuild_python_project::analysis_session::models::{
+    CacheStatsRow, FamilyRow, ModelRow, NativeModelAnalysisSession, RequestRow,
+};
 use sqlbuild_python_project::compiled_views::main::model_inputs::attached_schema::attached_schema;
 use sqlbuild_python_project::compiled_views::main::model_inputs::input_analysis_sql::input_analysis_sql;
 use sqlbuild_python_project::compiled_views::main::model_inputs::input_model_name::input_model_name;
 use sqlbuild_python_project::compiled_views::main::model_inputs::input_reference_rows::input_reference_rows;
 use sqlbuild_python_project::compiled_views::main::model_inputs::input_sql_macro_checks::input_sql_macro_checks;
-use sqlbuild_python_project::compiled_views::models::AttachedSchema;
-use sqlbuild_python_project::compiled_views::models::NativeModelInput;
-use sqlbuild_python_project::semantic_shapes::constants::VALID_FROM_DEFAULT;
-use sqlbuild_python_project::semantic_shapes::constants::VALID_TO_DEFAULT;
+use sqlbuild_python_project::compiled_views::models::{AttachedSchema, NativeModelInput};
+use sqlbuild_python_project::semantic_shapes::constants::{VALID_FROM_DEFAULT, VALID_TO_DEFAULT};
 
 const LOGGING_MODULE: &str = "logging";
 const DEBUG_LOGGER: &str = "sqlbuild.compile";

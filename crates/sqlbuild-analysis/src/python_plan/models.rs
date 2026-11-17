@@ -7,6 +7,7 @@ use crate::assembly::project::types::ObjectKey;
 pub struct LifecycleNode {
     /// `task`, `asset`, `loader` or `check`.
     pub kind: String,
+<<<<<<< HEAD
     /// The SQL resources the node reads, in authored order.
     pub sql_deps: Vec<ObjectKey>,
 }
@@ -19,6 +20,8 @@ pub struct RoundTripLoader {
     pub waits_for: Vec<ObjectKey>,
     /// Its selected upstream tasks and assets, which must succeed for it to load; sorted.
     pub gates: Vec<String>,
+=======
+>>>>>>> origin/main
 }
 
 /// Selected Python nodes split into ingress and read-side regions, each sorted.

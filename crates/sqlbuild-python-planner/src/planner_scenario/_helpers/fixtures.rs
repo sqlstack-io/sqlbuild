@@ -14,7 +14,10 @@ use sqlbuild_analysis::compiler::main::scenario_reader_ctes::scenario_reader_cte
 use sqlbuild_analysis::compiler::main::scenario_reader_sql::scenario_reader_sql;
 use sqlbuild_analysis::compiler::models::ScenarioHelperScope;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

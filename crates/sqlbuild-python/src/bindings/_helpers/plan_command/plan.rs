@@ -24,11 +24,17 @@ use sqlbuild_state::warehouse_state::models::WarehouseState;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
+<<<<<<< HEAD
 use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::changed_json;
 use crate::bindings::_helpers::plan_command::changed::changed_text;
+=======
+use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
+use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
+use crate::bindings::_helpers::plan_command::changed::{changed_json, changed_text};
+>>>>>>> origin/main
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -38,6 +44,10 @@ use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+<<<<<<< HEAD
+=======
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+>>>>>>> origin/main
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
 use sqlbuild_python_output::build_progress::main::with_verbose_inspection::with_verbose_inspection;
@@ -47,12 +57,18 @@ use sqlbuild_python_planner::consumption::main::changed_policy::changed_policy;
 use sqlbuild_python_planner::consumption::main::policy_line::policy_line;
 use sqlbuild_python_planner::consumption::main::preview_changed::preview_changed;
 use sqlbuild_python_planner::consumption::models::ChangedDecision;
+<<<<<<< HEAD
 use sqlbuild_python_planner::live_reads::models::LiveReads;
 use sqlbuild_python_planner::plan_output::constants::CHANGED_KEY;
 use sqlbuild_python_planner::plan_output::main::format_plan::format_plan;
 use sqlbuild_python_planner::plan_output::main::format_plan_json::format_plan_json;
 use sqlbuild_python_planner::planner_warehouse::models::PlannerReads;
 use sqlbuild_python_planner::planner_warehouse::models::SyncedReads;
+=======
+use sqlbuild_python_planner::plan_output::constants::CHANGED_KEY;
+use sqlbuild_python_planner::plan_output::main::format_plan::format_plan;
+use sqlbuild_python_planner::plan_output::main::format_plan_json::format_plan_json;
+>>>>>>> origin/main
 
 const COMMAND_NAME: &str = "plan";
 /// The plan document's field holding how long each planning step took.
@@ -66,9 +82,10 @@ const DEFAULT_SECTION_ENTRIES: i64 = 50;
 const ERROR_SEVERITY: &str = "error";
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 /// Request fields passed to the compile pipeline under the same name.
-const PIPELINE_FIELDS: [&str; 11] = [
+const PIPELINE_FIELDS: [&str; 12] = [
     "no_sql_validation",
     "no_cache",
+    "verbose",
     "defer_to",
     "defer_sources_to",
     "cursor_overrides",

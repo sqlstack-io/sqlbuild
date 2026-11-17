@@ -17,9 +17,7 @@ use sqlbuild_cli::argv::types::ArgvHost;
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 
 use crate::bindings::_helpers::cli::namespace::new_cli_namespace;
-use crate::bindings::_helpers::cli::surrogates::python_text;
-use crate::bindings::_helpers::cli::surrogates::rust_text;
-use crate::bindings::_helpers::cli::surrogates::uses_placeholders;
+use crate::bindings::_helpers::cli::surrogates::{python_text, rust_text, uses_placeholders};
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;

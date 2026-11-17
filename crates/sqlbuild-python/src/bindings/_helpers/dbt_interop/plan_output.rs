@@ -1,14 +1,15 @@
 //! Plan selected SQLBuild work against the live adapter and attach it to the interop plan.
 
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_planner::live_reads::models::LiveReads;
 
-use crate::bindings::_helpers::command_runtime::connection::anchor_local_database_path;
-use crate::bindings::_helpers::command_runtime::connection::with_dbt_profile;
+use crate::bindings::_helpers::command_runtime::connection::{
+    anchor_local_database_path, with_dbt_profile,
+};
 use crate::bindings::_helpers::command_runtime::warehouses::apply_command_warehouse;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

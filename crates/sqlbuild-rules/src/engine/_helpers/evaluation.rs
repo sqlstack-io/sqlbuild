@@ -1,7 +1,7 @@
+use crate::build_identity::main::native_build_identity::native_build_identity;
 use crate::configuration::main::validate as config;
 use crate::constants::{
-    API_VERSION, NATIVE_BUILD_IDENTITY, ORCHESTRATION_RULE_PREFIX, PYTHON_RULE_PREFIX,
-    RELATION_EXCEPTION_RULES,
+    API_VERSION, ORCHESTRATION_RULE_PREFIX, PYTHON_RULE_PREFIX, RELATION_EXCEPTION_RULES,
 };
 use crate::engine::_helpers::cache::{Cache, PendingBucketWrite, RuleCacheBucket, RuleCacheEntry};
 use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
@@ -431,7 +431,7 @@ pub(crate) fn evaluate_request_with(
             &request.rules_cache_path,
         )
     });
-    crate::rules::_helpers::sql_test_rules::with_fixture_memo(store.as_deref(), || {
+    crate::rules::_helpers::sql_checks::sql_test_rules::with_fixture_memo(store.as_deref(), || {
         let evaluated: Result<String, String> = evaluated_request(request, control);
         let keep: bool = match &evaluated {
             Ok(_) => !control.cancelled(),
@@ -589,7 +589,7 @@ fn model_cache_identity(model: &crate::models::Model, model_rules: &str) -> Resu
     let mut digest = blake3::Hasher::new();
     digest.update(MODEL_RULES_IDENTITY_SEED);
     digest.update(&[0]);
-    digest.update(NATIVE_BUILD_IDENTITY.as_bytes());
+    digest.update(native_build_identity().as_bytes());
     digest.update(&[0]);
     digest.update(model_rules.as_bytes());
     digest.update(&[0]);

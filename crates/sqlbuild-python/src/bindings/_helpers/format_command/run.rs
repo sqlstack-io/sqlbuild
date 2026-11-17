@@ -19,16 +19,13 @@ use sqlbuild_rules::lint_text::models::{
 };
 
 use crate::bindings::_helpers::format_command::cache::FormatCache;
-use crate::bindings::_helpers::format_command::files::FormatChange;
-use crate::bindings::_helpers::format_command::files::PendingWrite;
-use crate::bindings::_helpers::format_command::files::persist_changes;
-use crate::bindings::_helpers::format_command::stages::QuoteFix;
-use crate::bindings::_helpers::format_command::stages::each_file;
-use crate::bindings::_helpers::format_command::stages::format_header_text;
-use crate::bindings::_helpers::format_command::stages::lint_header_text;
-use crate::bindings::_helpers::format_command::stages::on_format_workers;
-use crate::bindings::_helpers::format_command::stages::parse_faults;
-use crate::bindings::_helpers::format_command::stages::quote_fixed_text;
+use crate::bindings::_helpers::format_command::files::{
+    FormatChange, PendingWrite, persist_changes,
+};
+use crate::bindings::_helpers::format_command::stages::{
+    QuoteFix, each_file, format_header_text, lint_header_text, on_format_workers, parse_faults,
+    quote_fixed_text,
+};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::compile_driver::constants::FORMAT_CACHE_HITS;

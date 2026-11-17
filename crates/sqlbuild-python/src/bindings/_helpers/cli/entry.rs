@@ -21,21 +21,17 @@ use sqlbuild_orchestration::runs::models::RunOutcome;
 
 use sqlbuild_python_base::build_progress::main::transient_lines::shared_transient_line_coordinator::shared_transient_line_coordinator;
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
-use crate::bindings::_helpers::cli::dispatch::command_facts;
-use crate::bindings::_helpers::cli::dispatch::dispatch_command;
+use crate::bindings::_helpers::cli::dispatch::{command_facts, dispatch_command};
 use crate::bindings::_helpers::cli::failure_cause::take_failure_cause;
 use sqlbuild_python_base::cli::main::offer_launch_record::offer_launch_record;
 use crate::bindings::_helpers::cli::machine_output::take_machine_output_written;
-use crate::bindings::_helpers::cli::observability::CliObservabilityScope;
-use crate::bindings::_helpers::cli::observability::cli_observability_scope;
-use crate::bindings::_helpers::cli::termination::CommandTerminated;
-use crate::bindings::_helpers::cli::termination::TERMINATED_MESSAGE;
-use crate::bindings::_helpers::cli::termination::TerminationHandler;
-use crate::bindings::_helpers::cli::termination::handle_sigterm;
-use crate::bindings::_helpers::cli::termination::interrupting_signal;
-use crate::bindings::_helpers::cli::termination::signal_exit_code;
-use crate::bindings::_helpers::cli::termination::terminated;
-use crate::bindings::_helpers::cli::termination::terminated_exit;
+use crate::bindings::_helpers::cli::observability::{
+    CliObservabilityScope, cli_observability_scope,
+};
+use crate::bindings::_helpers::cli::termination::{
+    CommandTerminated, TERMINATED_MESSAGE, TerminationHandler, handle_sigterm, interrupting_signal,
+    signal_exit_code, terminated, terminated_exit,
+};
 use sqlbuild_python_compile::compile_command::constants::COMPILE_COMMAND_NAME;
 use sqlbuild_python_compile::compile_command::main::invocation::format_compile_error_json::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;

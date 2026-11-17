@@ -1,16 +1,27 @@
 //! Warehouse source relation listing and column gathering for planning.
 
+<<<<<<< HEAD
+=======
+use crate::observations::main::capture_source_columns::capture_source_columns;
+>>>>>>> origin/main
 use crate::planner_warehouse::_helpers::inspection::snapshot::{columns_for, list_relations};
 use crate::planner_warehouse::constants::{
     COLUMN_INFO, METADATA_NAME_FILTER_LIMIT, RELATION_LOOKUP,
 };
+<<<<<<< HEAD
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::Read;
+=======
+>>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+<<<<<<< HEAD
+=======
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+>>>>>>> origin/main
 use sqlbuild_python_project::compiled_views::main::project::sources::sources;
 use sqlbuild_python_project::planner_phases::main::frozenset::frozenset;
 use sqlbuild_python_project::planner_phases::main::text::text;

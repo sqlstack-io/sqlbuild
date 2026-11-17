@@ -6,6 +6,10 @@ pub(crate) const POSITIVE_INTEGER_CONVERTER: &str = "_positive_integer";
 pub(crate) const POSITIVE_INTEGER_MESSAGE: &str = "value must be a positive integer";
 pub(crate) const NO_COLOR_OPTION: &str = "--no-color";
 pub(crate) const NO_COLOR_VARIABLE: &str = "NO_COLOR";
+/// Set by CI systems; `sqb dev` then prints plain lines.
+pub(crate) const CI_VARIABLE: &str = "CI";
+/// Turns live progress off; `sqb dev` then prints plain lines.
+pub(crate) const NO_PROGRESS_VARIABLE: &str = "SQLBUILD_NO_PROGRESS";
 pub(crate) const COLUMNS_VARIABLE: &str = "COLUMNS";
 /// `shutil.get_terminal_size`'s fallback width.
 pub(crate) const FALLBACK_COLUMNS: i64 = 80;
@@ -92,10 +96,17 @@ pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
 pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 /// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.
 pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
+<<<<<<< HEAD
 /// Seconds a state-table or catalog page may take; its byte budget bounds the transfer.
 pub(crate) const METADATA_PAGE_SECONDS: u64 = 120;
 /// Seconds added to a statistics page's allowance for each relation it samples.
 pub(crate) const STATISTICS_RELATION_SECONDS: u64 = 1;
+=======
+/// Failed reads in a row, waiting twice as long after each, that stop a sync until one is requested.
+pub(crate) const METADATA_FAILURE_LIMIT: u32 = 5;
+/// Characters of a failed read's error that its health report carries.
+pub(crate) const METADATA_ERROR_CHARS: usize = 500;
+>>>>>>> origin/main
 /// A metadata reader that ignores end of input this long after a synchronization is killed.
 pub(crate) const METADATA_READER_CLOSE_SECONDS: u64 = 5;
 /// How often a location asks git whether `HEAD` moved.
@@ -122,6 +133,7 @@ pub(crate) const CHANGED_BUILD_COMMAND: [&str; 2] = ["build", "--changed"];
 /// How much `sqb plan --json` output a location reads; model diffs over the server's cap are dropped.
 pub(crate) const PLAN_OUTPUT_BYTES: usize =
     8 * sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
+<<<<<<< HEAD
 
 /// How long an idle location waits between checks for named work; after work it checks at once.
 pub(crate) const LOCATION_WORK_IDLE_POLL: std::time::Duration = std::time::Duration::from_secs(2);
@@ -130,3 +142,9 @@ pub(crate) const PLAN_NOT_PRODUCED: &str =
     "sqb plan did not produce a plan; see the location's log";
 /// Return to the start of the line and erase it: a child's spinner may be drawn there.
 pub(crate) const CLEAR_TERMINAL_LINE: &str = "\r\u{1b}[K";
+=======
+/// `sqb dev` names at most this many changed inputs per change event.
+pub(crate) const CHANGED_PATHS_SHOWN: usize = 3;
+/// The spaces every `sqb dev` screen row starts with.
+pub(crate) const SCREEN_INDENT: usize = 2;
+>>>>>>> origin/main

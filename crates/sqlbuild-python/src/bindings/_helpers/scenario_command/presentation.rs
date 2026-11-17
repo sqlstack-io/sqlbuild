@@ -14,15 +14,12 @@ use sqlbuild_core::scenario_command::models::ScenarioNamespace;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::ScenarioRunResult;
 
-use crate::bindings::_helpers::scenario_command::conversions::capture_row;
-use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
-use crate::bindings::_helpers::scenario_command::conversions::write_local_runtime_target;
-use crate::bindings::_helpers::scenario_command::conversions::write_warehouse_runtime_target;
-use crate::bindings::_helpers::scenario_command::setup::boolean;
-use crate::bindings::_helpers::scenario_command::setup::flush;
-use crate::bindings::_helpers::scenario_command::setup::stream_isatty;
-use crate::bindings::_helpers::scenario_command::setup::text;
-use crate::bindings::_helpers::scenario_command::setup::write;
+use crate::bindings::_helpers::scenario_command::conversions::{
+    capture_row, scenario_result_row, write_local_runtime_target, write_warehouse_runtime_target,
+};
+use crate::bindings::_helpers::scenario_command::setup::{
+    boolean, flush, stream_isatty, text, write,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;

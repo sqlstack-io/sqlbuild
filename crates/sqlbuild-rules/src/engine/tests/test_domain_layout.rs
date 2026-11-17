@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 use tempfile::TempDir;
 
@@ -6,6 +7,7 @@ use crate::engine::tests::{helpers, test_types};
 #[test]
 fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_faults()
 -> Result<(), String> {
+    install_test_identity();
     let oversized_paths: Vec<String> = (0..11)
         .map(|index| format!("models/commerce/_macros/item_{index}.py"))
         .collect();

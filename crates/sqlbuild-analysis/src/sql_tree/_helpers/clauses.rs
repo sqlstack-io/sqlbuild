@@ -1,15 +1,17 @@
 //! Join and CTE clauses, which SQLQuack keeps as statement fields rather than expressions.
 
 use sqlquack_syntax::Expression;
+use sqlquack_syntax::expressions::names::models::Identifier;
 use sqlquack_syntax::expressions::queries::models::{Cte, Join, JoinKind, With};
 use sqlquack_syntax::tokens::models::Span;
 
 use crate::sql_tree::constants::{CTE_KIND, JOIN_KIND};
 
-/// One clause of a statement: its kind, its span, and the expressions it owns.
+/// One clause of a statement: its kind, its span, its name, and the expressions it owns.
 pub(crate) struct Clause<'ast> {
     pub(crate) kind: &'static str,
     pub(crate) span: Option<Span>,
+    pub(crate) name: Option<&'ast Identifier>,
     pub(crate) children: Vec<&'ast Expression>,
 }
 
@@ -45,6 +47,7 @@ fn cte_clause(cte: &Cte) -> Clause<'_> {
     Clause {
         kind: CTE_KIND,
         span: cte.span.0,
+        name: Some(&cte.alias),
         children: vec![&cte.this],
     }
 }
@@ -57,6 +60,7 @@ fn join_clause(join: &Join) -> Clause<'_> {
     Clause {
         kind: JOIN_KIND,
         span: join.span.0,
+        name: None,
         children,
     }
 }

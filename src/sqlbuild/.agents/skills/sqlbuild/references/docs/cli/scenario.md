@@ -125,10 +125,12 @@ daily_revenue_minimal                                            PASS  0.84s
     expect    assertion no_negative_revenue                      PASS
 
 PASS=1  FAIL=0  TOTAL=1  (0.91s)
+Statements: 9 (CREATE 3, SELECT 3, DROP 2, ALTER 1); compile time not reported by duckdb
 ```
 
 Each scenario row shows its wall time and the summary shows the total. `--json` reports the same
-values as `scenarios[].duration_ms` and `summary.duration_ms`.
+values as `scenarios[].duration_ms` and `summary.duration_ms`. The `Statements:` line and the JSON
+`statements` section are described in [Statement summary](test.md#statement-summary).
 
 Local scenarios add ERROR and SKIP statuses:
 

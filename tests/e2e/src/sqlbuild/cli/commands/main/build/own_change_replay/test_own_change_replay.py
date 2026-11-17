@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build.own_change_replay.helpers im
     insert_table_between_upstream_and_view,
     mark_first_day,
     merge_downstream_files,
+    plan,
     plan_models,
     relation_types,
     rename_upstream_with_cli,
@@ -341,6 +344,7 @@ def test_given_full_refresh_false_caller_when_function_forces_full_rebuild_then_
         RefusedPlanTestCase(
             description="explicit full refresh of a cursor-intrinsic merge names the FULL cause",
             expected_fragments=(
+                "error[S204]",
                 "Model 'downstream' was given a FULL backfill (--full-refresh)",
                 "non-microbatch full rebuild has no cursor interval",
                 "--start-cursor-ts",
@@ -361,6 +365,11 @@ def test_given_full_refresh_flag_on_cursor_intrinsic_merge_when_planning_then_na
         args=("--full-refresh", "--select", "downstream"),
         expected=test_case.expected_fragments,
     )
+    refused: subprocess.CompletedProcess[str] = plan(
+        project_dir=project_dir, args=("--json", "--full-refresh", "--select", "downstream")
+    )
+    assert refused.returncode != 0, refused.stdout + refused.stderr
+    assert json.loads(refused.stdout)["error"]["code"] == "S204", refused.stdout + refused.stderr
 
 
 @pytest.mark.parametrize(

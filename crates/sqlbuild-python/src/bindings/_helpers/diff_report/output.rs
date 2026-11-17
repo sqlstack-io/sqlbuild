@@ -9,8 +9,7 @@ use sqlbuild_cli::diff_report::models::{
     DiffDocumentOptions, DiffErrorFacts, DiffExampleOptions, DiffModelFacts, DiffTextOptions,
 };
 
-use crate::bindings::_helpers::diff_report::facts::diff_facts;
-use crate::bindings::_helpers::diff_report::facts::json_of;
+use crate::bindings::_helpers::diff_report::facts::{diff_facts, json_of};
 use sqlbuild_cli::diff_report::types::PhaseSeconds;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

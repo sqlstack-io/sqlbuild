@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use std::collections::BTreeMap;
 
 use serde_json::json;
@@ -15,6 +16,7 @@ use crate::custom_rule_cache::types::ReadSet;
 
 #[test]
 fn given_rule_identity_inputs_when_one_changes_then_only_relevant_edits_change_the_identity() {
+    install_test_identity();
     let test_cases = [
         IdentityTestCase {
             description: "the same inputs give the same identity",
@@ -53,6 +55,7 @@ fn given_rule_identity_inputs_when_one_changes_then_only_relevant_edits_change_t
 
 #[test]
 fn given_stored_results_when_looking_up_then_unchanged_subjects_and_reads_hit() {
+    install_test_identity();
     let test_cases = [
         LookupTestCase {
             description: "unchanged reads and subjects hit every subject",

@@ -17,12 +17,19 @@ use crate::native_commands::_helpers::execution::{
     acknowledge_metadata_page, begin_after_run, freeze_history_page, load_watermark,
     metadata_health, next_scan, page_limit, report_metadata_health, statistics_page,
 };
-use crate::native_commands::_helpers::execution::{finish_metadata_page, read_metadata_page};
+use crate::native_commands::_helpers::execution::{
+    failed_read, finish_metadata_page, location_warning, read_metadata_page, retry_stopped_sync,
+    wait_for_file,
+};
 use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::constants::METADATA_POLL_SECONDS;
 use crate::native_commands::models::{
+<<<<<<< HEAD
     LocationMetadataSync, LocationServe, LocationWatch, ReadFailure,
+=======
+    LocationMetadataSync, LocationServe, LocationWatch, MetadataReply,
+>>>>>>> origin/main
 };
 
 /// One bounded source or mirror page leaves named work polling a turn between pages.
@@ -32,7 +39,9 @@ pub(super) async fn sync_location_metadata(
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
-    if Instant::now() < state.next_at
+    retry_stopped_sync(&mut state);
+    if state.halted
+        || Instant::now() < state.next_at
         || state.locations.is_empty()
         || location_files(&options.project_dir, &watch.rules, &watch.local_files)
             != watch.observed.0
@@ -74,12 +83,13 @@ pub(super) async fn sync_location_metadata(
                 return retry_metadata(state, error);
             }
         }
-        let Some((read, page)) =
+        let Some((read, reply)) =
             read_metadata_page((options, script), state, stopped.as_mut()).await?
         else {
             return Ok(None);
         };
         state = read;
+<<<<<<< HEAD
         let page = match page {
             Ok(page) => {
                 state.reads_wake_compute = page.wakes_compute;
@@ -87,6 +97,15 @@ pub(super) async fn sync_location_metadata(
             }
             Err(failure) => {
                 return failed_read(state, failure, (client, poll), started, stopped.as_mut())
+=======
+        let page = match reply {
+            MetadataReply::Page(page) => page,
+            MetadataReply::Busy => {
+                return wait_for_file(state, (client, poll), started, stopped.as_mut()).await;
+            }
+            MetadataReply::Failed(failure) => {
+                return failed_read(state, (client, poll), (started, failure), stopped.as_mut())
+>>>>>>> origin/main
                     .await;
             }
         };
@@ -98,7 +117,7 @@ pub(super) async fn sync_location_metadata(
         if page.unchanged {
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },
-                () = metadata_health(&state, (client, poll), (started, None)) => {},
+                () = metadata_health(&state, (client, poll), (started, None), None) => {},
             }
             state.progress.scan_unchanged = true;
             return finish_metadata_page(next_scan(state)).await;
@@ -117,19 +136,24 @@ pub(super) async fn sync_location_metadata(
         Err(error) => {
             tokio::select! {
             result = &mut stopped => { result?; return Ok(None); },
+<<<<<<< HEAD
             () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
             }
             return retry_metadata(state, error);
+=======
+            () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery)), None) => {},
+>>>>>>> origin/main
         }
     };
     state.applied |= response.applied;
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
-        () = metadata_health(&state, (client, poll), (started, None)) => {},
+        () = metadata_health(&state, (client, poll), (started, None), None) => {},
     }
     finish_metadata_page(acknowledge_metadata_page(state)).await
 }
 
+<<<<<<< HEAD
 /// A busy warehouse file waits a poll interval; any other failed read retries a smaller page.
 async fn failed_read(
     mut state: LocationMetadataSync,
@@ -189,6 +213,8 @@ pub(crate) fn read_failure_line(state: &LocationMetadataSync, failure: &ReadFail
     )
 }
 
+=======
+>>>>>>> origin/main
 fn retry_metadata(
     mut state: LocationMetadataSync,
     error: ClientError,
@@ -200,6 +226,10 @@ fn retry_metadata(
     }
     state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
     state.reader = None;
+    location_warning(
+        "warehouse sync failed",
+        format!("retrying in {METADATA_POLL_SECONDS}s: {error}"),
+    );
     drop(write_output(&[(
         Stream::Stderr,
         &format!(

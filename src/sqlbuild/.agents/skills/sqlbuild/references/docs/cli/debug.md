@@ -6,7 +6,8 @@
 
 Online: https://sqlbuild.com/docs/cli/debug/
 
-Checks that your project config is valid, the adapter is resolvable, and the warehouse connection works. Useful for diagnosing setup issues.
+Checks that your project config is valid, the adapter is resolvable, and the warehouse connection works. Useful for diagnosing setup issues. It reads only the configuration, the adapter and the providers, so an error in a model,
+macro or Python node does not stop it.
 
 For detailed progress from any other command, use the global [`--debug`](build.md#global-options) option instead, as in `sqb --debug build`.
 

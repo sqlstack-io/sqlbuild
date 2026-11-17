@@ -19,11 +19,9 @@ use sqlbuild_analysis::review_command::models::{
 };
 use sqlbuild_config::project::models::ReviewConfig;
 
-use crate::bindings::_helpers::change_selection::base_snapshot::base_comparison;
-use crate::bindings::_helpers::change_selection::base_snapshot::base_variant;
+use crate::bindings::_helpers::change_selection::base_snapshot::{base_comparison, base_variant};
 use crate::bindings::_helpers::change_selection::definition_snapshot::project_wide_keys;
-use crate::bindings::_helpers::change_selection::selection::ChangedProject;
-use crate::bindings::_helpers::change_selection::selection::changed_project;
+use crate::bindings::_helpers::change_selection::selection::{ChangedProject, changed_project};
 use crate::bindings::_helpers::review_command::support::review_error;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;

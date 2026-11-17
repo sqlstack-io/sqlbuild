@@ -24,8 +24,7 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_conn
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_graph_from_compiled_project::build_project_graph_from_compiled_project;
 use sqlbuild_python_compile::compile_driver::main::setup::build_compiled_project::build_compiled_project;
-use crate::bindings::_helpers::contract_command::write::ContractWrite;
-use crate::bindings::_helpers::contract_command::write::write_contracts;
+use crate::bindings::_helpers::contract_command::write::{ContractWrite, write_contracts};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

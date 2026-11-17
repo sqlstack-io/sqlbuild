@@ -7,7 +7,11 @@ pub mod api;
 pub mod authorization;
 pub mod credentials;
 pub mod declarations;
+<<<<<<< HEAD
 pub mod node_states;
+=======
+pub mod dev_events;
+>>>>>>> origin/main
 pub mod platform;
 pub mod runs;
 pub mod scheduler;

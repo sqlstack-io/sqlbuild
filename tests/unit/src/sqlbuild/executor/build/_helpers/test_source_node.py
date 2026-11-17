@@ -15,6 +15,7 @@ from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind
 from tests.unit.src.sqlbuild.executor.build._helpers._test_types import (
     BuildSourceNodeExecutionTestCase,
+    BuildSourceNodeResultLocationTestCase,
 )
 from tests.unit.src.sqlbuild.executor.build._helpers.helpers import (
     build_discovered_source_loader,
@@ -86,3 +87,68 @@ def test_given_build_source_node_when_executing_then_runs_loader_runtime(
     assert rows == test_case.expected_rows
     assert progress_events == [test_case.expected_progress_event]
     assert start_events == [test_case.expected_start_event]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        BuildSourceNodeResultLocationTestCase(
+            description="an adapter without a default schema still records the result",
+            adapter_default_schema=None,
+            runtime_schema="analytics",
+            expected_result_schemas=("analytics",),
+        ),
+        BuildSourceNodeResultLocationTestCase(
+            description="the runtime location wins over the adapter default schema",
+            adapter_default_schema="main",
+            runtime_schema="analytics",
+            expected_result_schemas=("analytics",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_runtime_location_when_executing_source_node_then_result_is_written_there(
+    test_case: BuildSourceNodeResultLocationTestCase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter: DuckDbAdapter = DuckDbAdapter()
+    monkeypatch.setattr(adapter, "default_schema", lambda: test_case.adapter_default_schema)
+    connection: object = adapter.connect({"database": str(tmp_path / "source_node.duckdb")})
+    try:
+        result: LoadExecutionResult = execute_build_source_node(
+            key=CompiledObjectKey(CompiledResourceType.SOURCE, "raw_orders"),
+            plan=build_source_load_plan_output(
+                source_name="raw_orders", loader_name="raw_orders_loader"
+            ),
+            loader_functions_by_name={
+                "raw_orders_loader": build_discovered_source_loader(loader_name="raw_orders_loader")
+            },
+            loader_ref_entries={},
+            adapter=adapter,
+            connection_config={"database": str(tmp_path / "source_node.duckdb")},
+            connection=connection,
+            runtime=BuildRuntimeParams(
+                run_id="run-1",
+                target="dev",
+                default_schema=test_case.runtime_schema,
+            ),
+            callbacks=BuildCallbacks(),
+        )
+        result_schemas: tuple[str, ...] = tuple(
+            row[0]
+            for row in connection.execute(
+                "SELECT table_schema FROM information_schema.tables "
+                "WHERE table_name = '_sqlbuild_node_results' ORDER BY ALL"
+            ).fetchall()
+        )
+        recorded: list[tuple[object, ...]] = connection.execute(
+            f"SELECT node_type, target_schema, run_id "
+            f"FROM {test_case.runtime_schema}._sqlbuild_node_results"
+        ).fetchall()
+    finally:
+        adapter.close(connection)
+
+    assert result.status == ExecutionStatus.SUCCESS
+    assert result_schemas == test_case.expected_result_schemas
+    assert recorded == [("loader", test_case.runtime_schema, "run-1")]

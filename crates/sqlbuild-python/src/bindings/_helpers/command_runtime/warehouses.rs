@@ -18,8 +18,9 @@ use sqlbuild_core::text::main::python_strip::python_strip;
 
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::command_runtime::runtime_errors::expected_resolution_error;
-use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
+use crate::bindings::_helpers::command_runtime::runtime_errors::{
+    expected_resolution_error, raised,
+};
 use crate::bindings::_helpers::command_runtime::warehouse_scope::current_command_warehouse_scope;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

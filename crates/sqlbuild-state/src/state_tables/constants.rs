@@ -3,6 +3,7 @@
 pub(crate) const SQLSERVER_ADAPTER: &str = "sqlserver";
 /// Cursor key of a table without event IDs: always NULL, so it never orders or binds a value.
 pub(crate) const MISSING_EVENT_ID_KEY: &str = "NULL";
+<<<<<<< HEAD
 /// The trailing cursor key of a table whose projected columns already include `event_id`: aliased,
 /// so `ORDER BY event_id` names one output column (Snowflake rejects a duplicated output name).
 pub(crate) const EVENT_ID_KEY_PROJECTION: &str = ", event_id AS sqb_event_id_key";
@@ -10,3 +11,7 @@ pub(crate) const EVENT_ID_KEY_PROJECTION: &str = ", event_id AS sqb_event_id_key
 pub(crate) const NEWEST_VERSION_COLUMN: &str = "sqb_version";
 /// When an observation's first copy was written, so its copies share one rank.
 pub(crate) const NEWEST_FIRST_COLUMN: &str = "sqb_first_at";
+=======
+/// The column every event table identifies its rows by.
+pub(crate) const EVENT_ID_COLUMN: &str = "event_id";
+>>>>>>> origin/main

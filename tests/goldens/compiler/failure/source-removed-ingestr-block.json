@@ -1,0 +1,18 @@
+{
+ "commands": [
+  {
+   "label": "compile",
+   "exit_code": 1,
+   "diagnostics": [
+    {
+     "phase": "compile",
+     "severity": "error",
+     "code": "D006",
+     "message": "<project>/sources/raw.yml source 'raw_orders' declares an ingestr integration, which SQLBuild no longer supports; declare the source with `managed: true` and load it with a Python `@loader` named after the source instead"
+    }
+   ]
+  }
+ ],
+ "compiled": {},
+ "manifest": null
+}

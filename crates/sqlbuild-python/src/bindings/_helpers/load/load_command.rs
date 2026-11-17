@@ -19,14 +19,12 @@ use sqlbuild_core::load_command::models::{LoadCounts, LoadResultText};
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::load::load_progress::LoadCallbackRelay;
-use crate::bindings::_helpers::load::load_progress::LoadProgressReporter;
-use crate::bindings::_helpers::load::load_progress::load_result_text;
-use crate::bindings::_helpers::load::load_selection::LoadProject;
-use crate::bindings::_helpers::load::load_selection::LoaderDefaults;
-use crate::bindings::_helpers::load::load_selection::loader_defaults;
-use crate::bindings::_helpers::load::load_selection::loader_write_schemas;
-use crate::bindings::_helpers::load::load_selection::target_vars;
+use crate::bindings::_helpers::load::load_progress::{
+    LoadCallbackRelay, LoadProgressReporter, load_result_text,
+};
+use crate::bindings::_helpers::load::load_selection::{
+    LoadProject, LoaderDefaults, loader_defaults, loader_write_schemas, target_vars,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
@@ -37,7 +35,9 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::selected_target_settings::selected_target_settings;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
+use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::compile_attachment::main::build_effective_target_config::build_effective_target_config;
@@ -67,6 +67,7 @@ struct Invocation<'py> {
     selected: Vec<Bound<'py, PyAny>>,
     references: Vec<Bound<'py, PyAny>>,
     relation_sources: Vec<Bound<'py, PyAny>>,
+    defaults: LoaderDefaults<'py>,
     style: CliStyle,
     stream: Bound<'py, PyAny>,
 }
@@ -81,6 +82,7 @@ struct Preparation<'py> {
     cursor_overrides: Bound<'py, PyAny>,
     provider_session: Bound<'py, PyAny>,
     project_relations: Bound<'py, PyAny>,
+    target_config: TargetSettingsValues,
 }
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
@@ -180,6 +182,7 @@ fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Inv
         selected,
         references,
         relation_sources: project.sources,
+        defaults,
         style: CliStyle { use_color },
         stream,
     })
@@ -356,14 +359,23 @@ fn prepare<'py>(
     } else {
         new_record(py, RecordId::CursorOverrides, (), None)?
     };
+    let target_config: TargetSettingsValues = selected_target_settings(
+        (discovered, &native_field(request, "selected_target")?),
+        &adapter_name.extract::<String>()?,
+        (&connection_config, &runtime.1, &adapter),
+    )?;
     let provider_session: Bound<'py, PyAny> = call_with(
         &host_entry(py, UserCodeHost::BuildProviderSession)?,
-        &[(
-            "discovered_providers",
-            native_field(discovered, "providers")?,
-        )],
+        &[
+            (
+                "discovered_providers",
+                native_field(discovered, "providers")?,
+            ),
+            ("setup_context", target_config.setup_context(py)?),
+        ],
     )?;
     Ok(Preparation {
+        target_config,
         adapter_name: adapter_name.extract()?,
         project_relations: project_relations(invocation, &adapter)?,
         adapter,
@@ -384,6 +396,10 @@ fn runtime_params<'py>(
     let py: Python<'py> = request.py();
     let (target_name, effective_vars, run_id) = &preparation.runtime;
     let overrides: &Bound<'py, PyAny> = &preparation.cursor_overrides;
+    let defaults = (&invocation.defaults.database, &invocation.defaults.schema);
+    let (default_database, default_schema) = preparation
+        .target_config
+        .node_locations_from(defaults, &preparation.adapter)?;
     call_with(
         &host_entry(py, ExecutorHost::LoadRuntimeParams)?,
         &[
@@ -397,6 +413,9 @@ fn runtime_params<'py>(
             ("target", target_name.clone()),
             ("vars", effective_vars.clone()),
             ("is_reload", native_field(request, "reload")?),
+            ("target_config", preparation.target_config.record(py)?),
+            ("default_database", default_database),
+            ("default_schema", default_schema),
             (
                 "start_cursor_ts",
                 cursor_timestamp(&native_field(overrides, "start_ts")?)?,

@@ -277,12 +277,11 @@ inputs give the same output. See
 [Macros must be deterministic](../concepts/macros/python-macros.md#macros-must-be-deterministic). A
 compile whose templates read `run.id` is never reused.
 
-A replay differs from a full compile in three ways:
+A replay differs from a full compile in two ways:
 
 - In JSON, only `compile_timings` differs. It holds `project_reuse_hits`, `project_reuse_misses`,
   `project_reuse_bypasses`, `project_reuse_check_ms` and `total_ms`.
 - In text mode, the per-phase progress lines are not printed.
-- Lifecycle sinks receive only the invocation events, because no compile phase runs.
 
 When storing a result for reuse takes noticeable time, for example in a project with very many
 files, compile prints `Recording compile for reuse...` and a completion line on stderr before the
@@ -311,6 +310,7 @@ Compile runs in full instead when:
   a model-subject Rule must run again for a model that was not edited (for example because it reads
   an edited upstream file), or reads more for an edited model than that model's SQL, columns,
   contract and grain, project files and the source list;
+- the project selects `SQBRPERFORMANCE102` on the Snowflake dialect;
 - the previous compile failed its Rules, since that compile writes no SQL tests, functions or
   audits to `target/compiled/`, or it reported other errors or warnings in files the edit didn't
   change;

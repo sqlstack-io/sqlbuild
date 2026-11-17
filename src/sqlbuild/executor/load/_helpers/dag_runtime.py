@@ -189,8 +189,9 @@ def _execute_ready_dag_source(
         resolved_result_store = build_direct_node_result_store(
             adapter=adapter,
             connection=connection,
-            database=adapter.default_database(),
-            schema=adapter.default_schema(),
+            database=runtime.default_database,
+            schema=runtime.default_schema,
+            target_config=runtime.target_config,
         )
     return execute_source_load(
         source_entry=source,

@@ -13,6 +13,7 @@ use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_state::freshness::main::configuration_error::configuration_error;
 
 use crate::freshness::_helpers::exception_types::SourceFreshnessObservationError;
+<<<<<<< HEAD
 use crate::freshness::_helpers::observation::observation_record;
 use crate::freshness::_helpers::observation::observation_source;
 use crate::freshness::_helpers::observation::observe_adapter_batch;
@@ -27,12 +28,28 @@ use crate::planner_warehouse::models::Read;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::models::Dialect;
+=======
+use crate::freshness::_helpers::observation::{
+    observation_record, observation_source, observe_adapter_batch, observe_configured, strategy,
+    unknown,
+};
+use crate::freshness::_helpers::state_io::read_latest;
+use crate::freshness::_helpers::support::text;
+use crate::freshness::models::Observer;
+use crate::freshness::models::StateRead;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+>>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::types::RecordId;
+<<<<<<< HEAD
+=======
+use sqlbuild_python_base::warehouse_access::main::is_warehouse_access_refused::is_warehouse_access_refused;
+>>>>>>> origin/main
 use sqlbuild_python_front::state_rows::main::event_rows::age_policy::age_policy;
 use sqlbuild_python_front::state_rows::main::event_rows::equivalent::equivalent;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
@@ -42,7 +59,7 @@ const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavai
 
 /// The message of an adapter, freshness observation or preview access error, if it is one.
 fn handled_message<'py>(py: Python<'py>, error: &PyErr) -> PyResult<Option<Bound<'py, PyAny>>> {
-    if error.is_instance_of::<WarehouseAccessRefusedError>(py) {
+    if is_warehouse_access_refused(py, error) {
         return Ok(Some(text(py, PREVIEW_MESSAGE)));
     }
     let value: Bound<'py, PyAny> = error.value(py).clone().into_any();

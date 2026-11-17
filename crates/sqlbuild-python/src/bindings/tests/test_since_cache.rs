@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 
-use crate::bindings::tests::helpers::cache_key_under;
-use crate::bindings::tests::helpers::project_reading_environment;
+use sqlbuild_cli::launcher::main::install_native_build_identity::install_native_build_identity;
+
+use crate::bindings::tests::helpers::{cache_key_under, project_reading_environment};
 use crate::bindings::tests::test_types::CacheKeyTestCase;
 
 const BASE_ENVIRONMENT: [(&str, &str); 2] = [("ORDERS_REGION", "eu"), ("UNREAD_SETTING", "a")];
 
 #[test]
 fn given_referenced_environment_variable_when_keying_base_cache_then_its_value_counts() {
+    install_native_build_identity().expect("the build identity installs once");
     let project: PathBuf = project_reading_environment();
     let base_key: String = cache_key_under(&project, &BASE_ENVIRONMENT);
     let test_cases = [

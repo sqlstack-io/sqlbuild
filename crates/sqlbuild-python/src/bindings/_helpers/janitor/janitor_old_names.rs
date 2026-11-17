@@ -9,17 +9,12 @@ use sqlbuild_analysis::janitor_planning::main::old_name_request_matches::old_nam
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::janitor::janitor_facts::SchemaRelations;
-use crate::bindings::_helpers::janitor::janitor_facts::Warehouse;
-use crate::bindings::_helpers::janitor::janitor_facts::model_destinations;
-use crate::bindings::_helpers::janitor::janitor_keys::Folded;
-use crate::bindings::_helpers::janitor::janitor_keys::Key;
-use crate::bindings::_helpers::janitor::janitor_keys::SchemaKey;
-use crate::bindings::_helpers::janitor::janitor_keys::optional;
-use crate::bindings::_helpers::janitor::janitor_keys::record;
-use crate::bindings::_helpers::janitor::janitor_keys::sorted_schemas;
-use crate::bindings::_helpers::janitor::janitor_keys::text;
-use crate::bindings::_helpers::janitor::janitor_keys::tuple;
+use crate::bindings::_helpers::janitor::janitor_facts::{
+    SchemaRelations, Warehouse, model_destinations,
+};
+use crate::bindings::_helpers::janitor::janitor_keys::{
+    Folded, Key, SchemaKey, optional, record, sorted_schemas, text, tuple,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;

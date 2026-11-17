@@ -2,8 +2,13 @@ pub mod change_person_trigger;
 pub mod change_trigger;
 pub(crate) mod current_jobs;
 pub(crate) mod frozen_definitions;
+pub mod group_cycle_message;
 pub mod group_dependencies;
+<<<<<<< HEAD
 pub mod group_wait_reasons;
+=======
+pub mod group_wait_graph;
+>>>>>>> origin/main
 pub mod job_resources;
 pub mod list_person_jobs;
 pub mod list_person_trigger_changes;

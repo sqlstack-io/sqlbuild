@@ -1,6 +1,5 @@
 //! Project inputs holding only the project and local configuration.
 
-use crate::compile_driver::main::reject_invalid_connection_configuration::reject_invalid_connection_configuration;
 use crate::discovery::main::project::load_local_config_file::load_local_config_file;
 use crate::discovery::main::project::load_project_config_file::load_project_config_file;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
@@ -17,7 +16,7 @@ use sqlbuild_python_base::records::types::RecordId;
 pub(crate) fn configuration_inputs<'py>(
     py: Python<'py>,
     project_dir: &Bound<'py, PyAny>,
-    validate_connections: bool,
+    checks: impl FnOnce(&ProjectConfiguration<'_, '_>) -> PyResult<()>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let lifecycle: Bound<'py, PyAny> = call_with(
         &host_entry(py, ExecutorHost::OperationLifecycle)?,
@@ -30,25 +29,24 @@ pub(crate) fn configuration_inputs<'py>(
         ],
     )?;
     within(&lifecycle, |_| {
-        loaded_configuration(py, project_dir, validate_connections)
+        loaded_configuration(py, project_dir, checks)
     })
 }
 
+/// Both configuration files, after `checks` accepts them.
 pub(crate) fn loaded_configuration<'py>(
     py: Python<'py>,
     project_dir: &Bound<'py, PyAny>,
-    validate_connections: bool,
+    checks: impl FnOnce(&ProjectConfiguration<'_, '_>) -> PyResult<()>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let project_config: Bound<'py, PyAny> =
         load_project_config_file(py, project_dir)?.into_bound(py);
     let local_config: Bound<'py, PyAny> = load_local_config_file(py, project_dir)?.into_bound(py);
-    if validate_connections {
-        reject_invalid_connection_configuration(&ProjectConfiguration {
-            project_dir,
-            project_config: &project_config,
-            local_config: &local_config,
-        })?;
-    }
+    checks(&ProjectConfiguration {
+        project_dir,
+        project_config: &project_config,
+        local_config: &local_config,
+    })?;
     new_record_with(
         py,
         RecordId::DiscoveredProjectInputs,

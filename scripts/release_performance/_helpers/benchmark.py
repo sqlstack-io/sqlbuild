@@ -14,7 +14,7 @@ from typing import cast
 from scripts.cold_compile_performance._helpers.dense_project import write_dense_compile_project
 from scripts.compile_performance_ratio._helpers.edit import apply_one_model_edit
 from scripts.compile_performance_ratio._helpers.measure import run_checkout_generator
-from scripts.release_performance._helpers.versions import library_paths
+from scripts.release_performance._helpers.versions import library_paths, setup_timeout_error
 from scripts.release_performance.constants import (
     BASELINE_GENERATOR_ENTRY,
     BUILD_PROJECT,
@@ -29,6 +29,7 @@ from scripts.release_performance.constants import (
     INSPECTION_PROJECT,
     INSPECTION_WARMUPS,
     PRISTINE_DIRECTORY,
+    SETUP_COMMAND_TIMEOUT_SECONDS,
     STDERR_TAIL_CHARACTERS,
     TARGET_DIRECTORY,
     TIME_FORMAT,
@@ -174,14 +175,19 @@ def compare_command(
 def _run_baseline_generator(
     *, source: Path, python: Path, entry: str, arguments: tuple[str, ...], description: str
 ) -> None:
-    completed: subprocess.CompletedProcess[str] = run_checkout_generator(
-        checkout=source,
-        python=Path(sys.executable).absolute(),
-        entry=entry,
-        arguments=arguments,
-        environment=_environment(),
-        library_paths=library_paths(python=python),
-    )
+    paths: tuple[Path, ...] = library_paths(python=python)
+    try:
+        completed: subprocess.CompletedProcess[str] = run_checkout_generator(
+            checkout=source,
+            python=Path(sys.executable).absolute(),
+            entry=entry,
+            arguments=arguments,
+            environment=_environment(),
+            library_paths=paths,
+            timeout_seconds=SETUP_COMMAND_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        raise setup_timeout_error(phase=f"Baseline {description} generation") from None
     if completed.returncode != 0:
         raise ReleasePerformanceError(
             f"Baseline {description} generation with the generator in {source} failed with exit "

@@ -10,11 +10,18 @@ use sqlbuild_python_planner::planner_phases::main::timed::timed;
 use sqlbuild_python_planner::planner_warehouse::models::PlannerReads;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
+use sqlbuild_rules::rule_results::main::format_skipped_models::format_skipped_models;
 
+<<<<<<< HEAD
 use crate::bindings::_helpers::compile_driver::plan_result::PlanningInputs;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::plan_result::pipeline_result;
 use crate::bindings::_helpers::compile_driver::rules_at_load::rules_ran_at_load;
+=======
+use crate::bindings::_helpers::compile_driver::plan_result::{
+    PlanningInputs, connection_with_hooks, pipeline_result,
+};
+>>>>>>> origin/main
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -213,7 +220,13 @@ pub(crate) fn configured_rule_failures<'py>(
     if !on_progress.is_none() {
         let elapsed: f64 = monotonic(py)? - started;
         let message: String = rules_progress(elapsed, &result, true)?;
-        on_progress.call1((message,))?;
+        let note: Option<String> = format_skipped_models(
+            &native_field(&result, "skipped_models")?.extract::<Vec<_>>()?,
+            native_field(options, "verbose")?.is_truthy()?,
+        );
+        for line in std::iter::once(message).chain(note.map(|note| format!("note: {note}"))) {
+            on_progress.call1((line,))?;
+        }
     }
     let mut failing: Vec<Bound<'py, PyAny>> = Vec::new();
     for finding in native_field(&result, "findings")?.try_iter()? {

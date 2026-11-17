@@ -184,7 +184,12 @@ pub const OPERATION_KINDS: [&str; 10] = [
     "subprocess",
     "warehouse",
 ];
+<<<<<<< HEAD
 pub const OPERATION_NAMES: [&str; 55] = [
+=======
+/// Includes retired names, such as the removed dlt and ingestr loads, so stored history still decodes.
+pub const OPERATION_NAMES: [&str; 57] = [
+>>>>>>> origin/main
     "adbc_driver_install",
     "audit_evaluation",
     "clone_execution",

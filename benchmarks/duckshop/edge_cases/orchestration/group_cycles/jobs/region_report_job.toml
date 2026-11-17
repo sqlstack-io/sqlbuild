@@ -1,0 +1,3 @@
+name = "region_report_job"
+description = "Build the region report."
+select = "region_report"

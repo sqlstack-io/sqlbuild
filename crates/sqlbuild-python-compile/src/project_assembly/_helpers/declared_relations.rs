@@ -18,8 +18,7 @@ use sqlbuild_python_project::compiled_project::main::python_column_facts::python
 use sqlbuild_python_project::compiled_views::main::model_inputs::attached_columns::attached_columns;
 use sqlbuild_python_project::compiled_views::main::model_inputs::attached_schema::attached_schema;
 use sqlbuild_python_project::resource_views::main::source_views::read_source_view::read_source_view;
-use sqlbuild_python_project::resource_views::types::AttachedSource;
-use sqlbuild_python_project::resource_views::types::SourceViews;
+use sqlbuild_python_project::resource_views::types::{AttachedSource, SourceViews};
 
 const UNKNOWN_TYPE: &str = "UNKNOWN";
 const NOT_NULL_AUDIT_NAME: &str = "not_null";

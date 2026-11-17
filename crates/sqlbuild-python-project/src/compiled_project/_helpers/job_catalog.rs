@@ -12,9 +12,9 @@ use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector};
 use sqlbuild_cli::native_commands::main::effective_target::effective_target;
 use sqlbuild_discovery::orchestration_files::models::{OrchestrationInventory, RunFile};
 
-use crate::compiled_project::constants::JOB_SELECTOR_KINDS;
-use crate::compiled_project::constants::SELECTOR_INTERSECTION;
-use crate::compiled_project::constants::SENSOR_RUN_ARGUMENT;
+use crate::compiled_project::constants::{
+    JOB_SELECTOR_KINDS, SELECTOR_INTERSECTION, SENSOR_RUN_ARGUMENT,
+};
 use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
 
 /// Each job and group's selection, and the names of those a schedule or sensor starts.

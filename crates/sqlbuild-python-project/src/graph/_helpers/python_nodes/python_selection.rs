@@ -221,6 +221,7 @@ pub(crate) fn python_node_graph_indexes(nodes: Vec<InventoryRow>) -> PyResult<In
         })
     })
 }
+<<<<<<< HEAD
 
 /// `[settings] allow_warehouse_round_trips` of a compiled project.
 pub(crate) fn allows_round_trips(project: &Bound<'_, PyAny>) -> PyResult<bool> {
@@ -230,3 +231,5 @@ pub(crate) fn allows_round_trips(project: &Bound<'_, PyAny>) -> PyResult<bool> {
     )?
     .extract()
 }
+=======
+>>>>>>> origin/main

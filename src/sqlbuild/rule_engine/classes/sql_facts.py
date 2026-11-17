@@ -25,7 +25,12 @@ class SqlFacts:
         compiled: RuleFactModel = self._resolve(model)
         documents: ModelSql = ModelSql(
             authored=SqlDocument(source=compiled.authored_sql, dialect=self._dialect),
-            expanded=SqlDocument(source=compiled.query_sql, dialect=self._dialect),
+            expanded=SqlDocument(
+                source=compiled.query_sql,
+                dialect=self._dialect,
+                place=getattr(compiled, "query_place", None),
+                file=compiled.authored_sql,
+            ),
         )
         self._documents[model.path] = documents
         return documents

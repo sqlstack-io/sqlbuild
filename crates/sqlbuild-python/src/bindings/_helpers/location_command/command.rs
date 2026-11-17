@@ -13,6 +13,7 @@ use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 use sqlbuild_orchestration::declarations::models::{
     Schedule, TriggerDeclaration, TriggerDefinition,
 };
+<<<<<<< HEAD
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
@@ -30,6 +31,23 @@ use crate::bindings::_helpers::location_command::worker::execute_worker;
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
 use crate::bindings::_helpers::query_command::project::ProjectInputs;
 use crate::bindings::_helpers::query_command::project::project_adapter;
+=======
+use sqlbuild_orchestration::dev_events::main::compile_summary::compile_summary;
+use sqlbuild_orchestration::dev_events::main::emit_dev_steps::emit_dev_steps;
+use sqlbuild_orchestration::dev_events::models::{DevPhase, DevStepState};
+use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
+use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
+
+use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
+use crate::bindings::_helpers::location_command::runtime::run_runtime;
+use crate::bindings::_helpers::location_command::snapshot::{
+    build_orchestration_snapshot, orchestration_snapshot,
+};
+use crate::bindings::_helpers::location_command::worker::{blocked_nodes, execute_worker};
+use crate::bindings::_helpers::query_command::project::{
+    ProjectAdapter, ProjectInputs, project_adapter,
+};
+>>>>>>> origin/main
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -44,6 +62,15 @@ use sqlbuild_python_project::project_snapshot::types::NodeKeys;
 
 fn status(py: Python<'_>, message: &str) -> PyResult<()> {
     write_stderr(py, &format!("{message}\n"))
+}
+
+/// Tell a `sqb dev` parent that each phase reached its state; silent outside `sqb dev`.
+fn steps(
+    py: Python<'_>,
+    steps: &[(DevPhase, DevStepState)],
+    detail: Option<String>,
+) -> PyResult<()> {
+    Ok(py.detach(|| emit_dev_steps(steps, detail))?)
 }
 
 /// Git is optional in deployed images; absent metadata is not fabricated from the last publication.
@@ -124,15 +151,29 @@ fn compile_location<'py>(
     input: &SnapshotInput,
 ) -> PyResult<(CompiledSnapshot<'py>, ProjectAdapter<'py>)> {
     status(py, "Discovering location project...")?;
+    steps(py, &[(DevPhase::Discover, DevStepState::Started)], None)?;
     let project = project_adapter(
         py,
         Some(arguments.value("project_dir")?),
         ProjectInputs::DiscoveredDeferringSecrets,
     )?;
     status(py, "Location project discovered. Compiling snapshot...")?;
+<<<<<<< HEAD
     let compiled = compile_snapshot(py, arguments, (input, &project), None)?;
     status(py, "Location snapshot compiled.")?;
     Ok((compiled, project))
+=======
+    let discovered = [
+        (DevPhase::Discover, DevStepState::Finished),
+        (DevPhase::Compile, DevStepState::Started),
+    ];
+    steps(py, &discovered, None)?;
+    let (snapshot, blocked) = compile_snapshot(py, arguments, (input, &project), None)?;
+    status(py, "Location snapshot compiled.")?;
+    let compiled = [(DevPhase::Compile, DevStepState::Finished)];
+    steps(py, &compiled, Some(compile_summary(&snapshot.input)))?;
+    Ok((snapshot, project, blocked))
+>>>>>>> origin/main
 }
 
 /// Compile the discovered project into a snapshot, with a run's variables when it carries them.
@@ -270,6 +311,7 @@ pub(super) fn publish_location<'py>(
         })
         .min();
     status(py, "Publishing location snapshot...")?;
+    steps(py, &[(DevPhase::Publish, DevStepState::Started)], None)?;
     let record = snapshot.publication(
             py,
             &arguments.value("server_url")?.extract::<String>()?,
@@ -284,10 +326,15 @@ pub(super) fn publish_location<'py>(
             PyValueError::new_err(message)
         })?;
     status(py, "Location snapshot published.")?;
+<<<<<<< HEAD
     Ok(Ok((
         (record, refresh_at, locations.into_iter().collect()),
         (project.discovered, compiled),
     )))
+=======
+    steps(py, &[(DevPhase::Publish, DevStepState::Finished)], None)?;
+    Ok((record, refresh_at, locations.into_iter().collect()))
+>>>>>>> origin/main
 }
 
 /// One-shot publication and the supervisor's private stdio runtime share the same compiler path.

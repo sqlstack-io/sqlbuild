@@ -2,9 +2,27 @@
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 use sqlbuild_python_base::records::types::RecordId;
+<<<<<<< HEAD
 
 pub const RUN_BOUNDED: AdapterHost = AdapterHost::RunBoundedInspections;
 
+=======
+
+pub(crate) const RELATIONS_MAIN_LIST: AdapterHost = AdapterHost::ListRelationsForInspection;
+
+pub(crate) const RELATIONS_MAIN_COLUMNS: AdapterHost = AdapterHost::GetColumnsForInspection;
+
+pub(crate) const ACTIVE_CATALOG: AdapterHost = AdapterHost::ActiveInspectionCatalog;
+
+pub const RUN_BOUNDED: AdapterHost = AdapterHost::RunBoundedInspections;
+
+pub(crate) const RECORD_QUERY: AdapterHost = AdapterHost::RecordInspectionQuery;
+
+pub(crate) const RUN_RECORDED_QUERY: AdapterHost = AdapterHost::RunRecordedInspectionQuery;
+
+pub(crate) const QUERY_RECORD: AdapterHost = AdapterHost::InspectionQueryRecord;
+
+>>>>>>> origin/main
 pub(crate) const COLUMN_INFO: AdapterHost = AdapterHost::ColumnInfo;
 
 pub(crate) const RELATION_LOOKUP: AdapterHost = AdapterHost::RelationLookup;

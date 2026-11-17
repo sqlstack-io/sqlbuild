@@ -28,7 +28,10 @@ use crate::graph::models::ProjectSelection;
 use crate::native_host::main::compile_calendars::compile_calendars;
 use crate::native_host::main::compile_sensors::compile_sensors;
 use crate::native_host::models::CalendarRequest;
+<<<<<<< HEAD
 use sqlbuild_python_base::orchestration_reads::main::dependency_failures::dependency_failures;
+=======
+>>>>>>> origin/main
 use sqlbuild_python_base::orchestration_reads::main::imported_declarations::imported_declarations;
 use sqlbuild_python_base::orchestration_reads::main::run_controls::run_controls;
 use sqlbuild_python_base::orchestration_reads::main::run_resources::run_resources;
@@ -46,7 +49,7 @@ fn file_site(path: &str, position: FilePosition) -> Option<DeclaredAt> {
 }
 
 /// Whether a declaration with `targets` applies to `target`.
-fn declared_for(targets: &[String], target: &str) -> bool {
+pub(crate) fn declared_for(targets: &[String], target: &str) -> bool {
     targets.is_empty() || targets.iter().any(|name| name == target)
 }
 
