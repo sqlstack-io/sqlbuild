@@ -5,12 +5,13 @@ use std::path::Path;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyDictMethods};
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString};
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_orchestration::sensors::models::{
     CustomSensorOutcome, SensorCondition, SensorEvaluationRequest,
 };
 
+use crate::bindings::_helpers::native_host::setup_context::project_setup_context;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -73,15 +74,19 @@ pub(crate) fn evaluate_sensor(
         .import("sqlbuild.orchestration")?
         .getattr("SensorContext")?
         .call((), Some(&fields))?;
-    let providers = discover_provider_classes(
-        imported(py, "pathlib", "Path")?.call1((project_dir,))?,
-        SecretPolicy::Defer.name(),
-    )?;
+    let project_path = imported(py, "pathlib", "Path")?.call1((project_dir,))?;
+    let providers = discover_provider_classes(project_path.clone(), SecretPolicy::Defer.name())?;
     let by_name = provider_by_name(&providers)?;
+    let target = (
+        &PyString::new(py, &evaluation.target).into_any(),
+        &py.None().into_bound(py),
+    );
+    let setup_context = project_setup_context((&project_path, &providers), target, true)?;
     let session = call_with(
         &entry(py, UserCodeHost::BuildProviderSession)?,
         &[
             ("discovered_providers", providers),
+            ("setup_context", setup_context),
             ("allow_shared", PyBool::new(py, false).to_owned().into_any()),
         ],
     )?;

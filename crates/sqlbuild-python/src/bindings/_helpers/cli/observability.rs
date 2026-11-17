@@ -16,6 +16,7 @@ use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOU
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
 use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
+use crate::bindings::_helpers::native_host::setup_context::invocation_setup_context;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::result_output::terminal_index::TerminalEventIndex;
 use crate::bindings::_helpers::result_output::terminal_index::terminal_event_index_scope;
@@ -407,13 +408,16 @@ impl Observed {
                 )
                 .map(pyo3::Bound::into_any)?;
                 self.exporter_scope = Some(scope.clone().unbind());
+                let providers: Bound<'_, PyAny> = native_field(&extensions, "providers")?;
+                let setup_context = invocation_setup_context(args, (project_dir, &providers))?;
                 call_with(
                     &native_field(&scope, "configure_extensions")?,
                     &[
                         ("project_dir", project_dir.clone()),
-                        ("providers", native_field(&extensions, "providers")?),
+                        ("providers", providers),
                         ("event_exporters", event_exporters),
                         ("command_output_sinks", sinks),
+                        ("setup_context", setup_context),
                     ],
                 )?;
                 self.unsubscribe_exporters =
