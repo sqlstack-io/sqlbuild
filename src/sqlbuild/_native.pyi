@@ -1244,6 +1244,7 @@ class PlannerRuntime:
     local_config: LocalConfig | None
     on_progress: Callable[[str], None] | None
     invocation_time: datetime
+    node_results_location: tuple[str | None, str | None] | None
     def __init__(
         self,
         *,
@@ -1254,6 +1255,7 @@ class PlannerRuntime:
         local_config: LocalConfig | None = ...,
         on_progress: Callable[[str], None] | None = ...,
         invocation_time: datetime = ...,
+        node_results_location: tuple[str | None, str | None] | None = ...,
     ) -> None: ...
 
 class PlannerScopeResolution:
@@ -5736,6 +5738,7 @@ def build_execution_plan(
     on_progress: Callable[[str], None] | None = None,
     project_config: ProjectConfig | None = None,
     local_config: LocalConfig | None = None,
+    node_results_location: tuple[str | None, str | None] | None = None,
 ) -> PlanOutput: ...
 
 class SqlTestPlanning:

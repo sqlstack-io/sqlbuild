@@ -9,7 +9,7 @@ use crate::planner_migrations::models::{ColumnMigrationInputs, MigrationPhase};
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
-use crate::planner_phases::models::PlannerWarehouseState;
+use crate::planner_phases::models::{PlannerRuntime, PlannerWarehouseState};
 use crate::planner_warehouse::main::inspection::warehouse_snapshot::warehouse_snapshot;
 use crate::planner_warehouse::models::MigrationFingerprintCache;
 use crate::planner_warehouse::models::SnapshotRequest;
@@ -104,6 +104,11 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
         on_progress: runtime_field(runtime, |runtime| &runtime.on_progress)?,
         deferred_locations: native_field(deferral, "deferred_locations")?,
         cursor_scope,
+        node_results_location: runtime
+            .cast::<PlannerRuntime>()?
+            .get()
+            .node_results_location
+            .clone(),
     })?;
     let phase = MigrationPhase {
         runtime: runtime.clone(),
