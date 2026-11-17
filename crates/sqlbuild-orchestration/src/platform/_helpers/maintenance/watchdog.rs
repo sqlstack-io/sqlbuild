@@ -4,9 +4,9 @@ use chrono::TimeDelta;
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::platform::_helpers::liveness::scan_location_page;
-use crate::platform::_helpers::observations::observe;
-use crate::platform::_helpers::problems::calendar_low;
+use crate::platform::_helpers::health::observations::observe;
+use crate::platform::_helpers::health::problems::calendar_low;
+use crate::platform::_helpers::location::liveness::scan_location_page;
 use crate::platform::models::{InstallationHealth, PlatformEvent, WatchdogTrigger};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;

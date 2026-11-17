@@ -3,7 +3,7 @@
 use chrono::TimeDelta;
 use uuid::Uuid;
 
-use crate::platform::_helpers::observations::observe;
+use crate::platform::_helpers::health::observations::observe;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use crate::platform::models::{PlatformEvent, WatchdogLocation};
 use crate::store::errors::ControlError;

@@ -3,8 +3,8 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::platform::_helpers::location_heartbeat::location_heartbeat;
-use crate::platform::_helpers::reported_generation::reported_generation;
+use crate::platform::_helpers::location::location_heartbeat::location_heartbeat;
+use crate::platform::_helpers::location::reported_generation::reported_generation;
 use crate::platform::constants::{MAX_REPORTED_RULE_FINDINGS, MAX_RULE_FINDING_CHARS};
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::store::errors::ControlError;

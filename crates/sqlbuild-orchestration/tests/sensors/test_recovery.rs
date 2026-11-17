@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChange, TriggerStatus};
-use crate::platform::_helpers::retention::retain;
+use crate::platform::_helpers::maintenance::retention::retain;
 use crate::runs::main::list_runs::list_runs;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;

@@ -6,8 +6,10 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::current_jobs::current_jobs;
 use crate::declarations::models::ServerPoolCaps;
-use crate::platform::_helpers::pool_cap_warnings::{pool_cap_observation, pool_cap_warnings};
-use crate::platform::_helpers::recent_health::recent_health;
+use crate::platform::_helpers::health::pool_cap_warnings::{
+    pool_cap_observation, pool_cap_warnings,
+};
+use crate::platform::_helpers::health::recent_health::recent_health;
 use crate::platform::models::LocationHealthObservation;
 use crate::snapshots::main::read_current_record::read_current_record;
 use crate::store::errors::ControlError;

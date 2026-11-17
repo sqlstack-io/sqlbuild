@@ -1,6 +1,6 @@
 //! Commits a killed process acknowledged survive, though closing a connection never checkpoints.
 
-use crate::platform::_helpers::retention::wal_checkpoint;
+use crate::platform::_helpers::maintenance::retention::wal_checkpoint;
 use crate::store::main::open_store::open_store;
 use crate::store::tests::schema::helpers::{
     kill_writer_after, surviving_locations, wal_bytes_after_sequential_writes,

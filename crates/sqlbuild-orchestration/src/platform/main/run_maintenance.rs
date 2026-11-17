@@ -6,8 +6,10 @@ use std::time::{Duration, Instant};
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::platform::_helpers::retention::{reclaim_sqlite_space, retain, wal_checkpoint};
-use crate::platform::_helpers::watchdog::scan_health;
+use crate::platform::_helpers::maintenance::retention::{
+    reclaim_sqlite_space, retain, wal_checkpoint,
+};
+use crate::platform::_helpers::maintenance::watchdog::scan_health;
 use crate::platform::models::RetentionPolicies;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;

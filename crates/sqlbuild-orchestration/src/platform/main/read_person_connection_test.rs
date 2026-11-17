@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
-use crate::platform::_helpers::connection_tests::authorize_connection_test;
+use crate::platform::_helpers::location::connection_tests::authorize_connection_test;
 use crate::platform::main::_read_target_work::read_target_work;
 use crate::platform::models::{LocationWork, LocationWorkRecord};
 use crate::store::errors::ControlError;

@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::authorization::main::person_holds_target::person_holds_target;
 use crate::credentials::models::{Action, DefaultRole};
-use crate::platform::_helpers::event_history::event_history;
+use crate::platform::_helpers::health::event_history::event_history;
 use crate::platform::models::{PersonPlatformEvent, PersonPlatformEventPage};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};

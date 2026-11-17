@@ -12,7 +12,7 @@ use crate::api::tests::work_helpers::execute;
 use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, BuiltinRole};
 use crate::credentials::tests::location_helpers::create_location;
-use crate::platform::_helpers::retention::retain;
+use crate::platform::_helpers::maintenance::retention::retain;
 use crate::platform::main::claim_location_work::claim_location_work;
 use crate::platform::main::complete_location_work::complete_location_work;
 use crate::platform::main::read_person_plan::read_person_plan;

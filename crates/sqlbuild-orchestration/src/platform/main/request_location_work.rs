@@ -4,7 +4,7 @@ use chrono::Duration;
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
-use crate::platform::_helpers::connection_tests::authorize_connection_test;
+use crate::platform::_helpers::location::connection_tests::authorize_connection_test;
 use crate::platform::main::enqueue_location_work::enqueue_location_work;
 use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkRequest};

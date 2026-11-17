@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::platform::_helpers::recent_health::recent_health;
+use crate::platform::_helpers::health::recent_health::recent_health;
 use crate::platform::models::LocationHealthObservation;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};

@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 
 use crate::api::tests::test_types::StateHistoryRetentionTestCase;
 use crate::api::tests::warehouse_history_helpers::{batch, fixture, seed_target};
-use crate::platform::_helpers::retention::reclaim_sqlite_space;
+use crate::platform::_helpers::maintenance::retention::reclaim_sqlite_space;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};

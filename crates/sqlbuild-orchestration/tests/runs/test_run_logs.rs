@@ -3,7 +3,7 @@
 use serde_json::{Value, json};
 
 use crate::credentials::tests::location_helpers::create_location;
-use crate::platform::_helpers::retention::prune_run_logs;
+use crate::platform::_helpers::maintenance::retention::prune_run_logs;
 use crate::runs::models::RunLogRetention;
 use crate::runs::tests::helpers::{logged_worker, rows, seed_logged_runs, snapshot};
 use crate::runs::tests::test_types::RunLogRetentionTestCase;

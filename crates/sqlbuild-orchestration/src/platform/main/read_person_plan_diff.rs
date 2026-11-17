@@ -4,8 +4,8 @@ use sqlbuild_core::plan_display::main::plan_model_diff::plan_model_diff;
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
-use crate::platform::_helpers::plan_access::read_person_plan_with_sql;
-use crate::platform::_helpers::plan_diffs::read_plan_diff;
+use crate::platform::_helpers::plans::plan_access::read_person_plan_with_sql;
+use crate::platform::_helpers::plans::plan_diffs::read_plan_diff;
 use crate::platform::models::{LocationWorkOutcome, PlanDiffRead, PlanModelDiff};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};

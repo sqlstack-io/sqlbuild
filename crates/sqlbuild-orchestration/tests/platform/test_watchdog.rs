@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use crate::platform::_helpers::retention::retain;
-use crate::platform::_helpers::watchdog::scan_health;
+use crate::platform::_helpers::maintenance::retention::retain;
+use crate::platform::_helpers::maintenance::watchdog::scan_health;
 use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::main::run_maintenance::run_maintenance;
 use crate::platform::models::{LocationHealth, LocationHealthReport, PlatformEvent};

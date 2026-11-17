@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
-use crate::platform::_helpers::plan_access::read_person_plan_with_sql;
+use crate::platform::_helpers::plans::plan_access::read_person_plan_with_sql;
 use crate::platform::models::LocationWorkRecord;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;

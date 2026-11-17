@@ -4,7 +4,9 @@ use serde_json::{Value, json};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use uuid::Uuid;
 
-use crate::platform::_helpers::plan_diffs::{split_plan_diffs, store_plan_diffs, valid_plan_diffs};
+use crate::platform::_helpers::plans::plan_diffs::{
+    split_plan_diffs, store_plan_diffs, valid_plan_diffs,
+};
 use crate::platform::constants::PLAN_DOCUMENT_BYTES;
 use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::main::require_instance::require_instance;

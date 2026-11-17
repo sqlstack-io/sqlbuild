@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::authorization::main::person_holds_target::person_holds_target;
 use crate::credentials::models::{Action, DefaultRole};
-use crate::platform::_helpers::problems::{late_ticks, scan_problems};
+use crate::platform::_helpers::health::problems::{late_ticks, scan_problems};
 use crate::platform::models::PlatformProblems;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
