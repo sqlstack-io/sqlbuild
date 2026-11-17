@@ -14,7 +14,7 @@ pub async fn create_principal(
     name: &str,
 ) -> Result<Uuid, ControlError> {
     write(store, |transaction| {
-        insert_principal(transaction, context, name)
+        insert_principal(transaction, context, (Uuid::now_v7(), name))
     })
     .await
 }

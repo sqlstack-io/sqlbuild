@@ -24,6 +24,8 @@ mod person_sessions_helpers;
 mod person_sessions_test_types;
 #[path = "plans/helpers.rs"]
 mod plans_helpers;
+#[path = "proxy_provisioning/helpers.rs"]
+mod proxy_provisioning_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
 #[path = "statistics/eligibility/helpers.rs"]
@@ -86,6 +88,8 @@ mod test_person_sessions;
 mod test_providers;
 #[path = "test_proxy.rs"]
 mod test_proxy;
+#[path = "test_proxy_provisioning.rs"]
+mod test_proxy_provisioning;
 #[path = "test_publish_encoding.rs"]
 mod test_publish_encoding;
 #[path = "test_reads.rs"]

@@ -12,6 +12,35 @@ pub(crate) const PASSWORD_COOKIE: &str = "__Host-sqb-session";
 pub(crate) const PASSWORD_CSRF_COOKIE: &str = "__Host-sqb-csrf";
 pub(crate) const PASSWORD_CSRF_HEADER: &str = "x-sqb-csrf";
 pub(crate) const PROXY_USER_HEADER: &str = "x-sqb-user";
+/// Headers a trusted proxy's identity headers may not reuse: browsers, the proxy or this server own them.
+pub(crate) const PROXY_RESERVED_HEADERS: [&str; 14] = [
+    "accept",
+    "authorization",
+    "connection",
+    "content-length",
+    "content-type",
+    "cookie",
+    "forwarded",
+    "host",
+    "origin",
+    "referer",
+    "user-agent",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    PASSWORD_CSRF_HEADER,
+];
+/// The browser host a proxy that rewrites `Host` reports, as Apache's `mod_proxy` does by default.
+pub(crate) const FORWARDED_HOST_HEADER: &str = "x-forwarded-host";
+/// The longest proxy username, after trimming and lowercasing.
+pub(crate) const PROXY_USERNAME_CHARS: usize = 128;
+/// The longest display name or email address a proxy may report.
+pub(crate) const PROXY_PROFILE_CHARS: usize = 256;
+/// How many untrusted header-carrying peers are logged before the rest go unlogged.
+pub(crate) const PROXY_NOTED_SOURCES: usize = 32;
+/// What a streamed response sends so a proxy neither caches, compresses nor buffers it.
+pub(crate) const STREAM_CACHE_CONTROL: &str = "no-cache, no-transform";
+pub(crate) const STREAM_BUFFERING_HEADER: &str = "x-accel-buffering";
+pub(crate) const EVENT_STREAM_MEDIA_TYPE: &str = "text/event-stream";
 pub(crate) const OIDC_FLOW_COOKIE: &str = "__Host-sqb-oidc";
 pub(crate) const OIDC_RESPONSE_BYTES: usize = 1024 * 1024;
 #[cfg(unix)]

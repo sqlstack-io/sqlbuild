@@ -6,7 +6,9 @@ use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, HumanLogin, TrustedProxyAuthentication};
+use crate::api::models::{
+    ApiAuthentication, HumanLogin, TrustedProxyAuthentication, UnknownProxyUsers,
+};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::ExternalSessionTestCase;
 use crate::authorization::main::bootstrap_user::bootstrap_user;
@@ -67,6 +69,11 @@ fn given_proxy_people_when_administrators_and_roles_change_then_live_authority_h
                     (first_subject.into(), first),
                     (second_subject.into(), second),
                 ]),
+                username_header: "X-SQB-User".into(),
+                display_name_header: None,
+                email_header: None,
+                unknown_users: UnknownProxyUsers::Reject,
+                proxy_logout_url: None,
             };
             let api = start_api_with_authentication(
                 store,
