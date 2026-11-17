@@ -16,8 +16,7 @@ use crate::api::_helpers::authentication::proxy_warnings::warn_plain_http_origin
 use crate::api::constants::HTTP_SCHEME;
 use crate::api::errors::ApiError;
 use crate::api::models::{
-    BrowserLoginMethod, BrowserOrigin, ForwardedHostPeers, ProxyLogoutUrl,
-    TrustedProxyAuthentication,
+    BrowserLoginMethod, BrowserOrigin, ProxyLogoutUrl, ProxyPeers, TrustedProxyAuthentication,
 };
 use crate::authorization::main::resolve_proxy_person::resolve_proxy_person;
 use crate::authorization::models::ProxyPerson;
@@ -48,7 +47,7 @@ pub(crate) fn router(
     }
     Ok(routes
         .layer(Extension(origin))
-        .layer(Extension(ForwardedHostPeers(Arc::new(
+        .layer(Extension(ProxyPeers(Arc::new(
             settings.trusted_peers.clone(),
         ))))
         .layer(Extension(settings)))
