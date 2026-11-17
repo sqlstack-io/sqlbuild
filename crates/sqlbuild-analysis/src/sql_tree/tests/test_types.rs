@@ -17,3 +17,11 @@ pub(crate) struct TreeFailureTestCase {
     pub(crate) sql: String,
     pub(crate) expected_error: fn(&SqlTreeError) -> bool,
 }
+
+/// SQL, its dialect, and each node's facts as `helpers::facts` writes them.
+pub(crate) struct TreeFactsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_facts: &'static [&'static str],
+}
