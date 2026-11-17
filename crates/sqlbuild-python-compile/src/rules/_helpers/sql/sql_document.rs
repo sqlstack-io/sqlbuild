@@ -1,5 +1,6 @@
 //! Custom rules' SQL documents: the SQLQuack syntax tree of one SQL text and its common structures.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use pyo3::exceptions::{PyAttributeError, PyValueError};
@@ -13,7 +14,7 @@ use sqlbuild_analysis::sql_tree::models::{
     NodeExtent, NodeLiteral, NodeName, SqlTreeNode as TreeNode,
 };
 use sqlbuild_rules::models::ModelQueryPlace;
-use sqlbuild_rules::query_facts::main::query_file_position::query_file_position;
+use sqlbuild_rules::query_facts::main::query_file_positions::query_file_positions;
 
 use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -31,6 +32,14 @@ struct Tree {
     nodes: Vec<TreeNode>,
     /// Child indexes by parent index; the last entry holds the statements, the document's children.
     children: Vec<Vec<usize>>,
+}
+
+/// A model query's character offsets and the file positions of its tree's node starts, built once.
+struct FilePositions {
+    /// The character each line starts at, then the source's length.
+    line_starts: Vec<usize>,
+    /// The file `(line, column)` of every tree node's first character, by that character.
+    node_starts: HashMap<usize, (u64, u64)>,
 }
 
 /// One node of a rule's SQL syntax tree: an index into its shared tree, so freeing never recurses.
@@ -172,6 +181,7 @@ pub(crate) struct SqlDocument {
     /// Where `source`, a model's expanded query, sits in the model file; `None` for other SQL.
     place: Option<ModelQueryPlace>,
     tree: PyOnceLock<Arc<Tree>>,
+    positions: PyOnceLock<FilePositions>,
 }
 
 #[pymethods]
@@ -188,6 +198,7 @@ impl SqlDocument {
             dialect,
             place,
             tree: PyOnceLock::new(),
+            positions: PyOnceLock::new(),
         })
     }
 
@@ -228,17 +239,17 @@ impl SqlDocument {
         else {
             return Ok(None);
         };
-        let above: usize = self
-            .source
-            .split_inclusive('\n')
-            .take(line - 1)
-            .map(|text| text.chars().count())
-            .sum();
-        Ok(Some(query_file_position(
-            &self.source,
-            place,
-            above + column - 1,
-        )))
+        let positions: &FilePositions = self
+            .positions
+            .get_or_init(node.py(), || self.file_positions(node.py(), place));
+        let character: usize = positions.character(line, column);
+        Ok(Some(
+            positions
+                .node_starts
+                .get(&character)
+                .copied()
+                .unwrap_or_else(|| query_file_positions(&self.source, place, &[character])[0]),
+        ))
     }
 
     /// Every projected star, bare or qualified; a star a function call takes, such as `COUNT(*)`, is no projection.
@@ -278,6 +289,37 @@ impl SqlDocument {
         PyTuple::new(py, found)
     }
 
+    /// Line starts and the file positions of every tree node's start, mapped through `place` at once.
+    fn file_positions(&self, py: Python<'_>, place: &ModelQueryPlace) -> FilePositions {
+        let mut line_starts: Vec<usize> = vec![0];
+        let mut length: usize = 0;
+        for character in self.source.chars() {
+            length += 1;
+            if character == '\n' {
+                line_starts.push(length);
+            }
+        }
+        line_starts.push(length);
+        let mut positions: FilePositions = FilePositions {
+            line_starts,
+            node_starts: HashMap::new(),
+        };
+        let mut starts: Vec<usize> = self.parsed(py).map_or_else(
+            |_| Vec::new(),
+            |tree| {
+                tree.nodes
+                    .iter()
+                    .map(|node| positions.character(node.line, node.column))
+                    .collect()
+            },
+        );
+        starts.sort_unstable();
+        starts.dedup();
+        let mapped: Vec<(u64, u64)> = query_file_positions(&self.source, place, &starts);
+        positions.node_starts = starts.into_iter().zip(mapped).collect();
+        positions
+    }
+
     /// The parsed tree; a failure raises `RuleUsageError` each time it is read.
     fn parsed(&self, py: Python<'_>) -> PyResult<&Arc<Tree>> {
         self.tree.get_or_try_init(py, || {
@@ -287,10 +329,21 @@ impl SqlDocument {
     }
 }
 
-/// A node's 1-based `line` or `column` attribute; `None` when it has none or it is not positive.
+impl FilePositions {
+    /// The source character at 1-based `line` and `column`; a line past the end starts at the end.
+    fn character(&self, line: usize, column: usize) -> usize {
+        let last: usize = self.line_starts.len() - 1;
+        self.line_starts[line.saturating_sub(1).min(last)] + column.saturating_sub(1)
+    }
+}
+
+/// A node's 1-based `line` or `column` attribute; `None` when it has none or it is not a positive integer.
 fn node_index(node: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<usize>> {
     let value: i64 = match native_field(node, name) {
-        Ok(value) => value.extract()?,
+        Ok(value) => match value.extract() {
+            Ok(value) => value,
+            Err(_) => return Ok(None),
+        },
         Err(error) if error.is_instance_of::<PyAttributeError>(node.py()) => return Ok(None),
         Err(error) => return Err(error),
     };
