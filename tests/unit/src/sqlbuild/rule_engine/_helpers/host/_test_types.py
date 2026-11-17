@@ -52,6 +52,20 @@ class HostInterruptTestCase:
 
 
 @dataclass(frozen=True)
+class SingleHostInterruptTestCase:
+    """An interrupt sent once `interrupt_after` model invocations have started on one host."""
+
+    description: str
+    model_count: int
+    hosts: int
+    delay_seconds: float
+    interrupt_after: int
+    expected_host_launches: int
+    expected_max_started_after_interrupt: int
+    failing: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ModuleStateCase:
     """Custom-rule modules whose state changes both detectors must classify identically."""
 
