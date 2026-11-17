@@ -1768,6 +1768,8 @@ export interface components {
             /** Format: int64 */
             evidence_count?: number | null;
             evidence_truncated?: string | null;
+            /** @description An error-severity failure its build let through instead of holding anything back. */
+            ignored?: boolean;
             invocation_id: string;
             measured_value?: string | null;
             /** Format: int64 */
@@ -2031,6 +2033,8 @@ export interface components {
             declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
             exclude?: string | null;
+            /** @description The job's own `ignore_audit_failures` setting; absent uses the target's, then the project's. */
+            ignore_audit_failures?: boolean | null;
             job_key: string;
             kind: components["schemas"]["RunKind"];
             /** @description The groups this job belongs to. */
@@ -2069,6 +2073,8 @@ export interface components {
             concurrency?: number | null;
             declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
+            /** @description The job's own `ignore_audit_failures` setting; absent uses the target's, then the project's. */
+            ignore_audit_failures?: boolean | null;
             job_key: string;
             /** @description `job` or `group`; a group's selection is the union of its member jobs' selections. */
             kind: components["schemas"]["RunKind"];
@@ -3144,6 +3150,11 @@ export interface components {
             kind: "finished";
             outcome: components["schemas"]["RunOutcome"];
             reason: string;
+        } | {
+            /** Format: int32 */
+            count: number;
+            /** @enum {string} */
+            kind: "audit_failures_ignored";
         };
         RunChangeRequest: {
             change: components["schemas"]["RunChange"];
@@ -3280,6 +3291,11 @@ export interface components {
             ended_at?: string | null;
             git_dirty?: boolean | null;
             git_revision?: string | null;
+            /**
+             * Format: int32
+             * @description Error-severity audit failures the run let through; a group sums its members'.
+             */
+            ignored_audit_failures?: number;
             /** @description The deployment image the run is pinned to, when its location publishes one. */
             image_id?: string | null;
             job_key?: string | null;

@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlbuild._native import AuditPlanEntry, CompiledRelationLocation, Fingerprint, SourceEntry
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
-from sqlbuild.compiler.auditing.types import AuditOutcome, AuditRunScope
+from sqlbuild.compiler.auditing.types import AuditRunScope
 from sqlbuild.executor.auditing.main._execute import execute_audit
 from sqlbuild.executor.auditing.models import AuditExecutionResult
 from sqlbuild.executor.run._helpers.reuse.audit import (
@@ -59,7 +59,7 @@ def run_final_model_audits(
             quality_scope="final",
         )
         results.append(result)
-        if result.outcome == AuditOutcome.ERROR:
+        if result.blocks:
             has_error = True
     return FinalAuditRun(results=tuple(results), has_error=has_error)
 
@@ -106,6 +106,6 @@ def run_delta_scope_audits(
             quality_scope="delta",
         )
         results.append(result)
-        if result.outcome == AuditOutcome.ERROR:
+        if result.blocks:
             has_error = True
     return FinalAuditRun(results=tuple(results), has_error=has_error)

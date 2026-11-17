@@ -56,12 +56,13 @@ pub(crate) const INCLUDE_PYTHON_DEST: &str = "include_python";
 pub(crate) const SELECTOR_DESTS: [&str; 3] = ["select", "exclude", "positional_select"];
 
 /// Destinations an ad-hoc run may set; the control plane gates history rewrites and warehouses.
-pub(crate) const ALLOWED_DESTS: [&str; 31] = [
+pub(crate) const ALLOWED_DESTS: [&str; 32] = [
     "max_microbatches",
     "changed",
     "reach",
     "run_tests",
     "run_audits",
+    "ignore_audit_failures",
     "include_python",
     "fail_fast",
     "concurrency",

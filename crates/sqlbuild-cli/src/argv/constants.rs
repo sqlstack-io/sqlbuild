@@ -68,12 +68,16 @@ pub(crate) const CONCURRENCY_ENV_VAR: &str = "SQLBUILD_CONCURRENCY";
 pub(crate) const SCOPE_GLOBAL_SUMMARY: &str = "summary";
 pub(crate) const SCOPE_DEFAULT_PAGE_SIZE: i64 = 100;
 pub(crate) const SCOPE_KIND_DEST: &str = "scope_kind";
+/// Lets a build go on past failing audits; `false` makes them block whatever the settings say.
+pub(crate) const IGNORE_AUDIT_FAILURES_DEST: &str = "ignore_audit_failures";
+/// `false` with `--no-audits`.
+pub(crate) const RUN_AUDITS_DEST: &str = "run_audits";
 pub(crate) const INT_CONVERTER: &str = "int";
 /// The `type=pathlib.Path` converter, which never rejects a string.
 pub(crate) const PATH_CONVERTER: &str = "Path";
 
 /// Every `CliNamespace` attribute with a default, in declaration order.
-pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 190] = [
+pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 191] = [
     ("command", NamespaceDefault::None),
     ("project_dir", NamespaceDefault::None),
     ("dbt_project_dir", NamespaceDefault::None),
@@ -140,6 +144,7 @@ pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 190] = [
     ("reload", NamespaceDefault::Bool(false)),
     ("run_tests", NamespaceDefault::Bool(true)),
     ("run_audits", NamespaceDefault::Bool(true)),
+    ("ignore_audit_failures", NamespaceDefault::None),
     ("allow_snapshot_full_refresh", NamespaceDefault::Bool(false)),
     ("allow_table_type_downgrade", NamespaceDefault::Bool(false)),
     ("allow_retention_decrease", NamespaceDefault::Bool(false)),

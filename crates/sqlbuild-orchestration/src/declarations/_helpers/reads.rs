@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 
-use crate::declarations::_helpers::job_detail::{DeclaredPools, pool_uses, run_concurrency};
+use crate::declarations::_helpers::job_detail::{
+    DeclaredPools, ignores_audit_failures, pool_uses, run_concurrency,
+};
 use crate::declarations::models::{
     JobRecord, PersonTriggerChange, PoolUse, StoredJob, TriggerChangeRequest, TriggerRecord,
 };
@@ -91,6 +93,7 @@ pub(crate) async fn jobs_in(
         .zip(pools)
         .map(|(job, pools)| JobRecord {
             concurrency: run_concurrency(&job.definition_json),
+            ignore_audit_failures: ignores_audit_failures(&job.definition_json),
             job_key: job.job_key,
             kind: job.kind,
             description: job.definition_json.description,

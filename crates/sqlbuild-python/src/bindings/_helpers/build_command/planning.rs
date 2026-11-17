@@ -16,6 +16,7 @@ use crate::bindings::_helpers::build_command::support::{
     boolean, emit, joined, keyword_relay, none,
 };
 use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspection;
+use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::manifest::builder::build_manifest;
@@ -73,6 +74,17 @@ fn request_options<'py>(context: &BuildContext<'py>) -> PyResult<Bound<'py, PyAn
             ("concurrency", field("concurrency")?),
             ("selection_diagnostics", field("selection_diagnostics")?),
             ("plan_sql_tests", field("run_tests")?),
+            (
+                "ignore_audit_failures",
+                boolean(
+                    py,
+                    resolve_ignore_audit_failures(
+                        request,
+                        &context.get("discovered_inputs")?,
+                        &field("selected_target")?,
+                    )?,
+                ),
+            ),
             ("accepts_unit_test_selectors", boolean(py, true)),
         ],
     )

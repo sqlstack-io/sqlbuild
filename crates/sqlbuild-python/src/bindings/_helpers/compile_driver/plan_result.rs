@@ -182,6 +182,7 @@ pub(crate) fn pipeline_result<'py>(
                 "selection_diagnostics",
                 "plan_sql_tests",
                 "record_migration_fingerprints",
+                "ignore_audit_failures",
             ],
         )?,
     )?;

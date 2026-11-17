@@ -58,7 +58,7 @@ const PROJECT_CONFIG_ELSEWHERE: [&str; 11] = [
 ];
 const LOCAL_CONFIG_ELSEWHERE: [&str; 4] = ["settings", "setting_overrides", "vars", "scenario"];
 /// Settings that tune how a run executes or validates, not what a node computes.
-const RUNTIME_SETTINGS: [&str; 10] = [
+const RUNTIME_SETTINGS: [&str; 11] = [
     "sql_analysis",
     "require_sql_analysis",
     "allow_warehouse_round_trips",
@@ -69,6 +69,7 @@ const RUNTIME_SETTINGS: [&str; 10] = [
     "scenario_timeout",
     "scenario_timeout_seconds",
     "delta_compile",
+    "ignore_audit_failures",
 ];
 const PYTHON_SUFFIX: &str = ".py";
 /// Discovered Python node collections, in `PYTHON_NODE_KINDS` order.

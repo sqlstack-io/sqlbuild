@@ -92,7 +92,7 @@ cpus = 2
 | `pools` | No | Slots the job takes of each [pool](concurrency.md#jobs-sharing-something-else-pools), such as `{ warehouse_heavy = 1 }` |
 | `schedule` | No | When the server starts the job; see below |
 | `[retry]` | No | `attempts`, the most runs in all, from 2 to 11, and `delay_seconds` from 0 to 86400; see [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
-| `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh` or `changed` |
+| `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh`, `changed` or `ignore_audit_failures` ([Ignoring audit failures](audits.md#ignoring-audit-failures)) |
 | `[resources]` | No | Docker worker limits; see [Limit worker containers](../cli/server.md#limit-worker-containers) |
 
 A job's `[settings]` cannot set `select` or `exclude`: the job's own selection is the run's

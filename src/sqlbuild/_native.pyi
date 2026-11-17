@@ -6560,6 +6560,7 @@ class BuildCommandRequest(NativeRecord):
     cli_vars: dict[str, object] | None
     run_tests: bool
     run_audits: bool
+    ignore_audit_failures: bool | None
     manifest: bool
     json_output: bool
     json_output_path: Path | None
@@ -6601,6 +6602,7 @@ class BuildCommandRequest(NativeRecord):
         cli_vars: dict[str, object] | None = None,
         run_tests: bool = True,
         run_audits: bool = True,
+        ignore_audit_failures: bool | None = None,
         manifest: bool = False,
         json_output: bool = False,
         json_output_path: Path | None = None,
@@ -6962,6 +6964,7 @@ class PlanCommandRequest(NativeRecord):
     max_microbatches: int | None
     selection_diagnostics: bool
     timings: bool
+    ignore_audit_failures: bool | None
     def __init__(
         self,
         project_dir: Path | None = None,
@@ -6987,6 +6990,7 @@ class PlanCommandRequest(NativeRecord):
         max_microbatches: int | None = None,
         selection_diagnostics: bool = False,
         timings: bool = False,
+        ignore_audit_failures: bool | None = None,
     ) -> None: ...
 
 class PlaygroundCommandRequest(NativeRecord):
@@ -10203,6 +10207,7 @@ class CompilePipelineOptions(NativeRecord):
     accepts_unit_test_selectors: bool
     sql_test_selection: SqlTestSelection
     source_lexical_syntax: SqlLexicalSyntax | None
+    ignore_audit_failures: bool
     def __init__(
         self,
         selected_target: str | None = ...,
@@ -10229,6 +10234,7 @@ class CompilePipelineOptions(NativeRecord):
         accepts_unit_test_selectors: bool = ...,
         sql_test_selection: SqlTestSelection = ...,
         source_lexical_syntax: SqlLexicalSyntax | None = ...,
+        ignore_audit_failures: bool = ...,
     ) -> None: ...
 
 class PythonPlanEntry(NativeRecord):
@@ -10484,12 +10490,14 @@ class PlannerPolicies(NativeRecord):
     selection_diagnostics: bool
     plan_sql_tests: bool
     record_migration_fingerprints: bool
+    ignore_audit_failures: bool
     def __init__(
         self,
         auto_load_sources: bool = ...,
         selection_diagnostics: bool = ...,
         plan_sql_tests: bool = ...,
         record_migration_fingerprints: bool = ...,
+        ignore_audit_failures: bool = ...,
     ) -> None: ...
 
 class DiscoveredPythonLoaderMetadata(NativeRecord):
@@ -11930,6 +11938,7 @@ class TargetConfig(NativeRecord):
     warehouses: TargetWarehousesConfig
     concurrency: int | None
     catalog_connection: str | None
+    ignore_audit_failures: bool | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -11954,6 +11963,7 @@ class TargetConfig(NativeRecord):
         warehouses: TargetWarehousesConfig = ...,
         concurrency: int | None = ...,
         catalog_connection: str | None = ...,
+        ignore_audit_failures: bool | None = ...,
     ) -> None: ...
 
 class LocalTargetConfig(NativeRecord):
@@ -11981,6 +11991,7 @@ class LocalTargetConfig(NativeRecord):
     warehouses: TargetWarehousesConfig
     concurrency: int | None
     catalog_connection: str | None
+    ignore_audit_failures: bool | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12006,6 +12017,7 @@ class LocalTargetConfig(NativeRecord):
         warehouses: TargetWarehousesConfig = ...,
         concurrency: int | None = ...,
         catalog_connection: str | None = ...,
+        ignore_audit_failures: bool | None = ...,
     ) -> None: ...
 
 class SettingsConfig(NativeRecord):
@@ -12030,6 +12042,7 @@ class SettingsConfig(NativeRecord):
     delta_compile: bool
     allow_missing_secrets: bool
     allow_warehouse_round_trips: bool
+    ignore_audit_failures: bool
     def __init__(
         self,
         sql_analysis: bool = ...,
@@ -12051,6 +12064,7 @@ class SettingsConfig(NativeRecord):
         delta_compile: bool = ...,
         allow_missing_secrets: bool = ...,
         allow_warehouse_round_trips: bool = ...,
+        ignore_audit_failures: bool = ...,
     ) -> None: ...
     @property
     def sql_validation(self) -> bool: ...
@@ -14236,6 +14250,7 @@ class AuditPlanEntry(NativeRecord):
     description: str | None
     reads_outside_target_lineage: bool
     meta: dict[str, object] | None
+    ignore_failure: bool
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14264,6 +14279,7 @@ class AuditPlanEntry(NativeRecord):
         description: str | None = ...,
         reads_outside_target_lineage: bool = ...,
         meta: dict[str, object] | None = ...,
+        ignore_failure: bool = ...,
     ) -> None: ...
 
 class ChainStep(NativeRecord):
@@ -14489,6 +14505,7 @@ class PlanOutput(NativeRecord):
     cursor_overrides: CursorOverrides | None
     existing_model_names: frozenset[str]
     end_audit_source_keys: frozenset[CompiledObjectKey]
+    ignore_audit_failures: bool
     def __init__(
         self,
         execution_order: tuple[CompiledObjectKey, ...] = ...,
@@ -14525,6 +14542,7 @@ class PlanOutput(NativeRecord):
         cursor_overrides: CursorOverrides | None = ...,
         existing_model_names: frozenset[str] = ...,
         end_audit_source_keys: frozenset[CompiledObjectKey] = ...,
+        ignore_audit_failures: bool = ...,
     ) -> None: ...
     @property
     def python_source_entries(self) -> dict[str, SourceEntry]: ...

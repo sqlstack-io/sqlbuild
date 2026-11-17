@@ -51,11 +51,36 @@ pub(crate) async fn succeed(store: &ControlStore, claim: &RunClaim) {
     finish(store, claim, (NodeOutcome::Success, RunOutcome::Success)).await;
 }
 
+/// Every selected node and the run succeed, the run having let `ignored` audit failures through.
+pub(crate) async fn succeed_ignoring_audit_failures(
+    store: &ControlStore,
+    claim: &RunClaim,
+    ignored: u32,
+) {
+    finish_reporting(
+        store,
+        claim,
+        (NodeOutcome::Success, RunOutcome::Success),
+        vec![RunChange::AuditFailuresIgnored { count: ignored }],
+    )
+    .await;
+}
+
 /// Every selected node and the run end with the given outcomes.
 pub(crate) async fn finish(
     store: &ControlStore,
     claim: &RunClaim,
+    outcomes: (NodeOutcome, RunOutcome),
+) {
+    finish_reporting(store, claim, outcomes, Vec::new()).await;
+}
+
+/// `finish`, publishing `reported` after the nodes and before the run finishes.
+async fn finish_reporting(
+    store: &ControlStore,
+    claim: &RunClaim,
     (node_outcome, run_outcome): (NodeOutcome, RunOutcome),
+    reported: Vec<RunChange>,
 ) {
     let mut changes = vec![RunChange::Started];
     changes.extend(
@@ -72,6 +97,7 @@ pub(crate) async fn finish(
                 error_message: None,
             }),
     );
+    changes.extend(reported);
     changes.push(RunChange::Finished {
         outcome: run_outcome,
         reason: "synthetic child completed".into(),

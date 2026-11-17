@@ -604,5 +604,7 @@ pub(crate) fn command_facts(args: &Bound<'_, PyAny>) -> PyResult<CommandFacts> {
         scenario_retain: flag("scenario_retain")?,
         scenario_snapshot_sync: flag("scenario_sync_snapshots")? || flag("scenario_refresh")?,
         raw_query_diff,
+        ignores_failures_of_no_audits: attr("ignore_audit_failures")?.is_truthy()?
+            && !flag("run_audits")?,
     })
 }

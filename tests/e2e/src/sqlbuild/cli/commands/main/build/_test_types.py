@@ -1656,3 +1656,30 @@ class ChangedRoundTripE2ETestCase:
     orders_sql: str
     expected_output_fragments: tuple[str, ...]
     expected_scored_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class IgnoredAuditFailureE2ETestCase:
+    """One blocking path built with audit failures held back or ignored."""
+
+    description: str
+    project_files: dict[str, str]
+    seed_sql: str
+    settings_toml: str
+    build_args: tuple[str, ...]
+    expected_exit_code: int
+    expected_tables: dict[str, int]
+    expected_audit_results: tuple[tuple[str, str, bool], ...]
+    expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class IgnoredAuditFailureCommandE2ETestCase:
+    """A command whose output says whether audit failures are ignored, or refuses the flags."""
+
+    description: str
+    settings_toml: str
+    command: tuple[str, ...]
+    expected_exit_code: int
+    expected_fragments: tuple[str, ...]
+    expected_missing_fragments: tuple[str, ...]

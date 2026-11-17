@@ -53,8 +53,10 @@ pub(crate) const TEST_TIMEOUT_KEY: &str = "test_timeout";
 pub(crate) const DELTA_COMPILE_KEY: &str = "delta_compile";
 pub(crate) const ALLOW_MISSING_SECRETS_KEY: &str = "allow_missing_secrets";
 pub(crate) const SCENARIO_TIMEOUT_KEY: &str = "scenario_timeout";
+/// Whether a failing audit holds nothing back; `[settings]` and each target may set it.
+pub(crate) const IGNORE_AUDIT_FAILURES_KEY: &str = "ignore_audit_failures";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";
-pub(crate) const SETTINGS_KEYS: [&str; 17] = [
+pub(crate) const SETTINGS_KEYS: [&str; 18] = [
     "sql_analysis",
     "require_sql_analysis",
     "query_change_tracking",
@@ -72,6 +74,7 @@ pub(crate) const SETTINGS_KEYS: [&str; 17] = [
     "delta_compile",
     "allow_missing_secrets",
     "allow_warehouse_round_trips",
+    IGNORE_AUDIT_FAILURES_KEY,
 ];
 pub(crate) const DEFAULTS_KEYS: [&str; 33] = [
     "append_cursor_inclusive",
@@ -188,7 +191,7 @@ pub(crate) const MODEL_HEADER_KEYS: [&str; 73] = [
 pub(crate) const POOLS_KEY: &str = "pools";
 /// The highest limit a pool may declare.
 pub(crate) const MAX_POOL_LIMIT: i64 = 10_000;
-pub(crate) const TARGET_KEYS: [&str; 22] = [
+pub(crate) const TARGET_KEYS: [&str; 23] = [
     "connection",
     "catalog_connection",
     "vars",
@@ -211,6 +214,7 @@ pub(crate) const TARGET_KEYS: [&str; 22] = [
     "recall",
     "concurrency",
     POOLS_KEY,
+    IGNORE_AUDIT_FAILURES_KEY,
 ];
 pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
 pub(crate) const CHANGES_KEYS: [&str; 2] = ["counts", "reach"];

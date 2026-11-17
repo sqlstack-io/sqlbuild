@@ -91,6 +91,7 @@ fn audit_result_text(audit: &AuditExecutionResult<Bound<'_, PyAny>>) -> AuditRes
         },
         execution_error: audit.execution_error.clone(),
         skip_reason: audit.skip_reason.clone(),
+        ignored: audit.ignored,
     }
 }
 

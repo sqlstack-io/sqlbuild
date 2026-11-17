@@ -268,6 +268,9 @@ pub struct JobRecord {
     pub pools: Vec<PoolUse>,
     /// The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
     pub concurrency: Option<u64>,
+    /// The job's own `ignore_audit_failures` setting; absent uses the target's, then the project's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ignore_audit_failures: Option<bool>,
     pub snapshot_id: uuid::Uuid,
     /// A job's selectors as written; absent for a group and for snapshots published before they were recorded.
     pub select: Option<String>,
@@ -298,6 +301,9 @@ pub struct JobDetailRecord {
     pub pools: Vec<PoolUse>,
     /// The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
     pub concurrency: Option<u64>,
+    /// The job's own `ignore_audit_failures` setting; absent uses the target's, then the project's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ignore_audit_failures: Option<bool>,
     /// Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction.
     pub settings: BTreeMap<String, serde_json::Value>,
     /// A group's member jobs in run order; empty for a job.

@@ -316,6 +316,18 @@ fn given_job_settings_when_validating_then_values_survive_the_build_parser() {
             expected_empty: false,
         },
         JobSettingsTestCase {
+            description: "a job ignoring audit failures passes the flag",
+            settings: BTreeMap::from([("ignore_audit_failures".into(), json!(true))]),
+            expected_values: vec![("ignore_audit_failures", Value::Bool(true))],
+            expected_empty: false,
+        },
+        JobSettingsTestCase {
+            description: "a job letting audit failures block overrides the settings with the negated flag",
+            settings: BTreeMap::from([("ignore_audit_failures".into(), json!(false))]),
+            expected_values: vec![("ignore_audit_failures", Value::Bool(false))],
+            expected_empty: false,
+        },
+        JobSettingsTestCase {
             description: "default-valued flags do not become explicit options",
             settings: BTreeMap::from([
                 ("run_tests".into(), json!(true)),
@@ -367,6 +379,14 @@ fn given_conflicting_job_settings_when_validating_then_options_are_rejected() {
                 ("reload".into(), json!(true)),
             ]),
             expected_error: "mutually exclusive",
+        },
+        JobSettingsRejectionTestCase {
+            description: "ignoring audit failures conflicts with running no audits",
+            settings: BTreeMap::from([
+                ("ignore_audit_failures".into(), json!(true)),
+                ("run_audits".into(), json!(false)),
+            ]),
+            expected_error: "cannot be combined with run_audits = false",
         },
     ];
     for test_case in test_cases {

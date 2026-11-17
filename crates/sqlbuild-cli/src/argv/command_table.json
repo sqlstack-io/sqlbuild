@@ -1717,6 +1717,7 @@
        }
       ],
       "mutex_groups": [
+       false,
        false
       ],
       "actions": [
@@ -1863,6 +1864,31 @@
         "const": true,
         "default": false,
         "help": "Print how long each planning step took, after the plan.",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--ignore-audit-failures"
+        ],
+        "dest": "ignore_audit_failures",
+        "nargs": 0,
+        "const": true,
+        "help": "Let builds go on past failing audits; the failures are still recorded, as ignored.",
+        "mutex_group": 1,
+        "group": 1
+       },
+       {
+        "kind": "store_false",
+        "options": [
+         "--no-ignore-audit-failures"
+        ],
+        "dest": "ignore_audit_failures",
+        "nargs": 0,
+        "const": false,
+        "default": true,
+        "help": "Let failing audits stop the build, even where a setting ignores them.",
+        "mutex_group": 1,
         "group": 1
        },
        {
@@ -2125,6 +2151,7 @@
        }
       ],
       "mutex_groups": [
+       false,
        false
       ],
       "actions": [
@@ -2253,6 +2280,31 @@
         "nargs": 0,
         "const": false,
         "default": true,
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--ignore-audit-failures"
+        ],
+        "dest": "ignore_audit_failures",
+        "nargs": 0,
+        "const": true,
+        "help": "Let builds go on past failing audits; the failures are still recorded, as ignored.",
+        "mutex_group": 1,
+        "group": 1
+       },
+       {
+        "kind": "store_false",
+        "options": [
+         "--no-ignore-audit-failures"
+        ],
+        "dest": "ignore_audit_failures",
+        "nargs": 0,
+        "const": false,
+        "default": true,
+        "help": "Let failing audits stop the build, even where a setting ignores them.",
+        "mutex_group": 1,
         "group": 1
        },
        {

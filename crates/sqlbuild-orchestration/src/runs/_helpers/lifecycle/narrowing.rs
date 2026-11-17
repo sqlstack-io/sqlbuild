@@ -1,8 +1,11 @@
 //! A run's narrowing and backfill window are read from its frozen request, and nothing else of that request is returned.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
+use crate::runs::constants::IGNORED_AUDIT_FAILURES_COUNT;
 use crate::runs::models::{RunNarrowing, RunWindow};
 
 /// The narrowing of a stored frozen request, which reruns copy, or of an already projected record.
@@ -54,6 +57,27 @@ pub(crate) fn frozen_member_attempt<'de, D: Deserializer<'de>>(
     Ok(attempt
         .as_u64()
         .and_then(|attempt| u8::try_from(attempt).ok()))
+}
+
+/// How many audit failures a run let through: its stored node counts' entry, or an already projected count.
+pub(crate) fn ignored_audit_failures<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<u32, D::Error> {
+    let value: Value = frozen(deserializer)?;
+    let count: &Value = value.get(IGNORED_AUDIT_FAILURES_COUNT).unwrap_or(&value);
+    Ok(count
+        .as_u64()
+        .map_or(0, |count| u32::try_from(count).unwrap_or(u32::MAX)))
+}
+
+/// A run's node counts by status, without the entry that counts ignored audit failures.
+pub(crate) fn node_counts<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<BTreeMap<String, i64>, D::Error> {
+    let mut counts: BTreeMap<String, i64> =
+        serde_json::from_value(frozen(deserializer)?).map_err(serde::de::Error::custom)?;
+    counts.remove(IGNORED_AUDIT_FAILURES_COUNT);
+    Ok(counts)
 }
 
 /// A JSON column, which SQLite returns as text and PostgreSQL as JSON.

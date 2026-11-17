@@ -94,6 +94,17 @@ pub struct ConcurrencyLayers<'a> {
     pub local_override: bool,
 }
 
+/// Whether audit failures are ignored at each configuration layer, highest precedence first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AuditFailureLayers {
+    /// The command's flag; a job run's `[settings]` arrive as the flag.
+    pub requested: Option<bool>,
+    /// The selected target's `ignore_audit_failures`, when it sets one.
+    pub target: Option<bool>,
+    /// `[settings] ignore_audit_failures` after any `sqlbuild_local.toml` override.
+    pub settings: bool,
+}
+
 /// Where the effective concurrency came from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConcurrencySource {

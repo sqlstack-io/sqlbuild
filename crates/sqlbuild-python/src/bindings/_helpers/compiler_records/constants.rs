@@ -398,6 +398,7 @@ const R_COMPILE_PIPELINE_OPTIONS: RecordSpec = RecordSpec {
         FieldSpec::new("concurrency", FieldDefault::None),
         FieldSpec::new("selection_diagnostics", FieldDefault::False),
         FieldSpec::new("plan_sql_tests", FieldDefault::True),
+        FieldSpec::new("ignore_audit_failures", FieldDefault::False),
         FieldSpec::new("record_migration_fingerprints", FieldDefault::True),
         FieldSpec::new("accepts_unit_test_selectors", FieldDefault::False),
         FieldSpec::new(

@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::warehouse_history::_helpers::checks::ignored_failure;
 use crate::warehouse_metadata::models::{
     WarehouseAuditRecord, WarehouseJanitorRecord, WarehouseMigrationRecord,
 };
@@ -37,6 +38,9 @@ pub struct CheckResult {
     pub evidence_count: Option<i64>,
     pub evidence_truncated: Option<String>,
     pub reused: String,
+    /// An error-severity failure its build let through instead of holding anything back.
+    #[serde(default)]
+    pub ignored: bool,
 }
 
 impl CheckResult {
@@ -67,6 +71,7 @@ impl CheckResult {
             evidence_count: record.evidence_count,
             evidence_truncated: record.evidence_truncated,
             reused: record.reused,
+            ignored: ignored_failure(record.metadata_json.as_deref()),
         }
     }
 }

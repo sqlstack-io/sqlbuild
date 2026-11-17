@@ -12,6 +12,7 @@ use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionSc
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query, query_records::query_records};
 use crate::store::models::{ControlTransaction, Parameter};
+use crate::warehouse_history::constants::IGNORED_KEY;
 use crate::warehouse_history::models::CheckEvidence;
 use crate::warehouse_metadata::models::WarehouseAuditRecord;
 
@@ -161,4 +162,19 @@ async fn check_scope(
             nodes,
         },
     ))
+}
+
+/// Whether an audit result's metadata marks it as a failure its build ignored.
+pub(crate) fn ignored_failure(metadata_json: Option<&str>) -> bool {
+    let Some(text) = metadata_json else {
+        return false;
+    };
+    match serde_json::from_str::<serde_json::Value>(text) {
+        Ok(metadata) => metadata
+            .get(IGNORED_KEY)
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        Err(error) if error.is_syntax() || error.is_eof() => false,
+        Err(_) => false,
+    }
 }

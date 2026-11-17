@@ -508,3 +508,12 @@ pub(crate) struct PoolAmountTestCase {
     pub(crate) expected_claimed: &'static [u128],
     pub(crate) expected_slots: &'static [(&'static str, i64)],
 }
+
+pub(crate) struct GroupMemberSettingsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each member job's `ignore_audit_failures` setting and the audit failures its run ignores.
+    pub(crate) members: [(&'static str, bool, u32); 2],
+    pub(crate) expected_group_status: RunStatus,
+    pub(crate) expected_group_ignored: u32,
+}

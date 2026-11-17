@@ -37,6 +37,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--as` | Compile for another target and show its plan, including [model migration](../concepts/models/migrations.md) decisions, using the current connection. Inspection only. |
 | `--json` | Output the plan as JSON |
 | `--timings` | After the plan, print how long each planning step took; see [Timings](#timings) |
+| `--ignore-audit-failures`, `--no-ignore-audit-failures` | Plan the build `sqb build` would run with the same flag; a plan whose audit failures are ignored starts with `Audit failures won't stop this build`. See [Ignoring audit failures](../concepts/audits.md#ignoring-audit-failures) |
 | `--selection-diagnostics` | Warn when a selected model will build on changed upstream models that are not selected; see [Selection and staleness](../concepts/planning/selection-and-staleness.md) |
 | `--full-refresh` | Plan a full rebuild for selected models unless a model sets `full_refresh false`; `full_refresh true` forces a model without this flag |
 | `--changed` | Show what `sqb build --changed` would run, which nodes it holds back and why; takes `--changed=definition,source_data` and `--reach` like [`sqb build`](build.md#building-only-what-changed). In `--json`, the `changed` object lists `runs`, `held_back` and `unchanged` |

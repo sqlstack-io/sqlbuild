@@ -1,7 +1,7 @@
 //! Frozen selection, executor callbacks and completion belong to one verified worker build.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::{PyKeyboardInterrupt, PyRuntimeError, PyValueError};
@@ -52,6 +52,8 @@ pub(crate) struct WorkerBuild {
     returned: AtomicBool,
     /// Why the worker refused the run before executing anything, reported as the run's status reason.
     refusal: Mutex<Option<String>>,
+    /// Error-severity audit failures the build let through, reported before the run finishes.
+    ignored_audit_failures: AtomicU32,
 }
 
 impl WorkerBuild {
@@ -72,6 +74,7 @@ impl WorkerBuild {
             causes: Mutex::default(),
             checked: Mutex::default(),
             returned: AtomicBool::new(false),
+            ignored_audit_failures: AtomicU32::new(0),
             refusal: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
@@ -87,6 +90,14 @@ impl WorkerBuild {
     /// The server run this build executes.
     pub(crate) fn run_id(&self) -> uuid::Uuid {
         self.execution.claim.request.run_id
+    }
+
+    /// The build let `count` error-severity audit failures through.
+    pub(crate) fn ignored_audit_failures(&self, count: i64) {
+        self.ignored_audit_failures.store(
+            u32::try_from(count.max(0)).unwrap_or(u32::MAX),
+            Ordering::SeqCst,
+        );
     }
 
     /// Test and audit runs execute only attached checks, so their nodes take the checks' outcome.
@@ -709,6 +720,14 @@ impl WorkerBuild {
             .map_err(|_| poisoned())?
             .clone()
             .unwrap_or_else(|| "worker executor completed and closed its connections".into());
+        let ignored: u32 = self.ignored_audit_failures.load(Ordering::SeqCst);
+        if ignored > 0 {
+            self.worker.bind(py).get().change(
+                py,
+                "worker-audit-failures-ignored",
+                RunChange::AuditFailuresIgnored { count: ignored },
+            )?;
+        }
         self.worker.bind(py).get().change(
             py,
             "worker-finished",

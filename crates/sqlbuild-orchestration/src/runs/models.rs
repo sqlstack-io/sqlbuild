@@ -283,7 +283,14 @@ pub struct RunRecord {
     pub ended_at: Option<DateTime<Utc>>,
     pub cancel_requested_at: Option<DateTime<Utc>>,
     pub selection_json: BTreeSet<String>,
+    #[serde(deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::node_counts")]
     pub node_counts_json: BTreeMap<String, i64>,
+    /// Error-severity audit failures the run let through; a group sums its members'.
+    #[serde(
+        default,
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::ignored_audit_failures"
+    )]
+    pub ignored_audit_failures: u32,
     pub last_event_storage_id: i64,
     /// How a person narrowed this run of a job, or the run it reruns, as typed; `None` when it runs the whole job.
     #[serde(
@@ -605,6 +612,10 @@ pub enum RunChange {
         reason: String,
         exit_code: Option<i64>,
     },
+    /// How many error-severity audit failures a build let through; sent just before `Finished`.
+    AuditFailuresIgnored {
+        count: u32,
+    },
 }
 
 impl RunChange {
@@ -622,6 +633,7 @@ impl RunChange {
             Self::Recovered => "run_recovered",
             Self::CancelRequested { .. } => "run_cancel_requested",
             Self::Finished { .. } => "run_terminated",
+            Self::AuditFailuresIgnored { .. } => "run_audit_failures_ignored",
         }
     }
 

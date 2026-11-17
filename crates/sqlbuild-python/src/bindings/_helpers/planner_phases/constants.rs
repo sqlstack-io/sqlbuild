@@ -17,3 +17,10 @@ pub(crate) const RETENTION_MATCH: &str = "match";
 pub(crate) const PERCENT: f64 = 100.0;
 /// Plan document timings are rounded to the millisecond.
 pub(crate) const MILLISECONDS: f64 = 1000.0;
+
+/// The planner policy, and the plan field, saying audit failures hold nothing back.
+pub(crate) const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
+/// The plan field holding the planned audits.
+pub(crate) const AUDIT_ENTRIES: &str = "audit_entries";
+/// An audit plan entry's field saying its failure holds nothing back.
+pub(crate) const IGNORE_FAILURE: &str = "ignore_failure";

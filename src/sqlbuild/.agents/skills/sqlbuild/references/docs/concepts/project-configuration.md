@@ -187,6 +187,7 @@ A target is a named build context - the database and schema you build into, plus
 | `missing_migration_origin` | What a build does when a declared `migrate_from` origin does not exist in this target: `allow` (default), `require_confirmation`, or `deny`. See [Missing migration origins](models/migrations.md#missing-migration-origins) |
 | `warehouses` | Snowflake warehouse per command group, `build` and `query`. See [Command-group warehouses](adapters/snowflake.md#command-group-warehouses) |
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
+| `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
 
 ```toml
 [connections.warehouse]
@@ -519,6 +520,7 @@ delta_compile = true
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](../cli/compile.md#compiling-after-an-edit). |
 | `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](python-nodes/providers.md#secrets). |
 | `allow_warehouse_round_trips` | `false` | Allow a loader to depend on a task or asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](python-nodes/overview.md#warehouse-round-trips). |
+| `ignore_audit_failures` | `false` | Let builds go on past failing audits: they still run and record `fail`, but promote, apply and build downstream as if they passed. A target, a job and `--ignore-audit-failures` / `--no-ignore-audit-failures` override it. See [Ignoring audit failures](audits.md#ignoring-audit-failures). |
 
 ### Unit test and scenario limits
 

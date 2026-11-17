@@ -3,6 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use sqlbuild_core::build_aggregate::constants::IGNORED_AUDIT_FAILURE;
 use sqlbuild_core::build_aggregate::main::aggregate_build_counts::aggregate_build_counts;
 use sqlbuild_core::build_aggregate::models::{BuildCounts, BuildResultFacts, ModelResultFacts};
 use sqlbuild_host::entries::models::ExecutorHost;
@@ -68,11 +69,7 @@ impl<'a, V> RetainedBuildResults<'a, V> {
     pub(crate) fn counts(&self) -> BuildCounts {
         let mut models: Vec<ModelResultFacts> = Vec::new();
         for model in &self.models {
-            let audit_outcomes: Vec<String> = model
-                .audit_results
-                .iter()
-                .map(|audit| audit.outcome.value().to_owned())
-                .collect();
+            let audit_outcomes: Vec<String> = model.audit_results.iter().map(audit_fact).collect();
             models.push(ModelResultFacts {
                 status: model.status.value().to_owned(),
                 error_code: model.error_code.clone(),
@@ -110,12 +107,12 @@ impl<'a, V> RetainedBuildResults<'a, V> {
             source_audit_outcomes: self
                 .source_audits
                 .iter()
-                .map(|result| result.outcome.value().to_owned())
+                .map(|result| audit_fact(result))
                 .collect(),
             end_audit_outcomes: self
                 .end_audits
                 .iter()
-                .map(|result| result.outcome.value().to_owned())
+                .map(|result| audit_fact(result))
                 .collect(),
         })
     }
@@ -130,6 +127,28 @@ const RESULT_FIELDS: [&str; 7] = [
     "source_audit_results",
     "end_audit_results",
 ];
+
+/// An audit's outcome as the aggregation counts it: an ignored failure is its own outcome.
+fn audit_fact<V>(audit: &AuditExecutionResult<V>) -> String {
+    if audit.ignored {
+        return IGNORED_AUDIT_FAILURE.to_owned();
+    }
+    audit.outcome.value().to_owned()
+}
+
+/// Each audit result's outcome as the aggregation counts it.
+fn audit_facts(results: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+    results
+        .try_iter()?
+        .map(|result| {
+            let result: Bound<'_, PyAny> = result?;
+            if native_field(&result, "ignored")?.is_truthy()? {
+                return Ok(IGNORED_AUDIT_FAILURE.to_owned());
+            }
+            native_field(&result, "outcome")?.str()?.extract()
+        })
+        .collect()
+}
 
 fn texts(results: &Bound<'_, PyAny>, field: &str) -> PyResult<Vec<String>> {
     results
@@ -147,7 +166,7 @@ fn facts(sections: &[Bound<'_, PyAny>]) -> PyResult<BuildResultFacts> {
                 status: native_field(&model, "status")?.str()?.extract()?,
                 error_code: native_field(&model, "error_code")?.extract()?,
                 warning_count: native_field(&model, "warning_messages")?.len()?,
-                audit_outcomes: texts(&native_field(&model, "audit_results")?, "outcome")?,
+                audit_outcomes: audit_facts(&native_field(&model, "audit_results")?)?,
             })
         })
         .collect::<PyResult<_>>()?;
@@ -167,8 +186,8 @@ fn facts(sections: &[Bound<'_, PyAny>]) -> PyResult<BuildResultFacts> {
         functions,
         load_statuses: texts(&sections[3], "status")?,
         test_outcomes: texts(&sections[4], "outcome")?,
-        source_audit_outcomes: texts(&sections[5], "outcome")?,
-        end_audit_outcomes: texts(&sections[6], "outcome")?,
+        source_audit_outcomes: audit_facts(&sections[5])?,
+        end_audit_outcomes: audit_facts(&sections[6])?,
     })
 }
 
@@ -191,6 +210,10 @@ pub(crate) fn aggregated_build_result<'py>(
         (
             "insufficient_count",
             counts.insufficient.into_bound_py_any(py)?,
+        ),
+        (
+            "ignored_audit_failure_count",
+            counts.ignored_audit_failures.into_bound_py_any(py)?,
         ),
     ]);
     call_with(

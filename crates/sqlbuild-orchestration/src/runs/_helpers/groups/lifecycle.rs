@@ -13,6 +13,7 @@ use crate::runs::_helpers::groups::context::load_group;
 use crate::runs::_helpers::groups::selection::{failed_upstream, member_dependencies};
 use crate::runs::_helpers::lifecycle::claims::reserve_claims;
 use crate::runs::_helpers::lifecycle::publish_change::publish_change;
+use crate::runs::constants::IGNORED_AUDIT_FAILURES_COUNT;
 use crate::runs::models::{
     ChangingRun, GroupContext, NodeOutcome, QueueCandidate, RunChange, RunChangeRequest,
     RunNodeRecord, RunOutcome, RunStatus,
@@ -303,6 +304,27 @@ async fn finish_group(
     } else {
         RunOutcome::Success
     };
+    let ignored: i64 = group
+        .children
+        .iter()
+        .filter_map(|child| {
+            child
+                .state
+                .node_counts_json
+                .get(IGNORED_AUDIT_FAILURES_COUNT)
+        })
+        .sum();
+    let mut transaction = transaction;
+    if ignored > 0 {
+        transaction = group_change(
+            transaction,
+            parent_id,
+            RunChange::AuditFailuresIgnored {
+                count: u32::try_from(ignored).unwrap_or(u32::MAX),
+            },
+        )
+        .await?;
+    }
     group_change(
         transaction,
         parent_id,

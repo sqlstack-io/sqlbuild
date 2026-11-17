@@ -1,5 +1,6 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
+use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
 use crate::bindings::_helpers::planner_phases::timings::{
     BUILD_HISTORY, PlanTimingScope, PlanTimings, WRITING, timed,
 };
@@ -323,6 +324,13 @@ fn compile_pipeline<'py>(
         native_field(request, "include_python")?,
     )?;
     options.set_item("record_migration_fingerprints", false)?;
+    let planned_target: Bound<'py, PyAny> = options
+        .get_item("selected_target")?
+        .unwrap_or_else(|| py.None().into_bound(py));
+    options.set_item(
+        "ignore_audit_failures",
+        resolve_ignore_audit_failures(request, &invocation.discovered, &planned_target)?,
+    )?;
     let pipeline_options: Bound<'py, PyAny> =
         new_record(py, RecordId::CompilePipelineOptions, (), Some(&options))?;
     let adapter: Bound<'py, PyAny> = native_field(&invocation.context, "adapter")?;

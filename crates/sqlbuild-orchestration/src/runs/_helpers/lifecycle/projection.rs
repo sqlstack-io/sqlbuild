@@ -6,6 +6,7 @@ use serde_json::json;
 
 use crate::runs::_helpers::lifecycle::checks::check_execution_history;
 use crate::runs::_helpers::lifecycle::nodes::project_node;
+use crate::runs::constants::IGNORED_AUDIT_FAILURES_COUNT;
 use crate::runs::models::{ChangingRun, RunChange, RunChangeRequest, RunOutcome};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -63,6 +64,19 @@ pub(crate) async fn project_run_state(
         RunChange::NodeStarted { .. } | RunChange::NodeFinished { .. } => {
             return project_node(transaction, request, &state.node_counts_json).await;
         }
+        RunChange::AuditFailuresIgnored { count } => {
+            let mut counts: BTreeMap<String, i64> = state.node_counts_json.clone();
+            counts.insert(IGNORED_AUDIT_FAILURES_COUNT.into(), i64::from(*count));
+            (transaction, _) = query(
+                transaction,
+                "UPDATE sqb_runs SET node_counts_json=$1 WHERE run_id=$2",
+                vec![
+                    Parameter::Json(json!(counts)),
+                    Parameter::Id(request.run_id),
+                ],
+            )
+            .await?;
+        }
         RunChange::Launched { .. } => {
             (transaction, _) = query(transaction,
                 "UPDATE sqb_runs SET status=CASE WHEN status='queued' THEN 'launched' ELSE status END, launched_at=COALESCE(launched_at,$1) WHERE run_id=$2",
@@ -110,7 +124,7 @@ pub(crate) async fn project_run_state(
             (transaction, counts) = query(transaction,
                 "SELECT status, COUNT(*) AS count FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' GROUP BY status",
                 vec![Parameter::Id(request.run_id)]).await?;
-            let counts: BTreeMap<String, i64> = counts
+            let mut counts: BTreeMap<String, i64> = counts
                 .into_iter()
                 .filter_map(|row| {
                     Some((
@@ -119,6 +133,9 @@ pub(crate) async fn project_run_state(
                     ))
                 })
                 .collect();
+            if let Some(ignored) = state.node_counts_json.get(IGNORED_AUDIT_FAILURES_COUNT) {
+                counts.insert(IGNORED_AUDIT_FAILURES_COUNT.into(), *ignored);
+            }
             (transaction, _) = query(
                 transaction,
                 "UPDATE sqb_runs SET status=$1, status_reason=$2, ended_at=$3, node_counts_json=$5 WHERE run_id=$4",

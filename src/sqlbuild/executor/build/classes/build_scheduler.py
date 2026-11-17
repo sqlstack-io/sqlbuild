@@ -1448,7 +1448,7 @@ class BuildScheduler:
             quality_scope="seed",
         )
         self._seed_audit_results[key] = results
-        if not any(audit.outcome == AuditOutcome.ERROR for audit in results):
+        if not any(audit.blocks for audit in results):
             return result
         return dataclasses.replace(
             result,

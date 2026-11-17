@@ -6,7 +6,8 @@ use serde_json::Value;
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 
 use crate::declarations::constants::{
-    CONCURRENCY_SETTING, DEFER_SETTING_PREFIX, VARS_SETTING, WITHHELD_SETTING,
+    CONCURRENCY_SETTING, DEFER_SETTING_PREFIX, IGNORE_AUDIT_FAILURES_SETTING, VARS_SETTING,
+    WITHHELD_SETTING,
 };
 use crate::declarations::models::{
     Definitions, GroupDefinition, JobDefinition, JobMember, PoolSlots, PoolUse,
@@ -79,6 +80,18 @@ fn sharing(pool: &str, job_key: &str, all: &[DeclaredPools<'_>]) -> BTreeSet<Str
         }
     }
     shared
+}
+
+/// The job's settings as people see them, and its own `ignore_audit_failures` setting.
+pub(crate) fn declared_settings(job: &JobDefinition) -> (BTreeMap<String, Value>, Option<bool>) {
+    (shown_settings(&job.settings), ignores_audit_failures(job))
+}
+
+/// The job's own `ignore_audit_failures` setting, when it sets one.
+pub(crate) fn ignores_audit_failures(job: &JobDefinition) -> Option<bool> {
+    job.settings
+        .get(IGNORE_AUDIT_FAILURES_SETTING)
+        .and_then(Value::as_bool)
 }
 
 /// The job's own `concurrency` setting, when it is a whole number.

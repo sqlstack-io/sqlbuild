@@ -28,6 +28,8 @@ const RENAMED_REASON: &str = "renamed";
 const RENAMED_DECISION: &str = "renamed";
 const VIEW_MATERIALIZATION: &str = "view";
 const CHANGED_IDENTITY: &str = "changed";
+/// The plan document field saying audit failures hold nothing back; present only when they do.
+const IGNORE_AUDIT_FAILURES_KEY: &str = "ignore_audit_failures";
 
 fn token<'py>(bound: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     Ok(PyString::new(bound.py(), &sentinel_to_token(&bound)?).into_any())
@@ -832,6 +834,9 @@ pub(crate) fn format_plan_json(
     }
     if arguments.passed(CHANGED_KEY)? {
         result.set_item(CHANGED_KEY, arguments.value(CHANGED_KEY)?)?;
+    }
+    if native_field(&plan, IGNORE_AUDIT_FAILURES_KEY)?.is_truthy()? {
+        result.set_item(IGNORE_AUDIT_FAILURES_KEY, true)?;
     }
     indented_json(result.as_any())
 }

@@ -669,6 +669,8 @@ export type PlanDocument = {
 	changed: PlanChanged | null;
 	/** How long the location took to plan, step by step; absent for plans recorded without timings. */
 	timings?: PlanTimings | null;
+	/** Set when audit failures won't stop the build this plan previews; absent otherwise. */
+	ignore_audit_failures?: boolean;
 	/** A server summary's every built model, of which `models` holds the changed ones and the routine ones loaded so far. */
 	built_model_names?: string[];
 	/** A server summary's large sections, by size; their rows load a page at a time. */

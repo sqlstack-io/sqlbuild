@@ -514,6 +514,7 @@ fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextReport> {
         )?))?,
         pruned_models: pruned_models(&metadata)?,
         pre_build_lines: pre_build,
+        ignore_audit_failures: native_field(&plan, "ignore_audit_failures")?.is_truthy()?,
     })
 }
 

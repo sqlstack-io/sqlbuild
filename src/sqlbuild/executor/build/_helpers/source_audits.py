@@ -93,7 +93,7 @@ def run_pending_source_audits(
                     lifecycle.failed()
             audit_results.append(result)
             publish_completed_audit_results((result,))
-            if result.outcome == AuditOutcome.ERROR:
+            if result.blocks:
                 failed_names.append(source_name)
                 newly_blocked.update(
                     downstream_blocked_keys(

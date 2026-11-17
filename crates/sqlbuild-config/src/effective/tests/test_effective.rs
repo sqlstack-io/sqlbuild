@@ -2,17 +2,19 @@ use crate::effective::errors::EffectiveConfigError;
 use crate::effective::main::default_connection_name::default_connection_name;
 use crate::effective::main::effective_concurrency::effective_concurrency;
 use crate::effective::main::effective_connection::effective_connection;
+use crate::effective::main::effective_ignore_audit_failures::effective_ignore_audit_failures;
 use crate::effective::main::effective_settings::effective_settings;
 use crate::effective::main::effective_target_name::effective_target_name;
 use crate::effective::main::effective_vars::effective_vars;
 use crate::effective::main::merged_target::merged_target;
 use crate::effective::models::{
-    ConcurrencyLayers, ConnectionChoice, ConnectionLayers, FieldValue, TargetChoice, TargetLayer,
+    AuditFailureLayers, ConcurrencyLayers, ConnectionChoice, ConnectionLayers, FieldValue,
+    TargetChoice, TargetLayer,
 };
 use crate::effective::tests::helpers::{entries, field_value, local_layer, project_layer};
 use crate::effective::tests::test_types::{
-    ConcurrencyTestCase, ConnectionTestCase, DefaultConnectionTestCase, MergeTestCase,
-    MessageTestCase, Pairs, TargetNameTestCase, UnionTestCase,
+    AuditFailureTestCase, ConcurrencyTestCase, ConnectionTestCase, DefaultConnectionTestCase,
+    MergeTestCase, MessageTestCase, Pairs, TargetNameTestCase, UnionTestCase,
 };
 use crate::effective::types::Entries;
 
@@ -348,6 +350,67 @@ fn given_concurrency_layers_when_resolving_then_cli_beats_target_beats_settings(
         assert_eq!(
             (resolved.limit, resolved.source.to_string().as_str()),
             (test_case.expected_limit, test_case.expected_source),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_audit_failure_layers_when_resolving_then_request_beats_target_beats_settings() {
+    let test_cases = [
+        AuditFailureTestCase {
+            description: "nothing set keeps audit failures blocking",
+            requested: None,
+            target: None,
+            settings: false,
+            expected_ignored: false,
+        },
+        AuditFailureTestCase {
+            description: "the project setting applies without a target or flag",
+            requested: None,
+            target: None,
+            settings: true,
+            expected_ignored: true,
+        },
+        AuditFailureTestCase {
+            description: "the target turns it off over the project setting",
+            requested: None,
+            target: Some(false),
+            settings: true,
+            expected_ignored: false,
+        },
+        AuditFailureTestCase {
+            description: "the target turns it on over the project default",
+            requested: None,
+            target: Some(true),
+            settings: false,
+            expected_ignored: true,
+        },
+        AuditFailureTestCase {
+            description: "the flag or job setting turns it on over the target",
+            requested: Some(true),
+            target: Some(false),
+            settings: false,
+            expected_ignored: true,
+        },
+        AuditFailureTestCase {
+            description: "the negated flag or a job's false turns it off over the target",
+            requested: Some(false),
+            target: Some(true),
+            settings: true,
+            expected_ignored: false,
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            effective_ignore_audit_failures(&AuditFailureLayers {
+                requested: test_case.requested,
+                target: test_case.target,
+                settings: test_case.settings,
+            }),
+            test_case.expected_ignored,
             "{}",
             test_case.description
         );

@@ -18,3 +18,5 @@ pub(crate) const LOADER_KIND: &str = "loader";
 pub(crate) const SOURCE_LOADER_POINTER: &str = "/entry/loader";
 /// The job setting naming how many models a run builds at once.
 pub(crate) const CONCURRENCY_SETTING: &str = "concurrency";
+/// A job setting that lets its runs go on past failing audits.
+pub(crate) const IGNORE_AUDIT_FAILURES_SETTING: &str = "ignore_audit_failures";

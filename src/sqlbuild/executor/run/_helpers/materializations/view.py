@@ -19,7 +19,7 @@ from sqlbuild.adapter.relations.main.cached_relation_type import cached_relation
 from sqlbuild.adapter.relations.main.resolve_relation_location_qualified_name import (
     resolve_relation_location_qualified_name,
 )
-from sqlbuild.compiler.auditing.types import AuditOutcome, AuditRunScope
+from sqlbuild.compiler.auditing.types import AuditRunScope
 from sqlbuild.diagnostics.main.diagnostics_context import diagnostics_context
 from sqlbuild.executor.auditing.main._execute import execute_audit
 from sqlbuild.executor.auditing.models import AuditExecutionResult
@@ -146,7 +146,7 @@ def execute_view_entry(
             quality_scope="final",
         )
         audit_results.append(result)
-        if result.outcome == AuditOutcome.ERROR:
+        if result.blocks:
             audit_error = True
 
     if audit_error:

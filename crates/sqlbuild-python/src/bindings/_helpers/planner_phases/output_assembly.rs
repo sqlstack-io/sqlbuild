@@ -7,6 +7,9 @@ use crate::bindings::_helpers::planner_entries::models::PlanOutputInputs;
 use crate::bindings::_helpers::planner_entries::plan_output::plan_output_fields;
 use crate::bindings::_helpers::planner_identity::staleness::build_stale_out_of_selection_warnings;
 use crate::bindings::_helpers::planner_migrations::fingerprint::with_migration_fingerprints;
+use crate::bindings::_helpers::planner_phases::constants::{
+    AUDIT_ENTRIES, IGNORE_AUDIT_FAILURES, IGNORE_FAILURE,
+};
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
@@ -26,7 +29,7 @@ use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::source_freshness::source_freshness_unknown_warnings;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use crate::bindings::_helpers::records::fields::{mapping_items, replaced};
 use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
@@ -457,5 +460,33 @@ pub(crate) fn add_plan_metadata<'py>(
     output
         .metadata
         .push(("selection_diagnostics", diagnostics.into_any()));
+    if native_field(policies, IGNORE_AUDIT_FAILURES)?.is_truthy()? {
+        return ignoring_audit_failures(py, output);
+    }
     Ok(output)
+}
+
+/// Mark every planned audit's failure as one that holds nothing back, and the plan as saying so.
+fn ignoring_audit_failures<'py>(
+    py: Python<'py>,
+    output: PlanOutputFields<'py>,
+) -> PyResult<PlanOutputFields<'py>> {
+    let ignored = PyBool::new(py, true).to_owned().into_any();
+    let mut fields: Vec<(&'static str, Bound<'py, PyAny>)> = Vec::new();
+    for (name, value) in output.fields {
+        if name != AUDIT_ENTRIES {
+            fields.push((name, value));
+            continue;
+        }
+        let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
+        for entry in value.try_iter()? {
+            entries.push(replaced(&entry?, &[(IGNORE_FAILURE, ignored.clone())])?);
+        }
+        fields.push((name, PyTuple::new(py, entries)?.into_any()));
+    }
+    fields.push((IGNORE_AUDIT_FAILURES, ignored));
+    Ok(PlanOutputFields {
+        fields,
+        metadata: output.metadata,
+    })
 }

@@ -416,6 +416,8 @@ pub struct PlanTextReport {
     pub pruned_models: Vec<String>,
     /// Table type, retention and migration lines the planner renders.
     pub pre_build_lines: Vec<String>,
+    /// Audit failures hold nothing back in the build this plan previews.
+    pub ignore_audit_failures: bool,
 }
 
 /// The structural kind of a rendered plan line.

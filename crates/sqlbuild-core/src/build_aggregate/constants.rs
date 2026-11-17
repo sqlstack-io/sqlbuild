@@ -8,6 +8,8 @@ pub(crate) const AUDIT_WARN: &str = "warn";
 pub(crate) const AUDIT_ERROR: &str = "error";
 pub(crate) const AUDIT_INSUFFICIENT: &str = "insufficient";
 pub(crate) const AUDIT_SKIPPED: &str = "skipped";
+/// The outcome a fact names an error-severity audit failure by when the build ignored it.
+pub const IGNORED_AUDIT_FAILURE: &str = "ignored";
 pub(crate) const SOURCE_FRESHNESS_BLOCKED_CODE: &str = "B005";
 pub(crate) const TEST_TIMEOUT: &str = "timeout";
 pub(crate) const ITEM_TIMEOUT_CODE: &str = "C417";
