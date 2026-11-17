@@ -672,7 +672,7 @@ pub(crate) struct SourceLoadGate {
 
 #[pymethods]
 impl SourceLoadGate {
-    /// Why a round-trip load is skipped: `hard` after a failed or skipped upstream, `soft` when it never ran.
+    /// Why a round-trip load is skipped: `hard` after a failed or hard-skipped upstream, `soft` after a soft skip or when it never ran.
     fn __call__(
         &self,
         py: Python<'_>,
@@ -683,19 +683,28 @@ impl SourceLoadGate {
         let Some(gates) = loader.and_then(|loader| lifecycle.round_trip_gates.get(&loader)) else {
             return Ok(None);
         };
-        let mut statuses: HashMap<String, String> = HashMap::new();
+        let mut statuses: HashMap<String, (String, Option<String>)> = HashMap::new();
         for result in lifecycle.python_results(py)?.try_iter()? {
             let result: Bound<'_, PyAny> = result?;
+            let skip_mode: Bound<'_, PyAny> = native_field(&result, "skip_mode")?;
             statuses.insert(
                 native_field(&result, "node_name")?.extract()?,
-                native_field(&result, "status")?.str()?.extract()?,
+                (
+                    native_field(&result, "status")?.str()?.extract()?,
+                    (!skip_mode.is_none())
+                        .then(|| skip_mode.str()?.extract())
+                        .transpose()?,
+                ),
             );
         }
         for (kind, name) in gates {
-            let (outcome, mode): (&str, &'static str) = match statuses.get(name).map(String::as_str)
-            {
-                Some(SUCCESS_STATUS) => continue,
-                Some(SKIPPED_STATUS) => ("was skipped", HARD_SKIP),
+            let status = statuses
+                .get(name)
+                .map(|(status, mode)| (status.as_str(), mode.as_deref()));
+            let (outcome, mode): (&str, &'static str) = match status {
+                Some((SUCCESS_STATUS, _)) => continue,
+                Some((SKIPPED_STATUS, Some(SOFT_SKIP))) => ("was skipped", SOFT_SKIP),
+                Some((SKIPPED_STATUS, _)) => ("was skipped", HARD_SKIP),
                 Some(_) => ("failed", HARD_SKIP),
                 None if !lifecycle.include_python => (
                     "did not run; --no-python skips read-side tasks and assets",

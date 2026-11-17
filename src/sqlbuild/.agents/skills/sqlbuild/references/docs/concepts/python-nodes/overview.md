@@ -110,8 +110,9 @@ allow_warehouse_round_trips = true
 With the setting on:
 
 - One `sqb build` runs the SQL the task reads, then the task, then the loader, then the models that
-  read the loader's source. If the task fails or is skipped, the loader and everything downstream of
-  its source are skipped.
+  read the loader's source. If the task fails or skips with `mode="hard"`, the loader and everything
+  downstream of its source are skipped. If it skips softly, only the load is skipped: the source
+  keeps its last loaded data, and models reading it still build when another of their inputs ran.
 - Lineage and column lineage restart at the source: the source's columns come from the loader, not
   from the models the task read.
 - Job groups run a member that builds the task before the member that runs the loader, and that one

@@ -304,9 +304,10 @@ Dependencies form a DAG. SQLBuild schedules loaders in topological order and exe
 ### Depending on tasks and assets
 
 A loader reads an upstream task's or asset's result with `ctx.result_of(...)`; `ctx.loader(...)`
-takes loaders only. A failed or skipped upstream task or asset skips the loader and everything
-downstream of the source it fills. A loader selected without its upstream task or asset reads that
-upstream's latest successful result, and fails naming the upstream if it never succeeded.
+takes loaders only. A failed or hard-skipped upstream task or asset skips the loader and everything
+downstream of the source it fills. A soft-skipped one skips only the load, so the source keeps its
+last loaded data and its readers still build. A loader selected without its upstream task or asset
+reads that upstream's latest successful result, and fails naming the upstream if it never succeeded.
 
 ```python
 from sqlbuild.loaders import loader
