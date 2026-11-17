@@ -49,11 +49,11 @@ use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_shared_digest:
 use sqlbuild_analysis::planner_warehouse::models::FingerprintCacheKey;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
-use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::native_host::models::Location;
@@ -93,8 +93,7 @@ impl MigrationFingerprintCache {
         let root = root.filter(|root| !root.is_none());
         let database_path = match &root {
             Some(root) => Some(
-                root.call_method1("__truediv__", (CACHE_DIRECTORY_NAME,))?
-                    .call_method1("__truediv__", (CACHE_DATABASE_NAME,))?
+                root.call_method1("joinpath", (CACHE_DIRECTORY_NAME, CACHE_DATABASE_NAME))?
                     .unbind(),
             ),
             None => None,
@@ -561,11 +560,7 @@ impl WarehouseReads for SyncedReads {
                 ],
             );
         }
-        let class: Bound<'py, PyAny> = record_class(py, RecordId::Fingerprint)?;
-        let from_iso: Bound<'py, PyAny> = py
-            .import("datetime")?
-            .getattr("datetime")?
-            .getattr("fromisoformat")?;
+        let datetime: Bound<'py, PyAny> = imported(py, "datetime", "datetime")?;
         let location = StateLocation {
             database: read.database,
             schema: read.schema.to_owned(),
@@ -574,7 +569,7 @@ impl WarehouseReads for SyncedReads {
             .state
             .latest_fingerprints(&location)
             .into_iter()
-            .map(|stored| synced_reads::fingerprint((&class, &from_iso), stored))
+            .map(|stored| synced_reads::fingerprint(&datetime, stored))
             .collect::<PyResult<_>>()?;
         selected_set(
             py,

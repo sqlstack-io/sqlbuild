@@ -248,8 +248,8 @@ and always keeps the latest one:
   `state_history_versions` rows of each node or check from the warehouse.
 - Builds and results that arrive later are added, and older ones are deleted in small batches about
   once a minute.
-- A SQLite control database gives the freed space back to the disk, so the file shrinks. A file
-  with at least a quarter free is vacuumed once; after that, space is freed a little at a time.
+- A SQLite control database gives the freed space back to the disk a little at a time, so the file
+  shrinks.
 
 The PostgreSQL default matches the janitor's
 [`direct_state_history_versions`](janitor.md#state-history-pruning), so with the janitor

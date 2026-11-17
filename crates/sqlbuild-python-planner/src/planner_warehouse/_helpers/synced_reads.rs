@@ -8,6 +8,8 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_state::warehouse_state::models::{StateFingerprint, StateRelation};
 
 /// The error a preview raises for a read only a live plan makes.
@@ -57,10 +59,10 @@ pub(crate) fn relation_columns<'py>(
 }
 
 pub(crate) fn fingerprint<'py>(
-    (class, from_iso): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    datetime: &Bound<'py, PyAny>,
     fingerprint: &StateFingerprint,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = class.py();
+    let py: Python<'py> = datetime.py();
     let kwargs: Bound<'py, PyDict> = PyDict::new(py);
     kwargs.set_item("node_type", &fingerprint.node_type)?;
     kwargs.set_item("node_name", &fingerprint.node_name)?;
@@ -75,7 +77,10 @@ pub(crate) fn fingerprint<'py>(
     kwargs.set_item("metadata_json", &fingerprint.metadata_json)?;
     kwargs.set_item(
         "ts",
-        from_iso.call1((fingerprint.ts.to_rfc3339_opts(SecondsFormat::AutoSi, true),))?,
+        datetime.call_method1(
+            "fromisoformat",
+            (fingerprint.ts.to_rfc3339_opts(SecondsFormat::AutoSi, true),),
+        )?,
     )?;
-    class.call((), Some(&kwargs))
+    new_record(py, RecordId::Fingerprint, (), Some(&kwargs))
 }

@@ -16,6 +16,7 @@ use crate::bindings::_helpers::compile_driver::plan_result::PlanningInputs;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::plan_result::pipeline_result;
 use crate::bindings::_helpers::compile_driver::rules_at_load::rules_ran_at_load;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -76,7 +77,7 @@ pub(crate) fn planned_project<'py>(
     let py: Python<'py> = discovered.py();
     let options: Bound<'py, PyAny> = apply_unit_test_selectors(options, discovered)?;
     let hooks: Bound<'py, PyAny> = if hooks.is_none() {
-        host_entry(py, ExecutorHost::ConnectionHooks)?.call0()?
+        call_with(&host_entry(py, ExecutorHost::ConnectionHooks)?, &[])?
     } else {
         hooks
     };
