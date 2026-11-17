@@ -6,6 +6,7 @@ use crate::dag_artifact::_helpers::nodes::{
     loader_or_source_id, node_id, python_node_id, sources_by_loader,
 };
 use crate::dag_artifact::_helpers::values::{object, text};
+use crate::dag_artifact::constants::LOADER_KIND;
 use crate::dag_artifact::models::{DagProjectInput, DagPythonGraphInput};
 use crate::dag_artifact::types::DagValue;
 use crate::graph::models::ProjectGraph;
@@ -19,21 +20,28 @@ pub(crate) fn python_kinds(python: &DagPythonGraphInput) -> HashMap<&str, &str> 
         .collect()
 }
 
-fn python_edges(python: &DagPythonGraphInput) -> Vec<(String, String)> {
+/// Python dependency and SQL read edges; a loader a source declares is drawn as that source.
+fn python_edges(
+    python: &DagPythonGraphInput,
+    sources: &HashMap<&str, &str>,
+) -> Vec<(String, String)> {
     let kinds: HashMap<&str, &str> = python_kinds(python);
+    let id = |name: &str| {
+        let kind: &str = kinds[name];
+        if kind == LOADER_KIND {
+            loader_or_source_id(name, sources)
+        } else {
+            python_node_id(kind, name)
+        }
+    };
     let mut edges: Vec<(String, String)> = python
         .dependency_edges
         .iter()
-        .map(|(upstream, downstream)| {
-            (
-                python_node_id(kinds[upstream.as_str()], upstream),
-                python_node_id(kinds[downstream.as_str()], downstream),
-            )
-        })
+        .map(|(upstream, downstream)| (id(upstream), id(downstream)))
         .collect();
     for node in &python.nodes {
         for dependency in &node.sql_deps {
-            edges.push((node_id(dependency), python_node_id(&node.kind, &node.name)));
+            edges.push((node_id(dependency), id(&node.name)));
         }
     }
     edges
@@ -61,7 +69,7 @@ pub(crate) fn edges(
         }
     }
     if let Some(python) = python {
-        edges.extend(python_edges(python));
+        edges.extend(python_edges(python, &sources));
     }
     edges.sort();
     DagValue::Array(

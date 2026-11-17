@@ -12053,6 +12053,7 @@ class SettingsConfig(NativeRecord):
     scenario_timeout_seconds: int | None
     delta_compile: bool
     allow_missing_secrets: bool
+    allow_warehouse_round_trips: bool
     def __init__(
         self,
         sql_analysis: bool = ...,
@@ -12073,6 +12074,7 @@ class SettingsConfig(NativeRecord):
         scenario_timeout_seconds: int | None = ...,
         delta_compile: bool = ...,
         allow_missing_secrets: bool = ...,
+        allow_warehouse_round_trips: bool = ...,
     ) -> None: ...
     @property
     def sql_validation(self) -> bool: ...
@@ -13051,11 +13053,13 @@ class PythonSqlRunLifecyclePlan(NativeRecord):
     ingress_python_node_names: frozenset[str]
     ingress_loader_names: frozenset[str]
     read_side_python_node_names: frozenset[str]
+    round_trip_loader_names: frozenset[str]
     def __init__(
         self,
         ingress_python_node_names: frozenset[str],
         ingress_loader_names: frozenset[str],
         read_side_python_node_names: frozenset[str],
+        round_trip_loader_names: frozenset[str] = ...,
     ) -> None: ...
 
 class PythonIdentityDependency(NativeRecord):

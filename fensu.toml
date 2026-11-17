@@ -1347,6 +1347,14 @@ path = "src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"
 reason = "The SQL Server adapter intentionally keeps overrideable backend behavior on one class."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-planner/src/planner_changes/_helpers/detect.rs", "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_selection.rs"]
+reason = "One reads a column's name and type for schema-change detection, the other the kind and name of each SQL resource a Python node reads; only the two-field record loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/graph/_helpers/selectors.rs", "crates/sqlbuild-analysis/src/python_selection/_helpers/nodes.rs"]
+reason = "Each resolves `kind:` in its own selector engine: SQL selectors pick resource keys from the project graph and refuse Python kinds, Python selectors pick node names from the Python node index and refuse SQL kinds. Only the filter-then-refuse-empty shape is alike."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-rules/src/custom_rule_cache/main/parse_custom_rule_cache.rs", "crates/sqlbuild-rules/src/rule_cache/main/parse_rule_cache.rs"]
 reason = "Each reads its own cache format: the SQL rule cache checks its version and the build identity and returns findings by path, the custom-rule cache checks only its version, because its identities already include the build, and returns rules by code. Only the parse-and-filter shape is alike."
 
@@ -2609,7 +2617,7 @@ pending_budgets = [
     "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_selection.rs=4",
     "crates/sqlbuild-python-project/src/graph/main/nodes/model_python_hook_names.rs=1",
     "crates/sqlbuild-python-project/src/graph/main/nodes/sql_ref_key.rs=1",
-    "crates/sqlbuild-python-project/src/graph/main/python_nodes/build_python_sql_run_lifecycle.rs=2",
+    "crates/sqlbuild-python-project/src/graph/main/python_nodes/native_run_lifecycle.rs=2",
     "crates/sqlbuild-python-project/src/graph/models.rs=2",
     "crates/sqlbuild-python-project/src/lineage/_helpers/lineage_facts.rs=1",
     "crates/sqlbuild-python-project/src/lineage/main/facts_eq.rs=2",

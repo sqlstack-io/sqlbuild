@@ -1,8 +1,11 @@
 pub mod baselined_function_definition_hash;
 pub mod baselined_model_query_hash;
+pub mod execution_cycle;
 pub mod execution_deps;
+pub mod execution_deps_with;
 pub mod execution_order;
 pub mod execution_origins;
+pub mod execution_origins_with;
 pub mod function_definition_hash;
 pub mod graph_key;
 pub mod model_definition_hash;

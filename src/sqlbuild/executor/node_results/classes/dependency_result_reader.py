@@ -50,6 +50,16 @@ class DependencyResultReader:
     def result_dependency_identity(self, node_function: Callable[..., object]) -> tuple[str, str]:
         """Return the `(kind, name)` a dependency's results are stored under."""
 
+        identity: tuple[str, str] | None = self.result_node_identity(node_function)
+        if identity is None:
+            raise ExecutorInputError(
+                "Python node result dependency must be a task, asset, or loader"
+            )
+        return identity
+
+    def result_node_identity(self, node_function: Callable[..., object]) -> tuple[str, str] | None:
+        """Return the `(kind, name)` of a decorated task, asset or loader, else None."""
+
         for attribute, kind in RESULT_DEPENDENCY_ATTRIBUTES:
             definition: object = getattr(node_function, attribute, None)
             if definition is None:
@@ -58,4 +68,4 @@ class DependencyResultReader:
             if not isinstance(name, str):
                 raise ExecutorInputError("Python node result dependency has no resolved name")
             return kind, name
-        raise ExecutorInputError("Python node result dependency must be a task, asset, or loader")
+        return None
