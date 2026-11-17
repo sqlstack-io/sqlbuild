@@ -195,8 +195,9 @@ pub(crate) struct SchedulerClockTestCase {
 pub(crate) struct SchedulerWakeTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
+    pub(crate) expected_ticks: usize,
     /// Only a hang misses this: a healthy scheduler decides the time within milliseconds.
-    pub(crate) window: chrono::TimeDelta,
-    /// Work after the cycle's next-due read, which must not delay the wake past the window.
+    pub(crate) expected_max_decision_delay: chrono::TimeDelta,
+    /// Work after the cycle's next-due read, which must not delay the decision past its bound.
     pub(crate) launcher_poll: std::time::Duration,
 }

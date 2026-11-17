@@ -177,13 +177,15 @@ fn given_a_running_scheduler_when_a_time_falls_due_then_it_is_decided_without_ha
         SchedulerWakeTestCase {
             description: "SQLite real-clock wake",
             backend: Backend::Sqlite,
-            window: TimeDelta::seconds(3),
+            expected_ticks: 1,
+            expected_max_decision_delay: TimeDelta::seconds(3),
             launcher_poll: Duration::from_millis(700),
         },
         SchedulerWakeTestCase {
             description: "PostgreSQL real-clock wake",
             backend: Backend::Postgres,
-            window: TimeDelta::seconds(3),
+            expected_ticks: 1,
+            expected_max_decision_delay: TimeDelta::seconds(3),
             launcher_poll: Duration::from_millis(700),
         },
     ];
@@ -213,7 +215,7 @@ fn given_a_running_scheduler_when_a_time_falls_due_then_it_is_decided_without_ha
                 store,
                 trigger_id,
                 (
-                    due + test_case.window + TimeDelta::seconds(1),
+                    due + test_case.expected_max_decision_delay + TimeDelta::seconds(1),
                     test_case.launcher_poll,
                 ),
             )
@@ -229,9 +231,14 @@ fn given_a_running_scheduler_when_a_time_falls_due_then_it_is_decided_without_ha
                     test_case.description, cycle.timings, cycle.polled_at
                 );
             }
-            assert_eq!(ticks.len(), 1, "{}", test_case.description);
+            assert_eq!(
+                ticks.len(),
+                test_case.expected_ticks,
+                "{}",
+                test_case.description
+            );
             assert!(
-                ticks[0].evaluated_at - due <= test_case.window,
+                ticks[0].evaluated_at - due <= test_case.expected_max_decision_delay,
                 "{}: decided {:?} after the due time",
                 test_case.description,
                 ticks[0].evaluated_at - due
