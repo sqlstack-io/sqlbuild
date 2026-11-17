@@ -445,7 +445,7 @@ def _group_cycle_model(name: str, reads: str) -> str:
     )
 
 
-# Models and a seed for the DuckShop `group_cycles` jobs, whose group bundles them into three cycles.
+# Models and a seed for the DuckShop `group_cycles` jobs, grouped into three cycles.
 GROUP_CYCLE_NODES: dict[str, str] = {
     "seeds/regions.csv": "id\n1\n",
     "seeds/regions.yml": (
