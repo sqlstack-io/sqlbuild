@@ -15,6 +15,11 @@ use pyo3::types::PyDict;
 use pyo3::types::PyDictMethods;
 use pyo3::types::PyTuple;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
+use crate::native_host::_helpers::dialect::syntax;
+use crate::native_host::types::Syntax;
+use pyo3::exceptions::PyAttributeError;
+use pyo3::prelude::pyclass;
+use pyo3::prelude::pymethods;
 
 /// Factory results, source locations and the cached public audit tuple are Python-owned edges.
 pub struct AuditProjection {
@@ -141,5 +146,64 @@ impl std::fmt::Debug for FamilyProjection {
             .field("class", &self.class)
             .field("custom", &self.custom)
             .finish_non_exhaustive()
+    }
+}
+
+/// The adapter's SQL syntax for a plan; anything that would reach the warehouse is refused.
+#[pyclass(frozen, module = "sqlbuild._native", name = "Dialect")]
+pub struct Dialect {
+    adapter: Py<PyAny>,
+}
+
+impl Dialect {
+    /// The dialect of `adapter`.
+    pub fn of<'py>(adapter: &Bound<'py, PyAny>) -> PyResult<Bound<'py, Dialect>> {
+        Bound::new(
+            adapter.py(),
+            Dialect {
+                adapter: adapter.clone().unbind(),
+            },
+        )
+    }
+
+    /// A dialect passed as a keyword argument; an adapter or anything else is refused.
+    pub fn passed(value: Bound<'_, PyAny>) -> PyResult<Bound<'_, Dialect>> {
+        Ok(value.cast_into::<Dialect>()?)
+    }
+
+    /// One syntax attribute of the adapter, such as `render_qualified_name`.
+    pub fn attribute<'py>(
+        &self,
+        py: Python<'py>,
+        name: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if !syntax(name) {
+            return Err(PyAttributeError::new_err(format!(
+                "a plan's SQL dialect writes SQL only; `{name}` would reach the warehouse"
+            )));
+        }
+        self.adapter.bind(py).getattr(name)
+    }
+}
+
+impl<'py> Syntax<'py> for Bound<'py, Dialect> {
+    fn syntax(&self, name: &str) -> PyResult<Bound<'py, PyAny>> {
+        self.get().attribute(self.py(), name)
+    }
+}
+
+#[pymethods]
+impl Dialect {
+    #[new]
+    #[pyo3(signature = (adapter))]
+    fn new(adapter: Bound<'_, PyAny>) -> Self {
+        Dialect {
+            adapter: adapter.unbind(),
+        }
+    }
+
+    /// Python code handed a dialect reads the same syntax attributes; anything else is refused.
+    fn __getattr__<'py>(&self, py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
+        self.attribute(py, name)
     }
 }

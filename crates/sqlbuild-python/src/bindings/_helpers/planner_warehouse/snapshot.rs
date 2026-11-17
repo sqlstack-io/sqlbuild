@@ -10,8 +10,8 @@ use crate::bindings::_helpers::fingerprints::latest_rows::select_latest_fingerpr
 use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
-use crate::bindings::_helpers::native_host::dialect::Syntax;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
 use crate::bindings::_helpers::planner_phases::objects::object;

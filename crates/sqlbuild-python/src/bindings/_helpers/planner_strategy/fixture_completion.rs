@@ -1,6 +1,6 @@
 //! Relation fixture completion over the Rust fixture planning context.
 
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::HashSet;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};

@@ -1,7 +1,7 @@
 //! Reference lookup and adapter callbacks for planner SQL.
 
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;

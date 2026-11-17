@@ -1,6 +1,6 @@
 //! Cursor input relations and authored cursor input column checks of model plan entries.
 
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyTuple};

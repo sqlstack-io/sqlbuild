@@ -1,6 +1,5 @@
 //! Permanent Python host calls and compatibility views of native-owned execution data.
 
-pub(crate) mod dialect;
 pub(crate) mod live_reads;
 pub(crate) mod model_lookup;
 pub(crate) mod orchestration_sensors;

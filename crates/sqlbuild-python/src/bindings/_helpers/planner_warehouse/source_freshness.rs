@@ -5,8 +5,8 @@ use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::freshness::planning::{
     build_direct_source_freshness_planning_result, build_direct_source_freshness_propagation_result,
 };
-use crate::bindings::_helpers::native_host::dialect::Dialect;
-use crate::bindings::_helpers::native_host::dialect::Syntax;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_phases::objects::{native, replace, text, tuple};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_SCOPE;

@@ -1,7 +1,7 @@
 //! Resolve scenario SQL through the shared native scanner and adapter callbacks.
 
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_scenario::constants::{
     SCENARIO_PLAN_MISSING_RELATION_TARGET, SCENARIO_PLAN_UNRESOLVED_RELATION_MARKER,

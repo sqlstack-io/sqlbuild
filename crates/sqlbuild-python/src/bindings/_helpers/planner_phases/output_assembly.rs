@@ -1,7 +1,7 @@
 //! Plan output assembly: storage policies, warnings and direct-mode metadata.
 
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-use crate::bindings::_helpers::native_host::dialect::Syntax;
+use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_entries::models::PlanOutputInputs;
 use crate::bindings::_helpers::planner_entries::plan_output::plan_output_fields;

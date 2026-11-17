@@ -1,7 +1,7 @@
 //! Native migration discovery over existing inspection and fingerprint cache boundaries.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::native_host::dialect::Syntax;
+use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_migrations::matching::{
     match_migration_fingerprints, migration_destination_fingerprints,
 };

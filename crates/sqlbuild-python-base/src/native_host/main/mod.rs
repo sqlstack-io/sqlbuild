@@ -9,5 +9,4 @@ pub mod log_warning_message;
 pub mod module_installed;
 pub mod python_executable;
 pub mod redirect_stdout_to_stderr;
-pub mod within_identity_pass;
 pub mod write_console;

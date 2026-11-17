@@ -12,7 +12,7 @@ use crate::bindings::_helpers::compiled_views::{model_reads, project_reads};
 use crate::bindings::_helpers::consumption::relation_reads::relation;
 use sqlbuild_python_front::native_host::models::ConsumptionConnection;
 use sqlbuild_python_front::native_host::models::Location;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::native_host::live_reads::bound_task;
 use sqlbuild_python_front::native_host::models::ObservationAppend;
 use sqlbuild_python_front::native_host::main::append_observations::append_observations;

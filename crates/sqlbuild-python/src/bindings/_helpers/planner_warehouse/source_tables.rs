@@ -4,7 +4,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use sqlbuild_python_front::discovery::main::project::yaml_entry_line::yaml_entry_line;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_phases::objects::planner_error;
 use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;

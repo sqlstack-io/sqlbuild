@@ -1,7 +1,7 @@
 //! Assemble new and resumed old-name view steps from recorded facts.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::native_host::dialect::Syntax;
+use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_migrations::column_objects::{model, text};
 use crate::bindings::_helpers::planner_migrations::constants::{PENDING_ARCHIVE, PENDING_VIEW};
 use crate::bindings::_helpers::planner_migrations::models::OldNamePlanner;

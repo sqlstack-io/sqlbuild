@@ -1,6 +1,7 @@
 //! Construction, comparison and display of native record field values.
 
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use crate::native_host::models::Dialect;
+use crate::native_host::types::Syntax;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 

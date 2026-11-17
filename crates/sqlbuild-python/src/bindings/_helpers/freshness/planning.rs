@@ -19,7 +19,7 @@ use crate::bindings::_helpers::freshness::observation::{
     strategy, unknown,
 };
 use crate::bindings::_helpers::freshness::support::text;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::reads::Read;

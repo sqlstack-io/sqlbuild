@@ -1,6 +1,6 @@
 //! Extension-owned fixture analysis reuse and the project-wide fixture planning context.
 
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 

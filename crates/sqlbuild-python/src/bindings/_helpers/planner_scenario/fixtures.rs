@@ -1,7 +1,7 @@
 //! Materialize fixture SQL plans while preserving adapter and completion boundaries.
 
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_MISSING_FIXTURE_SQL;
 use crate::bindings::_helpers::planner_scenario::helper_scope::scenario_helper_scope;
 use crate::bindings::_helpers::planner_scenario::{

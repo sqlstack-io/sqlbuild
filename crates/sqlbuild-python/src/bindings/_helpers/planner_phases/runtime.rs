@@ -6,7 +6,7 @@ use pyo3::pymethods;
 use pyo3::types::{PyDict, PyTuple};
 
 use sqlbuild_python_base::build_command::main::utc_now::utc_now;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_phases::models::PlannerRuntime;
 use crate::bindings::_helpers::planner_phases::models::PlannerWarehouseState;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;

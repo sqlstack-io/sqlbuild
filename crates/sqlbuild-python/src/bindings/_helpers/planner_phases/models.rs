@@ -1,6 +1,6 @@
 //! Plan output fields gathered across the plan phases before the output is built once.
 
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use std::collections::BTreeMap;
 

@@ -1,7 +1,7 @@
 //! Host column migration planning while Python owns warehouse inspection.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::native_host::dialect::Syntax;
+use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_migrations::column_objects::replace;
 use crate::bindings::_helpers::planner_migrations::known_input_columns::KnownInputColumns;
 use crate::bindings::_helpers::planner_migrations::models::{

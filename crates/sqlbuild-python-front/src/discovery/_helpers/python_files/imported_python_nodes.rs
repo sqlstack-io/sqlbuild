@@ -1,6 +1,5 @@
 //! Decorated Python nodes, audit factories, hooks and materializations from imported modules.
 
-use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};

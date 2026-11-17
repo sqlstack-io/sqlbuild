@@ -1,6 +1,6 @@
 //! `sqb audit`: compile the selected audits, run them with nested progress, and report.
 
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 

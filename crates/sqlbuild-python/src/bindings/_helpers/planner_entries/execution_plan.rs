@@ -8,7 +8,7 @@ use sqlbuild_analysis::planner_scope::constants::MODEL;
 
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::build_command::main::utc_now::utc_now;
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_changes::actions::resolve_model_actions;
 use crate::bindings::_helpers::planner_changes::detect::detect_changes;
 use crate::bindings::_helpers::planner_entries::test_planning::{

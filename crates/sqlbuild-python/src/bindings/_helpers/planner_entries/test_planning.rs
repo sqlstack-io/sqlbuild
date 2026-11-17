@@ -1,6 +1,6 @@
 //! SQL test planning on a native thread, joined by the planner or, at interpreter exit, within a bound.
 
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Mutex, PoisonError};

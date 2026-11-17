@@ -1,6 +1,7 @@
 //! Assemble model plan dataclasses from resolved plan decisions and authored model config.
 
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};

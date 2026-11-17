@@ -129,15 +129,6 @@ pub(crate) fn log_warning_message(py: Python<'_>, logger: &str, message: &str) -
         .map(|_| ())
 }
 
-/// Run `body` inside one Python-node identity pass, so the identities it builds share source work.
-pub(crate) fn within_identity_pass<'py, T>(
-    py: Python<'py>,
-    body: impl FnOnce() -> PyResult<T>,
-) -> PyResult<T> {
-    let identity_pass: Bound<'py, PyAny> = entry(py, UserCodeHost::PythonIdentityPass)?.call0()?;
-    within(&identity_pass, |_| body())
-}
-
 /// The host exception class `id` raised with `message`, or the error looking it up or raising it.
 pub(crate) fn host_error(py: Python<'_>, id: impl Into<HostId>, message: &str) -> PyErr {
     entry(py, id)

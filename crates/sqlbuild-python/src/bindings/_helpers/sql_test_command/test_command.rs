@@ -1,6 +1,6 @@
 //! `sqb test`: compile the selected SQL unit tests, inspect or run them, and report; locally, then run the Python tests.
 
-use crate::bindings::_helpers::native_host::dialect::Dialect;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;

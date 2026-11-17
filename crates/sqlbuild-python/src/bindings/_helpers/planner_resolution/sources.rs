@@ -1,7 +1,8 @@
 //! Source contract validation and adapter-controlled projection rendering.
 
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;
 use crate::bindings::_helpers::planner_resolution::values::{
     cursor_wrap, filtering_of, method, string,

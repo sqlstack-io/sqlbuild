@@ -1,6 +1,7 @@
 //! Adapter-bound rendering of fixture completion SQL.
 
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_analysis::planner_fixtures::main::{

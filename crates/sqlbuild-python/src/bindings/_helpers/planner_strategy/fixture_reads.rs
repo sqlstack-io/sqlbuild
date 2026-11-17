@@ -1,6 +1,7 @@
 //! Boundary conversion for native fixture read analysis.
 
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::PyFrozenSet;
 use pyo3::{pyfunction, wrap_pyfunction};

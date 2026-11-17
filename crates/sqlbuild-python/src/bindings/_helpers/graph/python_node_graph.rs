@@ -6,7 +6,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python_node_graph_indexes as graph_indexes;
 use sqlbuild_analysis::python_selection::models::{InventoryIndexes, InventoryNode};
 use sqlbuild_host::entries::models::UserCodeHost;
-use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
 
 use crate::bindings::_helpers::graph::python_selection::resolve_python_sql_run_selection;
 use crate::bindings::_helpers::graph::views::compiled_graph_keys;
