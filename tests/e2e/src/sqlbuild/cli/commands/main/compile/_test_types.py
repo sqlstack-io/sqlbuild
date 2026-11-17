@@ -1443,3 +1443,10 @@ class ManagedSourceLoaderLocationTestCase:
     source_schema: str
     command: tuple[str, ...]
     expected_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class JobGroupCyclesCase:
+    description: str
+    fixed_group_toml: str
+    expected_messages: tuple[str, ...]

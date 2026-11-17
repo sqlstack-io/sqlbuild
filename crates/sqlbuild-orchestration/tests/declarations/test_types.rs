@@ -11,3 +11,13 @@ pub(crate) struct GroupWaitGraphTestCase {
     pub(crate) expected_edges: Pairs,
     pub(crate) expected_message: Option<&'static str>,
 }
+
+pub(crate) struct LargeGroupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) members: usize,
+    pub(crate) nodes_per_member: usize,
+    pub(crate) expected_cycles: usize,
+    /// Waits across all members: each waits for every member before it, and the first, which builds the tail, for all others.
+    pub(crate) expected_waits: usize,
+    pub(crate) expected_limit: std::time::Duration,
+}

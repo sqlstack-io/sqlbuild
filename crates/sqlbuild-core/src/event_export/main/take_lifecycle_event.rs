@@ -21,21 +21,25 @@ pub fn take_lifecycle_event<T>(
         .filter(|(_, queued)| selectable(queued) && Some(queued.priority) == highest)
         .min_by_key(|(_, queued)| queued.sequence)
         .map(|(position, _)| position);
-    let position: Option<usize> = position.map(|position| {
-        let chosen = &queue.items[position];
-        queue
-            .items
-            .iter()
-            .enumerate()
-            .filter(|(_, queued)| {
-                queued.invocation_start
-                    && !chosen.invocation_start
-                    && chosen.invocation_id.is_some()
-                    && queued.invocation_id == chosen.invocation_id
-            })
-            .min_by_key(|(_, queued)| queued.sequence)
-            .map_or(position, |(start, _)| start)
-    });
+    let position: Option<usize> = position.map(|position| start_first(&queue, position));
     let next: Option<QueuedEvent<T>> = position.map(|position| queue.items.remove(position));
     (queue, next)
+}
+
+/// The position of a queued start of the event at `position`'s invocation, or `position` when none is queued.
+fn start_first<T>(queue: &EventQueue<T>, position: usize) -> usize {
+    let chosen: &QueuedEvent<T> = &queue.items[position];
+    if chosen.invocation_start || chosen.invocation_id.is_none() {
+        return position;
+    }
+    let mut start: Option<(usize, u64)> = None;
+    for (index, queued) in queue.items.iter().enumerate() {
+        if queued.invocation_start
+            && queued.invocation_id == chosen.invocation_id
+            && start.is_none_or(|(_, sequence)| queued.sequence < sequence)
+        {
+            start = Some((index, queued.sequence));
+        }
+    }
+    start.map_or(position, |(index, _)| index)
 }

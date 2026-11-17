@@ -7,6 +7,7 @@ use sqlbuild_discovery::orchestration_files::models::{FilePosition, Orchestratio
 use sqlbuild_orchestration::declarations::main::group_cycle_message::group_cycle_message;
 use sqlbuild_orchestration::declarations::main::group_wait_graph::group_wait_graph;
 
+use crate::graph::constants::LOADER_KIND;
 use crate::graph::models::ProjectSelection;
 use crate::project_snapshot::_helpers::snapshot::snapshot_declarations::declared_for;
 
@@ -23,17 +24,18 @@ fn node_deps(
     graph: &ProjectGraph,
     selected: &ProjectSelection,
 ) -> BTreeMap<String, BTreeSet<String>> {
-    let key = |(kind, name): &(String, String)| format!("{kind}:{name}");
-    let mut deps: BTreeMap<String, BTreeSet<String>> = graph
-        .upstream
-        .iter()
-        .map(|(node, upstream)| (key(node), upstream.iter().map(key).collect()))
-        .collect();
+    let mut deps: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for ((kind, name), upstream) in &graph.upstream {
+        let reads: &mut BTreeSet<String> = deps.entry(format!("{kind}:{name}")).or_default();
+        for (upstream_kind, upstream_name) in upstream {
+            reads.insert(format!("{upstream_kind}:{upstream_name}"));
+        }
+    }
     for (node, upstream) in selected.node_deps() {
         deps.entry(node).or_default().extend(upstream);
     }
     for node in &selected.nodes.nodes {
-        if node.kind == "loader" && selected.intermediate_loader(&node.name) {
+        if node.kind == LOADER_KIND && selected.intermediate_loader(&node.name) {
             deps.entry(format!("source:{}", node.name))
                 .or_default()
                 .insert(format!("loader:{}", node.name));
@@ -42,9 +44,7 @@ fn node_deps(
     deps
 }
 
-/// One `path:line:column: message` per group declared for `target` whose members wait on each other.
-///
-/// A job whose selector fails is left out, since compile reports the selector itself.
+/// One `path:line:column: message` per group declared for `target` whose members wait on each other; jobs whose selector fails are left out.
 pub(crate) fn group_cycle_failures(
     inventory: &OrchestrationInventory,
     target: &str,
@@ -62,7 +62,8 @@ pub(crate) fn group_cycle_failures(
             continue;
         }
         let exclude: &str = job.exclude.as_ref().map_or("", |exclude| &exclude.value);
-        if let Ok(selection) = selected.run_keys(graph, &tokens(&job.select.value), &tokens(exclude))
+        if let Ok(selection) =
+            selected.run_keys(graph, &tokens(&job.select.value), &tokens(exclude))
         {
             jobs.insert(&job.run.name.value, selection);
         }
@@ -82,7 +83,8 @@ pub(crate) fn group_cycle_failures(
             })
             .collect();
         let name: &str = &group.run.name.value;
-        if let Some(message) = group_cycle_message(name, &group_wait_graph(&selections, &deps).cycles)
+        if let Some(message) =
+            group_cycle_message(name, &group_wait_graph(&selections, &deps).cycles)
         {
             let FilePosition { line, column } = group.run.name.position;
             failures.push(format!("{path}:{line}:{column}: {message}"));

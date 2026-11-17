@@ -797,7 +797,7 @@ impl EventExporterDispatcher {
         if self.withheld_kinds.contains(&policy.kind) {
             return Ok(());
         }
-        let invocation_id: Option<String> = match event.getattr("invocation_id") {
+        let invocation_id: Option<String> = match native_field(event, "invocation_id") {
             Ok(value) => value.extract()?,
             Err(_) => None,
         };

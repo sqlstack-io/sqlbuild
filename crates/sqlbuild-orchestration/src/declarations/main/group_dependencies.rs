@@ -24,7 +24,7 @@ pub fn group_dependencies(
         .nodes
         .iter()
         .map(|(key, node)| {
-            let upstream = node
+            let upstream: BTreeSet<String> = node
                 .definition
                 .get("deps")
                 .and_then(serde_json::Value::as_array)

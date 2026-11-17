@@ -1,23 +1,12 @@
 //! Every set of members that wait on each other is reported in one pass, and reads of seeds or shared nodes add the hint.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use crate::declarations::constants::SHARED_READ_HINT;
 use crate::declarations::main::group_cycle_message::group_cycle_message;
 use crate::declarations::main::group_wait_graph::group_wait_graph;
-use crate::declarations::tests::test_types::{GroupWaitGraphTestCase, Pairs};
-
-fn map(pairs: Pairs) -> BTreeMap<String, BTreeSet<String>> {
-    pairs
-        .iter()
-        .map(|(key, values)| {
-            (
-                (*key).to_owned(),
-                values.iter().map(|value| (*value).to_owned()).collect(),
-            )
-        })
-        .collect()
-}
+use crate::declarations::tests::helpers::{chained_group, map};
+use crate::declarations::tests::test_types::{GroupWaitGraphTestCase, LargeGroupTestCase};
 
 #[test]
 fn given_group_members_and_node_lineage_when_deriving_waits_then_every_cycle_is_reported_with_its_reasons()
@@ -115,40 +104,37 @@ fn given_group_members_and_node_lineage_when_deriving_waits_then_every_cycle_is_
 #[test]
 fn given_a_large_group_on_a_long_chain_when_deriving_waits_then_one_cycle_is_reported_within_the_time_limit()
  {
-    const MEMBERS: usize = 50;
-    const NODES_PER_MEMBER: usize = 200;
-    let node = |index: usize| format!("model:m{index}");
-    let last = MEMBERS * NODES_PER_MEMBER - 1;
-    let mut selections: BTreeMap<String, BTreeSet<String>> = (0..MEMBERS)
-        .map(|member| {
-            let first = member * NODES_PER_MEMBER;
-            (
-                format!("job_{member:03}"),
-                (first..first + NODES_PER_MEMBER).map(node).collect(),
-            )
-        })
-        .collect();
-    // An acyclic chain of 10,000 nodes: each reads the one before it, and the first job also builds
-    // a tail that reads the last node, so every member reaches every other through lineage.
-    selections
-        .get_mut("job_000")
-        .expect("first member")
-        .insert("model:tail".to_owned());
-    let mut deps: BTreeMap<String, BTreeSet<String>> = (1..=last)
-        .map(|index| (node(index), BTreeSet::from([node(index - 1)])))
-        .collect();
-    deps.insert("model:tail".to_owned(), BTreeSet::from([node(last)]));
+    let test_cases = [LargeGroupTestCase {
+        description: "50 members over a 10,000-node chain close into one cycle",
+        members: 50,
+        nodes_per_member: 200,
+        expected_cycles: 1,
+        expected_waits: 49 + (1..50).sum::<usize>(),
+        expected_limit: std::time::Duration::from_secs(2),
+    }];
+    for test_case in test_cases {
+        let (selections, deps) = chained_group(test_case.members, test_case.nodes_per_member);
 
-    let started = std::time::Instant::now();
-    let waits = group_wait_graph(&selections, &deps);
-    let elapsed = started.elapsed();
+        let started = std::time::Instant::now();
+        let waits = group_wait_graph(&selections, &deps);
+        let elapsed = started.elapsed();
 
-    assert_eq!(waits.cycles.len(), 1);
-    assert_eq!(waits.edges["job_000"].len(), MEMBERS - 1);
-    assert_eq!(waits.edges[&format!("job_{:03}", MEMBERS - 1)].len(), MEMBERS - 1);
-    assert!(
-        elapsed < std::time::Duration::from_secs(2),
-        "deriving waits for {MEMBERS} members over {} nodes took {elapsed:?}",
-        last + 2
-    );
+        assert_eq!(
+            waits.cycles.len(),
+            test_case.expected_cycles,
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            waits.edges.values().map(BTreeSet::len).sum::<usize>(),
+            test_case.expected_waits,
+            "{}",
+            test_case.description
+        );
+        assert!(
+            elapsed < test_case.expected_limit,
+            "{}: took {elapsed:?}",
+            test_case.description
+        );
+    }
 }

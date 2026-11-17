@@ -1,11 +1,10 @@
 //! Refuse a compile whose job groups have members that wait on each other, as `OrchestrationDeclarationError` (D017).
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::graph::models::ProjectGraph;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field;
-use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
+use sqlbuild_python_front::discovery::main::sources::orchestration_failure::orchestration_failure;
 
 use crate::graph::models::ProjectSelection;
 use crate::project_snapshot::_helpers::snapshot::snapshot_group_cycles::{
@@ -31,7 +30,5 @@ pub fn job_group_cycles(
     if failures.is_empty() {
         return Ok(());
     }
-    Err(PyErr::from_value(
-        error_class(py, ErrorId::OrchestrationDeclaration)?.call1((failures.join("\n"),))?,
-    ))
+    Err(orchestration_failure(py, failures.join("\n")))
 }

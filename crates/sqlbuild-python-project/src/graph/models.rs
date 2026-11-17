@@ -448,24 +448,22 @@ impl ProjectSelection {
             .iter()
             .map(|(name, names)| (name.as_str(), names.as_slice()))
             .collect();
-        self.nodes
-            .nodes
-            .iter()
-            .map(|node| {
-                let deps: BTreeSet<String> = upstream
-                    .get(node.name.as_str())
-                    .into_iter()
-                    .flat_map(|names| names.iter())
-                    .filter_map(|name| self.node_key(name))
-                    .chain(
-                        node.sql_deps
-                            .iter()
-                            .map(|(kind, name)| format!("{kind}:{name}")),
-                    )
-                    .collect();
-                (format!("{}:{}", node.kind, node.name), deps)
-            })
-            .collect()
+        let mut nodes: Vec<(String, BTreeSet<String>)> = Vec::new();
+        for node in &self.nodes.nodes {
+            let mut deps: BTreeSet<String> = BTreeSet::new();
+            for name in upstream
+                .get(node.name.as_str())
+                .copied()
+                .unwrap_or_default()
+            {
+                deps.extend(self.node_key(name));
+            }
+            for (kind, name) in &node.sql_deps {
+                deps.insert(format!("{kind}:{name}"));
+            }
+            nodes.push((format!("{}:{}", node.kind, node.name), deps));
+        }
+        nodes
     }
 
     /// The key a selected Python node's run reports under; a loader reports as the source it writes.
