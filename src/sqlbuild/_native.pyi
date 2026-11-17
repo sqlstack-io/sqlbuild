@@ -4335,6 +4335,14 @@ class SqlTreeNode:
     kind: str
     line: int
     column: int
+    name: str | None
+    quoted: bool | None
+    qualifier: tuple[str, ...] | None
+    value: str | None
+    literal_type: str | None
+    end_line: int | None
+    end_column: int | None
+    span: tuple[int, int] | None
     children: tuple[SqlTreeNode, ...]
     def walk(self) -> list[SqlTreeNode]: ...
 

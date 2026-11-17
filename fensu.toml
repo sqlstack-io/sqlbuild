@@ -3999,3 +3999,7 @@ reason = "Each is its own Python entry point with its own keyword contract and d
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-output/src/event_exporting/_helpers/getters.rs"]
 reason = "The export summary and the per-exporter counts are separate Python classes that each expose the same delivery counters; each getter reads its own class's fields."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/sql_tree/_helpers/source_map.rs"]
+reason = "source_start and source_end apply opposite boundary rules: a start inside a rewrite maps to the start of the replaced text, while an exclusive end inside or closing one maps to its end, and an end at a removal maps to where the removed text began. Only the partition-and-shift shape is alike."
