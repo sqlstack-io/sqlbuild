@@ -63,6 +63,18 @@ class NativeCatalogCase:
 
 
 @dataclass(frozen=True)
+class PhysicalEvidenceCase:
+    """Listed source columns on a case-sensitive dialect, and whether they rebind readers."""
+
+    description: str
+    adapter: Callable[[], BaseAdapter]
+    dialect: str
+    listed: tuple[tuple[str, str], ...]
+    expected_rebinding: bool
+    expected_codes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class SemanticCompileCase:
     description: str
     upstream: str
