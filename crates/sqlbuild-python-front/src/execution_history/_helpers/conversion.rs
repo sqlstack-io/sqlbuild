@@ -1,7 +1,9 @@
 //! Execution history models, timestamps, SQL parameters and errors across the Python boundary.
 
+use crate::execution_history::main::nullable_text::nullable_text;
+use crate::execution_history::main::parsed_iso::parsed_iso;
+use crate::execution_history::main::utc::utc;
 use pyo3::IntoPyObjectExt;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyInt, PyList, PyTuple};
 use sqlbuild_host::entries::models::ExecutorHost;
@@ -15,15 +17,15 @@ use sqlbuild_state::execution_history::models::{
 };
 use sqlbuild_state::execution_history::types::UtcTime;
 
+use crate::cursor::constants::DATETIME_MODULE;
+use crate::cursor::main::values::local_date_time::local_date_time;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_front::cursor::constants::DATETIME_MODULE;
-use sqlbuild_python_front::cursor::main::values::local_date_time::local_date_time;
 
-const UTC_SUFFIX: &str = "Z";
-const UTC_OFFSET: &str = "+00:00";
+pub(crate) const UTC_SUFFIX: &str = "Z";
+pub(crate) const UTC_OFFSET: &str = "+00:00";
 const DEFAULT_SCHEMA_VERSION: i64 = 1;
 const UTC_OFFSET_SECONDS: f64 = 0.0;
 
@@ -79,19 +81,6 @@ pub(crate) fn exact_int(value: &Bound<'_, PyAny>) -> Option<i64> {
     value.extract().unwrap_or(None)
 }
 
-/// `value` as text, or `None` when it is `None`.
-pub(crate) fn nullable_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    if value.is_none() {
-        return Ok(None);
-    }
-    Ok(Some(value.extract()?))
-}
-
-/// `datetime.UTC`.
-pub(crate) fn utc(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    imported(py, DATETIME_MODULE, "UTC")
-}
-
 /// An aware `datetime` as its UTC wall time.
 pub(crate) fn utc_time(value: &Bound<'_, PyAny>) -> PyResult<UtcTime> {
     local_date_time(&value.call_method1("astimezone", (utc(value.py())?,))?)
@@ -120,16 +109,6 @@ pub(crate) fn now(py: Python<'_>) -> PyResult<UtcTime> {
 /// Whether a `datetime`'s `tzinfo` is exactly `UTC`.
 pub(crate) fn utc_zone(value: &Bound<'_, PyAny>) -> PyResult<bool> {
     Ok(native_field(value, "tzinfo")?.is(&utc(value.py())?))
-}
-
-/// `datetime.fromisoformat(text.replace("Z", "+00:00"))`, or `None` on `ValueError`.
-pub(crate) fn parsed_iso<'py>(py: Python<'py>, text: &str) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let normalized: String = text.replace(UTC_SUFFIX, UTC_OFFSET);
-    match imported(py, DATETIME_MODULE, "datetime")?.call_method1("fromisoformat", (normalized,)) {
-        Ok(value) => Ok(Some(value)),
-        Err(error) if error.is_instance_of::<PyValueError>(py) => Ok(None),
-        Err(error) => Err(error),
-    }
 }
 
 fn filter_time(value: &Bound<'_, PyAny>) -> PyResult<Option<FilterTime>> {

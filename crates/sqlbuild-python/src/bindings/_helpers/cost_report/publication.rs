@@ -12,10 +12,9 @@ use sqlbuild_state::resource_costs::main::refresh_candidates::refresh_candidates
 use sqlbuild_state::resource_costs::models::RunCostAttempt;
 
 use crate::bindings::_helpers::cost_report::records::summary;
-use crate::bindings::_helpers::native_host::resource_costs_state::{
-    CostRunIdentity, ResourceCostStore,
-};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::resource_costs::models::CostRunIdentity;
+use sqlbuild_python_front::resource_costs::models::ResourceCostStore;
 
 /// The attempt number of a build's own collection; each accepted re-read appends the next.
 const FIRST_ATTEMPT: i64 = 1;

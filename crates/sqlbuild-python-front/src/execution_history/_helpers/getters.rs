@@ -3,24 +3,10 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::execution_history::postgres::PostgresExecutionHistory;
-use crate::bindings::_helpers::execution_history::sqlite::SqliteExecutionHistory;
-use sqlbuild_python_base::records::main::registry::class_of::class_of;
-use sqlbuild_python_base::records::models::GetterEntry;
+use crate::execution_history::models::PostgresExecutionHistory;
+use crate::execution_history::models::SqliteExecutionHistory;
 
-/// The getter readers of this module's native pyclasses.
-pub(crate) const GETTERS: &[GetterEntry] = &[
-    GetterEntry {
-        class: class_of::<PostgresExecutionHistory>,
-        read: read_postgres_execution_history,
-    },
-    GetterEntry {
-        class: class_of::<SqliteExecutionHistory>,
-        read: read_sqlite_execution_history,
-    },
-];
-
-fn read_postgres_execution_history<'py>(
+pub(crate) fn read_postgres_execution_history<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {
@@ -37,7 +23,7 @@ fn read_postgres_execution_history<'py>(
     })
 }
 
-fn read_sqlite_execution_history<'py>(
+pub(crate) fn read_sqlite_execution_history<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {

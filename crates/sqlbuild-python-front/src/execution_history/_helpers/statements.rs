@@ -4,10 +4,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyTuple;
 use sqlbuild_state::execution_history::models::{Query, SqlParam};
 
-use crate::bindings::_helpers::execution_history::conversion::python_params;
+use crate::execution_history::_helpers::conversion::python_params;
 use sqlbuild_python_base::warehouse_access::main::sqlite_params::sqlite_params;
 use sqlbuild_python_base::warehouse_access::models::SqliteConnection;
-use sqlbuild_python_base::warehouse_access::models::SqliteCursor;
 use sqlbuild_python_base::warehouse_access::models::SqliteRow;
 
 /// `target.execute(sql, params)`.
@@ -46,19 +45,6 @@ pub(crate) fn execute_query<'py>(
     query: &Query,
 ) -> PyResult<Bound<'py, PyAny>> {
     execute(target, &query.sql, &query.params)
-}
-
-/// The first row `cursor.fetchone()` returns, or `None`.
-pub(crate) fn fetch_one<'py>(cursor: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
-    if let Ok(cursor) = cursor.cast::<SqliteCursor>() {
-        return cursor
-            .get()
-            .next_row()
-            .map(|row| Bound::new(cursor.py(), row).map(Bound::into_any))
-            .transpose();
-    }
-    let row: Bound<'py, PyAny> = cursor.call_method0("fetchone")?;
-    Ok((!row.is_none()).then_some(row))
 }
 
 /// Every row `cursor.fetchall()` returns.

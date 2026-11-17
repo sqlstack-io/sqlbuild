@@ -30,7 +30,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     freshness::registration::register(module)?;
     sqlbuild_python_front::native_host::main::register_consumption_state::register_consumption_state(module)?;
     sqlbuild_python_front::native_host::main::register_observations_state::register_observations_state(module)?;
-    crate::bindings::_helpers::native_host::resource_costs_state::register(module)?;
+    sqlbuild_python_front::resource_costs::main::register_resource_costs_state::register_resource_costs_state(module)?;
     sqlbuild_python_front::native_host::main::register_audit_results_state::register_audit_results_state(module)?;
     clone::registration::register(module)?;
     compute_logs::registration::register(module)?;

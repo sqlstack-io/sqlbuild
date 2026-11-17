@@ -5,9 +5,10 @@ use sqlbuild_state::execution_history::main::canonical_event_id::canonical_event
 use sqlbuild_state::execution_history::main::prepared_events::prepared_events;
 use sqlbuild_state::execution_history::models::{EventSubmission, PreparedEvent};
 
-use crate::bindings::_helpers::execution_history::conversion::{
-    checked, envelope_of, event_id_of, event_json,
-};
+use crate::execution_history::_helpers::conversion::checked;
+use crate::execution_history::_helpers::conversion::envelope_of;
+use crate::execution_history::_helpers::conversion::event_id_of;
+use crate::execution_history::_helpers::conversion::event_json;
 
 /// The required stable id of a known or opaque event.
 pub(crate) fn event_id(event: &Bound<'_, PyAny>) -> PyResult<String> {
