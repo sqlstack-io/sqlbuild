@@ -103,6 +103,11 @@ async fn finish_reporting(
         reason: "synthetic child completed".into(),
         exit_code: Some(0),
     });
+    report(store, claim, changes).await;
+}
+
+/// Publish each of `changes` as the claimed worker, in order.
+pub(crate) async fn report(store: &ControlStore, claim: &RunClaim, changes: Vec<RunChange>) {
     for change in changes {
         change_run(
             store,

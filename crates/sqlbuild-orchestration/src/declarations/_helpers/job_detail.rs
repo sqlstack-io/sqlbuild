@@ -16,14 +16,19 @@ use crate::declarations::models::{
 };
 use crate::snapshots::models::SnapshotNode;
 
-/// Members whose waits are all earlier come next, by name among equals; validation rejected cycles.
+/// Members whose waits are all earlier come next, by name among equals; members that wait per node may wait on each other, so a loop places its first unplaced member.
 pub(crate) fn members_in_order(group: &GroupDefinition) -> Vec<JobMember> {
     let mut placed: BTreeSet<&str> = BTreeSet::new();
     let mut members: Vec<JobMember> = Vec::new();
     while members.len() < group.jobs.len() {
-        let ready = ready_members(group, &placed);
+        let mut ready = ready_members(group, &placed);
         if ready.is_empty() {
-            break;
+            ready = group
+                .jobs
+                .iter()
+                .filter(|(name, _)| !placed.contains(name.as_str()))
+                .take(1)
+                .collect();
         }
         for (name, waits) in ready {
             placed.insert(name);

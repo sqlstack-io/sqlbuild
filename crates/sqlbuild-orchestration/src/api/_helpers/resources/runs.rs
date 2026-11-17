@@ -14,9 +14,11 @@ use crate::runs::main::change_run::change_run;
 use crate::runs::main::heartbeat_run::heartbeat_run;
 use crate::runs::main::publish_run_output::publish_run_output;
 use crate::runs::main::publish_run_recall::publish_run_recall;
+use crate::runs::main::read_node_gates::read_node_gates;
 use crate::runs::main::run_execution::run_execution;
 use crate::runs::models::{
-    OutputPublication, RecallBatch, RunAuthority, RunChangeRequest, RunExecution,
+    NodeGates, NodeGatesRequest, OutputPublication, RecallBatch, RunAuthority, RunChangeRequest,
+    RunExecution,
 };
 use crate::store::models::ControlStore;
 
@@ -74,6 +76,27 @@ pub(crate) async fn heartbeat(
     Ok(Json(HeartbeatResponse {
         cancel_requested: heartbeat_run(&store, (run_id, claim_id)).await?,
     }))
+}
+
+#[utoipa::path(post, path = "/api/runs/{run_id}/gates", params(("run_id" = Uuid, Path)),
+    request_body = NodeGatesRequest,
+    responses((status = 200, body = NodeGates), (status = 401, description = "Inactive claim or invalid credential"),
+        (status = 403, description = "Run not authorized")), security(("bearer" = [])))]
+pub(crate) async fn gates(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path(run_id): Path<Uuid>,
+    Json(asked): Json<NodeGatesRequest>,
+) -> Result<Json<NodeGates>, ApiError> {
+    let claim_id = require_worker(&identity, run_id)?;
+    let gates = read_node_gates(&store, (run_id, claim_id), &asked)
+        .await?
+        .ok_or_else(|| ApiError {
+            status: StatusCode::UNAUTHORIZED,
+            message: "run claim is no longer active".into(),
+            decision_id: None,
+        })?;
+    Ok(Json(gates))
 }
 
 #[utoipa::path(post, path = "/api/runs/{run_id}/output", params(("run_id" = Uuid, Path)),

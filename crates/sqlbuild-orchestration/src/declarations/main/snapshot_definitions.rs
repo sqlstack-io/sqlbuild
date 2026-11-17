@@ -31,7 +31,11 @@ pub fn snapshot_definitions(input: &SnapshotInput) -> Result<Definitions, Contro
     }
     for (name, group) in &definitions.groups {
         let members: BTreeSet<String> = group.jobs.keys().cloned().collect();
-        let dependencies = group_dependencies((name, input), &definitions.jobs, &members)?;
+        let dependencies = group_dependencies(
+            (name, input),
+            &definitions.jobs,
+            (&members, &group.node_waits),
+        )?;
         let selection: BTreeSet<String> = group
             .jobs
             .keys()

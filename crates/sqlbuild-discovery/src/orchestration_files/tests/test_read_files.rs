@@ -422,12 +422,27 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
             )),
         },
         GroupDependenciesTestCase {
-            description: "waiting node by node is not available yet",
-            dependencies: "[dependencies]\nwait_for = \"node\"\n",
-            expected: Err((
-                "wait_for = \"node\" is not supported yet; it is planned, so use \"job\" for now",
-                at(6, 12),
-            )),
+            description: "a member waits node by node while the group waits for jobs",
+            dependencies: "[dependencies]\nwait_for = \"job\"\n\n[dependencies.orders_job]\nwait_for = \"node\"\n",
+            expected: Ok(GroupDependencies {
+                defaults: DependencySettings {
+                    wait_for: Some(WaitFor::Job),
+                    on_failure: None,
+                },
+                members: [(
+                    "orders_job".to_owned(),
+                    DependencySettings {
+                        wait_for: Some(WaitFor::Node),
+                        on_failure: None,
+                    },
+                )]
+                .into(),
+            }),
+        },
+        GroupDependenciesTestCase {
+            description: "an unknown wait",
+            dependencies: "[dependencies]\nwait_for = \"model\"\n",
+            expected: Err(("wait_for must be one of \"job\", \"node\"", at(6, 12))),
         },
     ];
     for test_case in test_cases {

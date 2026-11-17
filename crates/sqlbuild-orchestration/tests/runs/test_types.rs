@@ -517,3 +517,15 @@ pub(crate) struct GroupMemberSettingsTestCase {
     pub(crate) expected_group_status: RunStatus,
     pub(crate) expected_group_ignored: u32,
 }
+
+pub(crate) struct NodeGateTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The group's `dependency_failure` document: each member whose policy is not `partial`.
+    pub(crate) dependency_failure: serde_json::Value,
+    /// How many times staging reruns after a failure; a rerun re-opens the gate for the nodes it rebuilds.
+    pub(crate) staging_retries: u8,
+    /// The marts member's gates once staging ended with `customers` failed and `products` built.
+    pub(crate) expected_orders: crate::runs::models::NodeGate,
+    pub(crate) expected_inventory: crate::runs::models::NodeGate,
+}

@@ -98,6 +98,7 @@ pub(crate) fn router(store: &ControlStore, feed: ChangeFeed) -> Router<ControlSt
         .route("/api/runs/{run_id}/execution", get(runs::execution))
         .route("/api/runs/{run_id}/events", post(runs::report))
         .route("/api/runs/{run_id}/heartbeat", post(runs::heartbeat))
+        .route("/api/runs/{run_id}/gates", post(runs::gates))
         .route("/api/runs/{run_id}/output", post(runs::output))
         .route("/api/runs/{run_id}/recall", post(runs::recall))
         .layer(DefaultBodyLimit::max(BODY_BYTES))

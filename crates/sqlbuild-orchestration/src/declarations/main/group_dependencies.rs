@@ -3,20 +3,36 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::declarations::_helpers::group_waits::{describe_cycle, record_wait, upstream_keys};
+use crate::declarations::_helpers::node_waits::{GroupMembers, node_wait_cycle};
 use crate::declarations::models::{GroupWaits, JobDefinition};
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
 
+/// Each member's upstream member jobs; a group whose members all wait for jobs must order them without a cycle, and one with members that wait per node must order its nodes.
 pub fn group_dependencies(
     (group, input): (&str, &SnapshotInput),
     jobs: &BTreeMap<String, JobDefinition>,
-    members: &BTreeSet<String>,
+    (members, node_waits): (&BTreeSet<String>, &BTreeSet<String>),
 ) -> Result<BTreeMap<String, BTreeSet<String>>, ControlError> {
-    if members.is_empty() || members.iter().any(|name| !jobs.contains_key(name)) {
+    if members.is_empty()
+        || members.iter().any(|name| !jobs.contains_key(name))
+        || !node_waits.is_subset(members)
+    {
         return Err(ControlError::Invalid("group needs known jobs".into()));
     }
     let waits = lineage_dependencies(input, jobs, members);
-    ensure_acyclic(group, &waits.edges, &waits.reasons)?;
+    if node_waits.is_empty() {
+        ensure_acyclic(group, &waits.edges, &waits.reasons)?;
+    } else if let Some(cycle) = node_wait_cycle(&GroupMembers {
+        input,
+        jobs,
+        edges: &waits.edges,
+        node_waits,
+    }) {
+        return Err(ControlError::Invalid(format!(
+            "group dependencies contain a cycle in job group {group}: {cycle}"
+        )));
+    }
     Ok(waits.edges)
 }
 

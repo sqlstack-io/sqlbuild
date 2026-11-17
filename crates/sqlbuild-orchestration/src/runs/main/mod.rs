@@ -15,6 +15,7 @@ pub mod observe_run;
 pub mod publish_run_output;
 pub mod publish_run_recall;
 pub(crate) mod queue_run;
+pub mod read_node_gates;
 pub mod read_selection_vocabulary;
 pub mod request_job_run;
 pub mod request_person_run;

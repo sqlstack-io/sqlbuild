@@ -22,6 +22,8 @@ mod test_group_admission;
 mod test_group_declarations;
 #[path = "test_group_dependencies.rs"]
 mod test_group_dependencies;
+#[path = "test_group_node_waits.rs"]
+mod test_group_node_waits;
 #[path = "test_group_retries.rs"]
 mod test_group_retries;
 #[path = "test_group_round_trips.rs"]

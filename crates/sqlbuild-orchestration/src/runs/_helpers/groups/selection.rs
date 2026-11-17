@@ -19,7 +19,7 @@ pub(crate) async fn child_ready(
     Ok((transaction, waits.is_empty()))
 }
 
-/// What holds a group child back: its group not running, or upstream jobs of the group not finished.
+/// What holds a group child back: its group not running, or upstream jobs of the group not finished; a member that waits per node starts with its group and gates each node instead.
 pub(crate) async fn child_waits(
     transaction: ControlTransaction,
     request: &RunRequest,
@@ -40,16 +40,21 @@ pub(crate) async fn child_waits(
         .ok_or_else(|| ControlError::Invalid("group has no declaration".into()))?;
     let declaration = &group.definitions.groups[parent_name];
     let dependencies = upstream_jobs(&declaration.jobs, name);
+    let per_node = declaration.waits_per_node(name);
     if group.parent.state.status != RunStatus::Running
         || group.parent.state.cancel_requested_at.is_some()
         || group.stopped()
-        || (declaration.member_dependency_failure(name) == DependencyFailure::Skip
+        || (!per_node
+            && declaration.member_dependency_failure(name) == DependencyFailure::Skip
             && failed_upstream(&group, &dependencies).is_some())
     {
         return Ok((
             transaction,
             vec![QueueWait::GroupParent { run_id: parent_id }],
         ));
+    }
+    if per_node {
+        return Ok((transaction, Vec::new()));
     }
     let waits: Vec<QueueWait> = group
         .children
@@ -107,7 +112,7 @@ pub(crate) fn member_dependencies<'a>(group: &'a GroupContext, name: &str) -> BT
         .unwrap_or_default()
 }
 
-/// Nodes the worker skips because a sibling member failed; none for a member whose policy is `run`.
+/// Nodes the worker skips because a sibling member failed; none for a member whose policy is `run`, nor for one that waits per node, whose gate decides as its inputs end.
 pub(crate) async fn skipped_nodes(
     transaction: ControlTransaction,
     request: &RunRequest,
@@ -125,6 +130,7 @@ pub(crate) async fn skipped_nodes(
         .zip(request.job_key.as_deref())
         .is_some_and(|(declaration, name)| {
             declaration.member_dependency_failure(name) == DependencyFailure::Run
+                || declaration.waits_per_node(name)
         });
     if runs_regardless {
         return Ok((transaction, BTreeMap::new()));

@@ -92,14 +92,7 @@ fn setting(
         ));
     };
     match chosen {
-        "node" => {
-            return Err(error_at(
-                text,
-                value.span().start,
-                "wait_for = \"node\" is not supported yet; it is planned, so use \"job\" for now"
-                    .to_owned(),
-            ));
-        }
+        "node" => settings.wait_for = Some(WaitFor::Node),
         "job" => settings.wait_for = Some(WaitFor::Job),
         "skip" => settings.on_failure = Some(DependencyFailure::Skip),
         "run" => settings.on_failure = Some(DependencyFailure::Run),

@@ -519,6 +519,45 @@ pub struct RunExecution {
     /// Derived from completed sibling facts and pinned lineage, never a mutable request rewrite.
     #[serde(default)]
     pub skipped_nodes: BTreeMap<String, String>,
+    /// For a group member that waits per node, each selected node's inputs other members build; it runs once the gate opens.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub gated_nodes: BTreeMap<String, Vec<GateInput>>,
+}
+
+/// A node another member of the same group run builds, which a gated node reads.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct GateInput {
+    pub job_key: String,
+    pub node_key: String,
+}
+
+/// The gated nodes a worker asks about, each not yet started.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NodeGatesRequest {
+    pub nodes: BTreeSet<String>,
+}
+
+/// Whether a gated node may run now, must wait, or is skipped because an input was not built.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
+pub enum NodeGate {
+    /// Every input is built, or the member's `on_failure = "run"` runs it once its inputs ended.
+    Open,
+    /// These inputs have still to be built in this group run.
+    Waiting { waiting_for: Vec<GateInput> },
+    /// An input was not built, so the member's `on_failure` policy skips the node; `cause` is the failed node.
+    Skipped { cause: String },
+}
+
+/// Each asked-about node's gate.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NodeGates {
+    pub nodes: BTreeMap<String, NodeGate>,
 }
 
 #[derive(Debug, Deserialize)]

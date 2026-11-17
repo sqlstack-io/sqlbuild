@@ -14,6 +14,8 @@ pub(crate) const UPCOMING_TIMES: usize = 5;
 pub(crate) const SOURCE_KIND: &str = "source";
 /// The published kind of a loader node.
 pub(crate) const LOADER_KIND: &str = "loader";
+/// Node kinds a member build runs in a Python or load phase, so a member waits for their inputs before it starts.
+pub(crate) const PHASE_NODE_KINDS: [&str; 5] = ["task", "asset", "loader", "check", "source"];
 /// Where a published source names the loader that fills it.
 pub(crate) const SOURCE_LOADER_POINTER: &str = "/entry/loader";
 /// The job setting naming how many models a run builds at once.

@@ -98,6 +98,7 @@ use crate::api::_helpers::resources::{
     runs::execution,
     runs::report,
     runs::heartbeat,
+    runs::gates,
     runs::output,
     runs::recall,
     run_reads::recent,

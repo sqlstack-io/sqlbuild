@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::declarations::main::group_dependencies::group_dependencies;
 use crate::declarations::models::JobDefinition;
-use crate::declarations::tests::test_types::GroupWaitsTestCase;
+use crate::declarations::tests::test_types::{GroupWaitsTestCase, NodeWaitCycleTestCase};
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 
@@ -61,7 +61,11 @@ fn waits(
 ) -> Result<BTreeMap<String, BTreeSet<String>>, ControlError> {
     let jobs = jobs(selections);
     let members: BTreeSet<String> = jobs.keys().cloned().collect();
-    group_dependencies(("orders_job_group", &input(lineage)), &jobs, &members)
+    group_dependencies(
+        ("orders_job_group", &input(lineage)),
+        &jobs,
+        (&members, &BTreeSet::new()),
+    )
 }
 
 #[test]
@@ -238,4 +242,108 @@ fn given_members_reading_each_other_when_deriving_group_waits_then_the_cycle_nam
          model:stg_orders); orders_job waits for customers_job (model:stg_orders reads \
          model:customers)"
     );
+}
+
+#[test]
+fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are_refused_with_their_nodes()
+ {
+    let crossing = vec![
+        ("model:c_root", vec![]),
+        ("model:b_mart", vec!["model:c_root"]),
+        ("model:a_mart", vec!["model:b_mart"]),
+        ("model:c_report", vec!["model:a_mart"]),
+    ];
+    let crossing_jobs = vec![
+        ("a_job", vec!["model:a_mart"]),
+        ("b_job", vec!["model:b_mart"]),
+        ("c_job", vec!["model:c_root", "model:c_report"]),
+    ];
+    let test_cases = [
+        NodeWaitCycleTestCase {
+            description: "job waits that cycle over acyclic nodes publish when every member waits per node",
+            lineage: crossing.clone(),
+            jobs: crossing_jobs.clone(),
+            node_waits: vec!["a_job", "b_job", "c_job"],
+            expected_cycle: None,
+        },
+        NodeWaitCycleTestCase {
+            description: "the same group waiting for jobs is refused, naming the nodes",
+            lineage: crossing.clone(),
+            jobs: crossing_jobs.clone(),
+            node_waits: vec![],
+            expected_cycle: Some(
+                "a_job waits for b_job (model:a_mart reads model:b_mart); b_job waits for c_job \
+                 (model:b_mart reads model:c_root); c_job waits for a_job (model:c_report reads \
+                 model:a_mart)",
+            ),
+        },
+        NodeWaitCycleTestCase {
+            description: "one member waiting for whole jobs closes the loop through its own nodes",
+            lineage: crossing.clone(),
+            jobs: crossing_jobs.clone(),
+            node_waits: vec!["a_job", "b_job"],
+            expected_cycle: Some(
+                "model:a_mart (a_job) waits for model:b_mart (b_job); model:b_mart (b_job) waits \
+                 for model:c_root (c_job); model:c_root (c_job) waits for the end of job a_job; \
+                 the end of job a_job waits for model:a_mart (a_job)",
+            ),
+        },
+        NodeWaitCycleTestCase {
+            description: "nodes that read each other across members are refused",
+            lineage: vec![
+                ("model:stg_orders", vec!["model:customers"]),
+                ("model:customers", vec!["model:stg_orders"]),
+            ],
+            jobs: vec![
+                ("orders_job", vec!["model:stg_orders"]),
+                ("customers_job", vec!["model:customers"]),
+            ],
+            node_waits: vec!["orders_job", "customers_job"],
+            expected_cycle: Some(
+                "model:customers (customers_job) waits for model:stg_orders (orders_job); \
+                 model:stg_orders (orders_job) waits for model:customers (customers_job)",
+            ),
+        },
+        NodeWaitCycleTestCase {
+            description: "a Python task's input holds its whole member back, so reading the member's own output is refused",
+            lineage: vec![
+                ("model:a_mart", vec![]),
+                ("model:c_report", vec!["model:a_mart"]),
+                ("task:a_export", vec!["model:c_report"]),
+            ],
+            jobs: vec![
+                ("a_job", vec!["model:a_mart", "task:a_export"]),
+                ("c_job", vec!["model:c_report"]),
+            ],
+            node_waits: vec!["a_job", "c_job"],
+            expected_cycle: Some(
+                "model:a_mart (a_job) waits for the start of job a_job; the start of job a_job \
+                 waits for model:c_report (c_job); model:c_report (c_job) waits for model:a_mart \
+                 (a_job)",
+            ),
+        },
+    ];
+    for test_case in test_cases {
+        let jobs = jobs(&test_case.jobs);
+        let members: BTreeSet<String> = jobs.keys().cloned().collect();
+        let node_waits: BTreeSet<String> = test_case
+            .node_waits
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
+        let actual = group_dependencies(
+            ("orders_job_group", &input(&test_case.lineage)),
+            &jobs,
+            (&members, &node_waits),
+        )
+        .err()
+        .map(|error| error.to_string());
+        let expected = test_case.expected_cycle.map(|cycle| {
+            format!(
+                "invalid control-plane data: group dependencies contain a cycle in job group \
+                 orders_job_group: {cycle}"
+            )
+        });
+        assert_eq!(actual, expected, "{}", test_case.description);
+    }
 }

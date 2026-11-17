@@ -125,7 +125,7 @@ pub(crate) async fn advance_group(
     Ok(transaction)
 }
 
-/// End each queued member whose policy is `skip` once a job it depends on ended without success.
+/// End each queued member whose policy is `skip` once a job it depends on ended without success; a member that waits per node skips node by node at its gate.
 async fn skip_blocked_members(
     mut transaction: ControlTransaction,
     group: &GroupContext,
@@ -147,6 +147,7 @@ async fn skip_blocked_members(
         if child.state.status != RunStatus::Queued
             || child.state.cancel_requested_at.is_some()
             || declaration.member_dependency_failure(name) != DependencyFailure::Skip
+            || declaration.waits_per_node(name)
         {
             continue;
         }

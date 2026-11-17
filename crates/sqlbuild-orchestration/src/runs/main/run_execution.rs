@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use uuid::Uuid;
 
+use crate::runs::_helpers::groups::gate::gated_nodes;
 use crate::runs::_helpers::groups::selection::skipped_nodes;
 use crate::runs::models::{ExecutionMetadata, RunClaim, RunExecution};
 use crate::store::errors::ControlError;
@@ -46,6 +47,7 @@ pub async fn run_execution(
         })
         .collect::<Result<_, ControlError>>()?;
     let (transaction, skipped_nodes) = skipped_nodes(transaction, &metadata.request_json).await?;
+    let (transaction, gated_nodes) = gated_nodes(transaction, &metadata.request_json).await?;
     commit(transaction).await?;
     Ok(Some(RunExecution {
         claim: RunClaim {
@@ -56,5 +58,6 @@ pub async fn run_execution(
         sqb_version: metadata.sqb_version,
         node_hashes,
         skipped_nodes,
+        gated_nodes,
     }))
 }

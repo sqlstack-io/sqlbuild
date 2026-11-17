@@ -159,6 +159,9 @@ pub struct GroupDefinition {
     /// Each member whose `[dependencies] on_failure` is not `partial`, with its policy.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub dependency_failure: BTreeMap<String, DependencyFailure>,
+    /// Members whose nodes each wait only for the nodes they read (`wait_for = "node"`); the others wait for whole jobs, as every member of an older publication does.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub node_waits: BTreeSet<String>,
 }
 
 impl GroupDefinition {
@@ -169,6 +172,11 @@ impl GroupDefinition {
             .get(member)
             .copied()
             .unwrap_or_default()
+    }
+    /// Whether `member` runs each node once the nodes it reads are built rather than waiting for whole jobs.
+    #[must_use]
+    pub fn waits_per_node(&self, member: &str) -> bool {
+        self.node_waits.contains(member)
     }
 }
 

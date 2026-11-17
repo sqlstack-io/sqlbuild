@@ -156,6 +156,26 @@ pub(crate) fn dependency_failures(
         .collect()
 }
 
+/// Each member whose `[dependencies] wait_for`, its override or else the group's, is `node`, the default.
+pub(crate) fn node_waits(
+    dependencies: &files::GroupDependencies,
+    members: &BTreeSet<String>,
+) -> BTreeSet<String> {
+    members
+        .iter()
+        .filter(|member| {
+            dependencies
+                .members
+                .get(*member)
+                .and_then(|settings| settings.wait_for)
+                .or(dependencies.defaults.wait_for)
+                .unwrap_or_default()
+                == files::WaitFor::Node
+        })
+        .cloned()
+        .collect()
+}
+
 /// Refuse an unknown limit, a memory size Docker cannot read, and CPUs or a process limit that is not positive.
 pub(crate) fn run_resources(
     name: &str,

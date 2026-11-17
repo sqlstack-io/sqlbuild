@@ -28,7 +28,7 @@ use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     ImportedDeclarations, dependency_failures, imported_declarations, module_declarations,
-    run_controls, run_resources,
+    node_waits, run_controls, run_resources,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     CalendarRequest, compile_calendars, compile_sensors,
@@ -330,7 +330,8 @@ pub(crate) fn compile_declarations(
         if members.is_empty() {
             continue;
         }
-        let dependencies = group_dependencies((name, &input), &jobs, &members)
+        let node_waits = node_waits(&group.dependencies, &members);
+        let dependencies = group_dependencies((name, &input), &jobs, (&members, &node_waits))
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         let selection: BTreeSet<String> = members
             .iter()
@@ -361,6 +362,7 @@ pub(crate) fn compile_declarations(
                 wait_reasons: group_wait_reasons(&input, &jobs, &dependencies),
                 jobs: dependencies,
                 dependency_failure: dependency_failures(&group.dependencies, &members),
+                node_waits,
             },
         );
     }
