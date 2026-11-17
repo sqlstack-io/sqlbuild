@@ -11,6 +11,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyFrozenSetMethods, PyTupl
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
+use sqlbuild_python_compile::compile_driver::main::setup::project_model_free_locations::project_model_free_locations;
 use sqlbuild_python_project::graph::main::python_nodes::resolve_python_check_excludes::resolve_python_check_excludes;
 use sqlbuild_python_project::planner_phases::main::object::object;
 
@@ -446,6 +447,14 @@ fn read_side_references<'py>(
 fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = inputs.adapter.py();
     let project: Bound<'py, PyAny> = native_field(&inputs.pipeline_result, "project")?;
+    let (default_database, default_schema) = project_model_free_locations(
+        &project,
+        inputs
+            .target_config
+            .as_ref()
+            .and_then(TargetSettingsValues::loader_schema),
+        &inputs.adapter,
+    )?;
     call_with(
         &host_entry(py, ExecutorHost::PythonNodeRuntime)?,
         &[
@@ -463,14 +472,8 @@ fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>
                     None => py.None().into_bound(py),
                 },
             ),
-            (
-                "default_database",
-                inputs.adapter.call_method0("default_database")?,
-            ),
-            (
-                "default_schema",
-                inputs.adapter.call_method0("default_schema")?,
-            ),
+            ("default_database", default_database),
+            ("default_schema", default_schema),
             ("relation_targets", inputs.relation_targets.clone()),
             ("project_relations", inputs.project_relations.clone()),
             ("providers", inputs.providers.clone()),

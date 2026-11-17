@@ -15,11 +15,13 @@ def build_direct_node_result_store(
     database: str | None,
     schema: str | None,
 ) -> DirectNodeResultStore:
-    """Build a direct-mode runtime node result store."""
+    """Build a direct-mode node result store that also reads the adapter's default location."""
 
+    previous: tuple[str | None, str | None] = (adapter.default_database(), adapter.default_schema())
     return DirectNodeResultStore(
         adapter=adapter,
         connection=connection,
         database=database,
         schema=schema,
+        previous_location=previous if previous != (database, schema) else None,
     )

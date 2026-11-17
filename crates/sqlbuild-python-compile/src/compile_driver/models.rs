@@ -77,6 +77,12 @@ pub struct TargetSettingsValues {
 }
 
 impl TargetSettingsValues {
+    /// The resolved schema managed loader data goes to.
+    #[must_use]
+    pub fn loader_schema(&self) -> Option<&str> {
+        self.loader_schema.as_deref()
+    }
+
     /// The `TargetSettings` record: a `preserve` location reads `None` with its flag set.
     pub fn record<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let located = |value: &Option<String>| -> PyResult<Bound<'py, PyAny>> {

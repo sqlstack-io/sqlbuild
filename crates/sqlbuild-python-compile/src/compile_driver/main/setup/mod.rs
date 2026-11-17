@@ -16,6 +16,7 @@ pub mod plan_has_executable_work;
 pub mod preserved_loader_schemas;
 pub mod progress;
 pub mod project_graph;
+pub mod project_model_free_locations;
 pub mod project_target_settings;
 pub mod python_read_source_names_for;
 pub mod register_inputs;

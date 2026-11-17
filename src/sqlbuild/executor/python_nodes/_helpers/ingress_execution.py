@@ -284,6 +284,8 @@ def _execute_ingress_loader(
                     run_id=runtime.run_id,
                     target=runtime.target,
                     target_config=runtime.target_config,
+                    default_database=runtime.default_database,
+                    default_schema=runtime.default_schema,
                     vars=runtime.vars,
                     is_reload=runtime.is_reload,
                     start_cursor_ts=runtime.start_cursor_ts,
@@ -320,8 +322,8 @@ def _execute_ingress_loader(
                         adapter=runtime.adapter,
                         connection=runtime.connection,
                         run_id=runtime.run_id,
-                        database=runtime.adapter.default_database(),
-                        schema=runtime.adapter.default_schema(),
+                        database=runtime.default_database,
+                        schema=runtime.default_schema,
                         target_name=source_entry.name,
                     )
         if attempt is not None and result.status == ExecutionStatus.FAILED:

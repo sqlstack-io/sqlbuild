@@ -1664,3 +1664,23 @@ class CtxTargetSchemaE2ETestCase:
     target_schema: str
     expected_model_schema: str
     expected_loader_schema: str | None
+
+
+@dataclass(frozen=True)
+class PreservedTargetNodeResultsE2ETestCase:
+    """A target that keeps its database or schema, and where two builds' node results land."""
+
+    description: str
+    target_lines: str
+    source_location: str
+    expected_results_schema: str
+    expected_runs_per_node: int
+
+
+@dataclass(frozen=True)
+class PreservedTargetRefusalE2ETestCase:
+    """A preserved target without a loader schema and the compile error it must print."""
+
+    description: str
+    python_files: dict[str, str]
+    expected_error: str

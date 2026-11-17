@@ -1,23 +1,39 @@
 //! The target database and schema that Python nodes use outside any model.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_model_config::templates::main::holds_context_placeholder::holds_context_placeholder;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
-/// The compiled project's target database and schema, each from `default` with the adapter method's name when it is unset, empty, or resolves only inside a model, such as a `${CTX:...}` schema.
+/// The database and schema of Python nodes, their results and loader fingerprints, from the
+/// target's configured `(database, schema)`; a `preserve` schema reads `loader_schema`, and an
+/// unset, empty, `preserve` or model-only value, such as a `${CTX:...}` schema, reads `default`
+/// with the adapter method's name.
 pub fn model_free_locations<'py>(
-    project: &Bound<'py, PyAny>,
+    (database, schema): (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    loader_schema: Option<&str>,
     default: impl Fn(&str) -> PyResult<Bound<'py, PyAny>>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-    let location = |field: &str, fallback: &str| {
-        let value = native_field(project, field)?;
-        match value.extract::<Option<String>>()? {
-            Some(text) if !text.is_empty() && !holds_context_placeholder(&text) => Ok(value),
+    let location =
+        |value: Bound<'py, PyAny>, fallback: &str| match value.extract::<Option<String>>()? {
+            Some(text) if text == PRESERVE_TARGET_VALUE && fallback == SCHEMA_DEFAULT => {
+                match loader_schema.filter(|schema| *schema != PRESERVE_TARGET_VALUE) {
+                    Some(schema) => Ok(pyo3::types::PyString::new(value.py(), schema).into_any()),
+                    None => default(fallback),
+                }
+            }
+            Some(text)
+                if !text.is_empty()
+                    && text != PRESERVE_TARGET_VALUE
+                    && !holds_context_placeholder(&text) =>
+            {
+                Ok(value)
+            }
             _ => default(fallback),
-        }
-    };
+        };
     Ok((
-        location("effective_target_database", "default_database")?,
-        location("effective_target_schema", "default_schema")?,
+        location(database, "default_database")?,
+        location(schema, SCHEMA_DEFAULT)?,
     ))
 }
+
+const SCHEMA_DEFAULT: &str = "default_schema";

@@ -15,4 +15,6 @@ pub enum TargetError {
     NamedTargetSchema(String),
     /// An intermediate loader, by name, whose schema resolves to the target's `preserve`.
     PreservedLoaderSchema(String),
+    /// A target, by name, whose schema is `preserve` and that names no loader schema.
+    PreservedNodeResults(String),
 }

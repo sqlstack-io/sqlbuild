@@ -35,6 +35,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::model_free_locations::model_free_locations;
 use sqlbuild_python_compile::compile_driver::main::setup::selected_target_settings::selected_target_settings;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
@@ -67,6 +68,7 @@ struct Invocation<'py> {
     selected: Vec<Bound<'py, PyAny>>,
     references: Vec<Bound<'py, PyAny>>,
     relation_sources: Vec<Bound<'py, PyAny>>,
+    defaults: LoaderDefaults<'py>,
     style: CliStyle,
     stream: Bound<'py, PyAny>,
 }
@@ -181,6 +183,7 @@ fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Inv
         selected,
         references,
         relation_sources: project.sources,
+        defaults,
         style: CliStyle { use_color },
         stream,
     })
@@ -394,6 +397,14 @@ fn runtime_params<'py>(
     let py: Python<'py> = request.py();
     let (target_name, effective_vars, run_id) = &preparation.runtime;
     let overrides: &Bound<'py, PyAny> = &preparation.cursor_overrides;
+    let (default_database, default_schema) = model_free_locations(
+        (
+            invocation.defaults.database.clone(),
+            invocation.defaults.schema.clone(),
+        ),
+        preparation.target_config.loader_schema(),
+        |method| preparation.adapter.call_method0(method),
+    )?;
     call_with(
         &host_entry(py, ExecutorHost::LoadRuntimeParams)?,
         &[
@@ -408,6 +419,8 @@ fn runtime_params<'py>(
             ("vars", effective_vars.clone()),
             ("is_reload", native_field(request, "reload")?),
             ("target_config", preparation.target_config.record(py)?),
+            ("default_database", default_database),
+            ("default_schema", default_schema),
             (
                 "start_cursor_ts",
                 cursor_timestamp(&native_field(overrides, "start_ts")?)?,
