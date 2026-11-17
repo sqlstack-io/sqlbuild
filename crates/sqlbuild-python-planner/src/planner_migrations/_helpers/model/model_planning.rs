@@ -82,7 +82,7 @@ fn manual_migration_requests<'py>(
 
 pub(crate) fn discover<'py>(
     (phase, fingerprints): (&MigrationPhase<'py>, &Bound<'py, PyAny>),
-    state: &Bound<'py, PyAny>,
+    (state, models): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
     schemas: &Bound<'py, PyAny>,
 ) -> PyResult<ModelMigrationDiscovery<'py>> {
     let runtime = phase.runtime.clone();
@@ -104,7 +104,7 @@ pub(crate) fn discover<'py>(
     }
     let mut declarations: Vec<ModelMigrationDeclaration<'py>> = Vec::new();
     for request in &declared_requests {
-        let (origin_location, origin_model) = resolve_origin(request, &runtime, state)?;
+        let (origin_location, origin_model) = resolve_origin(request, (&runtime, models), state)?;
         declarations.push(ModelMigrationDeclaration {
             model_name: name_object(&request.model)?,
             origin_location,
@@ -125,7 +125,7 @@ pub(crate) fn discover<'py>(
 
 pub(crate) fn finish<'py>(
     phase: &MigrationPhase<'py>,
-    state: &Bound<'py, PyAny>,
+    (state, models): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
     schemas: &Bound<'py, PyAny>,
     discovery: &ModelMigrationDiscovery<'py>,
 ) -> PyResult<ModelMigrationPlanning<'py>> {
@@ -139,7 +139,7 @@ pub(crate) fn finish<'py>(
         Bound<'py, PyAny>,
     )> = Vec::new();
     for request in &discovery.requests {
-        let (origin, origin_model) = resolve_origin(request, &runtime, state)?;
+        let (origin, origin_model) = resolve_origin(request, (&runtime, models), state)?;
         resolved.push((request, origin, origin_model));
     }
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
