@@ -24,7 +24,6 @@ use crate::bindings::_helpers::change_selection::base_snapshot::base_variant;
 use crate::bindings::_helpers::change_selection::definition_snapshot::project_wide_keys;
 use crate::bindings::_helpers::change_selection::selection::ChangedProject;
 use crate::bindings::_helpers::change_selection::selection::changed_project;
-use crate::bindings::_helpers::execution_history::conversion::nullable_text;
 use crate::bindings::_helpers::review_command::support::review_error;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;
@@ -38,6 +37,7 @@ use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::reso
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_front::discovery::main::project::configured_git_base_ref::configured_git_base_ref;
 use sqlbuild_python_front::discovery::main::project::configured_review::configured_review;
+use sqlbuild_python_front::execution_history::main::nullable_text::nullable_text;
 use sqlbuild_python_project::compiled_views::main::compiled_models::dep_rows::dep_rows;
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;

@@ -2,15 +2,46 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::cli::{argv, entry, namespace, observability, termination};
-use crate::bindings::_helpers::{
-    audit_command, build_command, build_progress, change_selection, check, clone, command_runtime,
-    compute_logs, contract_command, cost_command, cost_report, cost_telemetry, dbt_command,
-    dbt_events, dbt_interop, debug_command, diff_report, event_exporting, execution_history,
-    format_command, freshness, init_command, janitor, load, output_capture, plan_command,
-    presentation_text, query_command, recall, result_output, review_command, scenario_command,
-    seed_command, sql_test_command, workspace_commands,
-};
+use crate::bindings::_helpers::audit_command;
+use crate::bindings::_helpers::build_command;
+use crate::bindings::_helpers::build_progress;
+use crate::bindings::_helpers::change_selection;
+use crate::bindings::_helpers::check;
+use crate::bindings::_helpers::cli::argv;
+use crate::bindings::_helpers::cli::entry;
+use crate::bindings::_helpers::cli::namespace;
+use crate::bindings::_helpers::cli::observability;
+use crate::bindings::_helpers::cli::termination;
+use crate::bindings::_helpers::clone;
+use crate::bindings::_helpers::command_runtime;
+use crate::bindings::_helpers::compute_logs;
+use crate::bindings::_helpers::contract_command;
+use crate::bindings::_helpers::cost_command;
+use crate::bindings::_helpers::cost_report;
+use crate::bindings::_helpers::cost_telemetry;
+use crate::bindings::_helpers::dbt_command;
+use crate::bindings::_helpers::dbt_events;
+use crate::bindings::_helpers::dbt_interop;
+use crate::bindings::_helpers::debug_command;
+use crate::bindings::_helpers::diff_report;
+use crate::bindings::_helpers::event_exporting;
+use crate::bindings::_helpers::execution_history;
+use crate::bindings::_helpers::format_command;
+use crate::bindings::_helpers::freshness;
+use crate::bindings::_helpers::init_command;
+use crate::bindings::_helpers::janitor;
+use crate::bindings::_helpers::load;
+use crate::bindings::_helpers::output_capture;
+use crate::bindings::_helpers::plan_command;
+use crate::bindings::_helpers::presentation_text;
+use crate::bindings::_helpers::query_command;
+use crate::bindings::_helpers::recall;
+use crate::bindings::_helpers::result_output;
+use crate::bindings::_helpers::review_command;
+use crate::bindings::_helpers::scenario_command;
+use crate::bindings::_helpers::seed_command;
+use crate::bindings::_helpers::sql_test_command;
+use crate::bindings::_helpers::workspace_commands;
 use sqlbuild_python_base::build_progress::main::progress::register_progress::register_progress;
 use sqlbuild_python_base::cli::main::register_launch_state::register_launch_state;
 use sqlbuild_python_output::build_progress::main::register_progress_reporters::register_progress_reporters;
@@ -31,7 +62,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     freshness::registration::register(module)?;
     sqlbuild_python_front::native_host::main::register_consumption_state::register_consumption_state(module)?;
     sqlbuild_python_front::native_host::main::register_observations_state::register_observations_state(module)?;
-    crate::bindings::_helpers::native_host::resource_costs_state::register(module)?;
+    sqlbuild_python_front::resource_costs::main::register_resource_costs_state::register_resource_costs_state(module)?;
     sqlbuild_python_front::native_host::main::register_audit_results_state::register_audit_results_state(module)?;
     clone::registration::register(module)?;
     compute_logs::registration::register(module)?;

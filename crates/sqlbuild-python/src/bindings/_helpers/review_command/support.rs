@@ -11,7 +11,6 @@ use sqlbuild_analysis::review_command::models::ReviewFailure;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::clone::clone_progress::write_line;
-use crate::bindings::_helpers::execution_history::conversion::nullable_text;
 use crate::bindings::_helpers::janitor::janitor_keys::now_utc;
 use crate::bindings::_helpers::janitor::janitor_keys::timestamp_fields;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -20,6 +19,7 @@ use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::execution_history::main::nullable_text::nullable_text;
 
 /// The code of an unexpected failure inside a review.
 const UNEXPECTED_CODE: &str = "C760";

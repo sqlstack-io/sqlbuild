@@ -22,8 +22,6 @@ use crate::bindings::_helpers::diff_report::command::target_max_full_rows;
 use crate::bindings::_helpers::diff_report::facts::diff_facts;
 use crate::bindings::_helpers::diff_report::support::error_text;
 use crate::bindings::_helpers::diff_report::support::matches_class;
-use crate::bindings::_helpers::execution_history::conversion::nullable_text;
-use crate::bindings::_helpers::execution_history::statements::fetch_one;
 use crate::bindings::_helpers::review_command::planning::ReviewSettings;
 use crate::bindings::_helpers::review_command::support::review_error;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -33,6 +31,8 @@ use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_compile::compile_driver::main::stages::run_diff_pipeline::run_diff_pipeline;
+use sqlbuild_python_front::execution_history::main::fetch_one::fetch_one;
+use sqlbuild_python_front::execution_history::main::nullable_text::nullable_text;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 
 const KEYED_CHECK: &str = "keyed comparison";
