@@ -13,7 +13,8 @@ use sqlbuild_model_config::config_presence::main::contains_template::contains_te
 use sqlbuild_model_config::config_presence::main::mutable_config_value::mutable_config_value;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
-use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, config_error};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::config_error;
 use sqlbuild_python_front::discovery::models::NativeModelFile;
 use sqlbuild_python_front::model_config::main::config::carried_node::carried_node;
 use sqlbuild_python_front::model_config::main::config::config_fields::config_fields;

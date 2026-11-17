@@ -16,24 +16,27 @@ use sqlbuild_rules::custom_host_pool::types::{FactKey, HostPlan};
 use sqlbuild_rules::custom_rule_cache::models::CustomEvaluation;
 use sqlbuild_rules::custom_rule_cache::types::ReadSet;
 
-use crate::bindings::_helpers::rules::constants::{
-    CUSTOM_HOST_RUNTIME_VERSION, CUSTOM_RULES_CACHE_FILE,
-};
+use crate::bindings::_helpers::rules::constants::CUSTOM_HOST_RUNTIME_VERSION;
+use crate::bindings::_helpers::rules::constants::CUSTOM_RULES_CACHE_FILE;
 use crate::bindings::_helpers::rules::custom_host_columns::custom_host_declared_columns;
-use crate::bindings::_helpers::rules::custom_host_payload::{
-    CUSTOM_HOST_PAYLOAD_MAGIC, custom_host_payload,
-};
-use crate::bindings::_helpers::rules::custom_hosts::{HostCancel, HostRequest, run_custom_hosts};
+use crate::bindings::_helpers::rules::custom_host_payload::CUSTOM_HOST_PAYLOAD_MAGIC;
+use crate::bindings::_helpers::rules::custom_host_payload::custom_host_payload;
+use crate::bindings::_helpers::rules::custom_hosts::HostCancel;
+use crate::bindings::_helpers::rules::custom_hosts::HostRequest;
+use crate::bindings::_helpers::rules::custom_hosts::run_custom_hosts;
 use crate::bindings::_helpers::rules::custom_rule_cache::CustomRuleCache;
 use crate::bindings::_helpers::rules::custom_rule_cache::custom_rule_identity;
 use crate::bindings::_helpers::rules::custom_rule_cache::stored_rules;
 use crate::bindings::_helpers::rules::custom_rule_evidence::custom_rule_implementation_fingerprint;
 use crate::bindings::_helpers::rules::custom_rule_evidence::custom_rule_import_closure;
-use crate::bindings::_helpers::rules::fact_encoder::{Encoded, reproducible};
-use crate::bindings::_helpers::rules::fact_replay::{
-    FactReplay, delta_safe_fact, is_tree_fact, read_text_path,
-};
-use crate::bindings::_helpers::rules::rule_run::{bulk_cache_file, rules_bulk_cache_path};
+use crate::bindings::_helpers::rules::fact_encoder::Encoded;
+use crate::bindings::_helpers::rules::fact_encoder::reproducible;
+use crate::bindings::_helpers::rules::fact_replay::FactReplay;
+use crate::bindings::_helpers::rules::fact_replay::delta_safe_fact;
+use crate::bindings::_helpers::rules::fact_replay::is_tree_fact;
+use crate::bindings::_helpers::rules::fact_replay::read_text_path;
+use crate::bindings::_helpers::rules::rule_run::bulk_cache_file;
+use crate::bindings::_helpers::rules::rule_run::rules_bulk_cache_path;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::cache::main::current_code_identity::current_code_identity;

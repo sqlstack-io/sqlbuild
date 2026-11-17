@@ -23,14 +23,16 @@ use sqlbuild_analysis::planner_identity::models::{
 
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::graph::algorithms::{closure, inverted};
-use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
+use crate::bindings::_helpers::graph::algorithms::closure;
+use crate::bindings::_helpers::graph::algorithms::inverted;
+use crate::bindings::_helpers::graph::keys::KeyCache;
+use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::planner_identity::hashing::graph_key;
-use crate::bindings::_helpers::references::explicit_references::{
-    GateRow, HookRow, native_execution_gate_edges,
-};
+use crate::bindings::_helpers::references::explicit_references::GateRow;
+use crate::bindings::_helpers::references::explicit_references::HookRow;
+use crate::bindings::_helpers::references::explicit_references::native_execution_gate_edges;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

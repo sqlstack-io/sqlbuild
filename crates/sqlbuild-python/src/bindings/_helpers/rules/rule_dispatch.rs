@@ -17,31 +17,34 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::rules::catalogue::{
-    resolved_ignore_selectors, rule_catalogue, select_rules,
-};
+use crate::bindings::_helpers::rules::catalogue::resolved_ignore_selectors;
+use crate::bindings::_helpers::rules::catalogue::rule_catalogue;
+use crate::bindings::_helpers::rules::catalogue::select_rules;
 use crate::bindings::_helpers::rules::constants::RULES_MEMO_REUSES;
 use crate::bindings::_helpers::rules::constants::TYPE_PROOF_RULE_CODES;
-use crate::bindings::_helpers::rules::custom_evaluation::{
-    CustomRun, evaluate_custom_rules_cached, outcome,
-};
+use crate::bindings::_helpers::rules::custom_evaluation::CustomRun;
+use crate::bindings::_helpers::rules::custom_evaluation::evaluate_custom_rules_cached;
+use crate::bindings::_helpers::rules::custom_evaluation::outcome;
 use crate::bindings::_helpers::rules::custom_hosts::HostCancel;
 use crate::bindings::_helpers::rules::custom_rule_evidence::verify_custom_rules;
-use crate::bindings::_helpers::rules::early_builtin_rules::{
-    EarlyBuiltinRules, EarlyRulesReport, take_early_rules,
-};
+use crate::bindings::_helpers::rules::early_builtin_rules::EarlyBuiltinRules;
+use crate::bindings::_helpers::rules::early_builtin_rules::EarlyRulesReport;
+use crate::bindings::_helpers::rules::early_builtin_rules::take_early_rules;
 use crate::bindings::_helpers::rules::fact_replay::project_models;
 use crate::bindings::_helpers::rules::results::rule_finding;
+use crate::bindings::_helpers::rules::rows::NativeRulesRequest;
+use crate::bindings::_helpers::rules::rows::build_rules_request;
+use crate::bindings::_helpers::rules::rows::evaluate_rules_request;
+use crate::bindings::_helpers::rules::rows::evaluate_rules_request_with;
 use crate::bindings::_helpers::rules::rows::finalize_rule_findings_rows;
-use crate::bindings::_helpers::rules::rows::{
-    NativeRulesRequest, build_rules_request, evaluate_rules_request, evaluate_rules_request_with,
-    rules_request_over, selectionless_rules_request,
-};
-use crate::bindings::_helpers::rules::rule_plan::{
-    plan_rule_run, selects_row_rules, whole_project_codes,
-};
+use crate::bindings::_helpers::rules::rows::rules_request_over;
+use crate::bindings::_helpers::rules::rows::selectionless_rules_request;
+use crate::bindings::_helpers::rules::rule_plan::plan_rule_run;
+use crate::bindings::_helpers::rules::rule_plan::selects_row_rules;
+use crate::bindings::_helpers::rules::rule_plan::whole_project_codes;
 use crate::bindings::_helpers::rules::rule_run::finish_rule_run;
-use crate::bindings::_helpers::rules::selection::{rule_selected, selected_rule_codes};
+use crate::bindings::_helpers::rules::selection::rule_selected;
+use crate::bindings::_helpers::rules::selection::selected_rule_codes;
 use crate::bindings::_helpers::rules::sql_rules::run_planned_sql_rules;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

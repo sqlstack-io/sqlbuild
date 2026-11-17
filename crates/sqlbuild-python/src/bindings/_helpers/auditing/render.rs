@@ -5,9 +5,8 @@ use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_reference_calls;
 
-use crate::bindings::_helpers::references::source_relations::{
-    render_source_read, render_source_relation,
-};
+use crate::bindings::_helpers::references::source_relations::render_source_read;
+use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;

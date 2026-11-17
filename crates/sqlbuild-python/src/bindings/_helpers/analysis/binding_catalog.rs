@@ -15,7 +15,8 @@ use sqlbuild_analysis::semantic_validation::types::{BindingRequest, Relations};
 use sqlbuild_python_base::types::IntoPositional;
 
 use crate::bindings::_helpers::analysis::conversions;
-use crate::bindings::models::{CatalogInput, ProjectCatalog};
+use crate::bindings::models::CatalogInput;
+use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

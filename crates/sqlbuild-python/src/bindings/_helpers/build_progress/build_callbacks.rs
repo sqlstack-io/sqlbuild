@@ -21,10 +21,15 @@ use sqlbuild_core::build_progress::models::{
 };
 use sqlbuild_core::cli_text::models::CliStyle;
 
-use crate::bindings::_helpers::build_progress::plan_facts::{BuildPlanFacts, build_plan_facts};
-use crate::bindings::_helpers::build_progress::result_text::{
-    function_text, load_text, model_text, optional, seed_text, test_text, text,
-};
+use crate::bindings::_helpers::build_progress::plan_facts::BuildPlanFacts;
+use crate::bindings::_helpers::build_progress::plan_facts::build_plan_facts;
+use crate::bindings::_helpers::build_progress::result_text::function_text;
+use crate::bindings::_helpers::build_progress::result_text::load_text;
+use crate::bindings::_helpers::build_progress::result_text::model_text;
+use crate::bindings::_helpers::build_progress::result_text::optional;
+use crate::bindings::_helpers::build_progress::result_text::seed_text;
+use crate::bindings::_helpers::build_progress::result_text::test_text;
+use crate::bindings::_helpers::build_progress::result_text::text;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::imported::imported;

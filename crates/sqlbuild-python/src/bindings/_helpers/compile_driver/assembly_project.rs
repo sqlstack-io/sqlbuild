@@ -9,25 +9,23 @@ use sqlbuild_analysis::assembly::project::main::configured_namespace::configured
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::compile_attachment::target::{
-    connection_is_default_target, project_location,
-};
-use crate::bindings::_helpers::compile_driver::assembly::{AssemblyRequest, AssemblyStage};
-use crate::bindings::_helpers::compile_driver::assembly_analysis::{
-    AnalysisContext, analysis_context, and_not,
-};
+use crate::bindings::_helpers::compile_attachment::target::connection_is_default_target;
+use crate::bindings::_helpers::compile_attachment::target::project_location;
+use crate::bindings::_helpers::compile_driver::assembly::AssemblyRequest;
+use crate::bindings::_helpers::compile_driver::assembly::AssemblyStage;
+use crate::bindings::_helpers::compile_driver::assembly_analysis::AnalysisContext;
+use crate::bindings::_helpers::compile_driver::assembly_analysis::analysis_context;
+use crate::bindings::_helpers::compile_driver::assembly_analysis::and_not;
 use crate::bindings::_helpers::compile_driver::assembly_checks::compiled_sql_scenarios;
-use crate::bindings::_helpers::compile_driver::assembly_facts::{
-    native_project_facts, pivot_tables,
-};
-use crate::bindings::_helpers::compile_driver::assembly_models::{
-    binding_rows, compiled_models, project_binding_diagnostics,
-};
+use crate::bindings::_helpers::compile_driver::assembly_facts::native_project_facts;
+use crate::bindings::_helpers::compile_driver::assembly_facts::pivot_tables;
+use crate::bindings::_helpers::compile_driver::assembly_models::binding_rows;
+use crate::bindings::_helpers::compile_driver::assembly_models::compiled_models;
+use crate::bindings::_helpers::compile_driver::assembly_models::project_binding_diagnostics;
 use crate::bindings::_helpers::compile_driver::assembly_sql_tests::assembled_sql_tests;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::semantic_checks::stage::{
-    SemanticCompletion, completed_semantic_project,
-};
+use crate::bindings::_helpers::semantic_checks::stage::SemanticCompletion;
+use crate::bindings::_helpers::semantic_checks::stage::completed_semantic_project;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::compile_driver::constants::SEMANTIC_COMPLETION;

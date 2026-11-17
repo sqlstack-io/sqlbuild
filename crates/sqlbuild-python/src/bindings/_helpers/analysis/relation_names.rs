@@ -10,8 +10,8 @@ use sqlbuild_analysis::relation_names::main::extract_relation_names::extract_rel
 use sqlbuild_analysis::relation_names::models::{ExtractedRelations, RelationName};
 use sqlbuild_core::panics::main::native_failure::native_failure;
 
-use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use crate::bindings::_helpers::input_loops::model_loop_prepass::pooled;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::types::CompilerDetach;
 
 const RELATION_NAMES_CONTEXT: &str = "native relation name extraction";

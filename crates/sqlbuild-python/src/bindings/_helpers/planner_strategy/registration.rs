@@ -3,9 +3,11 @@
 use pyo3::prelude::{Bound, PyModule, PyResult};
 use pyo3::{prelude::PyModuleMethods, wrap_pyfunction};
 
-use crate::bindings::_helpers::planner_strategy::{
-    audits, cursor_types, fixture_completion, microbatches, strategy,
-};
+use crate::bindings::_helpers::planner_strategy::audits;
+use crate::bindings::_helpers::planner_strategy::cursor_types;
+use crate::bindings::_helpers::planner_strategy::fixture_completion;
+use crate::bindings::_helpers::planner_strategy::microbatches;
+use crate::bindings::_helpers::planner_strategy::strategy;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(

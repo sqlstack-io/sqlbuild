@@ -3,12 +3,14 @@
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
+use crate::bindings::_helpers::planner_phases::objects::config_str;
 use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_phases::objects::{config_str, planner_error, text};
+use crate::bindings::_helpers::planner_phases::objects::planner_error;
+use crate::bindings::_helpers::planner_phases::objects::text;
 use crate::bindings::_helpers::planner_strategy::cursor_types::classify_cursor_sql_type;
-use crate::bindings::_helpers::planner_warehouse::constants::{
-    CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, WATERMARK_CONTRACT_CODE,
-};
+use crate::bindings::_helpers::planner_warehouse::constants::CURSOR_TYPE_INTEGER;
+use crate::bindings::_helpers::planner_warehouse::constants::CURSOR_TYPE_TIMESTAMP;
+use crate::bindings::_helpers::planner_warehouse::constants::WATERMARK_CONTRACT_CODE;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};

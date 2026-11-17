@@ -27,11 +27,13 @@ use crate::bindings::_helpers::input_loops::model_loop_prepass::spawned;
 use sqlbuild_python_base::cache::main::parse_key::parse_key;
 use sqlbuild_python_base::cache::models::NativeParseStore;
 
-use crate::bindings::_helpers::input_loops::model_loop::{
-    LoopContext, NativeModelLoop, compile_error,
-};
-use crate::bindings::_helpers::input_loops::model_loop_inputs::{HOOK_KEYS, present};
-use crate::bindings::_helpers::project_assembly::resources::{syntax_error_message, syntax_valid};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::HOOK_KEYS;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
+use crate::bindings::_helpers::project_assembly::resources::syntax_error_message;
+use crate::bindings::_helpers::project_assembly::resources::syntax_valid;
 use crate::bindings::_helpers::project_assembly::syntax_validation::sql_entry_label;
 use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

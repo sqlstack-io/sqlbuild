@@ -13,10 +13,12 @@ use sha2::{Digest, Sha256};
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_project::snapshot::{destination, insert_node};
+use crate::bindings::_helpers::compiled_project::snapshot::destination;
+use crate::bindings::_helpers::compiled_project::snapshot::insert_node;
 use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::compiled_views::seed_views::{NativeCompiledSeed, SeedViews};
+use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
+use crate::bindings::_helpers::compiled_views::seed_views::SeedViews;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
 

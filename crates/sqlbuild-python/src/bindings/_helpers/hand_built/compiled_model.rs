@@ -1,8 +1,8 @@
 //! A `CompiledModel` for a model input built outside the native compile-input stage.
 
-use crate::bindings::_helpers::analysis::binding_locations::{
-    ExpansionRow, LocatedRow, locate_model_binding_diagnostics,
-};
+use crate::bindings::_helpers::analysis::binding_locations::ExpansionRow;
+use crate::bindings::_helpers::analysis::binding_locations::LocatedRow;
+use crate::bindings::_helpers::analysis::binding_locations::locate_model_binding_diagnostics;
 use crate::bindings::_helpers::analysis_session::outcome_objects::dynamic_contract_proof;
 use crate::bindings::_helpers::analysis_session::outcome_objects::session_outcome_analysis;
 use crate::bindings::models::Positional;

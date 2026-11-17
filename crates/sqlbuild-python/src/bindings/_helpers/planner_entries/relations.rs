@@ -3,11 +3,8 @@
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
-use crate::bindings::_helpers::planner_entries::models::{
-    PlannerRelationsContext, RelationsRequest,
-};
+use crate::bindings::_helpers::planner_entries::models::PlannerRelationsContext;
+use crate::bindings::_helpers::planner_entries::models::RelationsRequest;
 use crate::bindings::_helpers::planner_entries::values::planner_model;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::locations::build_function_locations;
@@ -29,6 +26,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::types::RecordId;

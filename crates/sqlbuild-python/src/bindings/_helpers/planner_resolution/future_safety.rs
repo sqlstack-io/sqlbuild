@@ -1,8 +1,11 @@
 //! Future cursor safety evidence and exception boundary.
 
-use crate::bindings::_helpers::planner_resolution::cursor_safety::{
-    horizon, replace, safety_duration, safety_error, timestamp_bound, utc_clock,
-};
+use crate::bindings::_helpers::planner_resolution::cursor_safety::horizon;
+use crate::bindings::_helpers::planner_resolution::cursor_safety::replace;
+use crate::bindings::_helpers::planner_resolution::cursor_safety::safety_duration;
+use crate::bindings::_helpers::planner_resolution::cursor_safety::safety_error;
+use crate::bindings::_helpers::planner_resolution::cursor_safety::timestamp_bound;
+use crate::bindings::_helpers::planner_resolution::cursor_safety::utc_clock;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};

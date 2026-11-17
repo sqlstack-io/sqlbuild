@@ -22,7 +22,8 @@ use crate::bindings::_helpers::build_command::policies::enforce_model_execution_
 use crate::bindings::_helpers::clone::clone_pipeline::run_clone_pipeline_with_options;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::planner_scope::retained::{ScopeData, scope_data};
+use crate::bindings::_helpers::planner_scope::retained::ScopeData;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
 use crate::bindings::_helpers::planner_selection::unit_tests::split_unit_test_selectors;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

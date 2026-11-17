@@ -18,9 +18,8 @@ use sqlbuild_model_config::templates::models::Scalar;
 use sqlbuild_python_base::positional_record;
 
 use crate::bindings::_helpers::compiled_views::model_input_view::input_reference_rows;
-use crate::bindings::_helpers::project_assembly::models::{
-    NativeProjectResources, NativeResourceFailure,
-};
+use crate::bindings::_helpers::project_assembly::models::NativeProjectResources;
+use crate::bindings::_helpers::project_assembly::models::NativeResourceFailure;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::boundary::main::imported::imported;

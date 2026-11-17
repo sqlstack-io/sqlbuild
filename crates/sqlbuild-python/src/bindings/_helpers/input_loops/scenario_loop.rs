@@ -17,12 +17,15 @@ use sqlbuild_sqltext::sql_references::models::SqlReference;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::ScenarioRow;
 use crate::bindings::_helpers::input_loops::model_loop::compile_error;
 use crate::bindings::_helpers::input_loops::model_loop_calls::origin_references;
-use crate::bindings::_helpers::input_loops::source_loop::{
-    AuthoredExpansion, expanded_authored_sql, scoped_declarations,
-};
-use crate::bindings::_helpers::input_loops::sql_test_loop::{
-    FileOrigin, TestScope, assertion_targets, checked_body, source_names, unique,
-};
+use crate::bindings::_helpers::input_loops::source_loop::AuthoredExpansion;
+use crate::bindings::_helpers::input_loops::source_loop::expanded_authored_sql;
+use crate::bindings::_helpers::input_loops::source_loop::scoped_declarations;
+use crate::bindings::_helpers::input_loops::sql_test_loop::FileOrigin;
+use crate::bindings::_helpers::input_loops::sql_test_loop::TestScope;
+use crate::bindings::_helpers::input_loops::sql_test_loop::assertion_targets;
+use crate::bindings::_helpers::input_loops::sql_test_loop::checked_body;
+use crate::bindings::_helpers::input_loops::sql_test_loop::source_names;
+use crate::bindings::_helpers::input_loops::sql_test_loop::unique;
 use sqlbuild_python_base::compile_context::main::delta::record_test_source_reads::record_test_source_reads;
 
 impl<'py> TestScope<'_, 'py> {

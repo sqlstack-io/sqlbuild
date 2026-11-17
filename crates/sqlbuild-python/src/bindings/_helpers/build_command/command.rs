@@ -8,22 +8,24 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cli::person_login::main::sync_after_build::sync_after_build;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::build_command::completion::{
-    complete_direct_build, finalize_exceptional_cost, finalize_no_work_with_timings,
-    record_pending_cost, write_partial_timings,
-};
+use crate::bindings::_helpers::build_command::completion::complete_direct_build;
+use crate::bindings::_helpers::build_command::completion::finalize_exceptional_cost;
+use crate::bindings::_helpers::build_command::completion::finalize_no_work_with_timings;
+use crate::bindings::_helpers::build_command::completion::record_pending_cost;
+use crate::bindings::_helpers::build_command::completion::write_partial_timings;
 use crate::bindings::_helpers::build_command::execution::execute_direct_build;
-use crate::bindings::_helpers::build_command::invocation::{BuildContext, resolve_build_context};
-use crate::bindings::_helpers::build_command::planning::{
-    compile_build_plan, enforce_build_plan_policies, run_defer_clone_prephase,
-    write_compile_target, write_plan_text,
-};
+use crate::bindings::_helpers::build_command::invocation::BuildContext;
+use crate::bindings::_helpers::build_command::invocation::resolve_build_context;
+use crate::bindings::_helpers::build_command::planning::compile_build_plan;
+use crate::bindings::_helpers::build_command::planning::enforce_build_plan_policies;
+use crate::bindings::_helpers::build_command::planning::run_defer_clone_prephase;
+use crate::bindings::_helpers::build_command::planning::write_compile_target;
+use crate::bindings::_helpers::build_command::planning::write_plan_text;
 use crate::bindings::_helpers::check::check_core::relevant_check_functions;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
-use crate::bindings::_helpers::observations::source_capture::{
-    arm_source_capture, take_source_capture,
-};
+use crate::bindings::_helpers::observations::source_capture::arm_source_capture;
+use crate::bindings::_helpers::observations::source_capture::take_source_capture;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;

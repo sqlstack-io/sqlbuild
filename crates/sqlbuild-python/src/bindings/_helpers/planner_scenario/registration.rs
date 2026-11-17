@@ -1,8 +1,12 @@
 //! Register scenario planning bindings.
 
-use crate::bindings::_helpers::planner_scenario::{
-    artifacts, cli, execution, fixtures, graph, relations, sql,
-};
+use crate::bindings::_helpers::planner_scenario::artifacts;
+use crate::bindings::_helpers::planner_scenario::cli;
+use crate::bindings::_helpers::planner_scenario::execution;
+use crate::bindings::_helpers::planner_scenario::fixtures;
+use crate::bindings::_helpers::planner_scenario::graph;
+use crate::bindings::_helpers::planner_scenario::relations;
+use crate::bindings::_helpers::planner_scenario::sql;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
 

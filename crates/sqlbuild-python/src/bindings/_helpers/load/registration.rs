@@ -2,7 +2,9 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::load::{load_command, load_progress, load_selection};
+use crate::bindings::_helpers::load::load_command;
+use crate::bindings::_helpers::load::load_progress;
+use crate::bindings::_helpers::load::load_selection;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     load_command::register(module)?;

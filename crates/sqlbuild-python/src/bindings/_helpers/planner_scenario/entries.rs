@@ -2,18 +2,18 @@
 
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
 use crate::bindings::_helpers::planner_resolution::orchestration::resolve_function_sql;
 use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_UNKNOWN_SEED;
-use crate::bindings::_helpers::planner_scenario::{
-    models::SqlContext, sql::required_target, values::error,
-};
+use crate::bindings::_helpers::planner_scenario::models::SqlContext;
+use crate::bindings::_helpers::planner_scenario::sql::required_target;
+use crate::bindings::_helpers::planner_scenario::values::error;
 use crate::bindings::_helpers::planner_strategy::model_entries::extract_seed_columns;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyString;
 use pyo3::types::{PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::by_attribute::by_attribute;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

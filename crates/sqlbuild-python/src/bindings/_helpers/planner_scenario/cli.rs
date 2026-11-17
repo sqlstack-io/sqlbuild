@@ -2,8 +2,6 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_scenario::artifacts::build_scenario_hash_index;
 use crate::bindings::_helpers::planner_scenario::artifacts::build_scenario_relation_map;
@@ -18,6 +16,8 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

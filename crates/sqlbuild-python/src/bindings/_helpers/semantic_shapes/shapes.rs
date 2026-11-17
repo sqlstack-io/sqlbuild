@@ -5,18 +5,19 @@ use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::analysis::binding_catalog::{
-    BindingCatalog, CASE_SENSITIVE_BINDING_DIALECTS, CatalogKey,
-};
+use crate::bindings::_helpers::analysis::binding_catalog::BindingCatalog;
+use crate::bindings::_helpers::analysis::binding_catalog::CASE_SENSITIVE_BINDING_DIALECTS;
+use crate::bindings::_helpers::analysis::binding_catalog::CatalogKey;
 use crate::bindings::_helpers::analysis::normalization::normalize_analysis_sql;
 use crate::bindings::_helpers::analysis_session::stage_functions::infer_native_expression_source_shapes;
 use crate::bindings::_helpers::compiled_project::rows::ReferenceTuple;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::{
-    DeclaredRow, NativeCompiledModel,
-};
-use crate::bindings::_helpers::compiled_views::model_reads::{
-    declared_rows, dynamic_columns_declared, inferred_rows, star_flags, unchecked_columns,
-};
+use crate::bindings::_helpers::compiled_views::compiled_model_view::DeclaredRow;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
+use crate::bindings::_helpers::compiled_views::model_reads::declared_rows;
+use crate::bindings::_helpers::compiled_views::model_reads::dynamic_columns_declared;
+use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
+use crate::bindings::_helpers::compiled_views::model_reads::star_flags;
+use crate::bindings::_helpers::compiled_views::model_reads::unchecked_columns;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

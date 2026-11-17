@@ -29,20 +29,21 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 
 use crate::bindings::_helpers::analysis_session::query_columns::query_columns_error;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    FunctionRow, FunctionSettings,
-};
-use crate::bindings::_helpers::compiled_views::function_views::{
-    AttachedFunction, FunctionHandles,
-};
-use crate::bindings::_helpers::input_loops::model_loop::{
-    LoopContext, NativeModelLoop, compile_error,
-};
-use crate::bindings::_helpers::input_loops::model_loop_calls::{CallOrigin, report_invalid_calls};
+use crate::bindings::_helpers::compiled_project::attachment_inputs::FunctionRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::FunctionSettings;
+use crate::bindings::_helpers::compiled_views::function_views::AttachedFunction;
+use crate::bindings::_helpers::compiled_views::function_views::FunctionHandles;
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
+use crate::bindings::_helpers::input_loops::model_loop_calls::CallOrigin;
+use crate::bindings::_helpers::input_loops::model_loop_calls::report_invalid_calls;
 use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_row;
-use crate::bindings::_helpers::input_loops::source_loop::{
-    AuthoredExpansion, expanded_authored_sql, expanded_template, parse_checked, scoped_declarations,
-};
+use crate::bindings::_helpers::input_loops::source_loop::AuthoredExpansion;
+use crate::bindings::_helpers::input_loops::source_loop::expanded_authored_sql;
+use crate::bindings::_helpers::input_loops::source_loop::expanded_template;
+use crate::bindings::_helpers::input_loops::source_loop::parse_checked;
+use crate::bindings::_helpers::input_loops::source_loop::scoped_declarations;
 use sqlbuild_project::models::DestinationFact;
 use sqlbuild_project::models::PythonRuntime;
 use sqlbuild_project::models::ReferenceRow;

@@ -12,9 +12,11 @@ use sqlbuild_python_front::compile_attachment::main::build_effective_vars::build
 use crate::bindings::_helpers::compile_attachment::model_inputs::build_model_inputs;
 use sqlbuild_python_base::compile_context::main::diagnostic_collector::collect_compile_diagnostics::collect_compile_diagnostics;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::records::{compile_inputs_view, inputs_with};
+use crate::bindings::_helpers::compiled_views::records::compile_inputs_view;
+use crate::bindings::_helpers::compiled_views::records::inputs_with;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
-use crate::bindings::_helpers::input_loops::attachment::{attach_checks, attach_resources};
+use crate::bindings::_helpers::input_loops::attachment::attach_checks;
+use crate::bindings::_helpers::input_loops::attachment::attach_resources;
 use sqlbuild_python_front::model_config::main::config::run_id::run_id;
 use sqlbuild_python_front::render::main::declarations::public_declaration_indexes::public_declaration_indexes;
 use sqlbuild_python_front::render::main::declarations::public_model_schema_index::public_model_schema_index;

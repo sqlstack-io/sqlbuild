@@ -1,18 +1,19 @@
 //! Plan a compiled project over an open warehouse connection, and open that connection.
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use sqlbuild_host::entries::models::UserCodeHost;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 use crate::bindings::_helpers::compile_driver::deferral::build_deferred_locations;
 use crate::bindings::_helpers::compile_driver::deferral::gather_deferred_relations;
 use crate::bindings::_helpers::compile_driver::deferral::resolve_deferred_target_config;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_project_graph_from_compiled_project;
-use crate::bindings::_helpers::compile_driver::python_plan_entries::{
-    build_python_run_plan_outputs, python_read_source_names_for,
-};
-use crate::bindings::_helpers::compiled_views::{project_reads, source_reads};
-use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
+use crate::bindings::_helpers::compile_driver::python_plan_entries::build_python_run_plan_outputs;
+use crate::bindings::_helpers::compile_driver::python_plan_entries::python_read_source_names_for;
+use crate::bindings::_helpers::compiled_views::project_reads;
+use crate::bindings::_helpers::compiled_views::source_reads;
+use crate::bindings::_helpers::graph::keys::KeyCache;
+use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_entries::execution_plan::build_execution_plan;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use sqlbuild_analysis::planner_scope::constants::SOURCE;

@@ -7,7 +7,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyFrozenSet, PyString};
 use sqlbuild_analysis::review_command::models::NodeComparison;
 
-use crate::bindings::_helpers::compiled_views::{model_reads, project_reads};
+use crate::bindings::_helpers::compiled_views::model_reads;
+use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::lineage::column_lineage_graph::ProjectColumnLineage;
 use crate::bindings::_helpers::lineage::project_lineage::build_project_column_lineage;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;

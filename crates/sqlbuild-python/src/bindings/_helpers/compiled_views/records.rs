@@ -9,9 +9,10 @@ use pyo3::types::{
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::compiled_project::models::CompiledModelFacts;
 
-use crate::bindings::_helpers::compiled_project::project::{
-    AnalysisPy, NativeCompiledProject, ProofPy, model_facts,
-};
+use crate::bindings::_helpers::compiled_project::project::AnalysisPy;
+use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
+use crate::bindings::_helpers::compiled_project::project::ProofPy;
+use crate::bindings::_helpers::compiled_project::project::model_facts;
 use crate::bindings::_helpers::compiled_project::schema_facts::entry_schema_fact;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::inputs_view::NativeInputsView;

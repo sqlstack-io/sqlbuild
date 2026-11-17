@@ -1,46 +1,45 @@
 //! Plan output assembly: storage policies, warnings and direct-mode metadata.
 
-use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_entries::models::PlanOutputInputs;
 use crate::bindings::_helpers::planner_entries::plan_output::plan_output_fields;
 use crate::bindings::_helpers::planner_identity::staleness::build_stale_out_of_selection_warnings;
 use crate::bindings::_helpers::planner_migrations::fingerprint::with_migration_fingerprints;
-use crate::bindings::_helpers::planner_phases::constants::{
-    AUDIT_ENTRIES, IGNORE_AUDIT_FAILURES, IGNORE_FAILURE,
-};
+use crate::bindings::_helpers::planner_phases::constants::AUDIT_ENTRIES;
+use crate::bindings::_helpers::planner_phases::constants::IGNORE_AUDIT_FAILURES;
+use crate::bindings::_helpers::planner_phases::constants::IGNORE_FAILURE;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
+use crate::bindings::_helpers::planner_phases::models::PlanOutputContext;
+use crate::bindings::_helpers::planner_phases::models::PlanOutputFields;
+use crate::bindings::_helpers::planner_phases::models::PlanWarningContext;
+use crate::bindings::_helpers::planner_phases::models::PlannedModelEntries;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
-use crate::bindings::_helpers::planner_phases::models::{
-    PlanOutputContext, PlanOutputFields, PlanWarningContext, PlannedModelEntries,
-    StoragePolicyContext,
-};
+use crate::bindings::_helpers::planner_phases::models::StoragePolicyContext;
+use crate::bindings::_helpers::planner_phases::objects::native;
 use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_phases::objects::{
-    native, replace, sorted_names, strings, text, tuple,
-};
-use crate::bindings::_helpers::planner_phases::retention::{plan_retention, plan_table_types};
+use crate::bindings::_helpers::planner_phases::objects::replace;
+use crate::bindings::_helpers::planner_phases::objects::sorted_names;
+use crate::bindings::_helpers::planner_phases::objects::strings;
+use crate::bindings::_helpers::planner_phases::objects::text;
+use crate::bindings::_helpers::planner_phases::objects::tuple;
+use crate::bindings::_helpers::planner_phases::retention::plan_retention;
+use crate::bindings::_helpers::planner_phases::retention::plan_table_types;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::source_freshness::source_freshness_unknown_warnings;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
+use sqlbuild_analysis::planner_scope::constants::MODEL;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
-use sqlbuild_python_base::records::types::RecordId;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
-use sqlbuild_analysis::planner_scope::constants::MODEL;
-use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
 
 fn concat<'py>(py: Python<'py>, parts: &[Bound<'py, PyAny>]) -> PyResult<Bound<'py, PyAny>> {

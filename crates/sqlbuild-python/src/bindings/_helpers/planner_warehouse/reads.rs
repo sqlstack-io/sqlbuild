@@ -8,9 +8,9 @@ use pyo3::types::PyTuple;
 
 use sqlbuild_state::consumption::models::ConsumptionRow;
 
-use sqlbuild_python_front::native_host::types::ConsumptionReads;
 use sqlbuild_python_front::native_host::models::Location;
-use crate::state_rows::models::EventTableLayout;
+use sqlbuild_python_front::native_host::types::ConsumptionReads;
+use sqlbuild_python_front::state_rows::models::EventTableLayout;
 
 /// One warehouse read's answer: what the warehouse holds, or the item a plan reports as unknown.
 pub(crate) enum Read<T> {

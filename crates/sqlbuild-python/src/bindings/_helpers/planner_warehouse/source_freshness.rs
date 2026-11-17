@@ -2,20 +2,18 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::freshness::planning::{
-    build_direct_source_freshness_planning_result, build_direct_source_freshness_propagation_result,
-};
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
-use crate::bindings::_helpers::planner_phases::objects::{native, replace, text, tuple};
+use crate::bindings::_helpers::freshness::planning::build_direct_source_freshness_planning_result;
+use crate::bindings::_helpers::freshness::planning::build_direct_source_freshness_propagation_result;
+use crate::bindings::_helpers::planner_phases::objects::native;
+use crate::bindings::_helpers::planner_phases::objects::replace;
+use crate::bindings::_helpers::planner_phases::objects::text;
+use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_SCOPE;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
-use crate::bindings::_helpers::planner_warehouse::snapshot::{destination_nodes, lower};
+use crate::bindings::_helpers::planner_warehouse::snapshot::destination_nodes;
+use crate::bindings::_helpers::planner_warehouse::snapshot::lower;
 use crate::bindings::_helpers::planner_warehouse::synced_reads::PREVIEW_MESSAGE;
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
@@ -27,6 +25,11 @@ use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 use std::collections::BTreeSet;
 
 /// One warning per reason that left configured source freshness unknown.

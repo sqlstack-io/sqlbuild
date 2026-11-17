@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
 use crate::bindings::_helpers::rules::fact_replay::delta_safe_fact;
-use crate::bindings::tests::helpers::{names, strings};
+use crate::bindings::tests::helpers::names;
+use crate::bindings::tests::helpers::strings;
 use crate::bindings::tests::test_types::DeltaFactTestCase;
 
 #[test]

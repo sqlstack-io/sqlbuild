@@ -1,8 +1,7 @@
 //! Adapt diagnostic display facts while preserving policy and code ordering.
 
-use crate::bindings::_helpers::planner_migrations::column_warnings::{
-    missing_origin_outcome, warning,
-};
+use crate::bindings::_helpers::planner_migrations::column_warnings::missing_origin_outcome;
+use crate::bindings::_helpers::planner_migrations::column_warnings::warning;
 use crate::bindings::_helpers::planner_migrations::constants::HIDDEN_ORIGIN_REMEDY;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyString;

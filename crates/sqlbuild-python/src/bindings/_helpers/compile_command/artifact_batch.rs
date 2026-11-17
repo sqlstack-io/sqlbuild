@@ -7,12 +7,11 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use sqlbuild_host::compile_context::main::add_compile_timing::add_compile_timing;
 use sqlbuild_host::compile_context::main::record_compile_timing::record_compile_timing;
 
-use crate::bindings::_helpers::compile_command::reuse_recording::{
-    ArtifactRecorder, artifact_written, artifact_written_at,
-};
-use crate::bindings::_helpers::compile_outputs::artifacts::{
-    BackgroundArtifactWriter, write_compiled_artifacts,
-};
+use crate::bindings::_helpers::compile_command::reuse_recording::ArtifactRecorder;
+use crate::bindings::_helpers::compile_command::reuse_recording::artifact_written;
+use crate::bindings::_helpers::compile_command::reuse_recording::artifact_written_at;
+use crate::bindings::_helpers::compile_outputs::artifacts::BackgroundArtifactWriter;
+use crate::bindings::_helpers::compile_outputs::artifacts::write_compiled_artifacts;
 
 const PHYSICAL_WRITE_PHASE: &str = "physical_write_ms";
 

@@ -6,9 +6,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::analysis::relation_names::{
-    RelationRow, extract_sql_relation_names,
-};
+use crate::bindings::_helpers::analysis::relation_names::RelationRow;
+use crate::bindings::_helpers::analysis::relation_names::extract_sql_relation_names;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;

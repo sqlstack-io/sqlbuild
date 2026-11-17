@@ -16,21 +16,24 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::bindings::_helpers::compile_command::models::CompileReuseAttempt;
-use crate::bindings::_helpers::compile_command::report::{
-    format_compile_json_with_notice, format_compile_text,
-};
+use crate::bindings::_helpers::compile_command::report::format_compile_json_with_notice;
+use crate::bindings::_helpers::compile_command::report::format_compile_text;
+use crate::bindings::_helpers::compile_command::reuse_recording::CompileArtifactWrites;
+use crate::bindings::_helpers::compile_command::reuse_recording::RecordedCompileOutput;
+use crate::bindings::_helpers::compile_command::reuse_recording::compile_reuse_timings;
+use crate::bindings::_helpers::compile_command::reuse_recording::new_artifact_recorder;
 use crate::bindings::_helpers::compile_command::reuse_recording::write_reusable_compile;
-use crate::bindings::_helpers::compile_command::reuse_recording::{
-    CompileArtifactWrites, RecordedCompileOutput, compile_reuse_timings, new_artifact_recorder,
-};
-use crate::bindings::_helpers::compile_command::target_writer::{
-    remove_failed_compile, write_rule_failed_models,
-};
+use crate::bindings::_helpers::compile_command::target_writer::remove_failed_compile;
+use crate::bindings::_helpers::compile_command::target_writer::write_rule_failed_models;
 use crate::bindings::_helpers::compile_driver::analysis::analyze;
-use crate::bindings::_helpers::compile_driver::phases::{
-    elapsed_ms, manifest_payload, monotonic, resolved_dag_path, sql_test_planning_diagnostics,
-    target_dir, write_artifacts, write_dag_artifact,
-};
+use crate::bindings::_helpers::compile_driver::phases::elapsed_ms;
+use crate::bindings::_helpers::compile_driver::phases::manifest_payload;
+use crate::bindings::_helpers::compile_driver::phases::monotonic;
+use crate::bindings::_helpers::compile_driver::phases::resolved_dag_path;
+use crate::bindings::_helpers::compile_driver::phases::sql_test_planning_diagnostics;
+use crate::bindings::_helpers::compile_driver::phases::target_dir;
+use crate::bindings::_helpers::compile_driver::phases::write_artifacts;
+use crate::bindings::_helpers::compile_driver::phases::write_dag_artifact;
 use crate::bindings::_helpers::rules::results::format_skipped_type_proof_rules;
 use crate::bindings::_helpers::rules::rules_config::rules_config_of;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

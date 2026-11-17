@@ -6,18 +6,19 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::analysis::binding_catalog::{
-    self, CASE_SENSITIVE_BINDING_DIALECTS, NATIVE_DIALECT_ALIASES, schema_validations,
-};
-use crate::bindings::_helpers::analysis::schema_request::{
-    SchemaRequestParts, schema_validation_request,
-};
+use crate::bindings::_helpers::analysis::binding_catalog;
+use crate::bindings::_helpers::analysis::binding_catalog::CASE_SENSITIVE_BINDING_DIALECTS;
+use crate::bindings::_helpers::analysis::binding_catalog::NATIVE_DIALECT_ALIASES;
+use crate::bindings::_helpers::analysis::binding_catalog::schema_validations;
+use crate::bindings::_helpers::analysis::schema_request::SchemaRequestParts;
+use crate::bindings::_helpers::analysis::schema_request::schema_validation_request;
 use crate::bindings::_helpers::analysis_session::stage_functions::infer_native_query_columns;
 use crate::bindings::_helpers::semantic_shapes::constants::SOURCE_REBINDING_ANALYSES;
-use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
-use crate::bindings::_helpers::semantic_shapes::shapes::{
-    model_inputs, project_shapes, published_shape,
-};
+use crate::bindings::_helpers::semantic_shapes::declarations::declared_types;
+use crate::bindings::_helpers::semantic_shapes::declarations::function_names;
+use crate::bindings::_helpers::semantic_shapes::shapes::model_inputs;
+use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
+use crate::bindings::_helpers::semantic_shapes::shapes::published_shape;
 use crate::bindings::models::BindingPositions;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;

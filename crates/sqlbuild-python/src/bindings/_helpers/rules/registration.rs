@@ -1,14 +1,31 @@
 //! Register the native rules, lint and DSL header functions.
 
-use crate::bindings::_helpers::rules::{fix_facts::compile_facts, fix_verdict::fix_verdict};
+use crate::bindings::_helpers::rules::fix_facts::compile_facts;
+use crate::bindings::_helpers::rules::fix_verdict::fix_verdict;
 use pyo3::prelude::{Bound, PyModule, PyResult};
 use pyo3::{types::PyModuleMethods, wrap_pyfunction};
 
-use crate::bindings::_helpers::rules::{
-    catalogue, custom_rule_cache, custom_rule_evidence, dsl_headers, early_sql_lint, evaluation,
-    guidance, lint, lint_expansion, lint_sql_bodies, lint_text, results, rule_api, rule_cache,
-    rule_plan, rule_run, rules_config, run_lint, selection, sql_document, sql_rules,
-};
+use crate::bindings::_helpers::rules::catalogue;
+use crate::bindings::_helpers::rules::custom_rule_cache;
+use crate::bindings::_helpers::rules::custom_rule_evidence;
+use crate::bindings::_helpers::rules::dsl_headers;
+use crate::bindings::_helpers::rules::early_sql_lint;
+use crate::bindings::_helpers::rules::evaluation;
+use crate::bindings::_helpers::rules::guidance;
+use crate::bindings::_helpers::rules::lint;
+use crate::bindings::_helpers::rules::lint_expansion;
+use crate::bindings::_helpers::rules::lint_sql_bodies;
+use crate::bindings::_helpers::rules::lint_text;
+use crate::bindings::_helpers::rules::results;
+use crate::bindings::_helpers::rules::rule_api;
+use crate::bindings::_helpers::rules::rule_cache;
+use crate::bindings::_helpers::rules::rule_plan;
+use crate::bindings::_helpers::rules::rule_run;
+use crate::bindings::_helpers::rules::rules_config;
+use crate::bindings::_helpers::rules::run_lint;
+use crate::bindings::_helpers::rules::selection;
+use crate::bindings::_helpers::rules::sql_document;
+use crate::bindings::_helpers::rules::sql_rules;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     rule_api::register(module)?;

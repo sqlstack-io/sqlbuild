@@ -4,9 +4,9 @@ use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::PyTuple;
 use sqlbuild_host::entries::main::host_entry_labels::host_entry_labels;
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::native_host::live_reads;
 use crate::bindings::_helpers::planner_warehouse::synced_reads::WarehouseAccessRefusedError;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add(

@@ -2,9 +2,9 @@
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::bindings::_helpers::compiled_views::compiled_model_view::{
-    DeclaredRow, LineageInput, NativeCompiledModel,
-};
+use crate::bindings::_helpers::compiled_views::compiled_model_view::DeclaredRow;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::LineageInput;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_python_base::compile_driver::constants::COMPILED_VIEW_FALLBACKS;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;

@@ -8,7 +8,8 @@ use pyo3::FromPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 
-use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, VisibleDeclarations};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::VisibleDeclarations;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::render::types::MacroScopes;
 use sqlbuild_python_front::scopes::models::NativeDeclarationContexts;

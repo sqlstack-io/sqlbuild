@@ -5,7 +5,8 @@ use pyo3::types::{PyDict, PyFloat};
 use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::compile_driver::pipeline::compile_project_phase;
-use crate::bindings::_helpers::graph::project_graph::{CompiledProjectGraph, NativeProjectGraph};
+use crate::bindings::_helpers::graph::project_graph::CompiledProjectGraph;
+use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;

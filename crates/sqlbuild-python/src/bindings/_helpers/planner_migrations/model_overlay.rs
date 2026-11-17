@@ -1,7 +1,8 @@
 //! Project inherited fingerprints and live relation facts before normal planning.
 
+use crate::bindings::_helpers::planner_migrations::column_objects::config;
 use crate::bindings::_helpers::planner_migrations::column_objects::native;
-use crate::bindings::_helpers::planner_migrations::column_objects::{config, replace};
+use crate::bindings::_helpers::planner_migrations::column_objects::replace;
 use crate::bindings::_helpers::planner_migrations::models::MigrationPhase;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};

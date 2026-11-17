@@ -10,21 +10,28 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::analysis::binding_catalog::BindingCatalog;
 use crate::bindings::_helpers::project_assembly::declared_relations::DeclaredShapes;
 
-use crate::bindings::_helpers::analysis_session::profile_inputs::{
-    case_sensitive_shapes, nullability_rules, profile_dialect, return_types, shape_rows,
-};
-use crate::bindings::_helpers::analysis_session::session::{
-    CacheStatsRow, FamilyRow, ModelRow, NativeModelAnalysisSession, RequestRow,
-    start_model_analysis_session,
-};
-use crate::bindings::_helpers::compile_driver::analysis_cache::{
-    AnalysisCacheCounts, record_analysis_cache_metrics,
-};
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    AttachedSchema, NativeModelInput, attached_schema, input_analysis_sql, input_model_name,
-    input_reference_rows, input_sql_macro_checks,
-};
-use crate::bindings::_helpers::semantic_shapes::shapes::{VALID_FROM_DEFAULT, VALID_TO_DEFAULT};
+use crate::bindings::_helpers::analysis_session::profile_inputs::case_sensitive_shapes;
+use crate::bindings::_helpers::analysis_session::profile_inputs::nullability_rules;
+use crate::bindings::_helpers::analysis_session::profile_inputs::profile_dialect;
+use crate::bindings::_helpers::analysis_session::profile_inputs::return_types;
+use crate::bindings::_helpers::analysis_session::profile_inputs::shape_rows;
+use crate::bindings::_helpers::analysis_session::session::CacheStatsRow;
+use crate::bindings::_helpers::analysis_session::session::FamilyRow;
+use crate::bindings::_helpers::analysis_session::session::ModelRow;
+use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
+use crate::bindings::_helpers::analysis_session::session::RequestRow;
+use crate::bindings::_helpers::analysis_session::session::start_model_analysis_session;
+use crate::bindings::_helpers::compile_driver::analysis_cache::AnalysisCacheCounts;
+use crate::bindings::_helpers::compile_driver::analysis_cache::record_analysis_cache_metrics;
+use crate::bindings::_helpers::compiled_views::model_input_view::AttachedSchema;
+use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
+use crate::bindings::_helpers::compiled_views::model_input_view::attached_schema;
+use crate::bindings::_helpers::compiled_views::model_input_view::input_analysis_sql;
+use crate::bindings::_helpers::compiled_views::model_input_view::input_model_name;
+use crate::bindings::_helpers::compiled_views::model_input_view::input_reference_rows;
+use crate::bindings::_helpers::compiled_views::model_input_view::input_sql_macro_checks;
+use crate::bindings::_helpers::semantic_shapes::shapes::VALID_FROM_DEFAULT;
+use crate::bindings::_helpers::semantic_shapes::shapes::VALID_TO_DEFAULT;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::cache::main::content_digest::content_digest;

@@ -20,7 +20,9 @@ use sqlbuild_rules::project_tree::main::resolve_project_path::resolve_project_pa
 use sqlbuild_rules::project_tree::main::tracked_text_suffixes::tracked_text_suffixes;
 use sqlbuild_rules::project_tree::models::ProjectTreeEntry;
 
-use crate::bindings::_helpers::rules::fact_encoder::{Encoded, FactEncoder, FactFailure};
+use crate::bindings::_helpers::rules::fact_encoder::Encoded;
+use crate::bindings::_helpers::rules::fact_encoder::FactEncoder;
+use crate::bindings::_helpers::rules::fact_encoder::FactFailure;
 
 /// The qualified name of the `ProjectPath` record class.
 const PROJECT_PATH_RECORD: &str = "sqlbuild._native.ProjectPath";

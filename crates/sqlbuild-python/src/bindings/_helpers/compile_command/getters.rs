@@ -5,9 +5,8 @@ use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 use crate::bindings::_helpers::compile_command::models::CompileReuseAttempt;
 use crate::bindings::_helpers::compile_command::prepared_artifacts::PreparedCompileArtifacts;
-use crate::bindings::_helpers::compile_command::reuse_recording::{
-    CompileArtifactWrites, RecordedCompileOutput,
-};
+use crate::bindings::_helpers::compile_command::reuse_recording::CompileArtifactWrites;
+use crate::bindings::_helpers::compile_command::reuse_recording::RecordedCompileOutput;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 

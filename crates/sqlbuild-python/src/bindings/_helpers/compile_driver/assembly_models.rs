@@ -11,16 +11,16 @@ use crate::bindings::_helpers::analysis_session::model_analyses::ModelAnalyses;
 use crate::bindings::_helpers::analysis_session::profile_inputs::profile_dialect;
 use crate::bindings::_helpers::analysis_session::query_columns::ColumnsRow;
 use crate::bindings::_helpers::analysis_session::stage_functions::query_column_rows;
-use crate::bindings::_helpers::compile_driver::assembly_analysis::{
-    AnalysisContext, model_stem, selected_for_analysis,
-};
+use crate::bindings::_helpers::compile_driver::assembly_analysis::AnalysisContext;
+use crate::bindings::_helpers::compile_driver::assembly_analysis::model_stem;
+use crate::bindings::_helpers::compile_driver::assembly_analysis::selected_for_analysis;
 use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
 use crate::bindings::_helpers::compiled_views::model_input_view::input_analysis_sql;
 use crate::bindings::_helpers::hand_built::compiled_model::compiled_model as hand_built_model;
 use crate::bindings::_helpers::project_assembly::syntax_checks::model_placeholders;
-use crate::bindings::_helpers::project_assembly::syntax_validation::{
-    ParseOptions, validate_hook_sql_syntax, validate_sql_syntax,
-};
+use crate::bindings::_helpers::project_assembly::syntax_validation::ParseOptions;
+use crate::bindings::_helpers::project_assembly::syntax_validation::validate_hook_sql_syntax;
+use crate::bindings::_helpers::project_assembly::syntax_validation::validate_sql_syntax;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

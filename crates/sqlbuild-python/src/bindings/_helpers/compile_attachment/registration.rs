@@ -3,9 +3,12 @@
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
 
-use crate::bindings::_helpers::compile_attachment::{
-    cursor_roles, declaration_scope, model_config, model_inputs, sql_expansion_context, target,
-};
+use crate::bindings::_helpers::compile_attachment::cursor_roles;
+use crate::bindings::_helpers::compile_attachment::declaration_scope;
+use crate::bindings::_helpers::compile_attachment::model_config;
+use crate::bindings::_helpers::compile_attachment::model_inputs;
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context;
+use crate::bindings::_helpers::compile_attachment::target;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config_function::build_effective_connection_config_function;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_function::build_effective_connection_function;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config_function::build_effective_runtime_config_function;

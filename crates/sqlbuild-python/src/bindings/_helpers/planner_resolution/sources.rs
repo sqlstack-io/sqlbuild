@@ -1,12 +1,10 @@
 //! Source contract validation and adapter-controlled projection rendering.
 
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;
-use crate::bindings::_helpers::planner_resolution::values::{
-    cursor_wrap, filtering_of, method, string,
-};
+use crate::bindings::_helpers::planner_resolution::values::cursor_wrap;
+use crate::bindings::_helpers::planner_resolution::values::filtering_of;
+use crate::bindings::_helpers::planner_resolution::values::method;
+use crate::bindings::_helpers::planner_resolution::values::string;
 use crate::bindings::_helpers::planner_strategy::values::input_error;
 use crate::bindings::_helpers::references::source_relations::render_source_read;
 use pyo3::IntoPyObject;
@@ -16,6 +14,8 @@ use pyo3::prelude::{
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;

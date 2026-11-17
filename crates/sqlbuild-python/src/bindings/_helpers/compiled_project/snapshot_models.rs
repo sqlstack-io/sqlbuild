@@ -14,9 +14,9 @@ use sqlbuild_analysis::sql_macros::main::typed_analysis_sql::typed_analysis_sql;
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_project::snapshot::{
-    dependency_keys, destination, insert_node,
-};
+use crate::bindings::_helpers::compiled_project::snapshot::dependency_keys;
+use crate::bindings::_helpers::compiled_project::snapshot::destination;
+use crate::bindings::_helpers::compiled_project::snapshot::insert_node;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;

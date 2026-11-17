@@ -9,13 +9,15 @@ use pyo3::{pyclass, pymethods};
 use sqlbuild_core::integration_results::errors::IntegrationRecordError;
 use sqlbuild_core::terminal_events::models::TerminalRequest;
 
-use crate::bindings::_helpers::result_output::integration_records::{
-    clone_record, degraded_record, degraded_warning, execution_succeeded, integration_record,
-};
+use crate::bindings::_helpers::result_output::integration_records::clone_record;
+use crate::bindings::_helpers::result_output::integration_records::degraded_record;
+use crate::bindings::_helpers::result_output::integration_records::degraded_warning;
+use crate::bindings::_helpers::result_output::integration_records::execution_succeeded;
+use crate::bindings::_helpers::result_output::integration_records::integration_record;
 use crate::bindings::_helpers::result_output::projection::resource_identity;
-use crate::bindings::_helpers::result_output::terminal_index::{
-    TerminalEventClaim, TerminalEventIndex, current_index_object,
-};
+use crate::bindings::_helpers::result_output::terminal_index::TerminalEventClaim;
+use crate::bindings::_helpers::result_output::terminal_index::TerminalEventIndex;
+use crate::bindings::_helpers::result_output::terminal_index::current_index_object;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::result_output::types::Checked;

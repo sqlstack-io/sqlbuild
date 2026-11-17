@@ -2,13 +2,14 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
-use crate::bindings::_helpers::planner_migrations::column_objects::{
-    config, definition_hash, lower, native, replace,
-};
+use crate::bindings::_helpers::planner_migrations::column_objects::config;
+use crate::bindings::_helpers::planner_migrations::column_objects::definition_hash;
+use crate::bindings::_helpers::planner_migrations::column_objects::lower;
+use crate::bindings::_helpers::planner_migrations::column_objects::native;
+use crate::bindings::_helpers::planner_migrations::column_objects::replace;
 use crate::bindings::_helpers::planner_migrations::models::ColumnCandidate;
-use crate::bindings::_helpers::planner_migrations::models::{
-    ColumnMigrationInputs, MigrationPhase,
-};
+use crate::bindings::_helpers::planner_migrations::models::ColumnMigrationInputs;
+use crate::bindings::_helpers::planner_migrations::models::MigrationPhase;
 use crate::bindings::_helpers::planner_migrations::projections::renames_explain_change;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;

@@ -2,9 +2,10 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::build_progress::{
-    audit_progress, build_callbacks, footer, nested_progress,
-};
+use crate::bindings::_helpers::build_progress::audit_progress;
+use crate::bindings::_helpers::build_progress::build_callbacks;
+use crate::bindings::_helpers::build_progress::footer;
+use crate::bindings::_helpers::build_progress::nested_progress;
 use sqlbuild_python_base::build_progress::main::terminal::register_terminal::register_terminal;
 use sqlbuild_python_base::build_progress::main::transient_lines::register_transient_lines::register_transient_lines;
 use sqlbuild_python_base::build_progress::main::transient_status::register_transient_status::register_transient_status;

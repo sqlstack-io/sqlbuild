@@ -13,13 +13,16 @@ use sqlbuild_analysis::sql_macros::main::typed_analysis_sql::typed_analysis_sql;
 use sqlbuild_analysis::sql_macros::models::SqlMacroCheck;
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_project::rows::{ReferenceTuple, reference_row_tuple};
+use crate::bindings::_helpers::compiled_project::rows::ReferenceTuple;
+use crate::bindings::_helpers::compiled_project::rows::reference_row_tuple;
 use crate::bindings::_helpers::compiled_project::schema_facts::python_column_facts;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::{
-    CompiledArguments, CompiledViewClasses, NativeCompiledModel, compiled_record,
-};
+use crate::bindings::_helpers::compiled_views::compiled_model_view::CompiledArguments;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::CompiledViewClasses;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::compiled_record;
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
-use crate::bindings::_helpers::compiled_views::relation_keys::{RelationKeyRow, relation_key_row};
+use crate::bindings::_helpers::compiled_views::relation_keys::RelationKeyRow;
+use crate::bindings::_helpers::compiled_views::relation_keys::relation_key_row;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

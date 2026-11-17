@@ -9,9 +9,8 @@ use sqlbuild_cache::digest::main::digest_files::digest_files;
 use sqlbuild_cache::digest::main::hex_digest::hex_digest;
 use sqlbuild_cache::project_reuse::constants::NATIVE_DIGEST_PREFIX;
 
-use crate::bindings::_helpers::compile_command::reuse_recording::{
-    CompileArtifactWrites, RecordedCompileOutput,
-};
+use crate::bindings::_helpers::compile_command::reuse_recording::CompileArtifactWrites;
+use crate::bindings::_helpers::compile_command::reuse_recording::RecordedCompileOutput;
 
 /// The exit code of a compile whose delta differed from its full compile.
 pub(crate) const MISMATCH_EXIT_CODE: i64 = 70;

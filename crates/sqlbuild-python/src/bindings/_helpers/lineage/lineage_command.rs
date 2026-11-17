@@ -33,17 +33,18 @@ use sqlbuild_core::cli_text::models::CliStyle;
 
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
-use crate::bindings::_helpers::lineage::lineage_cache::{
-    lineage_fingerprint, read_lineage_cache, write_lineage_cache,
-};
-use crate::bindings::_helpers::lineage::lineage_index::{graph_index, index_views, lineage_keys};
+use crate::bindings::_helpers::lineage::lineage_cache::lineage_fingerprint;
+use crate::bindings::_helpers::lineage::lineage_cache::read_lineage_cache;
+use crate::bindings::_helpers::lineage::lineage_cache::write_lineage_cache;
+use crate::bindings::_helpers::lineage::lineage_index::graph_index;
+use crate::bindings::_helpers::lineage::lineage_index::index_views;
+use crate::bindings::_helpers::lineage::lineage_index::lineage_keys;
 use crate::bindings::_helpers::lineage::project_lineage::build_direct_semantic_uses;
+use crate::bindings::_helpers::planner_selection::selectors::match_project_selector;
+use crate::bindings::_helpers::planner_selection::selectors::parse_project_selector;
 use crate::bindings::_helpers::planner_selection::selectors::resolve_project_selector_tokens;
 use crate::bindings::_helpers::planner_selection::selectors::resolve_project_selectors;
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
-use crate::bindings::_helpers::planner_selection::selectors::{
-    match_project_selector, parse_project_selector,
-};
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use sqlbuild_python_base::build_progress::main::transient_status::maybe_status::maybe_status;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;

@@ -3,14 +3,16 @@
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::planner_migrations::column_objects::{lower, model, replace, text};
+use crate::bindings::_helpers::planner_migrations::column_objects::lower;
+use crate::bindings::_helpers::planner_migrations::column_objects::model;
+use crate::bindings::_helpers::planner_migrations::column_objects::replace;
+use crate::bindings::_helpers::planner_migrations::column_objects::text;
 use crate::bindings::_helpers::planner_migrations::compatibility::check_migration_compatibility;
-use crate::bindings::_helpers::planner_migrations::model_handover::{
-    applies, empty_version, handover,
-};
-use crate::bindings::_helpers::planner_migrations::models::{
-    CompatibilityCheck, MigrationDecisionRequest,
-};
+use crate::bindings::_helpers::planner_migrations::model_handover::applies;
+use crate::bindings::_helpers::planner_migrations::model_handover::empty_version;
+use crate::bindings::_helpers::planner_migrations::model_handover::handover;
+use crate::bindings::_helpers::planner_migrations::models::CompatibilityCheck;
+use crate::bindings::_helpers::planner_migrations::models::MigrationDecisionRequest;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyBool;
 use sqlbuild_analysis::planner_migrations::main::model_decision::model_decision;

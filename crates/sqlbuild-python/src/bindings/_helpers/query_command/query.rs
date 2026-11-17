@@ -15,13 +15,16 @@ use sqlbuild_core::query_command::models::QueryDisplay;
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::query_command::project::{
-    ProjectAdapter, ProjectInputs, project_adapter,
-};
-use crate::bindings::_helpers::query_command::query_values::{
-    decimal_instance, display_text, json_cell, python_json_rows, strict_width,
-};
-use crate::bindings::_helpers::query_command::text_output::{LONG_FORMAT, render_text};
+use crate::bindings::_helpers::query_command::project::ProjectAdapter;
+use crate::bindings::_helpers::query_command::project::ProjectInputs;
+use crate::bindings::_helpers::query_command::project::project_adapter;
+use crate::bindings::_helpers::query_command::query_values::decimal_instance;
+use crate::bindings::_helpers::query_command::query_values::display_text;
+use crate::bindings::_helpers::query_command::query_values::json_cell;
+use crate::bindings::_helpers::query_command::query_values::python_json_rows;
+use crate::bindings::_helpers::query_command::query_values::strict_width;
+use crate::bindings::_helpers::query_command::text_output::LONG_FORMAT;
+use crate::bindings::_helpers::query_command::text_output::render_text;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

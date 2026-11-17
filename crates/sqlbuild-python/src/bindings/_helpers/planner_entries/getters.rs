@@ -3,9 +3,9 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::planner_entries::models::{
-    ModelPlanContext, PlanEntryBuildInputs, PlannerRelationsContext,
-};
+use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
+use crate::bindings::_helpers::planner_entries::models::PlanEntryBuildInputs;
+use crate::bindings::_helpers::planner_entries::models::PlannerRelationsContext;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 

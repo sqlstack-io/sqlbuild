@@ -1,9 +1,8 @@
 //! Fingerprint cache callbacks around native one-to-one migration matching.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::planner_migrations::models::{
-    FingerprintInputs, ModelMigrationRequest,
-};
+use crate::bindings::_helpers::planner_migrations::models::FingerprintInputs;
+use crate::bindings::_helpers::planner_migrations::models::ModelMigrationRequest;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};

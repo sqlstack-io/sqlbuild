@@ -6,7 +6,8 @@ use sqlbuild_core::build_progress::main::format_build_footer::format_build_foote
 use sqlbuild_core::build_progress::models::{BuildResultText, PythonNodeText};
 use sqlbuild_core::cli_text::models::CliStyle;
 
-use crate::bindings::_helpers::build_progress::result_text::{build_text, python_node_text};
+use crate::bindings::_helpers::build_progress::result_text::build_text;
+use crate::bindings::_helpers::build_progress::result_text::python_node_text;
 
 /// Render the build completion line, warnings, failures and skipped rollup.
 #[pyfunction]

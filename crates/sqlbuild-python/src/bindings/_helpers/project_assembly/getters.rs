@@ -3,9 +3,10 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::project_assembly::models::{
-    NativeModelFacts, NativeProjectFacts, NativeProjectResources, NativeResourceFailure,
-};
+use crate::bindings::_helpers::project_assembly::models::NativeModelFacts;
+use crate::bindings::_helpers::project_assembly::models::NativeProjectFacts;
+use crate::bindings::_helpers::project_assembly::models::NativeProjectResources;
+use crate::bindings::_helpers::project_assembly::models::NativeResourceFailure;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 

@@ -12,7 +12,8 @@ use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use sqlbuild_orchestration::worker::models::{WorkerClient, WorkerSession};
 use uuid::Uuid;
 
-use crate::bindings::_helpers::compiled_project::constants::{REPORT_ATTEMPTS, STORE_BUSY_STATUS};
+use crate::bindings::_helpers::compiled_project::constants::REPORT_ATTEMPTS;
+use crate::bindings::_helpers::compiled_project::constants::STORE_BUSY_STATUS;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 
 struct WorkerOwner {

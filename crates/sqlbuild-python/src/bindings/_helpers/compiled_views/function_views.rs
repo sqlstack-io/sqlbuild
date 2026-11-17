@@ -11,12 +11,12 @@ use sqlbuild_project::models as project_models;
 use sqlbuild_project::types::{NamedTypeRow, ObjectKeyRow};
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::{
-    defaulted_destination, object_key, relation_location,
-};
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    InputViewClasses, reference_tuple, view_classes,
-};
+use crate::bindings::_helpers::compiled_views::compiled_model_view::defaulted_destination;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::object_key;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::relation_location;
+use crate::bindings::_helpers::compiled_views::model_input_view::InputViewClasses;
+use crate::bindings::_helpers::compiled_views::model_input_view::reference_tuple;
+use crate::bindings::_helpers::compiled_views::model_input_view::view_classes;
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;
 use sqlbuild_project::models::DestinationFact;

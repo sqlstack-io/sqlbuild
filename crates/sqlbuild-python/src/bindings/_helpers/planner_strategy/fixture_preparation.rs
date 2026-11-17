@@ -1,13 +1,14 @@
 //! Inference and schema preparation at the fixture Python boundary.
 
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_fixtures::main::empty_fixture_marker::empty_fixture_marker;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::bindings::_helpers::planner_strategy::fixture_sql::complete_empty_fixture_sql;
-use crate::bindings::_helpers::planner_strategy::fixture_values::{diagnostic, label};
+use crate::bindings::_helpers::planner_strategy::fixture_values::diagnostic;
+use crate::bindings::_helpers::planner_strategy::fixture_values::label;
 use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
 use sqlbuild_python_base::boundary::main::value_error::value_error;

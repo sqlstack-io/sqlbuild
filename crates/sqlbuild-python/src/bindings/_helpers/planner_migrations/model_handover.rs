@@ -2,7 +2,8 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::fingerprints::query_hashes::compute_query_hash;
-use crate::bindings::_helpers::planner_migrations::column_objects::{replace, text};
+use crate::bindings::_helpers::planner_migrations::column_objects::replace;
+use crate::bindings::_helpers::planner_migrations::column_objects::text;
 use crate::bindings::_helpers::planner_migrations::constants::MIGRATION_MODEL_NAME_METADATA_KEY;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};

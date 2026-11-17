@@ -5,11 +5,13 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 
 use crate::bindings::_helpers::analysis_session::profile_inputs::dialect_or_generic;
-use crate::bindings::_helpers::analysis_session::session::{
-    FamilyRow, NativeModelAnalysisSession, PivotRequestRow, prove_dynamic_column_contracts,
-};
+use crate::bindings::_helpers::analysis_session::session::FamilyRow;
+use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
+use crate::bindings::_helpers::analysis_session::session::PivotRequestRow;
+use crate::bindings::_helpers::analysis_session::session::prove_dynamic_column_contracts;
 use crate::bindings::_helpers::compile_driver::assembly_analysis::AnalysisContext;
-use crate::bindings::_helpers::project_assembly::models::{NativeModelFacts, NativeProjectFacts};
+use crate::bindings::_helpers::project_assembly::models::NativeModelFacts;
+use crate::bindings::_helpers::project_assembly::models::NativeProjectFacts;
 use crate::bindings::_helpers::project_assembly::native_resources::assemble_native_project_resources;
 use crate::bindings::_helpers::project_assembly::syntax_checks::model_syntax_checks;
 use crate::bindings::_helpers::project_assembly::syntax_checks::standalone_pivot_rows;

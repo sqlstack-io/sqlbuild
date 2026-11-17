@@ -2,12 +2,14 @@
 
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 
-use crate::bindings::_helpers::project_assembly::models::{
-    NativeModelFacts, NativeProjectFacts, NativeProjectResources, NativeResourceFailure,
-};
-use crate::bindings::_helpers::project_assembly::{
-    native_resources, resources, syntax_checks, syntax_validation,
-};
+use crate::bindings::_helpers::project_assembly::models::NativeModelFacts;
+use crate::bindings::_helpers::project_assembly::models::NativeProjectFacts;
+use crate::bindings::_helpers::project_assembly::models::NativeProjectResources;
+use crate::bindings::_helpers::project_assembly::models::NativeResourceFailure;
+use crate::bindings::_helpers::project_assembly::native_resources;
+use crate::bindings::_helpers::project_assembly::resources;
+use crate::bindings::_helpers::project_assembly::syntax_checks;
+use crate::bindings::_helpers::project_assembly::syntax_validation;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<NativeProjectResources>()?;

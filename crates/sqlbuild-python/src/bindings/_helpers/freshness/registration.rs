@@ -2,9 +2,12 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::freshness::{
-    exception_types, freshness_observe, observation, planning, publication, state_io,
-};
+use crate::bindings::_helpers::freshness::exception_types;
+use crate::bindings::_helpers::freshness::freshness_observe;
+use crate::bindings::_helpers::freshness::observation;
+use crate::bindings::_helpers::freshness::planning;
+use crate::bindings::_helpers::freshness::publication;
+use crate::bindings::_helpers::freshness::state_io;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     exception_types::register(module)?;

@@ -2,9 +2,12 @@
 
 use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::graph::views::edge_dict;
-use crate::bindings::_helpers::planner_scope::values::{
-    dependency_names, edges, keys, loader_graph, loader_names, project_graph,
-};
+use crate::bindings::_helpers::planner_scope::values::dependency_names;
+use crate::bindings::_helpers::planner_scope::values::edges;
+use crate::bindings::_helpers::planner_scope::values::keys;
+use crate::bindings::_helpers::planner_scope::values::loader_graph;
+use crate::bindings::_helpers::planner_scope::values::loader_names;
+use crate::bindings::_helpers::planner_scope::values::project_graph;
 use pyo3::prelude::{Bound, IntoPyObject, PyAny, PyAnyMethods, PyResult, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;

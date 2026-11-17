@@ -18,21 +18,22 @@ use sqlbuild_attachments::cursor_intrinsics::models::IntrinsicCheck;
 use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_references;
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 
-use crate::bindings::_helpers::input_loops::model_loop::{
-    LoopContext, NativeModelLoop, VisibleDeclarations, compile_error, record_reads,
-    validation_outcome,
-};
-use crate::bindings::_helpers::input_loops::model_loop_calls::{CallOrigin, report_invalid_calls};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
+use crate::bindings::_helpers::input_loops::model_loop::VisibleDeclarations;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
+use crate::bindings::_helpers::input_loops::model_loop::record_reads;
+use crate::bindings::_helpers::input_loops::model_loop::validation_outcome;
+use crate::bindings::_helpers::input_loops::model_loop_calls::CallOrigin;
+use crate::bindings::_helpers::input_loops::model_loop_calls::report_invalid_calls;
 use crate::bindings::_helpers::input_loops::model_loop_external::external_errors;
-use crate::bindings::_helpers::input_loops::model_loop_inputs::{
-    HOOK_KEYS, present, reference_row,
-};
-use crate::bindings::_helpers::input_loops::model_loop_macros::{
-    argument_references, expanded_with,
-};
-use crate::bindings::_helpers::input_loops::model_loop_named::{
-    SQL_HOOK_DECLARATION, named_usages,
-};
+use crate::bindings::_helpers::input_loops::model_loop_inputs::HOOK_KEYS;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_row;
+use crate::bindings::_helpers::input_loops::model_loop_macros::argument_references;
+use crate::bindings::_helpers::input_loops::model_loop_macros::expanded_with;
+use crate::bindings::_helpers::input_loops::model_loop_named::SQL_HOOK_DECLARATION;
+use crate::bindings::_helpers::input_loops::model_loop_named::named_usages;
 use crate::bindings::_helpers::input_loops::model_loop_visibility::ModelVisibility;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

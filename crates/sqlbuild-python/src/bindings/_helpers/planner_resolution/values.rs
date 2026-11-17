@@ -1,15 +1,15 @@
 //! Boundary calls shared by reference and source resolution.
 
-use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyString;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
 use sqlbuild_sqltext::resolution::main::cursor_subquery::cursor_subquery;
 use sqlbuild_sqltext::resolution::models::CursorFilter;
 

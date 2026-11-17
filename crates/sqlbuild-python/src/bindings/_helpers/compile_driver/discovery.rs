@@ -6,17 +6,15 @@ use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::compile_driver::config_validation::ProjectConfiguration;
-use crate::bindings::_helpers::compile_driver::config_validation::reject_invalid_project_configuration;
-use sqlbuild_python_base::compile_driver::constants::PROJECT_DISCOVERIES;
-use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
-use crate::bindings::_helpers::compile_driver::integration_loaders::integration_loader_functions;
-use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, produced};
+use crate::bindings::_helpers::frontier::compile_frontier::FrontierStage;
+use crate::bindings::_helpers::frontier::compile_frontier::produced;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::compile_driver::constants::PROJECT_DISCOVERIES;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::event_exporting::main::configure_discovered_event_exporters::configure_discovered_event_exporters;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

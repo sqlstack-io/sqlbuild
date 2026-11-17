@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use crate::bindings::tests::helpers::{cache_key_under, project_reading_environment};
+use crate::bindings::tests::helpers::cache_key_under;
+use crate::bindings::tests::helpers::project_reading_environment;
 use crate::bindings::tests::test_types::CacheKeyTestCase;
 
 const BASE_ENVIRONMENT: [(&str, &str); 2] = [("ORDERS_REGION", "eu"), ("UNREAD_SETTING", "a")];

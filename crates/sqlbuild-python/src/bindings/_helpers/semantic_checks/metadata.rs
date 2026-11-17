@@ -16,9 +16,9 @@ use sqlbuild_model_config::header_metadata::constants::ACCEPTED_VALUES_ARGUMENT;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_reads::binding_validated;
 use crate::bindings::_helpers::semantic_checks::failures::semantic_error;
-use crate::bindings::_helpers::semantic_checks::inputs::{
-    column_names, resource_sql_diagnostics, sql_test_columns,
-};
+use crate::bindings::_helpers::semantic_checks::inputs::column_names;
+use crate::bindings::_helpers::semantic_checks::inputs::resource_sql_diagnostics;
+use crate::bindings::_helpers::semantic_checks::inputs::sql_test_columns;
 use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
 use crate::bindings::_helpers::semantic_checks::type_recovery::items;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;

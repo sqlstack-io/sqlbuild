@@ -18,16 +18,17 @@ use sqlbuild_model_config::model_validation::models::ColumnMigration;
 use sqlbuild_model_config::types::NodeKind;
 
 use crate::bindings::_helpers::compiled_project::schema_facts::family_fact;
-use crate::bindings::_helpers::input_loops::model_loop::{
-    LoopContext, compile_error, config_error,
-};
-use crate::bindings::_helpers::input_loops::model_loop_contracts::{
-    EnumColumns, enum_columns, factory_audits,
-};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
+use crate::bindings::_helpers::input_loops::model_loop::config_error;
+use crate::bindings::_helpers::input_loops::model_loop_contracts::EnumColumns;
+use crate::bindings::_helpers::input_loops::model_loop_contracts::enum_columns;
+use crate::bindings::_helpers::input_loops::model_loop_contracts::factory_audits;
 use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
-use crate::bindings::_helpers::input_loops::model_loop_schema::{
-    DeclaredColumns, ModelSchema, merged_columns, schema_enums,
-};
+use crate::bindings::_helpers::input_loops::model_loop_schema::DeclaredColumns;
+use crate::bindings::_helpers::input_loops::model_loop_schema::ModelSchema;
+use crate::bindings::_helpers::input_loops::model_loop_schema::merged_columns;
+use crate::bindings::_helpers::input_loops::model_loop_schema::schema_enums;
 use sqlbuild_discovery::model_files::models::{HeaderFacts, NativeColumn};
 use sqlbuild_python_base::compile_driver::constants::NATIVE_HEADER_COLUMNS;
 use sqlbuild_python_base::compile_driver::constants::PARSED_HEADER_COLUMNS;

@@ -26,9 +26,10 @@ use crate::bindings::_helpers::compiled_project::attachment_inputs::TestBlockRow
 use crate::bindings::_helpers::compiled_project::attachment_inputs::TestCaseRow;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::TestFileRow;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::input_loops::resource_attachment::{
-    attach_audits, attach_functions, attach_sources, attach_sql_tests,
-};
+use crate::bindings::_helpers::input_loops::resource_attachment::attach_audits;
+use crate::bindings::_helpers::input_loops::resource_attachment::attach_functions;
+use crate::bindings::_helpers::input_loops::resource_attachment::attach_sources;
+use crate::bindings::_helpers::input_loops::resource_attachment::attach_sql_tests;
 use crate::bindings::_helpers::input_loops::resource_diagnostics::resource_diagnostics;
 use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_CTE_SCAN_ALGORITHM;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

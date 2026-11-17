@@ -1,20 +1,18 @@
 //! The static command context of audit, check, seed and test commands: scope and relations.
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::native_host::models::Dialect;
 
-use crate::bindings::_helpers::compile_driver::deferral::{
-    build_deferred_locations, resolve_deferred_target_config,
-};
+use crate::bindings::_helpers::compile_driver::deferral::build_deferred_locations;
+use crate::bindings::_helpers::compile_driver::deferral::resolve_deferred_target_config;
 use crate::bindings::_helpers::compile_driver::pipeline::compile_project_phase;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_project_graph_from_compiled_project;
 use crate::bindings::_helpers::compile_driver::selection_phases::unit_test_selectors_applied;
 use crate::bindings::_helpers::graph::python_node_graph::run_selection_from_inputs;
-use crate::bindings::_helpers::planner_entries::command_plans::{
-    resolve_static_command_scope, resolve_static_relation_context,
-};
+use crate::bindings::_helpers::planner_entries::command_plans::resolve_static_command_scope;
+use crate::bindings::_helpers::planner_entries::command_plans::resolve_static_relation_context;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

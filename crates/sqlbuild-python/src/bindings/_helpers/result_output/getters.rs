@@ -3,9 +3,9 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::result_output::integration_envelope::{
-    IntegrationAssetResult, IntegrationCheckResult, IntegrationResultEnvelope,
-};
+use crate::bindings::_helpers::result_output::integration_envelope::IntegrationAssetResult;
+use crate::bindings::_helpers::result_output::integration_envelope::IntegrationCheckResult;
+use crate::bindings::_helpers::result_output::integration_envelope::IntegrationResultEnvelope;
 use crate::bindings::_helpers::result_output::terminal_index::TerminalEventClaim;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;

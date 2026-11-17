@@ -14,12 +14,10 @@ use sqlbuild_analysis::fingerprint_storage::models::RelevantRead;
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::fingerprints::latest_rows::{
-    fingerprint_input_error, fingerprint_set_from_rows,
-};
-use crate::bindings::_helpers::fingerprints::storage_sql::{
-    fingerprint_insert_batches, fingerprint_insert_sql,
-};
+use crate::bindings::_helpers::fingerprints::latest_rows::fingerprint_input_error;
+use crate::bindings::_helpers::fingerprints::latest_rows::fingerprint_set_from_rows;
+use crate::bindings::_helpers::fingerprints::storage_sql::fingerprint_insert_batches;
+use crate::bindings::_helpers::fingerprints::storage_sql::fingerprint_insert_sql;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 

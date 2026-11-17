@@ -22,15 +22,16 @@ use sqlbuild_analysis::definition_changes::models::{
 };
 
 use crate::bindings::_helpers::change_selection::base_snapshot::BaseComparison;
-use crate::bindings::_helpers::change_selection::definition_snapshot::{
-    declaration_uses, definition_snapshot, project_wide_keys,
-};
+use crate::bindings::_helpers::change_selection::definition_snapshot::declaration_uses;
+use crate::bindings::_helpers::change_selection::definition_snapshot::definition_snapshot;
+use crate::bindings::_helpers::change_selection::definition_snapshot::project_wide_keys;
 use crate::bindings::_helpers::change_selection::environment_nodes::with_current_dependencies;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_scenario::graph::plan_scenario_graph;
-use crate::bindings::_helpers::scenario_command::setup::{flush, write};
+use crate::bindings::_helpers::scenario_command::setup::flush;
+use crate::bindings::_helpers::scenario_command::setup::write;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MACRO_TEST_MODE: &str = "macro";

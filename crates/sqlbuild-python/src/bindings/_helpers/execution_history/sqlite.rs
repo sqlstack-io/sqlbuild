@@ -41,15 +41,32 @@ use sqlbuild_state::execution_history::models::{
 use sqlbuild_state::execution_history::types::UtcTime;
 
 use crate::bindings::_helpers::execution_history::appends::prepared_batch;
-use crate::bindings::_helpers::execution_history::conversion::{
-    checked, event_filter_spec, exact_int, history_error_of_kind, new_namespace, now,
-    optional_text, parsed_iso, parsed_status, projection_facts, python_params, rejection,
-    run_filter_spec, run_records, run_rows, storage_error, storage_error_from, stored_event,
-    text_of, utc_time,
-};
-use crate::bindings::_helpers::execution_history::statements::{
-    column, execute, execute_plain, execute_query, fetch_one, tuple_of,
-};
+use crate::bindings::_helpers::execution_history::conversion::checked;
+use crate::bindings::_helpers::execution_history::conversion::event_filter_spec;
+use crate::bindings::_helpers::execution_history::conversion::exact_int;
+use crate::bindings::_helpers::execution_history::conversion::history_error_of_kind;
+use crate::bindings::_helpers::execution_history::conversion::new_namespace;
+use crate::bindings::_helpers::execution_history::conversion::now;
+use crate::bindings::_helpers::execution_history::conversion::optional_text;
+use crate::bindings::_helpers::execution_history::conversion::parsed_iso;
+use crate::bindings::_helpers::execution_history::conversion::parsed_status;
+use crate::bindings::_helpers::execution_history::conversion::projection_facts;
+use crate::bindings::_helpers::execution_history::conversion::python_params;
+use crate::bindings::_helpers::execution_history::conversion::rejection;
+use crate::bindings::_helpers::execution_history::conversion::run_filter_spec;
+use crate::bindings::_helpers::execution_history::conversion::run_records;
+use crate::bindings::_helpers::execution_history::conversion::run_rows;
+use crate::bindings::_helpers::execution_history::conversion::storage_error;
+use crate::bindings::_helpers::execution_history::conversion::storage_error_from;
+use crate::bindings::_helpers::execution_history::conversion::stored_event;
+use crate::bindings::_helpers::execution_history::conversion::text_of;
+use crate::bindings::_helpers::execution_history::conversion::utc_time;
+use crate::bindings::_helpers::execution_history::statements::column;
+use crate::bindings::_helpers::execution_history::statements::execute;
+use crate::bindings::_helpers::execution_history::statements::execute_plain;
+use crate::bindings::_helpers::execution_history::statements::execute_query;
+use crate::bindings::_helpers::execution_history::statements::fetch_one;
+use crate::bindings::_helpers::execution_history::statements::tuple_of;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_threads::models::ReentrantLock;

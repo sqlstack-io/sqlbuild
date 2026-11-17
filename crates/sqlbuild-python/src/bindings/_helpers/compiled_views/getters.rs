@@ -3,20 +3,18 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::compiled_views::audit_views::{
-    NativeAuditInput, NativeCompiledAudit,
-};
+use crate::bindings::_helpers::compiled_views::audit_views::NativeAuditInput;
+use crate::bindings::_helpers::compiled_views::audit_views::NativeCompiledAudit;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::compiled_views::function_views::{
-    NativeCompiledFunction, NativeFunctionInput,
-};
+use crate::bindings::_helpers::compiled_views::function_views::NativeCompiledFunction;
+use crate::bindings::_helpers::compiled_views::function_views::NativeFunctionInput;
 use crate::bindings::_helpers::compiled_views::inputs_view::NativeInputsView;
 use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::compiled_views::seed_views::{NativeCompiledSeed, NativeSeedInput};
-use crate::bindings::_helpers::compiled_views::source_views::{
-    NativeCompiledSource, NativeSourceInput,
-};
+use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
+use crate::bindings::_helpers::compiled_views::seed_views::NativeSeedInput;
+use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;
+use crate::bindings::_helpers::compiled_views::source_views::NativeSourceInput;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 

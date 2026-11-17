@@ -3,7 +3,10 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-use crate::bindings::_helpers::rules::fact_tree::{Raised, VALUE_ERROR, strerror, text_error};
+use crate::bindings::_helpers::rules::fact_tree::Raised;
+use crate::bindings::_helpers::rules::fact_tree::VALUE_ERROR;
+use crate::bindings::_helpers::rules::fact_tree::strerror;
+use crate::bindings::_helpers::rules::fact_tree::text_error;
 use pyo3::exceptions::PyOSError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{
@@ -21,7 +24,8 @@ use sqlbuild_rules::project_tree::main::project_tree_glob::project_tree_glob;
 use sqlbuild_rules::project_tree::main::read_project_text::read_project_text;
 use sqlbuild_rules::project_tree::main::resolve_project_path::resolve_project_path;
 
-use crate::bindings::_helpers::rules::rule_api::{usage_error_for, validate_project_relative};
+use crate::bindings::_helpers::rules::rule_api::usage_error_for;
+use crate::bindings::_helpers::rules::rule_api::validate_project_relative;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

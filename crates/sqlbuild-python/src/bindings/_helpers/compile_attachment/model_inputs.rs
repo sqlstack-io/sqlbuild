@@ -14,7 +14,8 @@ use crate::bindings::_helpers::compile_attachment::model_config::native_model_co
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
 use crate::bindings::_helpers::input_loops::loop_classes::model_loop_classes;
-use crate::bindings::_helpers::input_loops::model_loop::{LoopSwitches, NativeModelLoop};
+use crate::bindings::_helpers::input_loops::model_loop::LoopSwitches;
+use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

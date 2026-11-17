@@ -51,13 +51,15 @@ use sqlbuild_recall::store::models::{
 };
 use sqlbuild_recall::store::types::{RecallStore, RecallStoreOpener};
 
-use crate::bindings::_helpers::recall::clickhouse_calls::{
-    self as calls, ConnectionRole, QueryStatistics, StoreHandle,
-};
-use crate::bindings::_helpers::recall::constants::{
-    READ_ONLY_QUERIES, READONLY_SETTING, SECONDS_PER_DAY, SERVER_DEFAULT_DATABASE,
-    UNKNOWN_TABLE_ERROR,
-};
+use crate::bindings::_helpers::recall::clickhouse_calls as calls;
+use crate::bindings::_helpers::recall::clickhouse_calls::ConnectionRole;
+use crate::bindings::_helpers::recall::clickhouse_calls::QueryStatistics;
+use crate::bindings::_helpers::recall::clickhouse_calls::StoreHandle;
+use crate::bindings::_helpers::recall::constants::READ_ONLY_QUERIES;
+use crate::bindings::_helpers::recall::constants::READONLY_SETTING;
+use crate::bindings::_helpers::recall::constants::SECONDS_PER_DAY;
+use crate::bindings::_helpers::recall::constants::SERVER_DEFAULT_DATABASE;
+use crate::bindings::_helpers::recall::constants::UNKNOWN_TABLE_ERROR;
 
 /// Where a ClickHouse store lives and how long it keeps history.
 #[derive(Clone, Debug)]

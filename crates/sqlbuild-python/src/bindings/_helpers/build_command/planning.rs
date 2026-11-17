@@ -10,7 +10,8 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::build_command::defer_clone::run_defer_clone_boundary_prephase;
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
-use crate::bindings::_helpers::build_command::policies::{enforce_plan_policies, model_limit};
+use crate::bindings::_helpers::build_command::policies::enforce_plan_policies;
+use crate::bindings::_helpers::build_command::policies::model_limit;
 use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspection;
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;

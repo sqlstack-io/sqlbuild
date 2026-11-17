@@ -2,10 +2,13 @@
 
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 
-use crate::bindings::_helpers::analysis_session::{
-    fixture_columns, fixture_inferences, oracle, outcome_objects, query_columns, session,
-    stage_functions,
-};
+use crate::bindings::_helpers::analysis_session::fixture_columns;
+use crate::bindings::_helpers::analysis_session::fixture_inferences;
+use crate::bindings::_helpers::analysis_session::oracle;
+use crate::bindings::_helpers::analysis_session::outcome_objects;
+use crate::bindings::_helpers::analysis_session::query_columns;
+use crate::bindings::_helpers::analysis_session::session;
+use crate::bindings::_helpers::analysis_session::stage_functions;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     session::register(module)?;

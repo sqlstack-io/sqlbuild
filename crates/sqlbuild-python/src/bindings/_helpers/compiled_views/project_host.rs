@@ -4,17 +4,17 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use sqlbuild_project::types::ProjectHost;
 
-use crate::bindings::_helpers::compiled_views::audit_views::{AuditHandles, AuditProjections};
+use crate::bindings::_helpers::compiled_views::audit_views::AuditHandles;
+use crate::bindings::_helpers::compiled_views::audit_views::AuditProjections;
 use crate::bindings::_helpers::compiled_views::compiled_model_analysis::AnalysisProjections;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::CompiledProjections;
-use crate::bindings::_helpers::compiled_views::function_views::{
-    FunctionHandles, FunctionProjections,
-};
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    ModelInputHandles, SchemaHandles,
-};
+use crate::bindings::_helpers::compiled_views::function_views::FunctionHandles;
+use crate::bindings::_helpers::compiled_views::function_views::FunctionProjections;
+use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputHandles;
+use crate::bindings::_helpers::compiled_views::model_input_view::SchemaHandles;
 use crate::bindings::_helpers::compiled_views::seed_views::SeedHandles;
-use crate::bindings::_helpers::compiled_views::source_views::{SourceHandles, SourceProjections};
+use crate::bindings::_helpers::compiled_views::source_views::SourceHandles;
+use crate::bindings::_helpers::compiled_views::source_views::SourceProjections;
 
 /// The extension's host: Python handles and the views built from them.
 pub(crate) struct PyProjectHost;

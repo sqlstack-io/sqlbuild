@@ -8,7 +8,8 @@ use sqlbuild_analysis::dag_artifact::main::build_dag_json::build_dag_json as bui
 use sqlbuild_analysis::dag_artifact::models::{DagProjectInput, DagPythonGraphInput};
 use sqlbuild_core::json::errors::JsonEmitError;
 
-use crate::bindings::_helpers::dag_artifact::rows::{project_input, python_graph_input};
+use crate::bindings::_helpers::dag_artifact::rows::project_input;
+use crate::bindings::_helpers::dag_artifact::rows::python_graph_input;
 use crate::bindings::_helpers::graph::project_graph::CompiledProjectGraph;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;

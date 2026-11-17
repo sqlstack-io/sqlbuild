@@ -16,7 +16,9 @@ use sqlbuild_core::nested_progress::main::render_audit_row::render_audit_row;
 use sqlbuild_core::nested_progress::main::render_group_header::render_group_header;
 use sqlbuild_core::nested_progress::models::AuditAggregate;
 
-use crate::bindings::_helpers::build_progress::result_text::{audit_text, optional, text};
+use crate::bindings::_helpers::build_progress::result_text::audit_text;
+use crate::bindings::_helpers::build_progress::result_text::optional;
+use crate::bindings::_helpers::build_progress::result_text::text;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::build_progress::constants::CLEAR_LINE;

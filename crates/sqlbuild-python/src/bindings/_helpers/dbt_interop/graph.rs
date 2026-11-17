@@ -20,9 +20,8 @@ use sqlbuild_core::dbt_graph::models::{
 use sqlbuild_core::dbt_graph::types::DbtSelectorResolver;
 
 use crate::bindings::_helpers::dbt_interop::manifest::resolve_sqlbuild_model_dbt_refs;
-use crate::bindings::_helpers::planner_selection::model_selectors::{
-    resolve_sqlbuild_model_selector_names, split_selector_expansion,
-};
+use crate::bindings::_helpers::planner_selection::model_selectors::resolve_sqlbuild_model_selector_names;
+use crate::bindings::_helpers::planner_selection::model_selectors::split_selector_expansion;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

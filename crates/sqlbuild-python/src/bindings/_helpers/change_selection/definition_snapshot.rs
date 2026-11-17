@@ -18,15 +18,17 @@ use sqlbuild_analysis::definition_changes::main::sql_definition_digest::sql_defi
 use sqlbuild_analysis::definition_changes::main::sql_macro_definition_digest::sql_macro_definition_digest;
 use sqlbuild_analysis::definition_changes::models::{DefinitionSnapshot, NodeDefinition};
 
-use crate::bindings::_helpers::change_selection::fingerprints::{
-    Fingerprinting, directory_digest, file_digest, text_of,
-};
+use crate::bindings::_helpers::change_selection::fingerprints::Fingerprinting;
+use crate::bindings::_helpers::change_selection::fingerprints::directory_digest;
+use crate::bindings::_helpers::change_selection::fingerprints::file_digest;
+use crate::bindings::_helpers::change_selection::fingerprints::text_of;
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::planner_identity::metadata::{function_local_hashes, seed_identity};
+use crate::bindings::_helpers::planner_identity::metadata::function_local_hashes;
+use crate::bindings::_helpers::planner_identity::metadata::seed_identity;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Header values that rename rather than redefine a model.

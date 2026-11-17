@@ -1,7 +1,8 @@
 //! Selected-model inspection and untyped override conversion.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::planner_resolution::values::{method, string};
+use crate::bindings::_helpers::planner_resolution::values::method;
+use crate::bindings::_helpers::planner_resolution::values::string;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };

@@ -1,9 +1,9 @@
 //! Cursor input relations and authored cursor input column checks of model plan entries.
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyTuple};
+use sqlbuild_python_base::native_host::models::Dialect;
 
 use sqlbuild_analysis::planner_strategy::main::cursor_input_column::cursor_input_column_failure;
 use sqlbuild_analysis::planner_strategy::models::{CursorInputColumnCheck, CursorInputColumnOwner};
@@ -12,13 +12,16 @@ use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_identity::metadata::or_empty;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::planner_strategy::constants::{
-    ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
-    SOURCE_REFERENCE, TIMESTAMP_CURSOR,
-};
+use crate::bindings::_helpers::planner_strategy::constants::ENFORCED_CONTRACT;
+use crate::bindings::_helpers::planner_strategy::constants::INCREMENTAL_MATERIALIZATION;
+use crate::bindings::_helpers::planner_strategy::constants::MODEL_REFERENCE;
+use crate::bindings::_helpers::planner_strategy::constants::SEED_REFERENCE;
+use crate::bindings::_helpers::planner_strategy::constants::SOURCE_REFERENCE;
+use crate::bindings::_helpers::planner_strategy::constants::TIMESTAMP_CURSOR;
 use crate::bindings::_helpers::planner_strategy::lineage::resolve_lineage_reference;
 use crate::bindings::_helpers::planner_strategy::models::CursorInputLookups;
-use crate::bindings::_helpers::planner_strategy::values::{input_error, text};
+use crate::bindings::_helpers::planner_strategy::values::input_error;
+use crate::bindings::_helpers::planner_strategy::values::text;
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;

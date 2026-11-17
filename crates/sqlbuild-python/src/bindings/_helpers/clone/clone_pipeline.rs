@@ -1,13 +1,14 @@
 //! Compile the origin and destination environments of a clone and plan it.
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::native_host::models::Dialect;
 
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
-use crate::bindings::_helpers::planner_entries::clone_plans::{PhaseTimings, timed_clone_planning};
+use crate::bindings::_helpers::planner_entries::clone_plans::PhaseTimings;
+use crate::bindings::_helpers::planner_entries::clone_plans::timed_clone_planning;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

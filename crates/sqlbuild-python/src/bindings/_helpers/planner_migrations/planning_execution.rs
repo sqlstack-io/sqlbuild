@@ -1,13 +1,10 @@
 //! Preserve adapter overrides when describing migration execution.
 
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::bindings::_helpers::planner_migrations::column_objects::replace;
-use sqlbuild_python_base::records::main::construct::record_class::record_class;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyBool;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

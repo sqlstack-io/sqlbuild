@@ -9,11 +9,11 @@ use sqlbuild_discovery::orchestration_files::models::{FilePosition, Orchestratio
 use sqlbuild_discovery::project_validation::main::validate_project_inputs::validate_project_inputs;
 use sqlbuild_discovery::project_validation::models::{ProjectFacts, ValidationFailure};
 
-use crate::discovery::_helpers::sources::orchestration_files::orchestration_declarations;
-use crate::discovery::models::NodeRow;
-use crate::discovery::_helpers::project::project_facts::project_facts;
 use crate::discovery::_helpers::failures::raised::failure_error;
 use crate::discovery::_helpers::failures::raised::read_error;
+use crate::discovery::_helpers::project::project_facts::project_facts;
+use crate::discovery::_helpers::sources::orchestration_files::orchestration_declarations;
+use crate::discovery::models::NodeRow;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 

@@ -11,9 +11,9 @@ use sqlbuild_project::types::ObjectKeyRow;
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::object_key;
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    InputViewClasses, reference_tuple, view_classes,
-};
+use crate::bindings::_helpers::compiled_views::model_input_view::InputViewClasses;
+use crate::bindings::_helpers::compiled_views::model_input_view::reference_tuple;
+use crate::bindings::_helpers::compiled_views::model_input_view::view_classes;
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

@@ -17,17 +17,20 @@ use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::native_host::model_lookup::ModelHandle;
-use crate::bindings::_helpers::planner_strategy::constants::{
-    MODEL_REFERENCE_KIND, SEED_REFERENCE_KIND, SOURCE_REFERENCE_KIND,
-};
+use crate::bindings::_helpers::planner_strategy::constants::MODEL_REFERENCE_KIND;
+use crate::bindings::_helpers::planner_strategy::constants::SEED_REFERENCE_KIND;
+use crate::bindings::_helpers::planner_strategy::constants::SOURCE_REFERENCE_KIND;
 use crate::bindings::_helpers::planner_strategy::fixture_metadata::model_fixture_relation;
 use crate::bindings::_helpers::planner_strategy::fixture_reads::lineage_reads;
 use crate::bindings::_helpers::planner_strategy::fixture_types::projections;
-use crate::bindings::_helpers::planner_strategy::fixture_values::{columns, folded_name};
-use crate::bindings::_helpers::planner_strategy::models::{
-    FixtureReadCacheHost, FixtureRelation, ModelFixtureFacts, RelationFixturePlanningContext,
-};
-use crate::bindings::_helpers::planner_strategy::types::{FixtureKey, FixtureRelationInput};
+use crate::bindings::_helpers::planner_strategy::fixture_values::columns;
+use crate::bindings::_helpers::planner_strategy::fixture_values::folded_name;
+use crate::bindings::_helpers::planner_strategy::models::FixtureReadCacheHost;
+use crate::bindings::_helpers::planner_strategy::models::FixtureRelation;
+use crate::bindings::_helpers::planner_strategy::models::ModelFixtureFacts;
+use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
+use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
+use crate::bindings::_helpers::planner_strategy::types::FixtureRelationInput;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 static FIXTURE_READS: PyOnceLock<Py<FixtureReadCacheHost>> = PyOnceLock::new();

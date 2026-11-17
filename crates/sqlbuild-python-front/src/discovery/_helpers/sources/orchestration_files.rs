@@ -10,11 +10,11 @@ use sqlbuild_discovery::orchestration_files::models::{
 };
 use sqlbuild_discovery::tree::models::ProjectTree;
 
-use crate::discovery::_helpers::sources::orchestration_values::check_orchestration_values;
-use crate::discovery::_helpers::project::project_config::project_pool_limits;
 use crate::discovery::_helpers::failures::raised::failure_error;
 use crate::discovery::_helpers::failures::raised::relative_read_error;
 use crate::discovery::_helpers::failures::raised::stage_error;
+use crate::discovery::_helpers::project::project_config::project_pool_limits;
+use crate::discovery::_helpers::sources::orchestration_values::check_orchestration_values;
 
 /// Every job, job group, calendar and sensor of `project_dir`, or `OrchestrationDeclarationError` (D017).
 pub(crate) fn orchestration_declarations(

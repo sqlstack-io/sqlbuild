@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
-use crate::bindings::_helpers::compile_delta::splice::{SpliceScope, spliced_report};
+use crate::bindings::_helpers::compile_delta::splice::SpliceScope;
+use crate::bindings::_helpers::compile_delta::splice::spliced_report;
 use crate::bindings::tests::helpers::names;
 use crate::bindings::tests::test_types::SpliceTestCase;
 

@@ -1,7 +1,8 @@
 //! The compile-and-plan pipeline of execution commands: compile, rules gate, then planning.
 
 use crate::bindings::_helpers::native_host::live_reads::LiveReads;
-use crate::bindings::_helpers::planner_phases::timings::{COMPILING, timed};
+use crate::bindings::_helpers::planner_phases::timings::COMPILING;
+use crate::bindings::_helpers::planner_phases::timings::timed;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
@@ -11,21 +12,21 @@ use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
-use crate::bindings::_helpers::compile_driver::pipeline::{
-    compiled_phase, progress, timing_tracker,
-};
+use crate::bindings::_helpers::compile_driver::pipeline::compiled_phase;
+use crate::bindings::_helpers::compile_driver::pipeline::progress;
+use crate::bindings::_helpers::compile_driver::pipeline::timing_tracker;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::project_graph;
-use crate::bindings::_helpers::compile_driver::plan_result::{
-    PlanningInputs, connection_with_hooks, pipeline_result,
-};
+use crate::bindings::_helpers::compile_driver::plan_result::PlanningInputs;
+use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
+use crate::bindings::_helpers::compile_driver::plan_result::pipeline_result;
 use crate::bindings::_helpers::compile_driver::rules_at_load::rules_ran_at_load;
-use crate::bindings::_helpers::compile_driver::selection_phases::{
-    apply_unit_test_selectors, resolve_configured_rule_selection,
-};
+use crate::bindings::_helpers::compile_driver::selection_phases::apply_unit_test_selectors;
+use crate::bindings::_helpers::compile_driver::selection_phases::resolve_configured_rule_selection;
 use crate::bindings::_helpers::frontier::stage_capture::write_plan_capture;
 use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use crate::bindings::_helpers::rules::early_sql_lint::EarlySqlLint;
-use crate::bindings::_helpers::rules::results::{format_rules_result, rules_progress};
+use crate::bindings::_helpers::rules::results::format_rules_result;
+use crate::bindings::_helpers::rules::results::rules_progress;
 use crate::bindings::_helpers::rules::rule_dispatch::evaluate_rules;
 use crate::bindings::_helpers::rules::rules_config::load_rules_config_with_cache;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

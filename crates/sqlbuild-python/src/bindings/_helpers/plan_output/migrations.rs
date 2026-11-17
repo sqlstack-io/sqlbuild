@@ -1,9 +1,12 @@
 //! Convert public migration models at the Python boundary for native presentation.
 
 use crate::bindings::_helpers::plan_output::plan_text::display_limit;
-use crate::bindings::_helpers::plan_output::values::{
-    iso, items, optional_text, relation_name, text, texts,
-};
+use crate::bindings::_helpers::plan_output::values::iso;
+use crate::bindings::_helpers::plan_output::values::items;
+use crate::bindings::_helpers::plan_output::values::optional_text;
+use crate::bindings::_helpers::plan_output::values::relation_name;
+use crate::bindings::_helpers::plan_output::values::text;
+use crate::bindings::_helpers::plan_output::values::texts;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::cli_text::models::{

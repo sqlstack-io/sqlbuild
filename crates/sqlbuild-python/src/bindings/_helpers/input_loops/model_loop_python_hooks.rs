@@ -7,10 +7,10 @@ use pyo3::FromPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
 
-use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, compile_error};
-use crate::bindings::_helpers::input_loops::model_loop_named::{
-    PYTHON_HOOK_DECLARATION, named_usages,
-};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
+use crate::bindings::_helpers::input_loops::model_loop_named::PYTHON_HOOK_DECLARATION;
+use crate::bindings::_helpers::input_loops::model_loop_named::named_usages;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Hook keys in the sorted order `validate_python_hook_config` reads them.

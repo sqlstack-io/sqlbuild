@@ -38,18 +38,26 @@ use sqlbuild_recall::writer::models::{
 
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::output_capture::records::invocation_context;
-use crate::bindings::_helpers::recall::clickhouse_store::{
-    ClickHouseLocation, ClickHouseStoreOpener, missing_database_reason,
-};
+use crate::bindings::_helpers::recall::clickhouse_store::ClickHouseLocation;
+use crate::bindings::_helpers::recall::clickhouse_store::ClickHouseStoreOpener;
+use crate::bindings::_helpers::recall::clickhouse_store::missing_database_reason;
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::recall::constants::{
-    CLOSE_POLL_MS, DDL_NOTICE_PREFIX, DEBUG_COMMAND, GIT_DIRTY_ENVIRONMENT,
-    GIT_REVISION_ENVIRONMENT, HEARTBEAT_ENVIRONMENT, HOST_TOKEN_LENGTH, MINIMUM_HEARTBEAT_SECONDS,
-    NO_CONNECTION_ATTRIBUTE, NOTICE_INTERVAL_SECONDS, QUARANTINE_START_WAIT_MS, RECALL_HISTORY,
-    STDOUT_STREAM_INDEX,
-};
+use crate::bindings::_helpers::recall::constants::CLOSE_POLL_MS;
+use crate::bindings::_helpers::recall::constants::DDL_NOTICE_PREFIX;
+use crate::bindings::_helpers::recall::constants::DEBUG_COMMAND;
+use crate::bindings::_helpers::recall::constants::GIT_DIRTY_ENVIRONMENT;
+use crate::bindings::_helpers::recall::constants::GIT_REVISION_ENVIRONMENT;
+use crate::bindings::_helpers::recall::constants::HEARTBEAT_ENVIRONMENT;
+use crate::bindings::_helpers::recall::constants::HOST_TOKEN_LENGTH;
+use crate::bindings::_helpers::recall::constants::MINIMUM_HEARTBEAT_SECONDS;
+use crate::bindings::_helpers::recall::constants::NO_CONNECTION_ATTRIBUTE;
+use crate::bindings::_helpers::recall::constants::NOTICE_INTERVAL_SECONDS;
+use crate::bindings::_helpers::recall::constants::QUARANTINE_START_WAIT_MS;
+use crate::bindings::_helpers::recall::constants::RECALL_HISTORY;
+use crate::bindings::_helpers::recall::constants::STDOUT_STREAM_INDEX;
 use crate::bindings::_helpers::recall::events::escaped_text;
-use crate::bindings::_helpers::recall::replacements::{RecallReplacements, in_replacement_sink};
+use crate::bindings::_helpers::recall::replacements::RecallReplacements;
+use crate::bindings::_helpers::recall::replacements::in_replacement_sink;
 use crate::bindings::_helpers::recall::sinks::InvocationEvents;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

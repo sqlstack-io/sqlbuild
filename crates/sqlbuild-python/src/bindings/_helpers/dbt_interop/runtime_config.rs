@@ -13,8 +13,9 @@ use sqlbuild_core::dbt_cli::main::dbt_flag_value::dbt_flag_value;
 use sqlbuild_core::dbt_cli::models::DbtParsedFlags;
 use sqlbuild_host::entries::models::AdapterHost;
 
+use crate::bindings::_helpers::dbt_interop::cli::raised;
 use crate::bindings::_helpers::dbt_interop::cli::resolve_dbt_config;
-use crate::bindings::_helpers::dbt_interop::cli::{raised, resolved_path};
+use crate::bindings::_helpers::dbt_interop::cli::resolved_path;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

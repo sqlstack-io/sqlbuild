@@ -13,7 +13,8 @@ use sqlbuild_analysis::planner_selection::models::{
 };
 
 use crate::bindings::_helpers::compiled_project::job_catalog::job_names;
-use crate::bindings::_helpers::planner_selection::carrier::{Carrier, py_strings};
+use crate::bindings::_helpers::planner_selection::carrier::Carrier;
+use crate::bindings::_helpers::planner_selection::carrier::py_strings;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::path_stem::path_stem;

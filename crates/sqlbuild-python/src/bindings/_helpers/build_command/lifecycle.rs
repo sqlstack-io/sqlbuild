@@ -16,9 +16,8 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
-use crate::bindings::_helpers::graph::python_lifecycle::{
-    build_python_sql_run_lifecycle, native_run_lifecycle,
-};
+use crate::bindings::_helpers::graph::python_lifecycle::build_python_sql_run_lifecycle;
+use crate::bindings::_helpers::graph::python_lifecycle::native_run_lifecycle;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::planner_scope::loaders::build_intermediate_source_map;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

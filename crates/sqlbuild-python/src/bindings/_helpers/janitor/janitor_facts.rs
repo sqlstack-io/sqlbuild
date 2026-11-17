@@ -10,10 +10,17 @@ use sqlbuild_analysis::janitor_planning::constants::UNTRACKED_QUERY_DIFF_REASON;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
-use crate::bindings::_helpers::janitor::janitor_keys::{
-    Folded, Key, SchemaKey, dedupe_schema_keys, folded_schema, integer, optional, record,
-    sorted_schemas, text, tuple,
-};
+use crate::bindings::_helpers::janitor::janitor_keys::Folded;
+use crate::bindings::_helpers::janitor::janitor_keys::Key;
+use crate::bindings::_helpers::janitor::janitor_keys::SchemaKey;
+use crate::bindings::_helpers::janitor::janitor_keys::dedupe_schema_keys;
+use crate::bindings::_helpers::janitor::janitor_keys::folded_schema;
+use crate::bindings::_helpers::janitor::janitor_keys::integer;
+use crate::bindings::_helpers::janitor::janitor_keys::optional;
+use crate::bindings::_helpers::janitor::janitor_keys::record;
+use crate::bindings::_helpers::janitor::janitor_keys::sorted_schemas;
+use crate::bindings::_helpers::janitor::janitor_keys::text;
+use crate::bindings::_helpers::janitor::janitor_keys::tuple;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

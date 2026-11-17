@@ -15,9 +15,10 @@ use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::graph::views::native_graph_from_edges;
-use crate::bindings::_helpers::manifest::rows::{
-    ProjectRows, plan_input, project_rows, python_hooks,
-};
+use crate::bindings::_helpers::manifest::rows::ProjectRows;
+use crate::bindings::_helpers::manifest::rows::plan_input;
+use crate::bindings::_helpers::manifest::rows::project_rows;
+use crate::bindings::_helpers::manifest::rows::python_hooks;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

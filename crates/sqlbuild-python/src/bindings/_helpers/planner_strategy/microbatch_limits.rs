@@ -16,10 +16,12 @@ use sqlbuild_core::plan_display::models::TimestampGrainFacts;
 
 use crate::bindings::_helpers::compiled_views::records::replace;
 use crate::bindings::_helpers::plan_output::display::resolve_effective_microbatch_batch_size;
-use crate::bindings::_helpers::planner_strategy::microbatches::{
-    CAP_ACTIONS, capped_microbatch_bounds, count_microbatches,
-};
-use crate::bindings::_helpers::planner_strategy::values::{input_error, optional_string, text};
+use crate::bindings::_helpers::planner_strategy::microbatches::CAP_ACTIONS;
+use crate::bindings::_helpers::planner_strategy::microbatches::capped_microbatch_bounds;
+use crate::bindings::_helpers::planner_strategy::microbatches::count_microbatches;
+use crate::bindings::_helpers::planner_strategy::values::input_error;
+use crate::bindings::_helpers::planner_strategy::values::optional_string;
+use crate::bindings::_helpers::planner_strategy::values::text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;

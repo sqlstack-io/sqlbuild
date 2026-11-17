@@ -3,24 +3,16 @@
 use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
-use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
-use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
-use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
-use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
-use sqlbuild_python_front::model_config::main::config::config_value::config_value;
-use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
-use crate::bindings::_helpers::planner_resolution::cursor_model::{
-    compute_model_cursor_bounds, unbounded,
-};
-use crate::bindings::_helpers::planner_resolution::models::{CursorFiltering, ModelSqlRequest};
-use crate::bindings::_helpers::planner_resolution::refs::{
-    resolve_dbt_ref_references, resolve_refs, resolve_table_function_references,
-    resolve_udf_references,
-};
+use crate::bindings::_helpers::planner_resolution::cursor_model::compute_model_cursor_bounds;
+use crate::bindings::_helpers::planner_resolution::cursor_model::unbounded;
+use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;
+use crate::bindings::_helpers::planner_resolution::models::ModelSqlRequest;
+use crate::bindings::_helpers::planner_resolution::refs::resolve_dbt_ref_references;
+use crate::bindings::_helpers::planner_resolution::refs::resolve_refs;
+use crate::bindings::_helpers::planner_resolution::refs::resolve_table_function_references;
+use crate::bindings::_helpers::planner_resolution::refs::resolve_udf_references;
 use crate::bindings::_helpers::planner_resolution::sources::resolve_sources;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyTuple};
@@ -28,15 +20,22 @@ use pyo3::{PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::assert_no_unresolved_sql_markers;
 use sqlbuild_python_front::attachments::main::resolve_cursor_intrinsics::resolve_cursor_intrinsics;
+use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
+use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
+use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 const APPEND_STRATEGY: &str = "append";
 

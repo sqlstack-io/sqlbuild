@@ -21,17 +21,21 @@ use sqlbuild_orchestration::runs::models::RunOutcome;
 
 use sqlbuild_python_base::build_progress::main::transient_lines::shared_transient_line_coordinator::shared_transient_line_coordinator;
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
-use crate::bindings::_helpers::cli::dispatch::{command_facts, dispatch_command};
+use crate::bindings::_helpers::cli::dispatch::command_facts;
+use crate::bindings::_helpers::cli::dispatch::dispatch_command;
 use crate::bindings::_helpers::cli::failure_cause::take_failure_cause;
 use sqlbuild_python_base::cli::main::offer_launch_record::offer_launch_record;
 use crate::bindings::_helpers::cli::machine_output::take_machine_output_written;
-use crate::bindings::_helpers::cli::observability::{
-    CliObservabilityScope, cli_observability_scope,
-};
-use crate::bindings::_helpers::cli::termination::{
-    CommandTerminated, TERMINATED_MESSAGE, TerminationHandler, handle_sigterm, interrupting_signal,
-    signal_exit_code, terminated, terminated_exit,
-};
+use crate::bindings::_helpers::cli::observability::CliObservabilityScope;
+use crate::bindings::_helpers::cli::observability::cli_observability_scope;
+use crate::bindings::_helpers::cli::termination::CommandTerminated;
+use crate::bindings::_helpers::cli::termination::TERMINATED_MESSAGE;
+use crate::bindings::_helpers::cli::termination::TerminationHandler;
+use crate::bindings::_helpers::cli::termination::handle_sigterm;
+use crate::bindings::_helpers::cli::termination::interrupting_signal;
+use crate::bindings::_helpers::cli::termination::signal_exit_code;
+use crate::bindings::_helpers::cli::termination::terminated;
+use crate::bindings::_helpers::cli::termination::terminated_exit;
 use crate::bindings::_helpers::compile_command::constants::COMPILE_COMMAND_NAME;
 use crate::bindings::_helpers::compile_command::report::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
@@ -41,12 +45,15 @@ use sqlbuild_python_base::native_host::main::interrupted::interrupted;
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::recall::constants::{JSON_FORMAT, RECALL_SETTINGS_CODE};
+use crate::bindings::_helpers::recall::constants::JSON_FORMAT;
+use crate::bindings::_helpers::recall::constants::RECALL_SETTINGS_CODE;
 use crate::bindings::_helpers::recall::events::escaped_text;
-use crate::bindings::_helpers::recall::session::{
-    InvocationRecall, effective_selection, finish_invocation_recall, start_invocation_recall,
-};
-use crate::bindings::_helpers::recall::sinks::{RecallLifecycleSink, publish_lifecycle_event};
+use crate::bindings::_helpers::recall::session::InvocationRecall;
+use crate::bindings::_helpers::recall::session::effective_selection;
+use crate::bindings::_helpers::recall::session::finish_invocation_recall;
+use crate::bindings::_helpers::recall::session::start_invocation_recall;
+use crate::bindings::_helpers::recall::sinks::RecallLifecycleSink;
+use crate::bindings::_helpers::recall::sinks::publish_lifecycle_event;
 use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use crate::bindings::_helpers::workspace_commands::commands::maintain_sqlbuild_skills;
 use sqlbuild_cli::launcher::constants::LAUNCH_RECORD_OPTION;

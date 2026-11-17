@@ -1,6 +1,7 @@
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::{compiled_views, input_loops};
+use crate::bindings::_helpers::compiled_views;
+use crate::bindings::_helpers::input_loops;
 
 /// Register the compiled project, then its input loops, then its views and records.
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

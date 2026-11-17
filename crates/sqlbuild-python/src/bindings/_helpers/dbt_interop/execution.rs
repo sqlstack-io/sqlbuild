@@ -16,7 +16,8 @@ use sqlbuild_core::dbt_plan::main::render_dbt_execution_summary::render_dbt_exec
 use sqlbuild_core::dbt_plan::models::DbtExecutedNode;
 
 use crate::bindings::_helpers::dbt_interop::cli::option_values;
-use crate::bindings::_helpers::dbt_interop::graph::{DbtCombinedGraph, texts};
+use crate::bindings::_helpers::dbt_interop::graph::DbtCombinedGraph;
+use crate::bindings::_helpers::dbt_interop::graph::texts;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;

@@ -7,11 +7,15 @@ use sqlbuild_cache::project_reuse::types::ImageSections;
 use crate::bindings::_helpers::change_selection::base_cache::cache_key_with;
 use sqlbuild_rules::models::{EvaluateRequest, RetainedRows};
 
-use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
-use crate::bindings::_helpers::compile_delta::image::{
-    FACTS_SECTION, GATE_SECTION, IMAGE_FORMAT, ImageRelations, ImageRules, ProjectImage,
-    RULE_DIGESTS_SECTION,
-};
+use crate::bindings::_helpers::cli::failure_cause::FailureCause;
+use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
+use crate::bindings::_helpers::compile_delta::image::FACTS_SECTION;
+use crate::bindings::_helpers::compile_delta::image::GATE_SECTION;
+use crate::bindings::_helpers::compile_delta::image::IMAGE_FORMAT;
+use crate::bindings::_helpers::compile_delta::image::ImageRelations;
+use crate::bindings::_helpers::compile_delta::image::ImageRules;
+use crate::bindings::_helpers::compile_delta::image::ProjectImage;
+use crate::bindings::_helpers::compile_delta::image::RULE_DIGESTS_SECTION;
 use sqlbuild_python_base::compile_context::models::BaseRules;
 use sqlbuild_python_base::compile_context::models::CapturedDiagnostic;
 use sqlbuild_python_base::compile_context::models::CapturedModel;

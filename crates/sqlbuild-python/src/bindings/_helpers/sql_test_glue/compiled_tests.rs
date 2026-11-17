@@ -5,9 +5,9 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::compiler::models::{AssembledSqlTestFacts, SqlTestHelperDiagnostic};
 
-use crate::bindings::_helpers::sql_test_glue::assembly::{
-    AssemblyRequest, AssemblyRow, assemble_compiled_sql_tests,
-};
+use crate::bindings::_helpers::sql_test_glue::assembly::AssemblyRequest;
+use crate::bindings::_helpers::sql_test_glue::assembly::AssemblyRow;
+use crate::bindings::_helpers::sql_test_glue::assembly::assemble_compiled_sql_tests;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;

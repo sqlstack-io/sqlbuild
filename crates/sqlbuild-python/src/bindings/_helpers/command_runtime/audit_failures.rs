@@ -4,11 +4,10 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_config::effective::main::effective_ignore_audit_failures::effective_ignore_audit_failures;
 use sqlbuild_config::effective::models::AuditFailureLayers;
 
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings;
-use crate::bindings::_helpers::contracts::spec_resolution::{
-    resolve_target_config, resolve_target_name,
-};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::compile_attachment::main::build_effective_settings::build_effective_settings;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 
 const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
 

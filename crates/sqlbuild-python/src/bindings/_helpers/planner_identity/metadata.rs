@@ -20,9 +20,8 @@ use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::microbatches::conversion::timestamp;
-use crate::bindings::_helpers::planner_identity::hashing::{
-    baselined_function_definition_hash, function_definition_hash,
-};
+use crate::bindings::_helpers::planner_identity::hashing::baselined_function_definition_hash;
+use crate::bindings::_helpers::planner_identity::hashing::function_definition_hash;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;

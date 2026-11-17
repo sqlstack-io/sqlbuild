@@ -6,9 +6,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_reference_calls;
 use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 
-use crate::bindings::_helpers::analysis::relation_names::{
-    RelationRow, extract_sql_relation_names, prefetch_sql_relation_names,
-};
+use crate::bindings::_helpers::analysis::relation_names::RelationRow;
+use crate::bindings::_helpers::analysis::relation_names::extract_sql_relation_names;
+use crate::bindings::_helpers::analysis::relation_names::prefetch_sql_relation_names;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_front::native_host::main::optional_text::optional_text;

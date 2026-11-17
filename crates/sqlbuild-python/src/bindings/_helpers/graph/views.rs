@@ -9,7 +9,8 @@ use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::{GraphIndexes, ProjectGraph};
 
-use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
+use crate::bindings::_helpers::graph::keys::KeyCache;
+use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;

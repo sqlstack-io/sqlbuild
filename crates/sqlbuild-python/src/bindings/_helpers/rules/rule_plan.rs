@@ -8,12 +8,15 @@ use sqlbuild_rules::project_tree::main::pure_path_posix::pure_path_posix;
 use std::path::Path;
 
 use crate::bindings::_helpers::compiled_views::records::project_with;
-use crate::bindings::_helpers::rules::catalogue::{
-    references_custom_rules, resolved_ignore_selectors, rule_catalogue, select_rules,
-    verify_custom_rules,
-};
-use crate::bindings::_helpers::rules::constants::{SQL_RULE_PREFIX, TYPE_PROOF_RULE_CODES};
-use crate::bindings::_helpers::rules::fact_replay::{project_attribute, project_models};
+use crate::bindings::_helpers::rules::catalogue::references_custom_rules;
+use crate::bindings::_helpers::rules::catalogue::resolved_ignore_selectors;
+use crate::bindings::_helpers::rules::catalogue::rule_catalogue;
+use crate::bindings::_helpers::rules::catalogue::select_rules;
+use crate::bindings::_helpers::rules::catalogue::verify_custom_rules;
+use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
+use crate::bindings::_helpers::rules::constants::TYPE_PROOF_RULE_CODES;
+use crate::bindings::_helpers::rules::fact_replay::project_attribute;
+use crate::bindings::_helpers::rules::fact_replay::project_models;
 use crate::bindings::_helpers::rules::rule_run::freed_memory_released;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

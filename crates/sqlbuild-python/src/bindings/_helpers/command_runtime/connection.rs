@@ -18,7 +18,8 @@ use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::command_runtime::warehouses::{WarehouseInputs, apply_warehouse};
+use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
+use crate::bindings::_helpers::command_runtime::warehouses::apply_warehouse;
 use crate::bindings::_helpers::dbt_interop::profile_connection::resolve_raw_dbt_profile_connection;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

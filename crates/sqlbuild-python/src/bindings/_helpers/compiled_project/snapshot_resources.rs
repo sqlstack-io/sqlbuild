@@ -8,12 +8,13 @@ use sqlbuild_core::nested_progress::main::audit_resource_id::audit_resource_id;
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_project::snapshot::{
-    dependency_keys, destination, insert_node,
-};
-use crate::bindings::_helpers::compiled_project::snapshot_boundary::{
-    boundary_nodes, columns, metadata, relative_path,
-};
+use crate::bindings::_helpers::compiled_project::snapshot::dependency_keys;
+use crate::bindings::_helpers::compiled_project::snapshot::destination;
+use crate::bindings::_helpers::compiled_project::snapshot::insert_node;
+use crate::bindings::_helpers::compiled_project::snapshot_boundary::boundary_nodes;
+use crate::bindings::_helpers::compiled_project::snapshot_boundary::columns;
+use crate::bindings::_helpers::compiled_project::snapshot_boundary::metadata;
+use crate::bindings::_helpers::compiled_project::snapshot_boundary::relative_path;
 use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::compiled_views::function_views::NativeCompiledFunction;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;

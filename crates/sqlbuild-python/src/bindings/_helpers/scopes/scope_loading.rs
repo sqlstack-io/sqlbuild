@@ -12,10 +12,13 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::{AdapterHost, UserCodeHost};
 
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compile_driver::inputs::{InputsRequest, attached_inputs};
+use crate::bindings::_helpers::compile_driver::inputs::InputsRequest;
+use crate::bindings::_helpers::compile_driver::inputs::attached_inputs;
 use crate::bindings::_helpers::compile_driver::project::compile_adapter_context;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
-use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
+use crate::bindings::_helpers::frontier::compile_frontier::FrontierStage;
+use crate::bindings::_helpers::frontier::compile_frontier::bridged;
+use crate::bindings::_helpers::frontier::compile_frontier::produced;
 use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_EXPECTED_MODELS_SCAN_ALGORITHM;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

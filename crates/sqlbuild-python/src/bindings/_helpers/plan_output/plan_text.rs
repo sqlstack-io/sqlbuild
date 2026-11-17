@@ -12,19 +12,24 @@ use sqlbuild_core::cli_text::models::{
 };
 use sqlbuild_core::plan_display::main::format_query_diff::format_query_diff;
 
-use crate::bindings::_helpers::plan_output::cursor_details::{
-    CursorDetails, DEFERRED, RESOLVED, cursor_details, runtime_inputs_clause,
-};
-use crate::bindings::_helpers::plan_output::display::{
-    cursor_bound_display, format_no_input_rows, format_waiting_on_empty_inputs,
-    inclusive_cursor_end, model_materialization_label,
-};
+use crate::bindings::_helpers::plan_output::cursor_details::CursorDetails;
+use crate::bindings::_helpers::plan_output::cursor_details::DEFERRED;
+use crate::bindings::_helpers::plan_output::cursor_details::RESOLVED;
+use crate::bindings::_helpers::plan_output::cursor_details::cursor_details;
+use crate::bindings::_helpers::plan_output::cursor_details::runtime_inputs_clause;
+use crate::bindings::_helpers::plan_output::display::cursor_bound_display;
+use crate::bindings::_helpers::plan_output::display::format_no_input_rows;
+use crate::bindings::_helpers::plan_output::display::format_waiting_on_empty_inputs;
+use crate::bindings::_helpers::plan_output::display::inclusive_cursor_end;
+use crate::bindings::_helpers::plan_output::display::model_materialization_label;
 use crate::bindings::_helpers::plan_output::migrations::pre_build_lines;
 use crate::bindings::_helpers::plan_output::plan_json::unified_diff;
-use crate::bindings::_helpers::plan_output::python_identity::{
-    definition_source_text, dependency_source_text,
-};
-use crate::bindings::_helpers::plan_output::values::{items, optional_text, text, texts};
+use crate::bindings::_helpers::plan_output::python_identity::definition_source_text;
+use crate::bindings::_helpers::plan_output::python_identity::dependency_source_text;
+use crate::bindings::_helpers::plan_output::values::items;
+use crate::bindings::_helpers::plan_output::values::optional_text;
+use crate::bindings::_helpers::plan_output::values::text;
+use crate::bindings::_helpers::plan_output::values::texts;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

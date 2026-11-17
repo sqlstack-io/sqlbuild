@@ -7,9 +7,13 @@ use sqlbuild_core::dbt_command::main::dbt_output_options::dbt_output_options;
 use sqlbuild_core::dbt_command::models::DbtOutputOptions;
 
 use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
-use crate::bindings::_helpers::dbt_command::auto_init::{args_tuple, ensure_twin_project};
+use crate::bindings::_helpers::dbt_command::auto_init::args_tuple;
+use crate::bindings::_helpers::dbt_command::auto_init::ensure_twin_project;
 use crate::bindings::_helpers::dbt_command::debug::run_dbt_debug;
-use crate::bindings::_helpers::dbt_command::support::{color_enabled, effective_dir, flag, stream};
+use crate::bindings::_helpers::dbt_command::support::color_enabled;
+use crate::bindings::_helpers::dbt_command::support::effective_dir;
+use crate::bindings::_helpers::dbt_command::support::flag;
+use crate::bindings::_helpers::dbt_command::support::stream;
 use crate::bindings::_helpers::dbt_interop::plan::render_dbt_interop_plan;
 use crate::bindings::_helpers::dbt_interop::runtime_config::validate_dbt_execution_args;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

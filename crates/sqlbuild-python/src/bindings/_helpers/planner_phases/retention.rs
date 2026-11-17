@@ -1,28 +1,35 @@
 //! Warehouse-aware time-travel retention and Snowflake table-type planning.
 
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::planner_phases::constants::{
-    BIGQUERY_ADAPTER, DECREASE_WARNING, DOWNGRADE_HISTORY_DAYS, PERMANENT_TABLE_TYPE,
-    RETENTION_DECREASE, RETENTION_INCREASE, RETENTION_MATCH, SNOWFLAKE_ADAPTER,
-    TRANSIENT_TABLE_TYPE,
-};
-use crate::bindings::_helpers::planner_phases::objects::{
-    construct, member, native, native_member, optional_text, planner_error, planner_model, replace,
-    sorted_names, text, tuple,
-};
+use crate::bindings::_helpers::planner_phases::constants::BIGQUERY_ADAPTER;
+use crate::bindings::_helpers::planner_phases::constants::DECREASE_WARNING;
+use crate::bindings::_helpers::planner_phases::constants::DOWNGRADE_HISTORY_DAYS;
+use crate::bindings::_helpers::planner_phases::constants::PERMANENT_TABLE_TYPE;
+use crate::bindings::_helpers::planner_phases::constants::RETENTION_DECREASE;
+use crate::bindings::_helpers::planner_phases::constants::RETENTION_INCREASE;
+use crate::bindings::_helpers::planner_phases::constants::RETENTION_MATCH;
+use crate::bindings::_helpers::planner_phases::constants::SNOWFLAKE_ADAPTER;
+use crate::bindings::_helpers::planner_phases::constants::TRANSIENT_TABLE_TYPE;
+use crate::bindings::_helpers::planner_phases::objects::construct;
+use crate::bindings::_helpers::planner_phases::objects::member;
+use crate::bindings::_helpers::planner_phases::objects::native;
+use crate::bindings::_helpers::planner_phases::objects::native_member;
+use crate::bindings::_helpers::planner_phases::objects::optional_text;
+use crate::bindings::_helpers::planner_phases::objects::planner_error;
+use crate::bindings::_helpers::planner_phases::objects::planner_model;
+use crate::bindings::_helpers::planner_phases::objects::replace;
+use crate::bindings::_helpers::planner_phases::objects::sorted_names;
+use crate::bindings::_helpers::planner_phases::objects::text;
+use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_reads;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::reads::Read;
-use sqlbuild_python_base::records::main::construct::record_class::record_class;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
-use sqlbuild_python_base::records::types::RecordId;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -31,7 +38,10 @@ use sqlbuild_analysis::planner_warehouse::main::retention_direction::retention_d
 use sqlbuild_analysis::planner_warehouse::main::table_type_copy_name::table_type_copy_name as copy_name;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::typed_values::typed_values;

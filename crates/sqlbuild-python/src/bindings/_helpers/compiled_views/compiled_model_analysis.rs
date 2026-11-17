@@ -30,7 +30,8 @@ use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSes
 use crate::bindings::_helpers::compiled_views::compiled_model_view::CompiledViewClasses;
 use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
-use crate::bindings::_helpers::lineage::lineage_facts::{confidence_member, transform_kind_member};
+use crate::bindings::_helpers::lineage::lineage_facts::confidence_member;
+use crate::bindings::_helpers::lineage::lineage_facts::transform_kind_member;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::types::RecordId;

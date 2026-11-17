@@ -1,7 +1,5 @@
 //! Adapter-bound rendering of fixture completion SQL.
 
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_analysis::planner_fixtures::main::{
@@ -11,6 +9,8 @@ use sqlbuild_analysis::planner_fixtures::main::{
 use sqlbuild_analysis::planner_fixtures::models::{
     FixtureColumn, FixtureSqlInput, SuppliedProjection,
 };
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::bindings::_helpers::planner_strategy::models::FixtureRelation;
 use sqlbuild_python_base::boundary::main::value_error::value_error;

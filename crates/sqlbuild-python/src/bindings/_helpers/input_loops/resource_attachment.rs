@@ -4,20 +4,28 @@ use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    AttachedSqlTests, AuditFileRow, AuditSettings, FunctionRow, FunctionSettings,
-    ResourceAttachment, ScenarioRow, SourceRow, SourceSettings, SqlTestSettings, TestFileRow,
-};
+use crate::bindings::_helpers::compiled_project::attachment_inputs::AttachedSqlTests;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditSettings;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::FunctionRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::FunctionSettings;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::ResourceAttachment;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::ScenarioRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::SourceRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::SourceSettings;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::SqlTestSettings;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::TestFileRow;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::audit_views::NativeAuditInput;
-use crate::bindings::_helpers::compiled_views::function_views::{
-    AttachedFunction, NativeFunctionInput,
-};
-use crate::bindings::_helpers::compiled_views::seed_views::{SeedParts, SeedViews};
-use crate::bindings::_helpers::compiled_views::source_views::{AttachedSource, NativeSourceInput};
-use crate::bindings::_helpers::input_loops::audit_loop::{
-    AttachmentOwner, model_owner, resource_owner,
-};
+use crate::bindings::_helpers::compiled_views::function_views::AttachedFunction;
+use crate::bindings::_helpers::compiled_views::function_views::NativeFunctionInput;
+use crate::bindings::_helpers::compiled_views::seed_views::SeedParts;
+use crate::bindings::_helpers::compiled_views::seed_views::SeedViews;
+use crate::bindings::_helpers::compiled_views::source_views::AttachedSource;
+use crate::bindings::_helpers::compiled_views::source_views::NativeSourceInput;
+use crate::bindings::_helpers::input_loops::audit_loop::AttachmentOwner;
+use crate::bindings::_helpers::input_loops::audit_loop::model_owner;
+use crate::bindings::_helpers::input_loops::audit_loop::resource_owner;
 use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
 use crate::bindings::_helpers::input_loops::resource_diagnostics::resource_diagnostics;
 use sqlbuild_project::models::ReferenceRow;

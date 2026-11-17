@@ -1,6 +1,7 @@
 //! Python methods of authored binding positions.
 
-use crate::bindings::models::{BindingPositions, PositionInput};
+use crate::bindings::models::BindingPositions;
+use crate::bindings::models::PositionInput;
 use pyo3::exceptions::PyValueError;
 use pyo3::{PyResult, pymethods};
 use sqlbuild_analysis::semantic_validation::models as validation;

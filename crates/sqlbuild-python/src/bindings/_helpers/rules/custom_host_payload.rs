@@ -14,14 +14,15 @@ use sqlbuild_discovery::models::LineColumnSpan;
 
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_reads::enum_columns;
-use crate::bindings::_helpers::compiled_views::records::{
-    compiled_audit_record, compiled_function_record, compiled_seed_record, compiled_source_record,
-};
+use crate::bindings::_helpers::compiled_views::records::compiled_audit_record;
+use crate::bindings::_helpers::compiled_views::records::compiled_function_record;
+use crate::bindings::_helpers::compiled_views::records::compiled_seed_record;
+use crate::bindings::_helpers::compiled_views::records::compiled_source_record;
 use crate::bindings::_helpers::rules::custom_host_columns::PayloadColumn;
 use crate::bindings::_helpers::rules::custom_hosts::pickled;
-use crate::bindings::_helpers::rules::fact_replay::{
-    ModelEntry, project_attribute, project_models,
-};
+use crate::bindings::_helpers::rules::fact_replay::ModelEntry;
+use crate::bindings::_helpers::rules::fact_replay::project_attribute;
+use crate::bindings::_helpers::rules::fact_replay::project_models;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The first bytes of every payload file; hosts reject any other.

@@ -31,18 +31,20 @@ use sqlbuild_analysis::planner_changes::models::{
     SchemaFindingRow,
 };
 
-use crate::bindings::_helpers::compiled_views::model_reads::{inferred_rows, star_flags};
+use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
+use crate::bindings::_helpers::compiled_views::model_reads::star_flags;
 use crate::bindings::_helpers::planner_changes::renames::origin_names;
-use crate::bindings::_helpers::planner_changes::results::{
-    backfill_result, change_kind, planner_enum, replay_policy_error, schema_findings,
-};
-use crate::bindings::_helpers::planner_identity::hashing::{
-    baselined_function_definition_hash, baselined_model_query_hash,
-};
-use crate::bindings::_helpers::planner_identity::metadata::{
-    compiled_function_fingerprint_sql, function_local_hashes, model_declared_columns_hash,
-    model_version_identity_metadata_json,
-};
+use crate::bindings::_helpers::planner_changes::results::backfill_result;
+use crate::bindings::_helpers::planner_changes::results::change_kind;
+use crate::bindings::_helpers::planner_changes::results::planner_enum;
+use crate::bindings::_helpers::planner_changes::results::replay_policy_error;
+use crate::bindings::_helpers::planner_changes::results::schema_findings;
+use crate::bindings::_helpers::planner_identity::hashing::baselined_function_definition_hash;
+use crate::bindings::_helpers::planner_identity::hashing::baselined_model_query_hash;
+use crate::bindings::_helpers::planner_identity::metadata::compiled_function_fingerprint_sql;
+use crate::bindings::_helpers::planner_identity::metadata::function_local_hashes;
+use crate::bindings::_helpers::planner_identity::metadata::model_declared_columns_hash;
+use crate::bindings::_helpers::planner_identity::metadata::model_version_identity_metadata_json;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::semantic_shapes::shapes::snapshot_validity_columns;
 use sqlbuild_project::types::InferredRow;

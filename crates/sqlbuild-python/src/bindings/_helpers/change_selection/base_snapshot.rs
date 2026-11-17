@@ -19,13 +19,15 @@ use sqlbuild_core::git_revisions::main::short_commit::short_commit;
 use sqlbuild_core::git_revisions::models::GitBase;
 use sqlbuild_core::scenario_command::errors::ScenarioCommandError;
 
-use crate::bindings::_helpers::change_selection::base_cache::{
-    cache_key, prune_snapshots, work_directory_name,
-};
+use crate::bindings::_helpers::change_selection::base_cache::cache_key;
+use crate::bindings::_helpers::change_selection::base_cache::prune_snapshots;
+use crate::bindings::_helpers::change_selection::base_cache::work_directory_name;
 use crate::bindings::_helpers::change_selection::base_compile::NOTES_EXTENSION;
 use crate::bindings::_helpers::change_selection::environment_nodes::with_base_dependencies;
 use crate::bindings::_helpers::compile_command::runtime_identity::interpreter_values;
-use crate::bindings::_helpers::scenario_command::setup::{cli_user_error, flush, write};
+use crate::bindings::_helpers::scenario_command::setup::cli_user_error;
+use crate::bindings::_helpers::scenario_command::setup::flush;
+use crate::bindings::_helpers::scenario_command::setup::write;
 use sqlbuild_python_base::planner_identity::constants::COMPACT;
 use sqlbuild_python_base::planner_identity::main::sorted_dumps::sorted_dumps;
 use sqlbuild_python_front::discovery::main::project::configured_git_base_ref::configured_git_base_ref;

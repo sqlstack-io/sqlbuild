@@ -5,6 +5,7 @@ use crate::native_host::_helpers::consumption_io::ensure_table;
 use crate::native_host::_helpers::consumption_io::read_executions;
 use crate::native_host::_helpers::consumption_io::read_recent;
 use crate::native_host::_helpers::consumption_state::text;
+use crate::native_host::types::ConsumptionReads;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -16,7 +17,6 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_state::consumption::models::ConsumptionAppend;
 use sqlbuild_state::consumption::models::ConsumptionRow;
 use sqlbuild_state::consumption::models::RelationKey;
-use crate::native_host::types::ConsumptionReads;
 use std::sync::Mutex;
 
 /// One destination schema of the consumption table.

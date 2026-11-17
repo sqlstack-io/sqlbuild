@@ -23,7 +23,8 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_command_invo
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
+use crate::bindings::_helpers::compiled_project::snapshot_execution::VerifiedRun;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::planner_entries::command_plans::build_seed_command_plan;
 use crate::bindings::_helpers::planner_entries::command_plans::read_selected_seed_fingerprints;

@@ -13,9 +13,10 @@ use sqlbuild_core::cost_report::main::format_cost_history::format_cost_history a
 use sqlbuild_core::cost_report::main::select_cost_run::select_cost_run;
 use sqlbuild_core::cost_report::models::{BreakdownOptions, CostRun};
 
-use crate::bindings::_helpers::cost_report::records::{
-    cost_run, cost_runs, record_object, record_tuple,
-};
+use crate::bindings::_helpers::cost_report::records::cost_run;
+use crate::bindings::_helpers::cost_report::records::cost_runs;
+use crate::bindings::_helpers::cost_report::records::record_object;
+use crate::bindings::_helpers::cost_report::records::record_tuple;
 use crate::bindings::_helpers::cost_report::store;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_front::scopes::main::reports::json_to_python::json_to_python;

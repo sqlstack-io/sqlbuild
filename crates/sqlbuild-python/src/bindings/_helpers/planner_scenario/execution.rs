@@ -4,33 +4,38 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::records::compiled_model_record;
 use crate::bindings::_helpers::graph::keys::KeyCache;
-use sqlbuild_python_front::model_config::main::config::config_value::config_value;
-use sqlbuild_python_front::model_config::main::config::model_values::model_values;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_entries::model_entries::plan_model;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
-use crate::bindings::_helpers::planner_identity::graph::{execution_deps, execution_order};
+use crate::bindings::_helpers::planner_identity::graph::execution_deps;
+use crate::bindings::_helpers::planner_identity::graph::execution_order;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::locations::build_function_locations;
-use crate::bindings::_helpers::planner_scenario::constants::{
-    CURSOR_INTRINSIC_NAMES, CURSOR_TYPE_KEY, INCREMENTAL_MODE_KEY, INTEGER_CURSOR_TYPE,
-    MICROBATCH_INCREMENTAL_MODE, SCENARIO_EXPECTED_COLUMNS_HELP, SCENARIO_PLAN_EXPECTED_COLUMNS,
-    SCENARIO_PLAN_INVALID_FIXTURE,
-};
+use crate::bindings::_helpers::planner_scenario::constants::CURSOR_INTRINSIC_NAMES;
+use crate::bindings::_helpers::planner_scenario::constants::CURSOR_TYPE_KEY;
+use crate::bindings::_helpers::planner_scenario::constants::INCREMENTAL_MODE_KEY;
+use crate::bindings::_helpers::planner_scenario::constants::INTEGER_CURSOR_TYPE;
+use crate::bindings::_helpers::planner_scenario::constants::MICROBATCH_INCREMENTAL_MODE;
+use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_EXPECTED_COLUMNS_HELP;
+use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_EXPECTED_COLUMNS;
+use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_INVALID_FIXTURE;
+use crate::bindings::_helpers::planner_scenario::entries::function_entry;
+use crate::bindings::_helpers::planner_scenario::entries::seed_entries;
+use crate::bindings::_helpers::planner_scenario::fixtures::extract_fixtures;
+use crate::bindings::_helpers::planner_scenario::fixtures::fixture_plans;
 use crate::bindings::_helpers::planner_scenario::helper_scope::scenario_helper_scope;
-use crate::bindings::_helpers::planner_scenario::{
-    entries::{function_entry, seed_entries},
-    fixtures::{extract_fixtures, fixture_plans},
-    models::SqlContext,
-    sql::{required_target, resolve_model_dbt_refs, resolve_sql, source_label},
-    values::{error, string},
-};
+use crate::bindings::_helpers::planner_scenario::models::SqlContext;
+use crate::bindings::_helpers::planner_scenario::sql::required_target;
+use crate::bindings::_helpers::planner_scenario::sql::resolve_model_dbt_refs;
+use crate::bindings::_helpers::planner_scenario::sql::resolve_sql;
+use crate::bindings::_helpers::planner_scenario::sql::source_label;
+use crate::bindings::_helpers::planner_scenario::values::error;
+use crate::bindings::_helpers::planner_scenario::values::string;
 use crate::bindings::_helpers::planner_strategy::fixture_completion::complete_fixtures as complete_relation_fixtures;
 use crate::bindings::_helpers::planner_strategy::fixture_context::planning_context;
-use crate::bindings::_helpers::sql_test_glue::constants::{
-    DEFAULT_INTEGER_END, DEFAULT_INTEGER_START, DEFAULT_TIMESTAMP_END, DEFAULT_TIMESTAMP_START,
-};
+use crate::bindings::_helpers::sql_test_glue::constants::DEFAULT_INTEGER_END;
+use crate::bindings::_helpers::sql_test_glue::constants::DEFAULT_INTEGER_START;
+use crate::bindings::_helpers::sql_test_glue::constants::DEFAULT_TIMESTAMP_END;
+use crate::bindings::_helpers::sql_test_glue::constants::DEFAULT_TIMESTAMP_START;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::compiler::main::scenario_expected_column_message::scenario_expected_column_message;
@@ -39,6 +44,8 @@ use sqlbuild_analysis::compiler::main::scenario_reader_sql::scenario_reader_sql;
 use sqlbuild_discovery::constants::{SCENARIO_EXPECTED_COLUMNS_ALL, SCENARIO_EXPECTED_COLUMNS_KEY};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -47,6 +54,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]

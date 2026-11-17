@@ -6,7 +6,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::compiled_views::model_reads::{inferred_rows, star_flags};
+use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
+use crate::bindings::_helpers::compiled_views::model_reads::star_flags;
 use crate::bindings::_helpers::semantic_shapes::delta_shapes::semantic_reasons;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
 use sqlbuild_project::types::InferredRow;

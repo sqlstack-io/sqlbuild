@@ -1,7 +1,7 @@
 //! `sqb freshness`: observe selected source freshness without writing state.
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::native_host::live_reads::LiveReads;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::BTreeSet;
 
 use pyo3::exceptions::PyValueError;
@@ -20,12 +20,13 @@ use crate::bindings::_helpers::command_runtime::connection::resolve_project_conn
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::VerifiedRun;
-use crate::bindings::_helpers::freshness::freshness_observe::{PreviousState, observe_freshness};
+use crate::bindings::_helpers::freshness::freshness_observe::PreviousState;
+use crate::bindings::_helpers::freshness::freshness_observe::observe_freshness;
 use crate::bindings::_helpers::freshness::observation::Observer;
-use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
-use crate::bindings::_helpers::planner_selection::selectors::{
-    expand_project_upstream_keys, select_project_graph,
-};
+use crate::bindings::_helpers::freshness::state_io::StateRead;
+use crate::bindings::_helpers::freshness::state_io::read_latest;
+use crate::bindings::_helpers::planner_selection::selectors::expand_project_upstream_keys;
+use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;

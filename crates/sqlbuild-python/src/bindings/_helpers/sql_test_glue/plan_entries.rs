@@ -8,7 +8,8 @@ use sqlbuild_model_config::execution_limits::models::ExecutionLimit;
 
 use crate::bindings::_helpers::planner_strategy::constants::MODEL_REFERENCE_KIND;
 use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
-use crate::bindings::_helpers::sql_test_glue::constants::{TABLE_FN, UDF};
+use crate::bindings::_helpers::sql_test_glue::constants::TABLE_FN;
+use crate::bindings::_helpers::sql_test_glue::constants::UDF;
 use crate::bindings::_helpers::sql_test_glue::plan_values::model_payload;
 use sqlbuild_analysis::compiler::main::missing_expected_columns::missing_expected_columns;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;

@@ -11,9 +11,8 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{BuildExecutionResult, BuildStatus};
 
 use crate::bindings::_helpers::build_command::policies::enforce_plan_safety_policies_binding;
-use crate::bindings::_helpers::build_progress::build_callbacks::{
-    BuildProgressCallbacks, batch_complete_callback,
-};
+use crate::bindings::_helpers::build_progress::build_callbacks::BuildProgressCallbacks;
+use crate::bindings::_helpers::build_progress::build_callbacks::batch_complete_callback;
 use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::format_execution_header;

@@ -20,19 +20,22 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::analysis::sql_test_comparisons::single_comparison_sql;
 use crate::bindings::_helpers::compile_command::artifact_batch::ArtifactBatch;
 use crate::bindings::_helpers::compile_command::constants::RACY_WINDOW_NS;
-use crate::bindings::_helpers::compile_command::reuse_recording::{
-    ArtifactRecorder, artifact_kept, artifact_moved, artifact_tree_moved,
-};
-use crate::bindings::_helpers::compile_command::test_artifact_cache::{
-    IdentityContext, artifact_identity_payload, artifact_record_key_payload, identity_context,
-    payload_digests, read_cache, write_cache, yield_interpreter,
-};
-use crate::bindings::_helpers::compile_outputs::artifacts::{
-    publish_staged_artifacts, remove_stale_artifacts,
-};
-use crate::bindings::_helpers::compile_outputs::runtime_target::{
-    compiled_sql_test_path, planned_sql_test_path,
-};
+use crate::bindings::_helpers::compile_command::reuse_recording::ArtifactRecorder;
+use crate::bindings::_helpers::compile_command::reuse_recording::artifact_kept;
+use crate::bindings::_helpers::compile_command::reuse_recording::artifact_moved;
+use crate::bindings::_helpers::compile_command::reuse_recording::artifact_tree_moved;
+use crate::bindings::_helpers::compile_command::test_artifact_cache::IdentityContext;
+use crate::bindings::_helpers::compile_command::test_artifact_cache::artifact_identity_payload;
+use crate::bindings::_helpers::compile_command::test_artifact_cache::artifact_record_key_payload;
+use crate::bindings::_helpers::compile_command::test_artifact_cache::identity_context;
+use crate::bindings::_helpers::compile_command::test_artifact_cache::payload_digests;
+use crate::bindings::_helpers::compile_command::test_artifact_cache::read_cache;
+use crate::bindings::_helpers::compile_command::test_artifact_cache::write_cache;
+use crate::bindings::_helpers::compile_command::test_artifact_cache::yield_interpreter;
+use crate::bindings::_helpers::compile_outputs::artifacts::publish_staged_artifacts;
+use crate::bindings::_helpers::compile_outputs::artifacts::remove_stale_artifacts;
+use crate::bindings::_helpers::compile_outputs::runtime_target::compiled_sql_test_path;
+use crate::bindings::_helpers::compile_outputs::runtime_target::planned_sql_test_path;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::sql_test_glue::models::SqlTestPlanOptions;
 use crate::bindings::_helpers::sql_test_glue::plan_driver::planned_rows;

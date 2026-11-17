@@ -9,13 +9,12 @@ use sqlbuild_analysis::planner_fixtures::models::{
 
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 
-use crate::bindings::_helpers::compiled_views::model_reads::{LineageFactRow, lineage_facts};
-use crate::bindings::_helpers::planner_strategy::constants::{
-    DIRECT_TRANSFORM, MODEL_REFERENCE_KIND,
-};
-use crate::bindings::_helpers::planner_strategy::models::{
-    ExpectedTypes, RelationFixturePlanningContext,
-};
+use crate::bindings::_helpers::compiled_views::model_reads::LineageFactRow;
+use crate::bindings::_helpers::compiled_views::model_reads::lineage_facts;
+use crate::bindings::_helpers::planner_strategy::constants::DIRECT_TRANSFORM;
+use crate::bindings::_helpers::planner_strategy::constants::MODEL_REFERENCE_KIND;
+use crate::bindings::_helpers::planner_strategy::models::ExpectedTypes;
+use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
 
 /// Each chain model's known column types with direct lineage types propagated from its inputs.

@@ -6,7 +6,8 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use sqlbuild_analysis::compiled_project::models::SchemaColumnFact;
 
 use crate::bindings::_helpers::compiled_project::schema_facts::python_column_fact;
-use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, compile_error};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
 use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::models::HeaderColumn;

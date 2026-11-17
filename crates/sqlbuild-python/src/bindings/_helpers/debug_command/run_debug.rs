@@ -22,22 +22,22 @@ use sqlbuild_core::debug_report::models::{
     DebugReport, DebugRuntime, WarehouseCheck,
 };
 
-use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
-use crate::bindings::_helpers::command_runtime::connection::{
-    local_database_files, project_connection_config,
-};
-use crate::bindings::_helpers::command_runtime::runtime_errors::{
-    expected_resolution_error, resolution_message,
-};
+use crate::bindings::_helpers::cli::failure_cause::FailureCause;
+use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
+use crate::bindings::_helpers::command_runtime::connection::local_database_files;
+use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
+use crate::bindings::_helpers::command_runtime::runtime_errors::expected_resolution_error;
+use crate::bindings::_helpers::command_runtime::runtime_errors::resolution_message;
 use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
-use crate::bindings::_helpers::command_runtime::warehouses::{
-    CommandScope, WarehouseInputs, apply_warehouse, command_scope, find_authored, resolve_warehouse,
-};
+use crate::bindings::_helpers::command_runtime::warehouses::CommandScope;
+use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
+use crate::bindings::_helpers::command_runtime::warehouses::apply_warehouse;
+use crate::bindings::_helpers::command_runtime::warehouses::command_scope;
+use crate::bindings::_helpers::command_runtime::warehouses::find_authored;
+use crate::bindings::_helpers::command_runtime::warehouses::resolve_warehouse;
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
-use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

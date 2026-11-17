@@ -4,7 +4,24 @@ use pyo3::prelude::{Bound, PyModule, PyResult};
 
 use sqlbuild_python_base::compile_context::main::diagnostic_collector::register_diagnostic_collector::register_diagnostic_collector;
 use sqlbuild_python_base::compile_context::main::input_reads::register_input_reads::register_input_reads;
-use crate::bindings::_helpers::compile_driver::{analysis, analysis_cache, assembly, command, deferral, diff, discovery, inputs, pipeline, pipeline_entries, plan_pipeline, plan_result, project, python_plan_entries, relation_targets, selection_phases, static_context, targets};
+use crate::bindings::_helpers::compile_driver::analysis;
+use crate::bindings::_helpers::compile_driver::analysis_cache;
+use crate::bindings::_helpers::compile_driver::assembly;
+use crate::bindings::_helpers::compile_driver::command;
+use crate::bindings::_helpers::compile_driver::deferral;
+use crate::bindings::_helpers::compile_driver::diff;
+use crate::bindings::_helpers::compile_driver::discovery;
+use crate::bindings::_helpers::compile_driver::inputs;
+use crate::bindings::_helpers::compile_driver::pipeline;
+use crate::bindings::_helpers::compile_driver::pipeline_entries;
+use crate::bindings::_helpers::compile_driver::plan_pipeline;
+use crate::bindings::_helpers::compile_driver::plan_result;
+use crate::bindings::_helpers::compile_driver::project;
+use crate::bindings::_helpers::compile_driver::python_plan_entries;
+use crate::bindings::_helpers::compile_driver::relation_targets;
+use crate::bindings::_helpers::compile_driver::selection_phases;
+use crate::bindings::_helpers::compile_driver::static_context;
+use crate::bindings::_helpers::compile_driver::targets;
 use sqlbuild_python_base::compile_driver::main::register_stage_work::register_stage_work;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

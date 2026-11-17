@@ -4,15 +4,15 @@ use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
-use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_entries::models::RelationsRequest;
-use crate::bindings::_helpers::planner_entries::plan_output::{
-    function_entry, selected_test_entries, test_selected,
-};
+use crate::bindings::_helpers::planner_entries::plan_output::function_entry;
+use crate::bindings::_helpers::planner_entries::plan_output::selected_test_entries;
+use crate::bindings::_helpers::planner_entries::plan_output::test_selected;
 use crate::bindings::_helpers::planner_entries::relations::planner_relations_context;
-use crate::bindings::_helpers::planner_entries::values::{
-    boolean, none, planner_model, planner_type,
-};
+use crate::bindings::_helpers::planner_entries::values::boolean;
+use crate::bindings::_helpers::planner_entries::values::none;
+use crate::bindings::_helpers::planner_entries::values::planner_model;
+use crate::bindings::_helpers::planner_entries::values::planner_type;
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
 use crate::bindings::_helpers::planner_identity::metadata::build_seed_identity;
 use crate::bindings::_helpers::planner_phases::objects::object;
@@ -21,10 +21,8 @@ use crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes;
 use crate::bindings::_helpers::planner_strategy::audit_entries::build_selected_audit_entries;
 use crate::bindings::_helpers::planner_strategy::model_entries::extract_seed_columns;
 use crate::bindings::_helpers::planner_strategy::strategy::materialization_of;
-use crate::bindings::_helpers::planner_warehouse::reads::{FingerprintRead, PlannerReads};
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
-use sqlbuild_python_base::records::types::RecordId;
+use crate::bindings::_helpers::planner_warehouse::reads::FingerprintRead;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{
     PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyTuple,
@@ -34,6 +32,7 @@ use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_SEED;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;

@@ -10,7 +10,8 @@ use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_e
 use sqlbuild_rules::rules::main::selected_codes::selected_codes_json;
 use sqlbuild_rules::rules::main::selected_sql_codes::selected_sql_codes;
 
-use crate::bindings::_helpers::rules::config_json::{asdict_json, dumped_json};
+use crate::bindings::_helpers::rules::config_json::asdict_json;
+use crate::bindings::_helpers::rules::config_json::dumped_json;
 use crate::bindings::_helpers::rules::constants::RULES_NATIVE_API_VERSION;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::fields::field::field as record_field;

@@ -10,7 +10,9 @@ use sqlbuild_recall::store::models::{DescribedColumn, DescribedRelation, QueryRe
 
 use crate::bindings::_helpers::query_command::text_output::render_text;
 use crate::bindings::_helpers::recall::clickhouse_calls::QueryStatistics;
-use crate::bindings::_helpers::recall::constants::{JOIN_KEYS, JSON_FORMAT, NULL_TEXT};
+use crate::bindings::_helpers::recall::constants::JOIN_KEYS;
+use crate::bindings::_helpers::recall::constants::JSON_FORMAT;
+use crate::bindings::_helpers::recall::constants::NULL_TEXT;
 
 fn truncated(text: &str, max_bytes: Option<usize>) -> String {
     let Some(limit) = max_bytes.filter(|limit| text.len() > *limit) else {

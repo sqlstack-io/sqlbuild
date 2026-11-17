@@ -5,9 +5,11 @@ use sqlbuild_analysis::planner_fixtures::main::merge_metadata::merge_metadata;
 use sqlbuild_analysis::planner_fixtures::models::FixtureColumn;
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::model_reads::{inferred_rows, star_flags};
+use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
+use crate::bindings::_helpers::compiled_views::model_reads::star_flags;
 use crate::bindings::_helpers::planner_strategy::constants::ENFORCED_CONTRACT;
-use crate::bindings::_helpers::planner_strategy::fixture_values::{columns, folded_name};
+use crate::bindings::_helpers::planner_strategy::fixture_values::columns;
+use crate::bindings::_helpers::planner_strategy::fixture_values::folded_name;
 use crate::bindings::_helpers::planner_strategy::models::FixtureRelation;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

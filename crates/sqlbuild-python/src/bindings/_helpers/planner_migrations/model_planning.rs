@@ -3,15 +3,18 @@
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_changes::renames::plan_reference_renames;
-use crate::bindings::_helpers::planner_migrations::column_objects::{config, replace};
+use crate::bindings::_helpers::planner_migrations::column_objects::config;
+use crate::bindings::_helpers::planner_migrations::column_objects::replace;
 use crate::bindings::_helpers::planner_migrations::discovery::discover_model_migrations;
-use crate::bindings::_helpers::planner_migrations::models::{
-    DiscoveryRequest, MigrationDecisionRequest, MigrationPhase, ModelMigrationDeclaration,
-    ModelMigrationDiscovery, ModelMigrationPlanning, ModelMigrationRequest,
-};
-use crate::bindings::_helpers::planner_migrations::planning_origin::{
-    require_same_database, resolve_origin,
-};
+use crate::bindings::_helpers::planner_migrations::models::DiscoveryRequest;
+use crate::bindings::_helpers::planner_migrations::models::MigrationDecisionRequest;
+use crate::bindings::_helpers::planner_migrations::models::MigrationPhase;
+use crate::bindings::_helpers::planner_migrations::models::ModelMigrationDeclaration;
+use crate::bindings::_helpers::planner_migrations::models::ModelMigrationDiscovery;
+use crate::bindings::_helpers::planner_migrations::models::ModelMigrationPlanning;
+use crate::bindings::_helpers::planner_migrations::models::ModelMigrationRequest;
+use crate::bindings::_helpers::planner_migrations::planning_origin::require_same_database;
+use crate::bindings::_helpers::planner_migrations::planning_origin::resolve_origin;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;

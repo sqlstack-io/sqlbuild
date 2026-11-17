@@ -10,18 +10,17 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
 use pyo3::{pyclass, pymethods};
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::{
-    NativeCompiledModel, model_graph_row,
-};
+use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::model_graph_row;
 use crate::bindings::_helpers::compiled_views::function_views::NativeCompiledFunction;
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    InputViewClasses, authored_expansion, view_classes,
-};
+use crate::bindings::_helpers::compiled_views::model_input_view::InputViewClasses;
+use crate::bindings::_helpers::compiled_views::model_input_view::authored_expansion;
+use crate::bindings::_helpers::compiled_views::model_input_view::view_classes;
 use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
 use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;
-use crate::bindings::_helpers::graph::project_graph::{
-    NativeProjectGraph, ResourceRow, project_graph,
-};
+use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
+use crate::bindings::_helpers::graph::project_graph::ResourceRow;
+use crate::bindings::_helpers::graph::project_graph::project_graph;
 use sqlbuild_python_base::compile_driver::constants::LINEAGE_GRAPH_BUILDS;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

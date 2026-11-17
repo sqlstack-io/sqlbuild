@@ -2,7 +2,8 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::contracts::{contract_diagnostics, exception_types};
+use crate::bindings::_helpers::contracts::contract_diagnostics;
+use crate::bindings::_helpers::contracts::exception_types;
 use sqlbuild_python_base::contracts::main::register_resource_identities::register_resource_identities;
 use sqlbuild_python_base::contracts::main::register_state_literals::register_state_literals;
 use sqlbuild_python_front::authored_values::main::register_sql_values::register_sql_values;

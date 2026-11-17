@@ -1,9 +1,9 @@
 //! Assemble audit plan dataclasses using native rendering and scheduling.
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::GraphIndexes;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::HashSet;
 
 use crate::bindings::_helpers::auditing::render::render_audit_sql;
@@ -14,9 +14,9 @@ use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_scope::values::edges;
-use crate::bindings::_helpers::planner_strategy::audits::{
-    attachment, outside_target_lineage, resolve_effective_run_scope,
-};
+use crate::bindings::_helpers::planner_strategy::audits::attachment;
+use crate::bindings::_helpers::planner_strategy::audits::outside_target_lineage;
+use crate::bindings::_helpers::planner_strategy::audits::resolve_effective_run_scope;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
@@ -28,9 +28,10 @@ use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::Request;
 
-use crate::bindings::_helpers::planner_strategy::constants::{
-    AUDIT_TYPES_MODULE, COMPILE_TYPES_MODULE, MODEL_ATTACHMENT, SOURCE_ATTACHMENT,
-};
+use crate::bindings::_helpers::planner_strategy::constants::AUDIT_TYPES_MODULE;
+use crate::bindings::_helpers::planner_strategy::constants::COMPILE_TYPES_MODULE;
+use crate::bindings::_helpers::planner_strategy::constants::MODEL_ATTACHMENT;
+use crate::bindings::_helpers::planner_strategy::constants::SOURCE_ATTACHMENT;
 use crate::bindings::_helpers::planner_strategy::models::AuditPlanning;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;

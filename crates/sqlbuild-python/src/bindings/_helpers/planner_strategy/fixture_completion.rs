@@ -10,19 +10,20 @@ use sqlbuild_analysis::planner_fixtures::main::align_columns::align_columns;
 use sqlbuild_analysis::planner_fixtures::models::{AlignmentInput, FixtureColumn};
 
 use crate::bindings::_helpers::planner_strategy::fixture_context::planning_context as project_planning_context;
-use crate::bindings::_helpers::planner_strategy::fixture_preparation::{PreparedFixtures, prepare};
+use crate::bindings::_helpers::planner_strategy::fixture_preparation::PreparedFixtures;
+use crate::bindings::_helpers::planner_strategy::fixture_preparation::prepare;
 use crate::bindings::_helpers::planner_strategy::fixture_reads::required_fixture_columns;
-use crate::bindings::_helpers::planner_strategy::fixture_selection::{
-    fixture_keys_requiring_analysis, unknown_fixture_column_diagnostics,
-};
-use crate::bindings::_helpers::planner_strategy::fixture_sql::{CompletionSql, render_completed};
+use crate::bindings::_helpers::planner_strategy::fixture_selection::fixture_keys_requiring_analysis;
+use crate::bindings::_helpers::planner_strategy::fixture_selection::unknown_fixture_column_diagnostics;
+use crate::bindings::_helpers::planner_strategy::fixture_sql::CompletionSql;
+use crate::bindings::_helpers::planner_strategy::fixture_sql::render_completed;
 use crate::bindings::_helpers::planner_strategy::fixture_types::expected_fixture_types;
-use crate::bindings::_helpers::planner_strategy::fixture_values::{
-    columns, diagnostic, label, record,
-};
-use crate::bindings::_helpers::planner_strategy::models::{
-    ExpectedTypes, RelationFixturePlanningContext,
-};
+use crate::bindings::_helpers::planner_strategy::fixture_values::columns;
+use crate::bindings::_helpers::planner_strategy::fixture_values::diagnostic;
+use crate::bindings::_helpers::planner_strategy::fixture_values::label;
+use crate::bindings::_helpers::planner_strategy::fixture_values::record;
+use crate::bindings::_helpers::planner_strategy::models::ExpectedTypes;
+use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
 use sqlbuild_python_base::records::types::RecordId;
 

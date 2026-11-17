@@ -15,9 +15,10 @@ use sqlbuild_rules::lint_text::models::{
     FormatFault, FormatFile, FormattedBodies, InterpolationSite, Neutralized, SuppressionFinding,
 };
 
-use crate::bindings::_helpers::rules::lint_pipeline::{
-    LintViolationRow, NATIVE_ENGINE, ViolationClasses, project_relative_path,
-};
+use crate::bindings::_helpers::rules::lint_pipeline::LintViolationRow;
+use crate::bindings::_helpers::rules::lint_pipeline::NATIVE_ENGINE;
+use crate::bindings::_helpers::rules::lint_pipeline::ViolationClasses;
+use crate::bindings::_helpers::rules::lint_pipeline::project_relative_path;
 use crate::bindings::models::Positional;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::value_error::value_error;

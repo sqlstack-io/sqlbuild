@@ -2,10 +2,10 @@
 
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::planner_scenario::constants::{REF, SOURCE};
-use crate::bindings::_helpers::planner_scenario::constants::{
-    SCENARIO_PLAN_INTERNAL, SCENARIO_PLAN_MISSING_RELATION_TARGET,
-};
+use crate::bindings::_helpers::planner_scenario::constants::REF;
+use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_INTERNAL;
+use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_MISSING_RELATION_TARGET;
+use crate::bindings::_helpers::planner_scenario::constants::SOURCE;
 use crate::bindings::_helpers::planner_scenario::models::ScenarioRelations;
 use crate::bindings::_helpers::planner_scenario::values::error;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};

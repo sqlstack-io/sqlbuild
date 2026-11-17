@@ -19,14 +19,15 @@ use sqlbuild_analysis::semantic_validation::models as validation;
 use crate::bindings::_helpers::analysis::binding_catalog::schema_validations;
 use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::LineageInput;
-use crate::bindings::_helpers::compiled_views::model_reads::{inferred_names, lineage_inputs};
+use crate::bindings::_helpers::compiled_views::model_reads::inferred_names;
+use crate::bindings::_helpers::compiled_views::model_reads::lineage_inputs;
 use crate::bindings::_helpers::compiled_views::records::with_type_recovery;
 use crate::bindings::_helpers::semantic_checks::constants::SCHEMA_REVALIDATIONS;
-use crate::bindings::_helpers::semantic_checks::failures::{internal_error, semantic_error};
+use crate::bindings::_helpers::semantic_checks::failures::internal_error;
+use crate::bindings::_helpers::semantic_checks::failures::semantic_error;
 use crate::bindings::_helpers::semantic_checks::inputs::revalidation_request;
-use crate::bindings::_helpers::semantic_checks::session_facts::{
-    column_names, session_model_facts,
-};
+use crate::bindings::_helpers::semantic_checks::session_facts::column_names;
+use crate::bindings::_helpers::semantic_checks::session_facts::session_model_facts;
 use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;

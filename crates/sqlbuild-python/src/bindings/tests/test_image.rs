@@ -1,11 +1,18 @@
 use sqlbuild_cache::project_reuse::types::ImageSections;
 
-use crate::bindings::_helpers::compile_delta::image::{ImageGate, ProjectImage};
-use crate::bindings::tests::helpers::{
-    current_format, decoded_rules, encoded, facts, image, sparse_image, with_other_format,
-    with_truncated_facts, without_rule_digests,
-};
-use crate::bindings::tests::test_types::{DamagedImageTestCase, ImageRoundTripTestCase};
+use crate::bindings::_helpers::compile_delta::image::ImageGate;
+use crate::bindings::_helpers::compile_delta::image::ProjectImage;
+use crate::bindings::tests::helpers::current_format;
+use crate::bindings::tests::helpers::decoded_rules;
+use crate::bindings::tests::helpers::encoded;
+use crate::bindings::tests::helpers::facts;
+use crate::bindings::tests::helpers::image;
+use crate::bindings::tests::helpers::sparse_image;
+use crate::bindings::tests::helpers::with_other_format;
+use crate::bindings::tests::helpers::with_truncated_facts;
+use crate::bindings::tests::helpers::without_rule_digests;
+use crate::bindings::tests::test_types::DamagedImageTestCase;
+use crate::bindings::tests::test_types::ImageRoundTripTestCase;
 
 #[test]
 fn given_project_image_when_encoded_and_decoded_then_every_fact_and_the_rules_survive() {

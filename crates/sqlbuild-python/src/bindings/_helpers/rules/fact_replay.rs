@@ -19,13 +19,20 @@ use crate::bindings::_helpers::compiled_views::function_views::NativeCompiledFun
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
 use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;
-use crate::bindings::_helpers::rules::fact_encoder::{
-    Encoded, FactEncoder, FactFailure, error_digest, value_digest,
-};
-use crate::bindings::_helpers::rules::fact_tree::{
-    Outcome, Raised, TreeQuery, nodes_value, path_string, read_text, relative_parts,
-    selected_nodes, tree_nodes,
-};
+use crate::bindings::_helpers::rules::fact_encoder::Encoded;
+use crate::bindings::_helpers::rules::fact_encoder::FactEncoder;
+use crate::bindings::_helpers::rules::fact_encoder::FactFailure;
+use crate::bindings::_helpers::rules::fact_encoder::error_digest;
+use crate::bindings::_helpers::rules::fact_encoder::value_digest;
+use crate::bindings::_helpers::rules::fact_tree::Outcome;
+use crate::bindings::_helpers::rules::fact_tree::Raised;
+use crate::bindings::_helpers::rules::fact_tree::TreeQuery;
+use crate::bindings::_helpers::rules::fact_tree::nodes_value;
+use crate::bindings::_helpers::rules::fact_tree::path_string;
+use crate::bindings::_helpers::rules::fact_tree::read_text;
+use crate::bindings::_helpers::rules::fact_tree::relative_parts;
+use crate::bindings::_helpers::rules::fact_tree::selected_nodes;
+use crate::bindings::_helpers::rules::fact_tree::tree_nodes;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as record_field_or_attribute;

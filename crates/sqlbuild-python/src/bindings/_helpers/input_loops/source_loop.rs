@@ -7,19 +7,19 @@ use sqlbuild_attachments::cursor_intrinsics::main::intrinsic_free::intrinsic_fre
 use sqlbuild_attachments::cursor_intrinsics::models::IntrinsicCheck;
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{SourceRow, SourceSettings};
-use crate::bindings::_helpers::compiled_views::source_views::{
-    AttachedSource, SourceHandles, replaced,
-};
-use crate::bindings::_helpers::input_loops::model_loop::{
-    LoopContext, NativeModelLoop, compile_error, record_reads,
-};
-use crate::bindings::_helpers::input_loops::model_loop_macros::{
-    argument_references as macro_argument_references, expanded_with,
-};
-use crate::bindings::_helpers::project_assembly::resources::{
-    syntax_error_message, syntax_error_messages,
-};
+use crate::bindings::_helpers::compiled_project::attachment_inputs::SourceRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::SourceSettings;
+use crate::bindings::_helpers::compiled_views::source_views::AttachedSource;
+use crate::bindings::_helpers::compiled_views::source_views::SourceHandles;
+use crate::bindings::_helpers::compiled_views::source_views::replaced;
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
+use crate::bindings::_helpers::input_loops::model_loop::record_reads;
+use crate::bindings::_helpers::input_loops::model_loop_macros::argument_references as macro_argument_references;
+use crate::bindings::_helpers::input_loops::model_loop_macros::expanded_with;
+use crate::bindings::_helpers::project_assembly::resources::syntax_error_message;
+use crate::bindings::_helpers::project_assembly::resources::syntax_error_messages;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::main::config::expanded::expanded;

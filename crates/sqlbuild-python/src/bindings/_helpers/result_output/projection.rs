@@ -12,8 +12,10 @@ use sqlbuild_host::models::{
 use sqlbuild_host::types::ResultEnum;
 
 use crate::bindings::_helpers::plan_output::values::text;
-use crate::bindings::_helpers::result_output::resource_ids::{audit_identity, sql_test_identity};
-use crate::bindings::_helpers::result_output::terminal_index::{TerminalEventIndex, current_index};
+use crate::bindings::_helpers::result_output::resource_ids::audit_identity;
+use crate::bindings::_helpers::result_output::resource_ids::sql_test_identity;
+use crate::bindings::_helpers::result_output::terminal_index::TerminalEventIndex;
+use crate::bindings::_helpers::result_output::terminal_index::current_index;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 

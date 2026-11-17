@@ -1,7 +1,5 @@
 //! Boundary conversion for native fixture read analysis.
 
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::PyFrozenSet;
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -13,12 +11,15 @@ use sqlbuild_analysis::planner_fixtures::models::{
 };
 use sqlbuild_analysis::required_columns::models::ColumnRead;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use std::collections::{HashMap, HashSet};
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::model_reads::{
-    LineageFactRow, lineage_facts, proven_inputs, star_flags,
-};
+use crate::bindings::_helpers::compiled_views::model_reads::LineageFactRow;
+use crate::bindings::_helpers::compiled_views::model_reads::lineage_facts;
+use crate::bindings::_helpers::compiled_views::model_reads::proven_inputs;
+use crate::bindings::_helpers::compiled_views::model_reads::star_flags;
 use crate::bindings::_helpers::planner_strategy::constants::HIGH_CONFIDENCE;
 use crate::bindings::_helpers::planner_strategy::fixture_context::work_counts;
 use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;

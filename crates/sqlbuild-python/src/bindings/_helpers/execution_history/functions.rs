@@ -12,11 +12,17 @@ use sqlbuild_state::execution_history::main::validate_page_limit::validate_page_
 use sqlbuild_state::execution_history::main::validate_stored_event::validate_stored_event;
 use sqlbuild_state::execution_history::models::FilterSpec;
 
-use crate::bindings::_helpers::execution_history::appends::{event_content, event_id};
-use crate::bindings::_helpers::execution_history::conversion::{
-    checked, event_filter_spec, exact_int, projection_facts, run_filter_spec, run_records,
-    run_rows, text_of, utc_zone,
-};
+use crate::bindings::_helpers::execution_history::appends::event_content;
+use crate::bindings::_helpers::execution_history::appends::event_id;
+use crate::bindings::_helpers::execution_history::conversion::checked;
+use crate::bindings::_helpers::execution_history::conversion::event_filter_spec;
+use crate::bindings::_helpers::execution_history::conversion::exact_int;
+use crate::bindings::_helpers::execution_history::conversion::projection_facts;
+use crate::bindings::_helpers::execution_history::conversion::run_filter_spec;
+use crate::bindings::_helpers::execution_history::conversion::run_records;
+use crate::bindings::_helpers::execution_history::conversion::run_rows;
+use crate::bindings::_helpers::execution_history::conversion::text_of;
+use crate::bindings::_helpers::execution_history::conversion::utc_zone;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Return the required stable ID from a known or opaque lifecycle event.

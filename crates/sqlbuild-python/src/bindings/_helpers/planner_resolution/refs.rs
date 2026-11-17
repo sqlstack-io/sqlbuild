@@ -1,20 +1,20 @@
 //! Reference lookup and adapter callbacks for planner SQL.
 
+use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;
-use crate::bindings::_helpers::planner_resolution::values::{
-    cursor_wrap, filtering_of, method, string,
-};
+use crate::bindings::_helpers::planner_resolution::values::cursor_wrap;
+use crate::bindings::_helpers::planner_resolution::values::filtering_of;
+use crate::bindings::_helpers::planner_resolution::values::method;
+use crate::bindings::_helpers::planner_resolution::values::string;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::SqlCodeScanner;

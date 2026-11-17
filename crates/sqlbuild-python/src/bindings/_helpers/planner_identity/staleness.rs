@@ -17,7 +17,8 @@ use sqlbuild_analysis::planner_identity::models::{
     GraphKey, StaleWarning, StalenessGraph, StalenessNames,
 };
 
-use crate::bindings::_helpers::planner_changes::detect::{ModelPass, model_change};
+use crate::bindings::_helpers::planner_changes::detect::ModelPass;
+use crate::bindings::_helpers::planner_changes::detect::model_change;
 use crate::bindings::_helpers::planner_identity::hashing::graph_key;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

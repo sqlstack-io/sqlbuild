@@ -4,14 +4,10 @@ use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::types::PyString;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::compile_driver::models::ProjectConfiguration;
 use crate::compile_driver::main::reject_invalid_connection_configuration::reject_invalid_connection_configuration;
+use crate::compile_driver::models::ProjectConfiguration;
 use crate::discovery::_helpers::project::project_config::load_local_config_file;
 use crate::discovery::_helpers::project::project_config::load_project_config_file;
-use crate::compile_driver::main::reject_invalid_project_configuration::reject_invalid_project_configuration;
-use crate::discovery::_helpers::project::project_config::warn_deprecated_settings;
-use crate::discovery::_helpers::python_files::imported_providers::discover_provider_classes;
-use crate::discovery::models::SecretPolicy;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

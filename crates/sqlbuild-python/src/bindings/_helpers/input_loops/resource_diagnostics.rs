@@ -22,12 +22,15 @@ use sqlbuild_pysource::definition_locations::main::decorator_location::decorator
 use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
 use sqlbuild_sqltext::compiler::main::model_header_entry_span::model_header_entry_span;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    DiagnosticSettings, HookDescriptionRow, LoaderRow, PythonResourceRow, ResourceDiagnostics,
-    ScenarioDescriptionRow,
-};
+use crate::bindings::_helpers::compiled_project::attachment_inputs::DiagnosticSettings;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::HookDescriptionRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::LoaderRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::PythonResourceRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::ResourceDiagnostics;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::ScenarioDescriptionRow;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::seed_views::{SeedParts, SeedViews};
+use crate::bindings::_helpers::compiled_views::seed_views::SeedParts;
+use crate::bindings::_helpers::compiled_views::seed_views::SeedViews;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::compile_context::main::delta::capture::capture;
 use sqlbuild_python_base::compile_context::main::delta::capturing::capturing;

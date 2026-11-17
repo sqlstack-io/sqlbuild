@@ -45,9 +45,10 @@ use sqlbuild_rules::project_tree::main::project_real_paths::project_real_paths;
 use sqlclean::sql_lint::main::fill_finding_path::fill_finding_path;
 
 use crate::bindings::_helpers::rules::dsl_headers::header_violations;
-use crate::bindings::_helpers::rules::native_header_parser::{
-    FUNCTION_KIND, HeaderFailure, NativeHeaderParser, external_identifiers,
-};
+use crate::bindings::_helpers::rules::native_header_parser::FUNCTION_KIND;
+use crate::bindings::_helpers::rules::native_header_parser::HeaderFailure;
+use crate::bindings::_helpers::rules::native_header_parser::NativeHeaderParser;
+use crate::bindings::_helpers::rules::native_header_parser::external_identifiers;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;

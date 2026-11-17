@@ -1,10 +1,10 @@
 //! Typed requests of plan entry construction.
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 /// What resolving relation locations and source metadata for one scope reads.
 #[derive(Debug)]

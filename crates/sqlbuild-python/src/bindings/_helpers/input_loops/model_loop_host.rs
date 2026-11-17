@@ -13,19 +13,22 @@ use sqlbuild_analysis::compiled_project::models::{
 use sqlbuild_analysis::sql_macros::models::TypedCall;
 use sqlbuild_discovery::model_files::models::HeaderFacts;
 
-use crate::bindings::_helpers::compiled_project::project::{
-    CONTRACT_KEY, INCREMENTAL_MODE_KEY, materialization, text_value,
-};
-use crate::bindings::_helpers::compiled_project::project::{
-    DeclarationPy, config_values, declarations,
-};
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    InputProjections, ModelInputHandles, ModelInputRecord, SchemaHandles, SchemaRecord,
-};
+use crate::bindings::_helpers::compiled_project::project::CONTRACT_KEY;
+use crate::bindings::_helpers::compiled_project::project::DeclarationPy;
+use crate::bindings::_helpers::compiled_project::project::INCREMENTAL_MODE_KEY;
+use crate::bindings::_helpers::compiled_project::project::config_values;
+use crate::bindings::_helpers::compiled_project::project::declarations;
+use crate::bindings::_helpers::compiled_project::project::materialization;
+use crate::bindings::_helpers::compiled_project::project::text_value;
+use crate::bindings::_helpers::compiled_views::model_input_view::InputProjections;
+use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputHandles;
+use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
+use crate::bindings::_helpers::compiled_views::model_input_view::SchemaHandles;
+use crate::bindings::_helpers::compiled_views::model_input_view::SchemaRecord;
 use crate::bindings::_helpers::input_loops::model_loop_header::AttachedHeader;
-use crate::bindings::_helpers::input_loops::model_loop_inputs::{
-    HOOK_KEYS, reference_fact, stripped_values,
-};
+use crate::bindings::_helpers::input_loops::model_loop_inputs::HOOK_KEYS;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_fact;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::stripped_values;
 use sqlbuild_project::models::ExpansionRecord;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

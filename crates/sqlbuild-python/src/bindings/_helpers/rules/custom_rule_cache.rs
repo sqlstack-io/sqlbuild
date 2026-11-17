@@ -22,7 +22,8 @@ use sqlbuild_rules::custom_rule_cache::models::{
 use sqlbuild_rules::custom_rule_cache::types::{ReadSet, StoredRules, SubjectResults};
 
 use crate::bindings::_helpers::compiled_project::values::plain_value;
-use crate::bindings::_helpers::rules::findings::{FindingClasses, invalid_finding};
+use crate::bindings::_helpers::rules::findings::FindingClasses;
+use crate::bindings::_helpers::rules::findings::invalid_finding;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;

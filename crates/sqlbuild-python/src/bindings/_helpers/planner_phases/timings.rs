@@ -5,7 +5,8 @@ use std::time::Instant;
 
 use serde_json::{Value, json};
 
-use crate::bindings::_helpers::planner_phases::constants::{MILLISECONDS, PERCENT};
+use crate::bindings::_helpers::planner_phases::constants::MILLISECONDS;
+use crate::bindings::_helpers::planner_phases::constants::PERCENT;
 
 /// Compiling the project before planning; a location planning its published project skips it.
 pub(crate) const COMPILING: &str = "Compiling the project";

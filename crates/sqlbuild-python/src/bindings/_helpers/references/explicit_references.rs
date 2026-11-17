@@ -25,7 +25,8 @@ use sqlbuild_pysource::literal_sql::main::literal_sql_calls::literal_sql_calls;
 use sqlbuild_pysource::literal_sql::models::FunctionSource;
 
 use crate::bindings::_helpers::graph::execution_gates::model_python_hook_names;
-use crate::bindings::_helpers::references::reference_facts::{ProjectFacts, project_facts};
+use crate::bindings::_helpers::references::reference_facts::ProjectFacts;
+use crate::bindings::_helpers::references::reference_facts::project_facts;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

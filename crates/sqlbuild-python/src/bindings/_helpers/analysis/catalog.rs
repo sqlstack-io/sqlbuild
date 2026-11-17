@@ -2,8 +2,10 @@
 
 use crate::bindings::_helpers::analysis::conversions;
 use crate::bindings::_helpers::analysis::normalization_results::normalization_results;
+use crate::bindings::models::CatalogInput;
+use crate::bindings::models::CompactAnalysisJob;
 use crate::bindings::models::Positional;
-use crate::bindings::models::{CatalogInput, CompactAnalysisJob, ProjectCatalog};
+use crate::bindings::models::ProjectCatalog;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::pymethods;

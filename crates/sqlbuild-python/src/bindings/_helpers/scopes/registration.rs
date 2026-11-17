@@ -2,7 +2,8 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::scopes::{scope_command, scope_loading};
+use crate::bindings::_helpers::scopes::scope_command;
+use crate::bindings::_helpers::scopes::scope_loading;
 use sqlbuild_python_front::scopes::main::checks::register_scope_validation::register_scope_validation;
 use sqlbuild_python_front::scopes::main::checks::register_scope_visibility::register_scope_visibility;
 use sqlbuild_python_front::scopes::main::declarations::register_declaration_contexts::register_declaration_contexts;

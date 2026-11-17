@@ -1,12 +1,13 @@
 //! The helper and fixture CTEs a scenario's fixtures, expected output and assertions read.
 
-use sqlbuild_python_base::native_host::types::Syntax;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::compiler::main::scenario_helper_scope::scenario_helper_scope as helper_scope;
 use sqlbuild_analysis::compiler::models::{ScenarioHelperScope, ScenarioScopeInput};
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_INTERNAL;
-use crate::bindings::_helpers::planner_scenario::{models::SqlContext, values::error};
+use crate::bindings::_helpers::planner_scenario::models::SqlContext;
+use crate::bindings::_helpers::planner_scenario::values::error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;

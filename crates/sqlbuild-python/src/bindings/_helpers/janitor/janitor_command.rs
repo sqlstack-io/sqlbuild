@@ -26,17 +26,20 @@ use sqlbuild_core::janitor_text::main::validate_janitor_settings::validate_janit
 use sqlbuild_core::janitor_text::models::{JanitorOutcome, JanitorPlanText, JanitorRunText};
 use std::time::Instant;
 
-use crate::bindings::_helpers::cli::machine_output::{
-    report_machine_output_written, take_machine_output_written,
-};
+use crate::bindings::_helpers::cli::machine_output::report_machine_output_written;
+use crate::bindings::_helpers::cli::machine_output::take_machine_output_written;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::diff_report::support::cli_error;
-use crate::bindings::_helpers::janitor::janitor_phases::{
-    JanitorCompiled, build_janitor_execution_plan, close_janitor_warehouse,
-    compile_janitor_project, connect_janitor_warehouse, execute_janitor_cleanup, output_stream,
-};
-use crate::bindings::_helpers::janitor::janitor_plan::{janitor_plan_text, janitor_result_counts};
+use crate::bindings::_helpers::janitor::janitor_phases::JanitorCompiled;
+use crate::bindings::_helpers::janitor::janitor_phases::build_janitor_execution_plan;
+use crate::bindings::_helpers::janitor::janitor_phases::close_janitor_warehouse;
+use crate::bindings::_helpers::janitor::janitor_phases::compile_janitor_project;
+use crate::bindings::_helpers::janitor::janitor_phases::connect_janitor_warehouse;
+use crate::bindings::_helpers::janitor::janitor_phases::execute_janitor_cleanup;
+use crate::bindings::_helpers::janitor::janitor_phases::output_stream;
+use crate::bindings::_helpers::janitor::janitor_plan::janitor_plan_text;
+use crate::bindings::_helpers::janitor::janitor_plan::janitor_result_counts;
 use crate::bindings::_helpers::janitor::janitor_progress::JanitorProgressPrinter;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::scenario_command::setup::stream_isatty;

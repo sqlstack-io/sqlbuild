@@ -17,12 +17,11 @@ use sqlbuild_core::load_command::main::select_load_entries::select_load_entries 
 use sqlbuild_core::load_command::models::{LoadEntry, LoadGraph};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::compile_attachment::target::{
-    connection_is_default_target, project_location,
-};
-use crate::bindings::_helpers::compile_driver::targets::{
-    expanded_loader_namespace, managed_write_schema, preserved_loader_schemas,
-};
+use crate::bindings::_helpers::compile_attachment::target::connection_is_default_target;
+use crate::bindings::_helpers::compile_attachment::target::project_location;
+use crate::bindings::_helpers::compile_driver::targets::expanded_loader_namespace;
+use crate::bindings::_helpers::compile_driver::targets::managed_write_schema;
+use crate::bindings::_helpers::compile_driver::targets::preserved_loader_schemas;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;

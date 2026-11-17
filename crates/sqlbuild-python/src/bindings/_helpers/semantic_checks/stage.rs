@@ -12,9 +12,9 @@ use crate::bindings::_helpers::rules::early_builtin_rules::start_early_rules;
 use crate::bindings::_helpers::semantic_checks::completion::completed_diagnostics;
 use crate::bindings::_helpers::semantic_checks::metadata::metadata_diagnostics;
 use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
-use crate::bindings::_helpers::semantic_checks::type_recovery::{
-    StageShared, items, recovered_types,
-};
+use crate::bindings::_helpers::semantic_checks::type_recovery::StageShared;
+use crate::bindings::_helpers::semantic_checks::type_recovery::items;
+use crate::bindings::_helpers::semantic_checks::type_recovery::recovered_types;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
 use sqlbuild_python_base::boundary::models::Request;

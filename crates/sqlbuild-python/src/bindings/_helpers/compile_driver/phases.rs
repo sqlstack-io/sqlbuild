@@ -6,9 +6,9 @@ use pyo3::types::PyTuple;
 
 use crate::bindings::_helpers::compile_command::artifact_batch::ArtifactBatch;
 use crate::bindings::_helpers::compile_command::reuse_recording::ArtifactRecorder;
-use crate::bindings::_helpers::compile_command::target_writer::{
-    Prepared, planning_diagnostics, write_static_target,
-};
+use crate::bindings::_helpers::compile_command::target_writer::Prepared;
+use crate::bindings::_helpers::compile_command::target_writer::planning_diagnostics;
+use crate::bindings::_helpers::compile_command::target_writer::write_static_target;
 use crate::bindings::_helpers::dag_artifact::artifact::build_dag_json;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::manifest::builder::build_manifest;

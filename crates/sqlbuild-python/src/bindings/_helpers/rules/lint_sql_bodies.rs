@@ -8,9 +8,9 @@ use sqlbuild_rules::lint_text::models::{
     AuthoredDiagnostic, ExpansionSpan, LintSqlBody, LintSqlOptions,
 };
 
-use crate::bindings::_helpers::rules::lint_pipeline::{
-    LintViolationRow, ViolationClasses, relation_names as sentinel_relation_names,
-};
+use crate::bindings::_helpers::rules::lint_pipeline::LintViolationRow;
+use crate::bindings::_helpers::rules::lint_pipeline::ViolationClasses;
+use crate::bindings::_helpers::rules::lint_pipeline::relation_names as sentinel_relation_names;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;

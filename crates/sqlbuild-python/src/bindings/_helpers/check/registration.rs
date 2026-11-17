@@ -2,7 +2,9 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::check::{check_command, check_core, check_results};
+use crate::bindings::_helpers::check::check_command;
+use crate::bindings::_helpers::check::check_core;
+use crate::bindings::_helpers::check::check_results;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     check_command::register(module)?;

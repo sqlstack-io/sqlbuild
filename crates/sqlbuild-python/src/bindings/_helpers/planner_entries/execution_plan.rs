@@ -1,40 +1,42 @@
 //! Top-level planner orchestration producing an execution plan.
 
-use crate::bindings::_helpers::planner_phases::timings::{
-    ASSEMBLING, BUILDING_ENTRIES, DETECTING_CHANGES, READING_WAREHOUSE, SOURCE_FRESHNESS,
-    TEST_FIXTURES, record, timed,
-};
+use crate::bindings::_helpers::planner_phases::timings::ASSEMBLING;
+use crate::bindings::_helpers::planner_phases::timings::BUILDING_ENTRIES;
+use crate::bindings::_helpers::planner_phases::timings::DETECTING_CHANGES;
+use crate::bindings::_helpers::planner_phases::timings::READING_WAREHOUSE;
+use crate::bindings::_helpers::planner_phases::timings::SOURCE_FRESHNESS;
+use crate::bindings::_helpers::planner_phases::timings::TEST_FIXTURES;
+use crate::bindings::_helpers::planner_phases::timings::record;
+use crate::bindings::_helpers::planner_phases::timings::timed;
 use sqlbuild_analysis::planner_scope::constants::MODEL;
 
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::build_command::main::utc_now::utc_now;
-use sqlbuild_python_base::native_host::models::Dialect;
 use crate::bindings::_helpers::planner_changes::actions::resolve_model_actions;
 use crate::bindings::_helpers::planner_changes::detect::detect_changes;
-use crate::bindings::_helpers::planner_entries::test_planning::{
-    PlanningRequest, SqlTestPlanning, start_planning,
-};
-use crate::bindings::_helpers::planner_entries::values::{native, replaced};
+use crate::bindings::_helpers::planner_entries::test_planning::PlanningRequest;
+use crate::bindings::_helpers::planner_entries::test_planning::SqlTestPlanning;
+use crate::bindings::_helpers::planner_entries::test_planning::start_planning;
+use crate::bindings::_helpers::planner_entries::values::native;
+use crate::bindings::_helpers::planner_entries::values::replaced;
 use crate::bindings::_helpers::planner_phases::buildability::check_selected_scope_buildability;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::deferred_origins::defer_to_migration_origins;
-use crate::bindings::_helpers::planner_phases::execution_changes::{
-    build_planner_entry_results, reconcile_execution_changes,
-};
-use crate::bindings::_helpers::planner_phases::identities::{
-    build_planner_identity_context, detect_stale_warning_changes,
-};
+use crate::bindings::_helpers::planner_phases::execution_changes::build_planner_entry_results;
+use crate::bindings::_helpers::planner_phases::execution_changes::reconcile_execution_changes;
+use crate::bindings::_helpers::planner_phases::identities::build_planner_identity_context;
+use crate::bindings::_helpers::planner_phases::identities::detect_stale_warning_changes;
+use crate::bindings::_helpers::planner_phases::models::PlanOutputContext;
+use crate::bindings::_helpers::planner_phases::models::PlanWarningContext;
+use crate::bindings::_helpers::planner_phases::models::PlannedModelEntries;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::PlannerRuntime;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
-use crate::bindings::_helpers::planner_phases::models::{
-    PlanOutputContext, PlanWarningContext, PlannedModelEntries, StoragePolicyContext,
-};
+use crate::bindings::_helpers::planner_phases::models::StoragePolicyContext;
+use crate::bindings::_helpers::planner_phases::output_assembly::add_deferred_origin_notes;
+use crate::bindings::_helpers::planner_phases::output_assembly::add_plan_metadata;
+use crate::bindings::_helpers::planner_phases::output_assembly::add_plan_warnings;
+use crate::bindings::_helpers::planner_phases::output_assembly::add_storage_policies;
+use crate::bindings::_helpers::planner_phases::output_assembly::base_plan_output;
 use crate::bindings::_helpers::planner_phases::output_assembly::unselected_upstream_models;
-use crate::bindings::_helpers::planner_phases::output_assembly::{
-    add_deferred_origin_notes, add_plan_metadata, add_plan_warnings, add_storage_policies,
-    base_plan_output,
-};
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
 use crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes;
 use crate::bindings::_helpers::planner_phases::warehouse_state::gather_planner_warehouse_state;
@@ -45,9 +47,9 @@ use crate::bindings::_helpers::planner_warehouse::source_freshness::build_planne
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::main::within::within;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_command::main::utc_now::utc_now;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use std::time::Instant;

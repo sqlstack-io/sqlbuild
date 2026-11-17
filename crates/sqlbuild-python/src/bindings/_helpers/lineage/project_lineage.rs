@@ -23,13 +23,14 @@ use sqlbuild_analysis::semantic_validation::models as validation;
 
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_reads::star_flags;
-use crate::bindings::_helpers::lineage::column_lineage_graph::{
-    CompactColumns, CompactModel, ProjectColumnLineage,
-};
-use crate::bindings::_helpers::lineage::lineage_objects::{LineageClasses, log_lineage_event};
-use crate::bindings::_helpers::lineage::project_schema::{
-    fast_schema, inferred_names, rich_schema,
-};
+use crate::bindings::_helpers::lineage::column_lineage_graph::CompactColumns;
+use crate::bindings::_helpers::lineage::column_lineage_graph::CompactModel;
+use crate::bindings::_helpers::lineage::column_lineage_graph::ProjectColumnLineage;
+use crate::bindings::_helpers::lineage::lineage_objects::LineageClasses;
+use crate::bindings::_helpers::lineage::lineage_objects::log_lineage_event;
+use crate::bindings::_helpers::lineage::project_schema::fast_schema;
+use crate::bindings::_helpers::lineage::project_schema::inferred_names;
+use crate::bindings::_helpers::lineage::project_schema::rich_schema;
 use crate::bindings::_helpers::project_assembly::syntax_checks::model_placeholders;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;

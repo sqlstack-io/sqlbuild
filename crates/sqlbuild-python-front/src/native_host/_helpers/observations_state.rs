@@ -11,13 +11,13 @@ use sqlbuild_state::observations::main::prune_observations_sql::prune_observatio
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 use uuid::Uuid;
 
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use crate::native_host::main::execute::execute;
-use crate::native_host::models::Location;
-use crate::native_host::constants::ROWS_PER_STATEMENT;
 use crate::native_host::_helpers::consumption_state::fixed_state_table_sql;
 use crate::native_host::_helpers::consumption_state::literal;
 use crate::native_host::_helpers::consumption_state::state_table_name;
+use crate::native_host::constants::ROWS_PER_STATEMENT;
+use crate::native_host::main::execute::execute;
+use crate::native_host::models::Location;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Create-if-missing DDL for the observations table, with adapter-rendered column types.

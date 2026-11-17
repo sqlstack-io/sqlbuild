@@ -9,17 +9,20 @@ use sqlbuild_analysis::semantic_checks::models::{
 };
 
 use crate::bindings::_helpers::compiled_views::compiled_model_view::LineageInput;
-use crate::bindings::_helpers::compiled_views::model_reads::{inferred_names, lineage_inputs};
+use crate::bindings::_helpers::compiled_views::model_reads::inferred_names;
+use crate::bindings::_helpers::compiled_views::model_reads::lineage_inputs;
 use crate::bindings::_helpers::compiled_views::records::with_binding_diagnostics;
 use crate::bindings::_helpers::semantic_checks::failures::semantic_error;
-use crate::bindings::_helpers::semantic_checks::metadata::{ShapeRows, shape_rows};
-use crate::bindings::_helpers::semantic_checks::session_facts::{
-    column_names, session_model_facts,
-};
+use crate::bindings::_helpers::semantic_checks::metadata::ShapeRows;
+use crate::bindings::_helpers::semantic_checks::metadata::shape_rows;
+use crate::bindings::_helpers::semantic_checks::session_facts::column_names;
+use crate::bindings::_helpers::semantic_checks::session_facts::session_model_facts;
 use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
-use crate::bindings::_helpers::semantic_checks::type_recovery::{
-    StageShared, diagnostic_ids, id_of, items, lineage_outputs,
-};
+use crate::bindings::_helpers::semantic_checks::type_recovery::StageShared;
+use crate::bindings::_helpers::semantic_checks::type_recovery::diagnostic_ids;
+use crate::bindings::_helpers::semantic_checks::type_recovery::id_of;
+use crate::bindings::_helpers::semantic_checks::type_recovery::items;
+use crate::bindings::_helpers::semantic_checks::type_recovery::lineage_outputs;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

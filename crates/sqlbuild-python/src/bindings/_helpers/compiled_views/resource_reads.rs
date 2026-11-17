@@ -3,9 +3,8 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::bindings::_helpers::compiled_views::compiled_model_view::{
-    NativeCompiledModel, model_graph_row,
-};
+use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::model_graph_row;
 use crate::bindings::_helpers::compiled_views::function_views::NativeCompiledFunction;
 use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
 use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;

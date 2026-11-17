@@ -2,13 +2,16 @@
 
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::observations::source_capture::capture_source_columns;
-use crate::bindings::_helpers::planner_phases::objects::{frozenset, text, tuple};
-use crate::bindings::_helpers::planner_warehouse::constants::{
-    COLUMN_INFO, METADATA_NAME_FILTER_LIMIT, RELATION_LOOKUP,
-};
-use crate::bindings::_helpers::planner_warehouse::reads::{PlannerReads, Read};
-use crate::bindings::_helpers::planner_warehouse::snapshot::{columns_for, list_relations};
+use crate::bindings::_helpers::planner_phases::objects::frozenset;
+use crate::bindings::_helpers::planner_phases::objects::text;
+use crate::bindings::_helpers::planner_phases::objects::tuple;
+use crate::bindings::_helpers::planner_warehouse::constants::COLUMN_INFO;
+use crate::bindings::_helpers::planner_warehouse::constants::METADATA_NAME_FILTER_LIMIT;
+use crate::bindings::_helpers::planner_warehouse::constants::RELATION_LOOKUP;
+use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
+use crate::bindings::_helpers::planner_warehouse::reads::Read;
+use crate::bindings::_helpers::planner_warehouse::snapshot::columns_for;
+use crate::bindings::_helpers::planner_warehouse::snapshot::list_relations;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};

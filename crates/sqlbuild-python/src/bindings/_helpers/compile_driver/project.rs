@@ -8,18 +8,22 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_host::compile_context::main::record_compile_timing::record_compile_timing;
 
-use crate::bindings::_helpers::compile_driver::inputs::{InputsRequest, attached_inputs};
+use crate::bindings::_helpers::compile_driver::inputs::InputsRequest;
+use crate::bindings::_helpers::compile_driver::inputs::attached_inputs;
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::project_graph;
-use crate::bindings::_helpers::compile_driver::target_defaults::{
-    TargetDefaults, apply_target_defaults,
-};
-use crate::bindings::_helpers::compile_driver::targets::{
-    managed_loader_target_isolation, managed_source_loaders, managed_write_schemas,
-    named_target_schema_strategy, preserved_loader_schemas, project_targets,
-    requires_explicit_targets,
-};
-use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
+use crate::bindings::_helpers::compile_driver::target_defaults::TargetDefaults;
+use crate::bindings::_helpers::compile_driver::target_defaults::apply_target_defaults;
+use crate::bindings::_helpers::compile_driver::targets::managed_loader_target_isolation;
+use crate::bindings::_helpers::compile_driver::targets::managed_source_loaders;
+use crate::bindings::_helpers::compile_driver::targets::managed_write_schemas;
+use crate::bindings::_helpers::compile_driver::targets::named_target_schema_strategy;
+use crate::bindings::_helpers::compile_driver::targets::preserved_loader_schemas;
+use crate::bindings::_helpers::compile_driver::targets::project_targets;
+use crate::bindings::_helpers::compile_driver::targets::requires_explicit_targets;
+use crate::bindings::_helpers::frontier::compile_frontier::FrontierStage;
+use crate::bindings::_helpers::frontier::compile_frontier::bridged;
+use crate::bindings::_helpers::frontier::compile_frontier::produced;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;

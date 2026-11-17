@@ -23,7 +23,8 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_conn
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_project_graph_from_compiled_project;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
-use crate::bindings::_helpers::contract_command::write::{ContractWrite, write_contracts};
+use crate::bindings::_helpers::contract_command::write::ContractWrite;
+use crate::bindings::_helpers::contract_command::write::write_contracts;
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

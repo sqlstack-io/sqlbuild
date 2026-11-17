@@ -18,7 +18,9 @@ use sqlbuild_analysis::planner_strategy::models::{AuditAttachmentKind, AuditRunS
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_scope::values::edges;
-use crate::bindings::_helpers::planner_strategy::values::{input_error, optional_string, text};
+use crate::bindings::_helpers::planner_strategy::values::input_error;
+use crate::bindings::_helpers::planner_strategy::values::optional_string;
+use crate::bindings::_helpers::planner_strategy::values::text;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;

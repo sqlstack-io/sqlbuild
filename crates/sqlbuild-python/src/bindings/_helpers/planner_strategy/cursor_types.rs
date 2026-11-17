@@ -11,7 +11,9 @@ use sqlbuild_analysis::planner_strategy::models::{CursorType, CursorTypeCheck};
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::planner_changes::results::planner_enum;
-use crate::bindings::_helpers::planner_strategy::values::{optional_string, plan_warning, text};
+use crate::bindings::_helpers::planner_strategy::values::optional_string;
+use crate::bindings::_helpers::planner_strategy::values::plan_warning;
+use crate::bindings::_helpers::planner_strategy::values::text;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

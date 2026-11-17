@@ -16,7 +16,8 @@ use sqlbuild_core::plan_display::main::format_waiting_on_empty_inputs::format_wa
 use sqlbuild_core::plan_display::main::model_materialization_label::model_materialization_label as materialization_label;
 use sqlbuild_core::plan_display::models::{ModelLabelFacts, ParsedBound};
 
-use crate::bindings::_helpers::plan_output::values::{optional_text, text};
+use crate::bindings::_helpers::plan_output::values::optional_text;
+use crate::bindings::_helpers::plan_output::values::text;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

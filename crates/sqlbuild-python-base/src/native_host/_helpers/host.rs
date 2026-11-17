@@ -11,7 +11,6 @@ use sqlbuild_host::entries::constants::{HOST_ENTRIES, HOST_MODULE, HOST_TARGETS_
 use sqlbuild_host::entries::models::HostId;
 use sqlbuild_host::entries::types::HostEntries;
 
-use crate::boundary::main::within::within;
 use crate::build_progress::main::progress::write_persistent::write_persistent;
 
 /// One entry's target module path and attribute name.

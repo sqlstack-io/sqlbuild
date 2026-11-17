@@ -7,9 +7,10 @@ use pyo3::types::{PyBool, PyDict};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::compile_attachment::sql_expansion_context::{
-    ExpansionSources, ExpansionVars, present, sql_expansion_inputs,
-};
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionSources;
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::present;
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::sql_expansion_inputs;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

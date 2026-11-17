@@ -45,49 +45,59 @@ use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::audit_views::AttachedAudit;
 use crate::bindings::_helpers::compiled_views::function_views::AttachedFunction;
 use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
-use crate::bindings::_helpers::compiled_views::source_views::{
-    AttachedSource, NativeSourceInput, retain_sources,
-};
-use crate::bindings::_helpers::input_loops::audit_loop::{AttachmentOwner, attached_audits};
-use crate::bindings::_helpers::input_loops::function_loop::{
-    attached_functions, checked_table_function_arities,
-};
-use crate::bindings::_helpers::input_loops::model_loop_calls::{CallOrigin, report_invalid_calls};
+use crate::bindings::_helpers::compiled_views::source_views::AttachedSource;
+use crate::bindings::_helpers::compiled_views::source_views::NativeSourceInput;
+use crate::bindings::_helpers::compiled_views::source_views::retain_sources;
+use crate::bindings::_helpers::input_loops::audit_loop::AttachmentOwner;
+use crate::bindings::_helpers::input_loops::audit_loop::attached_audits;
+use crate::bindings::_helpers::input_loops::function_loop::attached_functions;
+use crate::bindings::_helpers::input_loops::function_loop::checked_table_function_arities;
+use crate::bindings::_helpers::input_loops::model_loop_calls::CallOrigin;
+use crate::bindings::_helpers::input_loops::model_loop_calls::report_invalid_calls;
 use crate::bindings::_helpers::input_loops::model_loop_config::ModelConfigs;
 use crate::bindings::_helpers::input_loops::model_loop_external::external_errors;
-use crate::bindings::_helpers::input_loops::model_loop_header::{
-    AttachedHeader, HeaderSource, header_schema,
-};
-use crate::bindings::_helpers::input_loops::model_loop_hooks::{
-    ExpandedHooks, HookModel, SqlHookClasses, expanded_hooks,
-};
-use crate::bindings::_helpers::input_loops::model_loop_host::{
-    DeclarationScan, FinishedModel, InterpolationRow, ModelLoopRow, RecordClasses, RecordInputs,
-    finished_record,
-};
-use crate::bindings::_helpers::input_loops::model_loop_inputs::{
-    analysis_override, hook_presence, reference_row,
-};
-use crate::bindings::_helpers::input_loops::model_loop_macros::{
-    ExpandedMacros, MacroClasses, MacroModel, expanded_macros,
-};
-use crate::bindings::_helpers::input_loops::model_loop_named::{SCHEMA_DECLARATION, named_usages};
-use crate::bindings::_helpers::input_loops::model_loop_opt_out::{
-    AuthoredQuery, GapQueue, OptOut, OptOutModel, gap_job, reject_unparseable_query,
-    rejected_opt_out, skip_unavailable,
-};
-use crate::bindings::_helpers::input_loops::model_loop_prepass::{
-    NativeHeader, all_header_facts, native_header,
-};
-use crate::bindings::_helpers::input_loops::model_loop_python_hooks::{
-    HookClasses, HookSignatures,
-};
-use crate::bindings::_helpers::input_loops::model_loop_schema::{
-    ModelSchema, model_schema, schema_column_names,
-};
-use crate::bindings::_helpers::input_loops::model_loop_visibility::{
-    ModelVisibility, VisibilityClasses, VisibilityModel,
-};
+use crate::bindings::_helpers::input_loops::model_loop_header::AttachedHeader;
+use crate::bindings::_helpers::input_loops::model_loop_header::HeaderSource;
+use crate::bindings::_helpers::input_loops::model_loop_header::header_schema;
+use crate::bindings::_helpers::input_loops::model_loop_hooks::ExpandedHooks;
+use crate::bindings::_helpers::input_loops::model_loop_hooks::HookModel;
+use crate::bindings::_helpers::input_loops::model_loop_hooks::SqlHookClasses;
+use crate::bindings::_helpers::input_loops::model_loop_hooks::expanded_hooks;
+use crate::bindings::_helpers::input_loops::model_loop_host::DeclarationScan;
+use crate::bindings::_helpers::input_loops::model_loop_host::FinishedModel;
+use crate::bindings::_helpers::input_loops::model_loop_host::InterpolationRow;
+use crate::bindings::_helpers::input_loops::model_loop_host::ModelLoopRow;
+use crate::bindings::_helpers::input_loops::model_loop_host::RecordClasses;
+use crate::bindings::_helpers::input_loops::model_loop_host::RecordInputs;
+use crate::bindings::_helpers::input_loops::model_loop_host::finished_record;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::analysis_override;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::hook_presence;
+use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_row;
+use crate::bindings::_helpers::input_loops::model_loop_macros::ExpandedMacros;
+use crate::bindings::_helpers::input_loops::model_loop_macros::MacroClasses;
+use crate::bindings::_helpers::input_loops::model_loop_macros::MacroModel;
+use crate::bindings::_helpers::input_loops::model_loop_macros::expanded_macros;
+use crate::bindings::_helpers::input_loops::model_loop_named::SCHEMA_DECLARATION;
+use crate::bindings::_helpers::input_loops::model_loop_named::named_usages;
+use crate::bindings::_helpers::input_loops::model_loop_opt_out::AuthoredQuery;
+use crate::bindings::_helpers::input_loops::model_loop_opt_out::GapQueue;
+use crate::bindings::_helpers::input_loops::model_loop_opt_out::OptOut;
+use crate::bindings::_helpers::input_loops::model_loop_opt_out::OptOutModel;
+use crate::bindings::_helpers::input_loops::model_loop_opt_out::gap_job;
+use crate::bindings::_helpers::input_loops::model_loop_opt_out::reject_unparseable_query;
+use crate::bindings::_helpers::input_loops::model_loop_opt_out::rejected_opt_out;
+use crate::bindings::_helpers::input_loops::model_loop_opt_out::skip_unavailable;
+use crate::bindings::_helpers::input_loops::model_loop_prepass::NativeHeader;
+use crate::bindings::_helpers::input_loops::model_loop_prepass::all_header_facts;
+use crate::bindings::_helpers::input_loops::model_loop_prepass::native_header;
+use crate::bindings::_helpers::input_loops::model_loop_python_hooks::HookClasses;
+use crate::bindings::_helpers::input_loops::model_loop_python_hooks::HookSignatures;
+use crate::bindings::_helpers::input_loops::model_loop_schema::ModelSchema;
+use crate::bindings::_helpers::input_loops::model_loop_schema::model_schema;
+use crate::bindings::_helpers::input_loops::model_loop_schema::schema_column_names;
+use crate::bindings::_helpers::input_loops::model_loop_visibility::ModelVisibility;
+use crate::bindings::_helpers::input_loops::model_loop_visibility::VisibilityClasses;
+use crate::bindings::_helpers::input_loops::model_loop_visibility::VisibilityModel;
 use crate::bindings::_helpers::input_loops::source_loop::attached_sources;
 use crate::bindings::_helpers::input_loops::sql_test_loop::TestScope;
 use sqlbuild_project::models::ReferenceRow;

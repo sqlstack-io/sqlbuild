@@ -18,12 +18,15 @@ use sqlbuild_rules::rule_catalogue::main::ruleset_fingerprint::ruleset_fingerpri
 use sqlbuild_rules::rule_catalogue::main::skill_lock_name::skill_lock_name;
 use sqlbuild_rules::rule_catalogue::models::{FingerprintRule, OptionText, RuleText, SkillTarget};
 
-use crate::bindings::_helpers::rules::catalogue::{
-    native_rules_config, references_custom_rules, rule_catalogue, select_rules, verify_custom_rules,
-};
+use crate::bindings::_helpers::rules::catalogue::native_rules_config;
+use crate::bindings::_helpers::rules::catalogue::references_custom_rules;
+use crate::bindings::_helpers::rules::catalogue::rule_catalogue;
+use crate::bindings::_helpers::rules::catalogue::select_rules;
+use crate::bindings::_helpers::rules::catalogue::verify_custom_rules;
 use crate::bindings::_helpers::rules::custom_rule_evidence::custom_rule_implementation_fingerprint;
 use crate::bindings::_helpers::rules::selection::rules_error;
-use crate::bindings::_helpers::rules::skills::{owned_skill, skill_state};
+use crate::bindings::_helpers::rules::skills::owned_skill;
+use crate::bindings::_helpers::rules::skills::skill_state;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as record_field;

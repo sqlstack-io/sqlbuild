@@ -15,12 +15,11 @@ use sqlbuild_rules::relation_keys::models::{DeclaredKeyColumn, DeclaredRelation}
 
 use crate::bindings::_helpers::compiled_project::schema_facts::python_column_facts;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    NativeModelInput, model_relation_key_row,
-};
-use crate::bindings::_helpers::compiled_views::source_views::{
-    SourceKeyFacts, SourceViews, read_source_view,
-};
+use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
+use crate::bindings::_helpers::compiled_views::model_input_view::model_relation_key_row;
+use crate::bindings::_helpers::compiled_views::source_views::SourceKeyFacts;
+use crate::bindings::_helpers::compiled_views::source_views::SourceViews;
+use crate::bindings::_helpers::compiled_views::source_views::read_source_view;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::discovery::main::project::seed_csv_settings::seed_csv_settings;
 

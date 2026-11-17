@@ -5,9 +5,10 @@ use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_analysis::assembly::analysis_session::types::{Pairs, Shapes};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::analysis::binding_catalog::{
-    BindingCatalog, CASE_SENSITIVE_BINDING_DIALECTS, CatalogKey, NATIVE_DIALECT_ALIASES,
-};
+use crate::bindings::_helpers::analysis::binding_catalog::BindingCatalog;
+use crate::bindings::_helpers::analysis::binding_catalog::CASE_SENSITIVE_BINDING_DIALECTS;
+use crate::bindings::_helpers::analysis::binding_catalog::CatalogKey;
+use crate::bindings::_helpers::analysis::binding_catalog::NATIVE_DIALECT_ALIASES;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

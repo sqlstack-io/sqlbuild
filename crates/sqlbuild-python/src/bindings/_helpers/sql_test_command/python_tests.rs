@@ -14,9 +14,8 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_discovery::python_paths::main::python_test_paths::python_test_paths;
 
 use crate::bindings::_helpers::compile_driver::pipeline_entries::project_graph;
-use crate::bindings::_helpers::graph::python_node_graph::{
-    python_node_graph, run_selection_from_inputs,
-};
+use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
+use crate::bindings::_helpers::graph::python_node_graph::run_selection_from_inputs;
 use crate::bindings::_helpers::graph::python_selection::python_node_names;
 use crate::bindings::_helpers::planner_selection::unit_tests::split_project_unit_test_selectors;
 use sqlbuild_python_base::build_progress::main::terminal::flush::flush;

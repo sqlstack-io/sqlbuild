@@ -23,23 +23,26 @@ use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use crate::bindings::_helpers::audit_command::command::run_audit;
 use crate::bindings::_helpers::build_command::command::run_build;
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
-use crate::bindings::_helpers::cli::dispatch::{Invocation, command_facts, warehouse_scope};
-use crate::bindings::_helpers::command_runtime::warehouses::{
-    WarehouseInputs, configured_warehouses,
-};
-use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
+use crate::bindings::_helpers::cli::dispatch::Invocation;
+use crate::bindings::_helpers::cli::dispatch::command_facts;
+use crate::bindings::_helpers::cli::dispatch::warehouse_scope;
+use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
+use crate::bindings::_helpers::command_runtime::warehouses::configured_warehouses;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::{NodeKeys, WorkerBuild};
+use crate::bindings::_helpers::compiled_project::snapshot_execution::NodeKeys;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::compiled_views::project_reads::sql_tests;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::command::compile_snapshot;
-use crate::bindings::_helpers::location_command::constants::{
-    CHANGED_SETTING, COMMAND_IMPLEMENTATIONS, JOB_RUN_COUNTS, JOB_RUN_REACH, REACH_SETTING,
-    SQL_TEST_NODE_KIND,
-};
+use crate::bindings::_helpers::location_command::constants::CHANGED_SETTING;
+use crate::bindings::_helpers::location_command::constants::COMMAND_IMPLEMENTATIONS;
+use crate::bindings::_helpers::location_command::constants::JOB_RUN_COUNTS;
+use crate::bindings::_helpers::location_command::constants::JOB_RUN_REACH;
+use crate::bindings::_helpers::location_command::constants::REACH_SETTING;
+use crate::bindings::_helpers::location_command::constants::SQL_TEST_NODE_KIND;
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::session::InvocationRecall;
@@ -52,6 +55,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
 
 /// Each audit and SQL test the snapshot publishes, with the node keys it checks.

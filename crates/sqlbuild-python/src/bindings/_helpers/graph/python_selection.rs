@@ -26,7 +26,8 @@ use sqlbuild_analysis::python_selection::models::{
 };
 
 use crate::bindings::_helpers::compiled_project::job_catalog::needed_jobs;
-use crate::bindings::_helpers::graph::project_graph::{CompiledProjectGraph, NativeProjectGraph};
+use crate::bindings::_helpers::graph::project_graph::CompiledProjectGraph;
+use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;

@@ -12,11 +12,13 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_recall::records::main::parse_event::parse_event;
 use sqlbuild_recall::writer::models::RecallSession;
 
-use crate::bindings::_helpers::recall::constants::{
-    INVOCATION_COMPLETED, INVOCATION_FAILED, INVOCATION_STARTED, STATEMENT_COMPLETED,
-    STATEMENT_FAILED,
-};
-use crate::bindings::_helpers::recall::events::{escaped_text, event_object};
+use crate::bindings::_helpers::recall::constants::INVOCATION_COMPLETED;
+use crate::bindings::_helpers::recall::constants::INVOCATION_FAILED;
+use crate::bindings::_helpers::recall::constants::INVOCATION_STARTED;
+use crate::bindings::_helpers::recall::constants::STATEMENT_COMPLETED;
+use crate::bindings::_helpers::recall::constants::STATEMENT_FAILED;
+use crate::bindings::_helpers::recall::events::escaped_text;
+use crate::bindings::_helpers::recall::events::event_object;
 use crate::bindings::_helpers::recall::replacements::RecallReplacements;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 

@@ -4,12 +4,12 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyTuple};
 
 use crate::bindings::_helpers::analysis::binding_catalog::ignores_quoted_case;
-use crate::bindings::_helpers::analysis::schema_request::{
-    SchemaRequestParts, schema_validation_request,
-};
+use crate::bindings::_helpers::analysis::schema_request::SchemaRequestParts;
+use crate::bindings::_helpers::analysis::schema_request::schema_validation_request;
 use crate::bindings::_helpers::analysis_session::stage_functions::infer_native_query_columns;
 use crate::bindings::_helpers::semantic_checks::resource_sql::resource_sql_diagnostics_of;
-use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
+use crate::bindings::_helpers::semantic_shapes::declarations::declared_types;
+use crate::bindings::_helpers::semantic_shapes::declarations::function_names;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

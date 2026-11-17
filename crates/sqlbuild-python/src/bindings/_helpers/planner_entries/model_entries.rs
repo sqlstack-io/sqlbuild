@@ -3,45 +3,47 @@
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use sqlbuild_python_front::discovery::main::failures::microbatch_guidance::microbatch_guidance;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_changes::actions::replaces_incremental_relation;
 use crate::bindings::_helpers::planner_changes::detect::detect_model_changes;
-use crate::bindings::_helpers::planner_entries::models::{
-    ModelPlanContext, PlanEntriesRequest, PlanEntryBuildInputs, PlannerRelationsContext,
-};
-use crate::bindings::_helpers::planner_entries::values::{
-    MICROBATCH_CONCURRENCY_MESSAGE, error_of, native, none, planner_type, replaced, string,
-};
+use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
+use crate::bindings::_helpers::planner_entries::models::PlanEntriesRequest;
+use crate::bindings::_helpers::planner_entries::models::PlanEntryBuildInputs;
+use crate::bindings::_helpers::planner_entries::models::PlannerRelationsContext;
+use crate::bindings::_helpers::planner_entries::values::MICROBATCH_CONCURRENCY_MESSAGE;
+use crate::bindings::_helpers::planner_entries::values::error_of;
+use crate::bindings::_helpers::planner_entries::values::native;
+use crate::bindings::_helpers::planner_entries::values::none;
+use crate::bindings::_helpers::planner_entries::values::planner_type;
+use crate::bindings::_helpers::planner_entries::values::replaced;
+use crate::bindings::_helpers::planner_entries::values::string;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
-use crate::bindings::_helpers::planner_phases::full_refresh::{
-    check_full_rebuild_allowed, describe_full_rebuild_cause, resolve_model_full_refresh,
-};
+use crate::bindings::_helpers::planner_phases::full_refresh::check_full_rebuild_allowed;
+use crate::bindings::_helpers::planner_phases::full_refresh::describe_full_rebuild_cause;
+use crate::bindings::_helpers::planner_phases::full_refresh::resolve_model_full_refresh;
 use crate::bindings::_helpers::planner_phases::models::ModelEntryResults;
 use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_resolution::cursor_ranges::{
-    CursorWindowInputs, config_str, cursor_safety_configs, empty_cursor_inputs, microbatch_range,
-    model_cursor_overrides, plan_cursor_bounds,
-};
+use crate::bindings::_helpers::planner_resolution::cursor_ranges::CursorWindowInputs;
+use crate::bindings::_helpers::planner_resolution::cursor_ranges::config_str;
+use crate::bindings::_helpers::planner_resolution::cursor_ranges::cursor_safety_configs;
+use crate::bindings::_helpers::planner_resolution::cursor_ranges::empty_cursor_inputs;
+use crate::bindings::_helpers::planner_resolution::cursor_ranges::microbatch_range;
+use crate::bindings::_helpers::planner_resolution::cursor_ranges::model_cursor_overrides;
+use crate::bindings::_helpers::planner_resolution::cursor_ranges::plan_cursor_bounds;
 use crate::bindings::_helpers::planner_resolution::cursor_warnings::with_cursor_safety_warnings;
 use crate::bindings::_helpers::planner_resolution::models::ModelSqlRequest as SqlRequest;
-use crate::bindings::_helpers::planner_resolution::orchestration::{
-    Resolution, model_hook_entries, resolve_model_sql,
-};
+use crate::bindings::_helpers::planner_resolution::orchestration::Resolution;
+use crate::bindings::_helpers::planner_resolution::orchestration::model_hook_entries;
+use crate::bindings::_helpers::planner_resolution::orchestration::resolve_model_sql;
+use crate::bindings::_helpers::planner_strategy::cursor_inputs::build_cursor_input_relations;
+use crate::bindings::_helpers::planner_strategy::cursor_inputs::reject_unexposed_cursor_input_columns;
 use crate::bindings::_helpers::planner_strategy::cursor_inputs::runtime_cursor_producer_names;
-use crate::bindings::_helpers::planner_strategy::cursor_inputs::{
-    build_cursor_input_relations, reject_unexposed_cursor_input_columns,
-};
 use crate::bindings::_helpers::planner_strategy::lineage::reject_capped_watermark_inputs;
 use crate::bindings::_helpers::planner_strategy::microbatch_limits::apply_configured_microbatch_limits;
 use crate::bindings::_helpers::planner_strategy::model_entries::assemble_model_plan_entry;
-use crate::bindings::_helpers::planner_strategy::models::{
-    CursorInputLookups, ModelEntryDecisions,
-};
-use crate::bindings::_helpers::planner_strategy::strategy::{
-    materialization_of, resolve_model_plan_action,
-};
+use crate::bindings::_helpers::planner_strategy::models::CursorInputLookups;
+use crate::bindings::_helpers::planner_strategy::models::ModelEntryDecisions;
+use crate::bindings::_helpers::planner_strategy::strategy::materialization_of;
+use crate::bindings::_helpers::planner_strategy::strategy::resolve_model_plan_action;
 use crate::bindings::_helpers::planner_strategy::values::text;
 use crate::bindings::_helpers::semantic_shapes::source_bindings::source_binding_diagnostics;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -49,10 +51,13 @@ use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::discovery::main::failures::microbatch_guidance::microbatch_guidance;
 
 const MICROBATCH_COMPLEXITY_CODE: &str = "MICROBATCH_CONCURRENCY_COMPLEXITY";
 

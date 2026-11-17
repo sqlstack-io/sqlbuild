@@ -16,9 +16,10 @@ use sqlbuild_core::cost_allocation::main::query_history_sql::query_history_sql;
 use sqlbuild_core::cost_allocation::models::{QueryHistoryWindow, RunAllocation};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::cost_telemetry::allocation::{
-    SummaryState, allocate_observations, priced, summary_object,
-};
+use crate::bindings::_helpers::cost_telemetry::allocation::SummaryState;
+use crate::bindings::_helpers::cost_telemetry::allocation::allocate_observations;
+use crate::bindings::_helpers::cost_telemetry::allocation::priced;
+use crate::bindings::_helpers::cost_telemetry::allocation::summary_object;
 use crate::bindings::_helpers::cost_telemetry::health::consume_ledger_failure;
 use crate::bindings::_helpers::cost_telemetry::ledger::read_ledger;
 use sqlbuild_python_base::boundary::main::imported::imported;

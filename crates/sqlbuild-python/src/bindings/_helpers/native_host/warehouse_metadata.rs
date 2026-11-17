@@ -39,9 +39,9 @@ use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::fingerprints::latest_rows::row_fingerprint;
 use crate::bindings::_helpers::freshness::state_io::row_record;
 use crate::bindings::_helpers::freshness::support::presumed_utc_datetime;
-use crate::bindings::_helpers::query_command::project::{
-    ProjectAdapter, ProjectInputs, project_adapter,
-};
+use crate::bindings::_helpers::query_command::project::ProjectAdapter;
+use crate::bindings::_helpers::query_command::project::ProjectInputs;
+use crate::bindings::_helpers::query_command::project::project_adapter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::constants::HISTORY_STREAM_PAGES;

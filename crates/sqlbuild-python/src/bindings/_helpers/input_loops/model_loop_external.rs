@@ -3,7 +3,8 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::PyDict;
 
-use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, compile_error};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
 use sqlbuild_project::models::ReferenceRow;
 
 const DBT_REF_KIND: &str = "dbt_ref";

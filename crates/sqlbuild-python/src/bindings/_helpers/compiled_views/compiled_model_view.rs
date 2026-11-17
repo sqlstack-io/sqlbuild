@@ -19,14 +19,23 @@ use sqlbuild_analysis::compiled_project::models::{
 };
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_project::rows::{ReferenceTuple, reference_row_tuple};
-use crate::bindings::_helpers::compiled_views::compiled_model_analysis::{
-    AnalysisRecord, AnalysisViews, ProofArgument, SessionArgument, analysis_record,
-};
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    InputViewClasses, ModelInputRecord, model_relation_key_row, query_sql_text, read_input,
-    read_input_with_owner, references, rejected_opt_out, schema_entry, view_classes,
-};
+use crate::bindings::_helpers::compiled_project::rows::ReferenceTuple;
+use crate::bindings::_helpers::compiled_project::rows::reference_row_tuple;
+use crate::bindings::_helpers::compiled_views::compiled_model_analysis::AnalysisRecord;
+use crate::bindings::_helpers::compiled_views::compiled_model_analysis::AnalysisViews;
+use crate::bindings::_helpers::compiled_views::compiled_model_analysis::ProofArgument;
+use crate::bindings::_helpers::compiled_views::compiled_model_analysis::SessionArgument;
+use crate::bindings::_helpers::compiled_views::compiled_model_analysis::analysis_record;
+use crate::bindings::_helpers::compiled_views::model_input_view::InputViewClasses;
+use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
+use crate::bindings::_helpers::compiled_views::model_input_view::model_relation_key_row;
+use crate::bindings::_helpers::compiled_views::model_input_view::query_sql_text;
+use crate::bindings::_helpers::compiled_views::model_input_view::read_input;
+use crate::bindings::_helpers::compiled_views::model_input_view::read_input_with_owner;
+use crate::bindings::_helpers::compiled_views::model_input_view::references;
+use crate::bindings::_helpers::compiled_views::model_input_view::rejected_opt_out;
+use crate::bindings::_helpers::compiled_views::model_input_view::schema_entry;
+use crate::bindings::_helpers::compiled_views::model_input_view::view_classes;
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::compiled_views::relation_keys::RelationKeyRow;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;

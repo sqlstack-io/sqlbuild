@@ -20,16 +20,16 @@ use sqlbuild_state::consumption::models::{
 };
 use uuid::Uuid;
 
-use crate::bindings::_helpers::consumption::facts::{
-    BuildFacts, MODEL, SEED, build_facts, enum_text,
-};
-use sqlbuild_python_front::native_host::models::ConsumptionConnection;
-use sqlbuild_python_front::native_host::types::ConsumptionReads;
-use sqlbuild_python_front::native_host::models::Location;
-use sqlbuild_python_front::native_host::models::NodeCompleteHook;
+use crate::bindings::_helpers::consumption::facts::BuildFacts;
+use crate::bindings::_helpers::consumption::facts::MODEL;
+use crate::bindings::_helpers::consumption::facts::SEED;
+use crate::bindings::_helpers::consumption::facts::build_facts;
+use crate::bindings::_helpers::consumption::facts::enum_text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::native_host::models::ConsumptionConnection;
 use sqlbuild_python_front::native_host::models::Location;
+use sqlbuild_python_front::native_host::models::NodeCompleteHook;
+use sqlbuild_python_front::native_host::types::ConsumptionReads;
 
 /// Succeeded rows are flushed once this many executions are pending.
 const FLUSH_EXECUTIONS: usize = 100;

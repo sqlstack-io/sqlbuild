@@ -11,7 +11,8 @@ use sqlbuild_rules::dsl_headers::main::scan_headers::scan_headers as scan;
 use sqlbuild_rules::dsl_headers::main::sql_body_ranges::sql_body_ranges as body_ranges;
 use sqlbuild_rules::dsl_headers::models::{HeaderRulesConfig, HeaderSpan, HeaderViolation};
 
-use crate::bindings::_helpers::rules::lint_pipeline::{LintViolationRow, ViolationClasses};
+use crate::bindings::_helpers::rules::lint_pipeline::LintViolationRow;
+use crate::bindings::_helpers::rules::lint_pipeline::ViolationClasses;
 use crate::bindings::_helpers::rules::native_header_parser::NativeHeaderParser;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

@@ -4,7 +4,8 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyList, PyTuple, PyTupleMethods};
 
-use crate::bindings::_helpers::graph::project_graph::{ResourceRow, project_graph};
+use crate::bindings::_helpers::graph::project_graph::ResourceRow;
+use crate::bindings::_helpers::graph::project_graph::project_graph;
 use crate::bindings::_helpers::record_behaviours::compiled::compile_input_error;
 use sqlbuild_python_base::boundary::main::call_argument::call_argument;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

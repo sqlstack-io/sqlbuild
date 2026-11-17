@@ -11,7 +11,8 @@ use sqlbuild_core::dagster_invocation::main::fallback_asset_description::fallbac
 use sqlbuild_core::text::main::python_strip::python_strip;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::dagster_invocation::access::{get, value_or};
+use crate::bindings::_helpers::dagster_invocation::access::get;
+use crate::bindings::_helpers::dagster_invocation::access::value_or;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 

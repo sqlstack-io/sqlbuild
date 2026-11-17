@@ -2,9 +2,8 @@
 
 use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyResult, wrap_pyfunction};
 
-use crate::bindings::_helpers::event_exporting::dispatcher::{
-    EventExporterDispatcher, stop_event_exporter_threads,
-};
+use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
+use crate::bindings::_helpers::event_exporting::dispatcher::stop_event_exporter_threads;
 use crate::bindings::_helpers::event_exporting::policy;
 use crate::bindings::_helpers::event_exporting::workers::DispatcherWorker;
 use sqlbuild_python_base::boundary::main::imported::imported;

@@ -14,7 +14,8 @@ use sqlbuild_sqltext::sql_references::models::{
 };
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, compile_error};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
 
 const REFERENCE_CALL_SYNTAX_CODE: &str = "P012";
 const MODEL_RESOURCE: &str = "model";

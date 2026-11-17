@@ -4,9 +4,8 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyString};
 
-use crate::bindings::_helpers::freshness::exception_types::{
-    SourceFreshnessInputError, SourceFreshnessObservationError,
-};
+use crate::bindings::_helpers::freshness::exception_types::SourceFreshnessInputError;
+use crate::bindings::_helpers::freshness::exception_types::SourceFreshnessObservationError;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_front::cursor::constants::DATETIME_MODULE;
 use sqlbuild_python_front::state_rows::main::event_rows::date_time_typed::date_time_typed;

@@ -1,9 +1,11 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
-use crate::bindings::_helpers::planner_phases::timings::{
-    BUILD_HISTORY, PlanTimingScope, PlanTimings, WRITING, timed,
-};
+use crate::bindings::_helpers::planner_phases::timings::BUILD_HISTORY;
+use crate::bindings::_helpers::planner_phases::timings::PlanTimingScope;
+use crate::bindings::_helpers::planner_phases::timings::PlanTimings;
+use crate::bindings::_helpers::planner_phases::timings::WRITING;
+use crate::bindings::_helpers::planner_phases::timings::timed;
 use std::sync::Arc;
 
 use pyo3::prelude::{
@@ -19,9 +21,8 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_state::consumption::models::ChangedPolicy;
 use sqlbuild_state::warehouse_state::models::WarehouseState;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::{
-    ConnectionProgressReporter, PlanningProgressReporter,
-};
+use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
+use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspection;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
@@ -29,10 +30,11 @@ use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
-use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
-use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, preview_changed};
+use crate::bindings::_helpers::consumption::policy::changed_policy;
+use crate::bindings::_helpers::consumption::policy::policy_line;
+use crate::bindings::_helpers::consumption::recorder::ChangedDecision;
+use crate::bindings::_helpers::consumption::recorder::preview_changed;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use crate::bindings::_helpers::plan_command::changed::changed_json;
 use crate::bindings::_helpers::plan_command::changed::changed_text;
@@ -41,15 +43,15 @@ use crate::bindings::_helpers::plan_output::plan_json::format_plan_json;
 use crate::bindings::_helpers::plan_output::plan_text::format_plan;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::synced_reads::SyncedReads;
-use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::keyword_relay::keyword_relay;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
 
 const COMMAND_NAME: &str = "plan";

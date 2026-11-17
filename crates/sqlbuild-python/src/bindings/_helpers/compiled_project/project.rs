@@ -34,28 +34,34 @@ use crate::bindings::_helpers::compiled_project::attachment_inputs::SourceSettin
 use crate::bindings::_helpers::compiled_project::attachment_inputs::SqlTestSettings;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::TestFileRow;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::resource_attachment;
-use crate::bindings::_helpers::compiled_project::values::{object_value, plain_value};
-use crate::bindings::_helpers::compiled_views::audit_views::{
-    AttachedAudit, AuditRecord, NativeAuditInput, NativeCompiledAudit, audit_record,
-};
-use crate::bindings::_helpers::compiled_views::compiled_model_view::{
-    CompiledViewClasses, NativeCompiledModel,
-};
-use crate::bindings::_helpers::compiled_views::function_views::{
-    AttachedFunction, FunctionRecord, NativeCompiledFunction, NativeFunctionInput, function_record,
-};
+use crate::bindings::_helpers::compiled_project::values::object_value;
+use crate::bindings::_helpers::compiled_project::values::plain_value;
+use crate::bindings::_helpers::compiled_views::audit_views::AttachedAudit;
+use crate::bindings::_helpers::compiled_views::audit_views::AuditRecord;
+use crate::bindings::_helpers::compiled_views::audit_views::NativeAuditInput;
+use crate::bindings::_helpers::compiled_views::audit_views::NativeCompiledAudit;
+use crate::bindings::_helpers::compiled_views::audit_views::audit_record;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::CompiledViewClasses;
+use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
+use crate::bindings::_helpers::compiled_views::function_views::AttachedFunction;
+use crate::bindings::_helpers::compiled_views::function_views::FunctionRecord;
+use crate::bindings::_helpers::compiled_views::function_views::NativeCompiledFunction;
+use crate::bindings::_helpers::compiled_views::function_views::NativeFunctionInput;
+use crate::bindings::_helpers::compiled_views::function_views::function_record;
 use crate::bindings::_helpers::compiled_views::inputs_view::NativeInputsView;
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    ModelInputRecord, NativeModelInput,
-};
+use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
+use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::compiled_views::seed_views::{
-    NativeCompiledSeed, NativeSeedInput, SeedNamespace, SeedRecord, SeedViews, paired_seeds,
-};
-use crate::bindings::_helpers::compiled_views::source_views::{
-    NativeCompiledSource, NativeSourceInput, SourceRecord,
-};
+use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
+use crate::bindings::_helpers::compiled_views::seed_views::NativeSeedInput;
+use crate::bindings::_helpers::compiled_views::seed_views::SeedNamespace;
+use crate::bindings::_helpers::compiled_views::seed_views::SeedRecord;
+use crate::bindings::_helpers::compiled_views::seed_views::SeedViews;
+use crate::bindings::_helpers::compiled_views::seed_views::paired_seeds;
+use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;
+use crate::bindings::_helpers::compiled_views::source_views::NativeSourceInput;
+use crate::bindings::_helpers::compiled_views::source_views::SourceRecord;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_project::types::ObjectKeyRow;
 use sqlbuild_project::types::SourceNamespace;

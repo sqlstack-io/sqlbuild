@@ -17,19 +17,21 @@ use sqlbuild_rules::fix_verification::models::{FixEdit, FixEligibility};
 
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
-use crate::bindings::_helpers::compiled_views::relation_keys::{
-    RelationKeys, project_relation_keys,
-};
+use crate::bindings::_helpers::compiled_views::relation_keys::RelationKeys;
+use crate::bindings::_helpers::compiled_views::relation_keys::project_relation_keys;
 use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
 use crate::bindings::_helpers::rules::fix_facts::compile_facts;
 use crate::bindings::_helpers::rules::fix_verdict::fix_verdict;
-use crate::bindings::_helpers::rules::lint_expansion::{
-    LintExpansionSources, lint_expansion_inputs,
-};
-use crate::bindings::_helpers::rules::lint_pipeline::{
-    LintFile, LintOutcome, LintRequest, LintSettings, ViolationClasses, lint, lint_sources,
-};
+use crate::bindings::_helpers::rules::lint_expansion::LintExpansionSources;
+use crate::bindings::_helpers::rules::lint_expansion::lint_expansion_inputs;
+use crate::bindings::_helpers::rules::lint_pipeline::LintFile;
+use crate::bindings::_helpers::rules::lint_pipeline::LintOutcome;
+use crate::bindings::_helpers::rules::lint_pipeline::LintRequest;
+use crate::bindings::_helpers::rules::lint_pipeline::LintSettings;
+use crate::bindings::_helpers::rules::lint_pipeline::ViolationClasses;
+use crate::bindings::_helpers::rules::lint_pipeline::lint;
+use crate::bindings::_helpers::rules::lint_pipeline::lint_sources;
 use crate::bindings::_helpers::rules::run_lint::given_files;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

@@ -6,7 +6,8 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::lineage::lineage_facts::{confidence_member, transform_kind_member};
+use crate::bindings::_helpers::lineage::lineage_facts::confidence_member;
+use crate::bindings::_helpers::lineage::lineage_facts::transform_kind_member;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;

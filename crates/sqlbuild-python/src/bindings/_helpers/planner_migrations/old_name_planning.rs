@@ -4,7 +4,8 @@ use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::planner_migrations::models::{MigrationPhase, OldNameViewPlanning};
+use crate::bindings::_helpers::planner_migrations::models::MigrationPhase;
+use crate::bindings::_helpers::planner_migrations::models::OldNameViewPlanning;
 use crate::bindings::_helpers::planner_migrations::old_name_objects::recorded_view;
 use crate::bindings::_helpers::planner_migrations::old_names::old_name_claim_errors;
 use crate::bindings::_helpers::planner_migrations::old_names::old_name_schemas_to_read;

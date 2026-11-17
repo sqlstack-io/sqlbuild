@@ -13,24 +13,26 @@ use sqlbuild_host::compile_context::main::record_compile_cpu_timing::record_comp
 use sqlbuild_host::compile_context::main::record_compile_timing::record_compile_timing;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::analysis::binding_catalog::{
-    BindingCatalog, CatalogKey, ignores_quoted_case,
-};
-use crate::bindings::_helpers::analysis_session::model_analyses::{
-    ModelAnalyses, ModelAnalysisRequest, analyze_models,
-};
-use crate::bindings::_helpers::analysis_session::profile_inputs::{
-    ADAPTER_RULE_ID, nullability_rules, text_pairs,
-};
+use crate::bindings::_helpers::analysis::binding_catalog::BindingCatalog;
+use crate::bindings::_helpers::analysis::binding_catalog::CatalogKey;
+use crate::bindings::_helpers::analysis::binding_catalog::ignores_quoted_case;
+use crate::bindings::_helpers::analysis_session::model_analyses::ModelAnalyses;
+use crate::bindings::_helpers::analysis_session::model_analyses::ModelAnalysisRequest;
+use crate::bindings::_helpers::analysis_session::model_analyses::analyze_models;
+use crate::bindings::_helpers::analysis_session::profile_inputs::ADAPTER_RULE_ID;
+use crate::bindings::_helpers::analysis_session::profile_inputs::nullability_rules;
+use crate::bindings::_helpers::analysis_session::profile_inputs::text_pairs;
 use crate::bindings::_helpers::analysis_session::stage_functions::expression_source_shapes;
 use crate::bindings::_helpers::compile_driver::analysis_cache::analysis_cache_context;
-use crate::bindings::_helpers::compile_driver::assembly::{AssemblyRequest, AssemblyStage};
+use crate::bindings::_helpers::compile_driver::assembly::AssemblyRequest;
+use crate::bindings::_helpers::compile_driver::assembly::AssemblyStage;
 use crate::bindings::_helpers::compiled_views::model_input_view::attached_schema;
 use crate::bindings::_helpers::compiled_views::source_views::read_source_view;
-use crate::bindings::_helpers::project_assembly::declared_relations::{
-    DeclaredRelations, DeclaredShapes, declared_relations,
-};
-use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
+use crate::bindings::_helpers::project_assembly::declared_relations::DeclaredRelations;
+use crate::bindings::_helpers::project_assembly::declared_relations::DeclaredShapes;
+use crate::bindings::_helpers::project_assembly::declared_relations::declared_relations;
+use crate::bindings::_helpers::semantic_shapes::declarations::declared_types;
+use crate::bindings::_helpers::semantic_shapes::declarations::function_names;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::compile_context::models::PythonProcessClock;

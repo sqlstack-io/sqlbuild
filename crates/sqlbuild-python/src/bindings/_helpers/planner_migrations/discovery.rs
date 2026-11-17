@@ -1,21 +1,19 @@
 //! Native migration discovery over existing inspection and fingerprint cache boundaries.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use sqlbuild_python_base::native_host::types::Syntax;
-use crate::bindings::_helpers::planner_migrations::matching::{
-    match_migration_fingerprints, migration_destination_fingerprints,
-};
-use crate::bindings::_helpers::planner_migrations::models::{
-    DiscoveryRequest, FingerprintInputs, ModelMigrationDiscovery,
-};
-use crate::bindings::_helpers::planner_migrations::{
-    discovery_events, discovery_models, discovery_requests,
-};
+use crate::bindings::_helpers::planner_migrations::discovery_events;
+use crate::bindings::_helpers::planner_migrations::discovery_models;
+use crate::bindings::_helpers::planner_migrations::discovery_requests;
+use crate::bindings::_helpers::planner_migrations::matching::match_migration_fingerprints;
+use crate::bindings::_helpers::planner_migrations::matching::migration_destination_fingerprints;
+use crate::bindings::_helpers::planner_migrations::models::DiscoveryRequest;
+use crate::bindings::_helpers::planner_migrations::models::FingerprintInputs;
+use crate::bindings::_helpers::planner_migrations::models::ModelMigrationDiscovery;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use pyo3::prelude::{PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple, PyTupleMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::BTreeSet;
 

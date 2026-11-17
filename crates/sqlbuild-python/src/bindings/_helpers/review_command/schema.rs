@@ -9,7 +9,8 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_target_connection_config;
 use crate::bindings::_helpers::janitor::janitor_keys::utc_datetime;
-use crate::bindings::_helpers::review_command::planning::{ReviewProject, ReviewSettings};
+use crate::bindings::_helpers::review_command::planning::ReviewProject;
+use crate::bindings::_helpers::review_command::planning::ReviewSettings;
 use crate::bindings::_helpers::review_command::support::review_error;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

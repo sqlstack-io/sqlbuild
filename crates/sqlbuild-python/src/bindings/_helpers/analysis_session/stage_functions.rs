@@ -8,17 +8,26 @@ use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::analysis_session::types::Pairs;
 
-use crate::bindings::_helpers::analysis_session::profile_inputs::{
-    aliased_dialect, case_sensitive_shapes, dialect_or_generic, nullability_rules, profile_catalog,
-    profile_dialect, return_types, shape_rows,
-};
-use crate::bindings::_helpers::analysis_session::query_columns::{
-    ColumnsRow, QueryRequestRow, QueryRow, infer_query_columns,
-};
-use crate::bindings::_helpers::analysis_session::session::{
-    ContractRow, ExpressionShapesRow, FamilyRow, NativeModelAnalysisSession, PivotModelRow,
-    PivotRequestRow, infer_expression_source_shapes, prove_dynamic_column_contracts,
-};
+use crate::bindings::_helpers::analysis_session::profile_inputs::aliased_dialect;
+use crate::bindings::_helpers::analysis_session::profile_inputs::case_sensitive_shapes;
+use crate::bindings::_helpers::analysis_session::profile_inputs::dialect_or_generic;
+use crate::bindings::_helpers::analysis_session::profile_inputs::nullability_rules;
+use crate::bindings::_helpers::analysis_session::profile_inputs::profile_catalog;
+use crate::bindings::_helpers::analysis_session::profile_inputs::profile_dialect;
+use crate::bindings::_helpers::analysis_session::profile_inputs::return_types;
+use crate::bindings::_helpers::analysis_session::profile_inputs::shape_rows;
+use crate::bindings::_helpers::analysis_session::query_columns::ColumnsRow;
+use crate::bindings::_helpers::analysis_session::query_columns::QueryRequestRow;
+use crate::bindings::_helpers::analysis_session::query_columns::QueryRow;
+use crate::bindings::_helpers::analysis_session::query_columns::infer_query_columns;
+use crate::bindings::_helpers::analysis_session::session::ContractRow;
+use crate::bindings::_helpers::analysis_session::session::ExpressionShapesRow;
+use crate::bindings::_helpers::analysis_session::session::FamilyRow;
+use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
+use crate::bindings::_helpers::analysis_session::session::PivotModelRow;
+use crate::bindings::_helpers::analysis_session::session::PivotRequestRow;
+use crate::bindings::_helpers::analysis_session::session::infer_expression_source_shapes;
+use crate::bindings::_helpers::analysis_session::session::prove_dynamic_column_contracts;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::compile_driver::constants::EXPRESSION_SHAPE_BATCHES;

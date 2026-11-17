@@ -37,9 +37,8 @@ use crate::bindings::_helpers::scenario_command::test_command::run_scenario_test
 use crate::bindings::_helpers::scopes::scope_command::run_scope_command;
 use crate::bindings::_helpers::seed_command::command::run_seed_command;
 use crate::bindings::_helpers::sql_test_command::test_command::run_test_command;
-use crate::bindings::_helpers::workspace_commands::commands::{
-    run_playground_command, run_skills_command,
-};
+use crate::bindings::_helpers::workspace_commands::commands::run_playground_command;
+use crate::bindings::_helpers::workspace_commands::commands::run_skills_command;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyAttributeError, PyOSError, PyTypeError, PyUnicodeError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};

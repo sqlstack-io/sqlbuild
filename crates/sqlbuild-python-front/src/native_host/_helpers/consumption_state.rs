@@ -1,7 +1,5 @@
 //! The consumption table's rows, SQL and locations, and the callbacks a recording build holds.
 
-use crate::native_host::constants::ROWS_PER_STATEMENT;
-use crate::native_host::models::Location;
 use chrono::{DateTime, NaiveDateTime, Utc};
 
 use pyo3::exceptions::PyValueError;
@@ -13,16 +11,14 @@ use sqlbuild_state::consumption::constants::{
     CONSUMPTION_COLUMN_TYPES, INTEGER_STATE_VALUE_TYPE, NULLABLE_COLUMNS,
 };
 use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
-use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_sql;
 use sqlbuild_state::consumption::models::{
     ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
 };
 use sqlbuild_state::freshness::constants::STRING_STATE_VALUE_TYPE;
 
-use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;
 use crate::state_rows::main::tables::state_table_create_sql::state_table_create_sql;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;
 
 /// Execution IDs per `IN` list when reading executions back by ID.
 pub(crate) const EXECUTION_ID_BATCH: usize = 500;

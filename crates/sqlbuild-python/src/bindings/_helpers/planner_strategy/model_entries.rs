@@ -1,11 +1,11 @@
 //! Assemble model plan dataclasses from resolved plan decisions and authored model config.
 
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
 use sqlbuild_analysis::planner_strategy::main::microbatch_lookback::microbatch_lookback;
@@ -20,22 +20,26 @@ use sqlbuild_model_config::model_validation::constants::PHYSICAL_STORAGE_KEYS;
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::planner_strategy::constants::{
-    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, MICROBATCH_MODE,
-    PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE, TABLE_RECREATING_ACTIONS,
-};
-use crate::bindings::_helpers::planner_strategy::cursor_types::{
-    cursor_type_warning_record, warehouse_column_types,
-};
-use crate::bindings::_helpers::planner_strategy::microbatch_limits::{replay_grain, unknown_grain};
+use crate::bindings::_helpers::planner_strategy::constants::CUSTOM_MATERIALIZATION;
+use crate::bindings::_helpers::planner_strategy::constants::DDL_SEPARATOR;
+use crate::bindings::_helpers::planner_strategy::constants::ENFORCED_CONTRACT;
+use crate::bindings::_helpers::planner_strategy::constants::MICROBATCH_MODE;
+use crate::bindings::_helpers::planner_strategy::constants::PHYSICAL_STORAGE_DIALECT;
+use crate::bindings::_helpers::planner_strategy::constants::PHYSICAL_STORAGE_UNSUPPORTED_CODE;
+use crate::bindings::_helpers::planner_strategy::constants::TABLE_RECREATING_ACTIONS;
+use crate::bindings::_helpers::planner_strategy::cursor_types::cursor_type_warning_record;
+use crate::bindings::_helpers::planner_strategy::cursor_types::warehouse_column_types;
+use crate::bindings::_helpers::planner_strategy::microbatch_limits::replay_grain;
+use crate::bindings::_helpers::planner_strategy::microbatch_limits::unknown_grain;
 use crate::bindings::_helpers::planner_strategy::microbatches::microbatch_limit_config;
 use crate::bindings::_helpers::planner_strategy::models::ModelEntryDecisions;
-use crate::bindings::_helpers::planner_strategy::strategy::{
-    model_warning_records, resolve_schema_actions, warning_inputs,
-};
-use crate::bindings::_helpers::planner_strategy::values::{
-    input_error, optional_string, plan_warning, text,
-};
+use crate::bindings::_helpers::planner_strategy::strategy::model_warning_records;
+use crate::bindings::_helpers::planner_strategy::strategy::resolve_schema_actions;
+use crate::bindings::_helpers::planner_strategy::strategy::warning_inputs;
+use crate::bindings::_helpers::planner_strategy::values::input_error;
+use crate::bindings::_helpers::planner_strategy::values::optional_string;
+use crate::bindings::_helpers::planner_strategy::values::plan_warning;
+use crate::bindings::_helpers::planner_strategy::values::text;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;

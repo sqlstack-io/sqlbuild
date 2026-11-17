@@ -4,12 +4,12 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_migrations::column_objects::config;
 use crate::bindings::_helpers::planner_migrations::column_objects::native;
-use crate::bindings::_helpers::planner_migrations::discovery_events::{
-    identity, key, newest, relation,
-};
-use crate::bindings::_helpers::planner_migrations::models::{
-    ModelMigrationDeclaration, ModelMigrationRequest,
-};
+use crate::bindings::_helpers::planner_migrations::discovery_events::identity;
+use crate::bindings::_helpers::planner_migrations::discovery_events::key;
+use crate::bindings::_helpers::planner_migrations::discovery_events::newest;
+use crate::bindings::_helpers::planner_migrations::discovery_events::relation;
+use crate::bindings::_helpers::planner_migrations::models::ModelMigrationDeclaration;
+use crate::bindings::_helpers::planner_migrations::models::ModelMigrationRequest;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{

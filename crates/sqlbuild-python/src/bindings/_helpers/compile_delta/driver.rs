@@ -14,16 +14,17 @@ use sqlbuild_cache::project_reuse::types::ImageSections;
 
 use crate::bindings::_helpers::compile_command::constants::TARGET_DIRECTORY_NAME;
 use crate::bindings::_helpers::compile_command::reuse_attempt::reuse_debug;
-use crate::bindings::_helpers::compile_command::reuse_recording::{
-    RecordedCompileOutput, print_to,
-};
-use crate::bindings::_helpers::compile_delta::image::{
-    ImageGate, ImageRelations, ImageRules, ProjectImage,
-};
-use crate::bindings::_helpers::compile_delta::splice::{SpliceScope, spliced_report};
-use crate::bindings::_helpers::compile_driver::command::{
-    PhasesOutcome, resolved_request, unrecorded_compile,
-};
+use crate::bindings::_helpers::compile_command::reuse_recording::RecordedCompileOutput;
+use crate::bindings::_helpers::compile_command::reuse_recording::print_to;
+use crate::bindings::_helpers::compile_delta::image::ImageGate;
+use crate::bindings::_helpers::compile_delta::image::ImageRelations;
+use crate::bindings::_helpers::compile_delta::image::ImageRules;
+use crate::bindings::_helpers::compile_delta::image::ProjectImage;
+use crate::bindings::_helpers::compile_delta::splice::SpliceScope;
+use crate::bindings::_helpers::compile_delta::splice::spliced_report;
+use crate::bindings::_helpers::compile_driver::command::PhasesOutcome;
+use crate::bindings::_helpers::compile_driver::command::resolved_request;
+use crate::bindings::_helpers::compile_driver::command::unrecorded_compile;
 use crate::bindings::_helpers::compile_outputs::reuse::NativeReuseAttempt;
 use crate::bindings::_helpers::rules::custom_evaluation::stored_custom_rule_refusal;
 use sqlbuild_discovery::header_changes::main::custom_rule_reads::custom_rule_reads;

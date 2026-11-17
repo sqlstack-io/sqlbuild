@@ -9,12 +9,11 @@ use sqlbuild_analysis::assembly::analysis_session::types::{Pairs, Shapes};
 use sqlbuild_analysis::compiled_project::models::SchemaColumnFact;
 
 use crate::bindings::_helpers::compiled_project::schema_facts::python_column_facts;
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    attached_columns, attached_schema,
-};
-use crate::bindings::_helpers::compiled_views::source_views::{
-    AttachedSource, SourceViews, read_source_view,
-};
+use crate::bindings::_helpers::compiled_views::model_input_view::attached_columns;
+use crate::bindings::_helpers::compiled_views::model_input_view::attached_schema;
+use crate::bindings::_helpers::compiled_views::source_views::AttachedSource;
+use crate::bindings::_helpers::compiled_views::source_views::SourceViews;
+use crate::bindings::_helpers::compiled_views::source_views::read_source_view;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::enum_member_value::enum_member_value;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

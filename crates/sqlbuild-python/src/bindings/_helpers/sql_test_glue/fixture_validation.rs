@@ -11,9 +11,8 @@ use sqlbuild_analysis::planner_fixtures::main::{
 
 use crate::bindings::_helpers::planner_strategy::constants::MODEL_REFERENCE_KIND;
 use crate::bindings::_helpers::planner_strategy::fixture_completion::complete_fixtures;
-use crate::bindings::_helpers::planner_strategy::fixture_sql::{
-    complete_empty_fixture_sql, complete_typed_null_columns,
-};
+use crate::bindings::_helpers::planner_strategy::fixture_sql::complete_empty_fixture_sql;
+use crate::bindings::_helpers::planner_strategy::fixture_sql::complete_typed_null_columns;
 use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
 use crate::bindings::_helpers::sql_test_glue::constants::FIXTURE_PREFIXES;

@@ -14,7 +14,8 @@ use sqlbuild_state::microbatches::models::{MicrobatchEventIdentity, ScopeRead};
 use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql;
 use sqlbuild_state::state_tables::models::TableColumn;
 
-use crate::bindings::_helpers::microbatches::conversion::{optional_text, state_error};
+use crate::bindings::_helpers::microbatches::conversion::optional_text;
+use crate::bindings::_helpers::microbatches::conversion::state_error;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;

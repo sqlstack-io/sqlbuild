@@ -35,19 +35,21 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::{ReferenceExtraction, SqlReference};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    SqlTestSettings, TestBlockRow, TestCaseRow, TestFileRow,
-};
+use crate::bindings::_helpers::compiled_project::attachment_inputs::SqlTestSettings;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::TestBlockRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::TestCaseRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::TestFileRow;
 use crate::bindings::_helpers::compiled_views::source_views::replaced;
-use crate::bindings::_helpers::input_loops::model_loop::{
-    LoopContext, NativeModelLoop, compile_error, helped_compile_error,
-};
-use crate::bindings::_helpers::input_loops::model_loop_calls::{
-    CallOrigin, origin_references, report_invalid_call,
-};
-use crate::bindings::_helpers::input_loops::source_loop::{
-    AuthoredExpansion, expanded_authored_sql, scoped_declarations,
-};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
+use crate::bindings::_helpers::input_loops::model_loop::helped_compile_error;
+use crate::bindings::_helpers::input_loops::model_loop_calls::CallOrigin;
+use crate::bindings::_helpers::input_loops::model_loop_calls::origin_references;
+use crate::bindings::_helpers::input_loops::model_loop_calls::report_invalid_call;
+use crate::bindings::_helpers::input_loops::source_loop::AuthoredExpansion;
+use crate::bindings::_helpers::input_loops::source_loop::expanded_authored_sql;
+use crate::bindings::_helpers::input_loops::source_loop::scoped_declarations;
 use sqlbuild_python_base::cache::models::SqlTestScanStore;
 use sqlbuild_python_base::compile_context::main::delta::record_test_source_reads::record_test_source_reads;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

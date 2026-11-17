@@ -2,7 +2,8 @@
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::planner_migrations::column_objects::{native, text};
+use crate::bindings::_helpers::planner_migrations::column_objects::native;
+use crate::bindings::_helpers::planner_migrations::column_objects::text;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::references::explicit_references::hard_coded_relation_remedy;
 use crate::bindings::_helpers::references::explicit_references::old_name_reference_message;

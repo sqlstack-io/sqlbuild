@@ -22,21 +22,22 @@ use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::header_metadata::main::parse_measurement_policy::parse_measurement_policy;
 use sqlbuild_sqltext::sql_references::models::SqlReference;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    AuditBlockRow, AuditFileRow, AuditSettings,
-};
-use crate::bindings::_helpers::compiled_views::audit_views::{AttachedAudit, AuditHandles};
-use crate::bindings::_helpers::input_loops::model_loop::{
-    LoopContext, NativeModelLoop, compile_error, helped_compile_error,
-};
+use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditBlockRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
+use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditSettings;
+use crate::bindings::_helpers::compiled_views::audit_views::AttachedAudit;
+use crate::bindings::_helpers::compiled_views::audit_views::AuditHandles;
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
+use crate::bindings::_helpers::input_loops::model_loop::helped_compile_error;
 use crate::bindings::_helpers::input_loops::model_loop_calls::origin_references;
 use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_row;
-use crate::bindings::_helpers::input_loops::model_loop_named::{
-    AUDIT_DECLARATION, resource_named_usages,
-};
-use crate::bindings::_helpers::input_loops::source_loop::{
-    AuthoredExpansion, expanded_authored_sql, file_declarations,
-};
+use crate::bindings::_helpers::input_loops::model_loop_named::AUDIT_DECLARATION;
+use crate::bindings::_helpers::input_loops::model_loop_named::resource_named_usages;
+use crate::bindings::_helpers::input_loops::source_loop::AuthoredExpansion;
+use crate::bindings::_helpers::input_loops::source_loop::expanded_authored_sql;
+use crate::bindings::_helpers::input_loops::source_loop::file_declarations;
 use sqlbuild_project::models::AttachedTarget;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads;

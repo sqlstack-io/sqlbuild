@@ -35,9 +35,9 @@ use sqlbuild_core::panics::main::is_compiler_panic::is_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 use std::path::PathBuf;
 
-use crate::bindings::_helpers::analysis_session::nullability_rules::{
-    RuleFailure, nullability_callback, raised,
-};
+use crate::bindings::_helpers::analysis_session::nullability_rules::RuleFailure;
+use crate::bindings::_helpers::analysis_session::nullability_rules::nullability_callback;
+use crate::bindings::_helpers::analysis_session::nullability_rules::raised;
 use crate::bindings::models::Positional;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;

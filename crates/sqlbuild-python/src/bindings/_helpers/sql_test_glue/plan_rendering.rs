@@ -1,15 +1,16 @@
 //! Adapter rendering and declared cursor-window boundaries for native test planning.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::sql_test_glue::plan_values::{model_payload, string};
+use crate::bindings::_helpers::sql_test_glue::plan_values::model_payload;
+use crate::bindings::_helpers::sql_test_glue::plan_values::string;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 
 use crate::bindings::_helpers::sql_test_glue::constants::SENTINEL;
-use crate::bindings::_helpers::sql_test_glue::cursor_window::{
-    declared_window_cursor_models, declares_cursor_window, render_test_cursor_intrinsics,
-};
+use crate::bindings::_helpers::sql_test_glue::cursor_window::declared_window_cursor_models;
+use crate::bindings::_helpers::sql_test_glue::cursor_window::declares_cursor_window;
+use crate::bindings::_helpers::sql_test_glue::cursor_window::render_test_cursor_intrinsics;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;

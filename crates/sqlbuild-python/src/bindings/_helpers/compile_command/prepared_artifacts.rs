@@ -8,12 +8,13 @@ use pyo3::types::{PyCFunction, PyDict, PyFrozenSet, PyTuple};
 use pyo3::{IntoPyObjectExt, pyclass, pymethods};
 
 use crate::bindings::_helpers::compile_command::reuse_recording::CompileArtifactWrites;
-use crate::bindings::_helpers::compile_command::target_writer::{
-    PlannedStaticSqlTests, plan_tests,
-};
-use crate::bindings::_helpers::compile_command::target_writer::{
-    Prepared, planning_diagnostics, publish_staged_target, staging_changed, write_static_target,
-};
+use crate::bindings::_helpers::compile_command::target_writer::PlannedStaticSqlTests;
+use crate::bindings::_helpers::compile_command::target_writer::Prepared;
+use crate::bindings::_helpers::compile_command::target_writer::plan_tests;
+use crate::bindings::_helpers::compile_command::target_writer::planning_diagnostics;
+use crate::bindings::_helpers::compile_command::target_writer::publish_staged_target;
+use crate::bindings::_helpers::compile_command::target_writer::staging_changed;
+use crate::bindings::_helpers::compile_command::target_writer::write_static_target;
 use crate::bindings::_helpers::compile_outputs::artifacts::staged_artifact_files;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;

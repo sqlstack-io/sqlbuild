@@ -1,11 +1,11 @@
 //! Deferred locations of renamed models the deferred target holds only under their old name.
 
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, IntoPyObject, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

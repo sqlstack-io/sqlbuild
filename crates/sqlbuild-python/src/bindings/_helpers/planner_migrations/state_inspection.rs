@@ -1,6 +1,7 @@
 //! Read-only warehouse evidence gathered once for all model migrations in one plan.
 
-use crate::bindings::_helpers::planner_warehouse::snapshot::{columns_for, list_relations};
+use crate::bindings::_helpers::planner_warehouse::snapshot::columns_for;
+use crate::bindings::_helpers::planner_warehouse::snapshot::list_relations;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
@@ -17,29 +18,16 @@ use crate::bindings::_helpers::planner_phases::runtime::runtime_reads;
 use crate::bindings::_helpers::planner_warehouse::reads::FingerprintRead;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::reads::Read;
+use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_MODEL;
+use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
-use crate::bindings::_helpers::state_rows::constants::COLUMN_KIND;
-use crate::bindings::_helpers::state_rows::constants::MODEL_KIND;
-use crate::bindings::_helpers::state_rows::constants::OLD_NAME_KIND;
-use crate::bindings::_helpers::state_rows::migration_objects::layout;
-use crate::bindings::_helpers::state_rows::migration_projections::old_name_views;
-use crate::bindings::_helpers::planner_migrations::constants::GET_COLUMNS_FOR_INSPECTION;
-use crate::bindings::_helpers::planner_migrations::constants::LIST_RELATIONS_FOR_INSPECTION;
-use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
-use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_MODEL;
-use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_front::state_rows::constants::COLUMN_KIND;
 use sqlbuild_python_front::state_rows::constants::MODEL_KIND;
 use sqlbuild_python_front::state_rows::constants::OLD_NAME_KIND;
 use sqlbuild_python_front::state_rows::main::migrations::layout::layout;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_views::old_name_views;
-use sqlbuild_python_front::state_rows::main::migrations::read_events::read_events;
-use sqlbuild_python_front::state_rows::main::migrations::stored_old_name_columns::stored_old_name_columns;
-use sqlbuild_python_front::state_rows::models::StateAccess;
 
 /// A lowercased schema and relation name.
 type RelationKey = (String, String);

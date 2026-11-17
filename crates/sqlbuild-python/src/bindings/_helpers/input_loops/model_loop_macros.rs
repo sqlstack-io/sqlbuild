@@ -10,9 +10,9 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::input_loops::model_loop::{
-    LoopContext, VisibleDeclarations, compile_error,
-};
+use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
+use crate::bindings::_helpers::input_loops::model_loop::VisibleDeclarations;
+use crate::bindings::_helpers::input_loops::model_loop::compile_error;
 use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_row;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

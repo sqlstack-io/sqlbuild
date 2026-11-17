@@ -1,20 +1,18 @@
 //! Host column migration planning while Python owns warehouse inspection.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use sqlbuild_python_base::native_host::types::Syntax;
 use crate::bindings::_helpers::planner_migrations::column_objects::replace;
 use crate::bindings::_helpers::planner_migrations::known_input_columns::KnownInputColumns;
-use crate::bindings::_helpers::planner_migrations::models::{
-    ColumnMigrationInputs, ColumnMigrationPlanning, MigrationPhase,
-};
+use crate::bindings::_helpers::planner_migrations::models::ColumnMigrationInputs;
+use crate::bindings::_helpers::planner_migrations::models::ColumnMigrationPlanning;
+use crate::bindings::_helpers::planner_migrations::models::MigrationPhase;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PySet, PySetMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 

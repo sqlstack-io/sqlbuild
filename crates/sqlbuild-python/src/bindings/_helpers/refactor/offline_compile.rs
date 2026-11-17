@@ -7,7 +7,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyString, PyTuple};
 
-use crate::bindings::_helpers::compile_command::target_writer::{Prepared, planning_diagnostics};
+use crate::bindings::_helpers::compile_command::target_writer::Prepared;
+use crate::bindings::_helpers::compile_command::target_writer::planning_diagnostics;
 use crate::bindings::_helpers::compile_driver::analysis::analyze_compile_project;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;

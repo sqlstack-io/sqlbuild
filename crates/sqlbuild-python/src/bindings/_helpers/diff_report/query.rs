@@ -17,9 +17,12 @@ use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
-use crate::bindings::_helpers::diff_report::support::{
-    call, cli_error, error_text, none, object, progress_line,
-};
+use crate::bindings::_helpers::diff_report::support::call;
+use crate::bindings::_helpers::diff_report::support::cli_error;
+use crate::bindings::_helpers::diff_report::support::error_text;
+use crate::bindings::_helpers::diff_report::support::none;
+use crate::bindings::_helpers::diff_report::support::object;
+use crate::bindings::_helpers::diff_report::support::progress_line;
 use crate::bindings::_helpers::diff_report::tolerances::cli_tolerance_overrides;
 use sqlbuild_analysis::diff_selection::main::raw_query_shape::raw_query_shape;
 use sqlbuild_analysis::diff_selection::models::RawQueryShape;

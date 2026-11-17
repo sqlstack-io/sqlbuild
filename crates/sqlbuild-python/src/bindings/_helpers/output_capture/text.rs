@@ -6,7 +6,9 @@ use pyo3::prelude::{
 use pyo3::types::{PyString, PyTuple};
 use sqlbuild_core::command_output::main::chunk_output_text::chunk_output_text;
 
-use crate::bindings::_helpers::output_capture::values::{pass_text, python_text, unencodable};
+use crate::bindings::_helpers::output_capture::values::pass_text;
+use crate::bindings::_helpers::output_capture::values::python_text;
+use crate::bindings::_helpers::output_capture::values::unencodable;
 
 /// Split text deterministically without splitting Unicode code points.
 #[pyfunction]

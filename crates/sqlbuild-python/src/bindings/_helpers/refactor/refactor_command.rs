@@ -37,7 +37,8 @@ use sqlbuild_refactor::refactoring::models::{
 use sqlbuild_refactor::refactoring::types::Originals;
 
 use crate::bindings::_helpers::lineage::lineage_index::lineage_key;
-use crate::bindings::_helpers::refactor::offline_compile::{OfflineCompile, compile_for_refactor};
+use crate::bindings::_helpers::refactor::offline_compile::OfflineCompile;
+use crate::bindings::_helpers::refactor::offline_compile::compile_for_refactor;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;

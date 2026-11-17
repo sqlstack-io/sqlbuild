@@ -1,6 +1,7 @@
 //! Register planner scope and loader entry points.
 
-use crate::bindings::_helpers::planner_scope::{loaders, sources};
+use crate::bindings::_helpers::planner_scope::loaders;
+use crate::bindings::_helpers::planner_scope::sources;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
 

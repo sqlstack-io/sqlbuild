@@ -4,9 +4,8 @@ use pyo3::prelude::{Bound, Py, PyAny, PyResult};
 use pyo3::pymethods;
 use pyo3::{PyClass, pyclass::boolean_struct::True};
 
-use crate::bindings::_helpers::planner_phases::models::{
-    PlannerIdentityContext, PlannerScopeResolution,
-};
+use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
+use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_scope::retained::project_scope;
 
 #[pymethods]

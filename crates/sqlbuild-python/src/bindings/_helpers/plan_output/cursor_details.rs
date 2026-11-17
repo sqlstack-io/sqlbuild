@@ -3,10 +3,10 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::plan_output::display::{
-    aligned_timestamp_bounds, resolve_effective_microbatch_batch_size,
-};
-use crate::bindings::_helpers::plan_output::values::{optional_text, text};
+use crate::bindings::_helpers::plan_output::display::aligned_timestamp_bounds;
+use crate::bindings::_helpers::plan_output::display::resolve_effective_microbatch_batch_size;
+use crate::bindings::_helpers::plan_output::values::optional_text;
+use crate::bindings::_helpers::plan_output::values::text;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

@@ -10,9 +10,9 @@ use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::models::NativeStore;
 
 use crate::bindings::_helpers::compile_command::constants::TARGET_DIRECTORY_NAME;
-use crate::bindings::_helpers::frontier::constants::{
-    CACHE_DIRECTORY_NAME, COMPILER_CACHE_DIRECTORY_NAME, NATIVE_CACHE_NAMESPACE_SUFFIX,
-};
+use crate::bindings::_helpers::frontier::constants::CACHE_DIRECTORY_NAME;
+use crate::bindings::_helpers::frontier::constants::COMPILER_CACHE_DIRECTORY_NAME;
+use crate::bindings::_helpers::frontier::constants::NATIVE_CACHE_NAMESPACE_SUFFIX;
 use sqlbuild_python_base::cache::main::current_code_identity::current_code_identity;
 use sqlbuild_python_base::cache::main::open_store::open_store;
 use sqlbuild_python_base::cache::main::save_store::save_store;

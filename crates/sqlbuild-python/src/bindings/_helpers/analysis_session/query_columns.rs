@@ -14,9 +14,9 @@ use sqlbuild_analysis::assembly::analysis_session::types::{Pairs, Shapes};
 use sqlbuild_core::panics::main::native_failure::native_failure;
 use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::analysis_session::nullability_rules::{
-    RuleFailure, nullability_callback, raised,
-};
+use crate::bindings::_helpers::analysis_session::nullability_rules::RuleFailure;
+use crate::bindings::_helpers::analysis_session::nullability_rules::nullability_callback;
+use crate::bindings::_helpers::analysis_session::nullability_rules::raised;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::types::CompilerDetach;

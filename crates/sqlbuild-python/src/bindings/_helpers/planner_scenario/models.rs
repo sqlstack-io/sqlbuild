@@ -1,7 +1,7 @@
 //! Borrowed Python callback boundaries for scenario SQL assembly.
 
-use sqlbuild_python_base::native_host::models::Dialect;
 use pyo3::prelude::{Bound, PyAny};
+use sqlbuild_python_base::native_host::models::Dialect;
 
 #[derive(Debug)]
 pub(crate) struct SqlContext<'py> {

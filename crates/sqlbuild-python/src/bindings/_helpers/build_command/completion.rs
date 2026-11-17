@@ -12,20 +12,18 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::BuildStatus;
 
-use crate::bindings::_helpers::build_command::execution::{
-    Outcome, Preparation, write_run_context,
-};
+use crate::bindings::_helpers::build_command::execution::Outcome;
+use crate::bindings::_helpers::build_command::execution::Preparation;
+use crate::bindings::_helpers::build_command::execution::write_run_context;
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
 use crate::bindings::_helpers::build_progress::result_text::build_result_text;
 use crate::bindings::_helpers::check::check_results::check_result_text;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::plan_has_executable_work;
-use crate::bindings::_helpers::compile_outputs::runtime_target::{
-    write_python_check_runtime_target, write_runtime_target,
-};
-use crate::bindings::_helpers::cost_report::degradation::{
-    finalize_build_cost as finalize_cost, render_build_cost,
-};
+use crate::bindings::_helpers::compile_outputs::runtime_target::write_python_check_runtime_target;
+use crate::bindings::_helpers::compile_outputs::runtime_target::write_runtime_target;
+use crate::bindings::_helpers::cost_report::degradation::finalize_build_cost as finalize_cost;
+use crate::bindings::_helpers::cost_report::degradation::render_build_cost;
 use crate::bindings::_helpers::cost_report::functions::cost_output_payload;
 use crate::bindings::_helpers::result_output::documents::format_build_execution_json;
 use crate::bindings::_helpers::result_output::documents::format_build_execution_json_with;

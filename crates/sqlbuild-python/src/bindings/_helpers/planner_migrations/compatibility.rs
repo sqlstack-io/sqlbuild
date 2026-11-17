@@ -3,9 +3,8 @@
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
 use crate::bindings::_helpers::planner_changes::detect::detect_model_changes;
-use crate::bindings::_helpers::planner_migrations::models::{
-    CompatibilityCheck, MigrationCompatibilityResult,
-};
+use crate::bindings::_helpers::planner_migrations::models::CompatibilityCheck;
+use crate::bindings::_helpers::planner_migrations::models::MigrationCompatibilityResult;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};

@@ -38,16 +38,16 @@ use sqlbuild_state::execution_history::constants::{
     DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, SCHEMA_VERSION,
 };
 
-use crate::bindings::_helpers::compile_command::constants::{
-    REUSE_DISABLE_ENV_VAR, TRACKED_ENVIRONMENT_PREFIXES, UNTRACKED_ENVIRONMENT_NAMES,
-};
-use crate::bindings::_helpers::compile_delta::driver::{
-    DELTA_DISABLE_ENV_VAR, DELTA_VERIFY_ENV_VAR,
-};
+use crate::bindings::_helpers::compile_command::constants::REUSE_DISABLE_ENV_VAR;
+use crate::bindings::_helpers::compile_command::constants::TRACKED_ENVIRONMENT_PREFIXES;
+use crate::bindings::_helpers::compile_command::constants::UNTRACKED_ENVIRONMENT_NAMES;
+use crate::bindings::_helpers::compile_delta::driver::DELTA_DISABLE_ENV_VAR;
+use crate::bindings::_helpers::compile_delta::driver::DELTA_VERIFY_ENV_VAR;
 use crate::bindings::_helpers::frontier::stage_capture::CAPTURE_DIR_ENV_VAR;
 use crate::bindings::_helpers::result_output::event_writer::RESULT_PATH_ENV;
 use crate::bindings::_helpers::rules::constants::CUSTOM_HOST_RUNTIME_VERSION;
-use crate::bindings::_helpers::semantic_shapes::shapes::{VALID_FROM_DEFAULT, VALID_TO_DEFAULT};
+use crate::bindings::_helpers::semantic_shapes::shapes::VALID_FROM_DEFAULT;
+use crate::bindings::_helpers::semantic_shapes::shapes::VALID_TO_DEFAULT;
 use sqlbuild_python_front::attachments::constants::MICROBATCH_END_SENTINEL;
 use sqlbuild_python_front::attachments::constants::MICROBATCH_START_SENTINEL;
 use sqlbuild_python_front::state_rows::constants::MIGRATION_WRITE_ATTEMPTS;
