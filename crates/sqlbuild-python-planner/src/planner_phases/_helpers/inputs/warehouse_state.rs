@@ -104,6 +104,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
         on_progress: runtime_field(runtime, |runtime| &runtime.on_progress)?,
         deferred_locations: native_field(deferral, "deferred_locations")?,
         cursor_scope,
+        node_results_location: runtime_field(runtime, |runtime| &runtime.node_results_location)?,
     })?;
     let phase = MigrationPhase {
         runtime: runtime.clone(),

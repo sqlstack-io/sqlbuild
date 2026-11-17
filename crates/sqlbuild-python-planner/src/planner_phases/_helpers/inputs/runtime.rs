@@ -25,6 +25,7 @@ impl PlannerRuntime {
                     "local_config",
                     "on_progress",
                     "invocation_time",
+                    "node_results_location",
                 ],
             ),
         )?;
@@ -41,6 +42,7 @@ impl PlannerRuntime {
             local_config: args.value("local_config")?.unbind(),
             on_progress: args.value("on_progress")?.unbind(),
             invocation_time: invocation_time.unbind(),
+            node_results_location: args.value("node_results_location")?.unbind(),
         })
     }
 }

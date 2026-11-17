@@ -41,6 +41,8 @@ pub(crate) struct PlanningInputs<'a, 'py> {
     pub(crate) discovered_inputs: &'a Bound<'py, PyAny>,
     pub(crate) adapter: &'a Bound<'py, PyAny>,
     pub(crate) connection: &'a Bound<'py, PyAny>,
+    /// Python nodes' `(database, schema)` under the active target.
+    pub(crate) node_results_location: Bound<'py, PyAny>,
 }
 
 /// The selected Python nodes and SQL keys when loading is off: loaders out, their sources in.
@@ -204,6 +206,7 @@ pub(crate) fn pipeline_result<'py>(
                     native_field(discovered, "project_config")?,
                 ),
                 ("local_config", native_field(discovered, "local_config")?),
+                ("node_results_location", inputs.node_results_location.clone()),
             ],
         )?),
     )?;

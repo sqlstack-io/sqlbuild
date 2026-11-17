@@ -11,6 +11,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     AdapterDefaultResultsFallbackE2ETestCase,
+    PlanAfterBuildsE2ETestCase,
     PreservedTargetNodeResultsE2ETestCase,
     PreservedTargetRefusalE2ETestCase,
 )
@@ -201,6 +202,54 @@ def test_given_preserved_schema_without_loader_schema_when_compiling_then_python
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert test_case.expected_error in result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PlanAfterBuildsE2ETestCase(
+            description="a preserved schema reads the task's fingerprint from the loader schema",
+            target_lines='schema = "preserve"\nloader_schema = "raw"\n',
+            expected_plan_line="announce_orders      task (unchanged)",
+        ),
+        PlanAfterBuildsE2ETestCase(
+            description="a plan of the task alone reads its fingerprint from the loader schema",
+            target_lines='schema = "preserve"\nloader_schema = "raw"\n',
+            expected_plan_line="announce_orders      task (unchanged)",
+            plan_args=("--select", "announce_orders"),
+        ),
+        PlanAfterBuildsE2ETestCase(
+            description="a named schema reads the task's fingerprint from the target schema",
+            target_lines='schema = "analytics"\n',
+            expected_plan_line="announce_orders      task (unchanged)",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_two_builds_when_planning_then_python_nodes_are_not_new(
+    test_case: PlanAfterBuildsE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = node_result_project(
+        tmp_path=tmp_path,
+        target_lines=test_case.target_lines,
+        files={
+            "sources/raw.yml": node_result_source_yml("    schema: raw\n"),
+            "python/loaders/orders.py": _LOADER,
+            "python/tasks/announce.py": _TASK,
+        },
+    )
+    for _ in range(2):
+        build: subprocess.CompletedProcess[str] = run_sqb(
+            command=("--no-color", "build"), project_dir=project_dir
+        )
+        assert build.returncode == 0, build.stdout + build.stderr
+
+    plan: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", *test_case.plan_args), project_dir=project_dir
+    )
+
+    assert plan.returncode == 0, plan.stdout + plan.stderr
+    assert test_case.expected_plan_line in plan.stdout, plan.stdout
 
 
 @pytest.mark.parametrize(
