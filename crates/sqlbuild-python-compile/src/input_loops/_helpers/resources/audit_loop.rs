@@ -1,6 +1,7 @@
 //! `build_project_audit_inputs`: singular and attached generic audits attached natively.
 
 use crate::input_loops::models::AttachmentOwner;
+use sqlbuild_python_base::boundary::main::text_item::text_item;
 use std::collections::{BTreeMap, HashMap};
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -251,8 +252,8 @@ impl<'py> AuditScope<'_, 'py> {
             self.report_not_cross_resource(relative_path, &audit_name, (message, help))?;
         }
         let header: &Bound<'py, PyDict> = header.bind(py);
-        let severity: Option<String> = header_text(header, SEVERITY_KEY)?;
-        let run_scope: Option<String> = header_text(header, RUN_SCOPE_KEY)?;
+        let severity: Option<String> = text_item(header, SEVERITY_KEY)?;
+        let run_scope: Option<String> = text_item(header, RUN_SCOPE_KEY)?;
         let always_run: bool = match header.get_item(ALWAYS_RUN_KEY)? {
             Some(value) => value
                 .downcast::<PyBool>()
@@ -680,14 +681,6 @@ fn reference_calls(references: &[ReferenceRow]) -> Vec<(&str, &str)> {
         .iter()
         .map(|ReferenceRow { kind, name, .. }| (kind.as_str(), name.as_str()))
         .collect()
-}
-
-/// `_str_from_dict`: a header value when it is a string.
-fn header_text(header: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<String>> {
-    match header.get_item(key)? {
-        Some(value) if value.is_instance_of::<PyString>() => Ok(Some(value.extract()?)),
-        _ => Ok(None),
-    }
 }
 
 /// The attachment owners of every model, source and seed, as the audit loop reads them.

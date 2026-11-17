@@ -15,9 +15,9 @@ use sqlbuild_core::build_command::models::{
     PlanWarningFact, PolicyStep, RetentionFact, SnapshotPolicies, SnapshotRefreshFact,
     TableTypeFact,
 };
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
@@ -43,16 +43,12 @@ const LIMIT_OPTIONS: (&[&str], &[&str]) = (
 
 /// `CliUserError(message, code=..., help=...)`.
 pub(crate) fn build_command_error(py: Python<'_>, error: BuildCommandError) -> PyErr {
-    let raised: PyResult<Bound<'_, PyAny>> = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", error.code)?;
-        options.set_item("help", error.help)?;
-        error_class(py, ErrorId::CliUser)?.call((error.message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        ErrorId::CliUser,
+        &error.message,
+        (error.code.as_deref(), error.help.as_deref()),
+    )
 }
 
 fn text(value: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {

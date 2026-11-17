@@ -8,7 +8,7 @@ use sqlbuild_analysis::sql_macros::main::parse_sql_macro::parse_sql_macro;
 use sqlbuild_analysis::sql_macros::main::sql_macro_cycle::sql_macro_cycle;
 use sqlbuild_analysis::sql_macros::models::{SqlMacroDefinition, SqlMacroLocation};
 
-use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::types::ErrorId;
 
 /// `(name, relative path, contents)` of one SQL macro file.
@@ -17,11 +17,11 @@ type SourceRow = (String, String, String);
 type DefinitionRow = (String, Vec<String>, Vec<String>);
 
 fn raised(py: Python<'_>, error: &SqlMacroError) -> PyErr {
-    new_helped_error(
+    new_error(
         py,
         ErrorId::CompileInput,
-        (error.located_message(None), error.code),
-        error.help.as_deref(),
+        &error.located_message(None),
+        (Some(error.code), error.help.as_deref()),
     )
 }
 

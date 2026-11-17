@@ -138,10 +138,3 @@ pub(crate) fn within_identity_pass<'py, T>(
     let identity_pass: Bound<'py, PyAny> = entry(py, UserCodeHost::PythonIdentityPass)?.call0()?;
     within(&identity_pass, |_| body())
 }
-
-/// The host exception class `id` raised with `message`, or the error looking it up or raising it.
-pub(crate) fn host_error(py: Python<'_>, id: impl Into<HostId>, message: &str) -> PyErr {
-    entry(py, id)
-        .and_then(|class| class.call1((message,)))
-        .map_or_else(|error| error, PyErr::from_value)
-}

@@ -3,8 +3,9 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyBool, PyInt, PyList, PyString, PyStringMethods, PyTuple};
+use pyo3::types::{PyBool, PyInt, PyList, PyTuple};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use sqlbuild_python_base::native_host::main::host_error::host_error;
 use sqlbuild_state::execution_history::constants::ENVELOPE_TEXT_FIELDS;
 use sqlbuild_state::execution_history::errors::{HistoryError, HistoryErrorKind};
@@ -78,16 +79,8 @@ pub(crate) fn exact_int(value: &Bound<'_, PyAny>) -> Option<i64> {
     value.extract().unwrap_or(None)
 }
 
-/// `value` as text when it is a `str`.
-pub(crate) fn text_of(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    match value.downcast::<PyString>() {
-        Ok(text) => Ok(Some(text.to_str()?.to_owned())),
-        Err(_) => Ok(None),
-    }
-}
-
 /// `value` as text, or `None` when it is `None`.
-pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+pub(crate) fn nullable_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if value.is_none() {
         return Ok(None);
     }
@@ -160,9 +153,9 @@ fn texts(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
 pub(crate) fn event_filter_spec(value: &Bound<'_, PyAny>) -> PyResult<EventFilterSpec> {
     let family: Bound<'_, PyAny> = native_field(value, "family")?;
     Ok(EventFilterSpec {
-        invocation_id: optional_text(&native_field(value, "invocation_id")?)?,
-        run_id: optional_text(&native_field(value, "run_id")?)?,
-        producer: optional_text(&native_field(value, "producer")?)?,
+        invocation_id: nullable_text(&native_field(value, "invocation_id")?)?,
+        run_id: nullable_text(&native_field(value, "run_id")?)?,
+        producer: nullable_text(&native_field(value, "producer")?)?,
         event_types: texts(&native_field(value, "event_types")?)?,
         family: if family.is_none() {
             None
@@ -199,7 +192,7 @@ pub(crate) fn run_filter_spec(value: &Bound<'_, PyAny>) -> PyResult<RunFilterSpe
         .map(|item| item.and_then(|item| run_status(&item)))
         .collect::<PyResult<_>>()?;
     Ok(RunFilterSpec {
-        invocation_id: optional_text(&native_field(value, "invocation_id")?)?,
+        invocation_id: nullable_text(&native_field(value, "invocation_id")?)?,
         statuses,
         created_at_start: filter_time(&native_field(value, "created_at_start")?)?,
         created_at_end: filter_time(&native_field(value, "created_at_end")?)?,
@@ -214,9 +207,9 @@ pub(crate) fn known_event(event: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// The `event_id` a known event carries or an opaque envelope holds as a string.
 pub(crate) fn event_id_of(event: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if known_event(event)? {
-        return text_of(&native_field(event, "event_id")?);
+        return optional_text(&native_field(event, "event_id")?);
     }
-    text_of(&raw_field(event, "event_id")?)
+    optional_text(&raw_field(event, "event_id")?)
 }
 
 fn raw_field<'py>(event: &Bound<'py, PyAny>, name: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -238,7 +231,7 @@ pub(crate) fn event_from_json<'py>(payload: &Bound<'py, PyAny>) -> PyResult<Boun
 /// An opaque envelope's `occurred_at` when it is ISO text with a zero UTC offset.
 fn opaque_occurred_at(event: &Bound<'_, PyAny>) -> PyResult<Option<UtcTime>> {
     let py: Python<'_> = event.py();
-    let Some(text) = text_of(&raw_field(event, "occurred_at")?)? else {
+    let Some(text) = optional_text(&raw_field(event, "occurred_at")?)? else {
         return Ok(None);
     };
     let Some(parsed) = parsed_iso(py, &text)? else {
@@ -259,7 +252,7 @@ pub(crate) fn envelope_of(event: &Bound<'_, PyAny>) -> PyResult<EventEnvelope> {
     if known_event(event)? {
         envelope.schema_version = native_field(event, "schema_version")?.extract()?;
         for (slot, name) in envelope.text_fields.iter_mut().zip(ENVELOPE_TEXT_FIELDS) {
-            *slot = optional_text(&native_field(event, name)?)?;
+            *slot = nullable_text(&native_field(event, name)?)?;
         }
         envelope.occurred_at = Some(utc_time(&native_field(event, "occurred_at")?)?);
         return Ok(envelope);
@@ -267,7 +260,7 @@ pub(crate) fn envelope_of(event: &Bound<'_, PyAny>) -> PyResult<EventEnvelope> {
     envelope.schema_version =
         exact_int(&raw_field(event, "schema_version")?).unwrap_or(DEFAULT_SCHEMA_VERSION);
     for (slot, name) in envelope.text_fields.iter_mut().zip(ENVELOPE_TEXT_FIELDS) {
-        *slot = text_of(&raw_field(event, name)?)?.filter(|text| !text.is_empty());
+        *slot = optional_text(&raw_field(event, name)?)?.filter(|text| !text.is_empty());
     }
     envelope.occurred_at = opaque_occurred_at(event)?;
     Ok(envelope)
@@ -313,9 +306,9 @@ pub(crate) fn run_row(record: &Bound<'_, PyAny>) -> PyResult<RunRow> {
         is_complete: native_field(record, "is_complete")?.is_truthy()?,
         last_event_cursor: native_field(record, "last_event_cursor")?.extract()?,
         last_storage_order: native_field(record, "last_storage_order")?.extract()?,
-        command: optional_text(&native_field(record, "command")?)?,
-        target: optional_text(&native_field(record, "target")?)?,
-        environment: optional_text(&native_field(record, "environment")?)?,
+        command: nullable_text(&native_field(record, "command")?)?,
+        target: nullable_text(&native_field(record, "target")?)?,
+        environment: nullable_text(&native_field(record, "environment")?)?,
         started_at: optional_time("started_at")?,
         ended_at: optional_time("ended_at")?,
     })

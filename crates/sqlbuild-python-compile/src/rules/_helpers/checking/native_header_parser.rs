@@ -1,8 +1,8 @@
 //! DSL header values parsed natively for header rules, compared as Python compares their objects.
 
 use crate::rules::models::NativeHeaderParser;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods};
+use pyo3::prelude::{PyErr, Python};
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_rules::dsl_headers::main::inner_header_text::inner_header_text;
 use sqlbuild_rules::dsl_headers::models::{HeaderSpan, ParseFailure, ParseOutcome};
 use sqlbuild_rules::dsl_headers::types::HeaderParser;
@@ -10,7 +10,6 @@ use sqlbuild_sqltext::compiler::main::header_word_value::header_word_value;
 use sqlbuild_sqltext::compiler::models::{AuthoredValue, HeaderWord};
 
 use sqlbuild_python_base::boundary::main::value_error::value_error;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;
 
 /// The path header rules report header syntax errors at.
@@ -23,14 +22,12 @@ const ZERO: &str = "0";
 
 /// The `ModelSqlParseError` a rejected header parse raises.
 pub(crate) fn rejection(py: Python<'_>, failure: ParseFailure) -> PyErr {
-    let raised: PyResult<PyErr> = (|| {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("help", failure.help)?;
-        let error: Bound<'_, PyAny> =
-            error_class(py, ErrorId::ModelSqlParse)?.call((failure.message,), Some(&keywords))?;
-        Ok(PyErr::from_value(error))
-    })();
-    raised.unwrap_or_else(|error| error)
+    new_error(
+        py,
+        ErrorId::ModelSqlParse,
+        &failure.message,
+        (None, failure.help.as_deref()),
+    )
 }
 
 /// Why a header could not be read: a header syntax error, or a native failure's message.

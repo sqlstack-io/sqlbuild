@@ -19,8 +19,7 @@ use sqlbuild_host::entries::models::AdapterHost;
 
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
-use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
@@ -137,11 +136,11 @@ fn preserved_source_namespace(
         ),
     ) {
         Ok(()) => Ok(()),
-        Err(AssemblyError::CompileInput { message, help }) => Err(new_helped_error(
+        Err(AssemblyError::CompileInput { message, help }) => Err(new_error(
             source.py(),
             ErrorId::CompileInput,
-            (message, COMPILE_INPUT_CODE),
-            help.as_deref(),
+            &message,
+            (Some(COMPILE_INPUT_CODE), help.as_deref()),
         )),
         Err(other) => Err(PyValueError::new_err(format!("{other:?}"))),
     }
@@ -283,22 +282,15 @@ impl<'py> LoadProject<'py> {
 }
 
 fn unknown_selector(py: Python<'_>, error: &UnknownLoadSelector) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", UNKNOWN_SELECTOR_CODE)?;
-        options.set_item("help", UNKNOWN_SELECTOR_HELP)?;
-        error_class(py, ErrorId::CliUser)?.call(
-            (format!(
-                "sqb load selector '{}' does not match any managed source or loader",
-                error.name
-            ),),
-            Some(&options),
-        )
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        ErrorId::CliUser,
+        &format!(
+            "sqb load selector '{}' does not match any managed source or loader",
+            error.name
+        ),
+        (Some(UNKNOWN_SELECTOR_CODE), Some(UNKNOWN_SELECTOR_HELP)),
+    )
 }
 
 /// `value.strip()` when it is a string with non-blank text, else `None`.

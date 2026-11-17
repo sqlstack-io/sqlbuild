@@ -1,5 +1,6 @@
 //! `sqb` command dispatch: the native route table applied to a parsed namespace.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::path::PathBuf;
 
 use crate::bindings::_helpers::audit_command::command::run_audit_command;
@@ -60,7 +61,6 @@ use sqlbuild_python_project::compiled_project::main::with_job_scope::with_job_sc
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::registry::record_named::record_named;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -266,16 +266,12 @@ fn concatenated<'py>(
 
 /// `CliUserError(message, code=..., help=...)`.
 fn user_error(py: Python<'_>, failure: DispatchFailure) -> PyErr {
-    let raised = (|| {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("code", failure.code)?;
-        keywords.set_item("help", failure.help)?;
-        error_class(py, ErrorId::CliUser)?.call((failure.message,), Some(&keywords))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        ErrorId::CliUser,
+        &failure.message,
+        (Some(failure.code), failure.help),
+    )
 }
 
 /// `--select` and the selectors of every `--select-file`, with each file's selector count.

@@ -1,5 +1,6 @@
 //! `sqb rename` and `sqb mv`: plan from compiler facts, verify in a scratch copy, then write.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
@@ -65,16 +66,12 @@ fn imported<'py>(py: Python<'py>, module: &str, name: &str) -> PyResult<Bound<'p
 
 /// `CliUserError(message, code=..., help=...)`.
 fn user_error(py: Python<'_>, (message, code, help): (String, &str, Option<String>)) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", code)?;
-        options.set_item("help", help)?;
-        error_class(py, ErrorId::CliUser)?.call((message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(
+        py,
+        ErrorId::CliUser,
+        &message,
+        (Some(code), help.as_deref()),
+    )
 }
 
 /// The Python exception a native refactoring failure becomes.

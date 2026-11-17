@@ -18,7 +18,7 @@ use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::native_host::main::flush_console::flush_console;
 use sqlbuild_python_base::native_host::main::module_installed::module_installed;
 use sqlbuild_python_base::native_host::main::python_executable::python_executable;
-use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_compile::compile_driver::main::setup::project_graph::project_graph;
@@ -111,24 +111,27 @@ pub(crate) fn selected_python_tests(
         _ => modules,
     };
     if native_field(request, "python_only")?.is_truthy()? && selected.is_empty() {
-        return Err(new_helped_error(
+        return Err(new_error(
             py,
             ErrorId::PlannerInput,
-            ("no Python tests found".to_owned(), PYTHON_TESTS_INPUT_CODE),
-            Some(
-                "add test_*.py modules under tests/python/ or tests/providers/, mirroring the code they test",
+            "no Python tests found",
+            (
+                Some(PYTHON_TESTS_INPUT_CODE),
+                Some(
+                    "add test_*.py modules under tests/python/ or tests/providers/, mirroring the code they test",
+                ),
             ),
         ));
     }
     if !selected.is_empty() && !module_installed(py, PYTEST_MODULE)? {
-        return Err(new_helped_error(
+        return Err(new_error(
             py,
             ErrorId::PlannerInput,
+            "Python tests found but pytest isn't installed",
             (
-                "Python tests found but pytest isn't installed".to_owned(),
-                PYTHON_TESTS_INPUT_CODE,
+                Some(PYTHON_TESTS_INPUT_CODE),
+                Some("install the dev dependencies, or run `sqb test --sql`"),
             ),
-            Some("install the dev dependencies, or run `sqb test --sql`"),
         ));
     }
     Ok(selected)

@@ -1,5 +1,6 @@
 //! `sqb query`: run ad hoc SQL on the project connection and print the rows.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::time::Duration;
 
 use pyo3::exceptions::PyException;
@@ -41,20 +42,7 @@ const RUNNING_QUERY_MESSAGE: &str = "Running query...";
 
 /// A `CliUserError` with its code and optional help.
 fn user_error(py: Python<'_>, message: &str, code: Option<&str>, help: Option<&str>) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        if let Some(code) = code {
-            options.set_item("code", code)?;
-        }
-        if let Some(help) = help {
-            options.set_item("help", help)?;
-        }
-        error_class(py, ErrorId::CliUser)?.call((message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(py, ErrorId::CliUser, message, (code, help))
 }
 
 fn empty_sql(py: Python<'_>) -> PyErr {

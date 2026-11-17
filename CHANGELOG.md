@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.236.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.0...v0.236.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* give the refused FULL backfill of a cursor-intrinsic model its own code S204 ([#1525](https://github.com/sqlstack-io/sqlbuild/issues/1525)) ([f33eb8d](https://github.com/sqlstack-io/sqlbuild/commit/f33eb8deebc8fb3bd7d49ee0fff0ba1fd2213f8f))
+
 ## [0.236.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.235.0...v0.236.0) (2026-11-16)
 
 

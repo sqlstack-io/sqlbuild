@@ -1,11 +1,12 @@
 //! `sqb init`: scaffold a blank SQLBuild project and its agent skills.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::path::PathBuf;
 
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{PyDict, PyDictMethods, PyString};
+use pyo3::types::PyString;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME as PROJECT_FILE;
@@ -18,22 +19,13 @@ use crate::bindings::_helpers::workspace_commands::commands::update_sqlbuild_ski
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
 const EXISTS_MESSAGE: &str = "sqlbuild_project.toml already exists in this directory";
 
 fn exists_error(py: Python<'_>) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", "C900")?;
-        error_class(py, ErrorId::CliUser)?.call((EXISTS_MESSAGE,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(py, ErrorId::CliUser, EXISTS_MESSAGE, (Some("C900"), None))
 }
 
 /// Create a minimal SQLBuild project in the project directory.

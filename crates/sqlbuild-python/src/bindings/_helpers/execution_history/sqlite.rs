@@ -1,5 +1,6 @@
 //! `SQLiteExecutionHistory`: project-local SQLite event-log and run-projection storage.
 
+use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use std::fs::DirBuilder;
 use std::io::ErrorKind;
 use std::path::Path;
@@ -43,9 +44,9 @@ use sqlbuild_state::execution_history::types::UtcTime;
 use crate::bindings::_helpers::execution_history::appends::prepared_batch;
 use crate::bindings::_helpers::execution_history::conversion::{
     checked, event_filter_spec, exact_int, history_error_of_kind, new_namespace, now,
-    optional_text, parsed_iso, parsed_status, projection_facts, python_params, rejection,
+    nullable_text, parsed_iso, parsed_status, projection_facts, python_params, rejection,
     run_filter_spec, run_records, run_rows, storage_error, storage_error_from, stored_event,
-    text_of, utc_time,
+    utc_time,
 };
 use crate::bindings::_helpers::execution_history::statements::{
     column, execute, execute_plain, execute_query, fetch_one, tuple_of,
@@ -171,9 +172,9 @@ fn stored_run(row: &Bound<'_, PyAny>) -> PyResult<RunRow> {
         is_complete: column(row, "is_complete")?.is_truthy()?,
         last_event_cursor: column(row, "last_event_cursor")?.extract()?,
         last_storage_order: column(row, "last_storage_order")?.extract()?,
-        command: optional_text(&column(row, "command")?)?,
-        target: optional_text(&column(row, "target")?)?,
-        environment: optional_text(&column(row, "environment")?)?,
+        command: nullable_text(&column(row, "command")?)?,
+        target: nullable_text(&column(row, "target")?)?,
+        environment: nullable_text(&column(row, "environment")?)?,
         started_at: optional_timestamp(&column(row, "started_at")?)?,
         ended_at: optional_timestamp(&column(row, "ended_at")?)?,
     })
@@ -273,7 +274,7 @@ impl SqliteExecutionHistory {
             return Ok(0);
         };
         let invalid = || storage_error(py, "SQLite history schema metadata is invalid");
-        match text_of(&value)? {
+        match optional_text(&value)? {
             Some(text) => text.trim().parse::<i64>().map_err(|_| invalid()),
             None => exact_int(&value).ok_or_else(invalid),
         }
@@ -350,8 +351,10 @@ impl SqliteExecutionHistory {
             )?)?;
             let row: Bound<'py, PyAny> = match existing {
                 Some(existing) => {
-                    let digest: Option<String> = text_of(&column(&existing, "content_digest")?)?;
-                    let payload: Option<String> = text_of(&column(&existing, "payload_json")?)?;
+                    let digest: Option<String> =
+                        optional_text(&column(&existing, "content_digest")?)?;
+                    let payload: Option<String> =
+                        optional_text(&column(&existing, "payload_json")?)?;
                     checked(
                         py,
                         validate_stored_content(event, (digest.as_deref(), payload.as_deref())),
@@ -431,7 +434,7 @@ impl SqliteExecutionHistory {
         if cursor.is_none() {
             return Ok(None);
         }
-        let text: String = text_of(cursor)?.unwrap_or_default();
+        let text: String = optional_text(cursor)?.unwrap_or_default();
         let namespace: String = Self::namespace(connection)?;
         let decoded = checked(py, decoded_run_cursor(Dialect::Sqlite, &text, &namespace))?;
         let invalid_timestamp =
@@ -808,7 +811,8 @@ impl SqliteExecutionHistory {
             let Some(result) = fetch_one(&execute_plain(&connection, SQLITE_QUICK_CHECK)?)? else {
                 return Ok(false);
             };
-            if text_of(&result.get_item(0)?)?.as_deref() != Some(SQLITE_HEALTHY_CHECK_RESULT) {
+            if optional_text(&result.get_item(0)?)?.as_deref() != Some(SQLITE_HEALTHY_CHECK_RESULT)
+            {
                 return Ok(false);
             }
             let version: i64 = slf.call_method0("get_schema_version")?.extract()?;
@@ -918,7 +922,7 @@ impl SqliteExecutionHistory {
         let Some(cursor) = cursor.filter(|cursor| !cursor.is_none()) else {
             return Ok(0);
         };
-        let text: String = text_of(cursor)?.unwrap_or_default();
+        let text: String = optional_text(cursor)?.unwrap_or_default();
         let namespace: String = Self::namespace(connection)?;
         let position: i64 = checked(
             py,
