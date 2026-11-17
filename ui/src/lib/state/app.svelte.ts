@@ -1,3 +1,4 @@
+import { throttled } from './throttle';
 import { browser } from '$app/environment';
 import { logout } from '$lib/api/http-client';
 import { MockApiClient } from '$lib/api/mock/mock-client';
@@ -23,6 +24,8 @@ import {
 const SCOPE_KEY = 'sb-scope';
 /** How often the shell rereads live problems and warehouse sync; locations report every 30 seconds. */
 const POLL_MS = 30_000;
+/** The least time between reloads of the sidebar's counts while changes stream in. */
+const NAV_COUNTS_MS = 10_000;
 
 /**
  * App-wide state: the bootstrap, the selected location, and the
@@ -85,7 +88,7 @@ class AppState {
 			if (channelMatches(signal.channel, ['platform_events'])) void this.#loadPlatformEvents();
 			if (channelMatches(signal.channel, ['warehouse_sync'])) void this.#loadWarehouseSync();
 			if (channelMatches(signal.channel, ['snapshot'])) void this.#loadSnapshot();
-			if (channelMatches(signal.channel, ['runs', 'triggers', 'checks'])) void this.#loadNavCounts();
+			if (channelMatches(signal.channel, ['runs', 'triggers', 'checks'])) this.#navCounts.request();
 		});
 		try {
 			this.bootstrap = await this.client.bootstrap();
@@ -141,6 +144,12 @@ class AppState {
 		if (!location) return;
 		this.locationId = location.id;
 	}
+
+	/**
+	 * The sidebar's counts read whole listings (every check's result, every run), so a running run's
+	 * stream of changes reloads them at most every `NAV_COUNTS_MS`, and once more after the last change.
+	 */
+	#navCounts = throttled(() => this.#loadNavCounts(), NAV_COUNTS_MS);
 
 	#loadScoped() {
 		void this.#loadNavCounts();
