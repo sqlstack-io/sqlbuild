@@ -163,6 +163,19 @@ pub(crate) struct ProxyApiTestCase {
     pub(crate) expected_sessions: i64,
 }
 
+pub(crate) struct ProxyProvisioningTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Untrusted peer, missing username, another host, a taken name, and a newcomer under `reject`.
+    pub(crate) expected_refusals: [reqwest::StatusCode; 5],
+    /// Writes from another origin, the HTTPS twin of the origin, no origin, and the origin itself.
+    pub(crate) expected_write_statuses: [reqwest::StatusCode; 4],
+    /// The newcomer's role assignments as JSON rows.
+    pub(crate) expected_roles: &'static str,
+    /// The change feed's cache-control, buffering and content-type headers.
+    pub(crate) expected_feed_headers: [&'static str; 3],
+}
+
 pub(crate) struct ExternalSessionTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
