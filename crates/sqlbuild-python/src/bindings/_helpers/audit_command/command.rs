@@ -16,18 +16,9 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome};
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
-use crate::bindings::_helpers::build_progress::audit_progress::AuditProgressReporter;
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
-use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::result_output::documents::{
-    audit_execution_json, audit_projection, write_execution_json_output,
-};
-use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
-use crate::bindings::_helpers::result_output::projection::audit_check_id;
-use crate::bindings::_helpers::result_output::resource_ids::audit_identity;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -41,6 +32,15 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::cost_context::models::CostContext;
+use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
+use sqlbuild_python_output::build_progress::models::AuditProgressReporter;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
+use sqlbuild_python_output::result_output::main::events::audit_identity::audit_identity;
+use sqlbuild_python_output::result_output::main::results::audit_check_id::audit_check_id;
+use sqlbuild_python_output::result_output::main::results::audit_execution_json::audit_execution_json;
+use sqlbuild_python_output::result_output::main::results::audit_projection::audit_projection;
+use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
+use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
 use sqlbuild_python_planner::planner_entries::main::plans::build_audit_command_plan::build_audit_command_plan;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;

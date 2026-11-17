@@ -11,10 +11,6 @@ use sqlbuild_core::plan_display::constants::{
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::{
-    ConnectionProgressReporter, PlanningProgressReporter,
-};
-use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspection;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
@@ -33,6 +29,9 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
+use sqlbuild_python_output::build_progress::main::with_verbose_inspection::with_verbose_inspection;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
+use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
 use sqlbuild_python_planner::consumption::main::changed_policy::changed_policy;
 use sqlbuild_python_planner::consumption::main::policy_line::policy_line;
 use sqlbuild_python_planner::consumption::main::preview_changed::preview_changed;

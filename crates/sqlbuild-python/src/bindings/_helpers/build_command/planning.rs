@@ -11,7 +11,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::build_command::defer_clone::run_defer_clone_boundary_prephase;
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::policies::{enforce_plan_policies, model_limit};
-use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspection;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -26,6 +25,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::manifest::main::build_manifest::build_manifest;
+use sqlbuild_python_output::build_progress::main::with_verbose_inspection::with_verbose_inspection;
 use sqlbuild_python_planner::plan_output::main::format_plan::format_plan;
 
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];

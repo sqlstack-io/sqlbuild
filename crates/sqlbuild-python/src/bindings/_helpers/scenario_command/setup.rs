@@ -22,8 +22,6 @@ use sqlbuild_core::scenario_command::models::{
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
-use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -42,6 +40,8 @@ use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inpu
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::contracts::main::resolve_effective_scenario_config::resolve_effective_scenario_config;
 use sqlbuild_python_front::discovery::main::failures::sql_analysis_guidance::sql_analysis_guidance;
+use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
+use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 
 const METADATA_MODULE: &str = "importlib.metadata";

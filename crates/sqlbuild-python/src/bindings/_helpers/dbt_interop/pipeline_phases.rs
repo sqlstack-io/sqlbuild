@@ -4,7 +4,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::dbt_interop::execution::render_dbt_execution_summary_footer;
 use crate::bindings::_helpers::dbt_interop::pipeline_prologue::progress;
 use crate::bindings::_helpers::dbt_interop::plan::render_dbt_interop_plan;
@@ -26,6 +25,7 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 
 const OPTIONS: (&[&str], &[&str]) = (
     &["request", "invocation"],

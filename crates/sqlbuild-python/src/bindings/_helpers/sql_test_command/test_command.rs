@@ -25,12 +25,6 @@ use sqlbuild_host::models::{SqlTestExecutionResult, SqlTestOutcome};
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
-use crate::bindings::_helpers::build_progress::nested_progress::NestedCommandProgressCallbacks;
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
-use crate::bindings::_helpers::build_progress::progress_text::{
-    format_expectation_detail, format_expectation_name, write_execution_header,
-};
-use crate::bindings::_helpers::build_progress::result_text::{test_label, test_result_label};
 use crate::bindings::_helpers::change_selection::base_snapshot::{
     BaseComparison, base_comparison, base_variant,
 };
@@ -41,10 +35,6 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_com
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::statement_report::StatementReport;
-use crate::bindings::_helpers::result_output::documents::test_execution_json;
-use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
-use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
-use crate::bindings::_helpers::result_output::resource_ids::sql_test_identity;
 use crate::bindings::_helpers::sql_test_command::python_tests::{
     PYTHON_TESTS_INPUT_CODE, names_python_node, python_test_modules, run_python_tests,
     selected_python_tests, selective, with_python_section,
@@ -70,6 +60,17 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
 use sqlbuild_python_compile::compile_outputs::main::write_test_runtime_target::write_test_runtime_target;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_output::build_progress::main::format_expectation_detail::format_expectation_detail;
+use sqlbuild_python_output::build_progress::main::format_expectation_name::format_expectation_name;
+use sqlbuild_python_output::build_progress::main::test_label::test_label;
+use sqlbuild_python_output::build_progress::main::test_result_label::test_result_label;
+use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
+use sqlbuild_python_output::build_progress::models::NestedCommandProgressCallbacks;
+use sqlbuild_python_output::result_output::main::events::sql_test_identity::sql_test_identity;
+use sqlbuild_python_output::result_output::main::results::test_execution_json::test_execution_json;
+use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
+use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
 use sqlbuild_python_planner::planner_entries::main::plans::build_test_command_plan::build_test_command_plan;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;

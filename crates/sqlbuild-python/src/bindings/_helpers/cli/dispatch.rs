@@ -28,7 +28,6 @@ use crate::bindings::_helpers::plan_command::rules::run_rules_command;
 use crate::bindings::_helpers::query_command::dag::run_dag_command;
 use crate::bindings::_helpers::query_command::query::run_query_command;
 use crate::bindings::_helpers::recall::command::run_recall_command;
-use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::refactor::refactor_command::run_refactor_command;
 use crate::bindings::_helpers::review_command::command::run_review_command;
 use crate::bindings::_helpers::scenario_command::capture_command::run_scenario_capture_command;
@@ -57,6 +56,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_compile::compile_command::main::invocation::run_compile::run_compile;
 use sqlbuild_python_front::discovery::models::MissingSecretsScope;
+use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_project::main::with_job_scope::with_job_scope;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
