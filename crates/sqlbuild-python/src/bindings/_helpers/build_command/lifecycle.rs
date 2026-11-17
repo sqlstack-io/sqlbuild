@@ -1,29 +1,21 @@
 //! Ingress Python before the build and read-side tasks and assets dispatched as SQL completes.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Mutex;
-
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods};
+use pyo3::types::PyDict;
 use pyo3::{pyclass, pymethods};
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
-use sqlbuild_analysis::python_plan::models::RoundTripLoader;
 use sqlbuild_core::build_command::main::render_python_node_rows::render_python_node_rows;
 use sqlbuild_core::build_command::models::PythonNodeRow;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
-
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;
 use sqlbuild_python_base::build_command::main::emit::emit;
 use sqlbuild_python_base::build_command::main::frozenset::frozenset;
-<<<<<<< HEAD
-use sqlbuild_python_base::build_command::main::or_none::or_none;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -34,21 +26,19 @@ use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_key
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
-<<<<<<< HEAD
-use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
-use sqlbuild_python_project::graph::main::python_nodes::native_run_lifecycle::native_run_lifecycle;
-=======
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
->>>>>>> origin/main
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::planner_scope::main::build_intermediate_source_map::build_intermediate_source_map;
+use std::collections::{HashMap, HashSet};
+use pyo3::types::{PyDict, PyDictMethods};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::python_plan::models::RoundTripLoader;
+use sqlbuild_python_base::build_command::main::or_none::or_none;
+use sqlbuild_python_project::graph::main::python_nodes::native_run_lifecycle::native_run_lifecycle;
 
 const SUCCESS_STATUS: &str = "success";
-const SKIPPED_STATUS: &str = "skipped";
-const HARD_SKIP: &str = "hard";
-const SOFT_SKIP: &str = "soft";
 
 /// The cursor window and output settings the Python lifecycle runs with.
 pub(crate) struct LifecycleInputs<'py> {
@@ -630,7 +620,14 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
     )
 }
 
+const SKIPPED_STATUS: &str = "skipped";
+
+const HARD_SKIP: &str = "hard";
+
+const SOFT_SKIP: &str = "soft";
+
 type RoundTripGates = HashMap<String, Vec<ObjectKey>>;
+
 type RoundTripWaits = Vec<(ObjectKey, Vec<ObjectKey>)>;
 
 /// Each round-trip loader's gating upstreams, and its source load key with the SQL it waits for.

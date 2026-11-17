@@ -1,19 +1,9 @@
 //! Reference lookup and adapter callbacks for planner SQL.
 
 use sqlbuild_host::entries::models::AdapterHost;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::native_host::models::Dialect;
-
-<<<<<<< HEAD
-use crate::planner_resolution::_helpers::references::values::cursor_wrap;
-use crate::planner_resolution::_helpers::references::values::filtering_of;
-use crate::planner_resolution::_helpers::references::values::method;
-use crate::planner_resolution::_helpers::references::values::string;
-=======
 use crate::planner_resolution::_helpers::references::values::{
     cursor_wrap, filtering_of, method, string,
 };
->>>>>>> origin/main
 use crate::planner_resolution::models::CursorFiltering;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -21,14 +11,16 @@ use pyo3::pyfunction;
 use pyo3::types::PyDict;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-<<<<<<< HEAD
-=======
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::SqlCodeScanner;
 use sqlbuild_sqltext::resolution::main::{ref_alias::ref_alias, reference_spans::reference_spans};
+use sqlbuild_python_base::native_host::models::Dialect;
+use crate::planner_resolution::_helpers::references::values::cursor_wrap;
+use crate::planner_resolution::_helpers::references::values::filtering_of;
+use crate::planner_resolution::_helpers::references::values::method;
+use crate::planner_resolution::_helpers::references::values::string;
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
@@ -85,14 +77,14 @@ pub(crate) fn resolve_refs(
             } else {
                 let relation: String = call_with(
                     &host_entry(py, AdapterHost::ResolveRelationLocationQualifiedName)?,
-<<<<<<< HEAD
+<<<<<<< ours
                     &[
                         ("adapter", dialect.clone().into_any()),
                         ("location", target),
                     ],
 =======
                     &[("adapter", adapter.clone()), ("location", target)],
->>>>>>> origin/main
+>>>>>>> theirs
                 )?
                 .extract()?;
                 let char_end = sql[..span.end].chars().count();
@@ -248,9 +240,5 @@ pub(crate) fn resolve_table_function_references(
     function_locations: &Bound<'_, PyAny>,
     dialect: &Bound<'_, Dialect>,
 ) -> PyResult<String> {
-<<<<<<< HEAD
     resolve_function_calls(query_sql, function_locations, dialect, true)
-=======
-    resolve_function_calls(query_sql, function_locations, adapter, true)
->>>>>>> origin/main
 }

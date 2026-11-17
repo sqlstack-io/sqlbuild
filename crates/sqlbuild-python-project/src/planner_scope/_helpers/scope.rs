@@ -5,26 +5,15 @@ use crate::compiled_views::main::project::compiled_models::compiled_models;
 use crate::compiled_views::main::project::sources::sources;
 use crate::graph::models::NativeProjectGraph;
 use crate::native_host::models::ModelHandle;
-<<<<<<< HEAD
-use crate::planner_identity::_helpers::graph::ExecutionGates;
-use crate::planner_identity::_helpers::graph::execution_deps_with;
-use crate::planner_identity::_helpers::graph::execution_origins_with;
-use crate::planner_identity::main::execution_order::execution_order;
-=======
 use crate::planner_identity::main::execution_deps::execution_deps;
 use crate::planner_identity::main::execution_order::execution_order;
 use crate::planner_identity::main::execution_origins::execution_origins;
->>>>>>> origin/main
 use crate::planner_scope::main::keys::keys;
 use crate::planner_scope::main::project_graph::project_graph;
 use crate::planner_scope::models::ScopeData;
 use crate::planner_selection::main::py_strings::py_strings;
 use crate::planner_selection::main::resolve_graph_keys::resolve_graph_keys;
 use crate::planner_selection::models::Carrier;
-<<<<<<< HEAD
-use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
-=======
->>>>>>> origin/main
 use crate::resource_views::main::source_reads::source_entry::source_entry;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyTuple};
@@ -40,6 +29,10 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use std::collections::HashSet;
+use crate::planner_identity::_helpers::graph::ExecutionGates;
+use crate::planner_identity::_helpers::graph::execution_deps_with;
+use crate::planner_identity::_helpers::graph::execution_origins_with;
+use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
 
 pub(crate) fn build_planner_scope<'py>(
     py: Python<'py>,

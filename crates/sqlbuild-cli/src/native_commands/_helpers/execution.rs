@@ -20,20 +20,17 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc::UnboundedSender;
-
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde_json::json;
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
-
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use sqlbuild_cache::project_snapshot::models::PathStamp;
 use sqlbuild_config::project::main::load_control_config::load_control_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
 use sqlbuild_config::project::models::ControlConfig;
-use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
@@ -48,9 +45,8 @@ use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::{
-    ConnectionCheckTrigger, LocationHealth, LocationHealthReport, LocationWorkClient,
-    LocationWorkPoll, RetentionPolicies, WarehouseReadFailure, WarehouseSyncFailure,
-    WarehouseSyncProgress,
+    LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
+    WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
@@ -61,9 +57,7 @@ use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::main::set_release_version::set_release_version;
 use sqlbuild_orchestration::store::models::ControlStore;
-use sqlbuild_orchestration::warehouse_metadata::constants::{
-    MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
-};
+use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, WarehouseHistoryFailure,
     WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead,
@@ -80,7 +74,6 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio::time::{Instant, Interval, MissedTickBehavior};
 use uuid::Uuid;
-
 use crate::argv::models::{Namespace, Stream, Value};
 use crate::compute_logs::constants::DEFAULT_RETENTION_COUNT;
 use crate::compute_logs::main::abandon_capture::abandon_capture;
@@ -102,46 +95,66 @@ use crate::native_commands::_helpers::project_facts::has_no_runtime_extensions;
 use crate::native_commands::_helpers::rules::run_rules;
 use crate::native_commands::_helpers::skills::{run_skills, skill_freshness_notice};
 use crate::native_commands::_helpers::terminal::{
-    finish_lost_stdout, share_terminal, terminal_columns, write_output,
+    finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
-<<<<<<< HEAD
-    ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
-    METADATA_PAGE_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
-    METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
-    METADATA_SYNC_CHECK_SECONDS, PLAN_NOT_PRODUCED, SAFETY_SYNC_ENV, SCHEDULER_COMMAND,
-    STATISTICS_RELATION_SECONDS, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
-=======
     ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_ERROR_CHARS,
     METADATA_FAILURE_LIMIT, METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS,
     METADATA_READER_CLOSE_SECONDS, METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES,
     METADATA_SAFETY_SYNC_SECONDS, METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND,
     UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
->>>>>>> origin/main
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-<<<<<<< HEAD
-    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationLoad,
-    LocationMetadataPage, LocationMetadataSync, LocationRuntimeRequest, LocationServe,
-    LocationWatch, LostStdout, MetadataReply, NativeCommand, NativeInvocation, ProjectLocation,
-    ReadFailure, ScanToken, SyncProgress,
-=======
     CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
     MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
->>>>>>> origin/main
 };
-use crate::native_commands::types::LoadOutcome;
+use crate::native_commands::types::LocationPublication;
 use crate::server_config::models::ServerSection;
 use crate::workers::main::docker_image_sources::docker_image_sources;
 use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
 use crate::workers::main::terminate_child::terminate_child;
 use crate::workers::models::{Launchers, Workers};
+use std::collections::HashMap;
+use chrono::{DateTime, Utc};
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
+use sqlbuild_orchestration::platform::models::{
+    ConnectionCheckTrigger, LocationHealth, LocationHealthReport, LocationWorkClient,
+    LocationWorkPoll, RetentionPolicies, WarehouseReadFailure, WarehouseSyncFailure,
+    WarehouseSyncProgress,
+};
+use sqlbuild_orchestration::warehouse_metadata::constants::{
+    MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
+};
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind,
+    WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead, WarehouseWatermarkRead,
+};
+use crate::native_commands::_helpers::decision::{
+    control_database, control_database_variable, text,
+};
+use crate::native_commands::_helpers::terminal::{
+    finish_lost_stdout, share_terminal, terminal_columns, write_output,
+};
+use crate::native_commands::constants::{
+    ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
+    METADATA_PAGE_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
+    METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
+    METADATA_SYNC_CHECK_SECONDS, PLAN_NOT_PRODUCED, SAFETY_SYNC_ENV, SCHEDULER_COMMAND,
+    STATISTICS_RELATION_SECONDS, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+};
+use crate::native_commands::models::{
+    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationLoad,
+    LocationMetadataPage, LocationMetadataSync, LocationRuntimeRequest, LocationServe,
+    LocationWatch, LostStdout, MetadataReply, NativeCommand, NativeInvocation, ProjectLocation,
+    ReadFailure, ScanToken, SyncProgress,
+};
+use crate::native_commands::types::LoadOutcome;
 
 /// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`.
 pub(crate) async fn run_development_roles(
@@ -324,7 +337,7 @@ fn development_location_role(
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
 pub(crate) async fn compile_generation(
-<<<<<<< HEAD
+<<<<<<< ours
     requests: &mpsc::Sender<LocationRuntimeRequest>,
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
@@ -336,7 +349,7 @@ pub(crate) async fn compile_generation(
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<CompileOutcome>, ControlError> {
->>>>>>> origin/main
+>>>>>>> theirs
     let (reply, publication) = oneshot::channel();
     requests
         .send(LocationRuntimeRequest::Publish(LocationCompileRequest {
@@ -364,7 +377,7 @@ pub(crate) async fn compile_generation(
                     "Location compiler failed; generation {generation} may already be published: {error}\n"
                 ),
             )]));
-<<<<<<< HEAD
+<<<<<<< ours
             LocationLoad {
                 published: None,
                 rules: None,
@@ -423,28 +436,9 @@ pub(crate) async fn compile_generation(
                 record.snapshot_id
             )));
         }
->>>>>>> origin/main
+>>>>>>> theirs
     }
     Ok(Some(Ok((refresh_at, locations))))
-}
-
-/// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
-pub(crate) async fn exchange_location_plan(
-    compiler: &mut LocationCompiler,
-    request: &serde_json::Value,
-) -> Result<serde_json::Value, ControlError> {
-    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
-    line.push(b'\n');
-    compiler.stdin.write_all(&line).await?;
-    compiler.stdin.flush().await?;
-    let mut reply = String::new();
-    if compiler.stdout.read_line(&mut reply).await? == 0 {
-        return Err(ControlError::Invalid(
-            "location interpreter exited before replying".into(),
-        ));
-    }
-    serde_json::from_str(&reply)
-        .map_err(|_| ControlError::Invalid("location interpreter returned an invalid plan".into()))
 }
 
 /// The child is retained by its owning task while this exchange can be cancelled.
@@ -721,62 +715,6 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
     state
 }
 
-/// One table's line as its scan completes, e.g. `Warehouse history 3/14: audit results, 1,204 rows in 0.8 s`.
-pub(crate) fn scan_line(state: &LocationMetadataSync, scans: usize) -> String {
-    let namespace = if state.locations.len() > 1 {
-        let location = state.location();
-        match &location.database {
-            Some(database) => format!(" in {database}.{}", location.schema),
-            None => format!(" in {}", location.schema),
-        }
-    } else {
-        String::new()
-    };
-    let read = if state.progress.scan_unchanged {
-        "unchanged".to_owned()
-    } else {
-        rows_text(state.progress.scan_rows)
-    };
-    format!(
-        "Warehouse history {}/{scans}: {}{namespace}, {read} in {:.1} s\n",
-        state.index + 1,
-        state.kind().as_str().replace('_', " "),
-        state.progress.scan_started.elapsed().as_secs_f64()
-    )
-}
-
-/// Where a synchronization has got to when a page is delivered or a table is found unchanged.
-///
-/// A clean report of the last table's last page completes the synchronization.
-pub(crate) fn sync_progress(state: &LocationMetadataSync, clean: bool) -> WarehouseSyncProgress {
-    let kinds = (state.locations.len() * WarehouseHistoryKind::ALL.len()) as u64;
-    let page = state.pending.as_ref();
-    let rows = state.progress.sync_rows
-        + state.progress.scan_rows
-        + page.map_or(0, |page| page.batch.records.len() as u64);
-    let scan_done = page.is_none_or(|page| page.next_source_after.is_none());
-    WarehouseSyncProgress {
-        position: state.index as u64 + 1,
-        kinds,
-        rows,
-        elapsed_millis: state.progress.sync_started.elapsed().as_millis() as u64,
-        completed: clean && scan_done && state.index as u64 + 1 == kinds,
-    }
-}
-
-/// A row count with thousands separators, e.g. `31,204 rows`.
-pub(crate) fn rows_text(rows: u64) -> String {
-    let digits = rows.to_string();
-    let mut grouped = String::new();
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(digit);
-    }
-    format!("{grouped} {}", if rows == 1 { "row" } else { "rows" })
-}
-
 /// The mirror's watermark bounds an incremental scan and shows whether the mirror holds rows.
 pub(crate) async fn load_watermark(
     mut state: LocationMetadataSync,
@@ -860,22 +798,6 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
     state
 }
 
-<<<<<<< HEAD
-/// When the next safety sync is due, if this report's page completes the sync: the last page of the last scan, without failure.
-///
-/// None where no timed sync follows: the interval is off, or reads wake billed compute and the
-/// interval is only the default, so the next run or a request syncs instead.
-pub(crate) fn completed_sync_next_at(
-    state: &LocationMetadataSync,
-    failure: Option<WarehouseSyncFailure>,
-    now: DateTime<Utc>,
-) -> Option<DateTime<Utc>> {
-    let completes = sync_progress(state, failure.is_none()).completed;
-    (completes && state.safety_seconds > 0 && !state.defers_safety_sync())
-        .then(|| i64::try_from(state.safety_seconds).ok())
-        .flatten()
-        .and_then(|seconds| now.checked_add_signed(chrono::Duration::seconds(seconds)))
-=======
 /// Under `sqb dev`, a warning the location logs also becomes a screen line, so plain output shows it.
 pub(crate) fn location_warning(title: &str, detail: String) {
     drop(emit_dev_event(&DevEvent::Warning {
@@ -896,7 +818,6 @@ pub(crate) fn retry_stopped_sync(state: &mut LocationMetadataSync) {
             "one attempt after the safety interval".to_owned(),
         );
     }
->>>>>>> origin/main
 }
 
 /// Operational cost is elapsed IO time, not an estimate of warehouse billing.
@@ -906,20 +827,9 @@ pub(crate) async fn metadata_health(
     (started, failure): (Instant, Option<WarehouseSyncFailure>),
     error: Option<&str>,
 ) {
+<<<<<<< ours
     report_metadata_health(state, (client, poll), (started, failure, None)).await;
-}
-
-/// A failed read also reports its closed cause and the page size it asked for.
-pub(crate) async fn report_metadata_health(
-    state: &LocationMetadataSync,
-    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
-    (started, failure, read_failure): (
-        Instant,
-        Option<WarehouseSyncFailure>,
-        Option<WarehouseReadFailure>,
-    ),
-) {
-    let next_sync_at = completed_sync_next_at(state, failure, Utc::now());
+=======
     let report = LocationHealthReport {
         event_id: Uuid::now_v7(),
         session_id: poll.session_id,
@@ -934,14 +844,7 @@ pub(crate) async fn report_metadata_health(
                 .as_ref()
                 .map_or(0, |page| page.batch.records.len()) as u64,
             elapsed_millis: started.elapsed().as_millis() as u64,
-<<<<<<< HEAD
-            page_limit: read_failure.map(|_| page_limit(state) as u64),
-            read_failure,
-            progress: Some(sync_progress(state, failure.is_none())),
-            next_sync_at,
-=======
             error: error.map(|error| error.chars().take(METADATA_ERROR_CHARS).collect()),
->>>>>>> origin/main
         },
     };
     if let Err(error) = client.report_health(&report).await {
@@ -950,6 +853,7 @@ pub(crate) async fn report_metadata_health(
             &format!("Warehouse synchronization health report failed: {error}\n"),
         )]));
     }
+>>>>>>> theirs
 }
 
 /// Health IO remains native even while a user-code child holds its interpreter's GIL.
@@ -1055,32 +959,29 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
         target,
         image_id: text(namespace, "location_image_id"),
         metadata_reconcile_seconds,
-<<<<<<< HEAD
+<<<<<<< ours
 =======
         safety_sync_seconds,
         dev_events: dev_events_enabled(),
->>>>>>> origin/main
+>>>>>>> theirs
     })
 }
 
-/// The safety sync interval from the flag, then the environment, then the project; `None` when
-/// nothing sets one and the default of thirty minutes applies.
-pub(crate) fn safety_sync_setting(
+/// The safety sync interval from the flag, then the environment, then the project, then thirty minutes.
+pub(crate) fn safety_sync_seconds(
     flag: Option<&str>,
     environment: Option<&str>,
     project: impl FnOnce() -> Result<ControlConfig, String>,
-) -> Result<Option<u64>, String> {
+) -> Result<u64, String> {
     if let Some(text) = flag {
-        return sync_interval_seconds(text)
-            .map(Some)
-            .map_err(|help| format!("--sync-at-least-every {help}"));
+        return sync_interval_seconds(text).map_err(|help| format!("--sync-at-least-every {help}"));
     }
     if let Some(text) = environment.filter(|text| !text.trim().is_empty()) {
-        return sync_interval_seconds(text)
-            .map(Some)
-            .map_err(|help| format!("{SAFETY_SYNC_ENV} {help}"));
+        return sync_interval_seconds(text).map_err(|help| format!("{SAFETY_SYNC_ENV} {help}"));
     }
-    Ok(project()?.sync_at_least_every_seconds)
+    Ok(project()?
+        .sync_at_least_every_seconds
+        .unwrap_or(METADATA_SAFETY_SYNC_SECONDS))
 }
 
 /// Reconcile from the server after restarts or lost acknowledgements; transient outages retry.
@@ -1138,14 +1039,14 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
 
 /// Check the connection after a publication: the first in a process is its startup check.
 pub(crate) async fn check_published_location(
-<<<<<<< HEAD
+<<<<<<< ours
     options: &LocationServe,
     script: &Path,
     (bearer, session_id, generation, trigger): (&str, Uuid, i64, ConnectionCheckTrigger),
 =======
     (options, script, connect): (&LocationServe, &Path, bool),
     (bearer, session_id, generation): (&str, Uuid, i64),
->>>>>>> origin/main
+>>>>>>> theirs
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Vec<PathBuf>>, ControlError> {
     drop(write_output(&[(
@@ -1529,23 +1430,6 @@ pub(crate) fn plan_failure(message: &str) -> serde_json::Value {
     json!({"error": {"code": "plan_failed", "message": message, "help": null}})
 }
 
-/// A plan document that left no diffs out, such as a failure report.
-pub(crate) fn without_diffs(
-    document: serde_json::Value,
-) -> crate::native_commands::types::LocationPlan {
-    (document, std::collections::BTreeMap::new())
-}
-
-/// The plan document of a plan that failed with its own coded error, its texts redacted and bounded.
-pub(crate) fn plan_error(failed: &serde_json::Value) -> serde_json::Value {
-    let text = |name: &str| failed[name].as_str().map(redact_error_text);
-    json!({"error": {
-        "code": text("code").unwrap_or_else(|| "plan_failed".to_owned()),
-        "message": text("message").unwrap_or_else(|| PLAN_NOT_PRODUCED.to_owned()),
-        "help": text("help"),
-    }})
-}
-
 pub(crate) fn open_location_runtime(
     options: &LocationServe,
     script: &Path,
@@ -1580,16 +1464,16 @@ pub(crate) async fn stop_location_runtime(
     Ok(())
 }
 
-<<<<<<< HEAD
+<<<<<<< ours
 /// An outer absence means shutdown; an inner error is a failed read, never an empty table.
 =======
 /// An absence means shutdown; a failed read never stands for an empty table.
->>>>>>> origin/main
+>>>>>>> theirs
 pub(crate) async fn read_metadata_page(
     (options, script): (&LocationServe, &Path),
     mut state: LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
-<<<<<<< HEAD
+<<<<<<< ours
 ) -> Result<
     Option<(
         LocationMetadataSync,
@@ -1600,7 +1484,7 @@ pub(crate) async fn read_metadata_page(
     state.busy = false;
 =======
 ) -> Result<Option<(LocationMetadataSync, MetadataReply)>, ControlError> {
->>>>>>> origin/main
+>>>>>>> theirs
     if let Some(statistics) = &state.statistics
         && statistics.names.is_empty()
     {
@@ -1611,11 +1495,11 @@ pub(crate) async fn read_metadata_page(
             unchanged: false,
             wakes_compute: false,
         };
-<<<<<<< HEAD
+<<<<<<< ours
         return Ok(Some((state, Ok(page))));
 =======
         return Ok(Some((state, MetadataReply::Page(page))));
->>>>>>> origin/main
+>>>>>>> theirs
     }
     let request = history_request(&state)?;
     let reader = match state.reader.take() {
@@ -1623,7 +1507,7 @@ pub(crate) async fn read_metadata_page(
         None => match open_location_runtime(options, script, Vec::new()) {
             Ok(reader) => reader,
             Err(error) => {
-<<<<<<< HEAD
+<<<<<<< ours
                 return Ok(Some((
                     state,
                     Err(ReadFailure::ReaderStart(error.to_string())),
@@ -1636,7 +1520,7 @@ pub(crate) async fn read_metadata_page(
                     page_size: false,
                 };
                 return Ok(Some((state, MetadataReply::Failed(failure))));
->>>>>>> origin/main
+>>>>>>> theirs
             }
         },
     };
@@ -1651,9 +1535,9 @@ pub(crate) async fn read_metadata_page(
             Duration::from_secs(seconds),
             exchange_metadata_read(reader, request),
         ) => match result {
-            Ok((reader, Ok(reply))) => {
+<<<<<<< ours
+            Ok((reader, Ok(MetadataReply::Page(page)))) => {
                 state.reader = Some(reader);
-<<<<<<< HEAD
                 Ok(Some((state, Ok(page))))
             }
             Ok((reader, Ok(MetadataReply::Busy))) => {
@@ -1671,6 +1555,8 @@ pub(crate) async fn read_metadata_page(
             }
             Err(_) => Ok(Some((state, Err(ReadFailure::TimedOut(seconds))))),
 =======
+            Ok((reader, Ok(reply))) => {
+                state.reader = Some(reader);
                 reply
             }
             Ok((reader, Err(failure))) => {
@@ -1690,7 +1576,7 @@ pub(crate) async fn read_metadata_page(
                     page_size: true,
                 })
             }
->>>>>>> origin/main
+>>>>>>> theirs
         },
     };
     if matches!(reply, MetadataReply::Page(_)) {
@@ -1757,26 +1643,6 @@ pub(crate) async fn failed_read(
     Ok(Some(state))
 }
 
-/// How long one page may take: a statistics page queries each relation it samples, so it scales
-/// with the relations asked for; any other page is bounded by its byte budget and gets a fixed
-/// allowance that also covers resuming a suspended warehouse.
-pub(crate) fn read_timeout_seconds(state: &LocationMetadataSync) -> u64 {
-    if state.kind() == WarehouseHistoryKind::Statistics {
-        METADATA_POLL_SECONDS + STATISTICS_RELATION_SECONDS * state.statistics_limit as u64
-    } else {
-        state.page_seconds
-    }
-}
-
-/// The page size a read asked for: statistics relations, or rows of any other table.
-pub(crate) fn page_limit(state: &LocationMetadataSync) -> usize {
-    if state.kind() == WarehouseHistoryKind::Statistics {
-        state.statistics_limit
-    } else {
-        state.limit
-    }
-}
-
 /// A completed synchronization closes its reader, so no warehouse session outlives the sync.
 pub(crate) async fn finish_metadata_page(
     state: LocationMetadataSync,
@@ -1809,12 +1675,12 @@ pub(crate) async fn close_metadata_reader(
     Ok(state)
 }
 
-<<<<<<< HEAD
+<<<<<<< ours
 /// A reply of `{"error": ...}`, or `null` from an older reader, means the read failed and the
 /// reader dropped its warehouse session.
 =======
 /// A reply too long, or a reader gone and likely killed for memory, may fit a smaller page.
->>>>>>> origin/main
+>>>>>>> theirs
 async fn exchange_metadata_read(
     mut reader: LocationCompiler,
     request: Vec<u8>,
@@ -1854,7 +1720,7 @@ async fn exchange_metadata_read(
         if reply.get("busy") == Some(&serde_json::Value::Bool(true)) {
             return Ok(MetadataReply::Busy);
         }
-<<<<<<< HEAD
+<<<<<<< ours
         if reply.is_null() {
             return Ok(MetadataReply::Failed("the reader read no page".into()));
         }
@@ -1865,7 +1731,7 @@ async fn exchange_metadata_read(
             return serde_json::from_value(failure.clone())
                 .map(MetadataReply::Failed)
                 .map_err(|_| failed("invalid location reply", false));
->>>>>>> origin/main
+>>>>>>> theirs
         }
         serde_json::from_value(reply)
             .map(MetadataReply::Page)
@@ -2193,4 +2059,191 @@ pub(crate) async fn compile_next_generation(
     )
     .await?;
     Ok(compiled.map(|compiled| (Some((compiled, generation)), metadata, compiled_inputs)))
+}
+
+/// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
+pub(crate) async fn exchange_location_plan(
+    compiler: &mut LocationCompiler,
+    request: &serde_json::Value,
+) -> Result<serde_json::Value, ControlError> {
+    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
+    line.push(b'\n');
+    compiler.stdin.write_all(&line).await?;
+    compiler.stdin.flush().await?;
+    let mut reply = String::new();
+    if compiler.stdout.read_line(&mut reply).await? == 0 {
+        return Err(ControlError::Invalid(
+            "location interpreter exited before replying".into(),
+        ));
+    }
+    serde_json::from_str(&reply)
+        .map_err(|_| ControlError::Invalid("location interpreter returned an invalid plan".into()))
+}
+
+/// One table's line as its scan completes, e.g. `Warehouse history 3/14: audit results, 1,204 rows in 0.8 s`.
+pub(crate) fn scan_line(state: &LocationMetadataSync, scans: usize) -> String {
+    let namespace = if state.locations.len() > 1 {
+        let location = state.location();
+        match &location.database {
+            Some(database) => format!(" in {database}.{}", location.schema),
+            None => format!(" in {}", location.schema),
+        }
+    } else {
+        String::new()
+    };
+    let read = if state.progress.scan_unchanged {
+        "unchanged".to_owned()
+    } else {
+        rows_text(state.progress.scan_rows)
+    };
+    format!(
+        "Warehouse history {}/{scans}: {}{namespace}, {read} in {:.1} s\n",
+        state.index + 1,
+        state.kind().as_str().replace('_', " "),
+        state.progress.scan_started.elapsed().as_secs_f64()
+    )
+}
+
+/// Where a synchronization has got to when a page is delivered or a table is found unchanged.
+///
+/// A clean report of the last table's last page completes the synchronization.
+pub(crate) fn sync_progress(state: &LocationMetadataSync, clean: bool) -> WarehouseSyncProgress {
+    let kinds = (state.locations.len() * WarehouseHistoryKind::ALL.len()) as u64;
+    let page = state.pending.as_ref();
+    let rows = state.progress.sync_rows
+        + state.progress.scan_rows
+        + page.map_or(0, |page| page.batch.records.len() as u64);
+    let scan_done = page.is_none_or(|page| page.next_source_after.is_none());
+    WarehouseSyncProgress {
+        position: state.index as u64 + 1,
+        kinds,
+        rows,
+        elapsed_millis: state.progress.sync_started.elapsed().as_millis() as u64,
+        completed: clean && scan_done && state.index as u64 + 1 == kinds,
+    }
+}
+
+/// A row count with thousands separators, e.g. `31,204 rows`.
+pub(crate) fn rows_text(rows: u64) -> String {
+    let digits = rows.to_string();
+    let mut grouped = String::new();
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            grouped.push(',');
+        }
+        grouped.push(digit);
+    }
+    format!("{grouped} {}", if rows == 1 { "row" } else { "rows" })
+}
+
+/// When the next safety sync is due, if this report's page completes the sync: the last page of the last scan, without failure.
+///
+/// None where no timed sync follows: the interval is off, or reads wake billed compute and the
+/// interval is only the default, so the next run or a request syncs instead.
+pub(crate) fn completed_sync_next_at(
+    state: &LocationMetadataSync,
+    failure: Option<WarehouseSyncFailure>,
+    now: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    let completes = sync_progress(state, failure.is_none()).completed;
+    (completes && state.safety_seconds > 0 && !state.defers_safety_sync())
+        .then(|| i64::try_from(state.safety_seconds).ok())
+        .flatten()
+        .and_then(|seconds| now.checked_add_signed(chrono::Duration::seconds(seconds)))
+}
+
+/// A failed read also reports its closed cause and the page size it asked for.
+pub(crate) async fn report_metadata_health(
+    state: &LocationMetadataSync,
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    (started, failure, read_failure): (
+        Instant,
+        Option<WarehouseSyncFailure>,
+        Option<WarehouseReadFailure>,
+    ),
+) {
+    let next_sync_at = completed_sync_next_at(state, failure, Utc::now());
+    let report = LocationHealthReport {
+        event_id: Uuid::now_v7(),
+        session_id: poll.session_id,
+        target: poll.target.clone(),
+        health: LocationHealth::WarehouseSync {
+            generation: state.generation,
+            location: state.location().clone(),
+            table: state.kind(),
+            failure,
+            records_sent: state
+                .pending
+                .as_ref()
+                .map_or(0, |page| page.batch.records.len()) as u64,
+            elapsed_millis: started.elapsed().as_millis() as u64,
+            page_limit: read_failure.map(|_| page_limit(state) as u64),
+            read_failure,
+            progress: Some(sync_progress(state, failure.is_none())),
+            next_sync_at,
+        },
+    };
+    if let Err(error) = client.report_health(&report).await {
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!("Warehouse synchronization health report failed: {error}\n"),
+        )]));
+    }
+}
+
+/// The safety sync interval from the flag, then the environment, then the project; `None` when
+/// nothing sets one and the default of thirty minutes applies.
+pub(crate) fn safety_sync_setting(
+    flag: Option<&str>,
+    environment: Option<&str>,
+    project: impl FnOnce() -> Result<ControlConfig, String>,
+) -> Result<Option<u64>, String> {
+    if let Some(text) = flag {
+        return sync_interval_seconds(text)
+            .map(Some)
+            .map_err(|help| format!("--sync-at-least-every {help}"));
+    }
+    if let Some(text) = environment.filter(|text| !text.trim().is_empty()) {
+        return sync_interval_seconds(text)
+            .map(Some)
+            .map_err(|help| format!("{SAFETY_SYNC_ENV} {help}"));
+    }
+    Ok(project()?.sync_at_least_every_seconds)
+}
+
+/// A plan document that left no diffs out, such as a failure report.
+pub(crate) fn without_diffs(
+    document: serde_json::Value,
+) -> crate::native_commands::types::LocationPlan {
+    (document, std::collections::BTreeMap::new())
+}
+
+/// The plan document of a plan that failed with its own coded error, its texts redacted and bounded.
+pub(crate) fn plan_error(failed: &serde_json::Value) -> serde_json::Value {
+    let text = |name: &str| failed[name].as_str().map(redact_error_text);
+    json!({"error": {
+        "code": text("code").unwrap_or_else(|| "plan_failed".to_owned()),
+        "message": text("message").unwrap_or_else(|| PLAN_NOT_PRODUCED.to_owned()),
+        "help": text("help"),
+    }})
+}
+
+/// How long one page may take: a statistics page queries each relation it samples, so it scales
+/// with the relations asked for; any other page is bounded by its byte budget and gets a fixed
+/// allowance that also covers resuming a suspended warehouse.
+pub(crate) fn read_timeout_seconds(state: &LocationMetadataSync) -> u64 {
+    if state.kind() == WarehouseHistoryKind::Statistics {
+        METADATA_POLL_SECONDS + STATISTICS_RELATION_SECONDS * state.statistics_limit as u64
+    } else {
+        state.page_seconds
+    }
+}
+
+/// The page size a read asked for: statistics relations, or rows of any other table.
+pub(crate) fn page_limit(state: &LocationMetadataSync) -> usize {
+    if state.kind() == WarehouseHistoryKind::Statistics {
+        state.statistics_limit
+    } else {
+        state.limit
+    }
 }

@@ -1,7 +1,6 @@
 //! A location keeps its interpreter, and a synchronization its warehouse session, warm.
 
 use std::io::{self, Write};
-
 use pyo3::PyErr;
 use pyo3::exceptions::{PyMemoryError, PyValueError};
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
@@ -13,30 +12,28 @@ use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluat
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseHistoryRead,
 };
-
-<<<<<<< HEAD
-use crate::bindings::_helpers::location_command::command::location_arguments;
-use crate::bindings::_helpers::location_command::command::publish_location;
-use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
-use crate::bindings::_helpers::location_command::constants::METADATA_ERROR_CHARS;
-use crate::bindings::_helpers::location_command::constants::PLAN_REQUEST;
-use crate::bindings::_helpers::location_command::runtime_plan::runtime_plan;
-use crate::bindings::_helpers::location_command::types::HeldProject;
-use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
-use crate::bindings::_helpers::native_host::warehouse_metadata::close_history_session;
-use crate::bindings::_helpers::native_host::warehouse_metadata::open_history_session;
-use crate::bindings::_helpers::native_host::warehouse_metadata::read_history;
-=======
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
 use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::{
     close_history_session, open_history_session, read_history,
 };
->>>>>>> origin/main
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
+use pyo3::exceptions::PyValueError;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    WarehouseHistoryKind, WarehouseHistoryRead,
+};
+use crate::bindings::_helpers::location_command::command::location_arguments;
+use crate::bindings::_helpers::location_command::command::publish_location;
+use crate::bindings::_helpers::location_command::constants::METADATA_ERROR_CHARS;
+use crate::bindings::_helpers::location_command::constants::PLAN_REQUEST;
+use crate::bindings::_helpers::location_command::runtime_plan::runtime_plan;
+use crate::bindings::_helpers::location_command::types::HeldProject;
+use crate::bindings::_helpers::native_host::warehouse_metadata::close_history_session;
+use crate::bindings::_helpers::native_host::warehouse_metadata::open_history_session;
+use crate::bindings::_helpers::native_host::warehouse_metadata::read_history;
 
 pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResult<i32> {
     options.set_item("action", "publish")?;
@@ -75,7 +72,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 py,
                                 &format!("Location compilation/publication failed: {error}\n"),
                             )?;
-<<<<<<< HEAD
+<<<<<<< ours
                             (None, None)
                         }
                     };
@@ -94,7 +91,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     };
                     serde_json::to_string(&record)
                 } else if let Some(kind) = WarehouseHistoryKind::ALL
->>>>>>> origin/main
+>>>>>>> theirs
                     .iter()
                     .find(|kind| request.get(kind.as_str()).is_some())
                 {
@@ -103,11 +100,11 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             PyValueError::new_err("runtime received an invalid metadata read")
                         })?;
                     let mut busy = false;
-<<<<<<< HEAD
+<<<<<<< ours
                     let mut failure: Option<String> = None;
 =======
                     let mut unconnected = WarehouseHistoryFailure::default();
->>>>>>> origin/main
+>>>>>>> theirs
                     if session.is_none() {
                         let arguments = location_arguments(py, Some(options.clone()))?;
                         session = match open_history_session(py, &arguments) {
@@ -115,7 +112,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             Err(error) => {
                                 busy = error.to_string().contains(DUCKDB_LOCK_CONFLICT);
                                 if !busy {
-<<<<<<< HEAD
+<<<<<<< ours
                                     failure = Some(format!(
                                         "warehouse connection for metadata reads failed: {error}"
                                     ));
@@ -128,7 +125,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                             unconnected.reason
                                         ),
                                     )?;
->>>>>>> origin/main
+>>>>>>> theirs
                                 } else if !reported_busy {
                                     write_stderr(
                                         py,
@@ -140,7 +137,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         };
                     }
                     let page = match &session {
-<<<<<<< HEAD
+<<<<<<< ours
                         Some(opened) => {
                             match read_history(py, (opened, stream.take()), &metadata) {
                                 Ok((page, open)) => {
@@ -165,7 +162,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 page_size: error.is_instance_of::<PyMemoryError>(py),
                             }),
                         None => Err(unconnected),
->>>>>>> origin/main
+>>>>>>> theirs
                     };
                     if session.as_ref().is_some_and(|opened| opened.local)
                         && let Some(opened) = session.take()
@@ -175,10 +172,10 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     reported_busy = busy;
                     if busy {
                         serde_json::to_string(&serde_json::json!({ "busy": true }))
-<<<<<<< HEAD
                     } else if let Some(page) = page {
                         serde_json::to_string(&page)
                     } else {
+<<<<<<< ours
                         if let Some(opened) = session.take() {
                             drop(close_history_session(opened, None));
                         }
@@ -187,7 +184,6 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             "error": message.chars().take(METADATA_ERROR_CHARS).collect::<String>()
                         }))
 =======
-                    } else {
                         match page {
                             Ok(page) => serde_json::to_string(&page),
                             Err(failure) => {
@@ -205,7 +201,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 serde_json::to_string(&serde_json::json!({ "failed": failure }))
                             }
                         }
->>>>>>> origin/main
+>>>>>>> theirs
                     }
                 } else {
                     let evaluation: SensorEvaluationRequest = serde_json::from_value(request)

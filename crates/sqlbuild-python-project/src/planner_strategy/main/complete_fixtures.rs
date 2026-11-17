@@ -8,15 +8,11 @@ use crate::planner_strategy::_helpers::fixtures::fixture_types::expected_fixture
 use crate::planner_strategy::models::FixtureCompletion;
 use crate::planner_strategy::models::RelationFixturePlanningContext;
 use pyo3::prelude::{Bound, PyAny, PyResult};
-<<<<<<< HEAD
 use sqlbuild_python_base::native_host::models::Dialect;
-=======
->>>>>>> origin/main
 
 /// Complete the fixture groups of one chain against the planning context.
 pub fn complete_fixtures<'py, 'a>(
     context: &'a RelationFixturePlanningContext,
-<<<<<<< HEAD
     dialect: &Bound<'py, Dialect>,
     (ordered_model_names, fixture_groups): (&[String], &Bound<'py, PyAny>),
 ) -> PyResult<FixtureCompletion<'py, 'a>> {
@@ -26,15 +22,4 @@ pub fn complete_fixtures<'py, 'a>(
     let required = required_fixture_columns(context, ordered_model_names, &fixture_keys, dialect)?;
     let expected = expected_fixture_types(context, py, ordered_model_names)?;
     complete_prepared(prepared, (context, &required), expected, dialect)
-=======
-    adapter: &Bound<'py, PyAny>,
-    (ordered_model_names, fixture_groups): (&[String], &Bound<'py, PyAny>),
-) -> PyResult<FixtureCompletion<'py, 'a>> {
-    let py = adapter.py();
-    let prepared = prepare(fixture_groups, context, adapter)?;
-    let fixture_keys = fixture_keys_requiring_analysis(&prepared, context)?;
-    let required = required_fixture_columns(context, ordered_model_names, &fixture_keys, adapter)?;
-    let expected = expected_fixture_types(context, py, ordered_model_names)?;
-    complete_prepared(prepared, (context, &required), expected, adapter)
->>>>>>> origin/main
 }

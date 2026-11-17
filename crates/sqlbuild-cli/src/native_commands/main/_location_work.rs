@@ -3,48 +3,34 @@
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-
 use chrono::Utc;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::models::{
     LocationWork, LocationWorkClient, LocationWorkOutcome, LocationWorkPoll, LocationWorkResult,
 };
 use sqlbuild_orchestration::store::errors::ControlError;
-use tokio::sync::mpsc;
 use tokio::time::Instant;
 use uuid::Uuid;
-
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::check_location_connection;
 use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
-use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
+use crate::native_commands::models::{LocationServe, LocationWatch};
+use tokio::sync::mpsc;
+use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::models::{
     LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn,
 };
 
-/// When to check for named work next: at once after a turn that claimed work, as more is often
-/// queued behind it, such as a person planning again; otherwise after the idle interval.
-pub(in crate::native_commands) fn next_work_check(
-    turn: &LocationWorkTurn,
-    now: Instant,
-) -> Instant {
-    if turn.claimed {
-        now
-    } else {
-        now + LOCATION_WORK_IDLE_POLL
-    }
-}
-
 /// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
-<<<<<<< HEAD
+<<<<<<< ours
     (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
 =======
     (options, script, connected): (&LocationServe, &Path, bool),
->>>>>>> origin/main
+>>>>>>> theirs
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -81,11 +67,11 @@ pub(super) async fn run_location_work(
         };
         let copy = (client, poll.session_id, claim.generation);
         let checked = perform_work(
-<<<<<<< HEAD
+<<<<<<< ours
             (options, script, runtime),
 =======
             (options, script, connected),
->>>>>>> origin/main
+>>>>>>> theirs
             claim.request.work,
             copy,
             expires,
@@ -166,11 +152,11 @@ pub(super) async fn run_location_work(
 
 /// One named operation; `None` means it stopped at shutdown or its lease ended; `sqb dev` never signs in here.
 async fn perform_work(
-<<<<<<< HEAD
+<<<<<<< ours
     (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
 =======
     (options, script, connected): (&LocationServe, &Path, bool),
->>>>>>> origin/main
+>>>>>>> theirs
     work: LocationWork,
     copy: (&LocationWorkClient, Uuid, i64),
     expires: impl Future<Output = Result<(), ControlError>>,
@@ -220,4 +206,17 @@ fn work_error(error: &ClientError) -> Result<(), ControlError> {
         &format!("Location work request failed: {error}\n"),
     )]));
     Ok(())
+}
+
+/// When to check for named work next: at once after a turn that claimed work, as more is often
+/// queued behind it, such as a person planning again; otherwise after the idle interval.
+pub(in crate::native_commands) fn next_work_check(
+    turn: &LocationWorkTurn,
+    now: Instant,
+) -> Instant {
+    if turn.claimed {
+        now
+    } else {
+        now + LOCATION_WORK_IDLE_POLL
+    }
 }

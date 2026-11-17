@@ -5,7 +5,6 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_host::entries::models::FacadeHost;
-
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -25,6 +24,7 @@ const CONTRACT_CLASSES: [(&str, RecordId); 6] = [
         RecordId::MeasurementThresholdBound,
     ),
 ];
+
 const YAML_ENTRY_CLASSES: [(&str, RecordId); 9] = [
     ("schema_seed_entry", RecordId::SchemaSeedEntry),
     ("seed_csv_settings", RecordId::SeedCsvSettings),
@@ -45,16 +45,11 @@ const YAML_ENTRY_CLASSES: [(&str, RecordId); 9] = [
         RecordId::SourceFreshnessValueKind,
     ),
 ];
-<<<<<<< HEAD
 
 pub(crate) static CONTRACT_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
+
 pub(crate) static YAML_ENTRY_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
 
-=======
-pub(crate) static CONTRACT_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
-pub(crate) static YAML_ENTRY_CLASS_TABLE: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
-
->>>>>>> origin/main
 pub(crate) fn built_contract_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let classes: Bound<'_, PyDict> = PyDict::new(py);
     for (key, class) in CONTRACT_CLASSES {

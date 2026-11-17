@@ -1,32 +1,23 @@
 //! One task owns a warm interpreter; cancelled requests and source restarts always reap it.
 
 use std::path::Path;
-
-<<<<<<< HEAD
-use sqlbuild_cache::project_snapshot::models::PathStamp;
-use sqlbuild_orchestration::store::errors::ControlError;
-use tokio::sync::mpsc;
-
-use crate::native_commands::_helpers::execution::{
-    exchange_location_generation, exchange_location_plan,
-};
-use crate::native_commands::_helpers::execution::{open_location_runtime, stop_location_runtime};
-use crate::native_commands::models::{
-    LocationCompileRequest, LocationCompiler, LocationPlanRequest, LocationRuntimeRequest,
-    LocationServe,
-};
-=======
 use sqlbuild_orchestration::dev_events::main::dev_event_line::dev_event_line;
 use sqlbuild_orchestration::dev_events::models::DevEvent;
 use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::sync::mpsc;
-
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::exchange_location_generation;
 use crate::native_commands::_helpers::execution::{open_location_runtime, stop_location_runtime};
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::models::{LocationCompileRequest, LocationCompiler, LocationServe};
->>>>>>> origin/main
+use sqlbuild_cache::project_snapshot::models::PathStamp;
+use crate::native_commands::_helpers::execution::{
+    exchange_location_generation, exchange_location_plan,
+};
+use crate::native_commands::models::{
+    LocationCompileRequest, LocationCompiler, LocationPlanRequest, LocationRuntimeRequest,
+    LocationServe,
+};
 
 pub(crate) async fn run_location_compiler(
     options: &LocationServe,
@@ -36,7 +27,7 @@ pub(crate) async fn run_location_compiler(
     let mut compiler: Option<LocationCompiler> = None;
     let mut sources: Vec<PathStamp> = Vec::new();
     let result = async {
-<<<<<<< HEAD
+<<<<<<< ours
         while let Some(request) = requests.recv().await {
             let carried_on;
             (compiler, carried_on) = match request {
@@ -81,7 +72,7 @@ pub(crate) async fn run_location_compiler(
             let result = tokio::select! {
                 _ = request.reply.closed() => break,
                 result = exchange_location_generation(active, request.generation) => result,
->>>>>>> origin/main
+>>>>>>> theirs
             };
             if !carried_on {
                 break;

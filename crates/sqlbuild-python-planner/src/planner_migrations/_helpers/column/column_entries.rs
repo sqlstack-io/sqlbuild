@@ -1,28 +1,13 @@
 //! Materialize column decisions from native proofs and live evidence.
 
-use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
-use crate::planner_warehouse::models::Read;
 use sqlbuild_host::entries::models::ExecutorHost;
-
 use crate::planner_migrations::_helpers::column::column_candidates::declared_names;
-<<<<<<< HEAD
-use crate::planner_migrations::_helpers::column::column_objects::lower;
-use crate::planner_migrations::_helpers::column::column_objects::model;
-use crate::planner_migrations::_helpers::column::column_objects::replace;
-use crate::planner_migrations::_helpers::column::columns::identical_renames;
-use crate::planner_migrations::_helpers::column::columns::rename_hints;
-use crate::planner_migrations::constants::AUTOMATIC;
-use crate::planner_migrations::constants::DONE;
-use crate::planner_migrations::models::CheckedColumns;
-use crate::planner_migrations::models::ColumnCandidate;
-=======
 use crate::planner_migrations::_helpers::column::column_objects::{lower, model, replace};
 use crate::planner_migrations::_helpers::column::columns::identical_renames;
 use crate::planner_migrations::_helpers::column::columns::rename_hints;
 use crate::planner_migrations::constants::{AUTOMATIC, DONE};
 use crate::planner_migrations::models::{CheckedColumns, ColumnCandidate};
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
->>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PyTuple};
 use sqlbuild_analysis::planner_migrations::main::column_decision::column_decision;
@@ -37,6 +22,15 @@ use sqlbuild_python_front::state_rows::main::migrations::newest_column::newest_c
 use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_phases::main::object::object;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
+use crate::planner_warehouse::models::Read;
+use crate::planner_migrations::_helpers::column::column_objects::lower;
+use crate::planner_migrations::_helpers::column::column_objects::model;
+use crate::planner_migrations::_helpers::column::column_objects::replace;
+use crate::planner_migrations::constants::AUTOMATIC;
+use crate::planner_migrations::constants::DONE;
+use crate::planner_migrations::models::CheckedColumns;
+use crate::planner_migrations::models::ColumnCandidate;
 
 pub(crate) fn decide<'py>(
     runtime: &Bound<'py, PyAny>,

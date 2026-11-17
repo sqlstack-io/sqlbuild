@@ -5,16 +5,13 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyString;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
 use sqlbuild_sqltext::resolution::main::cursor_subquery::cursor_subquery;
 use sqlbuild_sqltext::resolution::models::CursorFilter;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 pub(crate) fn string<'py>(py: Python<'py>, text: &str) -> Bound<'py, PyAny> {
     PyString::new(py, text).into_any()
@@ -29,11 +26,11 @@ pub(crate) fn method<'py>(
 }
 
 pub(crate) fn cursor_wrap(
-<<<<<<< HEAD
+<<<<<<< ours
     dialect: &Bound<'_, Dialect>,
 =======
     adapter: &Bound<'_, PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
     filtering: &CursorFiltering<'_>,
     relation: String,
     (name, inject_alias): (&str, bool),

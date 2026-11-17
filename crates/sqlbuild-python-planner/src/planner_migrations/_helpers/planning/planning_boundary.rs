@@ -2,11 +2,6 @@
 
 use crate::planner_migrations::_helpers::column::column_objects::native;
 use crate::planner_migrations::models::MigrationPhase;
-<<<<<<< HEAD
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
-=======
->>>>>>> origin/main
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use crate::planner_phases::main::rebuilds::effective_target_config::effective_target_config;
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
@@ -15,6 +10,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
 
 /// The target's policy for migration origins that no longer exist.
 pub(crate) fn missing_origin_policy<'py>(

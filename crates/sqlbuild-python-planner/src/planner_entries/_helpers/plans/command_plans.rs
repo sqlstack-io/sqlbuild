@@ -1,53 +1,43 @@
 //! Static plans for commands that do not build models, and direct seed identity reads.
 
-<<<<<<< HEAD
-use crate::planner_entries::_helpers::entries::values::{none, planner_model, planner_type};
-=======
 use crate::planner_entries::_helpers::entries::values::{
     boolean, none, planner_model, planner_type,
 };
->>>>>>> origin/main
 use crate::planner_entries::_helpers::plans::plan_output::{
     function_entry, selected_test_entries, test_selected,
 };
 use crate::planner_identity::main::build_compiled_function_fingerprint_sql::build_compiled_function_fingerprint_sql;
 use crate::planner_identity::main::build_seed_identity::build_seed_identity;
 use crate::planner_strategy::main::model_entries::extract_seed_columns::extract_seed_columns;
-<<<<<<< HEAD
-use crate::planner_warehouse::models::FingerprintRead;
-use crate::planner_warehouse::models::PlannerReads;
-=======
->>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{
-    PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyTuple,
+    PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyString,
+    PyTuple,
 };
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_SEED;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
-<<<<<<< HEAD
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::models::Dialect;
-=======
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
-<<<<<<< HEAD
-use sqlbuild_python_project::planner_phases::main::object::object;
-use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
-=======
 use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use sqlbuild_python_project::planner_phases::main::object::object;
->>>>>>> origin/main
 use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
 use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 use std::collections::{BTreeMap, BTreeSet};
+use crate::planner_entries::_helpers::entries::values::{none, planner_model, planner_type};
+use crate::planner_warehouse::models::FingerprintRead;
+use crate::planner_warehouse::models::PlannerReads;
+use pyo3::types::{
+    PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyTuple,
+};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
 
 /// Optional fields of a static command plan; absent ones take `PlanOutput` defaults.
 #[derive(Default)]

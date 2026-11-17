@@ -14,23 +14,7 @@ use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::connect;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::count_computation;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::package_version;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::sqlite_error;
-<<<<<<< HEAD
-use crate::planner_warehouse::_helpers::synced_reads;
-use crate::planner_warehouse::_helpers::synced_reads::refused;
-use crate::planner_warehouse::_helpers::synced_reads::relation_columns;
-use crate::planner_warehouse::_helpers::synced_reads::relation_info;
-use crate::planner_warehouse::constants::CURSOR_INPUTS;
-use crate::planner_warehouse::constants::PREVIEW_MESSAGE;
-use crate::planner_warehouse::constants::PREVIEW_UNKNOWNS;
-use crate::planner_warehouse::main::unknown::unknown;
-use crate::planner_warehouse::types::CursorProgress;
-use crate::planner_warehouse::types::WarehouseReads;
-use chrono::SecondsFormat;
 use pyo3::exceptions::PyOSError;
-use pyo3::exceptions::PyRuntimeError;
-=======
-use pyo3::exceptions::PyOSError;
->>>>>>> origin/main
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -45,30 +29,41 @@ use pyo3::types::PyDict;
 use pyo3::types::PyList;
 use pyo3::types::PyListMethods;
 use pyo3::types::PyTuple;
-<<<<<<< HEAD
-use pyo3::types::{PyDictMethods, PyString};
-=======
->>>>>>> origin/main
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_entry::fingerprint_cache_entry;
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_key::fingerprint_cache_key;
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_lookup::fingerprint_cache_lookup;
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_shared_digest::fingerprint_cache_shared_digest;
 use sqlbuild_analysis::planner_warehouse::models::FingerprintCacheKey;
-<<<<<<< HEAD
-use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use crate::planner_warehouse::_helpers::synced_reads;
+use crate::planner_warehouse::_helpers::synced_reads::refused;
+use crate::planner_warehouse::_helpers::synced_reads::relation_columns;
+use crate::planner_warehouse::_helpers::synced_reads::relation_info;
+use crate::planner_warehouse::constants::CURSOR_INPUTS;
+use crate::planner_warehouse::constants::PREVIEW_MESSAGE;
+use crate::planner_warehouse::constants::PREVIEW_UNKNOWNS;
+use crate::planner_warehouse::main::unknown::unknown;
+use crate::planner_warehouse::types::CursorProgress;
+use crate::planner_warehouse::types::WarehouseReads;
+use chrono::SecondsFormat;
+use pyo3::exceptions::PyRuntimeError;
+use pyo3::types::{PyDictMethods, PyString};
+use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::native_host::models::Location;
 use sqlbuild_python_front::native_host::types::ConsumptionReads;
 use sqlbuild_python_front::state_rows::models::EventTableLayout;
 use sqlbuild_python_project::fingerprints::main::selected_set::selected_set;
-use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_state::consumption::constants::RECENT_EXECUTIONS;
 use sqlbuild_state::consumption::main::recent_executions::recent_executions;
 use sqlbuild_state::consumption::models::ConsumptionRow;
@@ -76,14 +71,12 @@ use sqlbuild_state::warehouse_state::models::{
     InvalidObservation, RelationFilter, StateLocation, StateRelation, WarehouseState,
 };
 use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::{Mutex, PoisonError};
 
 /// Reuse migration fingerprints across rename maps, planning phases and invocations.
 #[pyclass(module = "sqlbuild._native")]
+<<<<<<< ours
 pub struct MigrationFingerprintCache {
     ref_names: HashMap<(String, String), Vec<String>>,
     fingerprints: HashMap<MemoKey, Option<String>>,
@@ -93,16 +86,6 @@ pub struct MigrationFingerprintCache {
     pending: Vec<(String, String)>,
     shared_digest: String,
 =======
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::planner_phases::main::object::object;
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-use std::collections::HashMap;
-
-/// Reuse migration fingerprints across rename maps, planning phases and invocations.
-#[pyclass(module = "sqlbuild._native")]
 #[derive(Debug)]
 pub struct MigrationFingerprintCache {
     pub(crate) ref_names: HashMap<(String, String), Vec<String>>,
@@ -112,16 +95,12 @@ pub struct MigrationFingerprintCache {
     pub(crate) connection_opened: bool,
     pub(crate) pending: Vec<(String, String)>,
     pub(crate) shared_digest: String,
->>>>>>> origin/main
+>>>>>>> theirs
 }
 
 impl MigrationFingerprintCache {
     /// A cache persisting under `root`, or an in-memory cache without one.
-<<<<<<< HEAD
-    pub(crate) fn open(py: Python<'_>, root: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
-=======
     pub fn open(py: Python<'_>, root: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
->>>>>>> origin/main
         let root = root.filter(|root| !root.is_none());
         let database_path = match &root {
             Some(root) => Some(
@@ -144,23 +123,14 @@ impl MigrationFingerprintCache {
             ref_names: HashMap::new(),
             fingerprints: HashMap::new(),
             database_path,
-<<<<<<< HEAD
             store: None,
             store_opened: false,
-=======
-            connection: None,
-            connection_opened: false,
->>>>>>> origin/main
             pending: Vec::new(),
             shared_digest,
         })
     }
 
-<<<<<<< HEAD
-    fn cache_key(&self, key: &MemoKey) -> PyResult<String> {
-=======
     pub(crate) fn cache_key(&self, key: &MemoKey) -> PyResult<String> {
->>>>>>> origin/main
         if self.database_path.is_none() {
             return Ok(String::new());
         }
@@ -174,12 +144,10 @@ impl MigrationFingerprintCache {
         .map_err(|error| PyValueError::new_err(format!("{error:?}")))
     }
 
-<<<<<<< HEAD
+<<<<<<< ours
     fn open_store(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         if self.store_opened {
             return Ok(self.store.as_ref().map(|store| store.clone_ref(py)));
-        }
-        self.store_opened = true;
 =======
     pub(crate) fn open_connection(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         if self.connection_opened {
@@ -187,9 +155,9 @@ impl MigrationFingerprintCache {
                 .connection
                 .as_ref()
                 .map(|connection| connection.clone_ref(py)));
+>>>>>>> theirs
         }
-        self.connection_opened = true;
->>>>>>> origin/main
+        self.store_opened = true;
         let Some(path) = &self.database_path else {
             return Ok(None);
         };
@@ -197,57 +165,38 @@ impl MigrationFingerprintCache {
         if !path.call_method0("is_file")?.is_truthy()? {
             return Ok(None);
         }
-<<<<<<< HEAD
         self.store = match connect(path) {
             Ok(store) => Some(store.unbind()),
-=======
-        self.connection = match connect(path) {
-            Ok(connection) => Some(connection.unbind()),
->>>>>>> origin/main
             Err(error) if error.is_instance_of::<PyOSError>(py) || sqlite_error(py, &error)? => {
                 None
             }
             Err(error) => return Err(error),
         };
-<<<<<<< HEAD
         Ok(self.store.as_ref().map(|store| store.clone_ref(py)))
     }
 
+<<<<<<< ours
     fn stored(&mut self, py: Python<'_>, cache_key: &str) -> PyResult<Option<Option<String>>> {
         let Some(store) = self.open_store(py)? else {
-            return Ok(None);
-        };
-        let row = store
 =======
-        Ok(self
-            .connection
-            .as_ref()
-            .map(|connection| connection.clone_ref(py)))
-    }
-
     pub(crate) fn stored(
         &mut self,
         py: Python<'_>,
         cache_key: &str,
     ) -> PyResult<Option<Option<String>>> {
         let Some(connection) = self.open_connection(py)? else {
+>>>>>>> theirs
             return Ok(None);
         };
-        let row = connection
->>>>>>> origin/main
+        let row = store
             .bind(py)
             .call_method1("execute", (SELECT_SQL, PyTuple::new(py, [cache_key])?))
             .and_then(|cursor| cursor.call_method0("fetchone"));
         let row = match row {
             Ok(row) => row,
             Err(error) if sqlite_error(py, &error)? => {
-<<<<<<< HEAD
                 self.store = None;
                 close(py, Some(store))?;
-=======
-                self.connection = None;
-                close(py, Some(connection))?;
->>>>>>> origin/main
                 return Ok(None);
             }
             Err(error) => return Err(error),
@@ -262,11 +211,7 @@ impl MigrationFingerprintCache {
         Ok(fingerprint_cache_lookup(&contents, cache_key))
     }
 
-<<<<<<< HEAD
-    fn remember(&mut self, cache_key: &str, fingerprint: Option<&str>) -> PyResult<()> {
-=======
     pub(crate) fn remember(&mut self, cache_key: &str, fingerprint: Option<&str>) -> PyResult<()> {
->>>>>>> origin/main
         if self.database_path.is_none() {
             return Ok(());
         }
@@ -279,8 +224,7 @@ impl MigrationFingerprintCache {
         Ok(())
     }
 
-<<<<<<< HEAD
-    fn write_pending(
+    pub(crate) fn write_pending(
         &self,
         py: Python<'_>,
         pending: &[(String, String)],
@@ -295,23 +239,6 @@ impl MigrationFingerprintCache {
         let path = path.bind(py);
         let store = match store {
             Some(store) => store,
-=======
-    pub(crate) fn write_pending(
-        &self,
-        py: Python<'_>,
-        pending: &[(String, String)],
-        connection: Option<Py<PyAny>>,
-    ) -> (Option<Py<PyAny>>, PyResult<()>) {
-        let Some(path) = &self.database_path else {
-            return (connection, Ok(()));
-        };
-        if pending.is_empty() {
-            return (connection, Ok(()));
-        }
-        let path = path.bind(py);
-        let connection = match connection {
-            Some(connection) => connection,
->>>>>>> origin/main
             None => {
                 let created = call_with(
                     &match native_field(path, "parent")
@@ -333,11 +260,7 @@ impl MigrationFingerprintCache {
             }
         };
         let written = (|| -> PyResult<()> {
-<<<<<<< HEAD
             let open = store.bind(py);
-=======
-            let open = connection.bind(py);
->>>>>>> origin/main
             open.call_method1("execute", (CREATE_CACHE_TABLE_SQL,))?;
             let rows = PyList::empty(py);
             for (key, entry) in pending {
@@ -347,11 +270,7 @@ impl MigrationFingerprintCache {
             open.call_method0("commit")?;
             Ok(())
         })();
-<<<<<<< HEAD
         (Some(store), written)
-=======
-        (Some(connection), written)
->>>>>>> origin/main
     }
 }
 
@@ -359,21 +278,13 @@ impl MigrationFingerprintCache {
 impl MigrationFingerprintCache {
     #[new]
     #[pyo3(signature = (*, root=None))]
-<<<<<<< HEAD
-    fn new(py: Python<'_>, root: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
-=======
     pub(crate) fn new(py: Python<'_>, root: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
->>>>>>> origin/main
         Self::open(py, root)
     }
 
     /// The migration fingerprint, keyed only by the renames this model can see.
     #[pyo3(signature = (**options))]
-<<<<<<< HEAD
-    fn fingerprint(
-=======
     pub(crate) fn fingerprint(
->>>>>>> origin/main
         &mut self,
         py: Python<'_>,
         options: Option<Bound<'_, PyDict>>,
@@ -447,21 +358,12 @@ impl MigrationFingerprintCache {
     }
 
     /// Write fingerprints computed since the last persist; failures only skip reuse.
-<<<<<<< HEAD
-    fn persist(&mut self, py: Python<'_>) -> PyResult<()> {
+    pub(crate) fn persist(&mut self, py: Python<'_>) -> PyResult<()> {
         let pending = std::mem::take(&mut self.pending);
         let store = self.store.take();
         self.store_opened = false;
         let (store, written) = self.write_pending(py, &pending, store);
         let closed = close(py, store);
-=======
-    pub(crate) fn persist(&mut self, py: Python<'_>) -> PyResult<()> {
-        let pending = std::mem::take(&mut self.pending);
-        let connection = self.connection.take();
-        self.connection_opened = false;
-        let (connection, written) = self.write_pending(py, &pending, connection);
-        let closed = close(py, connection);
->>>>>>> origin/main
         match written {
             Err(error) if error.is_instance_of::<PyOSError>(py) || sqlite_error(py, &error)? => {}
             Err(error) => return Err(error),
@@ -480,7 +382,7 @@ pub(crate) struct FingerprintWork {
 }
 
 /// Everything one snapshot gather needs.
-<<<<<<< HEAD
+<<<<<<< ours
 pub struct SnapshotRequest<'py> {
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
@@ -491,6 +393,20 @@ pub struct SnapshotRequest<'py> {
     pub(crate) on_progress: Bound<'py, PyAny>,
     pub(crate) deferred_locations: Bound<'py, PyAny>,
     pub(crate) cursor_scope: Bound<'py, PyAny>,
+=======
+#[derive(Debug)]
+pub struct SnapshotRequest<'py> {
+    pub project: Bound<'py, PyAny>,
+    pub adapter: Bound<'py, PyAny>,
+    pub connection: Bound<'py, PyAny>,
+    pub execute: Bound<'py, PyAny>,
+    pub selected_keys: Bound<'py, PyAny>,
+    pub full_refresh: bool,
+    pub full_refresh_model_names: Bound<'py, PyAny>,
+    pub on_progress: Bound<'py, PyAny>,
+    pub deferred_locations: Bound<'py, PyAny>,
+    pub cursor_scope: Bound<'py, PyAny>,
+>>>>>>> theirs
 }
 
 /// One warehouse read's answer: what the warehouse holds, or the item a plan reports as unknown.
@@ -923,18 +839,4 @@ impl WarehouseReads for SyncedReads {
     fn close_consumption(&self, _py: Python<'_>) -> PyResult<()> {
         Ok(())
     }
-=======
-#[derive(Debug)]
-pub struct SnapshotRequest<'py> {
-    pub project: Bound<'py, PyAny>,
-    pub adapter: Bound<'py, PyAny>,
-    pub connection: Bound<'py, PyAny>,
-    pub execute: Bound<'py, PyAny>,
-    pub selected_keys: Bound<'py, PyAny>,
-    pub full_refresh: bool,
-    pub full_refresh_model_names: Bound<'py, PyAny>,
-    pub on_progress: Bound<'py, PyAny>,
-    pub deferred_locations: Bound<'py, PyAny>,
-    pub cursor_scope: Bound<'py, PyAny>,
->>>>>>> origin/main
 }

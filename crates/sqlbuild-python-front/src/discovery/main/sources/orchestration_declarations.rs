@@ -1,21 +1,15 @@
 //! Every job, job group, calendar and sensor of `project_dir`, or `OrchestrationDeclarationError` (D017).
 
 use crate::discovery::_helpers::failures::raised::failure_error;
-<<<<<<< HEAD
-use crate::discovery::_helpers::project::project_config::project_pool_limits;
 use crate::discovery::_helpers::sources::orchestration_files::orchestration_error;
 use crate::discovery::_helpers::sources::orchestration_values::check_orchestration_values;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use sqlbuild_discovery::orchestration_files::main::check_pools::check_pools;
-=======
-use crate::discovery::_helpers::sources::orchestration_files::orchestration_error;
-use crate::discovery::_helpers::sources::orchestration_values::check_orchestration_values;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
->>>>>>> origin/main
 use sqlbuild_discovery::orchestration_files::main::orchestration_inventory::orchestration_inventory;
 use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_discovery::tree::models::ProjectTree;
 use std::path::PathBuf;
+use crate::discovery::_helpers::project::project_config::project_pool_limits;
+use sqlbuild_discovery::orchestration_files::main::check_pools::check_pools;
 
 /// Every job, job group, calendar and sensor of `project_dir`, or `OrchestrationDeclarationError` (D017).
 pub fn orchestration_declarations(
@@ -28,12 +22,9 @@ pub fn orchestration_declarations(
     let inventory = py.detach(|| orchestration_inventory(&tree, (version.major, version.minor)));
     let inventory =
         inventory.map_err(|failure| orchestration_error(&tree, project_dir, failure))?;
-<<<<<<< HEAD
     let limits = project_pool_limits(py, project_dir)?;
     check_pools(&inventory, &limits)
         .map_err(|failure| orchestration_error(&tree, project_dir, failure))?;
-=======
->>>>>>> origin/main
     check_orchestration_values(py, &inventory).map_err(|failure| failure_error(py, failure))?;
     Ok(inventory)
 }

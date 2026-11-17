@@ -5,19 +5,9 @@ use crate::planner_entries::models::PlanOutputInputs;
 use crate::planner_identity::main::build_stale_out_of_selection_warnings::build_stale_out_of_selection_warnings;
 use crate::planner_migrations::main::with_migration_fingerprints::with_migration_fingerprints;
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
-<<<<<<< HEAD
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
 use crate::planner_phases::_helpers::rebuilds::retention::{plan_retention, plan_table_types};
-use crate::planner_phases::constants::AUDIT_ENTRIES;
-use crate::planner_phases::constants::IGNORE_AUDIT_FAILURES;
-use crate::planner_phases::constants::IGNORE_FAILURE;
-=======
-use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
-use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
-use crate::planner_phases::_helpers::rebuilds::retention::{plan_retention, plan_table_types};
->>>>>>> origin/main
 use crate::planner_phases::models::PlannerIdentityContext;
 use crate::planner_phases::models::{
     PlanOutputContext, PlanOutputFields, PlanWarningContext, PlannedModelEntries,
@@ -27,17 +17,9 @@ use crate::planner_warehouse::main::sources::source_freshness_unknown_warnings::
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
-use sqlbuild_python_base::records::main::fields::replaced::replaced;
-=======
-use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
->>>>>>> origin/main
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::native_host::models::ModelLookup;
 use sqlbuild_python_project::planner_phases::main::native::native;
@@ -48,6 +30,12 @@ use sqlbuild_python_project::planner_phases::main::strings::strings;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::constants::AUDIT_ENTRIES;
+use crate::planner_phases::constants::IGNORE_AUDIT_FAILURES;
+use crate::planner_phases::constants::IGNORE_FAILURE;
+use sqlbuild_python_base::native_host::types::Syntax;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
 
 pub(crate) fn concat<'py>(
     py: Python<'py>,
@@ -378,7 +366,6 @@ pub(crate) fn freshness_metadata<'py>(
     metadata.set_item("blocked_model_names", propagated("blocked_model_names")?)?;
     Ok(metadata.into_any())
 }
-<<<<<<< HEAD
 
 /// Mark every planned audit's failure as one that holds nothing back, and the plan as saying so.
 pub(crate) fn ignoring_audit_failures<'py>(
@@ -404,5 +391,3 @@ pub(crate) fn ignoring_audit_failures<'py>(
         metadata: output.metadata,
     })
 }
-=======
->>>>>>> origin/main

@@ -7,16 +7,8 @@ use crate::planner_migrations::_helpers::discovery::state_inspection::pending;
 use crate::planner_migrations::_helpers::discovery::state_inspection::relation_key;
 use crate::planner_migrations::_helpers::discovery::state_inspection::schema_or_empty;
 use crate::planner_migrations::_helpers::discovery::state_inspection::tuple_of;
-<<<<<<< HEAD
-use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
-use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
-use crate::planner_warehouse::models::FingerprintRead;
-use crate::planner_warehouse::models::PlannerReads;
-use crate::planner_warehouse::models::Read;
-=======
 use crate::planner_migrations::constants::GET_COLUMNS_FOR_INSPECTION;
 use crate::planner_migrations::constants::LIST_RELATIONS_FOR_INSPECTION;
->>>>>>> origin/main
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::PyRef;
@@ -26,10 +18,7 @@ use pyo3::prelude::Python;
 use pyo3::prelude::pyclass;
 use pyo3::prelude::pymethods;
 use pyo3::prelude::{Bound, PyAny};
-<<<<<<< HEAD
-=======
 use pyo3::types::PyBool;
->>>>>>> origin/main
 use pyo3::types::PyDict;
 use pyo3::types::PyString;
 use pyo3::types::PyTuple;
@@ -39,12 +28,9 @@ use sqlbuild_core::constants::COLUMN_MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
-<<<<<<< HEAD
-=======
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
@@ -53,16 +39,18 @@ use sqlbuild_python_front::state_rows::constants::MODEL_KIND;
 use sqlbuild_python_front::state_rows::constants::OLD_NAME_KIND;
 use sqlbuild_python_front::state_rows::main::migrations::layout::layout;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_views::old_name_views;
-<<<<<<< HEAD
-=======
 use sqlbuild_python_front::state_rows::main::migrations::read_events::read_events;
 use sqlbuild_python_front::state_rows::main::migrations::stored_old_name_columns::stored_old_name_columns;
 use sqlbuild_python_front::state_rows::models::StateAccess;
 use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
->>>>>>> origin/main
 use sqlbuild_state::events::models::EventRelation;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
+use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
+use crate::planner_warehouse::models::FingerprintRead;
+use crate::planner_warehouse::models::PlannerReads;
+use crate::planner_warehouse::models::Read;
 
 #[derive(Debug)]
 pub(crate) struct OldNamePlanner<'py> {
@@ -215,7 +203,7 @@ pub(crate) struct DiscoveryRequest<'py> {
 
 /// Relations, fingerprints and migration events for one planning database.
 #[pyclass(module = "sqlbuild._native", name = "MigrationStateInspection")]
-<<<<<<< HEAD
+<<<<<<< ours
 pub struct MigrationStateInspection {
     reads: Py<PlannerReads>,
     database: Py<PyAny>,
@@ -234,11 +222,6 @@ pub struct MigrationStateInspection {
     old_name_schemas: HashSet<String>,
     old_name_moves: Vec<Py<PyAny>>,
     old_name_facts: Vec<Py<PyAny>>,
-}
-
-impl MigrationStateInspection {
-    fn reads<'py>(&self, py: Python<'py>) -> Bound<'py, PlannerReads> {
-        self.reads.bind(py).clone()
 =======
 #[derive(Debug)]
 pub struct MigrationStateInspection {
@@ -258,9 +241,14 @@ pub struct MigrationStateInspection {
     pub(crate) old_name_schemas: HashSet<String>,
     pub(crate) old_name_moves: Vec<Py<PyAny>>,
     pub(crate) old_name_facts: Vec<Py<PyAny>>,
+>>>>>>> theirs
 }
 
 impl MigrationStateInspection {
+<<<<<<< ours
+    fn reads<'py>(&self, py: Python<'py>) -> Bound<'py, PlannerReads> {
+        self.reads.bind(py).clone()
+=======
     pub(crate) fn access<'py>(&self, py: Python<'py>) -> PyResult<StateAccess<'py>> {
         let adapter: &Bound<'py, PyAny> = self.adapter.bind(py);
         Ok(StateAccess {
@@ -268,7 +256,7 @@ impl MigrationStateInspection {
             execute: native_field(adapter, "execute")?,
             render_qualified_name: native_field(adapter, "render_qualified_name")?,
         })
->>>>>>> origin/main
+>>>>>>> theirs
     }
 
     pub(crate) fn list_relations<'py>(
@@ -277,7 +265,7 @@ impl MigrationStateInspection {
         schemas: Vec<Bound<'py, PyAny>>,
         names: Bound<'py, PyAny>,
     ) -> PyResult<Vec<Bound<'py, PyAny>>> {
-<<<<<<< HEAD
+<<<<<<< ours
         list_relations(
             self.reads.bind(py),
             self.database.bind(py),
@@ -293,13 +281,13 @@ impl MigrationStateInspection {
                 ("schemas", PyTuple::new(py, schemas)?.into_any()),
                 ("names", names),
             ],
->>>>>>> origin/main
+>>>>>>> theirs
         )?
         .try_iter()?
         .collect()
     }
 
-<<<<<<< HEAD
+<<<<<<< ours
     /// The listed migration state tables of `schemas`, or `None` when the reads do not know them.
     fn migration_state_tables<'py>(
         &self,
@@ -332,7 +320,7 @@ impl MigrationStateInspection {
     fn model_fingerprints<'py>(
 =======
     pub(crate) fn model_fingerprints<'py>(
->>>>>>> origin/main
+>>>>>>> theirs
         &self,
         py: Python<'py>,
         schema: &Bound<'py, PyAny>,
@@ -375,7 +363,7 @@ impl MigrationStateInspection {
 #[pymethods]
 impl MigrationStateInspection {
     #[new]
-<<<<<<< HEAD
+<<<<<<< ours
     #[pyo3(signature = (*, reads, database, known_fingerprints = None))]
     pub(crate) fn new(
         reads: &Bound<'_, PlannerReads>,
@@ -384,7 +372,7 @@ impl MigrationStateInspection {
     pub(crate) fn new(
         adapter: &Bound<'_, PyAny>,
         connection: &Bound<'_, PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
         database: &Bound<'_, PyAny>,
         known_fingerprints: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
@@ -696,7 +684,7 @@ impl MigrationStateInspection {
         let columns: Bound<'_, PyAny> = if matched.is_empty() {
             PyDict::new(py).into_any()
         } else {
-<<<<<<< HEAD
+<<<<<<< ours
             let reads: Bound<'_, PlannerReads> = slf.borrow().reads(py);
             columns_for(
                 &reads,
@@ -716,7 +704,7 @@ impl MigrationStateInspection {
                         PyTuple::new(py, matched.iter().map(|(_, relation)| relation))?.into_any(),
                     ),
                 ],
->>>>>>> origin/main
+>>>>>>> theirs
             )?
         };
         let empty: Bound<'_, PyTuple> = PyTuple::empty(py);

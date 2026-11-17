@@ -2,21 +2,12 @@
 
 use crate::freshness::main::presumed_utc_datetime::presumed_utc_datetime;
 use crate::freshness::models::Observer;
-<<<<<<< HEAD
-use crate::planner_warehouse::_helpers::synced_reads::refused;
-use crate::planner_warehouse::models::PlannerReads;
-use crate::planner_warehouse::models::Read;
-=======
->>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_state::freshness::main::single_value_problem::single_value_problem;
 use sqlbuild_state::freshness::models::QueryShape;
-
 use crate::freshness::_helpers::support::{
     OBSERVATION_ERROR, exception_text, freshness_error, presumed_utc_value, text,
 };
@@ -34,11 +25,20 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::state_rows::main::event_rows::normalize::normalize;
 use sqlbuild_python_front::state_rows::main::event_rows::version_hash::version_hash;
 use sqlbuild_python_project::references::main::render_source_read::render_source_read;
+use crate::planner_warehouse::_helpers::synced_reads::refused;
+use crate::planner_warehouse::models::PlannerReads;
+use crate::planner_warehouse::models::Read;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 const ADAPTER_STRATEGY: &str = "adapter";
+
 const COLUMN_STRATEGY: &str = "column";
+
 const DEFAULT_STRATEGY: &str = "sql";
+
 const METADATA_OPERATION: &str = "source_freshness_metadata_observation";
+
 const QUERY_OPERATION: &str = "source_freshness_query_observation";
 
 pub(crate) fn observation_error(py: Python<'_>, message: &str) -> pyo3::PyErr {
@@ -480,7 +480,7 @@ fn observe_adapter_batch_inner<'py>(
     for request in requests.values() {
         unique.set_item(request, py.None())?;
     }
-<<<<<<< HEAD
+<<<<<<< ours
     let unique_requests: Bound<'py, PyAny> = PyTuple::new(py, unique.keys())?.into_any();
     let metadata_by_request: Bound<'py, PyAny> = match observer
         .reads
@@ -499,7 +499,7 @@ fn observe_adapter_batch_inner<'py>(
             ("requests", PyTuple::new(py, unique.keys())?.into_any()),
         ],
     )?;
->>>>>>> origin/main
+>>>>>>> theirs
     let metadata_class: Bound<'py, PyAny> = host_entry(py, AdapterHost::TableFreshnessMetadata)?;
     let observations: Bound<'py, PyDict> = PyDict::new(py);
     for (name, request) in requests.iter() {
@@ -574,7 +574,7 @@ pub(crate) fn observation_record<'py>(
 
 /// Observe one source freshness config and return a comparable data version.
 #[pyfunction]
-<<<<<<< HEAD
+<<<<<<< ours
 #[pyo3(signature = (*, dialect, reads, source, observed_at))]
 pub(crate) fn observe_configured_source_freshness<'py>(
     dialect: Bound<'py, Dialect>,
@@ -584,7 +584,7 @@ pub(crate) fn observe_configured_source_freshness<'py>(
 pub(crate) fn observe_configured_source_freshness<'py>(
     adapter: Bound<'py, PyAny>,
     connection: Bound<'py, PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
     source: &Bound<'py, PyAny>,
     observed_at: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -598,7 +598,7 @@ pub(crate) fn observe_configured_source_freshness<'py>(
 
 /// Observe adapter metadata freshness per source, batching the warehouse lookups.
 #[pyfunction]
-<<<<<<< HEAD
+<<<<<<< ours
 #[pyo3(signature = (*, dialect, reads, sources, observed_at))]
 pub(crate) fn observe_adapter_sources_freshness<'py>(
     dialect: Bound<'py, Dialect>,
@@ -608,7 +608,7 @@ pub(crate) fn observe_adapter_sources_freshness<'py>(
 pub(crate) fn observe_adapter_sources_freshness<'py>(
     adapter: Bound<'py, PyAny>,
     connection: Bound<'py, PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
     sources: &Bound<'py, PyAny>,
     observed_at: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {

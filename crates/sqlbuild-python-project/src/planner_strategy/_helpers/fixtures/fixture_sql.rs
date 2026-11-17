@@ -9,13 +9,9 @@ use sqlbuild_analysis::planner_fixtures::main::{
 use sqlbuild_analysis::planner_fixtures::models::{
     FixtureColumn, FixtureSqlInput, SuppliedProjection,
 };
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-=======
->>>>>>> origin/main
-
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 pub(crate) fn fixture_marker(sql: &str) -> PyResult<bool> {
     empty_fixture_marker(sql).map_err(value_error)
@@ -31,11 +27,7 @@ pub(crate) struct CompletionSql<'py, 'a> {
 
 pub(crate) fn render_completed(
     input: CompletionSql<'_, '_>,
-<<<<<<< HEAD
     dialect: &Bound<'_, Dialect>,
-=======
-    adapter: &Bound<'_, PyAny>,
->>>>>>> origin/main
 ) -> PyResult<String> {
     let mut supplied: Vec<SuppliedProjection> = Vec::new();
     if !input.typed_nulls.is_empty() {
@@ -62,11 +54,7 @@ pub(crate) fn render_completed(
             completed: &input.completed,
         },
         |name, exact| {
-<<<<<<< HEAD
             dialect
-=======
-            adapter
->>>>>>> origin/main
                 .call_method1(
                     if exact {
                         "render_exact_identifier"

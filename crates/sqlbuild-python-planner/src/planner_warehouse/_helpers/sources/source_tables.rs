@@ -1,16 +1,9 @@
 //! Selected-scope validation that external source tables exist in the warehouse.
 
-<<<<<<< HEAD
-use crate::planner_warehouse::constants::MISSING_SOURCE_TABLE_CODE;
-use crate::planner_warehouse::constants::WILDCARD_TABLE_CHARACTER;
-use crate::planner_warehouse::models::PlannerReads;
-use crate::planner_warehouse::models::Read;
-=======
 use crate::planner_warehouse::constants::{
     MISSING_SOURCE_TABLE_CODE, RUN_BOUNDED, WILDCARD_TABLE_CHARACTER,
 };
 use pyo3::IntoPyObject;
->>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
@@ -20,14 +13,6 @@ use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_help::missing_source_tables_help;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_message::missing_source_tables_message;
 use sqlbuild_analysis::planner_warehouse::models::MissingSourceTable;
-<<<<<<< HEAD
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
-use sqlbuild_python_front::discovery::main::project::yaml_entry_line::yaml_entry_line;
-use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
-=======
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -39,12 +24,16 @@ use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::discovery::main::project::yaml_entry_line::yaml_entry_line;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
->>>>>>> origin/main
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 use sqlbuild_python_project::resource_views::main::source_reads::source_file::source_file;
 use std::collections::HashMap;
+use crate::planner_warehouse::constants::MISSING_SOURCE_TABLE_CODE;
+use crate::planner_warehouse::constants::WILDCARD_TABLE_CHARACTER;
+use crate::planner_warehouse::models::PlannerReads;
+use crate::planner_warehouse::models::Read;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 fn selected_source_readers(scope: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Vec<String>>> {
     let mut readers: HashMap<String, Vec<String>> = HashMap::new();
@@ -152,7 +141,7 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     if unlisted.is_empty() {
         return Ok(());
     }
-<<<<<<< HEAD
+<<<<<<< ours
     let relations = || -> PyResult<Vec<Bound<'py, PyAny>>> {
         unlisted
             .iter()
@@ -188,7 +177,7 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
             ),
         ],
     )?;
->>>>>>> origin/main
+>>>>>>> theirs
     let mut missing: Vec<_> = Vec::new();
     let mut entries: Vec<_> = Vec::new();
     for ((source, entry, read_by), probe) in unlisted.into_iter().zip(probes) {

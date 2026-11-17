@@ -1,17 +1,13 @@
 //! Freeze job boundaries from snapshot lineage, rejecting cycles.
 
 use std::collections::{BTreeMap, BTreeSet};
-
-<<<<<<< HEAD
-use crate::declarations::_helpers::group_waits::{describe_cycle, record_wait, upstream_keys};
-use crate::declarations::models::{GroupWaits, JobDefinition};
-=======
 use crate::declarations::main::group_cycle_message::group_cycle_message;
 use crate::declarations::main::group_wait_graph::group_wait_graph;
 use crate::declarations::models::JobDefinition;
->>>>>>> origin/main
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
+use crate::declarations::_helpers::group_waits::{describe_cycle, record_wait, upstream_keys};
+use crate::declarations::models::{GroupWaits, JobDefinition};
 
 pub fn group_dependencies(
     (group, input): (&str, &SnapshotInput),
@@ -47,7 +43,6 @@ pub fn group_dependencies(
     }
     Ok(waits.edges)
 }
-<<<<<<< HEAD
 
 /// Each member waits for the members that build the first nodes it reaches upstream, and no further:
 /// those members wait for whatever their own nodes read. A job that builds a node itself, such as a
@@ -118,5 +113,3 @@ fn ensure_acyclic(
     }
     Ok(())
 }
-=======
->>>>>>> origin/main

@@ -1,28 +1,12 @@
 //! The facts `--changed` and the consumption recorder read from the plan and compiled project.
 
 use crate::consumption::main::relation::relation;
-<<<<<<< HEAD
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::collections::VecDeque;
-=======
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
->>>>>>> origin/main
-
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_state::consumption::models::{ForcedRun, InputFact, NodeFacts, NodeKey, RelationKey};
-
-<<<<<<< HEAD
-use crate::consumption::_helpers::relation_reads::Locations;
-use crate::consumption::_helpers::relation_reads::prefetch_reads;
-use crate::consumption::_helpers::relation_reads::sql_reads_undeclared;
-=======
 use crate::consumption::_helpers::relation_reads::{Locations, sql_reads_undeclared};
->>>>>>> origin/main
 use crate::planner_identity::main::function_local_hashes::function_local_hashes;
 use crate::planner_identity::main::hook_version_hashes::hook_version_hashes;
 use crate::planner_identity::main::model_version_identity_metadata_json::model_version_identity_metadata_json;
@@ -39,17 +23,34 @@ use sqlbuild_python_project::planner_identity::main::graph_key::graph_key;
 use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
 use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
 use sqlbuild_python_project::resource_views::main::function_reads::language::language;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::collections::VecDeque;
+use crate::consumption::_helpers::relation_reads::Locations;
+use crate::consumption::_helpers::relation_reads::prefetch_reads;
+use crate::consumption::_helpers::relation_reads::sql_reads_undeclared;
 
 pub(crate) const MODEL: &str = "model";
+
 pub(crate) const SEED: &str = "seed";
+
 const SOURCE: &str = "source";
+
 const FUNCTION_KINDS: [&str; 2] = ["udf", "table_fn"];
+
 /// Plan reasons that mean the planner sees no change of the model itself.
 const UNCHANGED_REASONS: [&str; 2] = ["no_change", "normal_incremental"];
+
 const FIRST_RUN: &str = "first_run";
+
 const FULL_REFRESH: &str = "full_refresh";
+
 const SKIP_ACTION: &str = "skip";
+
 const SQL_LANGUAGE: &str = "sql";
+
 const UDF: &str = "udf";
 
 /// The selection's nodes and their ancestry, and the selected ones that execute.
@@ -362,7 +363,7 @@ pub(crate) fn build_facts(
             }
         }
         let destination: Bound<'_, PyAny> = node.destination()?;
-<<<<<<< HEAD
+<<<<<<< ours
         if native_field(&destination, "schema")?.is_none() {
 =======
         let relation: Option<RelationKey> = (!native_field(&destination, "schema")?.is_none())
@@ -380,7 +381,7 @@ pub(crate) fn build_facts(
             forced.push(ForcedRun::InputsNotEnumerable);
         }
         let Some(relation) = relation else {
->>>>>>> origin/main
+>>>>>>> theirs
             continue;
         }
         if let (Compiled::Model(model), Some(_)) = (node, &locations) {

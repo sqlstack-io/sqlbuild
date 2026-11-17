@@ -1,42 +1,18 @@
 //! Planner execution edges, their injected origins, stable execution order and buildability over compiled keys.
 
-<<<<<<< HEAD
-use crate::compiled_views::main::project::compiled_models::compiled_models;
-use crate::compiled_views::main::project::functions::functions;
-use crate::compiled_views::main::project::seeds::seeds;
-use crate::compiled_views::main::project::sources::sources;
-use crate::compiled_views::main::project::sql_tests::sql_tests;
-use crate::graph::main::nodes::native_key::native_key;
-use crate::graph::models::NativeProjectGraph;
 use crate::planner_identity::main::execution_deps::execution_deps;
 use crate::planner_identity::main::execution_origins::execution_origins;
 use crate::planner_identity::main::graph_key::graph_key;
-use crate::references::models::GateRow;
-use crate::references::models::HookRow;
-use crate::resource_views::main::resource_reads::graph_row::graph_row;
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
-use sqlbuild_analysis::graph::main::edge_keys::edge_keys;
-use sqlbuild_analysis::graph::models::EdgeDirection;
-use sqlbuild_analysis::planner_identity::main::execution_upstream::execution_upstream;
-use sqlbuild_analysis::planner_identity::models::ExecutionTest;
-=======
-use crate::planner_identity::main::execution_deps::execution_deps;
-use crate::planner_identity::main::execution_origins::execution_origins;
-use crate::planner_identity::main::graph_key::graph_key;
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::collections::{HashMap, HashSet};
-
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySetMethods, PyString, PyTuple};
-
 use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
 use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing_upstream_message as message_of;
 use sqlbuild_analysis::planner_identity::main::missing_upstreams::missing_upstreams;
 use sqlbuild_analysis::planner_identity::main::topological_order::topological_order;
 use sqlbuild_analysis::planner_identity::models::{AvailableUpstreams, GraphKey, MissingUpstream};
-
 use crate::graph::main::nodes::closure::closure;
 use crate::graph::main::nodes::inverted::inverted;
 use crate::graph::main::project::edge_dict::edge_dict;
@@ -48,8 +24,24 @@ use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use crate::compiled_views::main::project::compiled_models::compiled_models;
+use crate::compiled_views::main::project::functions::functions;
+use crate::compiled_views::main::project::seeds::seeds;
+use crate::compiled_views::main::project::sources::sources;
+use crate::compiled_views::main::project::sql_tests::sql_tests;
+use crate::graph::main::nodes::native_key::native_key;
+use crate::graph::models::NativeProjectGraph;
+use crate::references::models::GateRow;
+use crate::references::models::HookRow;
+use crate::resource_views::main::resource_reads::graph_row::graph_row;
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::graph::main::edge_keys::edge_keys;
+use sqlbuild_analysis::graph::models::EdgeDirection;
+use sqlbuild_analysis::planner_identity::main::execution_upstream::execution_upstream;
+use sqlbuild_analysis::planner_identity::models::ExecutionTest;
 
 pub(crate) const TABLE_FN_TEST_MODE: &str = "table_fn";
+
 const INLINE_SQL_HOOK: &str = "inline SQL";
 
 /// Python keys by graph key, keeping the first object seen for each.
@@ -293,7 +285,6 @@ pub(crate) fn missing_upstream_message<'py>(
         self::edge_origins(edge_origins, &mut objects)?;
     Ok(PyString::new(missing.py(), &message_of(&rows, &origins)))
 }
-<<<<<<< HEAD
 
 /// The audit-gate and hook-read edges a plan injects, which both execution readers need.
 pub(crate) type ExecutionGates = (Vec<GateRow>, Vec<HookRow>);
@@ -426,5 +417,3 @@ pub(crate) fn ordered_keys(
         .map(|key| (key.kind, key.name))
         .collect())
 }
-=======
->>>>>>> origin/main

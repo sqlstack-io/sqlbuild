@@ -1,15 +1,8 @@
 //! Clone planning: destination and origin entries, and deferred-clone graph traversal.
 
-<<<<<<< HEAD
-use crate::planner_entries::_helpers::entries::values::native;
-use crate::planner_entries::_helpers::entries::values::planner_model;
-use crate::planner_entries::_helpers::entries::values::planner_type;
-use crate::planner_entries::_helpers::entries::values::string;
-=======
 use crate::planner_entries::_helpers::entries::values::{
     native, planner_model, planner_type, string,
 };
->>>>>>> origin/main
 use crate::planner_entries::models::ModelPlanContext;
 use crate::planner_entries::types::PhaseTimings;
 use crate::planner_identity::main::build_compiled_function_fingerprint_sql::build_compiled_function_fingerprint_sql;
@@ -22,10 +15,6 @@ use crate::planner_resolution::models::ModelSqlRequest;
 use crate::planner_resolution::models::Resolution;
 use crate::planner_strategy::main::strategy::materialization_of::materialization_of;
 use crate::planner_warehouse::main::sources::gather_source_columns::gather_source_columns;
-<<<<<<< HEAD
-use crate::planner_warehouse::models::PlannerReads;
-=======
->>>>>>> origin/main
 use pyo3::PyRef;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -36,11 +25,6 @@ use sqlbuild_core::graph_walk::models::ClonePolicy;
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -61,13 +45,23 @@ use sqlbuild_python_project::planner_selection::main::resolve_graph_selection::r
 use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
+use crate::planner_entries::_helpers::entries::values::native;
+use crate::planner_entries::_helpers::entries::values::planner_model;
+use crate::planner_entries::_helpers::entries::values::planner_type;
+use crate::planner_entries::_helpers::entries::values::string;
+use crate::planner_warehouse::models::PlannerReads;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 const ENABLED_KEY: &str = "enabled";
 
 const VIEW_MATERIALIZATION: &str = "view";
+
 const GRAPH_ARGUMENTS: [&str; 4] = ["selected", "upstream", "is_clonable", "is_view"];
+
 /// The clone phase that reads source columns from the warehouse.
 const SOURCE_INSPECTION_PHASE: &str = "source_inspection";
+
 /// The clone phase that plans entries from the compiled projects.
 const PLANNING_PHASE: &str = "planning";
 

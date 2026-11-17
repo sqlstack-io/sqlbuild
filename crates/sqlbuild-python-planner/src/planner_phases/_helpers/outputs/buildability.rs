@@ -1,13 +1,7 @@
 //! Selected-scope buildability validation before change planning.
 
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
-<<<<<<< HEAD
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
-=======
-use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
->>>>>>> origin/main
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
 use crate::planner_phases::constants::MISSING_UPSTREAM_CODE;
 use crate::planner_warehouse::main::sources::check_selected_source_tables_exist::check_selected_source_tables_exist;
@@ -24,6 +18,8 @@ use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use sqlbuild_python_project::resource_views::main::seed_reads::external::external;
 use sqlbuild_python_project::resource_views::main::seed_reads::key::key;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
 
 pub(crate) fn check_selected_scope_buildability<'py>(
     runtime: &Bound<'py, PyAny>,

@@ -1,37 +1,27 @@
 //! Public records of native host.
 
-<<<<<<< HEAD
-use crate::native_host::_helpers::dialect::syntax;
-use crate::native_host::_helpers::interrupt::INTERRUPTED;
-use crate::native_host::_helpers::interrupt::SIGINT;
-use crate::native_host::types::Syntax;
-use pyo3::exceptions::PyAttributeError;
-=======
 use crate::native_host::_helpers::interrupt::INTERRUPTED;
 use crate::native_host::_helpers::interrupt::SIGINT;
 use crate::native_host::_helpers::interrupt::restore_signal_handler;
->>>>>>> origin/main
 use pyo3::exceptions::PyKeyboardInterrupt;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
 use pyo3::prelude::PyAnyMethods;
-<<<<<<< HEAD
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
-use pyo3::prelude::pyclass;
-use pyo3::prelude::pymethods;
-=======
 use pyo3::prelude::PyErr;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
->>>>>>> origin/main
 use pyo3::sync::PyOnceLock;
 use pyo3::types::PyCFunction;
 use pyo3::types::PyDict;
 use pyo3::types::PyDictMethods;
 use pyo3::types::PyTuple;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
+use crate::native_host::_helpers::dialect::syntax;
+use crate::native_host::types::Syntax;
+use pyo3::exceptions::PyAttributeError;
+use pyo3::prelude::pyclass;
+use pyo3::prelude::pymethods;
 
 /// Factory results, source locations and the cached public audit tuple are Python-owned edges.
 pub struct AuditProjection {
@@ -124,32 +114,16 @@ impl InterruptHandler {
 impl Drop for InterruptHandler {
     fn drop(&mut self) {
         Python::attach(|py| {
-<<<<<<< HEAD
-            let restored: PyResult<()> = (|| {
-                let signal = py.import("signal")?;
-                if signal
-                    .call_method1("getsignal", (SIGINT,))?
-                    .is(self.installed.bind(py))
-                {
-                    signal.call_method1("signal", (SIGINT, self.previous.bind(py)))?;
-                }
-                Ok(())
-            })();
-            drop(restored);
-=======
             drop(restore_signal_handler(
                 py,
                 SIGINT,
                 (&self.installed, &self.previous),
             ));
->>>>>>> origin/main
         });
         INTERRUPTED.set(false);
     }
 }
 
-<<<<<<< HEAD
-=======
 /// A command's handler on an otherwise unused signal that raises the command's error, so another thread can interrupt the main thread while SIGINT is ignored, without changing how SIGINT is handled.
 #[derive(Debug)]
 pub struct WakeHandler {
@@ -217,7 +191,6 @@ impl Drop for WakeHandler {
     }
 }
 
->>>>>>> origin/main
 impl std::fmt::Debug for AuditProjection {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -238,7 +211,6 @@ impl std::fmt::Debug for FamilyProjection {
             .finish_non_exhaustive()
     }
 }
-<<<<<<< HEAD
 
 /// The adapter's SQL syntax for a plan; anything that would reach the warehouse is refused.
 #[pyclass(frozen, module = "sqlbuild._native", name = "Dialect")]
@@ -294,5 +266,3 @@ impl Dialect {
         self.attribute(py, name)
     }
 }
-=======
->>>>>>> origin/main

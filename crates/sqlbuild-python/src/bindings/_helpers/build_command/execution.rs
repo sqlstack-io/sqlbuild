@@ -10,22 +10,7 @@ use sqlbuild_core::build_command::models::{RunContextFacts, SelectorFileFact};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{BuildExecutionResult, BuildStatus, ExecutionStatus};
-
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
-<<<<<<< HEAD
-use crate::bindings::_helpers::build_command::lifecycle::DirectPythonLifecycle;
-use crate::bindings::_helpers::build_command::lifecycle::LifecycleInputs;
-use crate::bindings::_helpers::build_command::lifecycle::prepare_direct_python_lifecycle;
-use crate::bindings::_helpers::check::check_core::build_check_relation_targets;
-use crate::bindings::_helpers::check::check_core::load_results_by_loader_name;
-use crate::bindings::_helpers::check::check_core::record_python_run_state_results;
-use crate::bindings::_helpers::check::check_core::relevant_check_functions;
-use crate::bindings::_helpers::check::check_results::write_check_results;
-use crate::bindings::_helpers::command_runtime::warehouses::describe_connection_warehouse;
-use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
-use crate::bindings::_helpers::sql_test_command::timeouts::TimeoutKind;
-use crate::bindings::_helpers::sql_test_command::timeouts::resolve_run_timeout;
-=======
 use crate::bindings::_helpers::build_command::lifecycle::{
     DirectPythonLifecycle, LifecycleInputs, prepare_direct_python_lifecycle,
 };
@@ -37,7 +22,6 @@ use crate::bindings::_helpers::check::check_results::write_check_results;
 use crate::bindings::_helpers::command_runtime::warehouses::describe_connection_warehouse;
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
 use crate::bindings::_helpers::sql_test_command::timeouts::{TimeoutKind, resolve_run_timeout};
->>>>>>> origin/main
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -58,11 +42,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
-<<<<<<< HEAD
-=======
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
->>>>>>> origin/main
 use sqlbuild_python_front::cost_context::models::CostContext;
 use sqlbuild_python_front::cursor::main::overrides::cursor_integer::cursor_integer;
 use sqlbuild_python_front::cursor::main::overrides::cursor_timestamp::cursor_timestamp;
@@ -77,20 +58,28 @@ use sqlbuild_python_planner::consumption::main::held_back_text::held_back_text;
 use sqlbuild_python_planner::consumption::main::policy_line::policy_line;
 use sqlbuild_python_planner::consumption::main::prepare::prepare as prepare_consumption;
 use sqlbuild_python_planner::consumption::main::run_reason_text::run_reason_text;
-<<<<<<< HEAD
-use sqlbuild_python_planner::consumption::models::ConsumptionRecorder;
-use sqlbuild_python_planner::consumption::models::Prepared;
-=======
 use sqlbuild_python_planner::consumption::models::{ConsumptionRecorder, Prepared};
->>>>>>> origin/main
 use sqlbuild_python_planner::freshness::main::append_freshness_records::append_freshness_records;
 use sqlbuild_python_planner::observations::main::append_build_observations::append_build_observations;
 use sqlbuild_python_planner::planner_resolution::main::cursor::type_cursor_overrides::type_cursor_overrides;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_state::consumption::models::ChangedPolicy;
+use crate::bindings::_helpers::build_command::lifecycle::DirectPythonLifecycle;
+use crate::bindings::_helpers::build_command::lifecycle::LifecycleInputs;
+use crate::bindings::_helpers::build_command::lifecycle::prepare_direct_python_lifecycle;
+use crate::bindings::_helpers::check::check_core::build_check_relation_targets;
+use crate::bindings::_helpers::check::check_core::load_results_by_loader_name;
+use crate::bindings::_helpers::check::check_core::record_python_run_state_results;
+use crate::bindings::_helpers::check::check_core::relevant_check_functions;
+use crate::bindings::_helpers::sql_test_command::timeouts::TimeoutKind;
+use crate::bindings::_helpers::sql_test_command::timeouts::resolve_run_timeout;
+use sqlbuild_python_planner::consumption::models::ConsumptionRecorder;
+use sqlbuild_python_planner::consumption::models::Prepared;
 
 const EXECUTION_COMMAND: &str = "sqb build";
+
 const NODE_START: [&str; 2] = ["name", "resource_kind"];
+
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 
 /// Prepared callbacks, concurrency, cursors and Python lifecycle.

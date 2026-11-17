@@ -1,28 +1,22 @@
 //! The process's terminal: its width, colour support and stream writes.
 
 use std::io::{self, BufRead, IsTerminal, Read, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
-
 use sqlbuild_orchestration::store::errors::ControlError;
-
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::argv_host::python_int;
 use crate::native_commands::constants::{
-<<<<<<< HEAD
-    BROKEN_PIPE_EXCEPTION, CLEAR_TERMINAL_LINE, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE,
-    EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, PASSWORD_INPUT_BYTES,
-    PYTHON_STDOUT_BUFFER_SIZE, UNCAUGHT_EXCEPTION_STATUS,
-=======
     BROKEN_PIPE_EXCEPTION, CI_VARIABLE, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE,
     EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, NO_PROGRESS_VARIABLE,
     PASSWORD_INPUT_BYTES, PYTHON_STDOUT_BUFFER_SIZE, UNCAUGHT_EXCEPTION_STATUS,
->>>>>>> origin/main
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::LostStdout;
-
-/// Whether a child that may draw a spinner line shares this process's terminal.
-static TERMINAL_SHARED: AtomicBool = AtomicBool::new(false);
+use std::sync::atomic::{AtomicBool, Ordering};
+use crate::native_commands::constants::{
+    BROKEN_PIPE_EXCEPTION, CLEAR_TERMINAL_LINE, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE,
+    EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, PASSWORD_INPUT_BYTES,
+    PYTHON_STDOUT_BUFFER_SIZE, UNCAUGHT_EXCEPTION_STATUS,
+};
 
 /// `int(os.environ["COLUMNS"])`, `0` when unset or not an integer; beyond 64 bits is Python's.
 fn columns_variable() -> Result<i64, PythonNeeded> {
@@ -104,20 +98,6 @@ fn console_bytes(text: &str) -> Vec<u8> {
         text.replace('\n', "\r\n").into_bytes()
     } else {
         text.as_bytes().to_vec()
-    }
-}
-
-/// A child interpreter now writes to this terminal; later writes clear its spinner line first.
-pub(crate) fn share_terminal() {
-    TERMINAL_SHARED.store(true, Ordering::Relaxed);
-}
-
-/// What a write prints first: on a terminal a child shares, the erase of its spinner line.
-pub(crate) fn line_reset(shared: bool, terminal: bool) -> &'static [u8] {
-    if shared && terminal {
-        CLEAR_TERMINAL_LINE.as_bytes()
-    } else {
-        b""
     }
 }
 
@@ -247,4 +227,21 @@ pub(crate) fn stderr_columns() -> usize {
 #[cfg(not(unix))]
 pub(crate) fn stderr_columns() -> usize {
     usize::try_from(FALLBACK_COLUMNS).unwrap_or(80)
+}
+
+/// Whether a child that may draw a spinner line shares this process's terminal.
+static TERMINAL_SHARED: AtomicBool = AtomicBool::new(false);
+
+/// A child interpreter now writes to this terminal; later writes clear its spinner line first.
+pub(crate) fn share_terminal() {
+    TERMINAL_SHARED.store(true, Ordering::Relaxed);
+}
+
+/// What a write prints first: on a terminal a child shares, the erase of its spinner line.
+pub(crate) fn line_reset(shared: bool, terminal: bool) -> &'static [u8] {
+    if shared && terminal {
+        CLEAR_TERMINAL_LINE.as_bytes()
+    } else {
+        b""
+    }
 }

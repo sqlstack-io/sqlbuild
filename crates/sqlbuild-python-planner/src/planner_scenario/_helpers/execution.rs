@@ -14,22 +14,11 @@ use crate::planner_scenario::_helpers::sql::resolve_sql;
 use crate::planner_scenario::_helpers::sql::source_label;
 use crate::planner_scenario::_helpers::values::error;
 use crate::planner_scenario::_helpers::values::string;
-<<<<<<< HEAD
-use crate::planner_scenario::constants::CURSOR_INTRINSIC_NAMES;
-use crate::planner_scenario::constants::CURSOR_TYPE_KEY;
-use crate::planner_scenario::constants::INCREMENTAL_MODE_KEY;
-use crate::planner_scenario::constants::INTEGER_CURSOR_TYPE;
-use crate::planner_scenario::constants::MICROBATCH_INCREMENTAL_MODE;
-use crate::planner_scenario::constants::SCENARIO_EXPECTED_COLUMNS_HELP;
-use crate::planner_scenario::constants::SCENARIO_PLAN_EXPECTED_COLUMNS;
-use crate::planner_scenario::constants::SCENARIO_PLAN_INVALID_FIXTURE;
-=======
 use crate::planner_scenario::constants::{
     CURSOR_INTRINSIC_NAMES, CURSOR_TYPE_KEY, INCREMENTAL_MODE_KEY, INTEGER_CURSOR_TYPE,
     MICROBATCH_INCREMENTAL_MODE, SCENARIO_EXPECTED_COLUMNS_HELP, SCENARIO_PLAN_EXPECTED_COLUMNS,
     SCENARIO_PLAN_INVALID_FIXTURE,
 };
->>>>>>> origin/main
 use crate::planner_scenario::models::SqlContext;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFrozenSet, PyTuple};
@@ -39,11 +28,6 @@ use sqlbuild_analysis::compiler::main::scenario_reader_sql::scenario_reader_sql;
 use sqlbuild_discovery::constants::{SCENARIO_EXPECTED_COLUMNS_ALL, SCENARIO_EXPECTED_COLUMNS_KEY};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -65,16 +49,23 @@ use sqlbuild_python_project::planner_identity::main::execution_order::execution_
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_strategy::main::complete_fixtures::complete_fixtures as complete_relation_fixtures;
 use sqlbuild_python_project::planner_strategy::main::planning_context::planning_context;
-<<<<<<< HEAD
+use sqlbuild_python_project::sql_test_glue::constants::{
+    DEFAULT_INTEGER_END, DEFAULT_INTEGER_START, DEFAULT_TIMESTAMP_END, DEFAULT_TIMESTAMP_START,
+};
+use crate::planner_scenario::constants::CURSOR_INTRINSIC_NAMES;
+use crate::planner_scenario::constants::CURSOR_TYPE_KEY;
+use crate::planner_scenario::constants::INCREMENTAL_MODE_KEY;
+use crate::planner_scenario::constants::INTEGER_CURSOR_TYPE;
+use crate::planner_scenario::constants::MICROBATCH_INCREMENTAL_MODE;
+use crate::planner_scenario::constants::SCENARIO_EXPECTED_COLUMNS_HELP;
+use crate::planner_scenario::constants::SCENARIO_PLAN_EXPECTED_COLUMNS;
+use crate::planner_scenario::constants::SCENARIO_PLAN_INVALID_FIXTURE;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_INTEGER_END;
 use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_INTEGER_START;
 use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_TIMESTAMP_END;
 use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_TIMESTAMP_START;
-=======
-use sqlbuild_python_project::sql_test_glue::constants::{
-    DEFAULT_INTEGER_END, DEFAULT_INTEGER_START, DEFAULT_TIMESTAMP_END, DEFAULT_TIMESTAMP_START,
-};
->>>>>>> origin/main
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]

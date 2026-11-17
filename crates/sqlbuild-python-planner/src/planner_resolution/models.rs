@@ -15,15 +15,12 @@ use pyo3::types::PyDictMethods;
 use pyo3::types::PyList;
 use pyo3::types::PyString;
 use pyo3::types::PyTuple;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::assert_no_unresolved_sql_markers;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 /// The planner inputs that decide one model's plan-time cursor window.
 #[derive(Debug)]
@@ -61,14 +58,14 @@ pub struct ModelSqlRequest<'py> {
 }
 
 /// What resolving one model's, hook's or function's references reads.
-<<<<<<< HEAD
+<<<<<<< ours
 pub struct Resolution<'py> {
     pub(crate) dialect: Bound<'py, Dialect>,
 =======
 #[derive(Debug)]
 pub struct Resolution<'py> {
     pub adapter: Bound<'py, PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
     pub(crate) external: Bound<'py, PyAny>,
     pub(crate) source_map: Bound<'py, PyAny>,
     pub(crate) source_warehouse_columns: Bound<'py, PyAny>,
@@ -80,20 +77,16 @@ pub struct Resolution<'py> {
 impl<'py> Resolution<'py> {
     /// Resolution against a `ModelPlanContext`'s relations.
     pub fn of_context(
-<<<<<<< HEAD
+<<<<<<< ours
         dialect: Bound<'py, Dialect>,
 =======
         adapter: Bound<'py, PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
         context: &Bound<'py, PyAny>,
         external: Bound<'py, PyAny>,
     ) -> PyResult<Self> {
         Ok(Self {
-<<<<<<< HEAD
             dialect,
-=======
-            adapter,
->>>>>>> origin/main
             external,
             source_map: class_field(context, |c: &ModelPlanContext| &c.source_map)?,
             source_warehouse_columns: class_field(context, |c: &ModelPlanContext| {
@@ -106,29 +99,21 @@ impl<'py> Resolution<'py> {
     }
 
     pub(crate) fn resolve(&self, sql: &str, filtering: &CursorFiltering<'py>) -> PyResult<String> {
-<<<<<<< HEAD
+<<<<<<< ours
         let py = self.dialect.py();
+=======
+        let py = self.adapter.py();
+>>>>>>> theirs
         let resolved: String = resolve_sources(
             sql,
             (&self.source_map, &self.source_warehouse_columns),
             &self.dialect,
-=======
-        let py = self.adapter.py();
-        let resolved: String = resolve_sources(
-            sql,
-            (&self.source_map, &self.source_warehouse_columns),
-            &self.adapter,
->>>>>>> origin/main
             filtering,
         )?;
         let resolved: String = resolve_refs(
             &resolved,
             (&self.model_locations, &self.seed_locations),
-<<<<<<< HEAD
             &self.dialect,
-=======
-            &self.adapter,
->>>>>>> origin/main
             filtering,
         )?;
         let resolved: String = resolve_dbt_ref_references(&resolved, Some(&self.external))?;
@@ -137,21 +122,16 @@ impl<'py> Resolution<'py> {
         } else {
             PyDict::new(py).into_any()
         };
-<<<<<<< HEAD
         let resolved: String = resolve_udf_references(&resolved, &locations, &self.dialect)?;
         resolve_table_function_references(&resolved, &locations, &self.dialect)
     }
 
     pub(crate) fn assert_resolved(&self, sql: &str, label: &str) -> PyResult<()> {
+<<<<<<< ours
         let py = self.dialect.py();
 =======
-        let resolved: String = resolve_udf_references(&resolved, &locations, &self.adapter)?;
-        resolve_table_function_references(&resolved, &locations, &self.adapter)
-    }
-
-    pub(crate) fn assert_resolved(&self, sql: &str, label: &str) -> PyResult<()> {
         let py = self.adapter.py();
->>>>>>> origin/main
+>>>>>>> theirs
         assert_no_unresolved_sql_markers(
             py,
             &PyString::new(py, sql),
@@ -160,11 +140,11 @@ impl<'py> Resolution<'py> {
     }
 
     pub(crate) fn unbounded(&self, sql: Bound<'py, PyAny>, label: &str) -> PyResult<String> {
-<<<<<<< HEAD
+<<<<<<< ours
         let py = self.dialect.py();
 =======
         let py = self.adapter.py();
->>>>>>> origin/main
+>>>>>>> theirs
         let resolved = self.resolve(
             &sql.extract::<String>()?,
             &CursorFiltering {

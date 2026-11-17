@@ -6,11 +6,8 @@ use crate::planner_strategy::main::values::text::text;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyTuple};
-use sqlbuild_python_base::native_host::models::Dialect;
-
 use sqlbuild_analysis::planner_strategy::main::cursor_input_column::cursor_input_column_failure;
 use sqlbuild_analysis::planner_strategy::models::{CursorInputColumnCheck, CursorInputColumnOwner};
-
 use crate::planner_identity::main::or_empty::or_empty;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
@@ -26,21 +23,19 @@ use sqlbuild_python_front::model_config::main::config::config_text_object::confi
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
-<<<<<<< HEAD
+use sqlbuild_python_project::planner_strategy::constants::{
+    ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
+    SOURCE_REFERENCE, TIMESTAMP_CURSOR,
+};
+use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
+use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_project::planner_strategy::constants::ENFORCED_CONTRACT;
 use sqlbuild_python_project::planner_strategy::constants::INCREMENTAL_MATERIALIZATION;
 use sqlbuild_python_project::planner_strategy::constants::MODEL_REFERENCE;
 use sqlbuild_python_project::planner_strategy::constants::SEED_REFERENCE;
 use sqlbuild_python_project::planner_strategy::constants::SOURCE_REFERENCE;
 use sqlbuild_python_project::planner_strategy::constants::TIMESTAMP_CURSOR;
-=======
-use sqlbuild_python_project::planner_strategy::constants::{
-    ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
-    SOURCE_REFERENCE, TIMESTAMP_CURSOR,
-};
->>>>>>> origin/main
-use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
-use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 
 /// Whether a model is incremental with a cursor column.
 fn incremental_cursor_flag(

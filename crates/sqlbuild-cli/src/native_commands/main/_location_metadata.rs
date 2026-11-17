@@ -3,19 +3,17 @@
 use std::future::Future;
 use std::path::Path;
 use std::time::Duration;
-
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::models::{
-    LocationWorkClient, LocationWorkPoll, WarehouseReadFailure, WarehouseSyncFailure,
+    LocationWorkClient, LocationWorkPoll, WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
 use tokio::time::Instant;
-
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
     acknowledge_metadata_page, begin_after_run, freeze_history_page, load_watermark,
-    metadata_health, next_scan, page_limit, report_metadata_health, statistics_page,
+    metadata_health, next_scan, statistics_page,
 };
 use crate::native_commands::_helpers::execution::{
     failed_read, finish_metadata_page, location_warning, read_metadata_page, retry_stopped_sync,
@@ -25,11 +23,18 @@ use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::constants::METADATA_POLL_SECONDS;
 use crate::native_commands::models::{
-<<<<<<< HEAD
-    LocationMetadataSync, LocationServe, LocationWatch, ReadFailure,
-=======
     LocationMetadataSync, LocationServe, LocationWatch, MetadataReply,
->>>>>>> origin/main
+};
+use sqlbuild_orchestration::platform::models::{
+    LocationWorkClient, LocationWorkPoll, WarehouseReadFailure, WarehouseSyncFailure,
+};
+use crate::native_commands::_helpers::execution::{
+    acknowledge_metadata_page, begin_after_run, freeze_history_page, load_watermark,
+    metadata_health, next_scan, page_limit, report_metadata_health, statistics_page,
+};
+use crate::native_commands::_helpers::execution::{finish_metadata_page, read_metadata_page};
+use crate::native_commands::models::{
+    LocationMetadataSync, LocationServe, LocationWatch, ReadFailure,
 };
 
 /// One bounded source or mirror page leaves named work polling a turn between pages.
@@ -89,7 +94,7 @@ pub(super) async fn sync_location_metadata(
             return Ok(None);
         };
         state = read;
-<<<<<<< HEAD
+<<<<<<< ours
         let page = match page {
             Ok(page) => {
                 state.reads_wake_compute = page.wakes_compute;
@@ -105,7 +110,7 @@ pub(super) async fn sync_location_metadata(
             }
             MetadataReply::Failed(failure) => {
                 return failed_read(state, (client, poll), (started, failure), stopped.as_mut())
->>>>>>> origin/main
+>>>>>>> theirs
                     .await;
             }
         };
@@ -136,13 +141,13 @@ pub(super) async fn sync_location_metadata(
         Err(error) => {
             tokio::select! {
             result = &mut stopped => { result?; return Ok(None); },
-<<<<<<< HEAD
+<<<<<<< ours
             () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
             }
             return retry_metadata(state, error);
 =======
             () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery)), None) => {},
->>>>>>> origin/main
+>>>>>>> theirs
         }
     };
     state.applied |= response.applied;
@@ -153,7 +158,30 @@ pub(super) async fn sync_location_metadata(
     finish_metadata_page(acknowledge_metadata_page(state)).await
 }
 
-<<<<<<< HEAD
+fn retry_metadata(
+    mut state: LocationMetadataSync,
+    error: ClientError,
+) -> Result<Option<LocationMetadataSync>, ControlError> {
+    if matches!(error, ClientError::Configuration(_))
+        || matches!(error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
+    {
+        return Err(ControlError::Invalid(error.to_string()));
+    }
+    state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+    state.reader = None;
+    location_warning(
+        "warehouse sync failed",
+        format!("retrying in {METADATA_POLL_SECONDS}s: {error}"),
+    );
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!(
+            "Warehouse history sync incomplete: {error}. Retaining progress and the exact pending page for retry.\n"
+        ),
+    )]));
+    Ok(Some(state))
+}
+
 /// A busy warehouse file waits a poll interval; any other failed read retries a smaller page.
 async fn failed_read(
     mut state: LocationMetadataSync,
@@ -211,30 +239,4 @@ pub(crate) fn read_failure_line(state: &LocationMetadataSync, failure: &ReadFail
         state.kind().as_str().replace('_', " "),
         page_limit(state),
     )
-}
-
-=======
->>>>>>> origin/main
-fn retry_metadata(
-    mut state: LocationMetadataSync,
-    error: ClientError,
-) -> Result<Option<LocationMetadataSync>, ControlError> {
-    if matches!(error, ClientError::Configuration(_))
-        || matches!(error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
-    {
-        return Err(ControlError::Invalid(error.to_string()));
-    }
-    state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
-    state.reader = None;
-    location_warning(
-        "warehouse sync failed",
-        format!("retrying in {METADATA_POLL_SECONDS}s: {error}"),
-    );
-    drop(write_output(&[(
-        Stream::Stderr,
-        &format!(
-            "Warehouse history sync incomplete: {error}. Retaining progress and the exact pending page for retry.\n"
-        ),
-    )]));
-    Ok(Some(state))
 }

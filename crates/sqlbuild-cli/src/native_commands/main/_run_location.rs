@@ -3,22 +3,14 @@
 use std::future::Future;
 use std::path::Path;
 use std::time::Duration;
-
 use sqlbuild_cache::project_snapshot::models::PathStamp;
 use sqlbuild_orchestration::platform::main::connect_location_work::connect_location_work;
-<<<<<<< HEAD
-use sqlbuild_orchestration::platform::models::{
-    ConnectionCheckTrigger, LocationHealth, LocationWorkClient, LocationWorkPoll,
-};
-=======
 use sqlbuild_orchestration::platform::models::{LocationWorkClient, LocationWorkPoll};
->>>>>>> origin/main
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 use tokio::sync::{mpsc, watch};
 use tokio::time::Instant;
 use uuid::Uuid;
-
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
     apply_dev_controls, compile_next_generation, finish_compile,
@@ -30,19 +22,28 @@ use crate::native_commands::_helpers::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
 use crate::native_commands::_helpers::terminal::write_output;
-use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
-use crate::native_commands::main::_location_changed_build::report_changed_build;
 use crate::native_commands::main::_location_compiler::run_location_compiler;
 use crate::native_commands::main::_location_metadata::sync_location_metadata;
-use crate::native_commands::main::_location_work::{next_work_check, run_location_work};
+use crate::native_commands::main::_location_work::run_location_work;
 use crate::native_commands::models::{
-<<<<<<< HEAD
-    LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
-=======
     DevControlState, LocationCompileRequest, LocationMetadataSync, LocationServe, LocationWatch,
->>>>>>> origin/main
 };
 use crate::native_commands::types::CompileOutcome;
+use sqlbuild_orchestration::platform::models::{
+    ConnectionCheckTrigger, LocationHealth, LocationWorkClient, LocationWorkPoll,
+};
+use tokio::sync::mpsc;
+use crate::native_commands::_helpers::execution::{
+    check_published_location, close_metadata_reader, compile_generation, location_clock,
+    location_generation, location_heartbeats, metadata_sync, next_turn, report_location_health,
+    shutdown_signal,
+};
+use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
+use crate::native_commands::main::_location_changed_build::report_changed_build;
+use crate::native_commands::main::_location_work::{next_work_check, run_location_work};
+use crate::native_commands::models::{
+    LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
+};
 
 pub(super) async fn run_location(
     options: LocationServe,
@@ -73,7 +74,7 @@ async fn watch_location(
     options: &LocationServe,
     script: &Path,
     (bearer, client, poll): (&str, &LocationWorkClient, &LocationWorkPoll),
-<<<<<<< HEAD
+<<<<<<< ours
     requests: mpsc::Sender<LocationRuntimeRequest>,
 ) -> Result<(), ControlError> {
     let mut watch = location_watch(&options.project_dir);
@@ -89,7 +90,7 @@ async fn watch_location(
     let mut compiled_inputs: Option<Vec<PathStamp>> = None;
     let mut deferred_sync: Option<(Vec<WarehouseStateLocation>, i64)> = None;
     let mut work_at = Instant::now() + Duration::from_secs(2);
->>>>>>> origin/main
+>>>>>>> theirs
     let mut published_generation = None;
     // The first connection check of this process is its startup check.
     let mut checked = false;
@@ -127,11 +128,11 @@ async fn watch_location(
         if !ready {
             let connected: bool = controls.borrow().warehouse == Some(true);
             let Some(idle) = poll_location(
-<<<<<<< HEAD
+<<<<<<< ours
                 (options, script, &requests),
 =======
                 (options, script, connected),
->>>>>>> origin/main
+>>>>>>> theirs
                 (client, poll, published_generation),
                 (watch, work_at, metadata),
                 stopped.as_mut(),
@@ -144,21 +145,22 @@ async fn watch_location(
             continue;
         }
         published_generation = None;
-<<<<<<< HEAD
-        if let Some(state) = metadata.take() {
-            metadata = Some(close_metadata_reader(state).await?);
-        }
-        let generation = tokio::select! {
-            result = &mut stopped => return result,
-            generation = location_generation(options, bearer) => generation?,
+        let Some(next) = compile_next_generation(
+            (options, bearer, &requests),
+            (metadata, compiled_inputs, &watch.observed.0),
+            stopped.as_mut(),
+        )
+        .await?
+        else {
+            return Ok(());
         };
-        let generation = match generation {
-            Some(generation) => generation,
-            None => {
-                watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
-                continue;
-            }
+        let next_compile: Option<(CompileOutcome, i64)>;
+        (next_compile, metadata, compiled_inputs) = next;
+        let Some((compiled, generation)) = next_compile else {
+            watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
+            continue;
         };
+<<<<<<< ours
         drop(write_output(&[(
             Stream::Stderr,
             &format!("Compiling location generation {generation} in an isolated interpreter...\n"),
@@ -224,21 +226,6 @@ async fn watch_location(
             )]));
         }
 =======
-        let Some(next) = compile_next_generation(
-            (options, bearer, &requests),
-            (metadata, compiled_inputs, &watch.observed.0),
-            stopped.as_mut(),
-        )
-        .await?
-        else {
-            return Ok(());
-        };
-        let next_compile: Option<(CompileOutcome, i64)>;
-        (next_compile, metadata, compiled_inputs) = next;
-        let Some((compiled, generation)) = next_compile else {
-            watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
-            continue;
-        };
         published_generation = compiled.0.then_some(generation);
         let Some(settled) = finish_compile(
             (options, script, (bearer, poll.session_id)),
@@ -251,17 +238,17 @@ async fn watch_location(
             return Ok(());
         };
         (watch, metadata, deferred_sync) = settled;
->>>>>>> origin/main
+>>>>>>> theirs
     }
 }
 
 /// Named work and metadata share one idle turn without transferring interpreter ownership.
 async fn poll_location(
-<<<<<<< HEAD
+<<<<<<< ours
     (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
 =======
     (options, script, connected): (&LocationServe, &Path, bool),
->>>>>>> origin/main
+>>>>>>> theirs
     (client, poll, generation): (&LocationWorkClient, &LocationWorkPoll, Option<i64>),
     (mut watch, mut work_at, mut metadata): (LocationWatch, Instant, Option<LocationMetadataSync>),
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -269,13 +256,13 @@ async fn poll_location(
     tokio::pin!(stopped);
     if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
         if Instant::now() >= work_at {
-<<<<<<< HEAD
+<<<<<<< ours
             let Some(turn) = run_location_work(
                 (options, script, runtime),
 =======
             let Some((files, sync)) = run_location_work(
                 (options, script, connected),
->>>>>>> origin/main
+>>>>>>> theirs
                 (client, poll, &watch),
                 generation,
                 stopped.as_mut(),

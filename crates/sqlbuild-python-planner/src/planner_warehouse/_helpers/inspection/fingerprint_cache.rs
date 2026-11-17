@@ -11,11 +11,16 @@ use sqlbuild_python_base::boundary::main::imported::imported;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub(crate) const CACHE_DIRECTORY_NAME: &str = "migration-fingerprints-v1";
+
 pub(crate) const CACHE_DATABASE_NAME: &str = "migration-fingerprints.sqlite3";
+
 const SQLITE_TIMEOUT_SECONDS: f64 = 0.1;
+
 pub(crate) const CREATE_CACHE_TABLE_SQL: &str = "\nCREATE TABLE IF NOT EXISTS migration_fingerprint (\n    cache_key TEXT PRIMARY KEY,\n    payload TEXT NOT NULL\n)\n";
+
 pub(crate) const INSERT_SQL: &str =
     "INSERT OR REPLACE INTO migration_fingerprint (cache_key, payload) VALUES (?, ?)";
+
 pub(crate) const SELECT_SQL: &str = "SELECT payload FROM migration_fingerprint WHERE cache_key = ?";
 
 /// A fingerprint request: query SQL, metadata JSON, dialect and visible renames.
@@ -64,19 +69,16 @@ pub(crate) fn sqlite_error(py: Python<'_>, error: &PyErr) -> PyResult<bool> {
     Ok(error.is_instance(py, &imported(py, "sqlite3", "DatabaseError")?))
 }
 
-<<<<<<< HEAD
+<<<<<<< ours
 pub(crate) fn close(py: Python<'_>, store: Option<Py<PyAny>>) -> PyResult<()> {
     let Some(store) = store else {
-        return Ok(());
-    };
-    match store.bind(py).call_method0("close") {
 =======
 pub(crate) fn close(py: Python<'_>, connection: Option<Py<PyAny>>) -> PyResult<()> {
     let Some(connection) = connection else {
+>>>>>>> theirs
         return Ok(());
     };
-    match connection.bind(py).call_method0("close") {
->>>>>>> origin/main
+    match store.bind(py).call_method0("close") {
         Ok(_) => Ok(()),
         Err(error) if sqlite_error(py, &error)? => Ok(()),
         Err(error) => Err(error),

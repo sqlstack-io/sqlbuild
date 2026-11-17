@@ -1,15 +1,5 @@
 //! Execution dependencies kept native until a public graph or plan asks for its dict view.
 
-<<<<<<< HEAD
-use crate::planner_identity::_helpers::graph::execution_deps_with;
-use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
-use pyo3::prelude::{Bound, PyAny, PyResult};
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
-
-/// Execution dependencies kept native until a public graph or plan asks for its dict view.
-pub fn execution_deps(project: &Bound<'_, PyAny>) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
-    execution_deps_with(project, &native_execution_gate_edges(project)?)
-=======
 use crate::compiled_views::main::project::compiled_models::compiled_models;
 use crate::compiled_views::main::project::functions::functions;
 use crate::compiled_views::main::project::seeds::seeds;
@@ -25,9 +15,14 @@ use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::planner_identity::main::execution_upstream::execution_upstream;
 use sqlbuild_analysis::planner_identity::models::ExecutionTest;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use crate::planner_identity::_helpers::graph::execution_deps_with;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Execution dependencies kept native until a public graph or plan asks for its dict view.
 pub fn execution_deps(project: &Bound<'_, PyAny>) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
+<<<<<<< ours
+    execution_deps_with(project, &native_execution_gate_edges(project)?)
+=======
     let mut resources: Vec<(ObjectKey, Vec<ObjectKey>)> = Vec::new();
     let collections: [Bound<'_, PyAny>; 4] = [
         compiled_models(project)?,
@@ -61,5 +56,5 @@ pub fn execution_deps(project: &Bound<'_, PyAny>) -> PyResult<Vec<(ObjectKey, Ve
         .chain(hooks.into_iter().map(|hook| (hook.gated, hook.read)))
         .collect();
     Ok(execution_upstream(resources, &tests, &injected))
->>>>>>> origin/main
+>>>>>>> theirs
 }

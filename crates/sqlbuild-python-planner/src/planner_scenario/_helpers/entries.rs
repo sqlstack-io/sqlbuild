@@ -11,10 +11,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyString;
 use pyo3::types::{PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::types::Syntax;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::by_attribute::by_attribute;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -22,6 +18,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::resource_views::main::seed_reads::key::key;
 use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 pub(crate) fn seed_entries<'py>(
     project: &Bound<'py, PyAny>,

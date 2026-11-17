@@ -2,15 +2,8 @@
 
 use crate::freshness::main::build_direct_source_freshness_planning_result_function::build_direct_source_freshness_planning_result_function;
 use crate::freshness::main::build_direct_source_freshness_propagation_result_function::build_direct_source_freshness_propagation_result_function;
-<<<<<<< HEAD
-use crate::planner_warehouse::_helpers::inspection::snapshot::destination_nodes;
-use crate::planner_warehouse::_helpers::inspection::snapshot::lower;
-use crate::planner_warehouse::constants::RUN_SCOPE;
-use crate::planner_warehouse::models::PlannerReads;
-=======
 use crate::planner_warehouse::_helpers::inspection::snapshot::{destination_nodes, lower};
 use crate::planner_warehouse::constants::RUN_SCOPE;
->>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
@@ -21,19 +14,18 @@ use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-=======
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
->>>>>>> origin/main
 use sqlbuild_python_project::planner_phases::main::replace::replace;
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::collections::BTreeSet;
+use crate::planner_warehouse::_helpers::inspection::snapshot::destination_nodes;
+use crate::planner_warehouse::_helpers::inspection::snapshot::lower;
+use crate::planner_warehouse::models::PlannerReads;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 fn state_database<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     for node in destination_nodes(project)? {

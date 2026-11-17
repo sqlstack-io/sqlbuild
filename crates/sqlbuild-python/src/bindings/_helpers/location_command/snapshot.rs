@@ -2,7 +2,6 @@
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
@@ -13,16 +12,11 @@ use sqlbuild_core::models::DiagnosticSeverity;
 use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_discovery::project_validation::main::validate_orchestration_names::validate_orchestration_names;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
-
 use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
 use crate::bindings::_helpers::location_command::snapshot_providers::providers_document;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::orchestration_reads::main::environment_hash::environment_hash;
 use sqlbuild_python_base::records::main::fields::field::field;
-<<<<<<< HEAD
-use sqlbuild_python_front::command_runtime::main::published_concurrency::published_concurrency;
-=======
->>>>>>> origin/main
 use sqlbuild_python_front::discovery::main::project::named_node_rows::named_node_rows;
 use sqlbuild_python_front::discovery::main::project::project_facts::project_facts;
 use sqlbuild_python_front::discovery::main::project::validation_error::validation_error;
@@ -39,12 +33,8 @@ use sqlbuild_python_project::project_snapshot::main::model_nodes::model_nodes;
 use sqlbuild_python_project::project_snapshot::main::python_declarations::python_declarations;
 use sqlbuild_python_project::project_snapshot::main::resource_nodes::resource_nodes;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
-<<<<<<< HEAD
-
-/// The Python node kind whose functions load sources.
-const LOADER_KIND: &str = "loader";
-=======
->>>>>>> origin/main
+use std::collections::{BTreeMap, BTreeSet};
+use sqlbuild_python_front::command_runtime::main::published_concurrency::published_concurrency;
 
 /// Compile catalog nodes and identities in the location, never in the server.
 #[pyfunction]

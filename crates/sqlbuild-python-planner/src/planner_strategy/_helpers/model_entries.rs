@@ -6,12 +6,6 @@ use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
-=======
->>>>>>> origin/main
-
 use sqlbuild_analysis::planner_strategy::main::group_replacement_refusal::group_replacement_refusal;
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
 use sqlbuild_analysis::planner_strategy::main::microbatch_lookback::microbatch_lookback;
@@ -23,19 +17,6 @@ use sqlbuild_model_config::execution_limits::constants::MODEL_MAX_DURATION_KEY;
 use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_execution_limit;
 use sqlbuild_model_config::execution_limits::models::ExecutionLimit;
 use sqlbuild_model_config::model_validation::constants::PHYSICAL_STORAGE_KEYS;
-
-<<<<<<< HEAD
-use crate::planner_strategy::_helpers::cursor_types::cursor_type_warning_record;
-use crate::planner_strategy::_helpers::cursor_types::warehouse_column_types;
-use crate::planner_strategy::_helpers::microbatch_limits::replay_grain;
-use crate::planner_strategy::_helpers::microbatch_limits::unknown_grain;
-use crate::planner_strategy::_helpers::microbatches::microbatch_limit_config;
-use crate::planner_strategy::_helpers::strategy::model_warning_records;
-use crate::planner_strategy::_helpers::strategy::resolve_schema_actions;
-use crate::planner_strategy::_helpers::strategy::warning_inputs;
-use crate::planner_strategy::_helpers::values::optional_string;
-use crate::planner_strategy::_helpers::values::plan_warning;
-=======
 use crate::planner_strategy::_helpers::cursor_types::{
     cursor_type_warning_record, warehouse_column_types,
 };
@@ -45,7 +26,6 @@ use crate::planner_strategy::_helpers::strategy::{
     model_warning_records, resolve_schema_actions, warning_inputs,
 };
 use crate::planner_strategy::_helpers::values::{optional_string, plan_warning};
->>>>>>> origin/main
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
@@ -70,7 +50,23 @@ use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use sqlbuild_python_project::compiled_views::main::compiled_models::relative_path::relative_path;
-<<<<<<< HEAD
+use sqlbuild_python_project::planner_strategy::constants::{
+    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, GROUP_REPLACEMENT_UNSUPPORTED_CODE,
+    MICROBATCH_MODE, PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE,
+    TABLE_RECREATING_ACTIONS,
+};
+use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
+use crate::planner_strategy::_helpers::cursor_types::cursor_type_warning_record;
+use crate::planner_strategy::_helpers::cursor_types::warehouse_column_types;
+use crate::planner_strategy::_helpers::microbatch_limits::replay_grain;
+use crate::planner_strategy::_helpers::microbatch_limits::unknown_grain;
+use crate::planner_strategy::_helpers::strategy::model_warning_records;
+use crate::planner_strategy::_helpers::strategy::resolve_schema_actions;
+use crate::planner_strategy::_helpers::strategy::warning_inputs;
+use crate::planner_strategy::_helpers::values::optional_string;
+use crate::planner_strategy::_helpers::values::plan_warning;
 use sqlbuild_python_project::planner_strategy::constants::CUSTOM_MATERIALIZATION;
 use sqlbuild_python_project::planner_strategy::constants::DDL_SEPARATOR;
 use sqlbuild_python_project::planner_strategy::constants::ENFORCED_CONTRACT;
@@ -78,14 +74,6 @@ use sqlbuild_python_project::planner_strategy::constants::MICROBATCH_MODE;
 use sqlbuild_python_project::planner_strategy::constants::PHYSICAL_STORAGE_DIALECT;
 use sqlbuild_python_project::planner_strategy::constants::PHYSICAL_STORAGE_UNSUPPORTED_CODE;
 use sqlbuild_python_project::planner_strategy::constants::TABLE_RECREATING_ACTIONS;
-=======
-use sqlbuild_python_project::planner_strategy::constants::{
-    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, GROUP_REPLACEMENT_UNSUPPORTED_CODE,
-    MICROBATCH_MODE, PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE,
-    TABLE_RECREATING_ACTIONS,
-};
->>>>>>> origin/main
-use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
 
 /// Model config keys copied to the plan entry as optional strings, with their entry fields.
 const STRING_FIELDS: [(&str, &str); 15] = [
@@ -108,8 +96,10 @@ const STRING_FIELDS: [(&str, &str); 15] = [
     ("valid_to_column", "valid_to_column"),
     ("initial_valid_from", "initial_valid_from"),
 ];
+
 /// Model config keys copied as optional strings that complete the snapshot settings.
 const SNAPSHOT_POLICY_FIELDS: [&str; 2] = ["snapshot_full_refresh", "snapshot_schema_change"];
+
 /// Change-detection facts copied to the entry.
 const CHANGE_FIELDS: [&str; 9] = [
     "fingerprint_metadata_json",

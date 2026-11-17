@@ -1,3 +1,5 @@
+
+
 pub(crate) struct OrderTestCase {
     pub(crate) description: &'static str,
     pub(crate) selected: &'static [&'static str],
@@ -15,12 +17,12 @@ pub(crate) struct ClosureTestCase {
 pub(crate) struct LifecycleTestCase {
     pub(crate) description: &'static str,
     pub(crate) selected: &'static [&'static str],
-<<<<<<< HEAD
+<<<<<<< ours
     pub(crate) nodes: &'static [LifecycleNodeSpec],
 =======
     /// `(name, kind)`.
     pub(crate) nodes: &'static [(&'static str, &'static str)],
->>>>>>> origin/main
+>>>>>>> theirs
     pub(crate) upstream: &'static [(&'static str, &'static [&'static str])],
     pub(crate) expected_ingress: &'static [&'static str],
     pub(crate) expected_loaders: &'static [&'static str],

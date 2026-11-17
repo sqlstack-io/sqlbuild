@@ -1,14 +1,11 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
-<<<<<<< HEAD
+use crate::state_tables::constants::{EVENT_ID_COLUMN, MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
+use crate::state_tables::models::HistoryRead;
 use crate::state_tables::constants::{
     EVENT_ID_KEY_PROJECTION, MISSING_EVENT_ID_KEY, NEWEST_FIRST_COLUMN, NEWEST_VERSION_COLUMN,
     SQLSERVER_ADAPTER,
 };
-=======
-use crate::state_tables::constants::{EVENT_ID_COLUMN, MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
->>>>>>> origin/main
-use crate::state_tables::models::HistoryRead;
 
 /// Rendered cursor values, `None` first; a trailing event ID repeating an `event_id` key is ignored.
 pub fn read_history_sql(
@@ -27,7 +24,7 @@ pub fn read_history_sql(
         newest,
     } = read;
     let mut projection = columns.join(", ");
-<<<<<<< HEAD
+<<<<<<< ours
     projection.push_str(if !has_event_id {
         ", NULL AS event_id"
     } else if columns.contains(&"event_id") {
@@ -57,7 +54,7 @@ pub fn read_history_sql(
             MISSING_EVENT_ID_KEY
         });
     }
->>>>>>> origin/main
+>>>>>>> theirs
     let ordered = columns
         .iter()
         .map(|column| {

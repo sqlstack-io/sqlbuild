@@ -13,10 +13,6 @@ use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
@@ -41,9 +37,12 @@ use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::sch
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 use sqlbuild_python_project::sql_test_glue::main::assemble_sql_test_plans::assemble_sql_test_plans;
 use sqlbuild_python_project::sql_test_glue::models::SqlTestAssembly;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 const LOADER_CONSUMER: &str = "loader";
+
 const HOOK_CONSUMER: &str = "hook";
+
 const MATERIALIZATION_CONSUMER: &str = "custom materialization";
 
 fn tuple_of<'py>(py: Python<'py>, items: Vec<Bound<'py, PyAny>>) -> PyResult<Bound<'py, PyAny>> {
@@ -492,11 +491,11 @@ pub(crate) struct SelectedTests<'py> {
 
 /// Selected SQL test entries and their warnings, failing on invalid fixtures.
 pub(crate) fn selected_test_entries<'py>(
-<<<<<<< HEAD
+<<<<<<< ours
     (project, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
 =======
     (project, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
->>>>>>> origin/main
+>>>>>>> theirs
     selected_keys: &Bound<'py, PyAny>,
     selection: &Bound<'py, PyAny>,
     case_name: &Bound<'py, PyAny>,

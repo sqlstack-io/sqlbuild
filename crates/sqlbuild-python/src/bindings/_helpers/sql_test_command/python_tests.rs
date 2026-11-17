@@ -4,7 +4,6 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 use std::time::Instant;
-
 use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyFrozenSetMethods;
@@ -12,7 +11,6 @@ use serde_json::{Value, json};
 use sqlbuild_core::cli_text::main::format_phase_line::format_phase_line;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_discovery::python_paths::main::python_test_paths::python_test_paths;
-
 use sqlbuild_python_base::build_progress::main::terminal::flush::flush;
 use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::native_host::main::flush_console::flush_console;
@@ -29,11 +27,15 @@ use sqlbuild_python_project::planner_selection::main::split_project_unit_test_se
 
 /// The prefix of a Python test module's file name.
 const TEST_MODULE_PREFIX: &str = "test_";
+
 const PYTEST_MODULE: &str = "pytest";
+
 /// The diagnostic code of a Python test run that cannot start.
 pub(crate) const PYTHON_TESTS_INPUT_CODE: &str = "S000";
+
 /// The project folder whose `python/`, `providers/` and `orchestration/` folders mirror the project's.
 const TESTS_FOLDER: &str = "tests";
+
 /// The discovered Python node collections whose folders a selection's tests mirror.
 const NODE_COLLECTIONS: [&str; 4] = [
     "loader_functions",
@@ -41,11 +43,15 @@ const NODE_COLLECTIONS: [&str; 4] = [
     "asset_functions",
     "check_functions",
 ];
+
 /// Lets tests import project and `tests.*` modules, and mirrored folders reuse module names.
 const IMPORT_MODE: &str = "--import-mode=importlib";
+
 /// The JSON section reporting the Python tests a `sqb test` ran.
 const PYTHON_TESTS_SECTION: &str = "python_tests";
+
 const PASSED_STATUS: &str = "success";
+
 const FAILED_STATUS: &str = "failed";
 
 /// Whether the request selects or excludes anything.
@@ -118,11 +124,11 @@ pub(crate) fn selected_python_tests(
             (
                 Some(PYTHON_TESTS_INPUT_CODE),
                 Some(
-<<<<<<< HEAD
+<<<<<<< ours
                     "add test_*.py modules under tests/python/, tests/providers/ or tests/orchestration/, mirroring the code they test",
 =======
                     "add test_*.py modules under tests/python/ or tests/providers/, mirroring the code they test",
->>>>>>> origin/main
+>>>>>>> theirs
                 ),
             ),
         ));

@@ -5,18 +5,9 @@ use crate::planner_entries::models::RelationsRequest;
 use crate::planner_migrations::main::plan_column_migrations::plan_column_migrations;
 use crate::planner_migrations::main::plan_model_migrations::plan_model_migrations;
 use crate::planner_migrations::main::plan_old_name_views::plan_old_name_views as plan_old_name_migration_views;
-<<<<<<< HEAD
-use crate::planner_migrations::models::ColumnMigrationInputs;
-use crate::planner_migrations::models::MigrationPhase;
-use crate::planner_phases::_helpers::inputs::contexts::class_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
-=======
 use crate::planner_migrations::models::{ColumnMigrationInputs, MigrationPhase};
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
->>>>>>> origin/main
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
 use crate::planner_phases::models::PlannerWarehouseState;
 use crate::planner_warehouse::main::inspection::warehouse_snapshot::warehouse_snapshot;
@@ -31,6 +22,10 @@ use sqlbuild_python_project::planner_phases::main::native::native;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use std::time::Instant;
+use crate::planner_migrations::models::ColumnMigrationInputs;
+use crate::planner_migrations::models::MigrationPhase;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_reads;
 
 fn progress(runtime: &Bound<'_, PyAny>, message: &str) -> PyResult<()> {
     let on_progress = runtime_field(runtime, |runtime| &runtime.on_progress)?;

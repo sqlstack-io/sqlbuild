@@ -5,24 +5,18 @@ use crate::planner_migrations::_helpers::column::known_input_columns::KnownInput
 use crate::planner_migrations::models::{
     ColumnMigrationInputs, ColumnMigrationPlanning, MigrationPhase,
 };
-<<<<<<< HEAD
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
-=======
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
->>>>>>> origin/main
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PySet, PySetMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::types::Syntax;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 /// Decide column renames and return the existing planning result model.
 #[pyfunction(name = "plan_column_migrations")]
@@ -74,13 +68,13 @@ pub(crate) fn plan_column_migrations<'py>(
     let py = phase.runtime.py();
     let runtime = phase.runtime.clone();
     let snapshot = phase.snapshot.clone();
-<<<<<<< HEAD
+<<<<<<< ours
     let dialect = runtime_dialect(&runtime)?;
     let candidates = super::column_candidates::candidates(
 =======
     let adapter = runtime_field(&runtime, |runtime| &runtime.adapter)?;
     let candidates = crate::planner_migrations::_helpers::column::column_candidates::candidates(
->>>>>>> origin/main
+>>>>>>> theirs
         (phase, columns),
         &dialect.syntax("sql_analysis_dialect")?.call0()?,
     )?;
@@ -125,7 +119,7 @@ pub(crate) fn plan_column_migrations<'py>(
             &inputs,
         )?;
         let physical = mapping_get(&columns.physical_relations, name_object(&candidate.model)?)?;
-<<<<<<< HEAD
+<<<<<<< ours
         let checked = super::column_entries::checked(&runtime, candidate, decided, &physical)?;
         for hint in super::column_entries::hints(candidate, &checked.entries)?.try_iter()? {
 =======
@@ -138,7 +132,7 @@ pub(crate) fn plan_column_migrations<'py>(
         )?
         .try_iter()?
         {
->>>>>>> origin/main
+>>>>>>> theirs
             hints.push(hint?);
         }
         entries.extend(checked.entries);

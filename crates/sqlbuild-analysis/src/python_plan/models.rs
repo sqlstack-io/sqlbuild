@@ -7,21 +7,11 @@ use crate::assembly::project::types::ObjectKey;
 pub struct LifecycleNode {
     /// `task`, `asset`, `loader` or `check`.
     pub kind: String,
-<<<<<<< HEAD
+<<<<<<< ours
     /// The SQL resources the node reads, in authored order.
     pub sql_deps: Vec<ObjectKey>,
-}
-
-/// A selected loader whose selected Python upstream reads SQL, so it runs after that SQL is built.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct RoundTripLoader {
-    pub name: String,
-    /// The SQL its selected upstream tasks and assets read, which its load waits for; sorted.
-    pub waits_for: Vec<ObjectKey>,
-    /// Its selected upstream tasks and assets, which must succeed for it to load; sorted.
-    pub gates: Vec<String>,
 =======
->>>>>>> origin/main
+>>>>>>> theirs
 }
 
 /// Selected Python nodes split into ingress and read-side regions, each sorted.
@@ -32,4 +22,14 @@ pub struct RunLifecycle {
     pub read_side_names: Vec<String>,
     /// Loaders that load in the SQL build after the SQL their upstream reads, sorted by name.
     pub round_trip_loaders: Vec<RoundTripLoader>,
+}
+
+/// A selected loader whose selected Python upstream reads SQL, so it runs after that SQL is built.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RoundTripLoader {
+    pub name: String,
+    /// The SQL its selected upstream tasks and assets read, which its load waits for; sorted.
+    pub waits_for: Vec<ObjectKey>,
+    /// Its selected upstream tasks and assets, which must succeed for it to load; sorted.
+    pub gates: Vec<String>,
 }

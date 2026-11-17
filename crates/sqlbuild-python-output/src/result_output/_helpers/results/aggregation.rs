@@ -1,16 +1,8 @@
 //! Build `BuildExecutionResult` with aggregate counts and overall status from typed results.
 
-<<<<<<< HEAD
-use pyo3::IntoPyObjectExt;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::pyfunction;
-use pyo3::types::PyDict;
-use sqlbuild_core::build_aggregate::constants::IGNORED_AUDIT_FAILURE;
-=======
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObjectExt, pyfunction};
->>>>>>> origin/main
 use sqlbuild_core::build_aggregate::main::aggregate_build_counts::aggregate_build_counts;
 use sqlbuild_core::build_aggregate::models::{BuildCounts, BuildResultFacts, ModelResultFacts};
 use sqlbuild_host::entries::models::ExecutorHost;
@@ -19,12 +11,14 @@ use sqlbuild_host::models::{
     ModelExecutionResult, SeedExecutionResult, SqlTestExecutionResult,
 };
 use sqlbuild_host::types::ResultEnum;
-
 use crate::result_output::_helpers::results::projection::Projection;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use pyo3::IntoPyObjectExt;
+use pyo3::pyfunction;
+use sqlbuild_core::build_aggregate::constants::IGNORED_AUDIT_FAILURE;
 
 /// Borrowed executor results with canonical terminals, used by the build JSON projection.
 pub(crate) struct RetainedBuildResults<'a, V> {
@@ -135,28 +129,6 @@ const RESULT_FIELDS: [&str; 7] = [
     "end_audit_results",
 ];
 
-/// An audit's outcome as the aggregation counts it: an ignored failure is its own outcome.
-fn audit_fact<V>(audit: &AuditExecutionResult<V>) -> String {
-    if audit.ignored {
-        return IGNORED_AUDIT_FAILURE.to_owned();
-    }
-    audit.outcome.value().to_owned()
-}
-
-/// Each audit result's outcome as the aggregation counts it.
-fn audit_facts(results: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    results
-        .try_iter()?
-        .map(|result| {
-            let result: Bound<'_, PyAny> = result?;
-            if native_field(&result, "ignored")?.is_truthy()? {
-                return Ok(IGNORED_AUDIT_FAILURE.to_owned());
-            }
-            native_field(&result, "outcome")?.str()?.extract()
-        })
-        .collect()
-}
-
 fn texts(results: &Bound<'_, PyAny>, field: &str) -> PyResult<Vec<String>> {
     results
         .try_iter()?
@@ -241,4 +213,26 @@ pub(crate) fn aggregate_build_result<'py>(
         .map(|field| request.get(field))
         .collect::<PyResult<_>>()?;
     aggregated_build_result(request.py(), &sections)
+}
+
+/// An audit's outcome as the aggregation counts it: an ignored failure is its own outcome.
+fn audit_fact<V>(audit: &AuditExecutionResult<V>) -> String {
+    if audit.ignored {
+        return IGNORED_AUDIT_FAILURE.to_owned();
+    }
+    audit.outcome.value().to_owned()
+}
+
+/// Each audit result's outcome as the aggregation counts it.
+fn audit_facts(results: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+    results
+        .try_iter()?
+        .map(|result| {
+            let result: Bound<'_, PyAny> = result?;
+            if native_field(&result, "ignored")?.is_truthy()? {
+                return Ok(IGNORED_AUDIT_FAILURE.to_owned());
+            }
+            native_field(&result, "outcome")?.str()?.extract()
+        })
+        .collect()
 }

@@ -5,29 +5,19 @@ use crate::planner_resolution::main::cursor::resolve_effective_timestamp_grain::
 use crate::planner_resolution::main::cursor::resolve_start_cursor_config::resolve_start_cursor_config;
 use crate::planner_resolution::main::safety::maximum_allowed_start::maximum_allowed_start;
 use crate::planner_strategy::main::lineage::resolve_lineage_reference::resolve_lineage_reference;
-<<<<<<< HEAD
-=======
 use crate::planner_warehouse::_helpers::inspection::snapshot::inspection_concurrency;
->>>>>>> origin/main
 use crate::planner_warehouse::_helpers::inspection::watermarks::validate_watermark_column;
 use crate::planner_warehouse::constants::{
     CURSOR_ALGEBRA_ERROR, CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, DATE_VALUE, LOG_DEBUG_EVENT,
-    PLANNER_LOGGER,
+    PLANNER_LOGGER, QUERY_RECORD, RECORD_QUERY, RUN_BOUNDED, RUN_RECORDED_QUERY,
 };
-<<<<<<< HEAD
-use crate::planner_warehouse::models::EligibleCursorQuery;
-use crate::planner_warehouse::models::Read;
-use crate::planner_warehouse::models::SnapshotRequest;
-use crate::planner_warehouse::types::CursorProgress;
-use crate::planner_warehouse::types::WarehouseReads;
-=======
 use crate::planner_warehouse::main::inspection::adapter_cursor_sql::adapter_cursor_sql;
 use crate::planner_warehouse::main::inspection::bound_task::bound_task;
 use crate::planner_warehouse::models::SnapshotRequest;
->>>>>>> origin/main
 use pyo3::IntoPyObject;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyTuple};
+use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyFloat, PyTuple};
 use sqlbuild_analysis::planner_changes::constants::FORWARD_ONLY_POLICY;
 use sqlbuild_analysis::planner_warehouse::main::cursor_bounds::cursor_bounds;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_query_groups;
@@ -37,19 +27,11 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
-<<<<<<< HEAD
-=======
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
->>>>>>> origin/main
 use sqlbuild_python_front::cursor::main::intervals::partition::partition;
 use sqlbuild_python_front::cursor::main::scalars::compare_values::compare_values;
 use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
@@ -67,23 +49,29 @@ use sqlbuild_python_project::planner_phases::main::model_key::model_key;
 use sqlbuild_python_project::planner_phases::main::native_member::native_member;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
-<<<<<<< HEAD
-=======
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
->>>>>>> origin/main
 use sqlbuild_python_project::planner_phases::main::planner_model::planner_model;
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
-<<<<<<< HEAD
-use std::cell::RefCell;
-=======
->>>>>>> origin/main
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
+use crate::planner_warehouse::constants::{
+    CURSOR_ALGEBRA_ERROR, CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, DATE_VALUE, LOG_DEBUG_EVENT,
+    PLANNER_LOGGER,
+};
+use crate::planner_warehouse::models::EligibleCursorQuery;
+use crate::planner_warehouse::models::Read;
+use crate::planner_warehouse::types::CursorProgress;
+use crate::planner_warehouse::types::WarehouseReads;
+use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyTuple};
+use sqlbuild_analysis::planner_warehouse::main::cursor_query_sql::cursor_query_sql;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
+use std::cell::RefCell;
 
 /// The adapter method that renders one cursor bound expression as text.
 pub(crate) const CURSOR_TEXT_METHOD: &str = "render_cursor_text";
@@ -296,14 +284,14 @@ fn upstream_relation<'py>(
     {
         return object(
             py,
-<<<<<<< HEAD
+<<<<<<< ours
             render_source_relation(&source_entry(&source)?, Some(dialect.as_any()))?,
 =======
             render_source_relation(
                 &source_entry(&source)?,
                 Some(adapter).filter(|value| !value.is_none()),
             )?,
->>>>>>> origin/main
+>>>>>>> theirs
         );
     }
     Ok(py.None().into_bound(py))
@@ -606,8 +594,6 @@ fn physical_queries(models: &[CursorModel<'_>]) -> Vec<PhysicalCursorQuery> {
     cursor_query_groups(&requests)
 }
 
-<<<<<<< HEAD
-=======
 /// Run one physical cursor statement; a failure leaves only that relation unavailable.
 pub(crate) fn read_cursor_query<'py>(
     py: Python<'py>,
@@ -659,7 +645,6 @@ pub(crate) fn read_cursor_query<'py>(
     Ok(PyTuple::new(py, [row, PyFloat::new(py, elapsed).into_any(), error])?.into_any())
 }
 
->>>>>>> origin/main
 fn report_cursor_query(
     py: Python<'_>,
     query: &PhysicalCursorQuery,
@@ -753,16 +738,13 @@ fn fan_out<'py>(query: &PhysicalCursorQuery, row: &Bound<'py, PyAny>) -> PyResul
     Ok(values)
 }
 
-<<<<<<< HEAD
 /// The values the statements read and the failed tags; `None` when inputs are left to the run.
-=======
->>>>>>> origin/main
 fn execute_queries<'py>(
     request: &SnapshotRequest<'py>,
     queries: &[PhysicalCursorQuery],
 ) -> PyResult<Option<(Values<'py>, HashSet<String>)>> {
     let py = request.project.py();
-<<<<<<< HEAD
+<<<<<<< ours
     let statements = || -> PyResult<Vec<String>> {
         queries
             .iter()
@@ -823,7 +805,7 @@ fn execute_queries<'py>(
         )?
         .try_iter()?
         .collect::<PyResult<_>>()?
->>>>>>> origin/main
+>>>>>>> theirs
     };
     let mut values = Values::new();
     let mut failed: HashSet<_> = HashSet::new();
@@ -836,8 +818,6 @@ fn execute_queries<'py>(
     }
     Ok(Some((values, failed)))
 }
-<<<<<<< HEAD
-=======
 
 fn eligible_task<'py>(
     py: Python<'py>,
@@ -897,7 +877,6 @@ fn eligible_task<'py>(
     .into_any())
 }
 
->>>>>>> origin/main
 fn eligible_target_maxes<'py>(
     request: &SnapshotRequest<'py>,
     models: &[CursorModel<'py>],
@@ -977,7 +956,7 @@ fn eligible_target_maxes<'py>(
             sql: sql.extract()?,
         });
     }
-<<<<<<< HEAD
+<<<<<<< ours
     let Read::Known(rows_by_request) = request
         .reads
         .get()
@@ -1002,7 +981,7 @@ fn eligible_target_maxes<'py>(
     )?;
     for ((info, _), rows) in requests.iter().zip(rows_by_request.try_iter()?) {
         let rows = rows?;
->>>>>>> origin/main
+>>>>>>> theirs
         if !rows.is_truthy()? {
             continue;
         }
@@ -1211,6 +1190,90 @@ fn assemble<'py>(
     Ok(snapshots)
 }
 
+/// Plan previews: target `MAX` values from the synced copy; inputs are read when the run starts.
+fn synced_copy_values<'py>(
+    facade: &SyncedCopyAdapter,
+    models: &mut [CursorModel<'py>],
+) -> PyResult<Values<'py>> {
+    let mut values = Values::new();
+    for info in models {
+        let reads_inputs: bool = !info.upstreams.is_empty();
+        info.upstreams.clear();
+        let observed: Option<&str> = info
+            .target_tag
+            .as_ref()
+            .and_then(|_| facade.target_max(&info.model_name));
+        match (&info.target_tag, observed) {
+            (Some(tag), Some(observed)) => {
+                let value = parse_warehouse_cursor(&text(info.effective_grain.py(), observed))?;
+                let lifted = floor_lifts(info, &value)?;
+                values.insert(tag.clone(), value);
+                if reads_inputs && (info.replays || lifted) {
+                    facade.mark_unknown(format!(
+                        "cursor window of {} (the run starts it away from the last build's cursor)",
+                        info.model_name
+                    ));
+                } else if reads_inputs {
+                    facade.mark_window(&info.model_name, observed);
+                }
+                if !info.start_cursor_config.is_none()
+                    && !native_field(&info.start_cursor_config, "max_ahead")?.is_none()
+                {
+                    facade.mark_unknown(format!("future-cursor safety of {}", info.model_name));
+                }
+            }
+            (Some(_), None) => facade.mark_unknown(format!(
+                "cursor position of {} (no successful build recorded it)",
+                info.model_name
+            )),
+            (None, _) if reads_inputs => {
+                facade.mark_unknown(format!("cursor window of {}", info.model_name));
+            }
+            (None, _) => {}
+        }
+    }
+    Ok(values)
+}
+
+/// Cursor MIN/MAX values by model name, and whether the reads left cursor inputs to the run.
+pub(crate) fn cursor_snapshots<'py>(
+    request: &SnapshotRequest<'py>,
+    existing_relations: &Bound<'py, PyDict>,
+    inputs: &CursorInputs<'py>,
+) -> PyResult<(Bound<'py, PyDict>, bool)> {
+    let py = request.project.py();
+    let maps = ModelMaps {
+        models: by_name(&request.project, "models")?,
+        sources: by_name(&request.project, "sources")?,
+        seeds: by_name(&request.project, "seeds")?,
+        functions: by_name(&request.project, "functions")?,
+    };
+    let mut models = collect_models(request, existing_relations, inputs, &maps)?;
+    if models.is_empty() {
+        return Ok((PyDict::new(py), false));
+    }
+    let queries = physical_queries(&models);
+    let started = Instant::now();
+    let Some((values, failed)) = execute_queries(request, &queries)? else {
+        let values = synced_values(request.reads.get().reads(), &mut models)?;
+        return Ok((assemble(py, &models, (&values, &HashSet::new()))?, true));
+    };
+    let values = eligible_target_maxes(request, &models, values, &inputs.invocation_time)?;
+    if !request.on_progress.is_none() {
+        let logical: usize = queries
+            .iter()
+            .map(|query| query.min_tags.len() + query.max_tags.len())
+            .sum();
+        request.on_progress.call1((format!(
+            "Gathered cursor bounds ({}/{logical} logical values; {} physical relation reads). ({:.2}s)",
+            values.len(),
+            queries.len(),
+            started.elapsed().as_secs_f64()
+        ),))?;
+    }
+    Ok((assemble(py, &models, (&values, &failed))?, false))
+}
+
 /// Plan previews: target `MAX` values from the synced state; inputs are read when the run starts.
 fn synced_values<'py>(
     reads: &dyn WarehouseReads,
@@ -1257,45 +1320,6 @@ fn synced_values<'py>(
         }
     }
     Ok(values)
-}
-
-/// Cursor MIN/MAX values by model name, and whether the reads left cursor inputs to the run.
-pub(crate) fn cursor_snapshots<'py>(
-    request: &SnapshotRequest<'py>,
-    existing_relations: &Bound<'py, PyDict>,
-    inputs: &CursorInputs<'py>,
-) -> PyResult<(Bound<'py, PyDict>, bool)> {
-    let py = request.project.py();
-    let maps = ModelMaps {
-        models: by_name(&request.project, "models")?,
-        sources: by_name(&request.project, "sources")?,
-        seeds: by_name(&request.project, "seeds")?,
-        functions: by_name(&request.project, "functions")?,
-    };
-    let mut models = collect_models(request, existing_relations, inputs, &maps)?;
-    if models.is_empty() {
-        return Ok((PyDict::new(py), false));
-    }
-    let queries = physical_queries(&models);
-    let started = Instant::now();
-    let Some((values, failed)) = execute_queries(request, &queries)? else {
-        let values = synced_values(request.reads.get().reads(), &mut models)?;
-        return Ok((assemble(py, &models, (&values, &HashSet::new()))?, true));
-    };
-    let values = eligible_target_maxes(request, &models, values, &inputs.invocation_time)?;
-    if !request.on_progress.is_none() {
-        let logical: usize = queries
-            .iter()
-            .map(|query| query.min_tags.len() + query.max_tags.len())
-            .sum();
-        request.on_progress.call1((format!(
-            "Gathered cursor bounds ({}/{logical} logical values; {} physical relation reads). ({:.2}s)",
-            values.len(),
-            queries.len(),
-            started.elapsed().as_secs_f64()
-        ),))?;
-    }
-    Ok((assemble(py, &models, (&values, &failed))?, false))
 }
 
 /// The query's MIN/MAX statement, each bound read as text the way the adapter renders it.

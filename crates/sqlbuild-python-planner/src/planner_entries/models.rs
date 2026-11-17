@@ -1,20 +1,15 @@
 //! Public records of planner entries.
 
-<<<<<<< HEAD
-use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
-use sqlbuild_python_base::native_host::models::Dialect;
-=======
-use pyo3::prelude::{Bound, Py, PyAny};
-use pyo3::pyclass;
->>>>>>> origin/main
 use sqlbuild_python_project::native_host::models::ModelLookup;
+use crate::planner_warehouse::models::PlannerReads;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 /// What resolving relation locations and source metadata for one scope reads.
 #[derive(Debug)]
 pub struct RelationsRequest<'py> {
-<<<<<<< HEAD
+<<<<<<< ours
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
     /// The warehouse reads, or `None` to resolve from canonical static state only.
@@ -35,13 +30,13 @@ pub struct RelationsRequest<'py> {
     pub local_config: Bound<'py, PyAny>,
     pub known_source_columns: Bound<'py, PyAny>,
     pub relation_keys: Bound<'py, PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
 }
 
 /// What building model plan entries for one execution scope reads.
 #[derive(Debug)]
 pub struct PlanEntriesRequest<'py> {
-<<<<<<< HEAD
+<<<<<<< ours
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) scope: Bound<'py, PyAny>,
@@ -51,8 +46,6 @@ pub struct PlanEntriesRequest<'py> {
     pub(crate) cursor_overrides: Bound<'py, PyAny>,
     pub(crate) full_refresh: bool,
     pub(crate) build_inputs: Bound<'py, PyAny>,
-    /// The effective worker limit execution will use.
-    pub(crate) concurrency: i64,
 =======
     pub project: Bound<'py, PyAny>,
     pub adapter: Bound<'py, PyAny>,
@@ -63,15 +56,15 @@ pub struct PlanEntriesRequest<'py> {
     pub cursor_overrides: Bound<'py, PyAny>,
     pub full_refresh: bool,
     pub build_inputs: Bound<'py, PyAny>,
+>>>>>>> theirs
     /// The effective worker limit execution will use.
     pub concurrency: i64,
->>>>>>> origin/main
 }
 
 /// What assembling the plan output's fields reads.
 #[derive(Debug)]
 pub struct PlanOutputInputs<'py> {
-<<<<<<< HEAD
+<<<<<<< ours
     pub(crate) project: Bound<'py, PyAny>,
     pub(crate) dialect: Bound<'py, Dialect>,
     pub(crate) scope: Bound<'py, PyAny>,
@@ -93,7 +86,7 @@ pub struct PlanOutputInputs<'py> {
     pub model_warnings: Vec<Bound<'py, PyAny>>,
     pub reload_sources: Bound<'py, PyAny>,
     pub extras: Bound<'py, PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
 }
 
 /// Resolved relation and source inputs for plan entry construction.

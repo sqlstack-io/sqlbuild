@@ -1,9 +1,5 @@
 //! The plan as one JSON document, `json.dumps(indent=2)`.
 
-<<<<<<< HEAD
-use crate::plan_output::_helpers::plan_json::IGNORE_AUDIT_FAILURES_KEY;
-=======
->>>>>>> origin/main
 use crate::plan_output::_helpers::plan_json::column_migrations_json;
 use crate::plan_output::_helpers::plan_json::function_json;
 use crate::plan_output::_helpers::plan_json::migrations_json;
@@ -28,6 +24,7 @@ use sqlbuild_core::plan_display::constants::SYNCED_COPY_KEY;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use crate::plan_output::_helpers::plan_json::IGNORE_AUDIT_FAILURES_KEY;
 
 /// The plan as one JSON document, `json.dumps(indent=2)`.
 #[pyfunction]
@@ -119,11 +116,8 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
     if arguments.passed(CHANGED_KEY)? {
         result.set_item(CHANGED_KEY, arguments.value(CHANGED_KEY)?)?;
     }
-<<<<<<< HEAD
     if native_field(&plan, IGNORE_AUDIT_FAILURES_KEY)?.is_truthy()? {
         result.set_item(IGNORE_AUDIT_FAILURES_KEY, true)?;
     }
-=======
->>>>>>> origin/main
     indented_json(result.as_any())
 }

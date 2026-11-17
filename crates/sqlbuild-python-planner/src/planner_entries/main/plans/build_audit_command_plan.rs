@@ -8,28 +8,22 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-<<<<<<< HEAD
-use sqlbuild_python_base::native_host::models::Dialect;
-=======
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 /// Project selected audits from canonical static state.
 #[pyfunction]
-<<<<<<< HEAD
+<<<<<<< ours
 #[pyo3(signature = (*, project, dialect, scope, relations))]
+=======
+#[pyo3(signature = (*, project, adapter, scope, relations))]
+>>>>>>> theirs
 pub fn build_audit_command_plan<'py>(
     project: &Bound<'py, PyAny>,
     dialect: &Bound<'py, Dialect>,
-=======
-#[pyo3(signature = (*, project, adapter, scope, relations))]
-pub fn build_audit_command_plan<'py>(
-    project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
->>>>>>> origin/main
     scope: &Bound<'py, PyAny>,
     relations: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -48,11 +42,7 @@ pub fn build_audit_command_plan<'py>(
             py,
             &[
                 ("project", project.clone()),
-<<<<<<< HEAD
                 ("dialect", dialect.clone().into_any()),
-=======
-                ("adapter", adapter.clone()),
->>>>>>> origin/main
                 ("scope", scope.clone()),
                 ("relations", relations.clone()),
                 ("model_materializations", materializations.into_any()),

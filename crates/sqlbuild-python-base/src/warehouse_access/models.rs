@@ -1,13 +1,5 @@
 //! Public records of warehouse access.
 
-<<<<<<< HEAD
-use crate::boundary::main::imported::imported;
-use crate::warehouse_access::_helpers::sqlite_connection::database_error;
-use pyo3::IntoPyObjectExt;
-use pyo3::exceptions::PyIndexError;
-use pyo3::exceptions::PyTypeError;
-use pyo3::prelude::Bound;
-=======
 use crate::boundary::main::call_with::call_with;
 use crate::boundary::main::imported::imported;
 use crate::boundary::models::KeywordArguments;
@@ -34,7 +26,6 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
->>>>>>> origin/main
 use pyo3::prelude::PyAny;
 use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::PyResult;
@@ -42,20 +33,14 @@ use pyo3::prelude::Python;
 use pyo3::prelude::pyclass;
 use pyo3::prelude::pymethods;
 use pyo3::types::PyBytes;
-<<<<<<< HEAD
-=======
 use pyo3::types::PyDict;
 use pyo3::types::PyDictMethods;
 use pyo3::types::PyString;
 use pyo3::types::PyTuple;
->>>>>>> origin/main
 use rusqlite::Connection;
 use rusqlite::OpenFlags;
 use rusqlite::params_from_iter;
 use rusqlite::types::Value;
-<<<<<<< HEAD
-use sqlbuild_state::execution_history::constants::MEMORY_PATH;
-=======
 use sqlbuild_analysis::fingerprint_storage::constants::FINGERPRINT_COLUMNS;
 use sqlbuild_analysis::fingerprint_storage::main::read_latest_sql::read_latest_sql;
 use sqlbuild_cache::digest::main::base64_text::base64_text;
@@ -75,7 +60,6 @@ use sqlbuild_state::observations::constants::CURSOR_MAX_KIND;
 use sqlbuild_state::observations::constants::SOURCE_COLUMNS_KIND;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
->>>>>>> origin/main
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -307,8 +291,6 @@ impl SqliteCursor {
         self.last_row_id
     }
 }
-<<<<<<< HEAD
-=======
 
 /// Answers listing, column and fingerprint reads from the copy; dialect methods use `adapter`.
 #[pyclass(
@@ -751,4 +733,3 @@ impl SyncedCopyAdapter {
         Err(refused(&format!("adapter.{name}")))
     }
 }
->>>>>>> origin/main

@@ -1,22 +1,16 @@
 //! Public records of planner phases.
 
-<<<<<<< HEAD
+use pyo3::prelude::{Bound, Py, PyAny};
+use pyo3::pyclass;
+use std::collections::BTreeMap;
 use crate::planner_phases::_helpers::timings::STEPS;
 use crate::planner_phases::_helpers::timings::timings_of;
 use crate::planner_phases::constants::MILLISECONDS;
 use crate::planner_phases::constants::PERCENT;
 use crate::planner_warehouse::models::PlannerReads;
-use pyo3::prelude::{Bound, Py, PyAny};
-use pyo3::pyclass;
 use serde_json::{Value, json};
 use sqlbuild_python_base::native_host::models::Dialect;
-use std::collections::BTreeMap;
 use std::time::Instant;
-=======
-use pyo3::prelude::{Bound, Py, PyAny};
-use pyo3::pyclass;
-use std::collections::BTreeMap;
->>>>>>> origin/main
 
 /// The plan output's fields and metadata entries, each set before the output is built.
 #[derive(Debug)]
@@ -79,7 +73,7 @@ pub struct PlanWarningContext<'a, 'py> {
 #[pyclass(module = "sqlbuild._native", frozen, get_all)]
 #[derive(Debug)]
 pub struct PlannerRuntime {
-<<<<<<< HEAD
+<<<<<<< ours
     pub(crate) project: Py<PyAny>,
     pub(crate) dialect: Py<Dialect>,
     pub(crate) reads: Py<PlannerReads>,
@@ -95,7 +89,7 @@ pub struct PlannerRuntime {
     pub local_config: Py<PyAny>,
     pub on_progress: Py<PyAny>,
     pub invocation_time: Py<PyAny>,
->>>>>>> origin/main
+>>>>>>> theirs
 }
 
 /// Warehouse snapshot, inspection relations and migration plans gathered once per plan.
@@ -128,7 +122,6 @@ pub(crate) struct IdentityWork {
     pub identity_builds: u64,
     pub stale_detections: BTreeMap<String, u64>,
 }
-<<<<<<< HEAD
 
 /// While held, this thread's planning steps are recorded for one plan command.
 pub struct PlanTimingScope {
@@ -212,5 +205,3 @@ impl PlanTimings {
         })
     }
 }
-=======
->>>>>>> origin/main

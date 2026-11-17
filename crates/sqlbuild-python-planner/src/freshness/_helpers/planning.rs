@@ -2,7 +2,6 @@
 
 use crate::freshness::constants::PREVIEW_MESSAGE;
 use std::collections::{HashMap, HashSet};
-
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyTuple};
@@ -11,24 +10,7 @@ use sqlbuild_analysis::planner_identity::constants::{MODEL_RESOURCE, SOURCE_RESO
 use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_state::freshness::main::configuration_error::configuration_error;
-
 use crate::freshness::_helpers::exception_types::SourceFreshnessObservationError;
-<<<<<<< HEAD
-use crate::freshness::_helpers::observation::observation_record;
-use crate::freshness::_helpers::observation::observation_source;
-use crate::freshness::_helpers::observation::observe_adapter_batch;
-use crate::freshness::_helpers::observation::observe_configured;
-use crate::freshness::_helpers::observation::strategy;
-use crate::freshness::_helpers::observation::unknown;
-use crate::freshness::_helpers::support::text;
-use crate::freshness::models::Observer;
-use crate::planner_warehouse::errors::WarehouseAccessRefusedError;
-use crate::planner_warehouse::models::PlannerReads;
-use crate::planner_warehouse::models::Read;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::native_host::models::Dialect;
-=======
 use crate::freshness::_helpers::observation::{
     observation_record, observation_source, observe_adapter_batch, observe_configured, strategy,
     unknown,
@@ -39,22 +21,29 @@ use crate::freshness::models::Observer;
 use crate::freshness::models::StateRead;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
->>>>>>> origin/main
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::types::RecordId;
-<<<<<<< HEAD
-=======
 use sqlbuild_python_base::warehouse_access::main::is_warehouse_access_refused::is_warehouse_access_refused;
->>>>>>> origin/main
 use sqlbuild_python_front::state_rows::main::event_rows::age_policy::age_policy;
 use sqlbuild_python_front::state_rows::main::event_rows::equivalent::equivalent;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use crate::freshness::_helpers::observation::observation_record;
+use crate::freshness::_helpers::observation::observation_source;
+use crate::freshness::_helpers::observation::observe_adapter_batch;
+use crate::freshness::_helpers::observation::observe_configured;
+use crate::freshness::_helpers::observation::strategy;
+use crate::freshness::_helpers::observation::unknown;
+use crate::planner_warehouse::errors::WarehouseAccessRefusedError;
+use crate::planner_warehouse::models::PlannerReads;
+use crate::planner_warehouse::models::Read;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 const ADAPTER_STRATEGY: &str = "adapter";
+
 const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavailable";
 
 /// The message of an adapter, freshness observation or preview access error, if it is one.

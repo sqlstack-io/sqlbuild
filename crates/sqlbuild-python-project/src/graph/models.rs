@@ -6,15 +6,9 @@ use crate::graph::_helpers::project::project_graph::UniqueIdMap;
 use crate::graph::_helpers::project::project_graph::dependency_edges;
 use crate::graph::_helpers::project::project_graph::outcome;
 use crate::graph::_helpers::project::views::lineage_graph_views;
-<<<<<<< HEAD
-use crate::graph::_helpers::python_nodes::python_selection::allows_round_trips;
-use crate::graph::_helpers::python_nodes::python_selection::project_sources;
-use crate::graph::_helpers::python_nodes::python_selection::selection_graph;
-=======
 use crate::graph::_helpers::python_nodes::python_selection::project_sources;
 use crate::graph::_helpers::python_nodes::python_selection::selection_graph;
 use crate::graph::constants::LOADER_KIND;
->>>>>>> origin/main
 use crate::graph::main::project::project_graph::project_graph;
 use crate::graph::main::python_nodes::python_node_graph::python_node_graph;
 use pyo3::prelude::Bound;
@@ -54,12 +48,10 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use std::cell::RefCell;
-<<<<<<< HEAD
-=======
 use std::collections::BTreeMap;
->>>>>>> origin/main
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use crate::graph::_helpers::python_nodes::python_selection::allows_round_trips;
 
 /// One `CompiledObjectKey` per native pair, so shared keys convert once.
 #[derive(Debug)]
@@ -401,7 +393,7 @@ impl NativeProjectGraph {
 }
 
 /// A compiled project's sources and discovered Python nodes, which publication resolves selectors over.
-<<<<<<< HEAD
+<<<<<<< ours
 pub struct ProjectSelection {
     sources: Vec<(String, Option<String>)>,
     allow_warehouse_round_trips: bool,
@@ -409,7 +401,7 @@ pub struct ProjectSelection {
 #[derive(Debug)]
 pub struct ProjectSelection {
     pub(crate) sources: Vec<(String, Option<String>)>,
->>>>>>> origin/main
+>>>>>>> theirs
     pub nodes: PythonSelectionGraph,
 }
 
@@ -417,20 +409,13 @@ impl ProjectSelection {
     pub fn new(project: &Bound<'_, PyAny>, discovered_inputs: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             sources: project_sources(project)?,
-<<<<<<< HEAD
             allow_warehouse_round_trips: allows_round_trips(project)?,
-=======
->>>>>>> origin/main
             nodes: selection_graph(&python_node_graph(discovered_inputs)?)?,
         })
     }
 
     /// The `kind:name` keys `sqb build --select` runs for these selectors.
-<<<<<<< HEAD
-    pub(crate) fn run_keys(
-=======
     pub fn run_keys(
->>>>>>> origin/main
         &self,
         graph: &ProjectGraph,
         select: &[String],
@@ -440,11 +425,7 @@ impl ProjectSelection {
     }
 
     /// The `kind:name` keys these selectors name, Python checks included.
-<<<<<<< HEAD
-    pub(crate) fn node_keys(
-=======
     pub fn node_keys(
->>>>>>> origin/main
         &self,
         graph: &ProjectGraph,
         select: &[String],
@@ -468,10 +449,6 @@ impl ProjectSelection {
             .map(|node| format!("{}:{name}", node.kind))
     }
 
-<<<<<<< HEAD
-    /// The key a selected Python node's run reports under; a loader reports as the source it writes.
-    fn run_key(&self, name: &str) -> Option<String> {
-=======
     /// Each Python node's published key and the keys it reads: its upstream Python nodes and its SQL deps.
     pub fn node_deps(&self) -> Vec<(String, BTreeSet<String>)> {
         let upstream: BTreeMap<&str, &[String]> = self
@@ -500,7 +477,6 @@ impl ProjectSelection {
 
     /// The key a selected Python node's run reports under; a loader reports as the source it writes.
     pub(crate) fn run_key(&self, name: &str) -> Option<String> {
->>>>>>> origin/main
         let node = self
             .nodes
             .nodes
@@ -510,14 +486,11 @@ impl ProjectSelection {
         Some(python_run_key(&self.sources, (&node.kind, name)))
     }
 
-<<<<<<< HEAD
-=======
     /// The `source:` key a loader node publishes when it writes no declared source, so its chain's other loaders can read it.
     pub fn intermediate_source(&self, kind: &str, name: &str) -> Option<String> {
         (kind == LOADER_KIND && self.intermediate_loader(name)).then(|| format!("source:{name}"))
     }
 
->>>>>>> origin/main
     /// Whether a loader writes no declared source and so runs only as part of another loader's chain.
     pub fn intermediate_loader(&self, name: &str) -> bool {
         !self
@@ -526,17 +499,6 @@ impl ProjectSelection {
             .any(|(_, loader)| loader.as_deref() == Some(name))
     }
 
-<<<<<<< HEAD
-    fn sql<'graph>(&'graph self, graph: &'graph ProjectGraph) -> SqlSelectionGraph<'graph> {
-        SqlSelectionGraph {
-            graph,
-            sources: &self.sources,
-            allow_warehouse_round_trips: self.allow_warehouse_round_trips,
-        }
-    }
-
-    fn keys(
-=======
     pub(crate) fn sql<'graph>(
         &'graph self,
         graph: &'graph ProjectGraph,
@@ -544,11 +506,11 @@ impl ProjectSelection {
         SqlSelectionGraph {
             graph,
             sources: &self.sources,
+            allow_warehouse_round_trips: self.allow_warehouse_round_trips,
         }
     }
 
     pub(crate) fn keys(
->>>>>>> origin/main
         &self,
         selection: Result<RunSelection, SelectorError>,
     ) -> Result<BTreeSet<String>, String> {

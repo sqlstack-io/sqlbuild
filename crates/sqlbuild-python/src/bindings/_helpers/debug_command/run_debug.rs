@@ -1,7 +1,6 @@
 //! `sqb debug`: report the runtime, resolved configuration and connection health.
 
 use std::path::PathBuf;
-
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -21,26 +20,6 @@ use sqlbuild_core::debug_report::models::{
     ConnectionCheck, ConnectionValue, DebugConfigFiles, DebugProjectFacts, DebugProvider,
     DebugReport, DebugRuntime, WarehouseCheck,
 };
-
-<<<<<<< HEAD
-use crate::bindings::_helpers::cli::failure_cause::FailureCause;
-use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
-use crate::bindings::_helpers::command_runtime::connection::local_database_files;
-use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
-use crate::bindings::_helpers::command_runtime::runtime_errors::expected_resolution_error;
-use crate::bindings::_helpers::command_runtime::runtime_errors::resolution_message;
-use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
-use crate::bindings::_helpers::command_runtime::warehouses::CommandScope;
-use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
-use crate::bindings::_helpers::command_runtime::warehouses::apply_warehouse;
-use crate::bindings::_helpers::command_runtime::warehouses::command_scope;
-use crate::bindings::_helpers::command_runtime::warehouses::find_authored;
-use crate::bindings::_helpers::command_runtime::warehouses::resolve_warehouse;
-use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::boundary::main::keywords::keywords;
-=======
 use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
 use crate::bindings::_helpers::command_runtime::connection::{
     local_database_files, project_connection_config,
@@ -54,7 +33,6 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
 };
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
->>>>>>> origin/main
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
@@ -65,16 +43,26 @@ use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-<<<<<<< HEAD
-use sqlbuild_python_compile::compile_attachment::main::build_effective_target_namespace::build_effective_target_namespace;
-use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
-use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
-=======
 use sqlbuild_python_compile::compile_attachment::main::effective_target_namespace::effective_target_namespace;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::discovery::main::project::discover_configured_providers::discover_configured_providers;
->>>>>>> origin/main
 use sqlbuild_python_front::discovery::models::SecretPolicy;
+use crate::bindings::_helpers::cli::failure_cause::FailureCause;
+use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
+use crate::bindings::_helpers::command_runtime::connection::local_database_files;
+use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
+use crate::bindings::_helpers::command_runtime::runtime_errors::expected_resolution_error;
+use crate::bindings::_helpers::command_runtime::runtime_errors::resolution_message;
+use crate::bindings::_helpers::command_runtime::warehouses::CommandScope;
+use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
+use crate::bindings::_helpers::command_runtime::warehouses::apply_warehouse;
+use crate::bindings::_helpers::command_runtime::warehouses::command_scope;
+use crate::bindings::_helpers::command_runtime::warehouses::find_authored;
+use crate::bindings::_helpers::command_runtime::warehouses::resolve_warehouse;
+use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_compile::compile_attachment::main::build_effective_target_namespace::build_effective_target_namespace;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 
 const DEBUG_OPTIONS: (&[&str], &[&str]) = (
     &[],

@@ -48,12 +48,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
-<<<<<<< HEAD
-use std::sync::atomic::AtomicU32;
-=======
->>>>>>> origin/main
 use std::sync::atomic::Ordering;
 use uuid::Uuid;
+use std::sync::atomic::AtomicU32;
 
 /// A data-only publication; this object never contains adapters, connections or user callables.
 #[pyclass(frozen, module = "sqlbuild._native")]
@@ -122,7 +119,7 @@ impl NativeOrchestrationSnapshot {
 #[derive(Debug)]
 pub struct WorkerBuild {
     pub worker: Py<NativeOrchestrationWorker>,
-<<<<<<< HEAD
+<<<<<<< ours
     execution: RunExecution,
     completed: Mutex<BTreeMap<String, NodeOutcome>>,
     checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
@@ -130,7 +127,7 @@ pub struct WorkerBuild {
     pub(crate) execution: RunExecution,
     pub(crate) completed: Mutex<BTreeMap<String, NodeOutcome>>,
     pub(crate) checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
->>>>>>> origin/main
+>>>>>>> theirs
     /// The snapshot's audits and SQL tests, each with the node keys it checks.
     pub(crate) attached: BTreeMap<String, Vec<String>>,
     /// Each SQL test with every node a failure of it blocks in a build: its expected, assertion and reference models and the functions it checks.
@@ -148,13 +145,13 @@ pub struct WorkerBuild {
     /// Whether the command returned, having run every check it planned, rather than being refused or raising.
     pub(crate) returned: AtomicBool,
     /// Why the worker refused the run before executing anything, reported as the run's status reason.
-<<<<<<< HEAD
+<<<<<<< ours
     refusal: Mutex<Option<String>>,
     /// Error-severity audit failures the build let through, reported before the run finishes.
     ignored_audit_failures: AtomicU32,
 =======
     pub(crate) refusal: Mutex<Option<String>>,
->>>>>>> origin/main
+>>>>>>> theirs
 }
 
 impl WorkerBuild {

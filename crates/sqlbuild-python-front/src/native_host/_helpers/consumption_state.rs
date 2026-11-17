@@ -1,40 +1,19 @@
-<<<<<<< HEAD
-//! The consumption table's rows, SQL and locations, and the callbacks a recording build holds.
-
-=======
 //! The consumption table through the adapter, and the connection and callbacks a recording build holds.
 
 use crate::native_host::constants::ROWS_PER_STATEMENT;
 use crate::native_host::main::execute::execute;
->>>>>>> origin/main
 use crate::native_host::main::fixed_state_table_sql::fixed_state_table_sql;
 use crate::native_host::main::integer_literal::integer_literal;
 use crate::native_host::main::literal::literal;
 use crate::native_host::main::optional_text::optional_text;
 use crate::native_host::main::state_table_name::state_table_name;
-<<<<<<< HEAD
-=======
 use crate::native_host::models::Location;
->>>>>>> origin/main
 use chrono::{DateTime, NaiveDateTime, Utc};
-
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyInt, PyString};
 use sqlbuild_core::constants::CONSUMPTION_TABLE_NAME;
-<<<<<<< HEAD
-use sqlbuild_state::consumption::constants::{CONSUMPTION_COLUMN_TYPES, NULLABLE_COLUMNS};
-use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
-use sqlbuild_state::consumption::models::{
-    ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
-};
-
-use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;
-
-/// Execution IDs per `IN` list when reading executions back by ID.
-pub(crate) const EXECUTION_ID_BATCH: usize = 500;
-=======
 use sqlbuild_state::consumption::constants::{
     CONSUMPTION_COLUMN_TYPES, NULLABLE_COLUMNS, RECENT_EXECUTIONS,
 };
@@ -45,16 +24,17 @@ use sqlbuild_state::consumption::models::{
     ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
 };
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
-
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_state::consumption::constants::{CONSUMPTION_COLUMN_TYPES, NULLABLE_COLUMNS};
 
 /// Execution IDs per `IN` list when reading executions back by ID.
-const EXECUTION_ID_BATCH: usize = 500;
->>>>>>> origin/main
+pub(crate) const EXECUTION_ID_BATCH: usize = 500;
+
 /// Warehouse timestamp texts with a UTC offset, as drivers render aware values.
 const OFFSET_TIME_FORMATS: [&str; 2] = ["%Y-%m-%dT%H:%M:%S%.f%:z", "%Y-%m-%d %H:%M:%S%.f%:z"];
+
 /// Warehouse timestamp texts without an offset, which the consumption table stores as UTC.
 const NAIVE_TIME_FORMATS: [&str; 2] = ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M:%S%.f"];
 
@@ -62,8 +42,6 @@ pub(crate) fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()
 }
 
-<<<<<<< HEAD
-=======
 fn table_of(adapter: &Bound<'_, PyAny>, location: &Location) -> PyResult<Option<String>> {
     let py: Python<'_> = adapter.py();
     let database: Bound<'_, PyAny> = location
@@ -77,7 +55,6 @@ fn table_of(adapter: &Bound<'_, PyAny>, location: &Location) -> PyResult<Option<
     )
 }
 
->>>>>>> origin/main
 /// Create-if-missing DDL for the consumption table, with adapter-rendered column types.
 #[pyfunction]
 #[pyo3(signature = (*, database, schema, render_qualified_name, render_framework_type))]
@@ -116,8 +93,6 @@ pub(crate) fn build_consumption_prune_sql(
     .unwrap_or_default())
 }
 
-<<<<<<< HEAD
-=======
 /// Create the schema, table and indexes in `location`; `started` rows precede schema preparation.
 pub(crate) fn ensure_table(
     adapter: &Bound<'_, PyAny>,
@@ -210,7 +185,6 @@ pub(crate) fn read_executions(
     Ok(rows)
 }
 
->>>>>>> origin/main
 fn required_text(value: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(optional_text(value)?.unwrap_or_default())
 }
@@ -234,11 +208,7 @@ fn epoch_micros(value: &Bound<'_, PyAny>) -> PyResult<i64> {
     )))
 }
 
-<<<<<<< HEAD
 pub(crate) fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
-=======
-fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
->>>>>>> origin/main
     let cell = |index: usize| row.get_item(index);
     let input_kind: Option<String> = optional_text(&cell(10)?)?;
     let input: Option<ConsumedInput> = match input_kind {
@@ -292,15 +262,11 @@ pub(crate) fn state_literal(
     render_state_sql_literal(py, &value, declared_type, None)
 }
 
-<<<<<<< HEAD
 pub(crate) fn row_cells(
     py: Python<'_>,
     row: &ConsumptionAppend,
     recorded_at: &str,
 ) -> PyResult<Vec<String>> {
-=======
-fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyResult<Vec<String>> {
->>>>>>> origin/main
     let input = row.input.as_ref();
     Ok(vec![
         literal(py, Some(&row.execution_id))?,
@@ -319,8 +285,6 @@ fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyRe
         recorded_at.to_owned(),
     ])
 }
-<<<<<<< HEAD
-=======
 
 /// Append `rows` to `location`'s table, in statements no longer than every warehouse accepts.
 pub(crate) fn append(
@@ -352,4 +316,3 @@ pub(crate) fn append(
     }
     Ok(())
 }
->>>>>>> origin/main

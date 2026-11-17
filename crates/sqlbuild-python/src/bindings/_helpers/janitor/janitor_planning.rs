@@ -1,7 +1,6 @@
 //! The janitor cleanup plan: warehouse facts through adapter callbacks, decisions in Rust.
 
 use std::collections::HashSet;
-
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -13,8 +12,27 @@ use sqlbuild_analysis::janitor_planning::main::query_diff_artifact_name::query_d
 use sqlbuild_analysis::janitor_planning::main::query_diff_artifact_parts::query_diff_artifact_parts;
 use sqlbuild_analysis::review_command::constants::LEFTOVER_REVIEW_SCHEMA_AGE_DAYS;
 use sqlbuild_host::entries::models::ExecutorHost;
-
-<<<<<<< HEAD
+use crate::bindings::_helpers::janitor::janitor_classification::{
+    Candidate, Policy, Protection, SchemaClassification, classify_target_schemas, plan_archives,
+};
+use crate::bindings::_helpers::janitor::janitor_facts::{
+    Warehouse, WarehouseFacts, collect_target_schemas, direct_state_prune_candidates,
+    gather_warehouse_facts, query_diff_artifact_candidates,
+};
+use crate::bindings::_helpers::janitor::janitor_keys::{
+    Folded, Key, SchemaKey, archive_timestamp, days, dedupe_schema_keys, integer, now_utc, record,
+    sorted_schemas, timestamp_fields, tuple, union_exact,
+};
+use crate::bindings::_helpers::janitor::janitor_old_names::{
+    OldNamePlanning, pending_migration_origins, plan_old_name_views,
+};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_project::relation_naming::main::shared_error::shared_error;
 use crate::bindings::_helpers::janitor::janitor_classification::Candidate;
 use crate::bindings::_helpers::janitor::janitor_classification::Policy;
 use crate::bindings::_helpers::janitor::janitor_classification::Protection;
@@ -43,29 +61,6 @@ use crate::bindings::_helpers::janitor::janitor_keys::union_exact;
 use crate::bindings::_helpers::janitor::janitor_old_names::OldNamePlanning;
 use crate::bindings::_helpers::janitor::janitor_old_names::pending_migration_origins;
 use crate::bindings::_helpers::janitor::janitor_old_names::plan_old_name_views;
-=======
-use crate::bindings::_helpers::janitor::janitor_classification::{
-    Candidate, Policy, Protection, SchemaClassification, classify_target_schemas, plan_archives,
-};
-use crate::bindings::_helpers::janitor::janitor_facts::{
-    Warehouse, WarehouseFacts, collect_target_schemas, direct_state_prune_candidates,
-    gather_warehouse_facts, query_diff_artifact_candidates,
-};
-use crate::bindings::_helpers::janitor::janitor_keys::{
-    Folded, Key, SchemaKey, archive_timestamp, days, dedupe_schema_keys, integer, now_utc, record,
-    sorted_schemas, timestamp_fields, tuple, union_exact,
-};
-use crate::bindings::_helpers::janitor::janitor_old_names::{
-    OldNamePlanning, pending_migration_origins, plan_old_name_views,
-};
->>>>>>> origin/main
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::main::within::within;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
-use sqlbuild_python_project::relation_naming::main::shared_error::shared_error;
 
 const LIFECYCLE: ExecutorHost = ExecutorHost::OperationLifecycle;
 

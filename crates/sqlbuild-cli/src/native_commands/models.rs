@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-
 use chrono::{DateTime, Utc};
 use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
 use sqlbuild_orchestration::credentials::models::CredentialScope;
@@ -14,10 +13,13 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryPage, WarehouseStateLocation,
 };
 use uuid::Uuid;
-
 use crate::argv::models::Namespace;
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
 use crate::native_commands::types::LocationPublication;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
+    WarehouseStateLocation,
+};
 
 /// Privileged local operations require direct ownership of the control database.
 pub(crate) enum ControlAdmin {
@@ -54,15 +56,6 @@ pub(crate) enum NativeParse {
         namespace: Namespace,
         use_color: bool,
     },
-}
-
-/// What `sqb skills` installs.
-/// One turn of named work: the files it wrote, whether metadata should sync, and whether it claimed work.
-#[derive(Debug, Default)]
-pub(crate) struct LocationWorkTurn {
-    pub(crate) files: Vec<std::path::PathBuf>,
-    pub(crate) sync: bool,
-    pub(crate) claimed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,12 +154,13 @@ pub(crate) struct LocationServe {
     pub(crate) metadata_reconcile_seconds: u32,
     /// Seconds between safety syncs of an idle location; `0` turns them off.
     pub(crate) safety_sync_seconds: u64,
-<<<<<<< HEAD
+<<<<<<< ours
     /// A flag, the environment or the project set the interval, rather than the default.
     pub(crate) safety_sync_explicit: bool,
 =======
     /// `sqb dev` reads events on stdout and sends control lines on stdin.
     pub(crate) dev_events: bool,
+>>>>>>> theirs
 }
 
 /// What `sqb dev` last asked its location: the foreground warehouse verdict and how many recompiles.
@@ -175,7 +169,6 @@ pub(crate) struct DevControlState {
     /// `None` until `sqb dev` reports its foreground connection; outside `sqb dev`, always connected.
     pub(crate) warehouse: Option<bool>,
     pub(crate) recompiles: u64,
->>>>>>> origin/main
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -197,27 +190,6 @@ pub(crate) struct LocationCompileRequest {
     pub(crate) generation: i64,
     pub(crate) python_sources: Vec<PathStamp>,
     pub(crate) reply: tokio::sync::oneshot::Sender<Result<LocationLoad, String>>,
-}
-
-/// The runtime's reply to a generation: its publication, or the rule findings that failed its compile.
-#[derive(Debug, serde::Deserialize)]
-pub(crate) struct LocationLoad {
-    pub(crate) published: Option<LocationPublication>,
-    pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
-}
-
-/// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.
-#[derive(Debug)]
-pub(crate) struct LocationPlanRequest {
-    pub(crate) request: serde_json::Value,
-    pub(crate) reply: tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
-}
-
-/// Work for the task that owns the warm runtime interpreter.
-#[derive(Debug)]
-pub(crate) enum LocationRuntimeRequest {
-    Publish(LocationCompileRequest),
-    Plan(LocationPlanRequest),
 }
 
 /// Only its owner (the compiler task or one metadata synchronization) uses this interpreter's stdio.
@@ -293,56 +265,19 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) replan: bool,
 }
 
-/// Rows delivered and time taken by the current synchronization and its current table.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct SyncProgress {
-    pub(crate) sync_started: tokio::time::Instant,
-    pub(crate) scan_started: tokio::time::Instant,
-    pub(crate) sync_rows: u64,
-    pub(crate) scan_rows: u64,
-    /// The current table's change token showed it unchanged, so nothing was read.
-    pub(crate) scan_unchanged: bool,
-}
-
-impl SyncProgress {
-    pub(crate) fn new() -> Self {
-        let now = tokio::time::Instant::now();
-        Self {
-            sync_started: now,
-            scan_started: now,
-            sync_rows: 0,
-            scan_rows: 0,
-            scan_unchanged: false,
-        }
-    }
-}
-
 /// The metadata reader's answer to one read.
 #[derive(Debug)]
 pub(crate) enum MetadataReply {
     Page(WarehouseHistoryPage),
-<<<<<<< HEAD
+<<<<<<< ours
 =======
     /// The read failed and delivered nothing; never an empty table.
     Failed(WarehouseHistoryFailure),
->>>>>>> origin/main
+>>>>>>> theirs
     /// Another process holds the warehouse file; nothing was read.
     Busy,
     /// The read failed with this message, such as the warehouse's error.
     Failed(String),
-}
-
-/// Why a page was not read, with the detail printed to the location's log.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ReadFailure {
-    /// Another process holds the warehouse file; the sync waits, nothing failed.
-    Busy,
-    /// The metadata reader process did not start.
-    ReaderStart(String),
-    /// The reader could not connect, the read raised an error, or the reader broke off.
-    Read(String),
-    /// The reader did not answer within this many seconds.
-    TimedOut(u64),
 }
 
 /// A table's change token after a complete read, and what that read proves about the mirror.
@@ -501,4 +436,71 @@ pub(crate) enum LostStdout {
     Dropped,
     /// Raised by the write: an uncaught exception, with this last line and status 1.
     Raised(String),
+}
+
+/// What `sqb skills` installs.
+/// One turn of named work: the files it wrote, whether metadata should sync, and whether it claimed work.
+#[derive(Debug, Default)]
+pub(crate) struct LocationWorkTurn {
+    pub(crate) files: Vec<std::path::PathBuf>,
+    pub(crate) sync: bool,
+    pub(crate) claimed: bool,
+}
+
+/// The runtime's reply to a generation: its publication, or the rule findings that failed its compile.
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct LocationLoad {
+    pub(crate) published: Option<LocationPublication>,
+    pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
+}
+
+/// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.
+#[derive(Debug)]
+pub(crate) struct LocationPlanRequest {
+    pub(crate) request: serde_json::Value,
+    pub(crate) reply: tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
+}
+
+/// Work for the task that owns the warm runtime interpreter.
+#[derive(Debug)]
+pub(crate) enum LocationRuntimeRequest {
+    Publish(LocationCompileRequest),
+    Plan(LocationPlanRequest),
+}
+
+/// Rows delivered and time taken by the current synchronization and its current table.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SyncProgress {
+    pub(crate) sync_started: tokio::time::Instant,
+    pub(crate) scan_started: tokio::time::Instant,
+    pub(crate) sync_rows: u64,
+    pub(crate) scan_rows: u64,
+    /// The current table's change token showed it unchanged, so nothing was read.
+    pub(crate) scan_unchanged: bool,
+}
+
+impl SyncProgress {
+    pub(crate) fn new() -> Self {
+        let now = tokio::time::Instant::now();
+        Self {
+            sync_started: now,
+            scan_started: now,
+            sync_rows: 0,
+            scan_rows: 0,
+            scan_unchanged: false,
+        }
+    }
+}
+
+/// Why a page was not read, with the detail printed to the location's log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ReadFailure {
+    /// Another process holds the warehouse file; the sync waits, nothing failed.
+    Busy,
+    /// The metadata reader process did not start.
+    ReaderStart(String),
+    /// The reader could not connect, the read raised an error, or the reader broke off.
+    Read(String),
+    /// The reader did not answer within this many seconds.
+    TimedOut(u64),
 }

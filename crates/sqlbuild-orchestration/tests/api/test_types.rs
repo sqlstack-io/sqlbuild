@@ -8,6 +8,7 @@ use crate::warehouse_metadata::models::{
 use chrono::{DateTime, Utc};
 use futures_util::future::BoxFuture;
 use uuid::Uuid;
+use crate::warehouse_metadata::models::WarehouseHistoryKind;
 
 pub(crate) struct ApiContractTestCase {
     pub(crate) description: &'static str,
@@ -87,23 +88,6 @@ pub(crate) struct PersonLiveTestCase {
     pub(crate) expected_disabled_bootstrap: reqwest::StatusCode,
 }
 
-pub(crate) struct NodeStatesTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) backend: Backend,
-    pub(crate) expected_listed: usize,
-}
-
-pub(crate) struct ChangedBuildTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) backend: Backend,
-}
-
-pub(crate) struct PushedStatesTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) built: usize,
-    pub(crate) expected_pushed: Option<usize>,
-}
-
 pub(crate) struct ChangesTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -114,13 +98,6 @@ pub(crate) struct LocationHealthTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_observations: usize,
-}
-
-pub(crate) struct PoolCapHealthTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) caps: &'static [(&'static str, u32)],
-    /// Each warning as `(job_key, pool, amount, cap, message)`; empty when no pool_capped observation is expected.
-    pub(crate) expected_warnings: &'static [(&'static str, &'static str, u32, u32, &'static str)],
 }
 
 pub(crate) struct LocationWorkTestCase {
@@ -148,15 +125,6 @@ pub(crate) struct WarehouseMetadataTestCase {
     pub(crate) expected_observations: usize,
 }
 
-<<<<<<< HEAD
-pub(crate) struct StateHistoryRetentionTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) backend: Backend,
-    pub(crate) configured: Option<u16>,
-    pub(crate) expected_versions: u16,
-}
-
-=======
 pub(crate) struct MirrorConflictTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -183,7 +151,6 @@ pub(crate) type MirrorIngest =
         &'a MetadataBatch,
     ) -> BoxFuture<'a, Result<WarehouseSyncResponse, ControlError>>;
 
->>>>>>> origin/main
 pub(crate) struct PasswordApiTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -306,13 +273,6 @@ pub(crate) struct OlderNodeFinished {
     skipped_because_of: Option<String>,
 }
 
-pub(crate) struct PlanDiffTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) backend: Backend,
-    /// The diff of a model the document left out, as it reads back.
-    pub(crate) expected_detached_diff: &'static [&'static str],
-}
-
 pub(crate) struct PlanTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -341,6 +301,44 @@ pub(crate) struct ProvidersTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_jobs: Vec<&'static str>,
+}
+
+pub(crate) struct NodeStatesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_listed: usize,
+}
+
+pub(crate) struct ChangedBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+}
+
+pub(crate) struct PushedStatesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) built: usize,
+    pub(crate) expected_pushed: Option<usize>,
+}
+
+pub(crate) struct PoolCapHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) caps: &'static [(&'static str, u32)],
+    /// Each warning as `(job_key, pool, amount, cap, message)`; empty when no pool_capped observation is expected.
+    pub(crate) expected_warnings: &'static [(&'static str, &'static str, u32, u32, &'static str)],
+}
+
+pub(crate) struct StateHistoryRetentionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) configured: Option<u16>,
+    pub(crate) expected_versions: u16,
+}
+
+pub(crate) struct PlanDiffTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The diff of a model the document left out, as it reads back.
+    pub(crate) expected_detached_diff: &'static [&'static str],
 }
 
 pub(crate) struct IngestionTurnTestCase {

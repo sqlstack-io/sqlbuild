@@ -3,13 +3,15 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
 use crate::api::models::ControlClient;
 use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use crate::snapshots::models::SnapshotRetention;
+use crate::warehouse_metadata::models::{
+    StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
+};
 use crate::warehouse_metadata::models::{
     StateHistoryRetention, StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
 };
@@ -70,7 +72,7 @@ pub enum LocationHealth {
         failure: Option<WarehouseSyncFailure>,
         records_sent: u64,
         elapsed_millis: u64,
-<<<<<<< HEAD
+<<<<<<< ours
         /// Why a read failed, in closed terms; the location's log has the warehouse's message.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         read_failure: Option<WarehouseReadFailure>,
@@ -83,42 +85,15 @@ pub enum LocationHealth {
         /// On the report that completes a sync, when the next safety sync is due unless a run ends first; absent otherwise and from older locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         next_sync_at: Option<DateTime<Utc>>,
-    },
-}
-
-/// A job or group asking for more of a pool than this server's cap, so it runs alone in that pool.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PoolCapWarning {
-    pub job_key: String,
-    pub kind: crate::runs::models::RunKind,
-    pub pool: String,
-    pub amount: u32,
-    pub cap: u32,
-    /// Such as "job X takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool".
-    pub message: String,
-}
-
-/// When a location checks its warehouse connection on its own.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ConnectionCheckTrigger {
-    /// The first check after the location process starts and publishes.
-    Startup,
-    /// After the location published a later snapshot.
-    Publish,
-}
-
-/// Closed failure stages keep warehouse errors and credentials out of health observations.
 =======
         /// A failed read's warehouse error, redacted and bounded; absent otherwise.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error: Option<String>,
+>>>>>>> theirs
     },
 }
 
 /// The stage a warehouse sync failed at; only a failed read also reports its redacted error.
->>>>>>> origin/main
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WarehouseSyncFailure {
@@ -127,34 +102,6 @@ pub enum WarehouseSyncFailure {
     Delivery,
     /// Another process, such as a DuckDB build, holds the warehouse file; the sync waits for it.
     Busy,
-}
-
-/// How far one synchronization has got, so people see it running and when it completed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct WarehouseSyncProgress {
-    /// The reported kind's position in the synchronization, from 1.
-    pub position: u64,
-    /// Kinds the synchronization reads: 14 for each state schema.
-    pub kinds: u64,
-    /// Rows the synchronization has delivered, this report's included.
-    pub rows: u64,
-    /// Milliseconds since the synchronization began.
-    pub elapsed_millis: u64,
-    /// This report's page was the synchronization's last, so it has completed.
-    pub completed: bool,
-}
-
-/// What went wrong reading one page, without the warehouse's message, which may name hosts or users.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum WarehouseReadFailure {
-    /// The metadata reader process did not start.
-    ReaderStart {},
-    /// The reader could not connect to the warehouse, or the read raised an error.
-    ReadError {},
-    /// The reader did not answer within this many seconds.
-    TimedOut { seconds: u64 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -166,39 +113,11 @@ pub struct LocationHealthReport {
     pub health: LocationHealth,
 }
 
-/// How many records the server holds for one mirrored state table of a target.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct MirroredTotal {
-    pub table: WarehouseHistoryKind,
-    pub records: u64,
-}
-
 /// Narrows a location's health history to one target, so other targets' traffic cannot crowd it out.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LocationHealthQuery {
     pub target: Option<String>,
-}
-
-/// Configured rules that failed a location's load: how many findings, and the first of them.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct LocationRuleFailure {
-    pub finding_count: u64,
-    /// At most `MAX_REPORTED_RULE_FINDINGS`, in the rules' order.
-    pub findings: Vec<LocationRuleFinding>,
-}
-
-/// One rule finding as `sqb compile` prints it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct LocationRuleFinding {
-    pub code: String,
-    pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub line: Option<u64>,
 }
 
 /// Receipt time belongs to the server; consumers derive freshness rather than storing availability.
@@ -316,127 +235,6 @@ pub struct LocationWorkRequest {
 pub struct PlanRequest {
     pub request_id: Uuid,
     pub command: Vec<String>,
-}
-
-/// A plan section, read a page at a time beside its summary, in the order the plan reads.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum PlanRowSection {
-    /// Built models the plan rebuilds in full.
-    FullRefresh,
-    QueryChanged,
-    FunctionChanged,
-    ConfigChanged,
-    SchemaChanged,
-    /// Built models with no recorded build.
-    FirstRun,
-    Renamed,
-    /// Built models with no change of their own.
-    RoutineModels,
-    Migrations,
-    ColumnMigrations,
-    TableTypeConversions,
-    Retention,
-    LoaderReloads,
-    LoaderLoads,
-    SourceReloads,
-    SourceLoads,
-    /// Functions whose definition changed.
-    ChangedFunctions,
-    /// Functions without a change.
-    Functions,
-    /// Seeds the run loads or reports on.
-    Seeds,
-    PythonNodes,
-    /// `--changed` nodes held back for a job's own run.
-    HeldBack,
-    /// `--changed` nodes that run only when something they read changed.
-    Unchanged,
-    Warnings,
-}
-
-/// One page of a section's rows whose name contains `name`, ignoring case; `offset` defaults to 0 and `limit` to the cap.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct PlanRowsQuery {
-    pub section: PlanRowSection,
-    pub offset: Option<usize>,
-    pub limit: Option<usize>,
-    pub name: Option<String>,
-}
-
-/// A page of a plan section with the `--changed` runs, warnings and cursor window starts of its models.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PlanRows {
-    /// Rows matching the name filter; the section's size without one.
-    pub total: usize,
-    /// Rows in the section, filter or not.
-    pub section_total: usize,
-    /// Model rows carry `diff_stats` in place of their diff text, which `plans/{request_id}/diff` serves.
-    #[schema(value_type = Vec<Object>)]
-    pub rows: Vec<serde_json::Value>,
-    #[schema(value_type = Vec<Object>)]
-    pub runs: Vec<serde_json::Value>,
-    #[schema(value_type = Vec<Object>)]
-    pub warnings: Vec<serde_json::Value>,
-    pub cursor_window_starts: std::collections::BTreeMap<String, String>,
-}
-
-/// One planned model's diff text, as `sqb plan` prints it.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PlanModelDiff {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub query_diff: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub config_diff: Option<Vec<String>>,
-}
-
-/// The model whose diff to read.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct PlanDiffQuery {
-    pub model: String,
-}
-
-/// A planned model's diff text, from the plan document or, where the document left it out, apart from it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PlanDiffRead {
-    pub model: String,
-    #[serde(flatten)]
-    pub diff: PlanModelDiff,
-}
-
-/// A plan request's state with its summary: changed models in full, large sections as counts to page.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PlanSummaryRead {
-    pub expires_at: DateTime<Utc>,
-    /// `None` until the location answers; a plan's document is its summary.
-    pub outcome: Option<LocationWorkOutcome>,
-    /// How long the location took to plan, step by step; `None` for plans recorded without timings.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timings: Option<PlanTimings>,
-}
-
-/// How long one plan took: its steps in pipeline order with `Other` last, and what it read.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PlanTimings {
-    pub total_seconds: f64,
-    pub steps: Vec<PlanTimingStep>,
-    /// `synced_state` for a preview over the synced warehouse state; `live` when it read the warehouse.
-    pub planned_from: String,
-}
-
-/// One planning step and its wall time.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PlanTimingStep {
-    pub name: String,
-    pub seconds: f64,
 }
 
 /// A person asks a location for one named read-only operation, such as a connection test.
@@ -769,4 +567,204 @@ pub(crate) struct StoredInstallation {
     pub(crate) installed_at: DateTime<Utc>,
     pub(crate) schema_checksum: String,
     pub(crate) schema_applied_at: DateTime<Utc>,
+}
+
+/// A job or group asking for more of a pool than this server's cap, so it runs alone in that pool.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PoolCapWarning {
+    pub job_key: String,
+    pub kind: crate::runs::models::RunKind,
+    pub pool: String,
+    pub amount: u32,
+    pub cap: u32,
+    /// Such as "job X takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool".
+    pub message: String,
+}
+
+/// When a location checks its warehouse connection on its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionCheckTrigger {
+    /// The first check after the location process starts and publishes.
+    Startup,
+    /// After the location published a later snapshot.
+    Publish,
+}
+
+/// How far one synchronization has got, so people see it running and when it completed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseSyncProgress {
+    /// The reported kind's position in the synchronization, from 1.
+    pub position: u64,
+    /// Kinds the synchronization reads: 14 for each state schema.
+    pub kinds: u64,
+    /// Rows the synchronization has delivered, this report's included.
+    pub rows: u64,
+    /// Milliseconds since the synchronization began.
+    pub elapsed_millis: u64,
+    /// This report's page was the synchronization's last, so it has completed.
+    pub completed: bool,
+}
+
+/// What went wrong reading one page, without the warehouse's message, which may name hosts or users.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WarehouseReadFailure {
+    /// The metadata reader process did not start.
+    ReaderStart {},
+    /// The reader could not connect to the warehouse, or the read raised an error.
+    ReadError {},
+    /// The reader did not answer within this many seconds.
+    TimedOut { seconds: u64 },
+}
+
+/// How many records the server holds for one mirrored state table of a target.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MirroredTotal {
+    pub table: WarehouseHistoryKind,
+    pub records: u64,
+}
+
+/// Configured rules that failed a location's load: how many findings, and the first of them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationRuleFailure {
+    pub finding_count: u64,
+    /// At most `MAX_REPORTED_RULE_FINDINGS`, in the rules' order.
+    pub findings: Vec<LocationRuleFinding>,
+}
+
+/// One rule finding as `sqb compile` prints it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationRuleFinding {
+    pub code: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<u64>,
+}
+
+/// A plan section, read a page at a time beside its summary, in the order the plan reads.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanRowSection {
+    /// Built models the plan rebuilds in full.
+    FullRefresh,
+    QueryChanged,
+    FunctionChanged,
+    ConfigChanged,
+    SchemaChanged,
+    /// Built models with no recorded build.
+    FirstRun,
+    Renamed,
+    /// Built models with no change of their own.
+    RoutineModels,
+    Migrations,
+    ColumnMigrations,
+    TableTypeConversions,
+    Retention,
+    LoaderReloads,
+    LoaderLoads,
+    SourceReloads,
+    SourceLoads,
+    /// Functions whose definition changed.
+    ChangedFunctions,
+    /// Functions without a change.
+    Functions,
+    /// Seeds the run loads or reports on.
+    Seeds,
+    PythonNodes,
+    /// `--changed` nodes held back for a job's own run.
+    HeldBack,
+    /// `--changed` nodes that run only when something they read changed.
+    Unchanged,
+    Warnings,
+}
+
+/// One page of a section's rows whose name contains `name`, ignoring case; `offset` defaults to 0 and `limit` to the cap.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanRowsQuery {
+    pub section: PlanRowSection,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
+    pub name: Option<String>,
+}
+
+/// A page of a plan section with the `--changed` runs, warnings and cursor window starts of its models.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanRows {
+    /// Rows matching the name filter; the section's size without one.
+    pub total: usize,
+    /// Rows in the section, filter or not.
+    pub section_total: usize,
+    /// Model rows carry `diff_stats` in place of their diff text, which `plans/{request_id}/diff` serves.
+    #[schema(value_type = Vec<Object>)]
+    pub rows: Vec<serde_json::Value>,
+    #[schema(value_type = Vec<Object>)]
+    pub runs: Vec<serde_json::Value>,
+    #[schema(value_type = Vec<Object>)]
+    pub warnings: Vec<serde_json::Value>,
+    pub cursor_window_starts: std::collections::BTreeMap<String, String>,
+}
+
+/// One planned model's diff text, as `sqb plan` prints it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanModelDiff {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_diff: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_diff: Option<Vec<String>>,
+}
+
+/// The model whose diff to read.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanDiffQuery {
+    pub model: String,
+}
+
+/// A planned model's diff text, from the plan document or, where the document left it out, apart from it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanDiffRead {
+    pub model: String,
+    #[serde(flatten)]
+    pub diff: PlanModelDiff,
+}
+
+/// A plan request's state with its summary: changed models in full, large sections as counts to page.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanSummaryRead {
+    pub expires_at: DateTime<Utc>,
+    /// `None` until the location answers; a plan's document is its summary.
+    pub outcome: Option<LocationWorkOutcome>,
+    /// How long the location took to plan, step by step; `None` for plans recorded without timings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timings: Option<PlanTimings>,
+}
+
+/// How long one plan took: its steps in pipeline order with `Other` last, and what it read.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanTimings {
+    pub total_seconds: f64,
+    pub steps: Vec<PlanTimingStep>,
+    /// `synced_state` for a preview over the synced warehouse state; `live` when it read the warehouse.
+    pub planned_from: String,
+}
+
+/// One planning step and its wall time.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanTimingStep {
+    pub name: String,
+    pub seconds: f64,
 }

@@ -1,32 +1,16 @@
 //! Observe the current freshness of selected sources and compare it with previous state.
 
 use crate::freshness::models::PreviousState;
-<<<<<<< HEAD
-use crate::live_reads::models::LiveReads;
-use sqlbuild_python_base::native_host::models::Dialect;
-=======
->>>>>>> origin/main
 use std::collections::{HashMap, HashSet};
-
 use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString};
 use sqlbuild_core::freshness_text::main::freshness_json::freshness_json;
-
 use sqlbuild_host::entries::models::ExecutorHost;
-
-<<<<<<< HEAD
-use crate::freshness::_helpers::observation::observation_record;
-use crate::freshness::_helpers::observation::observation_source;
-use crate::freshness::_helpers::observation::observe_adapter_batch;
-use crate::freshness::_helpers::observation::observe_configured;
-use crate::freshness::_helpers::observation::strategy;
-=======
 use crate::freshness::_helpers::observation::{
     observation_record, observation_source, observe_adapter_batch, observe_configured, strategy,
 };
->>>>>>> origin/main
 use crate::freshness::models::Observer;
 use sqlbuild_core::freshness_text::main::freshness_status::freshness_status;
 use sqlbuild_core::freshness_text::models::{
@@ -38,12 +22,24 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::state_rows::main::event_rows::age_policy::age_policy;
 use sqlbuild_python_front::state_rows::main::event_rows::equivalent::equivalent;
+use crate::live_reads::models::LiveReads;
+use sqlbuild_python_base::native_host::models::Dialect;
+use crate::freshness::_helpers::observation::observation_record;
+use crate::freshness::_helpers::observation::observation_source;
+use crate::freshness::_helpers::observation::observe_adapter_batch;
+use crate::freshness::_helpers::observation::observe_configured;
+use crate::freshness::_helpers::observation::strategy;
 
 const ADAPTER_STRATEGY: &str = "adapter";
+
 const UNAVAILABLE_REASON: &str = "unavailable";
+
 const OBSERVATION_RUN_ID: &str = "freshness";
+
 const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavailable";
+
 const MISSING_STATE_MESSAGE: &str = "previous source freshness state missing";
+
 const NOT_RETURNED_MESSAGE: &str = "freshness metadata was not returned";
 
 fn optional_text(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {
