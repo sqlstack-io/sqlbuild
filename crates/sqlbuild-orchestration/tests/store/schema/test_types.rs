@@ -34,3 +34,22 @@ pub(crate) struct StoreUpgradeTestCase {
     pub(crate) list_indexes: &'static str,
     pub(crate) expected_indexes: Vec<&'static str>,
 }
+
+pub(crate) struct BaselineUpgradeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) baseline_checksum: &'static str,
+}
+
+pub(crate) struct MigrationRefusalTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) tamper: &'static str,
+    pub(crate) expected_fragments: Vec<&'static str>,
+}
+
+pub(crate) struct StoreMigrationPlanTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) baseline_checksum: &'static str,
+}

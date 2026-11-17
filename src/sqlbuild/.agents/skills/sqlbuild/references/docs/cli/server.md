@@ -177,9 +177,35 @@ sqlite3 control.sqlite3 ".backup '/backups/control.sqlite3'"
 
 ## Upgrade
 
-Upgrade the server first, then the locations and workers that connect to it. Don't downgrade the
-server after a location or worker has connected from a newer release; the server can't read what
-they wrote.
+Upgrade the server first, then the locations and workers that connect to it. On start, the server
+migrates its control database to the schema of its release in one transaction, keeping people,
+roles, tokens, triggers and run history. Back up the control database before you upgrade (see
+[Back up the control database](#back-up-the-control-database)).
+
+To see what an upgrade changes before you start the server, run the new release with `--dry-run`:
+
+```bash
+sqb server migrate --dry-run
+```
+
+```text
+The control store would migrate from schema version 1 to 2:
+  0002_add_skipped_runs
+```
+
+`sqb server migrate` without `--dry-run` applies the migrations and exits. It takes the same
+`--database-env` and `--config` options as `sqb server`, given before `migrate`.
+
+The server refuses a control database it can't migrate and leaves it unchanged:
+
+| Control database | Fix |
+| --- | --- |
+| Written by a newer release | Run the release that last opened it, or a later one. |
+| Older than the oldest schema this release migrates | Open it once with an earlier release that still migrates it, then with this one. Or start a new, empty store with the command in the message, which discards its history. |
+| Same schema version but a different schema, as from a development build | Start a new, empty store with the command in the message. |
+
+Don't downgrade the server after a location or worker has connected from a newer release; the
+server can't read what they wrote.
 
 | Newer than the server | What happens | Fix |
 | --- | --- | --- |

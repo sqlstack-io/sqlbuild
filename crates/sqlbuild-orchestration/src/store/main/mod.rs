@@ -9,6 +9,7 @@ pub mod list_recall_invocations;
 pub(crate) mod listen_changes;
 pub mod migrate_store;
 pub mod open_store;
+pub mod plan_store_migration;
 pub(crate) mod query;
 pub(crate) mod query_records;
 pub mod read_recall_view;

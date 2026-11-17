@@ -7,6 +7,7 @@ use crate::native_commands::_helpers::decision::{flag, text};
 use crate::native_commands::_helpers::execution::run_control_action;
 use crate::native_commands::_helpers::terminal::{finish_lost_stdout, write_output};
 use crate::native_commands::constants::{ADMIN_COMMAND, SCHEDULER_COMMAND, SERVER_COMMAND};
+use crate::native_commands::main::_run_store_migration::run_store_migration;
 
 pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
     let command = text(namespace, "command")?;
@@ -45,6 +46,9 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
             return Some(1);
         }
     };
+    if text(namespace, "server_command").as_deref() == Some("migrate") {
+        return Some(run_store_migration(namespace, &runtime));
+    }
     let admin = command == ADMIN_COMMAND;
     let role = if admin { "administration" } else { "service" };
     let result = runtime.block_on(run_control_action(namespace, &command));
