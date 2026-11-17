@@ -1655,6 +1655,11 @@ rule = "FFT104"
 path = "tests/integration/src/sqlbuild/compiler/compiled_project/publication/login/helpers.py"
 reason = "The disposable HTTPS gateway and OIDC provider dispatch real HTTP protocol messages and authentication transports; assertions in the parametrized installed journey remain branch-free."
 
+[[targets.python.rule_exceptions]]
+rule = "FFT104"
+path = "tests/unit/src/sqlbuild/rule_engine/_helpers/host/interrupts/helpers.py"
+reason = "The interrupter thread polls for the event that starts the interrupt and must not interrupt once its block has ended; the tests using it remain branch-free."
+
 [targets.rust]
 analyzer = "rust"
 roots = ["crates"]

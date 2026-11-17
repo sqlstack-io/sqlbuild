@@ -26,6 +26,8 @@ EMITTED_TAIL: bytes = b"after the warning\n"
 MEBIBYTE: int = 1024 * 1024
 HANG_SECONDS: int = 600
 HANG_DUMP_GRACE_SECONDS: int = 30
+# Only a hang takes this long: a signalled build stops within a second or two.
+STOP_HANG_SECONDS: int = 120
 EMPTY_RESULT: bytes = b'{"rows": []}'
 NUMBERED_LINE: re.Pattern[bytes] = re.compile(rb"^(\d+) std(?:out|err)$", re.MULTILINE)
 PROJECT_TOML: str = (
@@ -61,6 +63,7 @@ EMIT_TASK: str = (
     f"    sys.stdout.write({EMITTED_TAIL.decode()!r})\n"
     "    sys.stdout.flush()\n"
     '    time.sleep(float(os.environ.get("ORDERS_TASK_SLEEP_SECONDS", "0")))\n'
+    '    sys.stdout.write(os.environ.get("ORDERS_TASK_AFTER_SLEEP", ""))\n'
     '    _write_concurrently(int(os.environ.get("ORDERS_TASK_THREAD_LINES", "0")))\n'
     '    sys.stdout.write("y" * int(os.environ.get("ORDERS_TASK_STDOUT_BYTES", "0")))\n'
     "    sys.stdout.flush()\n"
@@ -118,7 +121,7 @@ def environment(**overrides: str) -> dict[str, str]:
 def run(project_dir: Path, *args: str, **env: str) -> subprocess.CompletedProcess[bytes]:
     """Run the Python CLI once in the project and capture exact streams, or fail with its stacks."""
 
-    process: subprocess.Popen[bytes] = start(project_dir, *args, **env)
+    process: subprocess.Popen[bytes] = start(project_dir, *args, interrupts=signal.SIG_DFL, **env)
     try:
         stdout, stderr = process.communicate(timeout=HANG_SECONDS)
     except subprocess.TimeoutExpired:
@@ -142,8 +145,15 @@ def hang_dump(process: subprocess.Popen[bytes]) -> str:
     return stderr.decode(errors="replace")
 
 
-def start(project_dir: Path, *args: str, **env: str) -> subprocess.Popen[bytes]:
-    """Start the Python CLI in its own process group."""
+def start(
+    project_dir: Path,
+    *args: str,
+    interrupts: signal.Handlers = signal.SIG_DFL,
+    **env: str,
+) -> subprocess.Popen[bytes]:
+    """Start the Python CLI in its own process group with SIGINT set to `interrupts`.
+
+    The default gives the CLI Ctrl-C handling even when this runner ignores SIGINT."""
 
     return subprocess.Popen(
         [str(PYTHON_CLI), *args],
@@ -152,6 +162,7 @@ def start(project_dir: Path, *args: str, **env: str) -> subprocess.Popen[bytes]:
         stderr=subprocess.PIPE,
         env=environment(**env),
         start_new_session=True,
+        preexec_fn=lambda: signal.signal(signal.SIGINT, interrupts),
     )
 
 
@@ -251,36 +262,60 @@ def write_slow_import_sink(project_dir: Path) -> Path:
     sink: Path = project_dir / "sinks" / "slow_import.py"
     sink.parent.mkdir(parents=True, exist_ok=True)
     _ = sink.write_text(
-        "import os\nimport time\n\n"
-        "time.sleep(float(os.environ.get('ORDERS_IMPORT_SECONDS', '0')))\n",
+        "import os\nimport sys\nimport time\n\n"
+        "time.sleep(float(os.environ.get('ORDERS_IMPORT_SECONDS', '0')))\n"
+        "sys.stdout.write(os.environ.get('ORDERS_IMPORT_AFTER_SLEEP', ''))\n",
         encoding="utf-8",
     )
     return project_dir
 
 
 def terminated_build(
-    project_dir: Path, *, wait_sql: str, **env: str
-) -> tuple[subprocess.CompletedProcess[bytes], float]:
-    """A build sent SIGTERM, as an orchestrator stops it, once `wait_sql` returns a row, and the
-    seconds it took to stop."""
+    project_dir: Path,
+    *,
+    wait_sql: str,
+    **env: str,
+) -> subprocess.CompletedProcess[bytes]:
+    """A build sent SIGTERM, as an orchestrator stops it, once `wait_sql` returns a row."""
 
     process: subprocess.Popen[bytes] = start(project_dir, "build", **env)
     try:
         _ = wait_for(wait_sql, project_dir, timeout=120)
         process.send_signal(signal.SIGTERM)
-        sent: float = time.monotonic()
-        stdout, stderr = process.communicate(timeout=60)
+        stdout, stderr = process.communicate(timeout=STOP_HANG_SECONDS)
     except subprocess.TimeoutExpired:
-        raise AssertionError(f"a terminated build kept running:\n{hang_dump(process)}") from None
-    completed: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
-        process.args, process.returncode, stdout, stderr
+        raise AssertionError(f"a terminated build hung:\n{hang_dump(process)}") from None
+    return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+
+
+def main_thread_state(pid: int) -> tuple[str, str, str]:
+    """The scheduler state and user and system CPU ticks of the process's main thread."""
+
+    fields: list[str] = (
+        Path(f"/proc/{pid}/task/{pid}/stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()
     )
-    return completed, time.monotonic() - sent
+    return fields[0], fields[11], fields[12]
 
 
-def terminated_while_closing(project_dir: Path) -> tuple[subprocess.CompletedProcess[bytes], float]:
-    """A build sent SIGTERM while it waits for a locked Recall store at exit, and the seconds it
-    took to stop."""
+def wait_until_blocked(pid: int, *, samples: int = 5) -> None:
+    """Wait until the main thread has slept without using CPU for `samples` polls in a row.
+
+    A thread waiting for the CPU reports `R`, so load does not pass for blocked."""
+
+    seen: list[tuple[str, str, str]] = [main_thread_state(pid)]
+    deadline: float = time.monotonic() + STOP_HANG_SECONDS
+    while (seen[-samples:] != [seen[-1]] * samples or seen[-1][0] != "S") and (
+        time.monotonic() < deadline
+    ):
+        time.sleep(0.1)
+        seen.append(main_thread_state(pid))
+    assert seen[-samples:] == [seen[-1]] * samples and seen[-1][0] == "S", (
+        f"the build's main thread never blocked, so it hung: {seen[-samples:]}"
+    )
+
+
+def terminated_while_closing(project_dir: Path) -> subprocess.CompletedProcess[bytes]:
+    """A build sent SIGTERM while it waits for a locked Recall store at exit."""
 
     with held_store_lock(project_dir):
         process: subprocess.Popen[bytes] = start(project_dir, "build", PYTHONUNBUFFERED="1")
@@ -288,36 +323,32 @@ def terminated_while_closing(project_dir: Path) -> tuple[subprocess.CompletedPro
         printed: bytes = b""
         while b"Completed" not in printed and process.poll() is None:
             printed += process.stdout.readline()
-        time.sleep(1)
+        wait_until_blocked(process.pid)
         process.send_signal(signal.SIGTERM)
-        sent: float = time.monotonic()
         try:
-            stdout, stderr = process.communicate(timeout=60)
+            stdout, stderr = process.communicate(timeout=STOP_HANG_SECONDS)
         except subprocess.TimeoutExpired:
-            raise AssertionError(f"a closing build kept running:\n{hang_dump(process)}") from None
-    completed: subprocess.CompletedProcess[bytes] = subprocess.CompletedProcess(
-        process.args, process.returncode, printed + stdout, stderr
+            raise AssertionError(f"a closing build hung:\n{hang_dump(process)}") from None
+    return subprocess.CompletedProcess(process.args, process.returncode, printed + stdout, stderr)
+
+
+def interrupted_build(project_dir: Path, **env: str) -> int | None:
+    """Exit code of a build sent SIGINT once its task has printed; `None` when it hung."""
+
+    process: subprocess.Popen[bytes] = start(
+        project_dir, "build", interrupts=signal.SIG_DFL, PYTHONUNBUFFERED="1", **env
     )
-    return completed, time.monotonic() - sent
-
-
-def interrupted_build(project_dir: Path, **env: str) -> tuple[int | None, float]:
-    """Exit code of a build sent SIGINT after its first logged event, and seconds to stop."""
-
-    log: Path = project_dir / "events.log"
-    process: subprocess.Popen[bytes] = start(project_dir, "build", **env)
     try:
-        deadline: float = time.monotonic() + 120
-        while not log.exists() and time.monotonic() < deadline:
-            time.sleep(0.1)
-        time.sleep(1)
-        interrupted: float = time.monotonic()
+        assert process.stdout is not None
+        printed: bytes = b""
+        while EMITTED_TAIL not in printed and process.poll() is None:
+            printed += process.stdout.readline()
         os.killpg(process.pid, signal.SIGINT)
         try:
-            _ = process.communicate(timeout=30)
+            _ = process.communicate(timeout=STOP_HANG_SECONDS)
         except subprocess.TimeoutExpired:
-            return None, time.monotonic() - interrupted
-        return process.returncode, time.monotonic() - interrupted
+            return None
+        return process.returncode
     finally:
         with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)

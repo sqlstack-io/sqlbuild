@@ -199,6 +199,14 @@ class SlowReplacementTestCase:
 
 
 @dataclass(frozen=True)
+class InterruptedSinkTestCase:
+    description: str
+    shutdown_seconds: float
+    sink_sleep_seconds: str
+    expected_exit_code: int
+
+
+@dataclass(frozen=True)
 class ThirdPartyLogTestCase:
     description: str
     build_arguments: tuple[str, ...]
@@ -369,6 +377,7 @@ class TerminatedCommandTestCase:
     environment: dict[str, str]
     wait_sql: str
     expected_output: bytes
+    unfinished_output: bytes
 
 
 @dataclass(frozen=True)

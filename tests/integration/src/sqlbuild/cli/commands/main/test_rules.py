@@ -53,13 +53,16 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     child_processes,
     compile_finding_keys,
     compile_findings,
-    interrupt_main_after,
     observe_hosts,
     write_custom_host_project,
     write_named_selector_project,
     write_project_files,
     write_project_scratch_rules,
     write_python_rules_project,
+)
+from tests.unit.src.sqlbuild.rule_engine._helpers.host.interrupts.helpers import (
+    default_interrupt_handling,
+    interrupt_when,
 )
 
 _CACHE_RULES_TOML: str = (
@@ -1388,8 +1391,7 @@ def test_given_failing_custom_rule_on_split_hosts_when_compiling_then_one_host_f
             description="busy split hosts stop after an interrupt",
             model_count=45,
             hosts=3,
-            interrupt_after_seconds=1.5,
-            expected_max_seconds=12.0,
+            expected_host_launches=3,
         ),
     ],
     ids=lambda case: case.description,
@@ -1399,26 +1401,34 @@ def test_given_busy_split_hosts_when_compile_is_interrupted_then_hosts_stop_and_
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    project_dir: Path = tmp_path / "orders"
+    project_dir.mkdir()
+    started: Path = tmp_path / "started"
+    started.mkdir()
     write_custom_host_project(
-        project_dir=tmp_path,
+        project_dir=project_dir,
         model_count=test_case.model_count,
-        rule_body="total = 0\nfor index in range(10_000_000):\n    total += index\nreturn []",
+        rule_body=(
+            "from pathlib import Path\n"
+            f"(Path({str(started)!r}) / model.name).mkdir()\n"
+            "total = 0\nfor index in range(10_000_000):\n    total += index\nreturn []"
+        ),
     )
     children_before: frozenset[int] = child_processes()
-    hosts: CustomHostObserver = observe_hosts(
-        monkeypatch=monkeypatch,
-        cores=test_case.hosts,
-        publish_inputs=interrupt_main_after(test_case.interrupt_after_seconds),
-    )
-    started: float = time.monotonic()
+    hosts: CustomHostObserver = observe_hosts(monkeypatch=monkeypatch, cores=test_case.hosts)
 
-    with pytest.raises(KeyboardInterrupt):
-        _ = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
+    with (
+        default_interrupt_handling(),
+        interrupt_when(lambda: len(tuple(started.iterdir())) >= test_case.hosts) as sent,
+        pytest.raises(KeyboardInterrupt),
+    ):
+        _ = main(["--project-dir", str(project_dir), "compile", "--json", "--no-cache"])
 
-    assert time.monotonic() - started < test_case.expected_max_seconds
-    assert len(hosts.launches()) == test_case.hosts
+    assert sent.is_set()
+    assert len(hosts.launches()) == test_case.expected_host_launches
+    assert len(tuple(started.iterdir())) < test_case.model_count
     assert child_processes() <= children_before
-    assert not tuple((tmp_path / "target" / "rules-cache" / "host-inputs").iterdir())
+    assert not tuple((project_dir / "target" / "rules-cache" / "host-inputs").iterdir())
 
 
 @pytest.mark.parametrize(
