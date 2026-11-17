@@ -1682,7 +1682,7 @@ class WarehouseRoundTripE2ETestCase:
 
 @dataclass(frozen=True)
 class ChangedRoundTripE2ETestCase:
-    """A second build of a round trip, with `build_flags`, after changing `orders` and maybe the task."""
+    """A second round-trip build with `build_flags`, after changing `orders` and maybe the task."""
 
     description: str
     orders_sql: str
