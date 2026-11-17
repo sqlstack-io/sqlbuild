@@ -42,18 +42,18 @@ use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
 use crate::bindings::_helpers::diff_report::output::render_diff_error_json;
 use sqlbuild_python_base::native_host::models::InterruptHandler;
 use sqlbuild_python_base::native_host::main::interrupted::interrupted;
-use crate::bindings::_helpers::output_capture::records::invocation_context;
+use sqlbuild_python_output::output_capture::main::invocation_context::invocation_context;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
-use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::recall::constants::JSON_FORMAT;
-use crate::bindings::_helpers::recall::constants::RECALL_SETTINGS_CODE;
-use crate::bindings::_helpers::recall::events::escaped_text;
-use crate::bindings::_helpers::recall::session::InvocationRecall;
-use crate::bindings::_helpers::recall::session::effective_selection;
-use crate::bindings::_helpers::recall::session::finish_invocation_recall;
-use crate::bindings::_helpers::recall::session::start_invocation_recall;
-use crate::bindings::_helpers::recall::sinks::RecallLifecycleSink;
-use crate::bindings::_helpers::recall::sinks::publish_lifecycle_event;
+use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
+use sqlbuild_python_output::recall::constants::JSON_FORMAT;
+use sqlbuild_python_output::recall::constants::RECALL_SETTINGS_CODE;
+use sqlbuild_python_output::recall::main::escaped_text::escaped_text;
+use sqlbuild_python_output::recall::models::InvocationRecall;
+use sqlbuild_python_output::recall::main::effective_selection::effective_selection;
+use sqlbuild_python_output::recall::main::finish_invocation_recall::finish_invocation_recall;
+use sqlbuild_python_output::recall::main::start_invocation_recall::start_invocation_recall;
+use sqlbuild_python_output::recall::models::RecallLifecycleSink;
+use sqlbuild_python_output::recall::main::publish_lifecycle_event::publish_lifecycle_event;
 use sqlbuild_python_compile::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use crate::bindings::_helpers::workspace_commands::commands::maintain_sqlbuild_skills;
 use sqlbuild_cli::launcher::constants::LAUNCH_RECORD_OPTION;
@@ -842,7 +842,7 @@ fn execute_parsed_invocation<'py>(
     let facts: CommandFacts = command_facts(&args)?;
     let policy: InvocationPolicy = invocation_policy(&facts);
     let recall: InvocationRecall = if policy.recalled {
-        start_invocation_recall(py, &args, identity, &facts)?
+        start_invocation_recall(py, (&args, identity, &facts), env!("CARGO_PKG_VERSION"))?
     } else {
         InvocationRecall::default()
     };
@@ -913,7 +913,8 @@ fn execute_parsed_invocation<'py>(
         Ok(code) if code.is_instance_of::<PyInt>() => Some(code.extract().unwrap_or(1)),
         Ok(_) | Err(_) => None,
     };
-    let finished: PyResult<()> = finish_invocation_recall(py, &recall, exit_status);
+    let finished: PyResult<()> =
+        finish_invocation_recall(py, &recall, exit_status, env!("CARGO_PKG_VERSION"));
     let worker = recall
         .worker
         .lock()

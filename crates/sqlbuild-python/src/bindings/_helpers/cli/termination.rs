@@ -13,10 +13,10 @@ use pyo3::prelude::{
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::recall::console::write_stderr;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 
 create_exception!(
     sqlbuild._native,

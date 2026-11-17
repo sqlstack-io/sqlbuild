@@ -12,7 +12,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::clone::clone_command::Invocation;
 use crate::bindings::_helpers::clone::clone_progress::CloneFingerprintReporter;
 use crate::bindings::_helpers::clone::clone_progress::CloneItemPrinter;
-use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -23,6 +22,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
 
 const DESTINATION_ENTRY_GROUPS: [&str; 4] = [
     "destination_source_entries",

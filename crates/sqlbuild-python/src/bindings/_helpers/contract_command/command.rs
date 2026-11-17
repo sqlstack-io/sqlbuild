@@ -19,7 +19,7 @@ use sqlbuild_core::contract_command::models::{
     ContractFindingText, ContractProgress, ContractReport, ContractResourceText,
 };
 
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_graph_from_compiled_project::build_project_graph_from_compiled_project;

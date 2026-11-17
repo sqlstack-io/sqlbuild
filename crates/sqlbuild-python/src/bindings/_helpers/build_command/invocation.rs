@@ -10,8 +10,6 @@ use sqlbuild_core::build_command::main::duration_limit_error::duration_limit_err
 use sqlbuild_core::build_command::models::DurationLimit;
 
 use crate::bindings::_helpers::build_command::policies::build_command_error;
-use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
-use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -31,6 +29,8 @@ use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::reso
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
+use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
+use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
 const DEFER_CONFLICT_CODE: &str = "C408";

@@ -38,7 +38,6 @@ use sqlbuild_state::execution_history::constants::{
     DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, SCHEMA_VERSION,
 };
 
-use crate::bindings::_helpers::result_output::event_writer::RESULT_PATH_ENV;
 use sqlbuild_python_compile::compile_command::constants::REUSE_DISABLE_ENV_VAR;
 use sqlbuild_python_compile::compile_command::constants::TRACKED_ENVIRONMENT_PREFIXES;
 use sqlbuild_python_compile::compile_command::constants::UNTRACKED_ENVIRONMENT_NAMES;
@@ -49,6 +48,7 @@ use sqlbuild_python_compile::rules::constants::CUSTOM_HOST_RUNTIME_VERSION;
 use sqlbuild_python_front::attachments::constants::MICROBATCH_END_SENTINEL;
 use sqlbuild_python_front::attachments::constants::MICROBATCH_START_SENTINEL;
 use sqlbuild_python_front::state_rows::constants::MIGRATION_WRITE_ATTEMPTS;
+use sqlbuild_python_output::result_output::constants::RESULT_PATH_ENV;
 use sqlbuild_python_project::semantic_shapes::constants::VALID_FROM_DEFAULT;
 use sqlbuild_python_project::semantic_shapes::constants::VALID_TO_DEFAULT;
 

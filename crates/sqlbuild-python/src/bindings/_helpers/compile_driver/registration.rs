@@ -4,7 +4,9 @@ use pyo3::prelude::{Bound, PyModule, PyResult};
 
 use sqlbuild_python_base::compile_context::main::diagnostic_collector::register_diagnostic_collector::register_diagnostic_collector;
 use sqlbuild_python_base::compile_context::main::input_reads::register_input_reads::register_input_reads;
-use crate::bindings::_helpers::compile_driver::{plan_pipeline, plan_result, static_context};
+use crate::bindings::_helpers::compile_driver::plan_pipeline;
+use crate::bindings::_helpers::compile_driver::plan_result;
+use crate::bindings::_helpers::compile_driver::static_context;
 use sqlbuild_python_compile::compile_driver::main::stages::register_analysis::register_analysis;
 use sqlbuild_python_compile::compile_driver::main::stages::register_analysis_cache::register_analysis_cache;
 use sqlbuild_python_compile::compile_driver::main::stages::register_assembly::register_assembly;

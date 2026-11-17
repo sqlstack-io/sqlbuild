@@ -26,29 +26,29 @@ use sqlbuild_recall::store::main::resolve_invocation::resolve_invocation;
 use sqlbuild_recall::store::models::{OpenMode, SqliteStore};
 
 use crate::bindings::_helpers::query_command::query::run_query_command;
-use crate::bindings::_helpers::recall::clickhouse_store::ClickHouseLocation;
-use crate::bindings::_helpers::recall::clickhouse_store::ClickHouseReader;
-use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::recall::console::write_stdout_bytes;
-use crate::bindings::_helpers::recall::constants::DEFAULT_MAX_CELL_BYTES;
-use crate::bindings::_helpers::recall::constants::DEFAULT_QUERY_LIMIT;
-use crate::bindings::_helpers::recall::constants::JSON_FORMAT;
-use crate::bindings::_helpers::recall::constants::LAST_INVOCATION;
-use crate::bindings::_helpers::recall::constants::RECALL_AMBIGUOUS_CODE;
-use crate::bindings::_helpers::recall::constants::RECALL_DISABLED_CODE;
-use crate::bindings::_helpers::recall::constants::RECALL_NOT_FOUND_CODE;
-use crate::bindings::_helpers::recall::constants::RECALL_OPTIONS;
-use crate::bindings::_helpers::recall::constants::RECALL_QUERY_CODE;
-use crate::bindings::_helpers::recall::constants::RECALL_SETTINGS_CODE;
-use crate::bindings::_helpers::recall::constants::RECALL_STORE_CODE;
-use crate::bindings::_helpers::recall::constants::WAREHOUSE_BACKEND;
-use crate::bindings::_helpers::recall::constants::WAREHOUSE_STATE_RELATIONS_SQL;
 use crate::bindings::_helpers::recall::rendering::QueryContext;
 use crate::bindings::_helpers::recall::rendering::render_result;
 use crate::bindings::_helpers::recall::rendering::render_schema;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_output::recall::constants::DEFAULT_MAX_CELL_BYTES;
+use sqlbuild_python_output::recall::constants::DEFAULT_QUERY_LIMIT;
+use sqlbuild_python_output::recall::constants::JSON_FORMAT;
+use sqlbuild_python_output::recall::constants::LAST_INVOCATION;
+use sqlbuild_python_output::recall::constants::RECALL_AMBIGUOUS_CODE;
+use sqlbuild_python_output::recall::constants::RECALL_DISABLED_CODE;
+use sqlbuild_python_output::recall::constants::RECALL_NOT_FOUND_CODE;
+use sqlbuild_python_output::recall::constants::RECALL_OPTIONS;
+use sqlbuild_python_output::recall::constants::RECALL_QUERY_CODE;
+use sqlbuild_python_output::recall::constants::RECALL_SETTINGS_CODE;
+use sqlbuild_python_output::recall::constants::RECALL_STORE_CODE;
+use sqlbuild_python_output::recall::constants::WAREHOUSE_BACKEND;
+use sqlbuild_python_output::recall::constants::WAREHOUSE_STATE_RELATIONS_SQL;
+use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
+use sqlbuild_python_output::recall::main::write_stdout_bytes::write_stdout_bytes;
+use sqlbuild_python_output::recall::models::ClickHouseLocation;
+use sqlbuild_python_output::recall::models::ClickHouseReader;
 
 fn user_error(py: Python<'_>, message: &str, code: &str) -> PyErr {
     new_error(py, ErrorId::CliUser, message, (Some(code), None))
@@ -210,7 +210,12 @@ fn open_store(py: Python<'_>, settings: &RecallSettings, checked: bool) -> PyRes
             config, database, ..
         } => ClickHouseReader::open(
             py,
-            &ClickHouseLocation::new(config, database, settings.retention_days),
+            &ClickHouseLocation::new(
+                config,
+                database,
+                settings.retention_days,
+                env!("CARGO_PKG_VERSION"),
+            ),
         )
         .and_then(|reader| {
             if checked && let Err(error) = reader.require_store(py) {
@@ -366,7 +371,12 @@ fn run_schema_ddl(py: Python<'_>, settings: &RecallSettings) -> PyResult<i32> {
         } => (
             ClickHouseReader::upgrade_statements(
                 py,
-                &ClickHouseLocation::new(config, database, settings.retention_days),
+                &ClickHouseLocation::new(
+                    config,
+                    database,
+                    settings.retention_days,
+                    env!("CARGO_PKG_VERSION"),
+                ),
             ),
             format!("in ClickHouse database `{database}`"),
         ),

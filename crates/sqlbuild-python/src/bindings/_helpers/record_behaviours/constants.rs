@@ -1,7 +1,5 @@
 //! Native behaviour of the hosted shapes: computed attributes, methods, ordering and validation.
 
-use crate::bindings::_helpers::build_progress;
-use crate::bindings::_helpers::compute_logs;
 use crate::bindings::_helpers::dbt_events;
 use crate::bindings::_helpers::dbt_interop;
 use crate::bindings::_helpers::event_exporting;
@@ -117,7 +115,6 @@ use crate::bindings::_helpers::record_behaviours::scopes::target_query_unknown;
 use crate::bindings::_helpers::record_behaviours::values::finish_fingerprint_set;
 use crate::bindings::_helpers::record_behaviours::values::logical_type_display_name;
 use crate::bindings::_helpers::record_behaviours::values::sql_value_kind;
-use crate::bindings::_helpers::result_output;
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
 use sqlbuild_python_base::records::types::ClassProperty;
@@ -404,11 +401,11 @@ pub(crate) const BEHAVIOUR_ORDERED: &[&str] = &[
 pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     sqlbuild_python_compile::analysis::constants::GETTERS,
     sqlbuild_python_compile::analysis_session::constants::GETTERS,
-    build_progress::getters::GETTERS,
+    sqlbuild_python_output::build_progress::constants::GETTERS,
     sqlbuild_python_compile::compile_command::constants::GETTERS,
     sqlbuild_python_base::compile_context::constants::GETTERS,
     sqlbuild_python_project::compiled_views::constants::GETTERS,
-    compute_logs::getters::GETTERS,
+    sqlbuild_python_output::compute_logs::constants::GETTERS,
     dbt_events::getters::GETTERS,
     dbt_interop::getters::GETTERS,
     sqlbuild_python_base::diagnostics::constants::GETTERS,
@@ -422,7 +419,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     sqlbuild_python_planner::planner_phases::constants::GETTERS,
     sqlbuild_python_base::presentation_text::constants::GETTERS,
     sqlbuild_python_compile::project_assembly::constants::GETTERS,
-    result_output::getters::GETTERS,
+    sqlbuild_python_output::result_output::constants::GETTERS,
     sqlbuild_python_compile::rules::constants::GETTERS,
     sqlbuild_python_front::scopes::constants::GETTERS,
 ];

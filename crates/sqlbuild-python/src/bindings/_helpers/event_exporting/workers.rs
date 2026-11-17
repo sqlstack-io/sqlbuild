@@ -17,7 +17,6 @@ use crate::bindings::_helpers::event_exporting::dispatcher::Exporter;
 use crate::bindings::_helpers::event_exporting::dispatcher::Queued;
 use crate::bindings::_helpers::event_exporting::dispatcher::Shared;
 use crate::bindings::_helpers::event_exporting::dispatcher::State;
-use crate::bindings::_helpers::recall::console::write_stderr;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::event_exporting::constants::CHARGE_LIMIT_SECONDS;
@@ -29,6 +28,7 @@ use sqlbuild_python_base::event_exporting::main::error_type_of::error_type_of;
 use sqlbuild_python_base::event_exporting::models::EventExportSummary;
 use sqlbuild_python_base::event_exporting::models::EventExporterFailure;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 
 /// Which long-lived dispatcher thread a worker runs.
 #[derive(Clone, Copy)]

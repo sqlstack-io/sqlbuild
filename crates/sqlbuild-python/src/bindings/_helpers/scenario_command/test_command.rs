@@ -25,8 +25,6 @@ use crate::bindings::_helpers::change_selection::selection::ChangedProject;
 use crate::bindings::_helpers::change_selection::selection::changed_project;
 use crate::bindings::_helpers::change_selection::selection::tests_and_models;
 use crate::bindings::_helpers::change_selection::selection::with_since_section;
-use crate::bindings::_helpers::result_output::documents::format_scenario_execution_json_with;
-use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
 use crate::bindings::_helpers::scenario_command::presentation::CompletionKind;
 use crate::bindings::_helpers::scenario_command::presentation::RelayContext;
@@ -66,6 +64,8 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_output::result_output::main::results::format_scenario_execution_json_with::format_scenario_execution_json_with;
+use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 
 const LOCAL_ADAPTER: &str = "duckdb";
 const LOCAL_STATUSES: [&str; 4] = ["PASS", "FAIL", "ERROR", "SKIP"];

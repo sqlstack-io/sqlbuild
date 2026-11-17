@@ -32,14 +32,15 @@ tested and benchmarked with `cargo test` alone.
 | `sqlbuild-python-project` | The compiled project as PyO3 bindings, on top of `sqlbuild-python-front`: the project host and the Python views of compiled models, inputs and resources, the compiled-project snapshot, analysis classes and the analysis session, the project graph, references, lineage, fingerprints, contracts and semantic shapes, audit rendering, and the planner's identities, scope, selection, phases, fixture strategy and SQL test planning. |
 | `sqlbuild-python-planner` | The plan layer as PyO3 bindings, on top of `sqlbuild-python-project`: execution plans and their entries, planner phases, change detection, migrations, reference and cursor resolution, scenarios, strategy and warehouse inspection, plus freshness, consumption, microbatches, observations, lifecycle events and plan output. |
 | `sqlbuild-python-compile` | The compile layer as PyO3 bindings, on top of `sqlbuild-python-project` and beside `sqlbuild-python-planner`: the compile command and driver, input loops and compile-input attachment, project assembly, analysis and the analysis session, Rules, lineage, semantic checks, compile deltas and outputs, the DAG artifact, manifest, frontier, offline scope facts, SQL test glue and auditing. |
-| `sqlbuild-python` | The `_native` module: its Python classes and functions and the conversions from Python objects, on top of `sqlbuild-python-compile`, `sqlbuild-python-planner`, `sqlbuild-python-project`, `sqlbuild-python-front` and `sqlbuild-python-base`. |
+| `sqlbuild-python-output` | The output layer as PyO3 bindings, on top of `sqlbuild-python-planner` and beside `sqlbuild-python-compile`: build progress reporting, build result output and its documents, output capture and invocation records, cost telemetry, compute log storage and the Recall session and its stores. |
+| `sqlbuild-python` | The `_native` module: its Python classes and functions and the conversions from Python objects, on top of `sqlbuild-python-output`, `sqlbuild-python-compile`, `sqlbuild-python-planner`, `sqlbuild-python-project`, `sqlbuild-python-front` and `sqlbuild-python-base`. |
 
 ## Layering
 
 Dependencies point one way, from the top of this graph to the bottom:
 
 ```text
-sqlbuild-python -> sqlbuild-python-compile -> sqlbuild-python-planner -> sqlbuild-python-project -> sqlbuild-python-front -> sqlbuild-python-base
+sqlbuild-python -> sqlbuild-python-output -> sqlbuild-python-compile -> sqlbuild-python-planner -> sqlbuild-python-project -> sqlbuild-python-front -> sqlbuild-python-base
   -> sqlbuild-project -> sqlbuild-refactor -> sqlbuild-rules -> sqlbuild-analysis -> sqlbuild-attachments
   -> sqlbuild-model-config -> sqlbuild-scopes -> sqlbuild-render -> sqlbuild-discovery -> sqlbuild-host
   -> sqlbuild-config -> sqlbuild-sqltext -> sqlbuild-cache -> sqlbuild-pysource -> sqlbuild-state -> sqlbuild-cursor -> sqlbuild-core

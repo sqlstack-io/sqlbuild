@@ -20,10 +20,10 @@ use crate::bindings::_helpers::cli::namespace::new_cli_namespace;
 use crate::bindings::_helpers::cli::surrogates::python_text;
 use crate::bindings::_helpers::cli::surrogates::rust_text;
 use crate::bindings::_helpers::cli::surrogates::uses_placeholders;
-use crate::bindings::_helpers::recall::console::write_stdout_bytes;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_output::recall::main::write_stdout_bytes::write_stdout_bytes;
 
 const INT_CONVERTER: &str = "int";
 const POSITIVE_INTEGER_CONVERTER: &str = "_positive_integer";
