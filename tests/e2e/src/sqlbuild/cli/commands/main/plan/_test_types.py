@@ -72,3 +72,17 @@ class PlanExitCodeE2ETestCase:
     plan_args: tuple[str, ...]
     expected_exit_code: int
     expected_output_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PreviewPerformanceTestCase:
+    """A synced 10K-model warehouse and the budgets a warm `--changed` preview of it meets."""
+
+    description: str
+    built_share: float
+    expected_unbuilt: tuple[int, int]
+    expected_definition_changes: tuple[int, int]
+    expected_max_warm_seconds: float
+    #: The warm preview's share of the location's publish, a linear 10K compile on one machine.
+    expected_max_warm_to_publish: float
+    expected_max_check_seconds: float
