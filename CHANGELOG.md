@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.242.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.241.0...v0.242.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* the dlt and ingestr integrations are removed. A project that declares `dlt_sources` or a source `ingestr` block no longer compiles; declare the source with `managed: true` and load it with a Python `@loader` named after the source. The `dlt` and `ingestr` package extras no longer exist.
+
+### Tests
+
+* add DuckShop cases for warehouse round trips and off-target group members ([#1553](https://github.com/sqlstack-io/sqlbuild/issues/1553)) ([fa63ff6](https://github.com/sqlstack-io/sqlbuild/commit/fa63ff60718d064f2963c3470c979d3c480d879d))
+
 ## [0.241.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.240.0...v0.241.0) (2026-11-17)
 
 
