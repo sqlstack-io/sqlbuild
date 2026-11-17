@@ -41,7 +41,7 @@ pub(super) fn sources(entry: Vec<(&str, Node)>) -> Node {
     map(vec![("sources", Node::List(vec![map(entry)]))])
 }
 
-/// A `dlt_sources` document with one group.
+/// A `dlt_sources` document with one group, which SQLBuild rejects.
 pub(super) fn dlt_group(group: Vec<(&str, Node)>) -> Node {
     map(vec![("dlt_sources", Node::List(vec![map(group)]))])
 }

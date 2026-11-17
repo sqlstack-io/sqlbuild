@@ -6,7 +6,7 @@ use crate::python_plan::main::upstream_closure::upstream_closure;
 use crate::python_plan::models::{LifecycleNode, RunLifecycle};
 use crate::python_selection::constants::{ASSET_KIND, LOADER_KIND, TASK_KIND};
 
-/// Ingress is every selected warehouse loader and its selected upstream tasks, assets and loaders.
+/// Ingress is every selected loader and its selected upstream tasks, assets and loaders.
 #[must_use]
 pub fn run_lifecycle(
     selected: &BTreeSet<String>,
@@ -19,7 +19,7 @@ pub fn run_lifecycle(
         .filter(|name| {
             nodes
                 .get(name.as_str())
-                .is_some_and(|node| node.kind == LOADER_KIND && !node.external_loader)
+                .is_some_and(|node| node.kind == LOADER_KIND)
         })
         .cloned()
         .collect();

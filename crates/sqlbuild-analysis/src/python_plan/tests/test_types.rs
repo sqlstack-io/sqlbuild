@@ -15,8 +15,8 @@ pub(crate) struct ClosureTestCase {
 pub(crate) struct LifecycleTestCase {
     pub(crate) description: &'static str,
     pub(crate) selected: &'static [&'static str],
-    /// `(name, kind, external loader)`.
-    pub(crate) nodes: &'static [(&'static str, &'static str, bool)],
+    /// `(name, kind)`.
+    pub(crate) nodes: &'static [(&'static str, &'static str)],
     pub(crate) upstream: &'static [(&'static str, &'static [&'static str])],
     pub(crate) expected_ingress: &'static [&'static str],
     pub(crate) expected_loaders: &'static [&'static str],

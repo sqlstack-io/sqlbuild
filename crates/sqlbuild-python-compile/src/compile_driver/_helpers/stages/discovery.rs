@@ -6,7 +6,6 @@ use pyo3::{IntoPyObject, pyfunction};
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::compile_driver::_helpers::setup::integration_loaders::integration_loader_functions;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -457,9 +456,7 @@ fn project_inputs<'py>(
         )?
         .into_any())
     };
-    let source_files: Bound<'py, PyAny> = declarations.get_item("source_files")?;
-    let integration_loaders: Bound<'py, PyAny> = integration_loader_functions(py, &source_files)?;
-    let loader_functions: Bound<'py, PyAny> = tuple_of("loaders")?.add(integration_loaders)?;
+    let loader_functions: Bound<'py, PyAny> = tuple_of("loaders")?;
     let mut fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
         ("project_config", project_config.clone()),
         ("local_config", local_config.clone()),

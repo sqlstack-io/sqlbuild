@@ -13,14 +13,13 @@ pub(crate) fn edges(rows: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
         .collect()
 }
 
-pub(crate) fn lifecycle_nodes(rows: &[(&str, &str, bool)]) -> HashMap<String, LifecycleNode> {
+pub(crate) fn lifecycle_nodes(rows: &[(&str, &str)]) -> HashMap<String, LifecycleNode> {
     rows.iter()
-        .map(|(name, kind, external_loader)| {
+        .map(|(name, kind)| {
             (
                 (*name).to_owned(),
                 LifecycleNode {
                     kind: (*kind).to_owned(),
-                    external_loader: *external_loader,
                 },
             )
         })

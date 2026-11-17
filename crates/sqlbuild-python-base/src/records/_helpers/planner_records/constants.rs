@@ -714,7 +714,6 @@ const R_SOURCE_LOAD_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("cursor_column", FieldDefault::None),
         FieldSpec::new("unique_key", FieldDefault::EmptyTuple),
         FieldSpec::new("is_reload", FieldDefault::False),
-        FieldSpec::new("integration_kind", FieldDefault::None),
     ],
 };
 const R_FUNCTION_PLAN_ENTRY: RecordSpec = RecordSpec {

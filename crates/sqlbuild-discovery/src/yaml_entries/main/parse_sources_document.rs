@@ -4,12 +4,12 @@ use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
 
 use crate::yaml_entries::_helpers::fields::{Site, get, reject_unknown_keys};
-use crate::yaml_entries::_helpers::integrations::dlt_sources;
+use crate::yaml_entries::_helpers::removed_integrations::reject_dlt_sources;
 use crate::yaml_entries::_helpers::sources::source_entry;
 use crate::yaml_entries::constants::SOURCE_FILE_KEYS;
 use crate::yaml_entries::models::ParsedSourceEntry;
 
-/// Parse a loaded sources document: its `sources`, then the managed sources of `dlt_sources`.
+/// Parse a loaded sources document's `sources`.
 pub fn parse_sources_document<N: AuthoredNode>(
     loaded: &N,
     path: &str,
@@ -23,6 +23,7 @@ pub fn parse_sources_document<N: AuthoredNode>(
             )));
         }
     };
+    reject_dlt_sources(&payload, path)?;
     reject_unknown_keys(
         &payload,
         &SOURCE_FILE_KEYS,
@@ -47,6 +48,5 @@ pub fn parse_sources_document<N: AuthoredNode>(
             sources.push(source_entry(&item.entries(), path)?);
         }
     }
-    sources.extend(dlt_sources(&payload, path)?);
     Ok(sources)
 }

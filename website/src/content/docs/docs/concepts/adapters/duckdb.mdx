@@ -85,6 +85,3 @@ model SQL as written:
   rejects later non-null values. Cast it, for example `CAST(NULL AS DECIMAL(18, 2)) AS discount`.
 - Integer division `//` and modulo `%` by zero raise an error instead of returning `NULL`. Wrap
   the expression in `TRY(...)` to get `NULL`.
-
-dlt's dataset read API calls a DuckDB method that DuckDB 2.0 removed when it reads a loaded table
-back as one whole Arrow table, so that read fails. Dataframe and chunked Arrow reads still work. Loading data with dlt is not affected.

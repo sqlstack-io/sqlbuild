@@ -10,11 +10,10 @@ use crate::yaml_entries::_helpers::fields::{
     stripped_strings,
 };
 use crate::yaml_entries::_helpers::freshness::freshness;
-use crate::yaml_entries::_helpers::integrations::source_integration_loader;
-use crate::yaml_entries::main::integration_loader_name::integration_loader_name;
-use crate::yaml_entries::models::{ParsedIntegrationLoader, ParsedSourceEntry, ParsedYamlColumn};
+use crate::yaml_entries::_helpers::removed_integrations::reject_ingestr_source;
+use crate::yaml_entries::models::{ParsedSourceEntry, ParsedYamlColumn};
 
-const ENTRY_KEYS: [&str; 19] = [
+const ENTRY_KEYS: [&str; 18] = [
     "audits",
     "columns",
     "contract",
@@ -24,7 +23,6 @@ const ENTRY_KEYS: [&str; 19] = [
     "expression",
     "final",
     "freshness",
-    "ingestr",
     "load_batch_size",
     "managed",
     "meta",
@@ -60,6 +58,7 @@ pub(crate) fn source_entry<N: AuthoredNode>(
         path,
         label: "source",
     };
+    reject_ingestr_source(entry, site)?;
     let shape: SourceShape<N> = source_shape(entry, site)?;
     let name: N = required_text(entry, "name", site)?;
     let name_text: String = name.text().unwrap_or_default();
@@ -102,28 +101,18 @@ fn source_shape<N: AuthoredNode>(
     })
 }
 
-/// The entry named `name`, managed by its own loader or by its integration loader.
+/// The entry named `name`, managed by the loader named after it.
 fn managed_source<N: AuthoredNode>(
     entry: &[(N, N)],
     name: N,
     name_text: &str,
     site: Site<'_>,
 ) -> Result<ParsedSourceEntry<N>, ConfigError> {
-    let integration_loader: Option<ParsedIntegrationLoader<N>> =
-        source_integration_loader(entry, site.path)?;
-    let mut managed: bool = optional_bool(entry, "managed", site)?
+    let managed: bool = optional_bool(entry, "managed", site)?
         .is_some_and(|node| node.kind() == NodeKind::Bool(true));
-    let mut loader: Option<String> = managed.then(|| name_text.to_owned());
-    if loader.is_none()
-        && let Some(integration) = &integration_loader
-    {
-        loader = Some(integration_loader_name(integration.kind(), name_text));
-        managed = true;
-    }
     let mut parsed: ParsedSourceEntry<N> = ParsedSourceEntry::named(name);
     parsed.managed = managed;
-    parsed.loader = loader;
-    parsed.integration_loader = integration_loader;
+    parsed.loader = managed.then(|| name_text.to_owned());
     Ok(parsed)
 }
 
@@ -242,15 +231,6 @@ fn validate_source<N: AuthoredNode>(
         return Err(error(
             "uses expression with type_enforcement but has no typed columns",
         ));
-    }
-    if let Some(integration) = &entry.integration_loader {
-        let kind: &str = integration.kind();
-        if entry.loader.as_deref() != Some(integration_loader_name(kind, name).as_str()) {
-            return Err(error(&format!("cannot override loader for {kind}")));
-        }
-        if entry.write_strategy.is_some() {
-            return Err(error(&format!("cannot define write_strategy with {kind}")));
-        }
     }
     let strategy: Option<&str> = entry.write_strategy;
     let has_unique_key: bool = !entry.unique_key.is_empty();
