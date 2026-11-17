@@ -171,7 +171,12 @@ export type LocationDetail = {
 	/** Null when the server doesn't name it. */
 	warehouseConnection: string | null;
 	connectionTest: ConnectionTest | null;
+	/** Jobs and groups this server's pool caps make run alone in a pool: the server's own warning, not a check-in. */
+	poolCapWarnings: PoolCapWarning[];
 };
+
+/** A job or group asking a pool for more than this server's cap, so it takes the whole pool. */
+export type PoolCapWarning = { jobKey: string; kind: 'job' | 'group'; pool: string; amount: number; cap: number; message: string };
 
 export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
 	/** Null when the server can't report it to this person. */

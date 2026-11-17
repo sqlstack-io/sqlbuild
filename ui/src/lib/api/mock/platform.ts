@@ -93,7 +93,7 @@ import {
 	type AccessData
 } from './access';
 import { LOCATION_MARKETING, LOCATION_SHOP, LOCATION_SHOP_DEV, LOCATION_SHOP_STAGING, ROLE_CAPABILITIES, SHOP_LOCATIONS } from './fixtures';
-import { triggerId } from './operate';
+import { poolCapWarnings, triggerId } from './operate';
 import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM } from './principals';
 
 const MIN = 60_000;
@@ -270,7 +270,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 	});
 	const loadError =
 		"ImportError: cannot import name 'campaign_touches' from 'models.attribution' (orchestration/jobs.py, line 12)";
-	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest'>;
+	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest' | 'poolCapWarnings'>;
 	const locationExtras: Record<string, LocationExtras> = {
 		[LOCATION_SHOP]: {
 			createdAt: ago(days(210)),
@@ -279,6 +279,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			lastLoadError: null,
 			imageId: 'sha256:4be1c07d9a52',
 			warehouseConnection: 'prod',
+			// This mock server caps a pool below what a group asks for.
+			poolCapWarnings: poolCapWarnings(),
 			connectionTest: publishTest(190, 820, 'Connected as TRANSFORMER to WAFFLE_SHOP; warehouse TRANSFORMING_WH available'),
 			instances: [
 				{ id: 'location-waffle-shop-7c2d', imageId: 'sha256:4be1c07d9a52', gitRevision: '7d2e41a', startedAt: ago(192), lastSeenAt: ago(0.2), state: 'live' },
@@ -293,6 +295,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			lastLoadError: null,
 			imageId: 'sha256:9f02b6e4c1a8',
 			warehouseConnection: 'staging',
+			poolCapWarnings: [],
 			connectionTest: publishTest(35, 760, 'Connected as TRANSFORMER to WAFFLE_SHOP_STAGING'),
 			instances: [
 				{ id: 'location-waffle-shop-staging-c7e3', imageId: 'sha256:61d0a4f7b2e9', gitRevision: 'e09a6c3', startedAt: ago(1), lastSeenAt: ago(0.1), state: 'live' },
@@ -306,6 +309,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			lastLoadError: null,
 			imageId: null,
 			warehouseConnection: 'dev',
+			poolCapWarnings: [],
 			connectionTest: publishTest(2, 12, 'Opened warehouse.duckdb'),
 			instances: [{ id: 'location-waffle-shop-dev-local', imageId: 'local', gitRevision: 'b81c09e', startedAt: ago(30), lastSeenAt: ago(0.3), state: 'live' }]
 		},
@@ -316,6 +320,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			lastLoadError: loadError,
 			imageId: 'sha256:3e5f7aa20c19',
 			warehouseConnection: 'prod',
+			poolCapWarnings: [],
 			connectionTest: publishTest(1440, 140, 'Connected to analytics as sqb_builder'),
 			instances: [
 				{ id: 'location-marketing-analytics-03f6', imageId: 'sha256:3e5f7aa20c19', gitRevision: '3e5f7aa', startedAt: ago(days(1) + 30), lastSeenAt: ago(0.5), state: 'live' },

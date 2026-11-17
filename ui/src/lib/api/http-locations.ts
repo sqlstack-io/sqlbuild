@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
 import type { Location, LocationHealth, Snapshot, WarehouseSync } from './types';
-import type { ConnectionDetails, ConnectionTest, LocationDetail, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
+import type { ConnectionDetails, ConnectionTest, LocationDetail, PoolCapWarning, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -117,6 +117,11 @@ export function instancesOf(observations: Wire['LocationHealthObservation'][], n
 		.map(([id, lastSeenAt]) => ({ id, imageId: null, gitRevision: null, startedAt: null, lastSeenAt, state: now - Date.parse(lastSeenAt) <= LIVE_WINDOW_MS ? 'live' : 'stale' }));
 }
 
+/** The server's newest pool-cap warning: each job or group asking a pool for more than this server's cap. */
+export function poolCapWarningsOf(observations: Wire['LocationHealthObservation'][]): PoolCapWarning[] {
+	return (latestOf(observations, 'pool_capped')?.report.health.jobs ?? []).map((w) => ({ jobKey: w.job_key, kind: w.kind === 'group' ? 'group' : 'job', pool: w.pool, amount: w.amount, cap: w.cap, message: w.message }));
+}
+
 /** A location's page from its health observations and newest snapshot; locations never send compile error text, so a failed reload shows only as its health. */
 /** The rule findings that failed the newest load, as `sqb compile` prints them; null when that load had none or a newer one connected. */
 export function loadErrorOf(observations: Wire['LocationHealthObservation'][], health: LocationHealth): string | null {
@@ -138,6 +143,7 @@ export function toLocationDetail(location: Location, observations: Wire['Locatio
 		brokenDeployPolicy: null,
 		failedDeploy: null,
 		lastLoadError: loadErrorOf(observations, health),
+		poolCapWarnings: poolCapWarningsOf(observations),
 		instances: instancesOf(observations, now),
 		target: location.target,
 		snapshot: snapshotOf(published),

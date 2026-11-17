@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionDetailsOf, connectionTestOf, firstSyncPending, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { connectionDetailsOf, connectionTestOf, firstSyncPending, healthOf, instancesOf, poolCapWarningsOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -12,6 +12,13 @@ const seen = (secondsAgo: number, health: Health, session = 's-1') => ({
 describe('location health', () => {
 	it('is broken without a check-in in the last 90 seconds, whatever was reported before', () => {
 		expect(healthOf([seen(91, { kind: 'heartbeat' })], now)).toEqual({ health: 'broken', liveInstances: 0, lastSeenAt: at(91) });
+	});
+
+	it("reads the server's newest pool-cap warning, job by job", () => {
+		const job = { job_key: 'close_of_business', kind: 'group' as const, pool: 'warehouse_heavy', amount: 3, cap: 1, message: 'group close_of_business takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool' };
+		const capped = seen(5, { kind: 'pool_capped', generation: 2, jobs: [job] }, '00000000-0000-0000-0000-000000000000');
+		expect(poolCapWarningsOf([capped, seen(10, { kind: 'heartbeat' })])).toEqual([{ jobKey: 'close_of_business', kind: 'group', pool: 'warehouse_heavy', amount: 3, cap: 1, message: job.message }]);
+		expect(poolCapWarningsOf([seen(10, { kind: 'heartbeat' })])).toEqual([]);
 	});
 
 	it("doesn't count the server's pool-cap warning as a location check-in", () => {
