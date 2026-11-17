@@ -117,7 +117,10 @@ def prepare_static_compile_project(root: Path) -> Path:
 
 
 def prepare_python_compile_project(root: Path) -> Path:
-    """Create a local project with Python nodes for compile DAG tests."""
+    """Create a local project with Python nodes for compile DAG tests.
+
+    Its loader depends on a task that reads SQL, so the project allows warehouse round trips.
+    """
 
     project_dir: Path = prepare_python_dag_project(root)
     (project_dir / "sqlbuild_project.toml").write_text(
@@ -129,6 +132,9 @@ def prepare_python_compile_project(root: Path) -> Path:
                 "",
                 "[targets.dev]",
                 'schema = "main"',
+                "",
+                "[settings]",
+                "allow_warehouse_round_trips = true",
             )
         )
         + "\n",
