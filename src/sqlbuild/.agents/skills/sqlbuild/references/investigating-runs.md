@@ -238,6 +238,7 @@ audit_results (view): one row per evaluated audit; its evidence rows are in arti
   evidence_count ANY
   evidence_truncated ANY
   sample_digest ANY
+  ignored ANY
 
 conflicts (view): record keys reused with different content; the first row is kept
   dataset TEXT
