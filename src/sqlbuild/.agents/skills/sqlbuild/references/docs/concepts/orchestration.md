@@ -64,7 +64,7 @@ exclude = "tag:deprecated"
 targets = ["production"]
 owner = "Orders team"
 overlap = "skip"
-concurrency_groups = ["warehouse_heavy"]
+pools = { warehouse_heavy = 1 }
 schedule = { cron = "0 2 * * *", timezone = "Europe/London" }
 
 [retry]
@@ -89,7 +89,7 @@ cpus = 2
 | `targets` | No | The targets the job exists in; all targets when omitted |
 | `owner` | No | Shown on the job's page and in the job list |
 | `overlap` | No | `queue` (default) or `skip`; see [Skip overlapping runs](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
-| `concurrency_groups` | No | Groups of jobs that share a limit of runs at once, declared in [`[concurrency_groups]`](project-configuration.md#concurrency-groups) |
+| `pools` | No | Slots the job takes of each [pool](concurrency.md#jobs-sharing-something-else-pools), such as `{ warehouse_heavy = 1 }` |
 | `schedule` | No | When the server starts the job; see below |
 | `[retry]` | No | `attempts`, the most runs in all, from 2 to 11, and `delay_seconds` from 0 to 86400; see [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
 | `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh` or `changed` |
@@ -109,7 +109,10 @@ reports a job or sensor `select` that names more than three nodes one by one; se
 ## Group jobs
 
 A job group runs its jobs as one run. A job waits for another job in the group when it reads a node
-that job builds.
+that job builds, directly or through nodes no job in the group builds. It waits only for the
+nearest such jobs: what they read is their own wait, so a node further upstream, such as a function
+many jobs build, adds no more waits. A job never waits for the other jobs that build a node it
+builds itself.
 
 ```toml
 # orchestration/job_groups/daily_orders_job_group.toml
@@ -120,7 +123,7 @@ schedule = { cron = "0 3 * * *", timezone = "UTC" }
 ```
 
 A group takes `name`, `description` and `jobs`, and the same `targets`, `owner`, `overlap`,
-`concurrency_groups`, `schedule` and `[retry]` as a job. Its members are jobs, never other
+`pools`, `schedule` and `[retry]` as a job. Its members are jobs, never other
 groups.
 
 When a location publishes, it records why each member waits, node by node: a node of the earlier
@@ -278,7 +281,8 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | `declares a second sensor; each module declares exactly one` | Split the module |
 | `schedule cron: invalid cron expression: Pattern must have 5 fields when seconds are disallowed.` | Write a five-field cron, such as `0 2 * * *` |
 | `job nightly_orders_job resources: cpus must be a positive number` | Set `cpus` above zero |
-| `job 'nightly_orders_job' names concurrency group 'nightly_windw', which [concurrency_groups] in sqlbuild_project.toml does not declare` | Fix the name, or declare the group in [`[concurrency_groups]`](project-configuration.md#concurrency-groups) |
+| `job 'nightly_orders_job' uses pool 'warehouse_hevy', which [pools] in sqlbuild_project.toml does not declare` | Fix the name, or declare the pool in [`[pools]`](project-configuration.md#pools) |
+| `job 'nightly_orders_job' takes 2 slots of pool 'supplier_api', more than its limit of 1 on target 'production'` | Take fewer slots, or raise the limit in `[targets.production.pools]` |
 | `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
 
 Details:

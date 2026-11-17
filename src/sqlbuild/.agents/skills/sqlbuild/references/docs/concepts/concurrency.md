@@ -1,0 +1,174 @@
+<!-- generated-by: sqlbuild skills -->
+
+# Concurrency
+
+> Choose how many models and runs SQLBuild works on at once: concurrency, max_workers, write claims, overlap and pools.
+
+Online: https://sqlbuild.com/docs/concepts/concurrency/
+
+## Contents
+
+- Models at once in a run: `concurrency`
+- Runs at once on a server: `max_workers`
+- Runs writing the same tables: write claims
+- A job triggered while it runs: `overlap`
+- Jobs sharing something else: pools
+
+SQLBuild has one setting for each kind of "not too much at once". Pick the row that matches what
+you want:
+
+| I want… | Use |
+| --- | --- |
+| More or fewer models building at once in a run | [`concurrency`](#models-at-once-in-a-run-concurrency) |
+| At most N runs on this server | [`max_workers`](#runs-at-once-on-a-server-max_workers) |
+| Two runs never writing the same tables at once | Nothing: automatic ([write claims](#runs-writing-the-same-tables-write-claims)) |
+| A job that's triggered while already running to wait, or be dropped | [`overlap = "queue"` or `"skip"`](#a-job-triggered-while-it-runs-overlap) |
+| Jobs that don't share tables but share something else (an API with a rate limit, an SSH host, a heavy warehouse) never to exceed N at once | [A pool](#jobs-sharing-something-else-pools) |
+
+## Models at once in a run: `concurrency`
+
+`concurrency` is how many models, tests and other nodes one command or run builds at once. Set a
+project default, change it per target, or give one job its own value:
+
+```toml
+# sqlbuild_project.toml
+[settings]
+concurrency = 4
+
+[targets.prod]
+concurrency = 8
+```
+
+```toml
+# orchestration/jobs/nightly_orders_job.toml
+[settings]
+concurrency = 2
+```
+
+`--concurrency` on the command line wins over all of them; see
+[Target concurrency](project-configuration.md#target-concurrency) for the full order.
+
+## Runs at once on a server: `max_workers`
+
+Each launcher in `server.toml` runs at most `max_workers` runs of its location and target at once.
+Further runs wait in the queue:
+
+```toml
+# server.toml
+[[launchers.local]]
+location = "orders"
+target = "production"
+server_url = "http://127.0.0.1:8000"
+max_workers = 4
+project_dir = "/srv/orders"
+executable = "/usr/local/bin/sqb"
+```
+
+The server's total is the sum of its launchers' `max_workers`. See
+[Configure the server](../cli/server.md#configure-the-server).
+
+## Runs writing the same tables: write claims
+
+Nothing to configure. Before a run starts, it claims every node it writes in its target. A run that
+writes a node another run has claimed waits until that run ends, and its queue entry names the run
+and node it waits for. Runs that write different nodes run side by side.
+
+## A job triggered while it runs: `overlap`
+
+```toml
+# orchestration/jobs/nightly_orders_job.toml
+overlap = "skip"
+```
+
+With `queue` (the default), a schedule tick or sensor request that arrives while the job is queued
+or running queues another run, which starts after the first. With `skip`, it starts no run. Runs
+people start, reruns and backfills always queue. See
+[Skip overlapping runs](../cli/server.md#skip-overlapping-runs-and-retry-failures).
+
+## Jobs sharing something else: pools
+
+Write claims keep runs off the same tables. A pool limits jobs that share something else: a
+supplier API with a rate limit, an SSH host, a warehouse that slows down under load.
+
+**A pool is just a name and a number that SQLBuild counts.** It never looks at the API, host or
+warehouse. It only makes sure the runs taking the pool never hold more slots than its limit.
+
+Declare each pool with its limit in `sqlbuild_project.toml`, and change a limit for one target:
+
+```toml
+# sqlbuild_project.toml
+[pools]
+supplier_api = 2
+warehouse_heavy = 4
+
+[targets.dev.pools]
+warehouse_heavy = 1
+```
+
+Two loader jobs share the supplier API, which allows two connections at once. Each takes one slot,
+so both may run together, but a third job taking `supplier_api` waits:
+
+```toml
+# orchestration/jobs/load_suppliers_job.toml
+name = "load_suppliers_job"
+description = "Load supplier records from the supplier API"
+select = "raw_suppliers"
+pools = { supplier_api = 1 }
+```
+
+```toml
+# orchestration/jobs/load_prices_job.toml
+name = "load_prices_job"
+description = "Load supplier prices from the supplier API"
+select = "raw_prices"
+pools = { supplier_api = 1 }
+```
+
+A job that needs more of the pool takes more slots. This backfill uses both API connections, so it
+runs only when no other job holds a `supplier_api` slot, and nothing else takes one while it runs:
+
+```toml
+# orchestration/jobs/backfill_prices_job.toml
+name = "backfill_prices_job"
+description = "Reload every supplier price"
+select = "raw_prices"
+pools = { supplier_api = 2 }
+```
+
+A job may take several pools. It starts only when every one has room, and takes all its slots at
+once:
+
+```toml
+# orchestration/jobs/price_report_job.toml
+name = "price_report_job"
+description = "Fetch the latest prices and rebuild the heavy price report"
+select = "+price_report"
+pools = { supplier_api = 1, warehouse_heavy = 2 }
+```
+
+| Field | Value |
+| --- | --- |
+| `[pools]` in `sqlbuild_project.toml` | Each pool's limit, a whole number of slots from `1` to `10000` |
+| `[targets.<name>.pools]` | The target's limit for pools `[pools]` declares |
+| `pools` on a job or job group | Each pool it takes, with its amount: a whole number of slots from `1` to its limit |
+
+Details:
+
+- Every pool is written with an amount: `pools = { supplier_api = 1 }`.
+- A pool the project doesn't declare fails `sqb compile` with `D017`, naming the job and the
+  declared pools.
+- An amount above the pool's limit fails `sqb compile`. A job with `targets` is checked against
+  those targets' limits, and a job without `targets` against the project's limit and each target's.
+- A target can change only the limit of a declared pool. Naming another pool fails with `D001`,
+  such as `targets.prod.pools.supplier_apy changes a pool [pools] does not declare`.
+- Limits are project policy, so `sqlbuild_local.toml` can't set them.
+- Slots belong to their location and target: runs of another location or target never take them.
+- A run that waits for a pool takes none of its slots, in that pool or any other, until all have
+  room. An earlier queued run taking the same pool goes first.
+- A job group takes every pool its members take, each at the largest amount, when it starts. Its
+  members then use the group's slots, one member per pool at a time.
+- The server can lower a limit for one launcher with `pool_caps`, never raise it; see
+  [Cap pools](../cli/server.md#cap-pools). A job whose amount is above the cap takes the whole
+  capped pool.
+- The job's page shows each pool it takes, its limit and the other jobs taking it. A queued run's
+  wait names the full pool and the runs holding it.

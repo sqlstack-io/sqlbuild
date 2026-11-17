@@ -97,7 +97,8 @@
 				"link": "/docs/cli/review/"
 			},
 			"docs/concepts/column-lineage",
-			"docs/concepts/orchestration"
+			"docs/concepts/orchestration",
+			"docs/concepts/concurrency"
 		]
 	},
 	{
