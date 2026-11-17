@@ -13,8 +13,6 @@ use sqlbuild_core::format_command::main::partition_lint_selectors::partition_lin
 use sqlbuild_core::format_command::main::resolve_lint_paths::resolve_lint_paths;
 use sqlbuild_rules::lint_text::main::scan_fixture_null_candidates::scan_fixture_null_candidates;
 
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compile_driver::project::build_project_graph;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -25,6 +23,8 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::build_project_graph::build_project_graph;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::discovery::main::project::load_local_config_file::load_local_config_file;
 use sqlbuild_python_front::discovery::main::project::load_project_config_file::load_project_config_file;

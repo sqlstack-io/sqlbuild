@@ -17,7 +17,6 @@ use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
-use crate::bindings::_helpers::compile_driver::pipeline::compiled_phase;
 use crate::bindings::_helpers::location_command::constants::EXECUTE_ACTION;
 use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
 use crate::bindings::_helpers::location_command::load_rules::load_rules;
@@ -38,6 +37,7 @@ use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::compiled_phase::compiled_phase;
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 use sqlbuild_python_project::project_snapshot::types::NodeKeys;

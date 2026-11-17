@@ -2,9 +2,9 @@
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
+use sqlbuild_python_compile::compile_driver::main::setup::build_compiled_project::build_compiled_project;
 use std::time::Instant;
 
 use pyo3::IntoPyObject;

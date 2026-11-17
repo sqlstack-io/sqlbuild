@@ -3,10 +3,10 @@
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use serde_json::{Value, json};
 
-use crate::bindings::_helpers::lineage::column_lineage_graph::ProjectColumnLineage;
-use crate::bindings::_helpers::lineage::project_lineage::build_project_column_lineage;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::lineage::main::build_project_column_lineage::build_project_column_lineage;
+use sqlbuild_python_compile::lineage::models::ProjectColumnLineage;
 
 /// FAST column lineage of every model as `[source key, column, target key, column, transform]` rows; `None` without SQL analysis.
 pub(crate) fn column_lineage_document(project: &Bound<'_, PyAny>) -> PyResult<Option<Value>> {

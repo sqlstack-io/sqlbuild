@@ -1,9 +1,8 @@
+use crate::bindings::_helpers::analysis_session;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::pymodule;
 use sqlbuild_rules::constants::{API_VERSION, NATIVE_BUILD_IDENTITY};
 
-use crate::bindings::_helpers::analysis;
-use crate::bindings::_helpers::analysis_session;
 use crate::bindings::_helpers::attachments;
 use crate::bindings::_helpers::auditing;
 use crate::bindings::_helpers::authored_values;
@@ -52,6 +51,9 @@ use sqlbuild_python_base::records::main::registry::capture::capture;
 use sqlbuild_python_base::records::main::registry::register_records::register_records;
 use sqlbuild_python_base::records::main::registry::verify_attributes::verify_attributes;
 use sqlbuild_python_base::records::main::registry::verify_tables::verify_tables;
+use sqlbuild_python_compile::analysis::main::register_queries::register_queries;
+use sqlbuild_python_compile::analysis::main::register_sql_test_comparisons::register_sql_test_comparisons;
+use sqlbuild_python_compile::analysis::main::register_sql_tests::register_sql_tests;
 use sqlbuild_python_project::analysis::main::register_normalization::register_normalization;
 use sqlbuild_python_project::analysis::models::BindingPositions;
 use sqlbuild_python_project::analysis::models::CompactAnalysisJob;
@@ -70,8 +72,8 @@ pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     rules::registration::register(module)?;
     cli::registration::register(module)?;
     register_normalization(module)?;
-    analysis::queries::register(module)?;
-    analysis::sql_tests::register(module)?;
+    register_queries(module)?;
+    register_sql_tests(module)?;
     sqltext::registration::register(module)?;
     register_oracles(module)?;
     register_expected_errors(module)?;
@@ -105,7 +107,7 @@ fn register_project_stages(module: &Bound<'_, PyModule>) -> PyResult<()> {
     microbatches::registration::register(module)?;
     lifecycle_events::registration::register(module)?;
     diagnostics::registration::register(module)?;
-    analysis::sql_test_comparisons::register(module)?;
+    register_sql_test_comparisons(module)?;
     Ok(())
 }
 

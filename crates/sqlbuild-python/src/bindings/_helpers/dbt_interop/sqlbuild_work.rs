@@ -17,7 +17,6 @@ use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::format_execution_header;
 use crate::bindings::_helpers::build_progress::result_text::build_result_text;
-use crate::bindings::_helpers::compile_outputs::runtime_target::write_runtime_target;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -35,6 +34,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_outputs::main::write_runtime_target::write_runtime_target;
 
 const WORK_OPTIONS: (&[&str], &[&str]) = (
     &[

@@ -11,7 +11,6 @@ use sqlbuild_core::cost_command::models::CostCoverage;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::cost_report::functions::read_cost_run;
 use crate::bindings::_helpers::cost_report::functions::resolve_cost_run;
 use crate::bindings::_helpers::cost_report::functions::write_cost_run;
@@ -23,6 +22,7 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::compile_attachment::main::build_effective_target_config::build_effective_target_config;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::cost_context::main::cost_aware::cost_aware;

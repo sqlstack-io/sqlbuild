@@ -35,8 +35,6 @@ use crate::bindings::_helpers::command_runtime::warehouses::apply_warehouse;
 use crate::bindings::_helpers::command_runtime::warehouses::command_scope;
 use crate::bindings::_helpers::command_runtime::warehouses::find_authored;
 use crate::bindings::_helpers::command_runtime::warehouses::resolve_warehouse;
-use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -51,6 +49,8 @@ use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_attachment::main::build_effective_target_namespace::build_effective_target_namespace;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
 

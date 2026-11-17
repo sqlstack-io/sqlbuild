@@ -1,15 +1,11 @@
 //! Native behaviour of the hosted shapes: computed attributes, methods, ordering and validation.
 
-use crate::bindings::_helpers::analysis;
-use crate::bindings::_helpers::analysis_session;
 use crate::bindings::_helpers::build_progress;
-use crate::bindings::_helpers::compile_command;
 use crate::bindings::_helpers::compute_logs;
 use crate::bindings::_helpers::dbt_events;
 use crate::bindings::_helpers::dbt_interop;
 use crate::bindings::_helpers::event_exporting;
 use crate::bindings::_helpers::execution_history;
-use crate::bindings::_helpers::project_assembly;
 use crate::bindings::_helpers::record_behaviours::auditing::finish_measurement_contract;
 use crate::bindings::_helpers::record_behaviours::auditing::finish_threshold_bound;
 use crate::bindings::_helpers::record_behaviours::auditing::finish_thresholds;
@@ -122,7 +118,6 @@ use crate::bindings::_helpers::record_behaviours::values::finish_fingerprint_set
 use crate::bindings::_helpers::record_behaviours::values::logical_type_display_name;
 use crate::bindings::_helpers::record_behaviours::values::sql_value_kind;
 use crate::bindings::_helpers::result_output;
-use crate::bindings::_helpers::rules;
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
 use sqlbuild_python_base::records::types::ClassProperty;
@@ -407,10 +402,10 @@ pub(crate) const BEHAVIOUR_ORDERED: &[&str] = &[
 
 /// The getter tables of every module that defines native pyclasses.
 pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
-    analysis::getters::GETTERS,
-    analysis_session::getters::GETTERS,
+    sqlbuild_python_compile::analysis::constants::GETTERS,
+    sqlbuild_python_compile::analysis_session::constants::GETTERS,
     build_progress::getters::GETTERS,
-    compile_command::getters::GETTERS,
+    sqlbuild_python_compile::compile_command::constants::GETTERS,
     sqlbuild_python_base::compile_context::constants::GETTERS,
     sqlbuild_python_project::compiled_views::constants::GETTERS,
     compute_logs::getters::GETTERS,
@@ -426,9 +421,9 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     sqlbuild_python_planner::planner_migrations::constants::GETTERS,
     sqlbuild_python_planner::planner_phases::constants::GETTERS,
     sqlbuild_python_base::presentation_text::constants::GETTERS,
-    project_assembly::getters::GETTERS,
+    sqlbuild_python_compile::project_assembly::constants::GETTERS,
     result_output::getters::GETTERS,
-    rules::getters::GETTERS,
+    sqlbuild_python_compile::rules::constants::GETTERS,
     sqlbuild_python_front::scopes::constants::GETTERS,
 ];
 

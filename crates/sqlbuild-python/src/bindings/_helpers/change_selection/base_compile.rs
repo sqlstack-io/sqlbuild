@@ -12,14 +12,14 @@ use sqlbuild_analysis::definition_changes::models::DefinitionSnapshot;
 
 use crate::bindings::_helpers::change_selection::definition_snapshot::definition_snapshot;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compile_driver::pipeline_entries::run_compile_only_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::run_compile_only_pipeline::run_compile_only_pipeline;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 
 /// The extension of the file beside the snapshot that holds notes for the run's output.
 pub(crate) const NOTES_EXTENSION: &str = "notes";

@@ -8,7 +8,6 @@ use crate::bindings::_helpers::check::check_command::run_check_command;
 use crate::bindings::_helpers::clone::clone_command::run_clone_command;
 use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
 use crate::bindings::_helpers::command_runtime::warehouses::validate_cli_warehouse;
-use crate::bindings::_helpers::compile_command::reuse_attempt::run_compile;
 use crate::bindings::_helpers::contract_command::command::run_contract_command;
 use crate::bindings::_helpers::cost_command::command::run_cost_command;
 use crate::bindings::_helpers::dbt_command::command::run_dbt_command;
@@ -54,6 +53,7 @@ use sqlbuild_core::format_command::main::format_path_selectors::format_path_sele
 use sqlbuild_python_base::cli::main::withhold_launch_record::withhold_launch_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_compile::compile_command::main::invocation::run_compile::run_compile;
 use sqlbuild_python_front::discovery::models::MissingSecretsScope;
 use sqlbuild_python_project::compiled_project::main::with_job_scope::with_job_scope;
 

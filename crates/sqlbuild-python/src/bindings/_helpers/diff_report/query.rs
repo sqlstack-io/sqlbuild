@@ -16,7 +16,6 @@ use sqlbuild_cli::diff_report::types::PhaseSeconds;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
 use crate::bindings::_helpers::diff_report::support::call;
 use crate::bindings::_helpers::diff_report::support::cli_error;
 use crate::bindings::_helpers::diff_report::support::error_text;
@@ -37,6 +36,7 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_compile::compile_attachment::main::build_effective_target_namespace::build_effective_target_namespace;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 

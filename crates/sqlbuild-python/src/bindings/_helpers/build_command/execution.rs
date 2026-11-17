@@ -26,7 +26,6 @@ use crate::bindings::_helpers::check::check_core::record_python_run_state_result
 use crate::bindings::_helpers::check::check_core::relevant_check_functions;
 use crate::bindings::_helpers::check::check_results::write_check_results;
 use crate::bindings::_helpers::command_runtime::warehouses::describe_connection_warehouse;
-use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
 use crate::bindings::_helpers::sql_test_command::timeouts::TimeoutKind;
 use crate::bindings::_helpers::sql_test_command::timeouts::resolve_run_timeout;
@@ -49,6 +48,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_front::cost_context::models::CostContext;
 use sqlbuild_python_front::cursor::main::overrides::cursor_integer::cursor_integer;
 use sqlbuild_python_front::cursor::main::overrides::cursor_timestamp::cursor_timestamp;

@@ -29,7 +29,6 @@ use std::time::Instant;
 use crate::bindings::_helpers::cli::machine_output::report_machine_output_written;
 use crate::bindings::_helpers::cli::machine_output::take_machine_output_written;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::diff_report::support::cli_error;
 use crate::bindings::_helpers::janitor::janitor_phases::JanitorCompiled;
 use crate::bindings::_helpers::janitor::janitor_phases::build_janitor_execution_plan;
@@ -48,6 +47,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_project::planner_phases::main::object::object;
 

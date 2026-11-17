@@ -13,7 +13,6 @@ use sqlbuild_scopes::scope_text::main::render_scope_text::render_scope_text;
 use sqlbuild_scopes::scope_text::main::scope_result_failed::scope_result_failed;
 use sqlbuild_scopes::scope_text::models::ScopeTextRequest;
 
-use crate::bindings::_helpers::scopes::scope_loading::load_or_build_scope_index;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -22,6 +21,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::scopes::main::load_or_build_scope_index::load_or_build_scope_index;
 use sqlbuild_python_front::scopes::main::index::build_scope_lookup::build_scope_lookup;
 use sqlbuild_python_front::scopes::main::reports::read_result::read_result;
 use sqlbuild_python_front::scopes::main::reports::scope_browse::scope_browse;

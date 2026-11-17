@@ -24,12 +24,12 @@ use crate::bindings::_helpers::change_selection::base_cache::prune_snapshots;
 use crate::bindings::_helpers::change_selection::base_cache::work_directory_name;
 use crate::bindings::_helpers::change_selection::base_compile::NOTES_EXTENSION;
 use crate::bindings::_helpers::change_selection::environment_nodes::with_base_dependencies;
-use crate::bindings::_helpers::compile_command::runtime_identity::interpreter_values;
 use crate::bindings::_helpers::scenario_command::setup::cli_user_error;
 use crate::bindings::_helpers::scenario_command::setup::flush;
 use crate::bindings::_helpers::scenario_command::setup::write;
 use sqlbuild_python_base::planner_identity::constants::COMPACT;
 use sqlbuild_python_base::planner_identity::main::sorted_dumps::sorted_dumps;
+use sqlbuild_python_compile::compile_command::main::invocation::interpreter_values::interpreter_values;
 use sqlbuild_python_front::discovery::main::project::configured_git_base_ref::configured_git_base_ref;
 
 const CACHE_DIRECTORY: [&str; 2] = ["target", "since"];
