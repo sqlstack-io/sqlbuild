@@ -142,18 +142,22 @@ fn given_member_lineage_when_deriving_group_waits_then_each_member_waits_for_the
         },
     ];
     for test_case in test_cases {
-        let expected: BTreeMap<String, BTreeSet<String>> = test_case
-            .expected_waits
-            .iter()
-            .map(|(name, deps)| {
-                (
-                    (*name).to_owned(),
-                    deps.iter().map(|dep| (*dep).to_owned()).collect(),
-                )
-            })
-            .collect();
         let actual = waits(&test_case.lineage, &test_case.jobs).expect(test_case.description);
-        assert_eq!(actual, expected, "{}", test_case.description);
+        assert_eq!(
+            actual,
+            test_case
+                .expected_waits
+                .iter()
+                .map(|(name, deps)| {
+                    (
+                        (*name).to_owned(),
+                        deps.iter().map(|dep| (*dep).to_owned()).collect(),
+                    )
+                })
+                .collect::<BTreeMap<String, BTreeSet<String>>>(),
+            "{}",
+            test_case.description
+        );
     }
 }
 

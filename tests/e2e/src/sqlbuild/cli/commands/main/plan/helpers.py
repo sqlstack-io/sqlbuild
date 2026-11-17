@@ -9,9 +9,11 @@ import sqlite3
 import subprocess
 import sys
 import time
+from bisect import bisect_right
 from collections.abc import Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
+from itertools import accumulate
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -19,6 +21,7 @@ from uuid import uuid4
 
 from tests.e2e.src.sqlbuild.cli.commands.main.lineage.helpers import DIAMOND_LAYERS
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    REPO_ROOT,
     execute_duckdb,
     prepare_inline_project,
     run_sqb,
@@ -286,6 +289,8 @@ def plan_timing_table(output: str) -> PlanTimingTable:
 # ---- the DuckShop 10K plan preview guard ----
 
 DUCKSHOP_10K_TARGET: str = "dev"
+DUCKSHOP_10K_GENERATOR: Path = REPO_ROOT / "benchmarks" / "duckshop-10k"
+DUCKSHOP_10K_SETUP_SECONDS: int = 600
 PREVIEW_PUBLISHED: str = "Location snapshot published."
 PREVIEW_DONE: str = "Location work completed."
 _PAGE_RECORDS: int = 2000
@@ -334,7 +339,7 @@ def served_duckshop_location(
             env=os.environ | (env or {}) | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
         ) as process:
             control: Path = directory / "control/.sqlbuild/control.sqlite3"
-            publishing = ServedLocation(api, control, log, process, 0.0)
+            publishing: ServedLocation = ServedLocation(api, control, log, process, 0.0)
             published: float = wait_for_log_count(publishing, PREVIEW_PUBLISHED, 1, 900.0)
             yield ServedLocation(api, control, log, process, published - started)
 
@@ -342,13 +347,11 @@ def served_duckshop_location(
 def wait_for_log_count(served: ServedLocation, text: str, count: int, timeout: float) -> float:
     """When the location log first holds `count` lines of `text`."""
     deadline: float = time.monotonic() + timeout
-    while True:
-        content: str = served.log.read_text(errors="replace")
-        if content.count(text) >= count:
-            return time.monotonic()
+    while (content := served.log.read_text(errors="replace")).count(text) < count:
         assert served.process.poll() is None, content[-4000:]
         assert time.monotonic() < deadline, content[-4000:]
         time.sleep(0.02)
+    return time.monotonic()
 
 
 def published_keys(control: Path) -> list[str]:
@@ -389,17 +392,14 @@ def _location_post(api: SnapshotApi, path: str, body: dict[str, Any]) -> None:
 
 
 def _pages(records: list[dict[str, Any]]) -> Iterator[list[dict[str, Any]]]:
-    page: list[dict[str, Any]] = []
-    size: int = 0
-    for record in records:
-        encoded: int = len(json.dumps(record))
-        if page and (len(page) == _PAGE_RECORDS or size + encoded > _PAGE_BYTES):
-            yield page
-            page, size = [], 0
-        page.append(record)
-        size += encoded
-    if page:
-        yield page
+    """Pages of at most `_PAGE_RECORDS` records and `_PAGE_BYTES`, each holding at least one."""
+    sizes: list[int] = [len(json.dumps(record)) for record in records]
+    start: int = 0
+    while start < len(records):
+        totals: list[int] = list(accumulate(sizes[start : start + _PAGE_RECORDS]))
+        end: int = start + max(1, bisect_right(totals, _PAGE_BYTES))
+        yield records[start:end]
+        start = end
 
 
 def _namespace_order(item: Any) -> str:
@@ -466,15 +466,16 @@ def timed_plan(
     started: float = time.monotonic()
     request_id: str = request_plan(served.control, selection, settings)
     deadline: float = started + 600.0
-    while True:
-        with closing(sqlite3.connect(served.control)) as database:
-            row = database.execute(
-                "SELECT result_json FROM sqb_location_work WHERE request_id=?", (request_id,)
-            ).fetchone()
-        if row and row[0]:
-            elapsed: float = time.monotonic() - started
-            document: dict[str, Any] = json.loads(row[0])["outcome"]["document"]
-            return elapsed, document
+    result: str | None = None
+    while result is None:
         assert served.process.poll() is None, served.log.read_text(errors="replace")[-4000:]
         assert time.monotonic() < deadline, served.log.read_text(errors="replace")[-4000:]
         time.sleep(0.02)
+        with closing(sqlite3.connect(served.control)) as database:
+            row: tuple[str | None] | None = database.execute(
+                "SELECT result_json FROM sqb_location_work WHERE request_id=?", (request_id,)
+            ).fetchone()
+        result = (row or (None,))[0]
+    elapsed: float = time.monotonic() - started
+    document: dict[str, Any] = json.loads(result)["outcome"]["document"]
+    return elapsed, document

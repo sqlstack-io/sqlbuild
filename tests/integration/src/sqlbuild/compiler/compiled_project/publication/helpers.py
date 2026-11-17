@@ -443,12 +443,11 @@ def warehouse_history_page(
     table: str,
     after: list[str | None] | None = None,
     observed_since: str | None = None,
-    newest_versions: int | None = None,
-    limit: int | None = None,
+    **options: int | None,
 ) -> Any:
     """Exercise the real isolated reader without a server, state database or declaration import."""
     result: subprocess.CompletedProcess[str] = warehouse_history_read(
-        project, table, after, observed_since, newest_versions=newest_versions, limit=limit
+        project, table, after, observed_since, **options
     )
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
@@ -459,19 +458,14 @@ def warehouse_history_read(
     table: str,
     after: list[str | None] | None = None,
     observed_since: str | None = None,
-    newest_versions: int | None = None,
-    limit: int | None = None,
+    **options: int | None,
 ) -> subprocess.CompletedProcess[str]:
     """One isolated reader exchange, with the reader's own report of a failed read."""
     read: dict[str, Any] = {
         "location": {"database": None, "schema": "main"},
         "after": after,
         "observed_since": observed_since,
-    }
-    if newest_versions is not None:
-        read["newest_versions"] = newest_versions
-    if limit is not None:
-        read["limit"] = limit
+    } | options
     return subprocess.run(
         [
             str(Path(sys.executable).with_name("sqb")),
@@ -496,7 +490,7 @@ def warehouse_history_read(
 
 
 def warehouse_history_pages(
-    project: Path, table: str, observed_since: str | None = None, limit: int | None = None
+    project: Path, table: str, observed_since: str | None = None, **options: int | None
 ) -> list[dict[str, Any]]:
     """Follow bounded source pages, including empty filtered pages with a continuation."""
     pages: list[dict[str, Any]] = []
@@ -504,7 +498,7 @@ def warehouse_history_pages(
     more: bool = True
     while more:
         page: dict[str, Any] = warehouse_history_page(
-            project, table, after, observed_since, limit=limit
+            project, table, after, observed_since, **options
         )
         assert "failed" not in page, page
         pages.append(page)
@@ -553,6 +547,18 @@ def wait_for_log(
         assert process.poll() is None, log.read_text()
         assert time.monotonic() < deadline, log.read_text()
         time.sleep(0.02)
+
+
+def wait_for_log_count(
+    process: subprocess.Popen[bytes], log: Path, text: str, count: int, *, timeout: float = 45
+) -> str:
+    """Wait until `text` has been logged `count` times; returns the log."""
+    deadline: float = time.monotonic() + timeout
+    while (logged := log.read_text()).count(text) < count:
+        assert process.poll() is None, logged
+        assert time.monotonic() < deadline, logged
+        time.sleep(0.05)
+    return logged
 
 
 def wait_for_development_ready(
@@ -690,6 +696,34 @@ def wait_for_location_health(
             observations.setdefault(observed_key, {})[event_id] = report
         time.sleep(0.02)
     return list(observations[key].values())[-1]
+
+
+def published_connection_health(
+    api: SnapshotApi,
+    expected: tuple[str, bool],
+    published: tuple[dict[str, Any], str],
+    process: subprocess.Popen[bytes],
+    log: Path,
+) -> dict[str, Any]:
+    """The timed connection check after a snapshot published, on a local DuckDB connection."""
+    target, healthy = expected
+    snapshot, trigger = published
+    health: dict[str, Any] = wait_for_location_health(
+        api,
+        target,
+        {
+            "kind": "connection",
+            "generation": snapshot["record"]["generation"],
+            "healthy": healthy,
+            "trigger": trigger,
+        },
+        process,
+        log,
+    )
+    assert isinstance(health["report"]["health"]["elapsed_millis"], int)
+    connection: dict[str, Any] = snapshot["documents"]["connection"]
+    assert (connection["adapter"], connection["auth_method"]) == ("duckdb", "none")
+    return health
 
 
 def wait_for_interpreter(process: subprocess.Popen[bytes], pidfile: Path, log: Path) -> int:
@@ -1886,6 +1920,19 @@ def plans_from_copy(
 def changed_runs(plan: dict[str, Any]) -> tuple[str, ...]:
     """The nodes a changed plan runs."""
     return tuple(run["node"] for run in plan["changed"]["runs"])
+
+
+def changed_build_report(plan: dict[str, Any]) -> dict[str, list[str]]:
+    """What a changed build of `plan` reports: the nodes it runs, split by why they run."""
+    runs: list[dict[str, Any]] = plan["changed"]["runs"]
+    changed: list[dict[str, Any]] = list(filter(lambda run: run["downstream_of"] is None, runs))
+    downstream: list[dict[str, Any]] = list(
+        filter(lambda run: run["downstream_of"] is not None, runs)
+    )
+    return {
+        "changed": [run["node"] for run in changed],
+        "downstream": [run["node"] for run in downstream],
+    }
 
 
 def failed_load(tmp_path: Path, project: Path) -> tuple[dict[str, Any], int, str]:

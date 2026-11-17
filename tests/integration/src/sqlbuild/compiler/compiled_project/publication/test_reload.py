@@ -18,11 +18,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     LocationDatabaseTestCase,
     LocationReloadTestCase,
     LocationShutdownTestCase,
-    SnapshotApi,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     current_snapshot,
     location_process,
+    published_connection_health,
     snapshot_api,
     wait_for_generation,
     wait_for_interpreter,
@@ -30,33 +30,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_log,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
-
-
-def _connection_check(
-    api: SnapshotApi,
-    test_case: LocationReloadTestCase,
-    published: tuple[dict[str, Any], str],
-    process: subprocess.Popen[bytes],
-    log: Path,
-) -> dict[str, Any]:
-    """The connection check after `snapshot` published, timed, and the connection settings it published."""
-    snapshot, trigger = published
-    health: dict[str, Any] = wait_for_location_health(
-        api,
-        test_case.target,
-        {
-            "kind": "connection",
-            "generation": snapshot["record"]["generation"],
-            "healthy": test_case.expected_connection,
-            "trigger": trigger,
-        },
-        process,
-        log,
-    )
-    assert isinstance(health["report"]["health"]["elapsed_millis"], int)
-    connection: dict[str, Any] = snapshot["documents"]["connection"]
-    assert (connection["adapter"], connection["auth_method"]) == ("duckdb", "none")
-    return health
 
 
 @pytest.mark.parametrize(
@@ -136,8 +109,12 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             heartbeat: dict[str, Any] = wait_for_location_health(
                 api, test_case.target, {"kind": "heartbeat"}, process, log
             )
-            initial_health: dict[str, Any] = _connection_check(
-                api, test_case, (first, "startup"), process, log
+            initial_health: dict[str, Any] = published_connection_health(
+                api,
+                (test_case.target, test_case.expected_connection),
+                (first, "startup"),
+                process,
+                log,
             )
             assert initial_health["report"]["session_id"] == heartbeat["report"]["session_id"]
             staging: Path = project / "models/stg_orders.sql"
@@ -152,7 +129,13 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             assert int(compiler_pid.read_text()) == first_interpreter
             assert "CAST(13 AS INTEGER)" in second["nodes"]["model:stg_orders"]["raw_sql"]
             assert {change["subject_key"] for change in second["changes"]} == {"model:stg_orders"}
-            _ = _connection_check(api, test_case, (second, "publish"), process, log)
+            _ = published_connection_health(
+                api,
+                (test_case.target, test_case.expected_connection),
+                (second, "publish"),
+                process,
+                log,
+            )
 
             _ = staging.write_text("SELECT FROM invalid SQL !\n")
             _ = wait_for_location_health(
@@ -229,8 +212,12 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             )
             assert int(compiler_pid.read_text()) != replacement_interpreter
             assert restarted["nodes"] == configured["nodes"]
-            restarted_health: dict[str, Any] = _connection_check(
-                api, test_case, (restarted, "startup"), process, log
+            restarted_health: dict[str, Any] = published_connection_health(
+                api,
+                (test_case.target, test_case.expected_connection),
+                (restarted, "startup"),
+                process,
+                log,
             )
             assert (
                 restarted_health["report"]["session_id"] != initial_health["report"]["session_id"]

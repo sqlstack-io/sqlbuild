@@ -13,7 +13,6 @@ import json
 import subprocess
 import sys
 import time
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +20,8 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.plan._test_types import PreviewPerformanceTestCase
 from tests.e2e.src.sqlbuild.cli.commands.main.plan.helpers import (
+    DUCKSHOP_10K_GENERATOR,
+    DUCKSHOP_10K_SETUP_SECONDS,
     DUCKSHOP_10K_TARGET,
     PREVIEW_DONE,
     mirror_synced_state,
@@ -29,36 +30,11 @@ from tests.e2e.src.sqlbuild.cli.commands.main.plan.helpers import (
     timed_plan,
     wait_for_log_count,
 )
-from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import REPO_ROOT
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person.helpers import (
     person_login,
     person_request,
     provision_person,
 )
-
-_GENERATOR: Path = REPO_ROOT / "benchmarks" / "duckshop-10k"
-_SETUP_SECONDS: int = 600
-
-
-@pytest.fixture(scope="module")
-def duckshop_10k(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[Path, Path, Path]]:
-    """The generated project, a planner capture of one plan of it, and the snapshot it published."""
-    root: Path = tmp_path_factory.mktemp("duckshop_10k_preview")
-    project: Path = root / "project"
-    generated = subprocess.run(
-        (sys.executable, str(_GENERATOR / "generate.py"), "--out", str(project)),
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=_SETUP_SECONDS,
-    )
-    assert generated.returncode == 0, generated.stdout + generated.stderr
-    capture: Path = root / "capture"
-    with served_duckshop_location(
-        root / "calibration", project, env={"SQLBUILD_PLANNER_CAPTURE_DIR": str(capture)}
-    ) as served:
-        _ = timed_plan(served, [], {})
-        yield project, next(capture.glob("*plan_output.json")), served.control
 
 
 @pytest.mark.performance
@@ -94,10 +70,10 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
 ) -> None:
     project, capture, published = duckshop_10k
     batches_path: Path = tmp_path / "synced_state.json"
-    written = subprocess.run(
+    written: subprocess.CompletedProcess[str] = subprocess.run(
         (
             sys.executable,
-            str(_GENERATOR / "synced_state.py"),
+            str(DUCKSHOP_10K_GENERATOR / "synced_state.py"),
             str(published),
             str(capture),
             str(batches_path),
@@ -107,7 +83,7 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
         capture_output=True,
         text=True,
         check=False,
-        timeout=_SETUP_SECONDS,
+        timeout=DUCKSHOP_10K_SETUP_SECONDS,
     )
     assert written.returncode == 0, written.stdout + written.stderr
     batches: dict[str, list[dict[str, Any]]] = json.loads(batches_path.read_text())

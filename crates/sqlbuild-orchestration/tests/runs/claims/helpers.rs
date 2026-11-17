@@ -188,11 +188,14 @@ pub(crate) async fn member_reactions(
 ) -> std::collections::BTreeMap<String, crate::runs::tests::test_types::MemberReaction> {
     use crate::runs::tests::test_types::MemberReaction;
     let mut reactions = std::collections::BTreeMap::new();
-    while let Some(claim) =
-        crate::runs::main::claim_next_run::claim_next_run(store, lease, limits, Some(scope))
-            .await
-            .expect("claim dependent")
-    {
+    for _ in 0..2 {
+        let Some(claim) =
+            crate::runs::main::claim_next_run::claim_next_run(store, lease, limits, Some(scope))
+                .await
+                .expect("claim dependent")
+        else {
+            break;
+        };
         let execution = crate::runs::main::run_execution::run_execution(
             store,
             (claim.request.run_id, claim.claim_id),
@@ -209,20 +212,18 @@ pub(crate) async fn member_reactions(
                         .into_iter()
                         .find(|known| known == node)
                         .expect("known node"),
-                    if cause == "customers" {
-                        "customers"
-                    } else {
-                        "other"
-                    },
+                    ["customers"]
+                        .into_iter()
+                        .find(|known| known == cause)
+                        .unwrap_or("other"),
                 )
             })
             .collect();
         skipped.sort_unstable();
-        let outcome = if skipped.is_empty() {
-            (NodeOutcome::Success, RunOutcome::Success)
-        } else {
-            (NodeOutcome::Skipped, RunOutcome::Failed)
-        };
+        let outcome = skipped
+            .is_empty()
+            .then_some((NodeOutcome::Success, RunOutcome::Success))
+            .unwrap_or((NodeOutcome::Skipped, RunOutcome::Failed));
         finish(store, &claim, outcome).await;
         reactions.insert(
             claim.request.job_key.clone().expect("member"),
@@ -232,10 +233,11 @@ pub(crate) async fn member_reactions(
     let runs = crate::runs::main::list_runs::list_runs(store, scope, 100)
         .await
         .expect("runs");
-    for member in ["marts_job", "inventory_job"] {
-        if reactions.contains_key(member) {
-            continue;
-        }
+    let unclaimed: Vec<&str> = ["marts_job", "inventory_job"]
+        .into_iter()
+        .filter(|member| !reactions.contains_key(*member))
+        .collect();
+    for member in unclaimed {
         let record = runs
             .iter()
             .find(|record| record.job_key.as_deref() == Some(member))
@@ -262,8 +264,7 @@ pub(crate) async fn member_reactions(
     reactions
 }
 
-/// With a retry delay, nothing starts until the delay ends; the test then ends it by moving the
-/// retry's `not_before` into the past.
+/// With a retry delay, nothing starts until the test moves the retry's `not_before` into the past.
 pub(crate) async fn wait_out_retry_delay(
     store: &ControlStore,
     (lease, (limits, scope)): (

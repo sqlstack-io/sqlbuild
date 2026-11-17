@@ -569,3 +569,18 @@ class FailedPlanTestCase:
     selection: list[str]
     expected_code: str
     expected_reason: str
+
+
+@dataclass(frozen=True)
+class ChangedBuildPublicationTestCase:
+    description: str
+    edit: tuple[str, str]
+    expected_published: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class ChangedBuildReplanTestCase:
+    description: str
+    edit: tuple[str, str]
+    expected_published: dict[str, list[str]]
+    expected_rebuilt: dict[str, list[str]]

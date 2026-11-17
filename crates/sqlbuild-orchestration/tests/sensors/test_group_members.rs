@@ -422,16 +422,20 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
 
 #[test]
 fn given_a_member_the_group_skips_when_sensors_and_alerts_watch_it_then_it_is_skipped_not_failed() {
-    let test_cases =
-        [Backend::Sqlite, Backend::Postgres].map(|backend| SkippedMemberSensorTestCase {
-            description: match backend {
-                Backend::Sqlite => "SQLite group skips its dependent member",
-                Backend::Postgres => "PostgreSQL group skips its dependent member",
-            },
-            backend,
+    let test_cases = [
+        SkippedMemberSensorTestCase {
+            description: "SQLite group skips its dependent member",
+            backend: Backend::Sqlite,
             expected_marts_status: RunStatus::Skipped,
             expected_fired: &[("marts_completed", 1), ("marts_skipped", 1)],
-        });
+        },
+        SkippedMemberSensorTestCase {
+            description: "PostgreSQL group skips its dependent member",
+            backend: Backend::Postgres,
+            expected_marts_status: RunStatus::Skipped,
+            expected_fired: &[("marts_completed", 1), ("marts_skipped", 1)],
+        },
+    ];
     for test_case in test_cases {
         run(async {
             let fixture = open_test_store(test_case.backend)

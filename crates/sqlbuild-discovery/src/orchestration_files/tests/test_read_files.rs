@@ -11,6 +11,8 @@ use crate::orchestration_files::tests::test_types::{
     FileErrorTestCase, GroupDependenciesTestCase, GroupReadTestCase, JobReadTestCase,
 };
 
+const DEPENDENCY_GROUP: &str = "name = \"nightly_job_group\"\ndescription = \"d\"\njobs = [\"orders_job\", \"partner_export_job\"]\n\n";
+
 const FULL_JOB: &str = r#"name = "orders_export_job"
 description = "Write the daily partner file."
 select = "python/orders/partner_export"
@@ -358,8 +360,6 @@ fn given_group_files_when_reading_then_keeps_member_positions_and_refuses_repeat
     }
 }
 
-const DEPENDENCY_GROUP: &str = "name = \"nightly_job_group\"\ndescription = \"d\"\njobs = [\"orders_job\", \"partner_export_job\"]\n\n";
-
 #[test]
 fn given_group_dependencies_when_reading_then_types_defaults_and_member_overrides() {
     let test_cases = [
@@ -437,7 +437,7 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
                 .map(|group| group.dependencies)
                 .map_err(|error| (error.message, error.position)),
             test_case
-                .expected
+                .expected_dependencies
                 .map_err(|(message, position)| (message.to_owned(), position)),
             "{}",
             test_case.description

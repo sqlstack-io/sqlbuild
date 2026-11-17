@@ -261,7 +261,6 @@ pub(crate) async fn reclaim_sqlite_space(store: &ControlStore) -> Result<bool, C
             return Ok(false);
         }
         if pragma("auto_vacuum")? == 2 {
-            // Each step frees one page, so step until the pragma finishes.
             let mut vacuum = connection.prepare(&format!(
                 "PRAGMA incremental_vacuum({SQLITE_RECLAIM_STEP_PAGES})"
             ))?;

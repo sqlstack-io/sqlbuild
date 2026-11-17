@@ -12,6 +12,7 @@ import sys
 import time
 from contextlib import closing
 from datetime import UTC, datetime, timedelta, timezone
+from itertools import chain
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -1717,17 +1718,13 @@ def test_given_many_builds_per_node_when_a_full_read_has_a_version_limit_then_on
             )
     adapter.close(connection)
 
+    pages: list[dict[str, Any]] = warehouse_history_pages(
+        project, "fingerprints", newest_versions=test_case.newest_versions
+    )
+    records: list[dict[str, Any]] = list(chain.from_iterable(page["records"] for page in pages))
     runs: dict[str, list[str]] = {}
-    after: list[str | None] | None = None
-    while True:
-        page: dict[str, Any] = warehouse_history_page(
-            project, "fingerprints", after, newest_versions=test_case.newest_versions
-        )
-        for record in page["records"]:
-            runs.setdefault(record["node_name"], []).append(record["run_id"])
-        after = page["next_after"]
-        if after is None:
-            break
+    for record in records:
+        runs.setdefault(record["node_name"], []).append(record["run_id"])
 
     assert {node: sorted(found) for node, found in runs.items()} == test_case.expected_runs
 
@@ -1767,7 +1764,8 @@ def test_given_wide_builds_when_reading_large_pages_then_the_byte_budget_ends_ea
 
     pages: list[dict[str, Any]] = warehouse_history_pages(project, "fingerprints")
 
-    runs: list[str] = [record["run_id"] for page in pages for record in page["records"]]
+    records: list[dict[str, Any]] = list(chain.from_iterable(page["records"] for page in pages))
+    runs: list[str] = [record["run_id"] for record in records]
     assert sorted(runs) == sorted(
         ["legacy-run"] + [f"wide-run-{index:03}" for index in range(test_case.wide_rows)]
     ), "every build arrives exactly once across byte-bounded pages"

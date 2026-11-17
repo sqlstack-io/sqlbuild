@@ -1094,9 +1094,9 @@ def test_given_a_job_retry_table_when_compiling_then_both_names_publish_one_poli
     )
     capfd.readouterr()
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    warnings: list[str] = [
-        line for line in capfd.readouterr().err.splitlines() if line.startswith("Warning: ")
-    ]
+    warnings: list[str] = list(
+        filter(lambda line: line.startswith("Warning: "), capfd.readouterr().err.splitlines())
+    )
     snapshot: dict[str, Any] = json.loads(
         compile_snapshot(
             project=build_compiled_project(
