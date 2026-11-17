@@ -440,7 +440,7 @@ impl WarehouseHistoryKind {
         self.names().1
     }
 
-    /// A refreshed cost observation reuses its source id and the warehouse's latest row is current, so its mirror keeps the latest row; every other kind keeps the earliest.
+    /// Two builds refreshing one run's cost estimate at once write the same source id and the warehouse's latest row is current, so cost mirrors keep the latest row; every other kind keeps the earliest.
     #[must_use]
     pub const fn mirror_keeps_latest(self) -> bool {
         matches!(self, Self::ResourceCosts)
