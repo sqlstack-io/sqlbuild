@@ -197,7 +197,7 @@ Details:
 
 - When the project can't resolve the target's settings, for example because the target names a connection that isn't defined, `sqb build`, `sqb check` and `sqb load` fail before any exporter or sink provider is set up.
 - Other commands still run in that case, and their exporter and sink providers get `ctx` set to `None`. `sqb format` is one example.
-- A sensor evaluation whose providers can't get its target's settings fails, and the sensor's cursor doesn't advance.
+- In a project that defines providers, a sensor evaluation whose target's settings can't be resolved fails, and the sensor's cursor doesn't advance.
 - Check for `None` in a provider that calendars, exporters or sinks use.
 
 ## Configuration from environment variables

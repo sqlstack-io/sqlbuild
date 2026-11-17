@@ -1642,7 +1642,7 @@ class PythonTargetConfigBuildE2ETestCase:
     project_target_lines: str
     local_target_lines: str
     expected_settings: dict[str, object]
-    lifecycle_sink: bool = False
+    extra_files: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1651,7 +1651,8 @@ class UnresolvedTargetSinkE2ETestCase:
 
     description: str
     command: tuple[str, ...]
-    expected_success: bool
+    expected_returncode: int
+    expected_output: str
     expected_setups: list[object]
 
 

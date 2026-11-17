@@ -15,8 +15,8 @@ use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::command_runtime::setup_context::project_setup_context;
 use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
+use crate::bindings::_helpers::native_host::setup_context::invocation_setup_context;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::result_output::terminal_index::TerminalEventIndex;
 use crate::bindings::_helpers::result_output::terminal_index::terminal_event_index_scope;
@@ -39,8 +39,6 @@ const DEBUG_COMMAND: &str = "debug";
 const LINEAGE_COMMAND: &str = "lineage";
 /// Compile's phase operations stay out of project lifecycle sinks; its invocation events do not.
 const COMPILE_COMMAND: &str = "compile";
-/// Commands whose own provider sessions get the target: their exporter and sink providers fail startup, rather than get `ctx` set to `None`, when the target can't be resolved.
-const TARGET_COMMANDS: [&str; 3] = ["build", "check", "load"];
 const COMPILE_WITHHELD_KINDS: &[&str] = &["operation"];
 const INVOCATION_COMPLETED: &str = "invocation_completed";
 const INVOCATION_FAILED: &str = "invocation_failed";
@@ -411,32 +409,7 @@ impl Observed {
                 .map(pyo3::Bound::into_any)?;
                 self.exporter_scope = Some(scope.clone().unbind());
                 let providers: Bound<'_, PyAny> = native_field(&extensions, "providers")?;
-                let setup_context: Bound<'_, PyAny> = if providers.is_truthy()? {
-                    let command: Option<String> = native_field(args, "command")?.extract()?;
-                    let resolve = || {
-                        project_setup_context(
-                            project_dir,
-                            (
-                                &args
-                                    .getattr("target")
-                                    .unwrap_or_else(|_| py.None().into_bound(py)),
-                                &args
-                                    .getattr("vars")
-                                    .unwrap_or_else(|_| py.None().into_bound(py)),
-                            ),
-                            command
-                                .is_some_and(|command| TARGET_COMMANDS.contains(&command.as_str())),
-                        )
-                    };
-                    // Resolving the target imports project adapters, which must not write to JSON stdout.
-                    if machine_output_mode(args)? {
-                        within(&redirect_stdout_to_stderr(py)?, |_| resolve())?
-                    } else {
-                        resolve()?
-                    }
-                } else {
-                    py.None().into_bound(py)
-                };
+                let setup_context = invocation_setup_context(args, (project_dir, &providers))?;
                 call_with(
                     &native_field(&scope, "configure_extensions")?,
                     &[

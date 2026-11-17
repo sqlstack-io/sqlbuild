@@ -47,6 +47,13 @@ _TARGET_CONFIG_RECORDER: str = (
     "    with Path(__file__).parents[1].joinpath('target_config.jsonl').open('a') as out:\n"
     "        out.write(json.dumps(line) + '\\n')\n"
 )
+_TARGET_PROBE_SINK: str = (
+    "from providers.target_probe import TargetProbe\n"
+    "from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink\n\n"
+    "@lifecycle_event_sink\n"
+    "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
+    "    del event, target_probe\n"
+)
 
 
 @pytest.mark.parametrize(
@@ -1848,7 +1855,7 @@ def test_given_loader_status_result_when_building_then_persists_loader_status_ro
                 "database_preserved": False,
                 "schema_preserved": False,
             },
-            lifecycle_sink=True,
+            extra_files=(("sinks/events.py", _TARGET_PROBE_SINK),),
         ),
         PythonTargetConfigBuildE2ETestCase(
             description="loader_schema falls back to the target schema",
@@ -1931,21 +1938,12 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "      - name: order_id\n"
                 "        type: INTEGER\n"
             ),
+            **dict(test_case.extra_files),
         },
     )
     (project_dir / "sqlbuild_local.toml").write_text(
         "[targets.dev]\n" + test_case.local_target_lines, encoding="utf-8"
     )
-    if test_case.lifecycle_sink:
-        (project_dir / "sinks").mkdir()
-        (project_dir / "sinks" / "events.py").write_text(
-            "from providers.target_probe import TargetProbe\n"
-            "from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink\n\n"
-            "@lifecycle_event_sink\n"
-            "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
-            "    del event, target_probe\n",
-            encoding="utf-8",
-        )
 
     results: list[subprocess.CompletedProcess[str]] = [
         run_sqb(command=("--no-color", *command), project_dir=project_dir)
@@ -1982,13 +1980,15 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
         UnresolvedTargetSinkE2ETestCase(
             description="build fails before any sink provider is set up",
             command=("build",),
-            expected_success=False,
+            expected_returncode=1,
+            expected_output="Unknown connection 'warehouse' selected by target",
             expected_setups=[],
         ),
         UnresolvedTargetSinkE2ETestCase(
             description="format needs no target and sets the provider up with None",
             command=("format", "--check"),
-            expected_success=True,
+            expected_returncode=0,
+            expected_output="Completed.",
             expected_setups=[None],
         ),
     ],
@@ -2025,13 +2025,8 @@ def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_fre
                 "        with Path(__file__).parents[1].joinpath('setups.jsonl').open('a') as out:\n"
                 "            out.write(json.dumps(line) + '\\n')\n"
             ),
-            "sinks/events.py": (
-                "from providers.target_probe import TargetProbe\n"
-                "from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink\n\n"
-                "@lifecycle_event_sink\n"
-                "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
-                "    del event, target_probe\n"
-            ),
+            "sinks/events.py": _TARGET_PROBE_SINK,
+            "setups.jsonl": "",
         },
     )
 
@@ -2039,15 +2034,12 @@ def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_fre
         command=("--no-color", *test_case.command), project_dir=project_dir
     )
 
-    assert (result.returncode == 0) == test_case.expected_success, result.stdout + result.stderr
-    if not test_case.expected_success:
-        assert "Unknown connection 'warehouse'" in result.stdout + result.stderr
-    setups_path: Path = project_dir / "setups.jsonl"
-    setups: list[object] = (
-        [json.loads(line) for line in setups_path.read_text(encoding="utf-8").splitlines()]
-        if setups_path.exists()
-        else []
-    )
+    assert result.returncode == test_case.expected_returncode, result.stdout + result.stderr
+    assert test_case.expected_output in result.stdout + result.stderr
+    setups: list[object] = [
+        json.loads(line)
+        for line in (project_dir / "setups.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
     assert setups == test_case.expected_setups
 
 
@@ -2136,13 +2128,13 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
     ], recorded
     # Python node results land in the adapter's default schema; no schema keeps the template.
     assert table_exists(db_path=db_path, table_name="_sqlbuild_node_results", schema="main")
-    schemas: list[str] = [
-        str(row[0])
-        for row in query_duckdb(
-            db_path=db_path, sql="SELECT schema_name FROM information_schema.schemata"
+    assert (
+        query_duckdb(
+            db_path=db_path,
+            sql="SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE '%${%'",
         )
-    ]
-    assert not [schema for schema in schemas if "${" in schema], schemas
+        == []
+    )
 
 
 @pytest.mark.parametrize(
