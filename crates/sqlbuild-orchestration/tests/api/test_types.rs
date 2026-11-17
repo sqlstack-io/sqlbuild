@@ -5,6 +5,7 @@ use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::models::{
     MetadataBatch, WarehouseHistoryKind, WarehouseSyncResponse,
 };
+use chrono::{DateTime, Utc};
 use futures_util::future::BoxFuture;
 use uuid::Uuid;
 
@@ -135,6 +136,9 @@ pub(crate) struct MirrorConflictTestCase {
     /// The kept value in its typed mirror column, for kinds that have one.
     pub(crate) expected_column: Option<&'static str>,
 }
+
+/// A kept mirror row as (source id, record time, record value, column time, typed column value).
+pub(crate) type KeptMirrorRow = (String, DateTime<Utc>, String, DateTime<Utc>, Option<String>);
 
 /// Mirrors one page of a history kind.
 pub(crate) type MirrorIngest =

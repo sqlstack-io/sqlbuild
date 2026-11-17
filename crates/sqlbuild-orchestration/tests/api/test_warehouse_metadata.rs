@@ -9,7 +9,8 @@ use uuid::Uuid;
 use crate::api::tests::changes_helpers::{connect, expect_topics};
 use crate::api::tests::helpers::{start_api, stop_api};
 use crate::api::tests::test_types::{
-    MirrorConflictTestCase, StateTableClassificationTestCase, WarehouseMetadataTestCase,
+    KeptMirrorRow, MirrorConflictTestCase, StateTableClassificationTestCase,
+    WarehouseMetadataTestCase,
 };
 use crate::api::tests::warehouse_history_helpers::{
     audit_page, batch, cost_page, fixture, seed_target,
@@ -612,26 +613,25 @@ fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_
             .await
             .expect("mirrored rows");
             commit(transaction).await.expect("close read");
-            let mut kept: Vec<(String, DateTime<Utc>, String, DateTime<Utc>, Option<String>)> =
-                rows.iter()
-                    .map(|row| {
-                        let record = &row["record_json"];
-                        (
-                            record[id_field].as_str().expect("id").to_owned(),
-                            record[time_field]
-                                .as_str()
-                                .expect("time")
-                                .parse()
-                                .expect("RFC 3339"),
-                            record[value_field].as_str().expect("value").to_owned(),
-                            serde_json::from_value(row["observed_at"].clone())
-                                .expect("column time"),
-                            row.get(value_field)
-                                .and_then(|value| value.as_str())
-                                .map(str::to_owned),
-                        )
-                    })
-                    .collect();
+            let mut kept: Vec<KeptMirrorRow> = rows
+                .iter()
+                .map(|row| {
+                    let record = &row["record_json"];
+                    (
+                        record[id_field].as_str().expect("id").to_owned(),
+                        record[time_field]
+                            .as_str()
+                            .expect("time")
+                            .parse()
+                            .expect("RFC 3339"),
+                        record[value_field].as_str().expect("value").to_owned(),
+                        serde_json::from_value(row["observed_at"].clone()).expect("column time"),
+                        row.get(value_field)
+                            .and_then(|value| value.as_str())
+                            .map(str::to_owned),
+                    )
+                })
+                .collect();
             kept.sort();
             let expected_at: DateTime<Utc> = test_case.expected_row.0.parse().expect("RFC 3339");
             assert_eq!(
