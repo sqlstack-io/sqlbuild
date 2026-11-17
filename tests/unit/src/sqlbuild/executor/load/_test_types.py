@@ -218,7 +218,6 @@ class LoaderOperationLifecycleTestCase:
     description: str
     expected_status: ExecutionStatus
     expected_event_types: tuple[str, ...]
-<<<<<<< HEAD
 
 
 @dataclass(frozen=True)
@@ -228,5 +227,3 @@ class LoaderReferenceRejectionTestCase:
     description: str
     reference: Callable[..., object]
     expected_message: str
-=======
->>>>>>> origin/main

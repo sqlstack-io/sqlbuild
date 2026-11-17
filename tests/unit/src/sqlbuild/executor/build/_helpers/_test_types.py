@@ -122,8 +122,6 @@ class BuildSourceNodeExecutionTestCase:
 
 
 @dataclass(frozen=True)
-<<<<<<< HEAD
-=======
 class BuildSourceNodeResultLocationTestCase:
     """Where a scheduled loader's result goes for an adapter default and a runtime location."""
 
@@ -134,7 +132,6 @@ class BuildSourceNodeResultLocationTestCase:
 
 
 @dataclass(frozen=True)
->>>>>>> origin/main
 class MaterializationRecreatesRelationTestCase:
     description: str
     materialization_type: MaterializationType

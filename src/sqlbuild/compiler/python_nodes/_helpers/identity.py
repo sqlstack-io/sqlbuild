@@ -4,17 +4,10 @@ from __future__ import annotations
 
 import inspect
 import json
-<<<<<<< HEAD
-import textwrap
-import weakref
-from collections.abc import Callable, Iterable, Mapping
-=======
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
->>>>>>> origin/main
 from dataclasses import asdict
-from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
@@ -22,9 +15,6 @@ from typing import Any, cast
 from sqlbuild._native import PythonIdentityDependency, PythonNodeIdentity
 from sqlbuild.compiler.python_nodes._helpers.object_source import class_anchor, hash_text
 from sqlbuild.compiler.python_nodes.classes.identity_pass import IdentityPass
-
-_SOURCE_PATHS: weakref.WeakKeyDictionary[object, Path | None] = weakref.WeakKeyDictionary()
-_NORMALIZED_SOURCES: weakref.WeakKeyDictionary[object, str] = weakref.WeakKeyDictionary()
 
 _IGNORED_PATH_PARTS: frozenset[str] = frozenset(
     {
@@ -237,37 +227,6 @@ def _dependency_for_object(
     )
 
 
-<<<<<<< HEAD
-@lru_cache(maxsize=4096)
-def _called_references(source: str) -> tuple[tuple[str, ...], ...]:
-    try:
-        tree: ast.AST = ast.parse(source)
-    except SyntaxError:
-        return ()
-    refs: set[tuple[str, ...]] = set()
-    node: ast.AST
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        ref: tuple[str, ...] | None = _reference_parts(node.func)
-        if ref is not None:
-            refs.add(ref)
-    return tuple(sorted(refs))
-
-
-def _reference_parts(node: ast.AST) -> tuple[str, ...] | None:
-    if isinstance(node, ast.Name):
-        return (node.id,)
-    if isinstance(node, ast.Attribute):
-        parent: tuple[str, ...] | None = _reference_parts(node.value)
-        if parent is None:
-            return None
-        return (*parent, node.attr)
-    return None
-
-
-=======
->>>>>>> origin/main
 def _resolve_reference(*, ref: tuple[str, ...], globals_map: Mapping[str, object]) -> object | None:
     if not ref:
         return None
@@ -282,45 +241,6 @@ def _resolve_reference(*, ref: tuple[str, ...], globals_map: Mapping[str, object
     return current
 
 
-<<<<<<< HEAD
-def _is_first_party_source(*, source_path: Path, allowed_roots: tuple[Path, ...]) -> bool:
-    return _first_party_source(source_path, allowed_roots)
-
-
-@lru_cache(maxsize=4096)
-def _first_party_source(source_path: Path, allowed_roots: tuple[Path, ...]) -> bool:
-    resolved: Path = source_path.resolve()
-    if any(part in _IGNORED_PATH_PARTS for part in resolved.parts):
-        return False
-    return any(_is_relative_to(path=resolved, root=root) for root in allowed_roots)
-
-
-def _source_path(obj: object) -> Path | None:
-    """The object's source file, read once per object: nodes share most of their dependencies."""
-    return _object_cached(_SOURCE_PATHS, obj, _uncached_source_path)
-
-
-def _uncached_source_path(obj: object) -> Path | None:
-    try:
-        raw_path: str | None = inspect.getsourcefile(cast(Any, obj))
-    except TypeError:
-        return None
-    if raw_path is None:
-        return None
-    return Path(raw_path)
-
-
-def _normalized_source(obj: object) -> str:
-    """The object's dedented source, read once per object: `inspect.getsource` rescans its file."""
-    return _object_cached(_NORMALIZED_SOURCES, obj, _uncached_normalized_source)
-
-
-def _uncached_normalized_source(obj: object) -> str:
-    try:
-        return textwrap.dedent(inspect.getsource(cast(Any, obj))).strip()
-    except (OSError, TypeError):
-        return ""
-=======
 def _is_first_party_source(
     *, source_path: Path, allowed_roots: tuple[Path, ...], memo: IdentityPass
 ) -> bool:
@@ -328,7 +248,6 @@ def _is_first_party_source(
     if any(part in _IGNORED_PATH_PARTS for part in resolved.parts):
         return False
     return any(_is_relative_to(path=resolved, root=root, memo=memo) for root in allowed_roots)
->>>>>>> origin/main
 
 
 def _object_kind(obj: object) -> str:
@@ -353,16 +272,7 @@ def _object_qualname(obj: object) -> str:
     return str(getattr(obj, "__qualname__", getattr(obj, "__name__", type(obj).__name__)))
 
 
-<<<<<<< HEAD
-def _display_path(*, source_path: Path | None, roots: Iterable[Path]) -> str:
-    return _cached_display_path(source_path, tuple(roots))
-
-
-@lru_cache(maxsize=4096)
-def _cached_display_path(source_path: Path | None, roots: tuple[Path, ...]) -> str:
-=======
 def _display_path(*, source_path: Path | None, roots: tuple[Path, ...], memo: IdentityPass) -> str:
->>>>>>> origin/main
     if source_path is None:
         return ""
     resolved: Path = memo.resolved(source_path)
@@ -380,30 +290,9 @@ def _display_path(*, source_path: Path | None, roots: tuple[Path, ...], memo: Id
 def _is_relative_to(*, path: Path, root: Path, memo: IdentityPass) -> bool:
     """`path.is_relative_to(root.resolve())`, comparing each path's parts computed once per pass."""
 
-<<<<<<< HEAD
-
-@lru_cache(maxsize=8192)
-def _hash_text(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
-=======
     root_parts: tuple[str, ...] = memo.parts(memo.resolved(root))
     return memo.parts(path)[: len(root_parts)] == root_parts
->>>>>>> origin/main
 
 
 def _stable_json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=repr)
-
-
-def _object_cached[T](
-    cache: weakref.WeakKeyDictionary[object, T], obj: object, compute: Callable[[object], T]
-) -> T:
-    """Memoise per live object; objects that cannot be weakly referenced are computed each time."""
-    try:
-        return cache[obj]
-    except KeyError:
-        value: T = compute(obj)
-        cache[obj] = value
-        return value
-    except TypeError:
-        return compute(obj)

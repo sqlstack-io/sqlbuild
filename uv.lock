@@ -3800,11 +3800,7 @@ dev = [
     { name = "dbt-postgres", specifier = ">=1.9.0,<1.11" },
     { name = "dbt-snowflake", specifier = "==1.12.0b1" },
     { name = "dbt-sqlserver", specifier = ">=1.9.0,<1.11" },
-<<<<<<< HEAD
-    { name = "fensu", specifier = ">=0.31.0" },
-=======
     { name = "fensu", specifier = ">=0.31.1" },
->>>>>>> origin/main
     { name = "jsonschema", specifier = ">=4.23.0" },
     { name = "maturin", specifier = ">=1.9,<2" },
     { name = "pre-commit", specifier = ">=4.3.0" },

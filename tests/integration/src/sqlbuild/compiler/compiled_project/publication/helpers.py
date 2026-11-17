@@ -447,20 +447,8 @@ def warehouse_history_page(
     limit: int | None = None,
 ) -> Any:
     """Exercise the real isolated reader without a server, state database or declaration import."""
-<<<<<<< HEAD
-    read: dict[str, Any] = {
-        "location": {"database": None, "schema": "main"},
-        "after": after,
-        "observed_since": observed_since,
-    }
-    if newest_versions is not None:
-        read["newest_versions"] = newest_versions
-    if limit is not None:
-        read["limit"] = limit
-    result: subprocess.CompletedProcess[str] = subprocess.run(
-=======
     result: subprocess.CompletedProcess[str] = warehouse_history_read(
-        project, table, after, observed_since
+        project, table, after, observed_since, newest_versions=newest_versions, limit=limit
     )
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
@@ -471,10 +459,20 @@ def warehouse_history_read(
     table: str,
     after: list[str | None] | None = None,
     observed_since: str | None = None,
+    newest_versions: int | None = None,
+    limit: int | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """One isolated reader exchange, with the reader's own report of a failed read."""
+    read: dict[str, Any] = {
+        "location": {"database": None, "schema": "main"},
+        "after": after,
+        "observed_since": observed_since,
+    }
+    if newest_versions is not None:
+        read["newest_versions"] = newest_versions
+    if limit is not None:
+        read["limit"] = limit
     return subprocess.run(
->>>>>>> origin/main
         [
             str(Path(sys.executable).with_name("sqb")),
             "--project-dir",
@@ -505,15 +503,10 @@ def warehouse_history_pages(
     after: list[str | None] | None = None
     more: bool = True
     while more:
-<<<<<<< HEAD
         page: dict[str, Any] = warehouse_history_page(
             project, table, after, observed_since, limit=limit
         )
-        assert page is not None
-=======
-        page: dict[str, Any] = warehouse_history_page(project, table, after, observed_since)
         assert "failed" not in page, page
->>>>>>> origin/main
         pages.append(page)
         after = page["next_after"]
         more = after is not None

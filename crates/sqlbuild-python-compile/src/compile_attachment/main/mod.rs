@@ -12,5 +12,3 @@ pub mod project_location;
 pub mod rebind_declaration_scope_function;
 pub mod resolved_target;
 pub mod sql_expansion_inputs;
-pub mod build_effective_target_namespace;
-pub mod build_effective_target_namespace_function;

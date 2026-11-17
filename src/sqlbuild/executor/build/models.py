@@ -212,13 +212,9 @@ class NodeCompletion:
         | FunctionExecutionResult
         | SqlTestExecutionResult
         | LoadExecutionResult
-<<<<<<< HEAD
-    )
-=======
         | None
     ) = None
     error: BaseException | None = None
->>>>>>> origin/main
 
 
 @dataclass(frozen=True)

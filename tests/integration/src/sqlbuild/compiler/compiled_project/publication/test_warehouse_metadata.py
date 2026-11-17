@@ -43,12 +43,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     AutomaticHistoryTestCase,
     CatalogConnectionTestCase,
     FingerprintHistoryTestCase,
-<<<<<<< HEAD
     NewestVersionsTestCase,
     PageBytesTestCase,
-=======
     ReadFailureTestCase,
->>>>>>> origin/main
     StateEventsTestCase,
     SyncPacingTestCase,
     WarehouseHistoryTestCase,
@@ -808,11 +805,7 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
     }
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
-<<<<<<< HEAD
-    assert "records" not in page() and "metadata reads failed" in page()["error"]
-=======
     assert page()["failed"]["page_size"] is False
->>>>>>> origin/main
     assert not (project / "warehouse.db").exists()
 
 
@@ -1386,11 +1379,7 @@ def test_given_fingerprint_history_when_read_in_isolated_pages_then_legacy_retri
             assert predecessor.execute("PRAGMA journal_mode").fetchone() == (journal_mode,)
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
-<<<<<<< HEAD
-    assert "records" not in page() and "metadata reads failed" in page()["error"]
-=======
     assert page()["failed"]["page_size"] is False
->>>>>>> origin/main
     assert not (project / "warehouse.db").exists()
 
 

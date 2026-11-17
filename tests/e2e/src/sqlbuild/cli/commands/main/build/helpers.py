@@ -1493,7 +1493,6 @@ def changed_build_steps(warehouse: ChangedWarehouse) -> tuple[ChangedBuildStep, 
     )
 
 
-<<<<<<< HEAD
 ALLOW_ROUND_TRIPS: str = "\n[settings]\nallow_warehouse_round_trips = true\n"
 SCORING_TASK: str = (
     '    relation = ctx.relation(model("orders"))\n'
@@ -1679,7 +1678,8 @@ def recorded_audit_outcomes(db_path: Path) -> tuple[tuple[str, str, bool], ...]:
         ),
     )
     return tuple((str(name), str(outcome), bool(ignored)) for name, outcome, ignored in rows)
-=======
+
+
 def node_result_source_yml(location: str) -> str:
     """A managed `raw_orders` source at `location`, for node result location tests."""
 
@@ -1721,4 +1721,3 @@ def node_results_in(*, db_path: Path, schema: str, node_type: str) -> list[tuple
             f"WHERE node_type = '{node_type}' ORDER BY node_name"
         ),
     )
->>>>>>> origin/main

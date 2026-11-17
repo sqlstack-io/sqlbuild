@@ -504,7 +504,6 @@ SYNCED_COPY_ALLOWED_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
         "preview's synced warehouse reads."
     ),
 )
-<<<<<<< HEAD
 SYNCED_COPY_PATTERN: str = r"\b(?:SyncedReads|WarehouseAccessRefusedError)\b"
 PLANNER_READ_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
     name="planner_paths",
@@ -527,10 +526,5 @@ PLANNER_WAREHOUSE_LITERAL_PATTERN: str = (
     r"|probe_relation_read|get_tables?_freshness_metadata|inspect_retention"
     r"|column_rename_unavailable_reason|metadata_inspection_concurrency|describe_relation"
     r'|relation_exists|schema_exists|render_read_latest_\w+)"'
-=======
-SYNCED_COPY_PATTERN: str = (
-    r"\b(?:SyncedCopyAdapter|SyncedCopyConnection|PLAN_SYNCED_COPY_ENV|"
-    r"WarehouseAccessRefusedError|is_warehouse_access_refused|register_synced_copy)\b"
->>>>>>> origin/main
 )
 RUST_LINE_COMMENT: str = "//"

@@ -1635,7 +1635,6 @@ class PythonUpstreamResultE2ETestCase:
 
 
 @dataclass(frozen=True)
-<<<<<<< HEAD
 class WarehouseRoundTripE2ETestCase:
     """A build of orders -> score task -> partner loader -> source -> scored model."""
 
@@ -1684,7 +1683,9 @@ class IgnoredAuditFailureCommandE2ETestCase:
     expected_exit_code: int
     expected_fragments: tuple[str, ...]
     expected_missing_fragments: tuple[str, ...]
-=======
+
+
+@dataclass(frozen=True)
 class PythonTargetConfigBuildE2ETestCase:
     """Test case for the active target's settings seen by Python nodes and loaders."""
 
@@ -1747,4 +1748,3 @@ class AdapterDefaultResultsFallbackE2ETestCase:
     kept_loader: str
     reading_task: str
     expected_payload_keys: tuple[str, str]
->>>>>>> origin/main

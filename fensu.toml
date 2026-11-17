@@ -1672,7 +1672,6 @@ allowed_paths = [
 
 [targets.rust.rule_options.XSB079]
 allowed_paths = [
-<<<<<<< HEAD
     "crates/sqlbuild-python-planner/src/freshness/_helpers/planning.rs=A preview's refused freshness observation leaves the source unknown.",
     "crates/sqlbuild-python/src/bindings/_helpers/native_host/registration.rs=Registers the preview's refusal error with Python.",
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=Only a location's plan preview plans through the synced reads and reports what they left unknown.",
@@ -1699,25 +1698,6 @@ planner_paths = [
     "crates/sqlbuild-python-planner/src/freshness/_helpers/observation.rs=Source freshness observation reads through WarehouseReads.",
     "crates/sqlbuild-python-planner/src/freshness/_helpers/planning.rs=Source freshness planning reads through WarehouseReads.",
     "crates/sqlbuild-python-front/src/native_host/_helpers/consumption_state.rs=Consumption rows and SQL without the adapter; I/O lives in consumption_io.",
-=======
-    "crates/sqlbuild-cli/src/native_commands/main/_location_plan.rs=A location's requested plan names the synced copy for its sqb plan child.",
-    "crates/sqlbuild-core/src/plan_display/constants.rs=Names the synced-copy environment variable.",
-    "crates/sqlbuild-python-planner/src/freshness/_helpers/planning.rs=Preview branch: a refused freshness observation leaves the source unknown.",
-    "crates/sqlbuild-python/src/bindings/_helpers/native_host/registration.rs=Registers the synced copy's refusal error with Python.",
-    "crates/sqlbuild-python-base/src/warehouse_access/_helpers/synced_copy.rs=Defines the synced-copy adapter.",
-    "crates/sqlbuild-python-base/src/warehouse_access/main/register_synced_copy.rs=Registers the synced copy's refusal error with Python.",
-    "crates/sqlbuild-python-base/src/warehouse_access/main/mod.rs=Declares the synced-copy entries.",
-    "crates/sqlbuild-python-base/src/warehouse_access/main/is_warehouse_access_refused.rs=Tells a plan preview's refused warehouse access apart.",
-    "crates/sqlbuild-python-base/src/warehouse_access/models.rs=Defines the synced-copy adapter the plan preview reads through.",
-    "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=Only sqb plan activates the synced copy and reports what it could not know.",
-    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/inspection/cursors.rs=Preview branch: target MAX from the copy, watermark inputs read when the run starts.",
-    "crates/sqlbuild-python-planner/src/planner_phases/_helpers/rebuilds/retention.rs=Preview branch: table types and retention stay unknown.",
-    "crates/sqlbuild-python-planner/src/planner_resolution/_helpers/references/orchestration.rs=Preview branch: cursor intrinsics bind to bounds the run resolves.",
-    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/sources/source_columns.rs=Preview branch: expression columns from the copy instead of DESCRIBE.",
-    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/sources/source_freshness.rs=Preview branch: the copy has no source freshness state to read.",
-    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/sources/source_tables.rs=Preview branch: sources outside the copy are not probed.",
-    "crates/sqlbuild-python-front/src/native_host/models.rs=Preview branch: --changed reads consumption history from the copy instead of the warehouse table.",
->>>>>>> origin/main
 ]
 
 [targets.rust.rule_options.XSB077]
@@ -1962,15 +1942,12 @@ reason = "Every native entry point installs the build identity before anything r
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
-<<<<<<< HEAD
-=======
 path = "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connection.rs"
 symbols = ["connection_config"]
 reason = "A once-per-process warning is process state by definition: a command resolves its connection at startup for provider setup and again for its own work, and threading a flag through every caller would not guarantee once. Approved 17 Nov for this module only."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
->>>>>>> origin/main
 path = "crates/sqlbuild-python-base/src/native_threads/_helpers/exit_signal.rs"
 symbols = ["signal_interpreter_exit"]
 reason = "The existing interpreter-exit signal is process-wide and monotonic: every native daemon wait must observe any exit hook before Python finalization. The atomic replaces the same global threading.Event, not per-command lifecycle state."
@@ -2384,11 +2361,7 @@ pending_budgets = [
     "crates/sqlbuild-python-front/src/discovery/_helpers/snapshots/scope_snapshot.rs=1",
     "crates/sqlbuild-python-front/src/discovery/_helpers/snapshots/snapshot.rs=3",
     "crates/sqlbuild-python-front/src/discovery/_helpers/sources/sql_test_blocks.rs=2",
-<<<<<<< HEAD
-    "crates/sqlbuild-python-front/src/discovery/_helpers/sources/yaml_entries.rs=14",
-=======
     "crates/sqlbuild-python-front/src/discovery/_helpers/sources/yaml_entries.rs=10",
->>>>>>> origin/main
     "crates/sqlbuild-python-front/src/discovery/main/headers/hook_entries.rs=1",
     "crates/sqlbuild-python-front/src/discovery/main/project/project_facts.rs=1",
     "crates/sqlbuild-python-front/src/discovery/main/project/validation_error.rs=6",
@@ -2708,13 +2681,8 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/build_command/lifecycle.rs=19",
     "crates/sqlbuild-python/src/bindings/_helpers/build_command/planning.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/build_command/policies.rs=4",
-<<<<<<< HEAD
-    "crates/sqlbuild-python/src/bindings/_helpers/check/check_command.rs=19",
-    "crates/sqlbuild-python/src/bindings/_helpers/check/check_core.rs=8",
-=======
     "crates/sqlbuild-python/src/bindings/_helpers/check/check_command.rs=18",
     "crates/sqlbuild-python/src/bindings/_helpers/check/check_core.rs=6",
->>>>>>> origin/main
     "crates/sqlbuild-python/src/bindings/_helpers/check/check_results.rs=13",
     "crates/sqlbuild-python/src/bindings/_helpers/cli/argv.rs=18",
     "crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs=17",
@@ -2775,11 +2743,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/runtime_execution.rs=18",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/runtime_results.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/sqlbuild_work.rs=4",
-<<<<<<< HEAD
-    "crates/sqlbuild-python/src/bindings/_helpers/debug_command/run_debug.rs=26",
-=======
     "crates/sqlbuild-python/src/bindings/_helpers/debug_command/run_debug.rs=24",
->>>>>>> origin/main
     "crates/sqlbuild-python/src/bindings/_helpers/diff_report/command.rs=10",
     "crates/sqlbuild-python/src/bindings/_helpers/diff_report/facts.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/diff_report/output.rs=4",
@@ -2803,13 +2767,8 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_phases.rs=17",
     "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_plan.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_planning.rs=2",
-<<<<<<< HEAD
-    "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_command.rs=12",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/load_command.rs=17",
-=======
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_command.rs=11",
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_command.rs=16",
->>>>>>> origin/main
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs=17",
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=10",
@@ -2841,11 +2800,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/test_command.rs=13",
     "crates/sqlbuild-python/src/bindings/_helpers/scopes/scope_command.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs=14",
-<<<<<<< HEAD
-    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=99",
-=======
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=96",
->>>>>>> origin/main
     "crates/sqlbuild-python/src/bindings/_helpers/workspace_commands/commands.rs=5",
 ]
 
@@ -2958,11 +2913,7 @@ pending_budgets = [
     "crates/sqlbuild-python-front/src/discovery/_helpers/records/model_file_record.rs=12",
     "crates/sqlbuild-python-front/src/discovery/_helpers/snapshots/native_classes.rs=2",
     "crates/sqlbuild-python-front/src/discovery/_helpers/snapshots/scope_snapshot.rs=1",
-<<<<<<< HEAD
-    "crates/sqlbuild-python-front/src/discovery/_helpers/sources/yaml_entries.rs=13",
-=======
     "crates/sqlbuild-python-front/src/discovery/_helpers/sources/yaml_entries.rs=9",
->>>>>>> origin/main
     "crates/sqlbuild-python-front/src/discovery/models.rs=7",
     "crates/sqlbuild-python-front/src/macro_bridge/_helpers/store_keys.rs=9",
     "crates/sqlbuild-python-front/src/model_config/_helpers/config/config_templates.rs=1",
@@ -3178,13 +3129,9 @@ module_layers = [
     "microbatches=registry",
     "model_config=registry",
     "native_host=front",
-<<<<<<< HEAD
     "native_host/live_reads=plan",
     "native_host/orchestration_sensors=commands",
-=======
-    "native_host/orchestration_sensors=commands",
     "native_host/setup_context=commands",
->>>>>>> origin/main
     "native_host/warehouse_metadata=commands",
     "observations=plan",
     "output_capture=registry",
@@ -4025,9 +3972,6 @@ reason = "The export summary and the per-exporter counts are separate Python cla
 paths = ["crates/sqlbuild-python-base/src/boundary/_helpers/expected_errors.rs", "crates/sqlbuild-python-compile/src/compile_command/main/invocation/register_report.rs", "crates/sqlbuild-python-compile/src/compile_driver/main/setup/register_project.rs", "crates/sqlbuild-python-compile/src/compile_driver/main/setup/register_python_plan_entries.rs", "crates/sqlbuild-python-front/src/discovery/main/headers/register_header_values.rs", "crates/sqlbuild-python-front/src/macro_bridge/main/register_module_digests.rs", "crates/sqlbuild-python-output/src/event_exporting/main/register_policy.rs", "crates/sqlbuild-python-planner/src/microbatches/main/register_projection.rs", "crates/sqlbuild-python-planner/src/planner_changes/main/register_detect.rs", "crates/sqlbuild-python-planner/src/planner_changes/main/register_metadata.rs", "crates/sqlbuild-python-planner/src/planner_resolution/main/cursor/register_cursor_ranges.rs", "crates/sqlbuild-python-planner/src/planner_resolution/main/references/register_locations.rs", "crates/sqlbuild-python-planner/src/planner_resolution/main/references/register_orchestration.rs", "crates/sqlbuild-python-planner/src/planner_strategy/main/audits/register_audits.rs", "crates/sqlbuild-python-project/src/semantic_shapes/main/register_shapes.rs", "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connection.rs", "crates/sqlbuild-python/src/bindings/_helpers/cost_report/degradation.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/pipeline.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/plan_output.rs"]
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
-<<<<<<< HEAD
-=======
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-analysis/src/sql_tree/_helpers/source_map.rs"]
 reason = "source_start and source_end apply opposite boundary rules: a start inside a rewrite maps to the start of the replaced text, while an exclusive end inside or closing one maps to its end, and an end at a removal maps to where the removed text began. Only the partition-and-shift shape is alike."
->>>>>>> origin/main

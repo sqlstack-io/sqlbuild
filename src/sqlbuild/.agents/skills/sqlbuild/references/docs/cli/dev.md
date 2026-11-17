@@ -35,18 +35,11 @@ sqb dev
   o open UI · r recompile · s retry warehouse · l logs · q quit
 ```
 
-<<<<<<< HEAD
 The location compiles the project, runs its [Rules](../concepts/rules.md), and publishes it to
 the server. When you save a model, orchestration file or other project input, it compiles and
-publishes again, so the UI and the next run use the new version. A compile error or a Rule finding
-leaves the previous version published and prints, for example, `Compile failed: 1 rule finding`
-with the findings.
-=======
-The location compiles the project and publishes it to the server. When you save a model,
-orchestration file or other project input, it compiles and publishes again, so the UI and the
-next run use the new version. Each change, publication, failure and run gets one line above the
-hotkey bar.
->>>>>>> origin/main
+publishes again, so the UI and the next run use the new version. Each change, publication, failure
+and run gets one line above the hotkey bar. A compile error or a Rule finding leaves the previous
+version published, and its failure line names the error or the first finding.
 
 ## Options
 
@@ -128,20 +121,16 @@ timed reads but not the read after each publication or run.
   for a server other people or machines connect to.
 - The control store keeps runs, trigger changes and history between sessions. Delete
   `.sqlbuild/control.sqlite3` to start again from nothing.
-<<<<<<< HEAD
 - The location is named after the project, the `name` in `sqlbuild_project.toml`. When the
   control store already has a location with that name, for example from another target of the
   same project, it gets ` (2)`, then ` (3)`, and so on. A location created by an earlier version
   keeps its name until you recreate the control store.
 - The UI is ready once the project compiles and publishes. The location then reads SQLBuild's
-  history from the warehouse and prints a line per kind; plan previews, history and costs show
+  history from the warehouse; plan previews, history and costs show
   **Syncing warehouse history…** until that first sync completes. See
   [Follow a sync](server.md#follow-a-sync).
 - The control store keeps the newest 5 builds of each node and results of each check that it copies
   from the warehouse; older ones are deleted and the file shrinks. See
   [retention](server.md#set-retention).
-- Stop it with Ctrl+C; it prints `Development services stopped successfully`.
-=======
 - When `sqb dev` stops, it prints `Development services stopped successfully`. After a failure it
   prints the last log lines that explain it.
->>>>>>> origin/main

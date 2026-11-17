@@ -303,8 +303,7 @@ events (view): every lifecycle fact
   outcome TEXT
   row_count INTEGER
   affected_rows INTEGER
-  payload ANY
-  started_at TEXT
+  payload TEXT
   invocation_id TEXT  join key
   invocation_started_at TEXT
   schema_version INTEGER
