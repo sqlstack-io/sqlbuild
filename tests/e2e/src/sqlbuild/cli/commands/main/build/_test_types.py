@@ -1715,10 +1715,11 @@ class WarehouseRoundTripE2ETestCase:
 
 @dataclass(frozen=True)
 class ChangedRoundTripE2ETestCase:
-    """A second build of a round trip, with `build_flags`, after an optional change to `orders`."""
+    """A second round-trip build with `build_flags`, after changing `orders` and maybe the task."""
 
     description: str
     orders_sql: str
     expected_output_fragments: tuple[str, ...]
     expected_scored_rows: tuple[tuple[object, ...], ...]
     build_flags: tuple[str, ...] = ("--changed",)
+    task_body: str | None = None
