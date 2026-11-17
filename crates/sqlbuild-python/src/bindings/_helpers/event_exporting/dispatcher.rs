@@ -13,8 +13,8 @@ use sqlbuild_core::command_output::constants::COMMAND_OUTPUT_RECORD_TYPE;
 use sqlbuild_core::event_export::constants::{
     DEFAULT_EVENT_EXPORT_HEALTH_INTERVAL_SECONDS, DEFAULT_EVENT_EXPORT_INVOCATION_TIMEOUT_SECONDS,
     DEFAULT_EVENT_EXPORT_NOTIFICATION_QUEUE_CAPACITY, DEFAULT_EVENT_EXPORT_QUEUE_CAPACITY,
-    DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS, INVOCATION_TERMINAL_EVENT_TYPES,
-    OUTCOME_EVENT_TYPES, OUTCOME_RESERVE_FRACTION,
+    DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS, INVOCATION_START_EVENT_TYPE,
+    INVOCATION_TERMINAL_EVENT_TYPES, OUTCOME_EVENT_TYPES, OUTCOME_RESERVE_FRACTION,
 };
 use sqlbuild_core::event_export::main::drop_lifecycle_attempts::drop_lifecycle_attempts;
 use sqlbuild_core::event_export::main::export_snapshot::export_snapshot;
@@ -797,6 +797,10 @@ impl EventExporterDispatcher {
         if self.withheld_kinds.contains(&policy.kind) {
             return Ok(());
         }
+        let invocation_id: Option<String> = match event.getattr("invocation_id") {
+            Ok(value) => value.extract()?,
+            Err(_) => None,
+        };
         let shared = &self.shared;
         let _held = shared.hold(py)?;
         let mut state = shared.locked()?;
@@ -832,6 +836,8 @@ impl EventExporterDispatcher {
                 priority: policy.priority,
                 invocation_terminal: INVOCATION_TERMINAL_EVENT_TYPES.contains(&event_type.as_str()),
                 outcome: OUTCOME_EVENT_TYPES.contains(&event_type.as_str()),
+                invocation_id,
+                invocation_start: event_type == INVOCATION_START_EVENT_TYPE,
                 eligible_exporters: eligible,
             },
         );
