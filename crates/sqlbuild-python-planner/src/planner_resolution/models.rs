@@ -15,12 +15,12 @@ use pyo3::types::PyDictMethods;
 use pyo3::types::PyList;
 use pyo3::types::PyString;
 use pyo3::types::PyTuple;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::assert_no_unresolved_sql_markers;
-use sqlbuild_python_base::native_host::models::Dialect;
 
 /// The planner inputs that decide one model's plan-time cursor window.
 #[derive(Debug)]

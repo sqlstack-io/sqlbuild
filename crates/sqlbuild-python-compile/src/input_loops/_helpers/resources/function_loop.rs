@@ -47,7 +47,8 @@ use sqlbuild_python_base::compile_context::main::delta::record_source_reads::rec
 use sqlbuild_python_front::attachments::main::parsed_header::parsed_header;
 use sqlbuild_python_front::model_config::models::NativeModelValidator;
 use sqlbuild_python_project::analysis_session::main::query_columns_error::query_columns_error;
-use sqlbuild_python_project::compiled_project::models::{FunctionRow, FunctionSettings};
+use sqlbuild_python_project::compiled_project::models::FunctionRow;
+use sqlbuild_python_project::compiled_project::models::FunctionSettings;
 use sqlbuild_python_project::resource_views::models::FunctionHandles;
 use sqlbuild_python_project::resource_views::types::AttachedFunction;
 

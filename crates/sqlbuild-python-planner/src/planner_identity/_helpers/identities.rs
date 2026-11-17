@@ -16,7 +16,8 @@ use sqlbuild_analysis::planner_identity::main::graph_write_identity_hashes::grap
 use sqlbuild_analysis::planner_identity::models::{GraphKey, IdentityGraph, IdentityNode};
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 
-use crate::planner_identity::_helpers::metadata::{function_local_hashes, seed_identity};
+use crate::planner_identity::_helpers::metadata::function_local_hashes;
+use crate::planner_identity::_helpers::metadata::seed_identity;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

@@ -13,7 +13,9 @@ use sqlbuild_state::microbatches::models::{
     ReplayState, ReplayVersions, RequirementFact, TextInterval,
 };
 
-use crate::microbatches::_helpers::conversion::{BoundParser, enum_text, optional_text};
+use crate::microbatches::_helpers::conversion::BoundParser;
+use crate::microbatches::_helpers::conversion::enum_text;
+use crate::microbatches::_helpers::conversion::optional_text;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

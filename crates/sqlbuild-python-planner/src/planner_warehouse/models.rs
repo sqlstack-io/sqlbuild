@@ -14,7 +14,19 @@ use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::connect;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::count_computation;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::package_version;
 use crate::planner_warehouse::_helpers::inspection::fingerprint_cache::sqlite_error;
+use crate::planner_warehouse::_helpers::synced_reads;
+use crate::planner_warehouse::_helpers::synced_reads::refused;
+use crate::planner_warehouse::_helpers::synced_reads::relation_columns;
+use crate::planner_warehouse::_helpers::synced_reads::relation_info;
+use crate::planner_warehouse::constants::CURSOR_INPUTS;
+use crate::planner_warehouse::constants::PREVIEW_MESSAGE;
+use crate::planner_warehouse::constants::PREVIEW_UNKNOWNS;
+use crate::planner_warehouse::main::unknown::unknown;
+use crate::planner_warehouse::types::CursorProgress;
+use crate::planner_warehouse::types::WarehouseReads;
+use chrono::SecondsFormat;
 use pyo3::exceptions::PyOSError;
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -29,41 +41,26 @@ use pyo3::types::PyDict;
 use pyo3::types::PyList;
 use pyo3::types::PyListMethods;
 use pyo3::types::PyTuple;
+use pyo3::types::{PyDictMethods, PyString};
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_entry::fingerprint_cache_entry;
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_key::fingerprint_cache_key;
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_lookup::fingerprint_cache_lookup;
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_shared_digest::fingerprint_cache_shared_digest;
 use sqlbuild_analysis::planner_warehouse::models::FingerprintCacheKey;
+use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::planner_phases::main::object::object;
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-use std::collections::HashMap;
-use crate::planner_warehouse::_helpers::synced_reads;
-use crate::planner_warehouse::_helpers::synced_reads::refused;
-use crate::planner_warehouse::_helpers::synced_reads::relation_columns;
-use crate::planner_warehouse::_helpers::synced_reads::relation_info;
-use crate::planner_warehouse::constants::CURSOR_INPUTS;
-use crate::planner_warehouse::constants::PREVIEW_MESSAGE;
-use crate::planner_warehouse::constants::PREVIEW_UNKNOWNS;
-use crate::planner_warehouse::main::unknown::unknown;
-use crate::planner_warehouse::types::CursorProgress;
-use crate::planner_warehouse::types::WarehouseReads;
-use chrono::SecondsFormat;
-use pyo3::exceptions::PyRuntimeError;
-use pyo3::types::{PyDictMethods, PyString};
-use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::native_host::models::Location;
 use sqlbuild_python_front::native_host::types::ConsumptionReads;
 use sqlbuild_python_front::state_rows::models::EventTableLayout;
 use sqlbuild_python_project::fingerprints::main::selected_set::selected_set;
+use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_state::consumption::constants::RECENT_EXECUTIONS;
 use sqlbuild_state::consumption::main::recent_executions::recent_executions;
 use sqlbuild_state::consumption::models::ConsumptionRow;
@@ -71,6 +68,9 @@ use sqlbuild_state::warehouse_state::models::{
     InvalidObservation, RelationFilter, StateLocation, StateRelation, WarehouseState,
 };
 use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::{Mutex, PoisonError};
 
@@ -89,7 +89,7 @@ pub struct MigrationFingerprintCache {
 
 impl MigrationFingerprintCache {
     /// A cache persisting under `root`, or an in-memory cache without one.
-    pub fn open(py: Python<'_>, root: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
+    pub(crate) fn open(py: Python<'_>, root: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
         let root = root.filter(|root| !root.is_none());
         let database_path = match &root {
             Some(root) => Some(
@@ -119,7 +119,7 @@ impl MigrationFingerprintCache {
         })
     }
 
-    pub(crate) fn cache_key(&self, key: &MemoKey) -> PyResult<String> {
+    fn cache_key(&self, key: &MemoKey) -> PyResult<String> {
         if self.database_path.is_none() {
             return Ok(String::new());
         }
@@ -182,7 +182,7 @@ impl MigrationFingerprintCache {
         Ok(fingerprint_cache_lookup(&contents, cache_key))
     }
 
-    pub(crate) fn remember(&mut self, cache_key: &str, fingerprint: Option<&str>) -> PyResult<()> {
+    fn remember(&mut self, cache_key: &str, fingerprint: Option<&str>) -> PyResult<()> {
         if self.database_path.is_none() {
             return Ok(());
         }
@@ -195,7 +195,7 @@ impl MigrationFingerprintCache {
         Ok(())
     }
 
-    pub(crate) fn write_pending(
+    fn write_pending(
         &self,
         py: Python<'_>,
         pending: &[(String, String)],
@@ -249,13 +249,13 @@ impl MigrationFingerprintCache {
 impl MigrationFingerprintCache {
     #[new]
     #[pyo3(signature = (*, root=None))]
-    pub(crate) fn new(py: Python<'_>, root: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
+    fn new(py: Python<'_>, root: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
         Self::open(py, root)
     }
 
     /// The migration fingerprint, keyed only by the renames this model can see.
     #[pyo3(signature = (**options))]
-    pub(crate) fn fingerprint(
+    fn fingerprint(
         &mut self,
         py: Python<'_>,
         options: Option<Bound<'_, PyDict>>,
@@ -329,7 +329,7 @@ impl MigrationFingerprintCache {
     }
 
     /// Write fingerprints computed since the last persist; failures only skip reuse.
-    pub(crate) fn persist(&mut self, py: Python<'_>) -> PyResult<()> {
+    fn persist(&mut self, py: Python<'_>) -> PyResult<()> {
         let pending = std::mem::take(&mut self.pending);
         let store = self.store.take();
         self.store_opened = false;

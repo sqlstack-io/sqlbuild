@@ -2,6 +2,8 @@
 
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::GraphIndexes;
+use sqlbuild_python_base::native_host::models::Dialect;
+
 use crate::planner_strategy::_helpers::audits::{
     attachment, outside_target_lineage, resolve_effective_run_scope,
 };
@@ -31,20 +33,18 @@ use sqlbuild_python_project::resource_views::main::audit_reads::run_scope::run_s
 use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
 use sqlbuild_python_project::resource_views::main::audit_reads::sql_body::sql_body;
 use sqlbuild_python_project::resource_views::main::audit_reads::thresholds::thresholds;
+
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::Request;
+
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::planner_strategy::constants::{
-    AUDIT_TYPES_MODULE, COMPILE_TYPES_MODULE, MODEL_ATTACHMENT, SOURCE_ATTACHMENT,
-};
-use sqlbuild_python_project::planner_strategy::models::AuditPlanning;
-use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_project::planner_strategy::constants::AUDIT_TYPES_MODULE;
 use sqlbuild_python_project::planner_strategy::constants::COMPILE_TYPES_MODULE;
 use sqlbuild_python_project::planner_strategy::constants::MODEL_ATTACHMENT;
 use sqlbuild_python_project::planner_strategy::constants::SOURCE_ATTACHMENT;
+use sqlbuild_python_project::planner_strategy::models::AuditPlanning;
 
 /// One attribute read of a compiled audit.
 type AuditRead<'py> = fn(&Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>;

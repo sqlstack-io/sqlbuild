@@ -2,14 +2,15 @@
 
 use crate::compiled_views::main::compiled_models::name_object::name_object;
 use crate::compiled_views::main::compiled_models::query_sql::query_sql;
-use crate::sql_test_glue::_helpers::plan::plan_values::{model_payload, string};
+use crate::sql_test_glue::_helpers::plan::plan_values::model_payload;
+use crate::sql_test_glue::_helpers::plan::plan_values::string;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 
-use crate::sql_test_glue::_helpers::inputs::cursor_window::{
-    declared_window_cursor_models, declares_cursor_window, render_test_cursor_intrinsics,
-};
+use crate::sql_test_glue::_helpers::inputs::cursor_window::declared_window_cursor_models;
+use crate::sql_test_glue::_helpers::inputs::cursor_window::declares_cursor_window;
+use crate::sql_test_glue::_helpers::inputs::cursor_window::render_test_cursor_intrinsics;
 use crate::sql_test_glue::constants::SENTINEL;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

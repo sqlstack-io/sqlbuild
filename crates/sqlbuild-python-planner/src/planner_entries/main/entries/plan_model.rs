@@ -9,8 +9,8 @@ use pyo3::pyfunction;
 use pyo3::types::PyDict;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Detect changes and build a plan entry and warnings for a single model.
 #[pyfunction]

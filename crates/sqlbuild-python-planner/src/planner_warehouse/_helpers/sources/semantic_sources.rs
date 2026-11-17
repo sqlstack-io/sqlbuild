@@ -1,15 +1,14 @@
 //! Complete missing source metadata in bounded, database-grouped batches.
 
-use crate::planner_warehouse::_helpers::inspection::snapshot::{columns_for, list_relations};
-use crate::planner_warehouse::constants::ACTIVE_CATALOG;
+use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
+use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_model_config::config_values::models::ConfigNode;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
@@ -20,9 +19,6 @@ use sqlbuild_python_project::compiled_views::main::project::compiled_models::com
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use std::collections::BTreeSet;
-use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
-use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
-use crate::planner_warehouse::models::PlannerReads;
 
 const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 

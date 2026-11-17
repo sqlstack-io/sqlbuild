@@ -3,8 +3,8 @@
 use crate::planner_strategy::_helpers::cursor_inputs;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyTuple;
-use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
 use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
 
 /// Cursor-bearing input relations of an incremental model, for runtime range discovery.
 #[inline]

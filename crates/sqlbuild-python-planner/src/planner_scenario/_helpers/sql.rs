@@ -12,13 +12,13 @@ use sqlbuild_analysis::planner_scenario::{
     errors::MarkerError, main::replace_markers::replace_markers,
 };
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 use sqlbuild_sqltext::sql_scan::models::Unclosed;
-use sqlbuild_python_base::native_host::models::Dialect;
 
 pub(crate) fn resolve_sql(
     context: &SqlContext<'_>,

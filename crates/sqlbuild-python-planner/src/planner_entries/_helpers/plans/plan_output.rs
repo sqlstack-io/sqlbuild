@@ -13,6 +13,7 @@ use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
@@ -37,12 +38,9 @@ use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::sch
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 use sqlbuild_python_project::sql_test_glue::main::assemble_sql_test_plans::assemble_sql_test_plans;
 use sqlbuild_python_project::sql_test_glue::models::SqlTestAssembly;
-use sqlbuild_python_base::native_host::models::Dialect;
 
 const LOADER_CONSUMER: &str = "loader";
-
 const HOOK_CONSUMER: &str = "hook";
-
 const MATERIALIZATION_CONSUMER: &str = "custom materialization";
 
 fn tuple_of<'py>(py: Python<'py>, items: Vec<Bound<'py, PyAny>>) -> PyResult<Bound<'py, PyAny>> {

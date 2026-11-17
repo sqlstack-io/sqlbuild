@@ -2,12 +2,15 @@
 
 use crate::planner_strategy::main::complete_fixtures::complete_fixtures;
 use crate::planner_strategy::models::FixtureCompletion;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::HashSet;
+
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::planner_fixtures::main::align_columns::align_columns;
 use sqlbuild_analysis::planner_fixtures::models::{AlignmentInput, FixtureColumn};
+
 use crate::planner_strategy::_helpers::fixtures::fixture_context::planning_context as project_planning_context;
 use crate::planner_strategy::_helpers::fixtures::fixture_preparation::PreparedFixtures;
 use crate::planner_strategy::_helpers::fixtures::fixture_selection::unknown_fixture_column_diagnostics;
@@ -18,7 +21,6 @@ use crate::planner_strategy::_helpers::fixtures::fixture_values::{
 use crate::planner_strategy::models::{ExpectedTypes, RelationFixturePlanningContext};
 use crate::planner_strategy::types::FixtureKey;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_base::native_host::models::Dialect;
 
 impl ExpectedTypes<'_> {
     /// The relation's expected column types: the chain's propagated types, else the context's.

@@ -1,10 +1,10 @@
 //! Gather source columns.
 
 use crate::planner_warehouse::_helpers::sources::source_columns::source_inspection;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyDict;
-use crate::planner_warehouse::models::PlannerReads;
 
 #[pyfunction]
 #[pyo3(signature = (*, project, reads, source_entries=None))]

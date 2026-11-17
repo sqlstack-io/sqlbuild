@@ -16,8 +16,6 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use pyo3::IntoPyObjectExt;
-use pyo3::pyfunction;
 use sqlbuild_core::build_aggregate::constants::IGNORED_AUDIT_FAILURE;
 
 /// Borrowed executor results with canonical terminals, used by the build JSON projection.

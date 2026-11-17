@@ -4,12 +4,12 @@ use crate::planner_warehouse::models::MigrationFingerprintCache;
 use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::pymethods;
 use pyo3::types::{PyDict, PyTuple};
-use crate::planner_phases::models::{PlannerRuntime, PlannerWarehouseState};
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::build_command::main::utc_now::utc_now;
+
 use crate::planner_phases::models::PlannerRuntime;
 use crate::planner_phases::models::PlannerWarehouseState;
 use crate::planner_warehouse::models::PlannerReads;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_command::main::utc_now::utc_now;
 use sqlbuild_python_base::native_host::models::Dialect;
 
 #[pymethods]
@@ -54,6 +54,28 @@ pub(crate) fn runtime_field<'py>(
     field: fn(&PlannerRuntime) -> &Py<PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     Ok(field(runtime.cast::<PlannerRuntime>()?.get())
+        .bind(runtime.py())
+        .clone())
+}
+
+/// The warehouse reads of a planner runtime passed as a Python object.
+pub(crate) fn runtime_reads<'py>(
+    runtime: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PlannerReads>> {
+    Ok(runtime
+        .cast::<PlannerRuntime>()?
+        .get()
+        .reads
+        .bind(runtime.py())
+        .clone())
+}
+
+/// The SQL dialect of a planner runtime passed as a Python object.
+pub(crate) fn runtime_dialect<'py>(runtime: &Bound<'py, PyAny>) -> PyResult<Bound<'py, Dialect>> {
+    Ok(runtime
+        .cast::<PlannerRuntime>()?
+        .get()
+        .dialect
         .bind(runtime.py())
         .clone())
 }
@@ -112,27 +134,5 @@ pub(crate) fn warehouse_field<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     Ok(field(warehouse.cast::<PlannerWarehouseState>()?.get())
         .bind(warehouse.py())
-        .clone())
-}
-
-/// The warehouse reads of a planner runtime passed as a Python object.
-pub(crate) fn runtime_reads<'py>(
-    runtime: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PlannerReads>> {
-    Ok(runtime
-        .cast::<PlannerRuntime>()?
-        .get()
-        .reads
-        .bind(runtime.py())
-        .clone())
-}
-
-/// The SQL dialect of a planner runtime passed as a Python object.
-pub(crate) fn runtime_dialect<'py>(runtime: &Bound<'py, PyAny>) -> PyResult<Bound<'py, Dialect>> {
-    Ok(runtime
-        .cast::<PlannerRuntime>()?
-        .get()
-        .dialect
-        .bind(runtime.py())
         .clone())
 }

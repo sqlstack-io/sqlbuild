@@ -2,6 +2,7 @@
 
 use sqlbuild_python_base::positional_record;
 use std::time::Instant;
+
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
@@ -11,11 +12,16 @@ use sqlbuild_cli::diff_report::main::query_column_problem::query_column_problem;
 use sqlbuild_cli::diff_report::main::read_only_query_problem::read_only_query_problem;
 use sqlbuild_cli::diff_report::models::QueryShapeFacts;
 use sqlbuild_cli::diff_report::types::PhaseSeconds;
+
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
+
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::diff_report::support::{
-    call, cli_error, error_text, object, progress_line,
-};
+use crate::bindings::_helpers::diff_report::support::call;
+use crate::bindings::_helpers::diff_report::support::cli_error;
+use crate::bindings::_helpers::diff_report::support::error_text;
+use crate::bindings::_helpers::diff_report::support::none;
+use crate::bindings::_helpers::diff_report::support::object;
+use crate::bindings::_helpers::diff_report::support::progress_line;
 use crate::bindings::_helpers::diff_report::tolerances::cli_tolerance_overrides;
 use sqlbuild_analysis::diff_selection::main::raw_query_shape::raw_query_shape;
 use sqlbuild_analysis::diff_selection::models::RawQueryShape;
@@ -26,20 +32,14 @@ use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cl
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_compile::compile_attachment::main::build_effective_target_namespace::build_effective_target_namespace;
 use sqlbuild_python_compile::compile_attachment::main::effective_target_namespace::effective_target_namespace;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
-use crate::bindings::_helpers::diff_report::support::call;
-use crate::bindings::_helpers::diff_report::support::cli_error;
-use crate::bindings::_helpers::diff_report::support::error_text;
-use crate::bindings::_helpers::diff_report::support::none;
-use crate::bindings::_helpers::diff_report::support::object;
-use crate::bindings::_helpers::diff_report::support::progress_line;
-use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
-use sqlbuild_python_compile::compile_attachment::main::build_effective_target_namespace::build_effective_target_namespace;
 
 const GENERIC_DIALECT: &str = "generic";
 

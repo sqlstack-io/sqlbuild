@@ -12,7 +12,6 @@ use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python
 use sqlbuild_analysis::python_selection::models::InventoryNode;
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
@@ -34,14 +33,11 @@ pub fn python_node_graph<'py>(
         providers,
     };
     let mut nodes: Vec<Bound<'py, PyAny>> = Vec::new();
-    within_identity_pass(py, || {
-        for (collection, kind, documented) in KINDS {
-            for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
-                nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
-            }
+    for (collection, kind, documented) in KINDS {
+        for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
+            nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
         }
-        Ok(())
-    })?;
+    }
     let inventory: Vec<InventoryNode> = nodes
         .iter()
         .zip(upstream_names(py, &nodes, &vocabulary.sql_ref)?)

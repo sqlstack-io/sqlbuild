@@ -1,7 +1,17 @@
 //! Top-level planner orchestration producing an execution plan.
 
+use crate::planner_phases::_helpers::timings::record;
+use crate::planner_phases::constants::ASSEMBLING;
+use crate::planner_phases::constants::BUILDING_ENTRIES;
+use crate::planner_phases::constants::DETECTING_CHANGES;
+use crate::planner_phases::constants::READING_WAREHOUSE;
+use crate::planner_phases::constants::SOURCE_FRESHNESS;
+use crate::planner_phases::constants::TEST_FIXTURES;
+use crate::planner_phases::main::timed::timed;
+use crate::planner_warehouse::models::PlannerReads;
 use sqlbuild_analysis::planner_scope::constants::MODEL;
-use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_python_base::native_host::models::Dialect;
+
 use crate::planner_changes::main::detect_changes::detect_changes;
 use crate::planner_changes::main::resolve_model_actions::resolve_model_actions;
 use crate::planner_entries::_helpers::entries::values::{native, replaced};
@@ -36,18 +46,6 @@ use sqlbuild_python_project::planner_scope::main::resolve_planner_scopes::resolv
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use std::time::Instant;
-use crate::planner_phases::_helpers::timings::record;
-use crate::planner_phases::constants::ASSEMBLING;
-use crate::planner_phases::constants::BUILDING_ENTRIES;
-use crate::planner_phases::constants::DETECTING_CHANGES;
-use crate::planner_phases::constants::READING_WAREHOUSE;
-use crate::planner_phases::constants::SOURCE_FRESHNESS;
-use crate::planner_phases::constants::TEST_FIXTURES;
-use crate::planner_phases::main::timed::timed;
-use crate::planner_warehouse::models::PlannerReads;
-use sqlbuild_python_base::native_host::models::Dialect;
-
-pub(crate) const INSPECTION_CATALOG: AdapterHost = AdapterHost::OpenInspectionCatalog;
 
 /// Selected scopes, and the overrides with cursor overrides typed for the selected models.
 pub(crate) fn scopes_and_cursor_overrides<'py>(

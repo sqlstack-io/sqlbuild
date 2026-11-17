@@ -1,6 +1,5 @@
 //! The effective target, its namespace, and the shared project-local compile-cache directory.
 
-use crate::compile_attachment::main::connection_is_default_target::connection_is_default_target;
 use crate::compile_attachment::main::project_location::project_location;
 use crate::compile_attachment::main::resolved_target::resolved_target;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};

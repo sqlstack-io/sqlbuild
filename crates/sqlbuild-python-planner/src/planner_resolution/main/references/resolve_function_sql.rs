@@ -5,8 +5,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
 use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]

@@ -1,31 +1,23 @@
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryKind, WarehouseStateLocation,
+    WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseStateLocation,
 };
 use chrono::Utc;
 use sqlbuild_config::project::models::ControlConfig;
 use std::time::Duration;
 use tokio::time::Instant;
-use crate::native_commands::_helpers::execution::{metadata_sync, safety_sync_seconds};
+use crate::native_commands::_helpers::execution::metadata_sync;
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
     MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
     SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
-use sqlbuild_orchestration::warehouse_metadata::constants::{
-    MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
-};
-use crate::native_commands::_helpers::execution::{
-    history_request, metadata_sync, read_metadata_page, rows_text, safety_sync_setting, scan_line,
-    sync_progress,
-};
+use sqlbuild_orchestration::warehouse_metadata::constants::{MAX_HISTORY_PAGE_RECORDS};
+use crate::native_commands::_helpers::execution::{history_request, read_metadata_page, rows_text, safety_sync_setting, scan_line, sync_progress};
 use crate::native_commands::constants::METADATA_SAFETY_SYNC_SECONDS;
 use crate::native_commands::main::_location_metadata::read_failure_line;
 use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
-use crate::native_commands::tests::test_types::{
-    MetadataRetryTestCase, NewestVersionsTestCase, ReadFailureTestCase, SafetySyncIdleTestCase,
-    SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
-};
+use crate::native_commands::tests::test_types::{NewestVersionsTestCase, ReadFailureTestCase};
 
 #[test]
 fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_scan_completes() {
@@ -69,7 +61,7 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             .iter()
             .position(|kind| *kind == test_case.failed_kind)
             .expect("kind is listed");
-        let wait = state.fail_read(test_case.page_size);
+        let wait = state.fail_read(test_case.page_size, Utc::now());
         assert!(wait.is_some(), "{}", test_case.description);
         let state = acknowledge_complete_pages(state, test_case.acknowledged_pages);
         assert_eq!(
@@ -136,15 +128,18 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
         let mut waits: Vec<Option<u64>> = test_case
             .failures
             .into_iter()
-            .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs()))
+            .map(|page_size| state.fail_read(page_size, Utc::now()).map(|wait| wait.as_secs()))
             .collect();
         state.request_sync();
+        if state.idle && state.sync_due(None) {
+            state.begin_sync(Utc::now());
+        }
         let paging_after_request = state.paging();
         waits.extend(
             test_case
                 .failures_after_request
                 .into_iter()
-                .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs())),
+                .map(|page_size| state.fail_read(page_size, Utc::now()).map(|wait| wait.as_secs())),
         );
         assert_eq!(
             (
@@ -166,35 +161,66 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
 }
 
 #[test]
-fn given_a_stopped_sync_when_its_safety_sync_is_due_then_it_makes_one_attempt() {
+fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_attempt() {
     let test_cases = [
         SafetyResumeTestCase {
             description: "before the safety sync is due the sync stays stopped",
             safety_seconds: 1800,
             due_in: Duration::from_secs(600),
+            billed: false,
+            ran: false,
             expected_outcome: (false, false, None, true),
         },
         SafetyResumeTestCase {
             description: "a due safety sync resumes it, and one more failure stops it for another interval",
             safety_seconds: 1800,
             due_in: Duration::ZERO,
+            billed: false,
+            ran: false,
             expected_outcome: (true, true, None, true),
         },
         SafetyResumeTestCase {
-            description: "with safety syncs off only a request or a publication resumes it",
+            description: "with safety syncs off only a run, a request or a publication resumes it",
             safety_seconds: 0,
             due_in: Duration::ZERO,
+            billed: false,
+            ran: false,
             expected_outcome: (false, false, None, true),
+        },
+        SafetyResumeTestCase {
+            description: "on a billed warehouse a due default safety sync does not wake it",
+            safety_seconds: 1800,
+            due_in: Duration::ZERO,
+            billed: true,
+            ran: false,
+            expected_outcome: (false, false, None, true),
+        },
+        SafetyResumeTestCase {
+            description: "on a billed warehouse a run that ends after the stop resumes it",
+            safety_seconds: 1800,
+            due_in: Duration::from_secs(600),
+            billed: true,
+            ran: true,
+            expected_outcome: (true, true, None, true),
         },
     ];
     for test_case in test_cases {
         let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
+        state.reads_wake_compute = test_case.billed;
+        state.safety_explicit = !test_case.billed;
         state.begin_sync(Utc::now());
-        let stopped: Vec<Option<Duration>> = (0..5).map(|_| state.fail_read(false)).collect();
+        let stopped: Vec<Option<Duration>> =
+            (0..5).map(|_| state.fail_read(false, Utc::now())).collect();
         state.safety_at = Instant::now() + test_case.due_in;
-        let resumed: bool = state.resume_after_safety_wait();
+        let runs_ended_at = test_case
+            .ran
+            .then(|| Utc::now() + chrono::Duration::seconds(1));
+        let resumed: bool = state.idle && state.sync_due(runs_ended_at);
+        if resumed {
+            state.begin_sync(Utc::now());
+        }
         let paging: bool = state.paging();
-        let wait: Option<Duration> = state.fail_read(false);
+        let wait: Option<Duration> = state.fail_read(false, Utc::now());
         assert_eq!(
             (
                 stopped[4],
@@ -596,14 +622,15 @@ fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_pag
             description: "a read error carries the warehouse's message",
             script: reader(
                 "erroring-reader",
-                r#"read line; echo '{"error":"permission denied for table _sqlbuild_audit_results"}'; read line"#,
+                r#"read line; echo '{"failed":{"reason":"permission denied for table _sqlbuild_audit_results","page_size":false}}'; read line"#,
             ),
             kind: WarehouseHistoryKind::AuditResults,
             expected: |failure| {
                 *failure
-                    == ReadFailure::Read(
-                        "permission denied for table _sqlbuild_audit_results".into(),
-                    )
+                    == ReadFailure::Read(WarehouseHistoryFailure {
+                        reason: "permission denied for table _sqlbuild_audit_results".into(),
+                        page_size: false,
+                    })
             },
             expected_line: "Warehouse history read failed for audit results (2000-row page): permission denied for table _sqlbuild_audit_results.",
         },
@@ -625,6 +652,7 @@ fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_pag
             metadata_reconcile_seconds: 3600,
             safety_sync_seconds: 0,
             safety_sync_explicit: false,
+            dev_events: false,
         };
         let mut state = metadata_sync((one_location(), 1), (3600, 0));
         state.index = WarehouseHistoryKind::ALL

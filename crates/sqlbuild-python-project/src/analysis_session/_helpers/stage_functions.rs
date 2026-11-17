@@ -14,14 +14,18 @@ use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple};
 use sqlbuild_analysis::assembly::analysis_session::types::Pairs;
 
 use crate::analysis::models::ProjectCatalog;
-use crate::analysis_session::_helpers::profile_inputs::{aliased_dialect, profile_catalog};
-use crate::analysis_session::_helpers::query_columns::{
-    QueryRequestRow, QueryRow, infer_query_columns,
-};
-use crate::analysis_session::_helpers::session::{
-    ContractRow, ExpressionShapesRow, PivotModelRow, infer_expression_source_shapes,
-};
-use crate::analysis_session::models::{FamilyRow, NativeModelAnalysisSession, PivotRequestRow};
+use crate::analysis_session::_helpers::profile_inputs::aliased_dialect;
+use crate::analysis_session::_helpers::profile_inputs::profile_catalog;
+use crate::analysis_session::_helpers::query_columns::QueryRequestRow;
+use crate::analysis_session::_helpers::query_columns::QueryRow;
+use crate::analysis_session::_helpers::query_columns::infer_query_columns;
+use crate::analysis_session::_helpers::session::ContractRow;
+use crate::analysis_session::_helpers::session::ExpressionShapesRow;
+use crate::analysis_session::_helpers::session::PivotModelRow;
+use crate::analysis_session::_helpers::session::infer_expression_source_shapes;
+use crate::analysis_session::models::FamilyRow;
+use crate::analysis_session::models::NativeModelAnalysisSession;
+use crate::analysis_session::models::PivotRequestRow;
 use crate::analysis_session::types::ColumnsRow;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::compile_driver::constants::EXPRESSION_SHAPE_BATCHES;

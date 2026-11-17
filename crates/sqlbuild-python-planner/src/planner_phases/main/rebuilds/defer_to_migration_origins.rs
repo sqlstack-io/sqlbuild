@@ -1,9 +1,9 @@
 //! Redirect unselected `models` unbuilt in the deferred target to their `migrate_from` relation.
 
 use crate::planner_phases::_helpers::rebuilds::deferred_origins;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyDict;
-use crate::planner_warehouse::models::PlannerReads;
 use sqlbuild_python_base::native_host::models::Dialect;
 
 /// Redirect unselected `models` unbuilt in the deferred target to their `migrate_from` relation.

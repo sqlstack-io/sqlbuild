@@ -2,12 +2,11 @@
 
 use crate::planner_strategy::_helpers::fixtures::fixture_sql::fixture_marker;
 use crate::planner_strategy::models::FixtureRelation;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::prelude::{Bound, PyAnyMethods, PyResult};
 use sqlbuild_analysis::planner_fixtures::main::{
     empty_fixture_error::empty_fixture_error, render_empty::render_empty,
 };
 use sqlbuild_analysis::planner_fixtures::models::FixtureColumn;
-use pyo3::prelude::{Bound, PyAnyMethods, PyResult};
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::native_host::types::Syntax;
 

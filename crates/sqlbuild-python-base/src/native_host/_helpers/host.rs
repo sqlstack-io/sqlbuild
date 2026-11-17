@@ -10,7 +10,6 @@ use sqlbuild_host::entries::constants::{HOST_ENTRIES, HOST_MODULE, HOST_TARGETS_
 use sqlbuild_host::entries::models::{HostId, UserCodeHost};
 use sqlbuild_host::entries::types::HostEntries;
 use crate::boundary::main::within::within;
-use sqlbuild_host::entries::models::HostId;
 use crate::build_progress::main::progress::write_persistent::write_persistent;
 
 /// One entry's target module path and attribute name.

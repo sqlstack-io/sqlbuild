@@ -36,9 +36,9 @@ use sqlbuild_state::state_tables::main::read_history_sql::read_history_sql;
 use sqlbuild_state::state_tables::models::{HistoryRead, NewestVersions};
 
 use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
-use crate::bindings::_helpers::query_command::project::{
-    ProjectAdapter, ProjectInputs, project_adapter,
-};
+use crate::bindings::_helpers::query_command::project::ProjectAdapter;
+use crate::bindings::_helpers::query_command::project::ProjectInputs;
+use crate::bindings::_helpers::query_command::project::project_adapter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::constants::HISTORY_STREAM_PAGES;

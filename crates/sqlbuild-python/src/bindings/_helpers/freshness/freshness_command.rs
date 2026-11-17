@@ -1,7 +1,10 @@
 //! `sqb freshness`: observe selected source freshness without writing state.
 
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
+use sqlbuild_python_planner::live_reads::models::LiveReads;
 use std::collections::BTreeSet;
+
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
@@ -10,8 +13,10 @@ use sqlbuild_core::freshness_text::main::freshness_exit_code::freshness_exit_cod
 use sqlbuild_core::freshness_text::main::freshness_json::freshness_json;
 use sqlbuild_core::freshness_text::main::render_freshness_text::render_freshness_text;
 use sqlbuild_core::freshness_text::models::{FreshnessSourceResult, FreshnessStatus};
+
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
+
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
 use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
@@ -31,15 +36,12 @@ use sqlbuild_python_project::planner_selection::main::expand_project_upstream_ke
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
+
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME as STATE_TABLE_NAME;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_planner::live_reads::models::LiveReads;
-
 const STALE_REQUIRES_STATE_MESSAGE: &str = "freshness --fail-on-stale requires --state";
-
 const STALE_REQUIRES_STATE_CODE: &str = "C238";
 
 fn imported<'py>(py: Python<'py>, module: &str, name: &str) -> PyResult<Bound<'py, PyAny>> {

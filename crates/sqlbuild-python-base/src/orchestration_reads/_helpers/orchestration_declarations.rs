@@ -20,10 +20,8 @@ use crate::native_host::constants::CALENDAR_CLASS;
 use crate::native_host::constants::CONSTRUCTING_MODULES;
 use crate::native_host::constants::SENSOR_CLASS;
 use crate::native_host::main::host_entry::host_entry as entry;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use sqlbuild_orchestration::declarations::models::{
-    DeclaredAt, DependencyFailure, OnFailure, Overlap, RunResources,
-};
+use std::collections::{BTreeSet};
+use sqlbuild_orchestration::declarations::models::{DependencyFailure};
 
 /// The file and line of the author's code constructing a declaration; `None` for code without a source file.
 #[pyfunction]

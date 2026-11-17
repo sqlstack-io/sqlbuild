@@ -1,11 +1,14 @@
 //! Project column renames onto the existing snapshot and redirect cursor reads.
 
-use crate::planner_migrations::_helpers::column::column_objects::{
-    config, definition_hash, lower, native, replace,
-};
+use crate::planner_migrations::_helpers::column::column_objects::config;
+use crate::planner_migrations::_helpers::column::column_objects::definition_hash;
+use crate::planner_migrations::_helpers::column::column_objects::lower;
+use crate::planner_migrations::_helpers::column::column_objects::native;
+use crate::planner_migrations::_helpers::column::column_objects::replace;
 use crate::planner_migrations::_helpers::projections::query_shapes::renames_explain_change;
 use crate::planner_migrations::models::ColumnCandidate;
-use crate::planner_migrations::models::{ColumnMigrationInputs, MigrationPhase};
+use crate::planner_migrations::models::ColumnMigrationInputs;
+use crate::planner_migrations::models::MigrationPhase;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::imported::imported;

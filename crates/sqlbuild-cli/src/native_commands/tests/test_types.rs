@@ -126,6 +126,10 @@ pub(super) struct SafetyResumeTestCase {
     pub(super) description: &'static str,
     pub(super) safety_seconds: u64,
     pub(super) due_in: std::time::Duration,
+    /// History reads wake billed compute and the safety interval is the default.
+    pub(super) billed: bool,
+    /// A run ended after the sync stopped.
+    pub(super) ran: bool,
     /// Whether it resumed and pages, the next failure's wait, and whether that stopped it again.
     pub(super) expected_outcome: (bool, bool, Option<std::time::Duration>, bool),
 }

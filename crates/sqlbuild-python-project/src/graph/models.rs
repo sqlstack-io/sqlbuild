@@ -6,6 +6,7 @@ use crate::graph::_helpers::project::project_graph::UniqueIdMap;
 use crate::graph::_helpers::project::project_graph::dependency_edges;
 use crate::graph::_helpers::project::project_graph::outcome;
 use crate::graph::_helpers::project::views::lineage_graph_views;
+use crate::graph::_helpers::python_nodes::python_selection::allows_round_trips;
 use crate::graph::_helpers::python_nodes::python_selection::project_sources;
 use crate::graph::_helpers::python_nodes::python_selection::selection_graph;
 use crate::graph::constants::LOADER_KIND;
@@ -51,7 +52,6 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use crate::graph::_helpers::python_nodes::python_selection::allows_round_trips;
 
 /// One `CompiledObjectKey` per native pair, so shared keys convert once.
 #[derive(Debug)]
@@ -393,10 +393,9 @@ impl NativeProjectGraph {
 }
 
 /// A compiled project's sources and discovered Python nodes, which publication resolves selectors over.
-#[derive(Debug)]
 pub struct ProjectSelection {
-    pub(crate) sources: Vec<(String, Option<String>)>,
-    pub(crate) allow_warehouse_round_trips: bool,
+    sources: Vec<(String, Option<String>)>,
+    allow_warehouse_round_trips: bool,
     pub nodes: PythonSelectionGraph,
 }
 
@@ -410,7 +409,7 @@ impl ProjectSelection {
     }
 
     /// The `kind:name` keys `sqb build --select` runs for these selectors.
-    pub fn run_keys(
+    pub(crate) fn run_keys(
         &self,
         graph: &ProjectGraph,
         select: &[String],
@@ -420,7 +419,7 @@ impl ProjectSelection {
     }
 
     /// The `kind:name` keys these selectors name, Python checks included.
-    pub fn node_keys(
+    pub(crate) fn node_keys(
         &self,
         graph: &ProjectGraph,
         select: &[String],
@@ -471,7 +470,7 @@ impl ProjectSelection {
     }
 
     /// The key a selected Python node's run reports under; a loader reports as the source it writes.
-    pub(crate) fn run_key(&self, name: &str) -> Option<String> {
+    fn run_key(&self, name: &str) -> Option<String> {
         let node = self
             .nodes
             .nodes
@@ -494,10 +493,7 @@ impl ProjectSelection {
             .any(|(_, loader)| loader.as_deref() == Some(name))
     }
 
-    pub(crate) fn sql<'graph>(
-        &'graph self,
-        graph: &'graph ProjectGraph,
-    ) -> SqlSelectionGraph<'graph> {
+    fn sql<'graph>(&'graph self, graph: &'graph ProjectGraph) -> SqlSelectionGraph<'graph> {
         SqlSelectionGraph {
             graph,
             sources: &self.sources,
@@ -505,7 +501,7 @@ impl ProjectSelection {
         }
     }
 
-    pub(crate) fn keys(
+    fn keys(
         &self,
         selection: Result<RunSelection, SelectorError>,
     ) -> Result<BTreeSet<String>, String> {

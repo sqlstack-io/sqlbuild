@@ -2,10 +2,13 @@
 
 use crate::dev_screen::models::ScreenSetup;
 use crate::native_commands::_helpers::paths::exclude_location_databases;
-use crate::native_commands::_helpers::project_facts::{project_directory_name, project_name};
+use crate::native_commands::_helpers::project_facts::{
+    development_project_name, project_directory_name, project_name,
+};
 use crate::native_commands::_helpers::terminal::{live_screen, stderr_columns};
 use crate::native_commands::constants::SCREEN_INDENT;
-use crate::native_commands::types::{CompileOutcome, NextGeneration, Settled};
+use crate::native_commands::types::{NextGeneration, Settled};
+use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
 use sqlbuild_orchestration::credentials::main::identities::development_person::development_person;
@@ -120,40 +123,13 @@ use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
 use crate::workers::main::terminate_child::terminate_child;
 use crate::workers::models::{Launchers, Workers};
-use std::collections::HashMap;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
-use sqlbuild_orchestration::platform::models::{
-    ConnectionCheckTrigger, LocationHealth, LocationHealthReport, LocationWorkClient,
-    LocationWorkPoll, RetentionPolicies, WarehouseReadFailure, WarehouseSyncFailure,
-    WarehouseSyncProgress,
-};
-use sqlbuild_orchestration::warehouse_metadata::constants::{
-    MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
-};
-use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind,
-    WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead, WarehouseWatermarkRead,
-};
-use crate::native_commands::_helpers::decision::{
-    control_database, control_database_variable, text,
-};
-use crate::native_commands::_helpers::terminal::{
-    finish_lost_stdout, share_terminal, terminal_columns, write_output,
-};
-use crate::native_commands::constants::{
-    ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
-    METADATA_PAGE_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
-    METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
-    METADATA_SYNC_CHECK_SECONDS, PLAN_NOT_PRODUCED, SAFETY_SYNC_ENV, SCHEDULER_COMMAND,
-    STATISTICS_RELATION_SECONDS, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
-};
-use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationLoad,
-    LocationMetadataPage, LocationMetadataSync, LocationRuntimeRequest, LocationServe,
-    LocationWatch, LostStdout, MetadataReply, NativeCommand, NativeInvocation, ProjectLocation,
-    ReadFailure, ScanToken, SyncProgress,
-};
+use sqlbuild_orchestration::platform::models::{ConnectionCheckTrigger, WarehouseReadFailure, WarehouseSyncProgress};
+use sqlbuild_orchestration::warehouse_metadata::constants::{MAX_HISTORY_PAGE_RECORDS};
+use crate::native_commands::_helpers::terminal::{share_terminal};
+use crate::native_commands::constants::{METADATA_PAGE_SECONDS, PLAN_NOT_PRODUCED, STATISTICS_RELATION_SECONDS};
+use crate::native_commands::models::{LocationLoad, LocationRuntimeRequest, ReadFailure, SyncProgress};
 use crate::native_commands::types::LoadOutcome;
 
 /// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`.
@@ -337,19 +313,11 @@ fn development_location_role(
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
 pub(crate) async fn compile_generation(
-<<<<<<< ours
-    requests: &mpsc::Sender<LocationRuntimeRequest>,
+    (requests, dev_events): (&mpsc::Sender<LocationRuntimeRequest>, bool),
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LoadOutcome>, ControlError> {
-=======
-    (requests, dev_events): (&mpsc::Sender<LocationCompileRequest>, bool),
-    generation: i64,
-    sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
-    stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<CompileOutcome>, ControlError> {
->>>>>>> theirs
     let (reply, publication) = oneshot::channel();
     requests
         .send(LocationRuntimeRequest::Publish(LocationCompileRequest {
@@ -377,7 +345,7 @@ pub(crate) async fn compile_generation(
                     "Location compiler failed; generation {generation} may already be published: {error}\n"
                 ),
             )]));
-<<<<<<< ours
+            dev_failure(dev_events, generation, error);
             LocationLoad {
                 published: None,
                 rules: None,
@@ -385,60 +353,60 @@ pub(crate) async fn compile_generation(
         }
     };
     let Some((record, refresh, locations)) = load.published else {
+        if let Some(rules) = &load.rules {
+            dev_failure(dev_events, generation, rule_failure_text(rules));
+        }
         return Ok(Some(Err(load.rules)));
     };
     let refresh_at = refresh
         .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
-    let output =
-        serde_json::to_string(&record).map_err(|error| ControlError::Invalid(error.to_string()))?;
-    if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
+    let output: String = if dev_events {
+        dev_event_line(&DevEvent::Published {
+            generation,
+            snapshot_id: record.snapshot_id.to_string(),
+            record: serde_json::to_value(&record)
+                .map_err(|error| ControlError::Invalid(error.to_string()))?,
+        })
+    } else {
+        let mut output: String = serde_json::to_string(&record)
+            .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        output.push('\n');
+        output
+    };
+    if write_output(&[(Stream::Stdout, &output)]).is_some() {
         return Err(ControlError::Invalid(format!(
             "Snapshot {} was published, but result delivery failed",
             record.snapshot_id
         )));
-=======
-            if dev_events {
-                drop(write_output(&[(
-                    Stream::Stdout,
-                    &dev_event_line(&DevEvent::Failed {
-                        generation,
-                        position: None,
-                        message: error,
-                    }),
-                )]));
-            }
-            None
-        }
-    };
-    let published = record.is_some();
-    let mut refresh_at = None;
-    let mut locations: Vec<WarehouseStateLocation> = Vec::new();
-    if let Some((record, refresh, state_locations)) = record {
-        refresh_at = refresh
-            .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
-        locations = state_locations;
-        let output: String = if dev_events {
-            dev_event_line(&DevEvent::Published {
-                generation,
-                snapshot_id: record.snapshot_id.to_string(),
-                record: serde_json::to_value(&record)
-                    .map_err(|error| ControlError::Invalid(error.to_string()))?,
-            })
-        } else {
-            let mut output: String = serde_json::to_string(&record)
-                .map_err(|error| ControlError::Invalid(error.to_string()))?;
-            output.push('\n');
-            output
-        };
-        if write_output(&[(Stream::Stdout, &output)]).is_some() {
-            return Err(ControlError::Invalid(format!(
-                "Snapshot {} was published, but result delivery failed",
-                record.snapshot_id
-            )));
-        }
->>>>>>> theirs
     }
     Ok(Some(Ok((refresh_at, locations))))
+}
+
+/// Under `sqb dev`, tell the screen a generation failed; the last good generation keeps serving.
+fn dev_failure(dev_events: bool, generation: i64, message: String) {
+    if dev_events {
+        drop(write_output(&[(
+            Stream::Stdout,
+            &dev_event_line(&DevEvent::Failed {
+                generation,
+                position: None,
+                message,
+            }),
+        )]));
+    }
+}
+
+/// Configured rules that failed a load, as one line: how many findings and the first.
+fn rule_failure_text(rules: &LocationRuleFailure) -> String {
+    let first: String = rules
+        .findings
+        .first()
+        .map(|finding| format!("; first: {} {}", finding.code, finding.message))
+        .unwrap_or_default();
+    format!(
+        "configured rules failed with {} finding(s){first}",
+        rules.finding_count
+    )
 }
 
 /// The child is retained by its owning task while this exchange can be cancelled.
@@ -530,6 +498,7 @@ pub(crate) fn metadata_sync(
         cycle_started_at: None,
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
+        busy: false,
         failed_reads: 0,
         halted: false,
         change_tokens: HashMap::new(),
@@ -747,7 +716,7 @@ pub(crate) async fn load_watermark(
             Err(error) => {
                 tokio::select! {
                     result = &mut stopped => { result?; return Ok(None); },
-                    () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Watermark)), None) => {},
+                    () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Watermark))) => {},
                 }
                 return Ok(Some((state, Some(error))));
             }
@@ -806,54 +775,13 @@ pub(crate) fn location_warning(title: &str, detail: String) {
     }));
 }
 
-/// A sync stopped by failed reads makes one attempt when its safety sync is due, and says so.
-pub(crate) fn retry_stopped_sync(state: &mut LocationMetadataSync) {
-    if state.resume_after_safety_wait() {
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Retrying the stopped warehouse history synchronization at its safety sync.\n",
-        )]));
-        location_warning(
-            "warehouse sync retrying",
-            "one attempt after the safety interval".to_owned(),
-        );
-    }
-}
-
 /// Operational cost is elapsed IO time, not an estimate of warehouse billing.
 pub(crate) async fn metadata_health(
     state: &LocationMetadataSync,
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
     (started, failure): (Instant, Option<WarehouseSyncFailure>),
-    error: Option<&str>,
 ) {
-<<<<<<< ours
     report_metadata_health(state, (client, poll), (started, failure, None)).await;
-=======
-    let report = LocationHealthReport {
-        event_id: Uuid::now_v7(),
-        session_id: poll.session_id,
-        target: poll.target.clone(),
-        health: LocationHealth::WarehouseSync {
-            generation: state.generation,
-            location: state.location().clone(),
-            table: state.kind(),
-            failure,
-            records_sent: state
-                .pending
-                .as_ref()
-                .map_or(0, |page| page.batch.records.len()) as u64,
-            elapsed_millis: started.elapsed().as_millis() as u64,
-            error: error.map(|error| error.chars().take(METADATA_ERROR_CHARS).collect()),
-        },
-    };
-    if let Err(error) = client.report_health(&report).await {
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!("Warehouse synchronization health report failed: {error}\n"),
-        )]));
-    }
->>>>>>> theirs
 }
 
 /// Health IO remains native even while a user-code child holds its interpreter's GIL.
@@ -959,11 +887,7 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
         target,
         image_id: text(namespace, "location_image_id"),
         metadata_reconcile_seconds,
-<<<<<<< ours
-=======
-        safety_sync_seconds,
         dev_events: dev_events_enabled(),
->>>>>>> theirs
     })
 }
 
@@ -1022,14 +946,8 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
 
 /// Check the connection after a publication: the first in a process is its startup check.
 pub(crate) async fn check_published_location(
-<<<<<<< ours
-    options: &LocationServe,
-    script: &Path,
-    (bearer, session_id, generation, trigger): (&str, Uuid, i64, ConnectionCheckTrigger),
-=======
     (options, script, connect): (&LocationServe, &Path, bool),
-    (bearer, session_id, generation): (&str, Uuid, i64),
->>>>>>> theirs
+    (bearer, session_id, generation, trigger): (&str, Uuid, i64, ConnectionCheckTrigger),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Vec<PathBuf>>, ControlError> {
     drop(write_output(&[(
@@ -1447,16 +1365,11 @@ pub(crate) async fn stop_location_runtime(
     Ok(())
 }
 
-<<<<<<< ours
 /// An outer absence means shutdown; an inner error is a failed read, never an empty table.
-=======
-/// An absence means shutdown; a failed read never stands for an empty table.
->>>>>>> theirs
 pub(crate) async fn read_metadata_page(
     (options, script): (&LocationServe, &Path),
     mut state: LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
-<<<<<<< ours
 ) -> Result<
     Option<(
         LocationMetadataSync,
@@ -1465,9 +1378,6 @@ pub(crate) async fn read_metadata_page(
     ControlError,
 > {
     state.busy = false;
-=======
-) -> Result<Option<(LocationMetadataSync, MetadataReply)>, ControlError> {
->>>>>>> theirs
     if let Some(statistics) = &state.statistics
         && statistics.names.is_empty()
     {
@@ -1478,11 +1388,7 @@ pub(crate) async fn read_metadata_page(
             unchanged: false,
             wakes_compute: false,
         };
-<<<<<<< ours
         return Ok(Some((state, Ok(page))));
-=======
-        return Ok(Some((state, MetadataReply::Page(page))));
->>>>>>> theirs
     }
     let request = history_request(&state)?;
     let reader = match state.reader.take() {
@@ -1490,26 +1396,16 @@ pub(crate) async fn read_metadata_page(
         None => match open_location_runtime(options, script, Vec::new()) {
             Ok(reader) => reader,
             Err(error) => {
-<<<<<<< ours
                 return Ok(Some((
                     state,
                     Err(ReadFailure::ReaderStart(error.to_string())),
                 )));
-=======
-                let reason = format!("Warehouse metadata reader did not start: {error}");
-                drop(write_output(&[(Stream::Stderr, &format!("{reason}\n"))]));
-                let failure = WarehouseHistoryFailure {
-                    reason,
-                    page_size: false,
-                };
-                return Ok(Some((state, MetadataReply::Failed(failure))));
->>>>>>> theirs
             }
         },
     };
     let seconds = read_timeout_seconds(&state);
     tokio::pin!(stopped);
-    let reply = tokio::select! {
+    let read = tokio::select! {
         result = &mut stopped => {
             result?;
             return Ok(None);
@@ -1518,112 +1414,30 @@ pub(crate) async fn read_metadata_page(
             Duration::from_secs(seconds),
             exchange_metadata_read(reader, request),
         ) => match result {
-<<<<<<< ours
             Ok((reader, Ok(MetadataReply::Page(page)))) => {
                 state.reader = Some(reader);
-                Ok(Some((state, Ok(page))))
+                Ok(page)
             }
             Ok((reader, Ok(MetadataReply::Busy))) => {
                 state.busy = true;
                 state.reader = Some(reader);
-                Ok(Some((state, Err(ReadFailure::Busy))))
+                Err(ReadFailure::Busy)
             }
-            Ok((reader, Ok(MetadataReply::Failed(message)))) => {
+            Ok((reader, Ok(MetadataReply::Failed(failure)))) => {
                 state.reader = Some(reader);
-                Ok(Some((state, Err(ReadFailure::Read(message)))))
-            }
-            Ok((reader, Err(error))) => {
-                stop_location_runtime(Some(reader)).await?;
-                Ok(Some((state, Err(ReadFailure::Read(error.to_string())))))
-            }
-            Err(_) => Ok(Some((state, Err(ReadFailure::TimedOut(seconds))))),
-=======
-            Ok((reader, Ok(reply))) => {
-                state.reader = Some(reader);
-                reply
+                Err(ReadFailure::Read(failure))
             }
             Ok((reader, Err(failure))) => {
-                drop(write_output(&[(
-                    Stream::Stderr,
-                    &format!("Warehouse metadata reader failed: {}\n", failure.reason),
-                )]));
                 stop_location_runtime(Some(reader)).await?;
-                MetadataReply::Failed(failure)
+                Err(ReadFailure::Read(failure))
             }
-            Err(_) => {
-                let reason =
-                    format!("Warehouse metadata read did not answer within {METADATA_POLL_SECONDS}s.");
-                drop(write_output(&[(Stream::Stderr, &format!("{reason}\n"))]));
-                MetadataReply::Failed(WarehouseHistoryFailure {
-                    reason,
-                    page_size: true,
-                })
-            }
->>>>>>> theirs
+            Err(_) => Err(ReadFailure::TimedOut(seconds)),
         },
     };
-    if matches!(reply, MetadataReply::Page(_)) {
+    if read.is_ok() {
         state.failed_reads = 0;
     }
-    Ok(Some((state, reply)))
-}
-
-/// A warehouse file held by another process, such as a DuckDB build, waits a poll interval.
-pub(crate) async fn wait_for_file(
-    mut state: LocationMetadataSync,
-    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
-    started: Instant,
-    stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<LocationMetadataSync>, ControlError> {
-    let failure = Some(WarehouseSyncFailure::Busy);
-    tokio::select! {
-        result = stopped => { result?; return Ok(None); },
-        () = metadata_health(&state, (client, poll), (started, failure), None) => {},
-    }
-    state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
-    Ok(Some(state))
-}
-
-/// Report the failed read with its error, then retry it later or stop after failures in a row.
-pub(crate) async fn failed_read(
-    mut state: LocationMetadataSync,
-    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
-    (started, failure): (Instant, WarehouseHistoryFailure),
-    stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<LocationMetadataSync>, ControlError> {
-    let read = Some(WarehouseSyncFailure::Read);
-    tokio::select! {
-        result = stopped => { result?; return Ok(None); },
-        () = metadata_health(&state, (client, poll), (started, read), Some(&failure.reason)) => {},
-    }
-    let message = match state.fail_read(failure.page_size) {
-        Some(wait) => {
-            location_warning(
-                "warehouse read failed",
-                format!("retrying in {}s: {}", wait.as_secs(), failure.reason),
-            );
-            format!(
-                "Warehouse history read failed; retaining mirror and retrying in {}s.\n",
-                wait.as_secs()
-            )
-        }
-        None => {
-            state = close_metadata_reader(state).await?;
-            location_warning(
-                "warehouse sync stopped",
-                format!(
-                    "{METADATA_FAILURE_LIMIT} failed reads in a row: {}; it retries at the next safety sync, on request or after a publish",
-                    failure.reason
-                ),
-            );
-            format!(
-                "Warehouse history synchronization stopped after {METADATA_FAILURE_LIMIT} failed reads in a row: {}. It retries at the next safety sync, on request or after a publish.\n",
-                failure.reason
-            )
-        }
-    };
-    drop(write_output(&[(Stream::Stderr, &message)]));
-    Ok(Some(state))
+    Ok(Some((state, read)))
 }
 
 /// A completed synchronization closes its reader, so no warehouse session outlives the sync.
@@ -1658,12 +1472,7 @@ pub(crate) async fn close_metadata_reader(
     Ok(state)
 }
 
-<<<<<<< ours
-/// A reply of `{"error": ...}`, or `null` from an older reader, means the read failed and the
-/// reader dropped its warehouse session.
-=======
 /// A reply too long, or a reader gone and likely killed for memory, may fit a smaller page.
->>>>>>> theirs
 async fn exchange_metadata_read(
     mut reader: LocationCompiler,
     request: Vec<u8>,
@@ -1703,18 +1512,10 @@ async fn exchange_metadata_read(
         if reply.get("busy") == Some(&serde_json::Value::Bool(true)) {
             return Ok(MetadataReply::Busy);
         }
-<<<<<<< ours
-        if reply.is_null() {
-            return Ok(MetadataReply::Failed("the reader read no page".into()));
-        }
-        if let Some(message) = reply.get("error").and_then(serde_json::Value::as_str) {
-            return Ok(MetadataReply::Failed(message.to_owned()));
-=======
         if let Some(failure) = reply.get("failed") {
             return serde_json::from_value(failure.clone())
                 .map(MetadataReply::Failed)
                 .map_err(|_| failed("invalid location reply", false));
->>>>>>> theirs
         }
         serde_json::from_value(reply)
             .map(MetadataReply::Page)
@@ -1828,25 +1629,31 @@ pub(crate) fn note_compiled_inputs(
 /// Sync a published generation's warehouse state, or defer it until the warehouse connects, then check the location.
 pub(crate) async fn settle_publication(
     (options, script, (bearer, session_id)): (&LocationServe, &Path, (&str, Uuid)),
-    (locations, generation, connect): (Vec<WarehouseStateLocation>, i64, bool),
+    (locations, generation, connect, trigger): (
+        Vec<WarehouseStateLocation>,
+        i64,
+        bool,
+        ConnectionCheckTrigger,
+    ),
     (watch, metadata): (LocationWatch, Option<LocationMetadataSync>),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Settled>, ControlError> {
     let (metadata, deferred) = if connect {
-        let sync: LocationMetadataSync = metadata_sync(
+        let mut sync: LocationMetadataSync = metadata_sync(
             (locations, generation),
             (
                 options.metadata_reconcile_seconds,
                 options.safety_sync_seconds,
             ),
         );
+        sync.safety_explicit = options.safety_sync_explicit;
         (Some(sync), None)
     } else {
         (metadata, Some((locations, generation)))
     };
     let Some(files) = check_published_location(
         (options, script, connect),
-        (bearer, session_id, generation),
+        (bearer, session_id, generation, trigger),
         stopped,
     )
     .await?
@@ -1872,7 +1679,7 @@ pub(crate) async fn apply_dev_controls(
     };
     let settled: Option<Settled> = settle_publication(
         (options, script, session),
-        (locations, generation, true),
+        (locations, generation, true, ConnectionCheckTrigger::Publish),
         (watch, metadata),
         stopped,
     )
@@ -1953,8 +1760,16 @@ pub(crate) async fn development_store(
         request_id: Uuid::now_v7(),
         ip_address: None,
     };
-    let location_id =
-        development_location(&store, &project.to_string_lossy(), target, &context).await?;
+    let location_id = development_location(
+        &store,
+        (
+            &project.to_string_lossy(),
+            &development_project_name(project)?,
+        ),
+        target,
+        &context,
+    )
+    .await?;
     let scope = DevelopmentScope {
         location_id,
         target: target.into(),
@@ -1970,7 +1785,7 @@ pub(crate) async fn development_store(
 /// After a compile: a publication waits for the `sqb dev` warehouse verdict and settles; a failure keeps the last good snapshot.
 pub(crate) async fn finish_compile(
     (options, script, session): (&LocationServe, &Path, (&str, Uuid)),
-    (compiled, generation): (CompileOutcome, i64),
+    (load, generation, trigger): (LoadOutcome, i64, ConnectionCheckTrigger),
     (mut watch, metadata, deferred): Settled,
     (controls, stopped): (
         &mut watch::Receiver<DevControlState>,
@@ -1978,19 +1793,21 @@ pub(crate) async fn finish_compile(
     ),
 ) -> Result<Option<Settled>, ControlError> {
     tokio::pin!(stopped);
-    let (published, refresh_at, locations) = compiled;
-    if !published {
-        watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
-        tokio::select! {
-            result = &mut stopped => { result?; return Ok(None); },
-            () = report_location_health(options, session.0, session.1, LocationHealth::CompileFailed { generation }) => {},
+    let (refresh_at, locations) = match load {
+        Ok(published) => published,
+        Err(rules) => {
+            watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
+            tokio::select! {
+                result = &mut stopped => { result?; return Ok(None); },
+                () = report_location_health(options, session.0, session.1, LocationHealth::CompileFailed { generation, rules }) => {},
+            }
+            drop(write_output(&[(
+                Stream::Stderr,
+                "Location reload failed; retaining last good snapshot. Retrying on change or in 30 seconds.\n",
+            )]));
+            return Ok(Some((watch, metadata, deferred)));
         }
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Location reload failed; retaining last good snapshot. Retrying on change or in 30 seconds.\n",
-        )]));
-        return Ok(Some((watch, metadata, deferred)));
-    }
+    };
     watch.retry_at = refresh_at;
     let connect: bool = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
@@ -2000,7 +1817,7 @@ pub(crate) async fn finish_compile(
     };
     settle_publication(
         (options, script, session),
-        (locations, generation, connect),
+        (locations, generation, connect, trigger),
         (watch, metadata),
         stopped.as_mut(),
     )
@@ -2009,7 +1826,7 @@ pub(crate) async fn finish_compile(
 
 /// Close the metadata reader, take the next generation number and compile it; `None` inside when no number was issued.
 pub(crate) async fn compile_next_generation(
-    (options, bearer, requests): (&LocationServe, &str, &mpsc::Sender<LocationCompileRequest>),
+    (options, bearer, requests): (&LocationServe, &str, &mpsc::Sender<LocationRuntimeRequest>),
     (metadata, compiled_inputs, observed): (
         Option<LocationMetadataSync>,
         Option<Vec<PathStamp>>,
@@ -2034,14 +1851,14 @@ pub(crate) async fn compile_next_generation(
         &format!("Compiling location generation {generation} in an isolated interpreter...\n"),
     )]));
     let compiled_inputs = note_compiled_inputs(options, compiled_inputs, observed);
-    let compiled: Option<CompileOutcome> = compile_generation(
+    let load: Option<LoadOutcome> = compile_generation(
         (requests, options.dev_events),
         generation,
         observed,
         stopped.as_mut(),
     )
     .await?;
-    Ok(compiled.map(|compiled| (Some((compiled, generation)), metadata, compiled_inputs)))
+    Ok(load.map(|load| (Some((load, generation)), metadata, compiled_inputs)))
 }
 
 /// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
@@ -2103,6 +1920,7 @@ pub(crate) fn sync_progress(state: &LocationMetadataSync, clean: bool) -> Wareho
         rows,
         elapsed_millis: state.progress.sync_started.elapsed().as_millis() as u64,
         completed: clean && scan_done && state.index as u64 + 1 == kinds,
+        halted: state.halted,
     }
 }
 
@@ -2129,23 +1947,39 @@ pub(crate) fn completed_sync_next_at(
     now: DateTime<Utc>,
 ) -> Option<DateTime<Utc>> {
     let completes = sync_progress(state, failure.is_none()).completed;
-    (completes && state.safety_seconds > 0 && !state.defers_safety_sync())
+    completes.then(|| safety_sync_at(state, now)).flatten()
+}
+
+/// When a timed safety sync follows from `now`, under the same rules as `completed_sync_next_at`.
+pub(crate) fn safety_sync_at(
+    state: &LocationMetadataSync,
+    now: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    (state.safety_seconds > 0 && !state.defers_safety_sync())
         .then(|| i64::try_from(state.safety_seconds).ok())
         .flatten()
         .and_then(|seconds| now.checked_add_signed(chrono::Duration::seconds(seconds)))
 }
 
-/// A failed read also reports its closed cause and the page size it asked for.
+/// A failed read also reports its closed cause, its redacted error and the page size it asked
+/// for, and whether it stops the sync; a stopped sync's next sync is its safety retry, if any.
 pub(crate) async fn report_metadata_health(
     state: &LocationMetadataSync,
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
-    (started, failure, read_failure): (
+    (started, failure, read): (
         Instant,
         Option<WarehouseSyncFailure>,
-        Option<WarehouseReadFailure>,
+        Option<(&ReadFailure, bool)>,
     ),
 ) {
-    let next_sync_at = completed_sync_next_at(state, failure, Utc::now());
+    let now = Utc::now();
+    let halted: bool = read.is_some_and(|(_, halts)| halts);
+    let next_sync_at = if halted {
+        safety_sync_at(state, now)
+    } else {
+        completed_sync_next_at(state, failure, now)
+    };
+    let read_failure = read.and_then(|(read, _)| read.cause());
     let report = LocationHealthReport {
         event_id: Uuid::now_v7(),
         session_id: poll.session_id,
@@ -2162,7 +1996,13 @@ pub(crate) async fn report_metadata_health(
             elapsed_millis: started.elapsed().as_millis() as u64,
             page_limit: read_failure.map(|_| page_limit(state) as u64),
             read_failure,
-            progress: Some(sync_progress(state, failure.is_none())),
+            error: read
+                .filter(|(read, _)| read.cause().is_some())
+                .map(|(read, _)| read.reason().chars().take(METADATA_ERROR_CHARS).collect()),
+            progress: Some(WarehouseSyncProgress {
+                halted,
+                ..sync_progress(state, failure.is_none())
+            }),
             next_sync_at,
         },
     };

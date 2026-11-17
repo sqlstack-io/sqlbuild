@@ -2,6 +2,7 @@
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
+
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use pyo3::prelude::{
@@ -38,13 +39,14 @@ use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lif
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_selection::main::parse_project_selector::parse_project_selector;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
-use crate::bindings::_helpers::check::check_core::{
-    ReadSideInputs, load_results_by_loader_name, record_python_run_state_results,
-    run_read_side_dependencies,
-};
-use crate::bindings::_helpers::check::check_results::{
-    check_result_text, results_json, write_results,
-};
+
+use crate::bindings::_helpers::check::check_core::ReadSideInputs;
+use crate::bindings::_helpers::check::check_core::load_results_by_loader_name;
+use crate::bindings::_helpers::check::check_core::record_python_run_state_results;
+use crate::bindings::_helpers::check::check_core::run_read_side_dependencies;
+use crate::bindings::_helpers::check::check_results::check_result_text;
+use crate::bindings::_helpers::check::check_results::results_json;
+use crate::bindings::_helpers::check::check_results::write_results;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -55,19 +57,10 @@ use sqlbuild_python_compile::compile_outputs::main::write_python_check_runtime_t
 use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_names::python_node_names;
-use crate::bindings::_helpers::check::check_core::ReadSideInputs;
-use crate::bindings::_helpers::check::check_core::load_results_by_loader_name;
-use crate::bindings::_helpers::check::check_core::record_python_run_state_results;
-use crate::bindings::_helpers::check::check_core::run_read_side_dependencies;
-use crate::bindings::_helpers::check::check_results::check_result_text;
-use crate::bindings::_helpers::check::check_results::results_json;
-use crate::bindings::_helpers::check::check_results::write_results;
 
 const GRAPH_OPERATOR_CODE: &str = "C681";
-
 const GRAPH_OPERATOR_MESSAGE: &str = "sqb check selectors do not support graph operators; \
     select checks directly without '+', '~', or path-between expansion";
-
 const EXECUTION_COMMAND: &str = "sqb check";
 
 /// The compiled pipeline and everything checks run with.
@@ -684,17 +677,4 @@ pub(crate) fn run_check_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_check_command, module)?)?;
     Ok(())
-}
-
-fn target_default<'py>(
-    project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    (field, fallback): (&str, &str),
-) -> PyResult<Bound<'py, PyAny>> {
-    let value: Bound<'py, PyAny> = native_field(project, field)?;
-    if value.is_none() {
-        adapter.call_method0(fallback)
-    } else {
-        Ok(value)
-    }
 }

@@ -2,24 +2,22 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+
 use chrono::{DateTime, Utc};
 use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
 use sqlbuild_orchestration::credentials::models::CredentialScope;
 use sqlbuild_orchestration::declarations::models::TriggerChange;
-use sqlbuild_orchestration::platform::models::LocationWorkRequest;
+use sqlbuild_orchestration::platform::models::{LocationWorkRequest, WarehouseReadFailure};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind,
     WarehouseHistoryPage, WarehouseStateLocation,
 };
 use uuid::Uuid;
+
 use crate::argv::models::Namespace;
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
 use crate::native_commands::types::LocationPublication;
-use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
-    WarehouseStateLocation,
-};
 
 /// Privileged local operations require direct ownership of the control database.
 pub(crate) enum ControlAdmin {
@@ -56,6 +54,15 @@ pub(crate) enum NativeParse {
         namespace: Namespace,
         use_color: bool,
     },
+}
+
+/// What `sqb skills` installs.
+/// One turn of named work: the files it wrote, whether metadata should sync, and whether it claimed work.
+#[derive(Debug, Default)]
+pub(crate) struct LocationWorkTurn {
+    pub(crate) files: Vec<std::path::PathBuf>,
+    pub(crate) sync: bool,
+    pub(crate) claimed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,13 +161,10 @@ pub(crate) struct LocationServe {
     pub(crate) metadata_reconcile_seconds: u32,
     /// Seconds between safety syncs of an idle location; `0` turns them off.
     pub(crate) safety_sync_seconds: u64,
-<<<<<<< ours
     /// A flag, the environment or the project set the interval, rather than the default.
     pub(crate) safety_sync_explicit: bool,
-=======
     /// `sqb dev` reads events on stdout and sends control lines on stdin.
     pub(crate) dev_events: bool,
->>>>>>> theirs
 }
 
 /// What `sqb dev` last asked its location: the foreground warehouse verdict and how many recompiles.
@@ -190,6 +194,27 @@ pub(crate) struct LocationCompileRequest {
     pub(crate) generation: i64,
     pub(crate) python_sources: Vec<PathStamp>,
     pub(crate) reply: tokio::sync::oneshot::Sender<Result<LocationLoad, String>>,
+}
+
+/// The runtime's reply to a generation: its publication, or the rule findings that failed its compile.
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct LocationLoad {
+    pub(crate) published: Option<LocationPublication>,
+    pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
+}
+
+/// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.
+#[derive(Debug)]
+pub(crate) struct LocationPlanRequest {
+    pub(crate) request: serde_json::Value,
+    pub(crate) reply: tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
+}
+
+/// Work for the task that owns the warm runtime interpreter.
+#[derive(Debug)]
+pub(crate) enum LocationRuntimeRequest {
+    Publish(LocationCompileRequest),
+    Plan(LocationPlanRequest),
 }
 
 /// Only its owner (the compiler task or one metadata synchronization) uses this interpreter's stdio.
@@ -235,9 +260,12 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) safety_seconds: u64,
     /// When an idle location syncs even though no run ended and nobody asked.
     pub(crate) safety_at: tokio::time::Instant,
+    /// The last read found the warehouse file held by another process, such as a DuckDB build.
+    pub(crate) busy: bool,
     /// Failed reads in a row that did not shrink the page; a delivered page resets it.
     pub(crate) failed_reads: u32,
-    /// Failed reads in a row stopped the synchronization until a sync request or a new publication.
+    /// Failed reads in a row stopped the synchronization. It rests idle until a run ends, someone
+    /// asks, the generation is published again, or its safety sync is due where that applies.
     pub(crate) halted: bool,
     /// Per scan index: the table's change token after its last complete read.
     pub(crate) change_tokens: HashMap<usize, ScanToken>,
@@ -265,19 +293,85 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) replan: bool,
 }
 
+/// Rows delivered and time taken by the current synchronization and its current table.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SyncProgress {
+    pub(crate) sync_started: tokio::time::Instant,
+    pub(crate) scan_started: tokio::time::Instant,
+    pub(crate) sync_rows: u64,
+    pub(crate) scan_rows: u64,
+    /// The current table's change token showed it unchanged, so nothing was read.
+    pub(crate) scan_unchanged: bool,
+}
+
+impl SyncProgress {
+    pub(crate) fn new() -> Self {
+        let now = tokio::time::Instant::now();
+        Self {
+            sync_started: now,
+            scan_started: now,
+            sync_rows: 0,
+            scan_rows: 0,
+            scan_unchanged: false,
+        }
+    }
+}
+
 /// The metadata reader's answer to one read.
 #[derive(Debug)]
 pub(crate) enum MetadataReply {
     Page(WarehouseHistoryPage),
-<<<<<<< ours
-=======
-    /// The read failed and delivered nothing; never an empty table.
-    Failed(WarehouseHistoryFailure),
->>>>>>> theirs
     /// Another process holds the warehouse file; nothing was read.
     Busy,
-    /// The read failed with this message, such as the warehouse's error.
-    Failed(String),
+    /// The read failed and delivered nothing; never an empty table.
+    Failed(WarehouseHistoryFailure),
+}
+
+/// Why a page was not read, with the detail printed to the location's log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ReadFailure {
+    /// Another process holds the warehouse file; the sync waits, nothing failed.
+    Busy,
+    /// The metadata reader process did not start.
+    ReaderStart(String),
+    /// The reader could not connect, the read raised an error, or the reader broke off; the
+    /// failure says whether a smaller page may fit.
+    Read(WarehouseHistoryFailure),
+    /// The reader did not answer within this many seconds.
+    TimedOut(u64),
+}
+
+impl ReadFailure {
+    /// Whether a smaller page may succeed: a time-out, or a read too large for the reader's memory.
+    /// A reader that did not start and any other read error back off instead, and failures in a
+    /// row stop the sync.
+    pub(crate) fn page_size(&self) -> bool {
+        match self {
+            Self::Busy | Self::ReaderStart(_) => false,
+            Self::Read(failure) => failure.page_size,
+            Self::TimedOut(_) => true,
+        }
+    }
+
+    /// The closed cause a health report carries; a busy warehouse file is no failure.
+    pub(crate) fn cause(&self) -> Option<WarehouseReadFailure> {
+        match self {
+            Self::Busy => None,
+            Self::ReaderStart(_) => Some(WarehouseReadFailure::ReaderStart {}),
+            Self::Read(_) => Some(WarehouseReadFailure::ReadError {}),
+            Self::TimedOut(seconds) => Some(WarehouseReadFailure::TimedOut { seconds: *seconds }),
+        }
+    }
+
+    /// The failure in words for the location's log and, redacted, the health report.
+    pub(crate) fn reason(&self) -> String {
+        match self {
+            Self::Busy => "another process holds the warehouse file".to_owned(),
+            Self::ReaderStart(error) => format!("the metadata reader did not start: {error}"),
+            Self::Read(failure) => failure.reason.trim().to_owned(),
+            Self::TimedOut(seconds) => format!("no reply within {seconds} s"),
+        }
+    }
 }
 
 /// A table's change token after a complete read, and what that read proves about the mirror.
@@ -309,7 +403,7 @@ impl LocationMetadataSync {
     pub(crate) fn request_sync(&mut self) {
         self.cycle_started_at = None;
         let backing_off = std::mem::take(&mut self.failed_reads) > 0;
-        if std::mem::take(&mut self.halted) || backing_off || self.idle {
+        if backing_off || self.idle {
             self.next_at = tokio::time::Instant::now();
         }
     }
@@ -337,14 +431,41 @@ impl LocationMetadataSync {
     /// Start the sync `sync_due` asked for, at server time `now`.
     pub(crate) fn begin_sync(&mut self, now: DateTime<Utc>) {
         self.idle = false;
+        self.halted = false;
         self.applied = false;
         self.progress = SyncProgress::new();
         self.cycle_started_at = Some(now);
         self.next_at = tokio::time::Instant::now();
     }
 
-    /// Statistics revisit catalog; a page-size failure halves the page, any other backs off; `None` once stopped.
-    pub(crate) fn fail_read(&mut self, page_size: bool) -> Option<std::time::Duration> {
+    /// Whether a failed read halves the page rather than counting toward a stop: it ran out of
+    /// time or memory, and the page holds more than one row or relation.
+    pub(crate) fn shrinks(&self, page_size: bool) -> bool {
+        let limit: usize = if self.kind() == WarehouseHistoryKind::Statistics {
+            self.statistics_limit
+        } else {
+            self.limit
+        };
+        page_size && limit > 1
+    }
+
+    /// Whether a failed read stops the sync: it does not shrink the page and is the last of the
+    /// failures in a row allowed.
+    pub(crate) fn halts(&self, page_size: bool) -> bool {
+        !self.shrinks(page_size) && self.failed_reads + 1 >= METADATA_FAILURE_LIMIT
+    }
+
+    /// Statistics revisit catalog; a page-size failure halves the page, any other backs off.
+    ///
+    /// `None` once failures in a row stop the sync: it rests idle from `now`, so the next run, a
+    /// request, a publication or a due safety sync resumes it where it stopped, and one more
+    /// failure stops it again.
+    pub(crate) fn fail_read(
+        &mut self,
+        page_size: bool,
+        now: DateTime<Utc>,
+    ) -> Option<std::time::Duration> {
+        let shrinks: bool = self.shrinks(page_size);
         self.statistics = None;
         let statistics = self.kind() == WarehouseHistoryKind::Statistics;
         if statistics {
@@ -359,13 +480,15 @@ impl LocationMetadataSync {
         } else {
             &mut self.limit
         };
-        let seconds = if page_size && *limit > 1 {
+        let seconds = if shrinks {
             *limit /= 2;
             METADATA_POLL_SECONDS
         } else {
             self.failed_reads += 1;
             if self.failed_reads >= METADATA_FAILURE_LIMIT {
                 self.halted = true;
+                self.idle = true;
+                self.cycle_started_at = Some(now);
                 self.safety_at = tokio::time::Instant::now()
                     + std::time::Duration::from_secs(self.safety_seconds);
                 return None;
@@ -377,21 +500,9 @@ impl LocationMetadataSync {
         Some(wait)
     }
 
-    /// A stopped sync tries once more when its safety sync is due; one more failure stops it again.
-    pub(crate) fn resume_after_safety_wait(&mut self) -> bool {
-        let now = tokio::time::Instant::now();
-        let due: bool = self.halted && self.safety_seconds > 0 && now >= self.safety_at;
-        if due {
-            self.halted = false;
-            self.failed_reads = METADATA_FAILURE_LIMIT - 1;
-            self.next_at = now;
-        }
-        due
-    }
-
     /// A synchronization is mid-flight and its next page is due, so the loop need not wait a tick.
     pub(crate) fn paging(&self) -> bool {
-        !self.idle && !self.halted && tokio::time::Instant::now() >= self.next_at
+        !self.idle && tokio::time::Instant::now() >= self.next_at
     }
 
     pub(crate) fn reconciling(&self) -> bool {
@@ -436,71 +547,4 @@ pub(crate) enum LostStdout {
     Dropped,
     /// Raised by the write: an uncaught exception, with this last line and status 1.
     Raised(String),
-}
-
-/// What `sqb skills` installs.
-/// One turn of named work: the files it wrote, whether metadata should sync, and whether it claimed work.
-#[derive(Debug, Default)]
-pub(crate) struct LocationWorkTurn {
-    pub(crate) files: Vec<std::path::PathBuf>,
-    pub(crate) sync: bool,
-    pub(crate) claimed: bool,
-}
-
-/// The runtime's reply to a generation: its publication, or the rule findings that failed its compile.
-#[derive(Debug, serde::Deserialize)]
-pub(crate) struct LocationLoad {
-    pub(crate) published: Option<LocationPublication>,
-    pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
-}
-
-/// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.
-#[derive(Debug)]
-pub(crate) struct LocationPlanRequest {
-    pub(crate) request: serde_json::Value,
-    pub(crate) reply: tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
-}
-
-/// Work for the task that owns the warm runtime interpreter.
-#[derive(Debug)]
-pub(crate) enum LocationRuntimeRequest {
-    Publish(LocationCompileRequest),
-    Plan(LocationPlanRequest),
-}
-
-/// Rows delivered and time taken by the current synchronization and its current table.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct SyncProgress {
-    pub(crate) sync_started: tokio::time::Instant,
-    pub(crate) scan_started: tokio::time::Instant,
-    pub(crate) sync_rows: u64,
-    pub(crate) scan_rows: u64,
-    /// The current table's change token showed it unchanged, so nothing was read.
-    pub(crate) scan_unchanged: bool,
-}
-
-impl SyncProgress {
-    pub(crate) fn new() -> Self {
-        let now = tokio::time::Instant::now();
-        Self {
-            sync_started: now,
-            scan_started: now,
-            sync_rows: 0,
-            scan_rows: 0,
-            scan_unchanged: false,
-        }
-    }
-}
-
-/// Why a page was not read, with the detail printed to the location's log.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ReadFailure {
-    /// Another process holds the warehouse file; the sync waits, nothing failed.
-    Busy,
-    /// The metadata reader process did not start.
-    ReaderStart(String),
-    /// The reader could not connect, the read raised an error, or the reader broke off.
-    Read(String),
-    /// The reader did not answer within this many seconds.
-    TimedOut(u64),
 }

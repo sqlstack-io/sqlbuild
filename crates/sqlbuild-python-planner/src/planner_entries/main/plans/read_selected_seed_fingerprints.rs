@@ -1,9 +1,9 @@
 //! Read only fingerprint state required by selected direct seeds.
 
 use crate::planner_entries::_helpers::plans::command_plans;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyDict;
-use crate::planner_warehouse::models::PlannerReads;
 
 /// Read only fingerprint state required by selected direct seeds.
 #[inline]

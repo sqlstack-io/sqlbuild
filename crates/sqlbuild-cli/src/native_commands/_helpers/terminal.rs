@@ -12,11 +12,7 @@ use crate::native_commands::constants::{
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::LostStdout;
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::native_commands::constants::{
-    BROKEN_PIPE_EXCEPTION, CLEAR_TERMINAL_LINE, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE,
-    EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, PASSWORD_INPUT_BYTES,
-    PYTHON_STDOUT_BUFFER_SIZE, UNCAUGHT_EXCEPTION_STATUS,
-};
+use crate::native_commands::constants::{CLEAR_TERMINAL_LINE};
 
 /// `int(os.environ["COLUMNS"])`, `0` when unset or not an integer; beyond 64 bits is Python's.
 fn columns_variable() -> Result<i64, PythonNeeded> {

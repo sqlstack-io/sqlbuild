@@ -4,6 +4,7 @@ use crate::graph::main::python_nodes::python_node_names::python_node_names;
 use sqlbuild_python_base::positional_record;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::borrow::Cow;
+
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyFrozenSet;
@@ -17,6 +18,7 @@ use sqlbuild_analysis::python_selection::models::{
     InventoryIndexes, InventoryNode, PythonSelectionGraph, PythonSelectionNode, RunSelection,
     SqlSelectionGraph,
 };
+
 use crate::compiled_project::main::needed_jobs::needed_jobs;
 use crate::graph::models::{CompiledProjectGraph, NativeProjectGraph};
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
@@ -25,7 +27,6 @@ use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 
 type NameRows = Vec<(String, Vec<String>)>;
-
 positional_record! {
     extract;
     /// `(name, tags, POSIX relative path, upstream node names)` of one discovered node.

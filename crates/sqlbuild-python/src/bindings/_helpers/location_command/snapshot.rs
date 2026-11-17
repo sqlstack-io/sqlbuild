@@ -33,7 +33,7 @@ use sqlbuild_python_project::project_snapshot::main::model_nodes::model_nodes;
 use sqlbuild_python_project::project_snapshot::main::python_declarations::python_declarations;
 use sqlbuild_python_project::project_snapshot::main::resource_nodes::resource_nodes;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeSet};
 use sqlbuild_python_front::command_runtime::main::published_concurrency::published_concurrency;
 
 /// Compile catalog nodes and identities in the location, never in the server.

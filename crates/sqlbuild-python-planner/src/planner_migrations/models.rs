@@ -7,8 +7,11 @@ use crate::planner_migrations::_helpers::discovery::state_inspection::pending;
 use crate::planner_migrations::_helpers::discovery::state_inspection::relation_key;
 use crate::planner_migrations::_helpers::discovery::state_inspection::schema_or_empty;
 use crate::planner_migrations::_helpers::discovery::state_inspection::tuple_of;
-use crate::planner_migrations::constants::GET_COLUMNS_FOR_INSPECTION;
-use crate::planner_migrations::constants::LIST_RELATIONS_FOR_INSPECTION;
+use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
+use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
+use crate::planner_warehouse::models::FingerprintRead;
+use crate::planner_warehouse::models::PlannerReads;
+use crate::planner_warehouse::models::Read;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::PyRef;
@@ -18,7 +21,6 @@ use pyo3::prelude::Python;
 use pyo3::prelude::pyclass;
 use pyo3::prelude::pymethods;
 use pyo3::prelude::{Bound, PyAny};
-use pyo3::types::PyBool;
 use pyo3::types::PyDict;
 use pyo3::types::PyString;
 use pyo3::types::PyTuple;
@@ -28,9 +30,6 @@ use sqlbuild_core::constants::COLUMN_MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
@@ -39,18 +38,9 @@ use sqlbuild_python_front::state_rows::constants::MODEL_KIND;
 use sqlbuild_python_front::state_rows::constants::OLD_NAME_KIND;
 use sqlbuild_python_front::state_rows::main::migrations::layout::layout;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_views::old_name_views;
-use sqlbuild_python_front::state_rows::main::migrations::read_events::read_events;
-use sqlbuild_python_front::state_rows::main::migrations::stored_old_name_columns::stored_old_name_columns;
-use sqlbuild_python_front::state_rows::models::StateAccess;
-use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use sqlbuild_state::events::models::EventRelation;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
-use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
-use crate::planner_warehouse::models::FingerprintRead;
-use crate::planner_warehouse::models::PlannerReads;
-use crate::planner_warehouse::models::Read;
 
 #[derive(Debug)]
 pub(crate) struct OldNamePlanner<'py> {
@@ -229,7 +219,7 @@ impl MigrationStateInspection {
         self.reads.bind(py).clone()
     }
 
-    pub(crate) fn list_relations<'py>(
+    fn list_relations<'py>(
         &self,
         py: Python<'py>,
         schemas: Vec<Bound<'py, PyAny>>,
@@ -354,25 +344,25 @@ impl MigrationStateInspection {
 
     /// The database whose namespaces this inspection reads.
     #[getter]
-    pub fn database(&self, py: Python<'_>) -> Py<PyAny> {
+    pub(crate) fn database(&self, py: Python<'_>) -> Py<PyAny> {
         self.database.clone_ref(py)
     }
 
     /// Every migration event read so far.
     #[getter]
-    pub fn events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+    pub(crate) fn events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         tuple_of(py, &self.events)
     }
 
     /// Every column migration event read so far.
     #[getter]
-    pub fn column_events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+    pub(crate) fn column_events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         tuple_of(py, &self.column_events)
     }
 
     /// The old-name history of every move read by `inspect_old_name_views`.
     #[getter]
-    pub fn old_name_histories<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+    pub(crate) fn old_name_histories<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         old_name_views(
             tuple_of(py, &self.old_name_moves)?.as_any(),
             tuple_of(py, &self.old_name_facts)?.as_any(),
@@ -381,10 +371,7 @@ impl MigrationStateInspection {
 
     /// Read the column migration state table once for every schema not inspected yet.
     #[pyo3(signature = (*, schemas))]
-    pub(crate) fn inspect_column_events(
-        slf: &Bound<'_, Self>,
-        schemas: &Bound<'_, PyAny>,
-    ) -> PyResult<()> {
+    fn inspect_column_events(slf: &Bound<'_, Self>, schemas: &Bound<'_, PyAny>) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let pending = pending(schemas, &slf.borrow().column_event_schemas)?;
         if pending.is_empty() {
@@ -435,10 +422,7 @@ impl MigrationStateInspection {
 
     /// Read moves and old-name facts once for every schema not inspected yet.
     #[pyo3(signature = (*, schemas))]
-    pub(crate) fn inspect_old_name_views(
-        slf: &Bound<'_, Self>,
-        schemas: &Bound<'_, PyAny>,
-    ) -> PyResult<()> {
+    fn inspect_old_name_views(slf: &Bound<'_, Self>, schemas: &Bound<'_, PyAny>) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let pending = pending(schemas, &slf.borrow().old_name_schemas)?;
         if pending.is_empty() {
@@ -499,10 +483,7 @@ impl MigrationStateInspection {
 
     /// Read migration events once from schemas known to hold the migration table.
     #[pyo3(signature = (*, schemas))]
-    pub(crate) fn inspect_migration_events(
-        slf: &Bound<'_, Self>,
-        schemas: &Bound<'_, PyAny>,
-    ) -> PyResult<()> {
+    fn inspect_migration_events(slf: &Bound<'_, Self>, schemas: &Bound<'_, PyAny>) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let mut sorted: Vec<(String, Bound<'_, PyAny>)> = Vec::new();
         for schema in schemas.try_iter()? {
@@ -537,10 +518,7 @@ impl MigrationStateInspection {
 
     /// Read state tables once for every schema not inspected yet.
     #[pyo3(signature = (*, schemas))]
-    pub(crate) fn inspect_schemas(
-        slf: &Bound<'_, Self>,
-        schemas: &Bound<'_, PyAny>,
-    ) -> PyResult<()> {
+    fn inspect_schemas(slf: &Bound<'_, Self>, schemas: &Bound<'_, PyAny>) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let pending = pending(schemas, &slf.borrow().read_schemas)?;
         if pending.is_empty() {
@@ -585,10 +563,7 @@ impl MigrationStateInspection {
 
     /// List candidate relations and their columns with one metadata read.
     #[pyo3(signature = (*, locations))]
-    pub(crate) fn inspect_relations(
-        slf: &Bound<'_, Self>,
-        locations: &Bound<'_, PyAny>,
-    ) -> PyResult<()> {
+    fn inspect_relations(slf: &Bound<'_, Self>, locations: &Bound<'_, PyAny>) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let mut wanted: HashSet<RelationKey> = HashSet::new();
         let mut schemas: Vec<String> = Vec::new();
@@ -649,11 +624,7 @@ impl MigrationStateInspection {
     }
 
     /// The listed relation for a location.
-    pub(crate) fn relation(
-        &self,
-        py: Python<'_>,
-        location: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+    fn relation(&self, py: Python<'_>, location: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         Ok(match self.relations.get(&relation_key(location)?) {
             Some(relation) => relation.clone_ref(py),
             None => py.None(),
@@ -661,11 +632,7 @@ impl MigrationStateInspection {
     }
 
     /// Listed columns for a location.
-    pub(crate) fn relation_columns(
-        &self,
-        py: Python<'_>,
-        location: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+    fn relation_columns(&self, py: Python<'_>, location: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         Ok(match self.columns.get(&relation_key(location)?) {
             Some(columns) => columns.clone_ref(py),
             None => PyTuple::empty(py).into_any().unbind(),
@@ -674,7 +641,7 @@ impl MigrationStateInspection {
 
     /// The latest model fingerprint that built the location or named model.
     #[pyo3(signature = (*, location, model_name))]
-    pub(crate) fn model_fingerprint<'py>(
+    fn model_fingerprint<'py>(
         &self,
         py: Python<'py>,
         location: &Bound<'py, PyAny>,
@@ -695,7 +662,7 @@ impl MigrationStateInspection {
 
     /// The newest model fingerprint with this node name in any inspected schema.
     #[pyo3(signature = (*, model_name))]
-    pub(crate) fn named_fingerprint<'py>(
+    fn named_fingerprint<'py>(
         &self,
         py: Python<'py>,
         model_name: &str,
@@ -717,7 +684,7 @@ impl MigrationStateInspection {
 
     /// Latest model fingerprints whose names are no longer in the project.
     #[pyo3(signature = (*, project_model_names))]
-    pub(crate) fn orphan_fingerprints<'py>(
+    fn orphan_fingerprints<'py>(
         &self,
         py: Python<'py>,
         project_model_names: &Bound<'py, PyAny>,

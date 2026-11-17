@@ -5,9 +5,8 @@ use crate::consumption::_helpers::recorder::changed_decision;
 use crate::consumption::_helpers::recorder::read_history;
 use crate::consumption::models::ChangedDecision;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
-use sqlbuild_python_front::native_host::models::ConsumptionConnection;
-use sqlbuild_state::consumption::models::{ChangedPolicy, ConsumptionHistory};
 use sqlbuild_python_front::native_host::types::ConsumptionReads;
+use sqlbuild_state::consumption::models::{ChangedPolicy, ConsumptionHistory};
 
 /// What `plan --changed` previews: what a build would run now, read without recording anything.
 pub fn preview_changed<R: ConsumptionReads + ?Sized>(

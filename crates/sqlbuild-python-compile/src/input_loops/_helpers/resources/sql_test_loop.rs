@@ -49,9 +49,9 @@ use sqlbuild_python_base::cache::models::SqlTestScanStore;
 use sqlbuild_python_base::compile_context::main::delta::record_test_source_reads::record_test_source_reads;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::render::main::sql_macros::without_with_list_calls::without_with_list_calls;
-use sqlbuild_python_project::compiled_project::models::{
-    SqlTestSettings, TestBlockRow, TestFileRow,
-};
+use sqlbuild_python_project::compiled_project::models::SqlTestSettings;
+use sqlbuild_python_project::compiled_project::models::TestBlockRow;
+use sqlbuild_python_project::compiled_project::models::TestFileRow;
 use sqlbuild_python_project::compiled_project::types::TestCaseRow;
 use sqlbuild_python_project::resource_views::main::source_views::replaced::replaced;
 

@@ -3,9 +3,9 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::planner_phases::models::{
-    PlannerIdentityContext, PlannerRuntime, PlannerWarehouseState,
-};
+use crate::planner_phases::models::PlannerIdentityContext;
+use crate::planner_phases::models::PlannerRuntime;
+use crate::planner_phases::models::PlannerWarehouseState;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use sqlbuild_python_project::planner_scope::models::RetainedScope;
 

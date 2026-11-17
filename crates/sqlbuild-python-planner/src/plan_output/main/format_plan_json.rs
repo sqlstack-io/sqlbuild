@@ -1,5 +1,6 @@
 //! The plan as one JSON document, `json.dumps(indent=2)`.
 
+use crate::plan_output::_helpers::plan_json::IGNORE_AUDIT_FAILURES_KEY;
 use crate::plan_output::_helpers::plan_json::column_migrations_json;
 use crate::plan_output::_helpers::plan_json::function_json;
 use crate::plan_output::_helpers::plan_json::migrations_json;
@@ -24,7 +25,6 @@ use sqlbuild_core::plan_display::constants::SYNCED_COPY_KEY;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use crate::plan_output::_helpers::plan_json::IGNORE_AUDIT_FAILURES_KEY;
 
 /// The plan as one JSON document, `json.dumps(indent=2)`.
 #[pyfunction]

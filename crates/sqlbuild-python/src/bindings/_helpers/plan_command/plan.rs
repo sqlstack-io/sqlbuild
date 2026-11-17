@@ -1,21 +1,35 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
+use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
+use sqlbuild_python_planner::planner_phases::constants::BUILD_HISTORY;
+use sqlbuild_python_planner::planner_phases::constants::WRITING;
+use sqlbuild_python_planner::planner_phases::main::timed::timed;
+use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
+use sqlbuild_python_planner::planner_phases::models::PlanTimings;
+use std::sync::Arc;
+
 use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
+    Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
 };
-use pyo3::types::{PyBool, PyDict, PyDictMethods};
+use pyo3::types::{PyBool, PyCFunction, PyDict, PyDictMethods};
 use pyo3::wrap_pyfunction;
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_core::plan_display::constants::{
-    PLAN_SYNCED_COPY_ENV, SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY,
+    SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY, SYNCED_COPY_READING,
 };
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_state::consumption::models::ChangedPolicy;
+use sqlbuild_state::warehouse_state::models::WarehouseState;
+
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
+use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
+use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::plan_command::changed::{changed_json, changed_text};
+use crate::bindings::_helpers::plan_command::changed::changed_json;
+use crate::bindings::_helpers::plan_command::changed::changed_text;
+use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -25,7 +39,6 @@ use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
 use sqlbuild_python_output::build_progress::main::with_verbose_inspection::with_verbose_inspection;
@@ -35,42 +48,24 @@ use sqlbuild_python_planner::consumption::main::changed_policy::changed_policy;
 use sqlbuild_python_planner::consumption::main::policy_line::policy_line;
 use sqlbuild_python_planner::consumption::main::preview_changed::preview_changed;
 use sqlbuild_python_planner::consumption::models::ChangedDecision;
+use sqlbuild_python_planner::live_reads::models::LiveReads;
 use sqlbuild_python_planner::plan_output::constants::CHANGED_KEY;
 use sqlbuild_python_planner::plan_output::main::format_plan::format_plan;
 use sqlbuild_python_planner::plan_output::main::format_plan_json::format_plan_json;
-use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
-use sqlbuild_python_planner::planner_phases::constants::BUILD_HISTORY;
-use sqlbuild_python_planner::planner_phases::constants::WRITING;
-use sqlbuild_python_planner::planner_phases::main::timed::timed;
-use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
-use sqlbuild_python_planner::planner_phases::models::PlanTimings;
-use std::sync::Arc;
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
-};
-use pyo3::types::{PyBool, PyCFunction, PyDict, PyDictMethods};
-use sqlbuild_core::plan_display::constants::{
-    SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY, SYNCED_COPY_READING,
-};
-use sqlbuild_state::consumption::models::ChangedPolicy;
-use sqlbuild_state::warehouse_state::models::WarehouseState;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
-use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
-use crate::bindings::_helpers::plan_command::changed::changed_json;
-use crate::bindings::_helpers::plan_command::changed::changed_text;
-use sqlbuild_python_planner::live_reads::models::LiveReads;
 use sqlbuild_python_planner::planner_warehouse::models::PlannerReads;
 use sqlbuild_python_planner::planner_warehouse::models::SyncedReads;
 
 const COMMAND_NAME: &str = "plan";
-
+/// The plan document's field holding how long each planning step took.
+const TIMINGS_KEY: &str = "timings";
+/// `timings.planned_from` for a location preview over the synced warehouse state.
+const SYNCED_STATE: &str = "synced_state";
+/// `timings.planned_from` for a plan that read the warehouse.
+const LIVE: &str = "live";
 const DEFAULT_SECTION_ENTRIES: i64 = 50;
-
 /// The `severity` value of a plan finding that blocks a build.
 const ERROR_SEVERITY: &str = "error";
-
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
-
 /// Request fields passed to the compile pipeline under the same name.
 const PIPELINE_FIELDS: [&str; 12] = [
     "no_sql_validation",
@@ -115,6 +110,46 @@ struct PlanInvocation<'py> {
     load_sources: Bound<'py, PyAny>,
     /// Set for a location's plan preview: the reads that answer from the synced state.
     preview: Option<SyncedPlan<'py>>,
+}
+
+/// A plan preview's reads over the synced state, and the handle the planner reads through.
+struct SyncedPlan<'py> {
+    synced: Arc<SyncedReads>,
+    reads: Bound<'py, PlannerReads>,
+}
+
+/// A plan's project: compiled for the request, or the discovered inputs and compiled phase a location holds.
+#[derive(Clone, Copy)]
+pub(crate) enum PlanProject<'a, 'py> {
+    Compiled,
+    Held {
+        discovered: &'a Bound<'py, PyAny>,
+        compiled: &'a Bound<'py, PyAny>,
+    },
+}
+
+/// A location preview's reads over the synced `state`, never deferring; other plans read live.
+fn preview<'py>(
+    request: &Bound<'py, PyAny>,
+    state: Option<&Arc<WarehouseState>>,
+) -> PyResult<Option<SyncedPlan<'py>>> {
+    let py: Python<'py> = request.py();
+    let Some(state) = state else {
+        return Ok(None);
+    };
+    if native_field(request, "defer_to")?.is_truthy()? {
+        return Err(raised(
+            py,
+            CommandConnectionError::User {
+                code: None,
+                message: SYNCED_COPY_DEFER_REFUSAL.to_owned(),
+                help: Some(SYNCED_COPY_DEFER_HELP.to_owned()),
+            },
+        ));
+    }
+    let synced: Arc<SyncedReads> = Arc::new(SyncedReads::new(Arc::clone(state)));
+    let reads: Bound<'py, PlannerReads> = Bound::new(py, PlannerReads::new(synced.clone()))?;
+    Ok(Some(SyncedPlan { synced, reads }))
 }
 
 fn resolve_invocation<'py>(
@@ -339,6 +374,34 @@ fn changed_preview(
     })
 }
 
+/// The `--changed` decision under `policy`, read from recorded consumption.
+fn changed_decision(
+    request: &Bound<'_, PyAny>,
+    invocation: &PlanInvocation<'_>,
+    (pipeline, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    policy: &ChangedPolicy,
+) -> PyResult<Option<ChangedDecision>> {
+    let plan: (&Bound<'_, PyAny>, &Bound<'_, PyAny>) =
+        (&native_field(pipeline, "plan_output")?, project);
+    let full_refresh: bool = native_field(request, "full_refresh")?.is_truthy()?;
+    let py = request.py();
+    let reads: Bound<'_, PlannerReads> = match &invocation.preview {
+        Some(preview) => preview.reads.clone(),
+        None => LiveReads::handle(
+            &native_field(&invocation.context, "adapter")?,
+            &py.None().into_bound(py),
+            Some(&native_field(&invocation.context, "connection_config")?),
+        )?,
+    };
+    let changed = preview_changed(plan, reads.get().reads(), (policy, full_refresh));
+    reads.get().reads().close_consumption(py)?;
+    let (decision, warnings) = changed?;
+    for warning in warnings {
+        write_progress(&invocation.stream, &format!("warning: {warning}\n"))?;
+    }
+    Ok(Some(decision))
+}
+
 /// Print the plan; the JSON plan is returned instead when `captured`.
 fn write_output(
     request: &Bound<'_, PyAny>,
@@ -449,99 +512,6 @@ pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
     Ok(plan(request, (PlanProject::Compiled, None))?.0)
 }
 
-/// Whether any plan finding has error severity, which `sqb build` refuses.
-fn plan_has_errors(plan: &Bound<'_, PyAny>) -> PyResult<bool> {
-    for warning in native_field(plan, "warnings")?.try_iter()? {
-        let severity: Bound<'_, PyAny> =
-            native_field(&native_field(&warning?, "severity")?, "value")?;
-        if severity.extract::<String>()? == ERROR_SEVERITY {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(run_plan_command, module)?)
-}
-
-/// The plan document's field holding how long each planning step took.
-const TIMINGS_KEY: &str = "timings";
-
-/// `timings.planned_from` for a location preview over the synced warehouse state.
-const SYNCED_STATE: &str = "synced_state";
-
-/// `timings.planned_from` for a plan that read the warehouse.
-const LIVE: &str = "live";
-
-/// A plan preview's reads over the synced state, and the handle the planner reads through.
-struct SyncedPlan<'py> {
-    synced: Arc<SyncedReads>,
-    reads: Bound<'py, PlannerReads>,
-}
-
-/// A plan's project: compiled for the request, or the discovered inputs and compiled phase a location holds.
-#[derive(Clone, Copy)]
-pub(crate) enum PlanProject<'a, 'py> {
-    Compiled,
-    Held {
-        discovered: &'a Bound<'py, PyAny>,
-        compiled: &'a Bound<'py, PyAny>,
-    },
-}
-
-/// A location preview's reads over the synced `state`, never deferring; other plans read live.
-fn preview<'py>(
-    request: &Bound<'py, PyAny>,
-    state: Option<&Arc<WarehouseState>>,
-) -> PyResult<Option<SyncedPlan<'py>>> {
-    let py: Python<'py> = request.py();
-    let Some(state) = state else {
-        return Ok(None);
-    };
-    if native_field(request, "defer_to")?.is_truthy()? {
-        return Err(raised(
-            py,
-            CommandConnectionError::User {
-                code: None,
-                message: SYNCED_COPY_DEFER_REFUSAL.to_owned(),
-                help: Some(SYNCED_COPY_DEFER_HELP.to_owned()),
-            },
-        ));
-    }
-    let synced: Arc<SyncedReads> = Arc::new(SyncedReads::new(Arc::clone(state)));
-    let reads: Bound<'py, PlannerReads> = Bound::new(py, PlannerReads::new(synced.clone()))?;
-    Ok(Some(SyncedPlan { synced, reads }))
-}
-
-/// The `--changed` decision under `policy`, read from recorded consumption.
-fn changed_decision(
-    request: &Bound<'_, PyAny>,
-    invocation: &PlanInvocation<'_>,
-    (pipeline, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    policy: &ChangedPolicy,
-) -> PyResult<Option<ChangedDecision>> {
-    let plan: (&Bound<'_, PyAny>, &Bound<'_, PyAny>) =
-        (&native_field(pipeline, "plan_output")?, project);
-    let full_refresh: bool = native_field(request, "full_refresh")?.is_truthy()?;
-    let py = request.py();
-    let reads: Bound<'_, PlannerReads> = match &invocation.preview {
-        Some(preview) => preview.reads.clone(),
-        None => LiveReads::handle(
-            &native_field(&invocation.context, "adapter")?,
-            &py.None().into_bound(py),
-            Some(&native_field(&invocation.context, "connection_config")?),
-        )?,
-    };
-    let changed = preview_changed(plan, reads.get().reads(), (policy, full_refresh));
-    reads.get().reads().close_consumption(py)?;
-    let (decision, warnings) = changed?;
-    for warning in warnings {
-        write_progress(&invocation.stream, &format!("warning: {warning}\n"))?;
-    }
-    Ok(Some(decision))
-}
-
 /// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile.
 pub(crate) fn location_plan<'py>(
     request: &Bound<'py, PyAny>,
@@ -614,4 +584,20 @@ fn with_timings(document: String, timings: &serde_json::Value) -> String {
         Some(fields) => format!("{{\"{TIMINGS_KEY}\": {timings}, {fields}"),
         None => document,
     }
+}
+
+/// Whether any plan finding has error severity, which `sqb build` refuses.
+fn plan_has_errors(plan: &Bound<'_, PyAny>) -> PyResult<bool> {
+    for warning in native_field(plan, "warnings")?.try_iter()? {
+        let severity: Bound<'_, PyAny> =
+            native_field(&native_field(&warning?, "severity")?, "value")?;
+        if severity.extract::<String>()? == ERROR_SEVERITY {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(run_plan_command, module)?)
 }

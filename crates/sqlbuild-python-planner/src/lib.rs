@@ -5,6 +5,7 @@
 pub mod consumption;
 pub mod freshness;
 pub mod lifecycle_events;
+pub mod live_reads;
 pub mod microbatches;
 pub mod observations;
 pub mod plan_output;

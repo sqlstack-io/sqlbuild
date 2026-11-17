@@ -8,7 +8,8 @@ use sqlbuild_analysis::planner_strategy::errors::LineageFailure;
 use sqlbuild_analysis::planner_strategy::models::{ProducerFacts, ReferenceIdentity};
 use sqlbuild_analysis::planner_strategy::types::ReferenceGraph;
 
-use crate::planner_strategy::_helpers::microbatches::{CAP_ACTIONS, microbatch_limit_config};
+use crate::planner_strategy::_helpers::microbatches::CAP_ACTIONS;
+use crate::planner_strategy::_helpers::microbatches::microbatch_limit_config;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;

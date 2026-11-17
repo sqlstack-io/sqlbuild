@@ -34,9 +34,10 @@ use sqlbuild_analysis::planner_changes::models::{
 };
 
 use crate::planner_changes::_helpers::renames::origin_names;
-use crate::planner_changes::_helpers::results::{
-    backfill_result, change_kind, replay_policy_error, schema_findings,
-};
+use crate::planner_changes::_helpers::results::backfill_result;
+use crate::planner_changes::_helpers::results::change_kind;
+use crate::planner_changes::_helpers::results::replay_policy_error;
+use crate::planner_changes::_helpers::results::schema_findings;
 use crate::planner_identity::main::compiled_function_fingerprint_sql::compiled_function_fingerprint_sql;
 use crate::planner_identity::main::function_local_hashes::function_local_hashes;
 use crate::planner_identity::main::model_declared_columns_hash::model_declared_columns_hash;

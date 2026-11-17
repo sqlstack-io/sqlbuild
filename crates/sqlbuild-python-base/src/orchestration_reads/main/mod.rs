@@ -12,3 +12,4 @@ pub mod run_controls;
 pub mod run_resources;
 pub mod secret_variables;
 pub mod setting_rows;
+pub mod dependency_failures;

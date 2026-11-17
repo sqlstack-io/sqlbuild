@@ -1,6 +1,7 @@
 //! A location keeps its interpreter, and a synchronization its warehouse session, warm.
 
 use std::io::{self, Write};
+
 use pyo3::PyErr;
 use pyo3::exceptions::{PyMemoryError, PyValueError};
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
@@ -12,28 +13,20 @@ use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluat
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseHistoryRead,
 };
-use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
-use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
-use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
-use crate::bindings::_helpers::native_host::warehouse_metadata::{
-    close_history_session, open_history_session, read_history,
-};
-use sqlbuild_python_base::boundary::main::within::within;
-use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
-use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
-use pyo3::exceptions::PyValueError;
-use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryKind, WarehouseHistoryRead,
-};
+
 use crate::bindings::_helpers::location_command::command::location_arguments;
 use crate::bindings::_helpers::location_command::command::publish_location;
-use crate::bindings::_helpers::location_command::constants::METADATA_ERROR_CHARS;
+use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
 use crate::bindings::_helpers::location_command::constants::PLAN_REQUEST;
 use crate::bindings::_helpers::location_command::runtime_plan::runtime_plan;
 use crate::bindings::_helpers::location_command::types::HeldProject;
+use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::close_history_session;
 use crate::bindings::_helpers::native_host::warehouse_metadata::open_history_session;
 use crate::bindings::_helpers::native_host::warehouse_metadata::read_history;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
+use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 
 pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResult<i32> {
     options.set_item("action", "publish")?;
@@ -72,7 +65,8 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 py,
                                 &format!("Location compilation/publication failed: {error}\n"),
                             )?;
-<<<<<<< ours
+                            let failed = generation_failed(generation, error.to_string());
+                            py.detach(|| emit_dev_event(&failed))?;
                             (None, None)
                         }
                     };
@@ -82,16 +76,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     }))
                 } else if let Some(plan) = request.get(PLAN_REQUEST) {
                     serde_json::to_string(&runtime_plan(py, held.as_ref(), plan)?)
-                } else if WarehouseHistoryKind::ALL
-=======
-                            let failed = generation_failed(generation, error.to_string());
-                            py.detach(|| emit_dev_event(&failed))?;
-                            None
-                        }
-                    };
-                    serde_json::to_string(&record)
                 } else if let Some(kind) = WarehouseHistoryKind::ALL
->>>>>>> theirs
                     .iter()
                     .find(|kind| request.get(kind.as_str()).is_some())
                 {
@@ -100,11 +85,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             PyValueError::new_err("runtime received an invalid metadata read")
                         })?;
                     let mut busy = false;
-<<<<<<< ours
-                    let mut failure: Option<String> = None;
-=======
                     let mut unconnected = WarehouseHistoryFailure::default();
->>>>>>> theirs
                     if session.is_none() {
                         let arguments = location_arguments(py, Some(options.clone()))?;
                         session = match open_history_session(py, &arguments) {
@@ -112,11 +93,6 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             Err(error) => {
                                 busy = error.to_string().contains(DUCKDB_LOCK_CONFLICT);
                                 if !busy {
-<<<<<<< ours
-                                    failure = Some(format!(
-                                        "warehouse connection for metadata reads failed: {error}"
-                                    ));
-=======
                                     unconnected.reason = failure_reason(&error);
                                     write_stderr(
                                         py,
@@ -125,7 +101,6 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                             unconnected.reason
                                         ),
                                     )?;
->>>>>>> theirs
                                 } else if !reported_busy {
                                     write_stderr(
                                         py,
@@ -137,21 +112,6 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         };
                     }
                     let page = match &session {
-<<<<<<< ours
-                        Some(opened) => {
-                            match read_history(py, (opened, stream.take()), &metadata) {
-                                Ok((page, open)) => {
-                                    stream = open;
-                                    Some(page)
-                                }
-                                Err(error) => {
-                                    failure = Some(error.to_string());
-                                    None
-                                }
-                            }
-                        }
-                        None => None,
-=======
                         Some(opened) => read_history(py, (opened, stream.take()), &metadata)
                             .map(|(page, open)| {
                                 stream = open;
@@ -162,7 +122,6 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 page_size: error.is_instance_of::<PyMemoryError>(py),
                             }),
                         None => Err(unconnected),
->>>>>>> theirs
                     };
                     if session.as_ref().is_some_and(|opened| opened.local)
                         && let Some(opened) = session.take()
@@ -172,18 +131,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     reported_busy = busy;
                     if busy {
                         serde_json::to_string(&serde_json::json!({ "busy": true }))
-                    } else if let Some(page) = page {
-                        serde_json::to_string(&page)
                     } else {
-<<<<<<< ours
-                        if let Some(opened) = session.take() {
-                            drop(close_history_session(opened, None));
-                        }
-                        let message = failure.unwrap_or_else(|| "no page was read".into());
-                        serde_json::to_string(&serde_json::json!({
-                            "error": message.chars().take(METADATA_ERROR_CHARS).collect::<String>()
-                        }))
-=======
                         match page {
                             Ok(page) => serde_json::to_string(&page),
                             Err(failure) => {
@@ -201,7 +149,6 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 serde_json::to_string(&serde_json::json!({ "failed": failure }))
                             }
                         }
->>>>>>> theirs
                     }
                 } else {
                     let evaluation: SensorEvaluationRequest = serde_json::from_value(request)

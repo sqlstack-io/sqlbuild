@@ -1,5 +1,6 @@
 pub mod baselined_function_definition_hash;
 pub mod baselined_model_query_hash;
+pub mod execution_cycle;
 pub mod execution_deps;
 pub mod execution_order;
 pub mod execution_origins;

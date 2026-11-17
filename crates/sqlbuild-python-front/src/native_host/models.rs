@@ -1,10 +1,11 @@
 //! Public records of native host.
 
-use crate::native_host::_helpers::consumption_state::append;
-use crate::native_host::_helpers::consumption_state::ensure_table;
-use crate::native_host::_helpers::consumption_state::read_executions;
-use crate::native_host::_helpers::consumption_state::read_recent;
+use crate::native_host::_helpers::consumption_io::append;
+use crate::native_host::_helpers::consumption_io::ensure_table;
+use crate::native_host::_helpers::consumption_io::read_executions;
+use crate::native_host::_helpers::consumption_io::read_recent;
 use crate::native_host::_helpers::consumption_state::text;
+use crate::native_host::types::ConsumptionReads;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -13,18 +14,10 @@ use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
-use sqlbuild_state::consumption::constants::RECENT_EXECUTIONS;
-use sqlbuild_state::consumption::main::recent_executions::recent_executions;
 use sqlbuild_state::consumption::models::ConsumptionAppend;
 use sqlbuild_state::consumption::models::ConsumptionRow;
 use sqlbuild_state::consumption::models::RelationKey;
 use std::sync::Mutex;
-use crate::native_host::_helpers::consumption_io::append;
-use crate::native_host::_helpers::consumption_io::ensure_table;
-use crate::native_host::_helpers::consumption_io::read_executions;
-use crate::native_host::_helpers::consumption_io::read_recent;
-use crate::native_host::types::ConsumptionReads;
 
 /// One destination schema of the consumption table.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -134,6 +127,21 @@ impl ConsumptionConnection {
     }
 }
 
+impl ConsumptionReads for ConsumptionConnection {
+    fn read_recent(&self, py: Python<'_>, location: &Location) -> PyResult<Vec<ConsumptionRow>> {
+        ConsumptionConnection::read_recent(self, py, location)
+    }
+
+    fn read_executions(
+        &self,
+        py: Python<'_>,
+        location: &Location,
+        execution_ids: &[&str],
+    ) -> PyResult<Vec<ConsumptionRow>> {
+        ConsumptionConnection::read_executions(self, py, location, execution_ids)
+    }
+}
+
 /// The build's own node-completion callback, which the recorder forwards every result to.
 #[derive(Debug)]
 pub struct NodeCompleteHook(Py<PyAny>);
@@ -157,19 +165,4 @@ pub struct ObservationAppend {
     pub cursor_type: Option<String>,
     pub value: String,
     pub run_id: String,
-}
-
-impl ConsumptionReads for ConsumptionConnection {
-    fn read_recent(&self, py: Python<'_>, location: &Location) -> PyResult<Vec<ConsumptionRow>> {
-        ConsumptionConnection::read_recent(self, py, location)
-    }
-
-    fn read_executions(
-        &self,
-        py: Python<'_>,
-        location: &Location,
-        execution_ids: &[&str],
-    ) -> PyResult<Vec<ConsumptionRow>> {
-        ConsumptionConnection::read_executions(self, py, location, execution_ids)
-    }
 }

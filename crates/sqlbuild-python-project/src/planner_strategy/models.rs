@@ -11,9 +11,9 @@ use sqlbuild_analysis::planner_fixtures::models::{
     FixtureColumn, FixtureReadCache, FixtureTypeProjection,
 };
 use sqlbuild_analysis::required_columns::models::ColumnRead;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
-use sqlbuild_python_base::native_host::models::Dialect;
 
 /// Completed fixture SQL and inferred columns by Python fixture key, expected types and diagnostics.
 #[derive(Debug)]

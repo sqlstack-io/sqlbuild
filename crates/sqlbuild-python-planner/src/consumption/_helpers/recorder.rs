@@ -3,9 +3,11 @@
 use crate::consumption::models::ChangedDecision;
 use crate::consumption::models::ConsumptionRecorder;
 use crate::consumption::models::Prepared;
+use sqlbuild_python_front::native_host::types::ConsumptionReads;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_state::consumption::constants::RECENT_EXECUTIONS;
 use sqlbuild_state::consumption::main::changed_run_set::changed_run_set;
@@ -17,24 +19,19 @@ use sqlbuild_state::consumption::models::{
     InputFact, NodeFacts, NodeKey, Reach, RelationKey, RunReason,
 };
 use uuid::Uuid;
+
 use crate::consumption::_helpers::facts::{BuildFacts, MODEL, SEED, build_facts};
 use sqlbuild_python_front::native_host::models::{
     ConsumptionConnection, Location, NodeCompleteHook,
 };
-use sqlbuild_python_front::native_host::types::ConsumptionReads;
 
 /// Succeeded rows are flushed once this many executions are pending.
 pub(crate) const FLUSH_EXECUTIONS: usize = 100;
-
 /// Or once this long has passed since the last flush.
 pub(crate) const FLUSH_INTERVAL: Duration = Duration::from_secs(30);
-
 const MODEL_RESULT: &str = "model_name";
-
 const SEED_RESULT: &str = "seed_name";
-
 pub(crate) const SUCCESS: &str = "success";
-
 pub(crate) const ERROR_OUTCOME: &str = "error";
 
 /// The mutable side of one build's recording.

@@ -1,15 +1,15 @@
 //! Add the direct-mode source freshness, remaining stale models and selection diagnostics metadata.
 
 use crate::planner_phases::_helpers::outputs::output_assembly::freshness_metadata;
+use crate::planner_phases::_helpers::outputs::output_assembly::ignoring_audit_failures;
+use crate::planner_phases::constants::IGNORE_AUDIT_FAILURES;
 use crate::planner_phases::models::PlanOutputFields;
+use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_project::planner_phases::main::sorted_names::sorted_names;
 use sqlbuild_python_project::planner_phases::main::text::text;
-use crate::planner_phases::_helpers::outputs::output_assembly::ignoring_audit_failures;
-use crate::planner_phases::constants::IGNORE_AUDIT_FAILURES;
-use pyo3::prelude::PyAnyMethods;
 
 /// Add the direct-mode source freshness, remaining stale models and selection diagnostics metadata.
 pub fn add_plan_metadata<'py>(

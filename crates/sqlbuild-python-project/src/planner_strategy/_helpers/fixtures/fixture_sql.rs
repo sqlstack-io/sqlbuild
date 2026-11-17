@@ -9,9 +9,10 @@ use sqlbuild_analysis::planner_fixtures::main::{
 use sqlbuild_analysis::planner_fixtures::models::{
     FixtureColumn, FixtureSqlInput, SuppliedProjection,
 };
+use sqlbuild_python_base::native_host::models::Dialect;
+
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::native_host::models::Dialect;
 
 pub(crate) fn fixture_marker(sql: &str) -> PyResult<bool> {
     empty_fixture_marker(sql).map_err(value_error)

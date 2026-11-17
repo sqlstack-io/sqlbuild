@@ -3,6 +3,7 @@
 use std::future::Future;
 use std::path::Path;
 use std::time::Duration;
+
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::models::{
     LocationWorkClient, LocationWorkPoll, WarehouseSyncFailure,
@@ -10,29 +11,17 @@ use sqlbuild_orchestration::platform::models::{
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
 use tokio::time::Instant;
+use chrono::Utc;
+
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
-    acknowledge_metadata_page, begin_after_run, freeze_history_page, load_watermark,
-    metadata_health, next_scan, statistics_page,
-};
-use crate::native_commands::_helpers::execution::{
-    failed_read, finish_metadata_page, location_warning, read_metadata_page, retry_stopped_sync,
-    wait_for_file,
+    acknowledge_metadata_page, begin_after_run, close_metadata_reader, finish_metadata_page,
+    freeze_history_page, load_watermark, location_warning, metadata_health, next_scan, page_limit,
+    read_metadata_page, report_metadata_health, statistics_page,
 };
 use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
-use crate::native_commands::constants::METADATA_POLL_SECONDS;
-use crate::native_commands::models::{
-    LocationMetadataSync, LocationServe, LocationWatch, MetadataReply,
-};
-use sqlbuild_orchestration::platform::models::{
-    LocationWorkClient, LocationWorkPoll, WarehouseReadFailure, WarehouseSyncFailure,
-};
-use crate::native_commands::_helpers::execution::{
-    acknowledge_metadata_page, begin_after_run, freeze_history_page, load_watermark,
-    metadata_health, next_scan, page_limit, report_metadata_health, statistics_page,
-};
-use crate::native_commands::_helpers::execution::{finish_metadata_page, read_metadata_page};
+use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
 use crate::native_commands::models::{
     LocationMetadataSync, LocationServe, LocationWatch, ReadFailure,
 };
@@ -44,9 +33,7 @@ pub(super) async fn sync_location_metadata(
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
-    retry_stopped_sync(&mut state);
-    if state.halted
-        || Instant::now() < state.next_at
+    if Instant::now() < state.next_at
         || state.locations.is_empty()
         || location_files(&options.project_dir, &watch.rules, &watch.local_files)
             != watch.observed.0
@@ -56,12 +43,14 @@ pub(super) async fn sync_location_metadata(
     let started = Instant::now();
     tokio::pin!(stopped);
     if state.idle {
+        let halted: bool = state.halted;
         let (next, due) = tokio::select! {
             result = &mut stopped => { result?; return Ok(None); },
             result = begin_after_run(state, (client, poll), &options.target) => result,
         };
         state = next;
         match due {
+            Ok(true) if halted => resumed_line(),
             Ok(true) => {}
             Ok(false) => return Ok(Some(state)),
             Err(error) => return retry_metadata(state, error),
@@ -88,13 +77,12 @@ pub(super) async fn sync_location_metadata(
                 return retry_metadata(state, error);
             }
         }
-        let Some((read, reply)) =
+        let Some((read, page)) =
             read_metadata_page((options, script), state, stopped.as_mut()).await?
         else {
             return Ok(None);
         };
         state = read;
-<<<<<<< ours
         let page = match page {
             Ok(page) => {
                 state.reads_wake_compute = page.wakes_compute;
@@ -102,15 +90,6 @@ pub(super) async fn sync_location_metadata(
             }
             Err(failure) => {
                 return failed_read(state, failure, (client, poll), started, stopped.as_mut())
-=======
-        let page = match reply {
-            MetadataReply::Page(page) => page,
-            MetadataReply::Busy => {
-                return wait_for_file(state, (client, poll), started, stopped.as_mut()).await;
-            }
-            MetadataReply::Failed(failure) => {
-                return failed_read(state, (client, poll), (started, failure), stopped.as_mut())
->>>>>>> theirs
                     .await;
             }
         };
@@ -122,7 +101,7 @@ pub(super) async fn sync_location_metadata(
         if page.unchanged {
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },
-                () = metadata_health(&state, (client, poll), (started, None), None) => {},
+                () = metadata_health(&state, (client, poll), (started, None)) => {},
             }
             state.progress.scan_unchanged = true;
             return finish_metadata_page(next_scan(state)).await;
@@ -141,19 +120,15 @@ pub(super) async fn sync_location_metadata(
         Err(error) => {
             tokio::select! {
             result = &mut stopped => { result?; return Ok(None); },
-<<<<<<< ours
             () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
             }
             return retry_metadata(state, error);
-=======
-            () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery)), None) => {},
->>>>>>> theirs
         }
     };
     state.applied |= response.applied;
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
-        () = metadata_health(&state, (client, poll), (started, None), None) => {},
+        () = metadata_health(&state, (client, poll), (started, None)) => {},
     }
     finish_metadata_page(acknowledge_metadata_page(state)).await
 }
@@ -182,7 +157,9 @@ fn retry_metadata(
     Ok(Some(state))
 }
 
-/// A busy warehouse file waits a poll interval; any other failed read retries a smaller page.
+/// A busy warehouse file waits a poll interval. Any other failed read reports its cause and
+/// error, then shrinks the page after a time-out or a read too large for memory, and otherwise
+/// backs off; failures in a row stop the sync until the next run, a request or a publication.
 async fn failed_read(
     mut state: LocationMetadataSync,
     failure: ReadFailure,
@@ -190,53 +167,79 @@ async fn failed_read(
     started: Instant,
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
-    let (stage, cause) = match &failure {
-        ReadFailure::Busy => (WarehouseSyncFailure::Busy, None),
-        ReadFailure::ReaderStart(_) => (
-            WarehouseSyncFailure::Read,
-            Some(WarehouseReadFailure::ReaderStart {}),
-        ),
-        ReadFailure::Read(_) => (
-            WarehouseSyncFailure::Read,
-            Some(WarehouseReadFailure::ReadError {}),
-        ),
-        ReadFailure::TimedOut(seconds) => (
-            WarehouseSyncFailure::Read,
-            Some(WarehouseReadFailure::TimedOut { seconds: *seconds }),
-        ),
+    let stage = if state.busy {
+        WarehouseSyncFailure::Busy
+    } else {
+        WarehouseSyncFailure::Read
     };
+    let halts: bool = !state.busy && state.halts(failure.page_size());
     tokio::select! {
         result = stopped => { result?; return Ok(None); },
-        () = report_metadata_health(&state, (client, poll), (started, Some(stage), cause)) => {},
+        () = report_metadata_health(&state, (client, poll), (started, Some(stage), Some((&failure, halts)))) => {},
     }
     if state.busy {
         state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
         return Ok(Some(state));
     }
-    drop(write_output(&[(
-        Stream::Stderr,
-        &read_failure_line(&state, &failure),
-    )]));
-    state.retry_read();
+    let line: String = read_failure_line(&state, &failure);
+    let shrinks: bool = state.shrinks(failure.page_size());
+    let outcome: String = match state.fail_read(failure.page_size(), Utc::now()) {
+        Some(wait) if shrinks => {
+            format!(" Sync incomplete; retaining mirror and retrying a smaller page in {} s.\n", wait.as_secs())
+        }
+        Some(wait) => {
+            location_warning(
+                "warehouse read failed",
+                format!("retrying in {}s: {}", wait.as_secs(), failure.reason()),
+            );
+            format!(" Sync incomplete; retaining mirror and retrying in {} s.\n", wait.as_secs())
+        }
+        None => {
+            state = close_metadata_reader(state).await?;
+            let resumes: &str = if state.defers_safety_sync() || state.safety_seconds == 0 {
+                "after the next run, on request or after a publish"
+            } else {
+                "at the next safety sync, after the next run, on request or after a publish"
+            };
+            location_warning(
+                "warehouse sync stopped",
+                format!(
+                    "{METADATA_FAILURE_LIMIT} failed reads in a row: {}; it resumes {resumes}",
+                    failure.reason()
+                ),
+            );
+            format!(
+                " Synchronization stopped after {METADATA_FAILURE_LIMIT} failed reads in a row; it resumes {resumes}.\n"
+            )
+        }
+    };
+    drop(write_output(&[(Stream::Stderr, &format!("{line}{outcome}"))]));
     Ok(Some(state))
 }
 
-/// What failed, on which table and page size, and why, before the retry shrinks the page.
+/// A stopped synchronization that resumes says so before its first read.
+fn resumed_line() {
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Retrying the stopped warehouse history synchronization.\n",
+    )]));
+    location_warning(
+        "warehouse sync retrying",
+        "one attempt; another failed read stops it again".to_owned(),
+    );
+}
+
+/// What failed, on which table and page size, and why.
 pub(crate) fn read_failure_line(state: &LocationMetadataSync, failure: &ReadFailure) -> String {
     let unit = if state.kind() == WarehouseHistoryKind::Statistics {
         "relation"
     } else {
         "row"
     };
-    let cause = match failure {
-        ReadFailure::Busy => "another process holds the warehouse file".to_owned(),
-        ReadFailure::ReaderStart(error) => format!("the metadata reader did not start: {error}"),
-        ReadFailure::Read(message) => message.trim().to_owned(),
-        ReadFailure::TimedOut(seconds) => format!("no reply within {seconds} s"),
-    };
     format!(
-        "Warehouse history read failed for {} ({}-{unit} page): {cause}. Sync incomplete; retaining mirror and retrying a smaller page.\n",
+        "Warehouse history read failed for {} ({}-{unit} page): {}.",
         state.kind().as_str().replace('_', " "),
         page_limit(state),
+        failure.reason(),
     )
 }

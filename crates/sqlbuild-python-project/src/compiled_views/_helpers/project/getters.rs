@@ -7,10 +7,14 @@ use crate::compiled_views::models::NativeCompiledModel;
 use crate::compiled_views::models::NativeInputsView;
 use crate::compiled_views::models::NativeModelInput;
 use crate::compiled_views::models::NativeProjectView;
-use crate::resource_views::models::{NativeAuditInput, NativeCompiledAudit};
-use crate::resource_views::models::{NativeCompiledFunction, NativeFunctionInput};
-use crate::resource_views::models::{NativeCompiledSeed, NativeSeedInput};
-use crate::resource_views::models::{NativeCompiledSource, NativeSourceInput};
+use crate::resource_views::models::NativeAuditInput;
+use crate::resource_views::models::NativeCompiledAudit;
+use crate::resource_views::models::NativeCompiledFunction;
+use crate::resource_views::models::NativeCompiledSeed;
+use crate::resource_views::models::NativeCompiledSource;
+use crate::resource_views::models::NativeFunctionInput;
+use crate::resource_views::models::NativeSeedInput;
+use crate::resource_views::models::NativeSourceInput;
 
 pub(crate) fn read_native_audit_input<'py>(
     value: &Bound<'py, PyAny>,

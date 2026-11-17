@@ -1,9 +1,9 @@
 //! Lifecycle regions of a run's selected Python nodes, classified natively.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::python_plan::models::LifecycleNode;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
 
 pub(crate) fn lifecycle_node(node: &Bound<'_, PyAny>) -> PyResult<LifecycleNode> {
     let mut sql_deps: Vec<ObjectKey> = Vec::new();

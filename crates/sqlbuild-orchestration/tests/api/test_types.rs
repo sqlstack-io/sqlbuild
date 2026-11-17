@@ -8,7 +8,6 @@ use crate::warehouse_metadata::models::{
 use chrono::{DateTime, Utc};
 use futures_util::future::BoxFuture;
 use uuid::Uuid;
-use crate::warehouse_metadata::models::WarehouseHistoryKind;
 
 pub(crate) struct ApiContractTestCase {
     pub(crate) description: &'static str,

@@ -13,10 +13,11 @@ use pyo3::{PyErr, pyfunction};
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::attachments::main::resolve_cursor_intrinsics::resolve_cursor_intrinsics;
 use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
@@ -26,8 +27,6 @@ use sqlbuild_python_front::model_config::main::config::model_values::model_value
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 
 const APPEND_STRATEGY: &str = "append";
 

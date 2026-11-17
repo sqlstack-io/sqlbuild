@@ -12,9 +12,7 @@ use crate::snapshots::models::SnapshotRetention;
 use crate::warehouse_metadata::models::{
     StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
 };
-use crate::warehouse_metadata::models::{
-    StateHistoryRetention, StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
-};
+use crate::warehouse_metadata::models::{StateHistoryRetention};
 
 /// Every retention horizon one server's maintenance role enforces.
 #[derive(Clone, Copy, Debug, Default)]
@@ -603,6 +601,10 @@ pub struct WarehouseSyncProgress {
     pub elapsed_millis: u64,
     /// This report's page was the synchronization's last, so it has completed.
     pub completed: bool,
+    /// Failed reads in a row stopped the synchronization. It resumes after the next run, on
+    /// request or on a publication, and at `next_sync_at` when the report sets one.
+    #[serde(default)]
+    pub halted: bool,
 }
 
 /// What went wrong reading one page, without the warehouse's message, which may name hosts or users.

@@ -20,16 +20,9 @@ pub(crate) type Settled = (
     Option<(Vec<WarehouseStateLocation>, i64)>,
 );
 
-/// A compile's outcome: whether it published, its next calendar refresh, and the warehouse state it reads.
-pub(crate) type CompileOutcome = (
-    bool,
-    Option<tokio::time::Instant>,
-    Vec<WarehouseStateLocation>,
-);
-
 /// The next compile, if a generation number was issued, with the metadata sync and the inputs it saw.
 pub(crate) type NextGeneration = (
-    Option<(CompileOutcome, i64)>,
+    Option<(LoadOutcome, i64)>,
     Option<LocationMetadataSync>,
     Option<Vec<sqlbuild_cache::project_snapshot::models::PathStamp>>,
 );

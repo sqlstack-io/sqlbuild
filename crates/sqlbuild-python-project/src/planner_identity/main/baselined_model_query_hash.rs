@@ -1,10 +1,9 @@
 //! The model's query fingerprint, or its recorded one while the recorded SQL still fingerprints the same.
 
 use crate::planner_identity::_helpers::hashing::model_query_hash;
+use crate::planner_identity::_helpers::hashing::query_fingerprint;
 use crate::planner_identity::_helpers::hashing::recorded_baseline;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
-use sqlbuild_analysis::sql_tokens::main::compiler_query_fingerprint::compiler_query_fingerprint;
-use crate::planner_identity::_helpers::hashing::query_fingerprint;
 
 /// The model's query fingerprint, or its recorded one while the recorded SQL still fingerprints the same.
 pub fn baselined_model_query_hash(

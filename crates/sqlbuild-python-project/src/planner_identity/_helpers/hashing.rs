@@ -2,19 +2,53 @@
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::PyString;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::sync::PoisonError;
+
 use sqlbuild_analysis::planner_identity::constants::{FINGERPRINT_HELP, QUERY_FINGERPRINT_FAILED};
 use sqlbuild_analysis::sql_tokens::main::baseline_fingerprint::baseline_fingerprint;
 use sqlbuild_analysis::sql_tokens::main::compiler_query_fingerprint::compiler_query_fingerprint;
 use sqlbuild_core::panics::main::is_compiler_panic::is_compiler_panic;
+
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
-use std::collections::HashMap;
-use std::sync::Mutex;
-use std::sync::PoisonError;
+
+/// Query fingerprints by dialect and SQL text: the text alone decides them, and every plan computes
+/// each model's several times, as do a location's later previews of the same publication.
+static QUERY_FINGERPRINTS: Mutex<Option<QueryFingerprints>> = Mutex::new(None);
+/// Distinct SQL texts the memo keeps before starting over; a 10K-model project holds about 10K.
+const QUERY_FINGERPRINTS_LIMIT: usize = 100_000;
+
+/// Fingerprint results by `(dialect, SQL text)`.
+type QueryFingerprints = HashMap<(Option<String>, String), Result<String, String>>;
+
+/// `compiler_query_fingerprint`, remembered by dialect and SQL text.
+pub(crate) fn query_fingerprint(sql: &str, dialect: Option<&str>) -> Result<String, String> {
+    let key: (Option<String>, String) = (dialect.map(str::to_owned), sql.to_owned());
+    if let Some(known) = QUERY_FINGERPRINTS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .as_ref()
+        .and_then(|memo| memo.get(&key))
+    {
+        return known.clone();
+    }
+    let fingerprint: Result<String, String> = compiler_query_fingerprint(sql, dialect);
+    let mut memo = QUERY_FINGERPRINTS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    let entries: &mut QueryFingerprints = memo.get_or_insert_with(HashMap::new);
+    if entries.len() > QUERY_FINGERPRINTS_LIMIT {
+        entries.clear();
+    }
+    entries.insert(key, fingerprint.clone());
+    fingerprint
+}
 
 /// The query fingerprint of a model, or the planner input error naming the model.
 pub(crate) fn model_query_hash(
@@ -72,37 +106,4 @@ pub(crate) fn fingerprint_error(py: Python<'_>, subject: &str, message: String) 
         Ok(error) => PyErr::from_value(error),
         Err(error) => error,
     }
-}
-
-/// Query fingerprints by dialect and SQL text: the text alone decides them, and every plan computes
-/// each model's several times, as do a location's later previews of the same publication.
-static QUERY_FINGERPRINTS: Mutex<Option<QueryFingerprints>> = Mutex::new(None);
-
-/// Distinct SQL texts the memo keeps before starting over; a 10K-model project holds about 10K.
-const QUERY_FINGERPRINTS_LIMIT: usize = 100_000;
-
-/// Fingerprint results by `(dialect, SQL text)`.
-type QueryFingerprints = HashMap<(Option<String>, String), Result<String, String>>;
-
-/// `compiler_query_fingerprint`, remembered by dialect and SQL text.
-pub(crate) fn query_fingerprint(sql: &str, dialect: Option<&str>) -> Result<String, String> {
-    let key: (Option<String>, String) = (dialect.map(str::to_owned), sql.to_owned());
-    if let Some(known) = QUERY_FINGERPRINTS
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .as_ref()
-        .and_then(|memo| memo.get(&key))
-    {
-        return known.clone();
-    }
-    let fingerprint: Result<String, String> = compiler_query_fingerprint(sql, dialect);
-    let mut memo = QUERY_FINGERPRINTS
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    let entries: &mut QueryFingerprints = memo.get_or_insert_with(HashMap::new);
-    if entries.len() > QUERY_FINGERPRINTS_LIMIT {
-        entries.clear();
-    }
-    entries.insert(key, fingerprint.clone());
-    fingerprint
 }

@@ -1,7 +1,8 @@
 //! Convert existing planner contracts for origin compatibility checks.
 
 use crate::planner_changes::main::detect_model_changes::detect_model_changes;
-use crate::planner_migrations::models::{CompatibilityCheck, MigrationCompatibilityResult};
+use crate::planner_migrations::models::CompatibilityCheck;
+use crate::planner_migrations::models::MigrationCompatibilityResult;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};

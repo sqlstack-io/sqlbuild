@@ -2,11 +2,13 @@
 
 use crate::planner_migrations::constants::QUALIFIED_RELATION_MAX_PARTS;
 use crate::planner_migrations::models::ModelMigrationRequest;
+use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::PyErr;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PySet, PySetMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -14,8 +16,6 @@ use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
-use crate::planner_phases::_helpers::inputs::runtime::runtime_dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 
 pub(crate) fn location<'py>(
     runtime: &Bound<'py, PyAny>,

@@ -1,10 +1,10 @@
 //! Scenario artifact dataclasses and adapter identifier callbacks.
 
-use crate::planner_scenario::_helpers::values::{error, string};
-use crate::planner_scenario::constants::{
-    SCENARIO_PLAN_HASH_COLLISION, SCENARIO_PLAN_INVALID_HASH_PREFIX,
-    SCENARIO_PLAN_RELATION_COLLISION,
-};
+use crate::planner_scenario::_helpers::values::error;
+use crate::planner_scenario::_helpers::values::string;
+use crate::planner_scenario::constants::SCENARIO_PLAN_HASH_COLLISION;
+use crate::planner_scenario::constants::SCENARIO_PLAN_INVALID_HASH_PREFIX;
+use crate::planner_scenario::constants::SCENARIO_PLAN_RELATION_COLLISION;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_scenario::main::{hash_prefix, parse_artifact_name};

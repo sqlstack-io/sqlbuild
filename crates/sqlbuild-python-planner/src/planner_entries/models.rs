@@ -1,10 +1,10 @@
 //! Public records of planner entries.
 
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
-use sqlbuild_python_project::native_host::models::ModelLookup;
-use crate::planner_warehouse::models::PlannerReads;
 use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_project::native_host::models::ModelLookup;
 
 /// What resolving relation locations and source metadata for one scope reads.
 #[derive(Debug)]
@@ -34,7 +34,7 @@ pub struct PlanEntriesRequest<'py> {
     pub(crate) full_refresh: bool,
     pub(crate) build_inputs: Bound<'py, PyAny>,
     /// The effective worker limit execution will use.
-    pub concurrency: i64,
+    pub(crate) concurrency: i64,
 }
 
 /// What assembling the plan output's fields reads.

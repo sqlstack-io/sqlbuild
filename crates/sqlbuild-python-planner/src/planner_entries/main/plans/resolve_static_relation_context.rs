@@ -1,7 +1,6 @@
 //! Resolve canonical locations and source routing without warehouse inventory.
 
 use crate::planner_entries::_helpers::entries::relations::planner_relations_context;
-use crate::planner_entries::_helpers::entries::values::none;
 use crate::planner_entries::models::RelationsRequest;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::pyfunction;

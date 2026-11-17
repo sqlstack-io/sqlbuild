@@ -9,10 +9,7 @@ use crate::state_tables::tests::helpers::column;
 use crate::state_tables::tests::test_types::{
     CreateTableTestCase, EventKeyTestCase, HistoryReadTestCase, ValuesInsertTestCase,
 };
-use crate::state_tables::models::{HistoryRead, NewestVersions};
-use crate::state_tables::tests::test_types::{
-    CreateTableTestCase, HistoryReadTestCase, ValuesInsertTestCase,
-};
+use crate::state_tables::models::{NewestVersions};
 
 #[test]
 fn given_columns_when_rendering_ddl_then_required_columns_are_not_null() {
@@ -210,6 +207,7 @@ fn given_event_tables_keyed_by_event_id_when_paging_history_then_each_column_and
                     adapter,
                     has_event_id: true,
                     limit: 5,
+                    newest: None,
                 },
             )
             .expect("supported adapter");

@@ -1,17 +1,13 @@
 //! `(relations, temporary names)` named in `sql`, or None if unparseable.
 
-use crate::analysis::_helpers::relation_names::relation_names_error;
-use crate::analysis::_helpers::relation_names::relation_row;
-use crate::analysis::types::RelationRow;
-use pyo3::prelude::{PyResult, Python};
-use sqlbuild_analysis::relation_names::main::extract_relation_names::extract_relation_names;
-use sqlbuild_analysis::relation_names::models::ExtractedRelations;
-use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
-use sqlbuild_python_base::types::CompilerDetach;
 use crate::analysis::_helpers::relation_names::{
     relation_names_error, remember, remembered, rows_of,
 };
 use crate::analysis::types::ExtractedRows;
+use pyo3::prelude::{PyResult, Python};
+use sqlbuild_analysis::relation_names::main::extract_relation_names::extract_relation_names;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// `(relations, temporary names)` named in `sql`, or None if unparseable.
 pub fn extract_sql_relation_names(

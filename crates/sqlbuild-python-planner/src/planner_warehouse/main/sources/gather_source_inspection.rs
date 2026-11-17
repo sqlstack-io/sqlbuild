@@ -1,11 +1,10 @@
 //! Gather source inspection.
 
 use crate::planner_warehouse::_helpers::sources::source_columns::source_inspection;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyTuple;
-use crate::planner_warehouse::models::PlannerReads;
 
-/// Gather source inspection.
 pub fn gather_source_inspection<'py>(
     project: &Bound<'py, PyAny>,
     reads: &Bound<'py, PlannerReads>,

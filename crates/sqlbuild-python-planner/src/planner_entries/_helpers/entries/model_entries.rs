@@ -37,6 +37,8 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -45,12 +47,9 @@ use sqlbuild_python_front::discovery::main::failures::microbatch_guidance::micro
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::project::functions::functions;
 use sqlbuild_python_project::planner_phases::main::object::object;
-use sqlbuild_python_project::planner_strategy::models::{CursorInputLookups, ModelEntryDecisions};
-use sqlbuild_python_project::semantic_shapes::main::source_binding_diagnostics::source_binding_diagnostics;
-use sqlbuild_python_base::native_host::models::Dialect;
-use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
 use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
+use sqlbuild_python_project::semantic_shapes::main::source_binding_diagnostics::source_binding_diagnostics;
 
 const MICROBATCH_COMPLEXITY_CODE: &str = "MICROBATCH_CONCURRENCY_COMPLEXITY";
 

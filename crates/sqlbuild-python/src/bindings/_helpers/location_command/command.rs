@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::{Command, Stdio};
+
 use chrono::{DateTime, Utc};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -15,17 +16,23 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::dev_events::main::compile_summary::compile_summary;
 use sqlbuild_orchestration::dev_events::main::emit_dev_steps::emit_dev_steps;
 use sqlbuild_orchestration::dev_events::models::{DevPhase, DevStepState};
+use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
-use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
+
+use crate::bindings::_helpers::location_command::constants::EXECUTE_ACTION;
+use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
+use crate::bindings::_helpers::location_command::load_rules::load_rules;
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
-use crate::bindings::_helpers::location_command::snapshot::{
-    build_orchestration_snapshot, orchestration_snapshot,
-};
-use crate::bindings::_helpers::location_command::worker::{blocked_nodes, execute_worker};
-use crate::bindings::_helpers::query_command::project::{
-    ProjectAdapter, ProjectInputs, project_adapter,
-};
+use crate::bindings::_helpers::location_command::snapshot::build_orchestration_snapshot;
+use crate::bindings::_helpers::location_command::snapshot::orchestration_snapshot;
+use crate::bindings::_helpers::location_command::snapshot_connection::add_connection;
+use crate::bindings::_helpers::location_command::types::HeldProject;
+use crate::bindings::_helpers::location_command::worker::blocked_nodes;
+use crate::bindings::_helpers::location_command::worker::execute_worker;
+use crate::bindings::_helpers::query_command::project::ProjectAdapter;
+use crate::bindings::_helpers::query_command::project::ProjectInputs;
+use crate::bindings::_helpers::query_command::project::project_adapter;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -37,19 +44,6 @@ use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 use sqlbuild_python_project::project_snapshot::types::NodeKeys;
-use sqlbuild_orchestration::platform::models::LocationRuleFailure;
-use crate::bindings::_helpers::location_command::constants::EXECUTE_ACTION;
-use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
-use crate::bindings::_helpers::location_command::load_rules::load_rules;
-use crate::bindings::_helpers::location_command::snapshot::build_orchestration_snapshot;
-use crate::bindings::_helpers::location_command::snapshot::orchestration_snapshot;
-use crate::bindings::_helpers::location_command::snapshot_connection::add_connection;
-use crate::bindings::_helpers::location_command::types::HeldProject;
-use crate::bindings::_helpers::location_command::worker::blocked_nodes;
-use crate::bindings::_helpers::location_command::worker::execute_worker;
-use crate::bindings::_helpers::query_command::project::ProjectAdapter;
-use crate::bindings::_helpers::query_command::project::ProjectInputs;
-use crate::bindings::_helpers::query_command::project::project_adapter;
 
 fn status(py: Python<'_>, message: &str) -> PyResult<()> {
     write_stderr(py, &format!("{message}\n"))
@@ -133,6 +127,9 @@ fn metadata(
     })
 }
 
+/// A compiled snapshot, its blocked nodes and the compile's `CompiledProjectPhaseResult`.
+type CompiledSnapshot<'py> = (NativeOrchestrationSnapshot, NodeKeys, Bound<'py, PyAny>);
+
 fn compile_location<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
@@ -146,22 +143,16 @@ fn compile_location<'py>(
         ProjectInputs::DiscoveredDeferringSecrets,
     )?;
     status(py, "Location project discovered. Compiling snapshot...")?;
-<<<<<<< ours
-    let compiled = compile_snapshot(py, arguments, (input, &project), None)?;
-    status(py, "Location snapshot compiled.")?;
-    Ok((compiled, project))
-=======
     let discovered = [
         (DevPhase::Discover, DevStepState::Finished),
         (DevPhase::Compile, DevStepState::Started),
     ];
     steps(py, &discovered, None)?;
-    let (snapshot, blocked) = compile_snapshot(py, arguments, (input, &project), None)?;
+    let compiled = compile_snapshot(py, arguments, (input, &project), None)?;
     status(py, "Location snapshot compiled.")?;
-    let compiled = [(DevPhase::Compile, DevStepState::Finished)];
-    steps(py, &compiled, Some(compile_summary(&snapshot.input)))?;
-    Ok((snapshot, project, blocked))
->>>>>>> theirs
+    let finished = [(DevPhase::Compile, DevStepState::Finished)];
+    steps(py, &finished, Some(compile_summary(&compiled.0.input)))?;
+    Ok((compiled, project))
 }
 
 /// Compile the discovered project into a snapshot, with a run's variables when it carries them.
@@ -226,6 +217,13 @@ pub(super) fn location_arguments<'py>(
         ),
     )
 }
+
+/// A published record, its earliest calendar refresh and the state locations its nodes write.
+pub(super) type Published = (
+    SnapshotRecord,
+    Option<DateTime<Utc>>,
+    Vec<WarehouseStateLocation>,
+);
 
 pub(super) fn publish_location<'py>(
     py: Python<'py>,
@@ -307,15 +305,11 @@ pub(super) fn publish_location<'py>(
             PyValueError::new_err(message)
         })?;
     status(py, "Location snapshot published.")?;
-<<<<<<< ours
+    steps(py, &[(DevPhase::Publish, DevStepState::Finished)], None)?;
     Ok(Ok((
         (record, refresh_at, locations.into_iter().collect()),
         (project.discovered, compiled),
     )))
-=======
-    steps(py, &[(DevPhase::Publish, DevStepState::Finished)], None)?;
-    Ok((record, refresh_at, locations.into_iter().collect()))
->>>>>>> theirs
 }
 
 /// One-shot publication and the supervisor's private stdio runtime share the same compiler path.
@@ -394,13 +388,3 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(build_orchestration_snapshot, module)?)?;
     module.add_function(wrap_pyfunction!(run_location_command, module)?)
 }
-
-/// A compiled snapshot, its blocked nodes and the compile's `CompiledProjectPhaseResult`.
-type CompiledSnapshot<'py> = (NativeOrchestrationSnapshot, NodeKeys, Bound<'py, PyAny>);
-
-/// A published record, its earliest calendar refresh and the state locations its nodes write.
-pub(super) type Published = (
-    SnapshotRecord,
-    Option<DateTime<Utc>>,
-    Vec<WarehouseStateLocation>,
-);

@@ -1,15 +1,15 @@
 //! Public records of planner phases.
 
-use pyo3::prelude::{Bound, Py, PyAny};
-use pyo3::pyclass;
-use std::collections::BTreeMap;
 use crate::planner_phases::_helpers::timings::STEPS;
 use crate::planner_phases::_helpers::timings::timings_of;
 use crate::planner_phases::constants::MILLISECONDS;
 use crate::planner_phases::constants::PERCENT;
 use crate::planner_warehouse::models::PlannerReads;
+use pyo3::prelude::{Bound, Py, PyAny};
+use pyo3::pyclass;
 use serde_json::{Value, json};
 use sqlbuild_python_base::native_host::models::Dialect;
+use std::collections::BTreeMap;
 use std::time::Instant;
 
 /// The plan output's fields and metadata entries, each set before the output is built.

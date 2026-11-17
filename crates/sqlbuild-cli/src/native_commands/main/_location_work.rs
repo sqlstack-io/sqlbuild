@@ -20,17 +20,16 @@ use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
 use crate::native_commands::models::{LocationServe, LocationWatch};
 use tokio::sync::mpsc;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
-use crate::native_commands::models::{
-    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn,
-};
+use crate::native_commands::models::{LocationRuntimeRequest, LocationWorkTurn};
 
 /// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
-<<<<<<< ours
-    (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
-=======
-    (options, script, connected): (&LocationServe, &Path, bool),
->>>>>>> theirs
+    (options, script, runtime, connected): (
+        &LocationServe,
+        &Path,
+        &mpsc::Sender<LocationRuntimeRequest>,
+        bool,
+    ),
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -67,11 +66,7 @@ pub(super) async fn run_location_work(
         };
         let copy = (client, poll.session_id, claim.generation);
         let checked = perform_work(
-<<<<<<< ours
-            (options, script, runtime),
-=======
-            (options, script, connected),
->>>>>>> theirs
+            (options, script, runtime, connected),
             claim.request.work,
             copy,
             expires,
@@ -152,11 +147,12 @@ pub(super) async fn run_location_work(
 
 /// One named operation; `None` means it stopped at shutdown or its lease ended; `sqb dev` never signs in here.
 async fn perform_work(
-<<<<<<< ours
-    (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
-=======
-    (options, script, connected): (&LocationServe, &Path, bool),
->>>>>>> theirs
+    (options, script, runtime, connected): (
+        &LocationServe,
+        &Path,
+        &mpsc::Sender<LocationRuntimeRequest>,
+        bool,
+    ),
     work: LocationWork,
     copy: (&LocationWorkClient, Uuid, i64),
     expires: impl Future<Output = Result<(), ControlError>>,
