@@ -131,30 +131,40 @@ fn validate_python_sql_refs(context: &SelectionContext<'_>) -> Result<(), Select
     Ok(())
 }
 
-fn validate_loader_upstreams(context: &SelectionContext<'_>) -> Result<(), SelectorError> {
-    let loaders: Vec<&str> = context
+/// The dependency cycle through a loader, which every cycle across SQL and Python passes.
+fn dependency_cycle(context: &SelectionContext<'_>) -> Option<SelectorError> {
+    let cycle: Vec<String> = round_trip_cycle(context, &loader_names(context))?;
+    Some(SelectorError {
+        code: PLANNER_DEFAULT_CODE,
+        message: format!(
+            "{} is in a dependency cycle: {}",
+            cycle[0],
+            cycle.join(" -> ")
+        ),
+        help: Some(
+            "each arrow points to what a node depends on; a task or asset upstream of a \
+             loader cannot read anything built from the source that loader fills"
+                .to_owned(),
+        ),
+    })
+}
+
+fn loader_names<'graph>(context: &SelectionContext<'graph>) -> Vec<&'graph str> {
+    context
         .nodes
         .graph
         .nodes
         .iter()
         .filter(|node| node.kind == LOADER_KIND)
         .map(|node| node.name.as_str())
-        .collect();
-    if let Some(cycle) = round_trip_cycle(context, &loaders) {
-        return Err(SelectorError {
-            code: PLANNER_DEFAULT_CODE,
-            message: format!(
-                "{} is in a dependency cycle: {}",
-                cycle[0],
-                cycle.join(" -> ")
-            ),
-            help: Some(
-                "each arrow points to what a node depends on; a task or asset upstream of a \
-                 loader cannot read anything built from the source that loader fills"
-                    .to_owned(),
-            ),
-        });
+        .collect()
+}
+
+fn validate_loader_upstreams(context: &SelectionContext<'_>) -> Result<(), SelectorError> {
+    if let Some(cycle) = dependency_cycle(context) {
+        return Err(cycle);
     }
+    let loaders: Vec<&str> = loader_names(context);
     if context.sql.allow_warehouse_round_trips {
         return Ok(());
     }

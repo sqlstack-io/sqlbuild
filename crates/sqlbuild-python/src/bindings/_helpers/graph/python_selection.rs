@@ -14,6 +14,7 @@ use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_analysis::python_selection::main::attach_python_jobs::attach_python_jobs;
 use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python_node_graph_indexes as graph_indexes;
 use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
+use sqlbuild_analysis::python_selection::main::python_sql_graph_error::python_sql_graph_error;
 use sqlbuild_analysis::python_selection::main::resolve_python_node_excludes::resolve_python_node_excludes;
 use sqlbuild_analysis::python_selection::main::resolve_python_node_selectors::resolve_python_node_selectors;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_nodes::resolve_python_sql_nodes;
@@ -326,6 +327,29 @@ pub(crate) fn resolve_python_sql_run_selection(
     })?
     .map_err(|error| planner_error(py, error))?;
     Ok((selection.sql_keys, selection.python_node_names))
+}
+
+/// The project's first whole-graph boundary error across SQL resources and Python nodes, as every selection reports it.
+pub(crate) fn project_graph_error(
+    project_graph: &Bound<'_, PyAny>,
+    discovered_inputs: &Bound<'_, PyAny>,
+) -> PyResult<Option<SelectorError>> {
+    let py: Python<'_> = project_graph.py();
+    let project_graph: &Bound<'_, CompiledProjectGraph> = project_graph.cast()?;
+    let project: &Bound<'_, PyAny> = project_graph.get().project(py);
+    let sources: Vec<(String, Option<String>)> = project_sources(project)?;
+    let nodes: PythonSelectionGraph = selection_graph(&python_node_graph(discovered_inputs)?)?;
+    let native: &Bound<'_, NativeProjectGraph> = project_graph.get().native(py);
+    compiler_guard(|| {
+        Ok(python_sql_graph_error(
+            SqlSelectionGraph {
+                graph: native.get().graph(),
+                sources: &sources,
+                allow_warehouse_round_trips: allows_round_trips(project)?,
+            },
+            &nodes,
+        ))
+    })
 }
 
 /// The dependency edges, adjacency, tag and path indexes of discovered Python nodes.
