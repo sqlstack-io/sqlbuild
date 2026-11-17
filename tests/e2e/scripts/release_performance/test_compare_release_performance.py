@@ -40,6 +40,10 @@ _REPO_ROOT: Path = Path(__file__).resolve().parents[4]
                 "| `build (empty warehouse)` |",
                 "| `lineage column trace` |",
                 "Benchmark projects are generated per side",
+                "### Release performance progress",
+                " UTC: Generating baseline benchmark projects with ",
+                " UTC: Warming caches for candidate ",
+                " UTC: Timing `dense compile (no cache)`",
                 "**Result: ",
             ),
             expected_marked_projects=(
