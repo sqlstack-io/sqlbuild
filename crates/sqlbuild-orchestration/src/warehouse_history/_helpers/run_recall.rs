@@ -166,7 +166,8 @@ pub(crate) async fn run_events_in(
         &format!("SELECT storage_id, event_id, invocation_id, occurred_at, event_type, severity, producer, resource_id, \
          resource_kind, resource_name, resource_attempt_id, statement_id, error_type, error_code, duration_ms, outcome, \
          row_count, affected_rows, CASE WHEN event_type IN ('{MEMBER_RETRYING_EVENT}','{MEMBER_RECOVERED_EVENT}') \
-         THEN payload END AS member_payload FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", next + 1),
+         THEN payload END AS member_payload, CASE WHEN resource_name IS NULL AND event_type IN ({NODE_EVENTS}) \
+         THEN payload END AS node_payload FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", next + 1),
         parameters).await?;
     let records = rows
         .into_iter()
@@ -175,10 +176,48 @@ pub(crate) async fn run_events_in(
             if let Some(message) = member_message(&payload) {
                 row.insert("message".into(), Value::String(message));
             }
+            let payload = row.remove("node_payload").unwrap_or(Value::Null);
+            if let Some((kind, name)) = node_of(&payload) {
+                row.insert("resource_kind".into(), Value::String(kind));
+                row.insert("resource_name".into(), Value::String(name));
+            }
             decode_row(row)
         })
         .collect::<Result<_, _>>()?;
     Ok((transaction, records))
+}
+
+/// Events about one node whose node may be only in their payload: the scheduler's node and check
+/// events stored before they carried resource columns, and audit results.
+const NODE_EVENTS: &str = "'run_node_started','run_node_finished','run_check_started','run_check_finished','audit_completed'";
+
+/// The node an event is about, as `(kind, name)`, from a scheduler change's `<kind>:<name>` node key or
+/// an audit's target; only the node's identity is read, never the rest of the payload.
+pub(crate) fn node_of(payload: &Value) -> Option<(String, String)> {
+    let payload: Value = match payload {
+        Value::String(text) => serde_json::from_str(text).ok()?,
+        Value::Null => return None,
+        other => other.clone(),
+    };
+    if let Some(key) = payload
+        .pointer("/change/change/node_key")
+        .and_then(Value::as_str)
+    {
+        let (kind, name) = key.split_once(':')?;
+        return Some((kind.into(), name.into()));
+    }
+    let text = |field: &str| {
+        payload
+            .get(field)
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+    };
+    // A column audit names its table as the attached target; other audits name their node directly.
+    let (kind, name) = match (text("attached_target_kind"), text("attached_target_name")) {
+        (Some(kind), Some(name)) => (kind, name),
+        _ => (text("attachment_kind")?, text("target_name")?),
+    };
+    Some((kind.into(), name.into()))
 }
 
 /// The scheduler's summary of a member retry or recovery on its group run, from its own payload.

@@ -44,7 +44,12 @@ pub(crate) fn validate_retry(
     request: &RunChangeRequest,
     body: &serde_json::Value,
 ) -> Result<(), ControlError> {
-    if previous.get("payload") != Some(body)
+    // The report is the stored `change`; fields derived from it, such as a node's resource columns, may
+    // differ between server versions without making a retried report different.
+    let change =
+        |payload: Option<&serde_json::Value>| payload.and_then(|p| p.get("change")).cloned();
+    if change(previous.get("payload")).is_none()
+        || change(previous.get("payload")) != change(Some(body))
         || previous
             .get("invocation_id")
             .and_then(serde_json::Value::as_str)
