@@ -2281,24 +2281,45 @@ class SnowflakeAdapter(
     ) -> SchemaRelationListing:
         """List one schema's tables and views with SHOW, which needs no running warehouse."""
 
+        return self.relation_listing_from_reads(
+            database=database,
+            schema=schema,
+            results=tuple(
+                read()
+                for read in self.relation_listing_reads(
+                    connection=connection, database=database, schema=schema
+                )
+            ),
+        )
+
+    def relation_listing_reads(
+        self, *, connection: _SnowflakeConnection, database: str | None, schema: str
+    ) -> tuple[Callable[[], object], ...]:
+        """SHOW TABLES and SHOW VIEWS of one schema, independent reads that may run together."""
+
         show_database: str = self._show_database(
             connection=connection, database=database, schema=schema
         )
         scope: str = self._show_schema_scope(
             connection=connection, database=database, schema=schema
         )
-        tables: list[dict[str, object]] = self._fetch_paged_show_rows(
-            connection=connection,
-            query=f"SHOW TABLES IN SCHEMA {scope}",
-            show_database=show_database,
-            schema=schema,
+        return tuple(
+            partial(
+                self._fetch_paged_show_rows,
+                connection=connection,
+                query=f"SHOW {kind} IN SCHEMA {scope}",
+                show_database=show_database,
+                schema=schema,
+            )
+            for kind in ("TABLES", "VIEWS")
         )
-        views: list[dict[str, object]] = self._fetch_paged_show_rows(
-            connection=connection,
-            query=f"SHOW VIEWS IN SCHEMA {scope}",
-            show_database=show_database,
-            schema=schema,
-        )
+
+    def relation_listing_from_reads(
+        self, *, database: str | None, schema: str, results: tuple[object, ...]
+    ) -> SchemaRelationListing:
+        """One schema's listing from its SHOW TABLES and SHOW VIEWS rows."""
+
+        tables, views = cast(tuple[list[dict[str, object]], list[dict[str, object]]], results)
         entries: dict[str, ListedRelation] = {}
         row: dict[str, object]
         for row in tables:

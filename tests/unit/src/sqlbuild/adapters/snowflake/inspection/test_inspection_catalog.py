@@ -28,6 +28,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake.inspection._test_types import (
     FreshnessReuseTestCase,
     MissingSchemaTestCase,
     NestedConcurrencyTestCase,
+    PartedListingTestCase,
     RelationRequestEquivalenceTestCase,
     RepeatedLookupTestCase,
     ShowResultCapTestCase,
@@ -285,7 +286,9 @@ def test_given_repeated_lookups_when_catalog_is_open_then_lists_schema_once(
     )
 
     assert counts == test_case.expected_relation_counts
-    assert tuple(query.kind for query in warehouse.queries) == test_case.expected_query_kinds
+    assert sorted(query.kind for query in warehouse.queries) == sorted(
+        test_case.expected_query_kinds
+    )
 
 
 @pytest.mark.parametrize(
@@ -295,7 +298,7 @@ def test_given_repeated_lookups_when_catalog_is_open_then_lists_schema_once(
             description="unreadable speculative schema fails only the request that needs it",
             failing_schema="RESTRICTED",
             expected_error_fragment="unavailable",
-            expected_failed_reads=2,
+            expected_failed_reads=(3, 4),
         )
     ],
     ids=lambda case: case.description,
@@ -324,7 +327,8 @@ def test_given_unreadable_schema_when_prefetching_best_effort_then_only_real_rea
 
     assert len(staging) == 1
     assert len(warehouse.queries_of_kind("show_tables")) == 1
-    assert len(warehouse.attempted_sql) - len(warehouse.queries) == test_case.expected_failed_reads
+    failed_reads: int = len(warehouse.attempted_sql) - len(warehouse.queries)
+    assert test_case.expected_failed_reads[0] <= failed_reads <= test_case.expected_failed_reads[1]
 
 
 @pytest.mark.parametrize(
@@ -395,7 +399,9 @@ def test_given_schema_beyond_show_cap_when_listing_then_matches_direct_adapter(
 
     assert sorted_relation_reprs(served) == sorted_relation_reprs(direct)
     assert served_columns == direct_columns
-    assert tuple(query.kind for query in warehouse.queries) == test_case.expected_query_kinds
+    assert sorted(query.kind for query in warehouse.queries) == sorted(
+        test_case.expected_query_kinds
+    )
 
 
 @pytest.mark.parametrize(
@@ -434,7 +440,8 @@ def test_given_no_database_when_listing_schemas_then_show_uses_the_session_datab
 
     assert len(staging) + len(marts) == test_case.expected_relation_count
     assert {relation.database for relation in (*staging, *marts)} == {None}
-    assert tuple(warehouse.attempted_sql) == test_case.expected_attempted_sql
+    assert warehouse.attempted_sql[0] == test_case.expected_attempted_sql[0]
+    assert sorted(warehouse.attempted_sql[1:]) == sorted(test_case.expected_attempted_sql[1:])
 
 
 @pytest.mark.parametrize(
@@ -447,6 +454,7 @@ def test_given_no_database_when_listing_schemas_then_show_uses_the_session_datab
             expected_error_fragment="database restricted_catalog does not exist",
             expected_attempted_sql=(
                 'SHOW TABLES IN SCHEMA "RESTRICTED_CATALOG"."STAGING" LIMIT 10000',
+                'SHOW VIEWS IN SCHEMA "RESTRICTED_CATALOG"."STAGING" LIMIT 10000',
                 "SHOW SCHEMAS LIKE 'STAGING' IN DATABASE \"RESTRICTED_CATALOG\"",
             ),
         )
@@ -464,7 +472,7 @@ def test_given_missing_database_when_listing_schema_then_inspection_fails(
     with pytest.raises(AdapterUserError, match=test_case.expected_error_fragment or ""):
         _ = catalog.list_relations(database=test_case.database, schemas=("staging",))
 
-    assert tuple(warehouse.attempted_sql) == test_case.expected_attempted_sql
+    assert set(warehouse.attempted_sql) == set(test_case.expected_attempted_sql)
 
 
 @pytest.mark.parametrize(
@@ -665,6 +673,52 @@ def test_given_capped_schemas_when_reading_columns_then_nested_reads_do_not_mult
 
     assert warehouse.max_concurrent_metadata <= test_case.expected_max_concurrent
     assert len(warehouse.queries_of_kind("columns")) == test_case.expected_column_reads
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PartedListingTestCase(
+            description="each schema's tables and views are listed at once",
+            schema_count=2,
+            relations_per_schema=3,
+            statement_latency_seconds=0.05,
+            expected_max_concurrent=4,
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_schemas_when_prefetching_listings_then_tables_and_views_run_together(
+    test_case: PartedListingTestCase,
+) -> None:
+    relations: tuple[FakeRelation, ...] = build_wide_schemas_relations(
+        schema_count=test_case.schema_count,
+        relation_count=test_case.relations_per_schema,
+        columns_per_relation=1,
+    )
+    adapter, connection, warehouse = build_offline_snowflake(
+        relations=relations, statement_latency_seconds=test_case.statement_latency_seconds
+    )
+    schemas: tuple[str, ...] = tuple(
+        f"warehouse_{index}" for index in range(test_case.schema_count)
+    )
+    direct: tuple[RelationInfo, ...] = adapter.list_relations(
+        connection=connection, database="analytics", schemas=schemas
+    )
+    warehouse.reset()
+
+    with open_inspection_catalog(adapter=adapter, connection=connection) as catalog:
+        catalog.prefetch_schema_listings(scopes=tuple(("analytics", schema) for schema in schemas))
+        listed: tuple[RelationInfo, ...] = catalog.list_relations(
+            database="analytics", schemas=schemas
+        )
+
+    assert sorted(relation.identity for relation in listed) == sorted(
+        relation.identity for relation in direct
+    )
+    assert warehouse.max_concurrent_metadata == test_case.expected_max_concurrent
+    assert len(warehouse.queries_of_kind("show_tables")) == test_case.schema_count
+    assert len(warehouse.queries_of_kind("show_views")) == test_case.schema_count
 
 
 if __name__ == "__main__":
