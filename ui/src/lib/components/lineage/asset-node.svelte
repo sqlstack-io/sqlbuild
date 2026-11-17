@@ -33,6 +33,8 @@
 		status: 'ok' | 'fail' | 'warn' | 'run' | 'src' | 'none';
 		/** The main stale reason, if any. */
 		stale?: 'changed' | 'compiled' | 'upstream' | 'behind';
+		/** The node is in an active run, so its status is that run's, not its last build's. */
+		live?: boolean;
 		checks?: string;
 		checksColor?: string;
 		dimmed?: boolean;
@@ -93,7 +95,7 @@
 
 	// Zoomed out, the card's state is its colour: a failure or a run first, then staleness, then the outcome.
 	const faceTone = $derived(
-		d.status === 'fail' || d.status === 'run' ? tone : d.stale === 'behind' ? 'var(--sb-behind)' : d.stale ? 'var(--sb-stale)' : tone
+		d.live || d.status === 'fail' || d.status === 'run' ? tone : d.stale === 'behind' ? 'var(--sb-behind)' : d.stale ? 'var(--sb-stale)' : tone
 	);
 	// The status line stays one line: worked out once per card, the drift chip and then the status word
 	// shorten when its parts don't fit; the time never does.

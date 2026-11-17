@@ -39,8 +39,10 @@ export function cardData(node: CatalogNode): Record<string, unknown> {
 		kind: kindLine(node),
 		group: node.group,
 		nodeKind: node.kind,
-		status: cardStatus(node),
-		stale: cardStale(node.stale ?? []),
+		status: node.liveStatus ?? cardStatus(node),
+		// A node the active run is building, or has just built, shows that, not whether it was stale.
+		stale: node.liveStatus ? undefined : cardStale(node.stale ?? []),
+		live: !!node.liveStatus,
 		icon: nodeIconKey(node),
 		lastBuiltAt: node.kind === 'source' ? (node.sourceFreshness?.loadedAt ?? undefined) : node.lastBuild?.builtAt,
 		description: node.description || undefined,
