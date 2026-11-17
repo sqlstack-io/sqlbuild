@@ -24,6 +24,7 @@ from tests.unit.src.sqlbuild.runtime.observability._test_types import (
     JsonErrorCase,
     MetadataBoundaryCase,
     OpaqueRoundTripCase,
+    RetiredOperationCase,
     SchemaVersionCase,
     StatementRoundTripCase,
 )
@@ -147,6 +148,40 @@ def test_given_known_event_when_serializing_and_decoding_then_round_trips(
     assert decoded == event
     assert isinstance(decoded, LifecycleEvent)
     assert decoded.event_type == test_case.expected_event_type
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RetiredOperationCase("a stored dlt or callable load", "loader", "external_source_load"),
+        RetiredOperationCase("a stored ingestr subprocess", "subprocess", "ingestr_command"),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_operation_from_a_removed_integration_when_decoding_history_then_it_reads_back(
+    test_case: RetiredOperationCase,
+) -> None:
+    stored: str = json.dumps(
+        {
+            "event_id": "evt-retired",
+            "event_type": "operation_started",
+            "schema_version": 1,
+            "producer": "sqlbuild",
+            "producer_version": "0.238.0",
+            "occurred_at": "2026-08-31T12:34:56.123456Z",
+            "invocation_id": "inv-1",
+            "operation_id": "op-1",
+            "payload": {
+                "operation_kind": test_case.operation_kind,
+                "operation_name": test_case.operation_name,
+            },
+        }
+    )
+
+    decoded: LifecycleEvent | OpaqueLifecycleEvent = lifecycle_event_from_json(stored)
+
+    assert isinstance(decoded, LifecycleEvent)
+    assert decoded.payload["operation_name"] == test_case.operation_name
 
 
 @pytest.mark.parametrize(

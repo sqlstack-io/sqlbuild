@@ -129,6 +129,13 @@ class OpaqueRoundTripCase:
 
 
 @dataclass(frozen=True)
+class RetiredOperationCase:
+    description: str
+    operation_kind: str
+    operation_name: str
+
+
+@dataclass(frozen=True)
 class JsonErrorCase:
     description: str
     encoded: str
