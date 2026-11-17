@@ -8,6 +8,7 @@ use crate::graph::_helpers::project::project_graph::outcome;
 use crate::graph::_helpers::project::views::lineage_graph_views;
 use crate::graph::_helpers::python_nodes::python_selection::project_sources;
 use crate::graph::_helpers::python_nodes::python_selection::selection_graph;
+use crate::graph::constants::LOADER_KIND;
 use crate::graph::main::project::project_graph::project_graph;
 use crate::graph::main::python_nodes::python_node_graph::python_node_graph;
 use pyo3::prelude::Bound;
@@ -475,6 +476,11 @@ impl ProjectSelection {
             .rev()
             .find(|node| node.name == name)?;
         Some(python_run_key(&self.sources, (&node.kind, name)))
+    }
+
+    /// The `source:` key a loader node publishes when it writes no declared source, so its chain's other loaders can read it.
+    pub fn intermediate_source(&self, kind: &str, name: &str) -> Option<String> {
+        (kind == LOADER_KIND && self.intermediate_loader(name)).then(|| format!("source:{name}"))
     }
 
     /// Whether a loader writes no declared source and so runs only as part of another loader's chain.

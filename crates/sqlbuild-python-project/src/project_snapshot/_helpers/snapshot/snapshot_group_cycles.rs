@@ -7,7 +7,6 @@ use sqlbuild_discovery::orchestration_files::models::{FilePosition, Orchestratio
 use sqlbuild_orchestration::declarations::main::group_cycle_message::group_cycle_message;
 use sqlbuild_orchestration::declarations::main::group_wait_graph::group_wait_graph;
 
-use crate::graph::constants::LOADER_KIND;
 use crate::graph::models::ProjectSelection;
 use crate::project_snapshot::_helpers::snapshot::snapshot_declarations::declared_for;
 
@@ -35,10 +34,10 @@ fn node_deps(
         deps.entry(node).or_default().extend(upstream);
     }
     for node in &selected.nodes.nodes {
-        if node.kind == LOADER_KIND && selected.intermediate_loader(&node.name) {
-            deps.entry(format!("source:{}", node.name))
+        if let Some(source) = selected.intermediate_source(&node.kind, &node.name) {
+            deps.entry(source)
                 .or_default()
-                .insert(format!("loader:{}", node.name));
+                .insert(format!("{}:{}", node.kind, node.name));
         }
     }
     deps

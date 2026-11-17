@@ -36,9 +36,6 @@ use sqlbuild_python_project::project_snapshot::main::python_declarations::python
 use sqlbuild_python_project::project_snapshot::main::resource_nodes::resource_nodes;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 
-/// The Python node kind whose functions load sources.
-const LOADER_KIND: &str = "loader";
-
 /// Compile catalog nodes and identities in the location, never in the server.
 #[pyfunction]
 #[pyo3(signature = (project, metadata_json, project_dir, **options))]
@@ -166,7 +163,7 @@ fn python_nodes(
         published.definition["deps"] = json!(deps);
         published.definition["tags"] =
             json!(tags.get(node.name.as_str()).cloned().unwrap_or_default());
-        if node.kind == LOADER_KIND && selected.intermediate_loader(&node.name) {
+        if let Some(source) = selected.intermediate_source(&node.kind, &node.name) {
             let mut definition = json!({
                 "name": node.name,
                 "entry": {"loader": node.name},
@@ -177,7 +174,7 @@ fn python_nodes(
                 definition["path"] = path.clone();
             }
             outputs.push((
-                format!("source:{}", node.name),
+                source,
                 SnapshotNode {
                     kind: "source".into(),
                     definition,
