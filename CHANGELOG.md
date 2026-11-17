@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.240.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.239.0...v0.240.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* a preserve target with Python loaders, tasks, assets or checks now needs loader_schema, which is where their results are kept. Without it, compile fails with S105, which says to set targets.<name>.loader_schema.
+
+### Bug Fixes
+
+* keep Python node results in one location per target ([#1551](https://github.com/sqlstack-io/sqlbuild/issues/1551)) ([0fc54fa](https://github.com/sqlstack-io/sqlbuild/commit/0fc54faac7f5c8a96c704bd8da58b9ebcfdc3d79))
+
 ## [0.239.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.2...v0.239.0) (2026-11-17)
 
 
