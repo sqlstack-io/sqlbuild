@@ -413,7 +413,9 @@ pub(crate) fn execute_clone_plan<'py>(
     let closed: PyResult<Bound<'py, PyAny>> = event_writer.call_method0("close");
     let result: Bound<'py, PyAny> = executed?;
     closed?;
+    let marked: PyResult<()> =
+        forget_replaced_consumption((&invocation.adapter, connection), pipeline, &result);
     copy_fingerprints(invocation, (pipeline, connection), &result)?;
-    forget_replaced_consumption((&invocation.adapter, connection), pipeline, &result)?;
+    marked?;
     Ok((result, started.elapsed().as_secs_f64()))
 }

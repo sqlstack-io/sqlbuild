@@ -441,6 +441,8 @@ fn clone_boundaries<'py>(
         ),
     )?;
     let result: Bound<'py, PyAny> = executed_clone(context, prephase, (&pipeline, connection))?;
+    let marked: PyResult<()> =
+        forget_replaced_consumption((&prephase.adapter, connection), &pipeline, &result);
     let failed: Vec<String> = failed_items(&result)?;
     if !failed.is_empty() {
         return Err(user_error(
@@ -482,7 +484,7 @@ fn clone_boundaries<'py>(
             ),
         ],
     )?;
-    forget_replaced_consumption((&prephase.adapter, connection), &pipeline, &result)
+    marked
 }
 
 /// Clone the selected boundary relations from the origin before build planning.

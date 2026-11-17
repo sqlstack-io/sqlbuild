@@ -19,9 +19,12 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clone._test_types import (
     ClonePolicyErrorTestCase,
     ClonePythonFunctionE2ETestCase,
     MissingUpstreamFixesE2ETestCase,
+    PartialDeferCloneE2ETestCase,
+    UnwritableConsumptionDeferCloneE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.clone.helpers import (
     MISSING_UPSTREAMS,
+    defer_clone_with_missing_origin,
     plan_missing_upstreams,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
@@ -1050,6 +1053,13 @@ def test_given_missing_upstreams_when_planning_then_s301_lists_them_with_fixes(
             expected_clone_command="sqb clone --from prod --to dev -s "
             + " ".join(MISSING_UPSTREAMS),
         ),
+        CloneMissingUpstreamE2ETestCase(
+            description="a default target that does not exist still yields a runnable clone",
+            default_target="retired",
+            target_args=("--target", "dev"),
+            expected_clone_command="sqb clone --from prod --to dev -s "
+            + " ".join(MISSING_UPSTREAMS),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -1077,3 +1087,63 @@ def test_given_missing_upstreams_when_running_printed_clone_then_plan_succeeds(
     assert printed == [test_case.expected_clone_command], refused.stdout + refused.stderr
     assert cloned.returncode == 0, cloned.stdout + cloned.stderr
     assert planned.returncode == 0, planned.stdout + planned.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PartialDeferCloneE2ETestCase(
+            description="a boundary cloned before another failed still rebuilds",
+            dropped_origin_table="customers",
+            expected_fragments=(
+                "orders  no completed record",
+                "Unchanged (1): skipped by --changed",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_partly_failed_defer_clone_when_planning_changed_then_cloned_boundary_rebuilds(
+    test_case: PartialDeferCloneE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    cloned, planned = defer_clone_with_missing_origin(
+        tmp_path=tmp_path, dropped_origin_table=test_case.dropped_origin_table
+    )
+
+    assert cloned.returncode == 1, cloned.stdout + cloned.stderr
+    assert "error[C411]" in cloned.stdout + cloned.stderr
+    assert planned.returncode == 0, planned.stdout + planned.stderr
+    assert all(fragment in planned.stdout for fragment in test_case.expected_fragments), (
+        planned.stdout
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UnwritableConsumptionDeferCloneE2ETestCase(
+            description="the failed boundary is reported, not the consumption write",
+            dropped_origin_table="customers",
+            before_clone=(
+                "DROP TABLE dev._sqlbuild_consumption",
+                "CREATE TABLE dev._sqlbuild_consumption (unexpected INTEGER)",
+            ),
+            expected_fragments=("error[C411]", "customers: missing in origin environment"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_unwritable_consumption_table_when_defer_clone_partly_fails_then_c411_is_reported(
+    test_case: UnwritableConsumptionDeferCloneE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    cloned, _ = defer_clone_with_missing_origin(
+        tmp_path=tmp_path,
+        dropped_origin_table=test_case.dropped_origin_table,
+        before_clone=test_case.before_clone,
+    )
+
+    output: str = cloned.stdout + cloned.stderr
+    assert cloned.returncode == 1, output
+    assert all(fragment in output for fragment in test_case.expected_fragments), output

@@ -77,7 +77,7 @@ pub(crate) fn check_selected_scope_buildability<'py>(
         let message = missing_upstream_message(
             &missing,
             &origins,
-            &missing_upstream_fixes(runtime, &project)?,
+            &missing_upstream_fixes(runtime, &project, available.deferred_relations.is_some())?,
         );
         let names = missing.iter().map(|entry| entry.key.name.as_str());
         return Err(new_error_with_fields(
@@ -98,10 +98,11 @@ pub(crate) fn check_selected_scope_buildability<'py>(
     )
 }
 
-/// The active target, the targets it may clone from, and the clone `--to` it needs, from configuration only.
+/// The active target, its clone or deferral origins, and the clone `--to` it needs (also when the default target is unknown).
 fn missing_upstream_fixes(
     runtime: &Bound<'_, PyAny>,
     project: &Bound<'_, PyAny>,
+    deferring: bool,
 ) -> PyResult<MissingUpstreamFixes> {
     let py: Python<'_> = runtime.py();
     let target: Option<String> = native_field(project, "effective_target_name")?.extract()?;
@@ -123,22 +124,29 @@ fn missing_upstream_fixes(
         native_field(&native_field(&config, "clone")?, flag)?.is_truthy()
     };
     let mut origins: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut deferrable: Vec<String> = Vec::new();
     if allows(&active, "allow_as_clone_destination")? {
-        for config in [&configs.0, &configs.1] {
+        for (config, project_targets) in [(&configs.0, true), (&configs.1, false)] {
             for name in native_field(config, "targets")?.try_iter()? {
                 let name: String = name?.extract()?;
                 if name != active && allows(&name, "allow_as_clone_origin")? {
+                    if project_targets && !deferring {
+                        deferrable.push(name.clone());
+                    }
                     origins.insert(name);
                 }
             }
         }
     }
     let default: Option<String> =
-        resolve_target_name(py, &configs.0, &configs.1, &py.None().into_bound(py))?
-            .map(|name| name.to_string());
+        match resolve_target_name(py, &configs.0, &configs.1, &py.None().into_bound(py)) {
+            Ok(name) => name.map(|name| name.to_string()),
+            Err(_) => None,
+        };
     Ok(MissingUpstreamFixes {
         clone_to: (default.as_deref() != Some(active.as_str())).then(|| active.clone()),
         target,
         origins: origins.into_iter().collect(),
+        deferrable,
     })
 }
