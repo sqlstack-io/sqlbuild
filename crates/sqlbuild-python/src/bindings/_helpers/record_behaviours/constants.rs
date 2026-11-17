@@ -2,7 +2,6 @@
 
 use crate::bindings::_helpers::dbt_events;
 use crate::bindings::_helpers::dbt_interop;
-use crate::bindings::_helpers::event_exporting;
 use crate::bindings::_helpers::record_behaviours::auditing::finish_measurement_contract;
 use crate::bindings::_helpers::record_behaviours::auditing::finish_threshold_bound;
 use crate::bindings::_helpers::record_behaviours::auditing::finish_thresholds;
@@ -409,7 +408,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     dbt_interop::getters::GETTERS,
     sqlbuild_python_base::diagnostics::constants::GETTERS,
     sqlbuild_python_front::discovery::constants::GETTERS,
-    event_exporting::getters::GETTERS,
+    sqlbuild_python_output::event_exporting::constants::GETTERS,
     sqlbuild_python_front::execution_history::constants::GETTERS,
     sqlbuild_python_project::graph::constants::GETTERS,
     sqlbuild_python_front::model_config::constants::GETTERS,
