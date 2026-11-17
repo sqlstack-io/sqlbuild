@@ -104,7 +104,7 @@ def test_given_effective_target_when_binding_quotes_then_honours_session_setting
     )
     physical: tuple[CompilerDiagnostic, ...] = source_binding_diagnostics(
         project=project,
-        columns={"orders": (ColumnInfo(name="customer", type="VARCHAR"),)},
+        columns={"orders": (ColumnInfo(name="customer", type="VARCHAR(10)"),)},
         profile=ExpressionInferenceProfile(sql_analysis_dialect="snowflake"),
         selected_keys=frozenset(model.key for model in project.models),
     )
