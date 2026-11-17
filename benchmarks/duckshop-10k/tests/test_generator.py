@@ -39,13 +39,15 @@ def test_given_full_profile_when_building_then_matches_recorded_checksum() -> No
     assert checksum_line(full()) == (HERE / "checksum.txt").read_text()
 
 
-def test_given_full_profile_when_measuring_then_has_about_ten_thousand_models_in_real_mix() -> None:
+def test_given_full_profile_when_measuring_then_has_about_eleven_thousand_models_in_real_mix() -> (
+    None
+):
     measured = shape(full())
 
-    assert 9_900 <= measured.models <= 10_300
-    assert 58 <= measured.layer_percent("staging") <= 62
-    assert 18 <= measured.layer_percent("intermediate") <= 21
-    assert 19 <= measured.layer_percent("marts") + measured.layer_percent("snapshots") <= 23
+    assert 10_500 <= measured.models <= 11_000
+    assert 55 <= measured.layer_percent("staging") <= 59
+    assert 21 <= measured.layer_percent("intermediate") <= 25
+    assert 18 <= measured.layer_percent("marts") + measured.layer_percent("snapshots") <= 22
 
 
 def test_given_full_profile_when_measuring_then_fan_in_and_depth_match_the_profile() -> None:
@@ -78,6 +80,9 @@ def test_given_full_profile_when_measuring_then_samples_a_few_hundred_unit_tests
         (r"TRY_PARSE_JSON", 100),
         (r"\bFILTER\(", 10),
         (r"incremental_mode microbatch", 20),
+        (r"materialized incremental", 500),
+        (r"cursor_start_max_ahead", 100),
+        (r"migrate_from", 100),
         (r"materialized snapshot", 5),
         (r"__udf\(", 2),
         (r"__table_fn\(", 1),
@@ -91,6 +96,18 @@ def test_given_full_profile_when_scanning_then_uses_each_construct(
     pattern = re.compile(construct)
 
     assert sum(1 for text in models(full()).values() if pattern.search(text)) >= minimum_models
+
+
+def test_given_full_profile_when_scanning_then_writes_a_few_hundred_python_assets() -> None:
+    files = full()
+    modules = [path for path in files if path.startswith("python/exports/")]
+    assets = sum(
+        files[path].count("\n@asset(") + files[path].startswith("@asset(") for path in modules
+    )
+
+    assert 350 <= assets <= 500
+    assert len(modules) >= 40
+    assert all("from python.shared.export_feed import" in files[path] for path in modules)
 
 
 def test_given_known_divergence_constructs_when_scanning_then_models_are_tagged() -> None:

@@ -13,6 +13,7 @@ from duckshop10k.mart_layer import build_marts
 from duckshop10k.rules_gen import build_rules
 from duckshop10k.staging import StagedTable, stage_collector, stage_instance
 from duckshop10k.tests_gen import build_scenarios, build_tests
+from duckshop10k.workload import build_workload
 from duckshop10k.world import Instance, instances, storefront_instances
 
 
@@ -89,6 +90,7 @@ def build(profile_name: str = "full") -> dict[str, str]:
     build_extras(project, intermediate)
     build_tests(project, staging.tables, intermediate)
     build_scenarios(project, staging.tables)
+    build_workload(project)
     build_rules(project)
     _static_files(project)
     project.write("seeds/source_instances.csv", instances_seed(systems))
