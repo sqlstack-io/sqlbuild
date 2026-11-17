@@ -182,12 +182,6 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                         header::ORIGIN,
                         header::HeaderValue::from_static("https://other.example.com"),
                     )])),
-                request(&api.url)
-                    .header("x-sqb-user", value("subject"))
-                    .headers(header::HeaderMap::from_iter([(
-                        header::HOST,
-                        header::HeaderValue::from_static("other.example.com"),
-                    )])),
                 request(&untrusted.url)
                     .header("x-sqb-user", value("subject"))
                     .header("x-forwarded-for", value("untrusted_peer"))

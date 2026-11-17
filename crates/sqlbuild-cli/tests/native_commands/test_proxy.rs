@@ -106,6 +106,12 @@ fn given_invalid_or_conflicting_server_configuration_when_a_standalone_server_st
             expected_error: "[trusted_proxy] username_header cannot be cookie",
         },
         ServerConfigurationTestCase {
+            description: "a fetch-metadata header a browser sets",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\nusername_header = \"Sec-Fetch-User\"\n",
+            arguments: &[],
+            expected_error: "[trusted_proxy] username_header cannot be sec-fetch-user",
+        },
+        ServerConfigurationTestCase {
             description: "the display name in the username header",
             configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nusername_header = \"X-Example-User\"\ndisplay_name_header = \"x-example-user\"\n",
             arguments: &[],
