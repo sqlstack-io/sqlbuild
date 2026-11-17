@@ -25,8 +25,9 @@ use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::scheduler::tests::contracts::ticks::test_types::{
-    CycleRecorder, FaultAnomalies, FaultStep, RecordedCycle, TransactionFault,
+    ClockCycleStep, CycleRecorder, FaultAnomalies, FaultStep, RecordedCycle, TransactionFault,
 };
+use crate::store::tests::clock_helpers::set_database_clock;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::helpers::read_recall_events;
 use crate::store::tests::lease_helpers::expire_lease;
@@ -761,30 +762,56 @@ pub(crate) async fn run_scheduler_until(
     (ticks, cycles)
 }
 
-/// How late the cycle that made a decision woke: after `ready` or the previous poll, whichever is later.
-pub(crate) fn decision_wake(
-    cycles: &[RecordedCycle],
-    decided_at: DateTime<Utc>,
-    ready: DateTime<Utc>,
-) -> (TimeDelta, &RecordedCycle) {
-    let index = cycles
-        .iter()
-        .rposition(|cycle| cycle.timings.started_at <= decided_at)
-        .expect("a cycle started before the decision");
-    let free = index
-        .checked_sub(1)
-        .map_or(ready, |previous| ready.max(cycles[previous].polled_at));
-    (cycles[index].timings.started_at - free, &cycles[index])
-}
-
-pub(crate) async fn queued_times(
+/// Publish an `orders` calendar trigger due `offsets` seconds after `base` and return its ID.
+pub(crate) async fn publish_calendar(
     store: &ControlStore,
     location: Uuid,
-) -> BTreeMap<Uuid, DateTime<Utc>> {
-    list_runs(store, (location, "development"), 100)
+    (base, offsets): (DateTime<Utc>, &[i64]),
+) -> Uuid {
+    let times: Vec<String> = offsets
+        .iter()
+        .map(|offset| {
+            (base + TimeDelta::seconds(*offset)).to_rfc3339_opts(SecondsFormat::Secs, true)
+        })
+        .collect();
+    let mut input = snapshot(location);
+    input.documents.insert(
+        "triggers".into(),
+        json!({"calendar_orders": {"description": "Calendar orders", "job_key": "orders",
+            "schedule": {"kind": "calendar", "times": times, "refresh_at": "2099-01-01T00:00:00Z"}}}),
+    );
+    publish_snapshot(store, &input).await.expect("publication");
+    list_triggers(store, location, "development")
         .await
-        .expect("runs")
-        .into_iter()
-        .map(|run| (run.run_id, run.queued_at))
-        .collect()
+        .expect("trigger")[0]
+        .trigger_id
+}
+
+/// Run each step's cycle at its database time and assert who leads, how many ticks it made and how long it sleeps.
+pub(crate) async fn step_cycles(
+    store: &ControlStore,
+    (base, steps, description): (DateTime<Utc>, &[ClockCycleStep], &str),
+) {
+    let mut holders = [
+        SchedulerState::new(Uuid::now_v7()),
+        SchedulerState::new(Uuid::now_v7()),
+    ];
+    for step in steps {
+        set_database_clock(base + TimeDelta::seconds(step.at_seconds));
+        let (state, cycle) = scheduler_cycle(store, holders[step.holder].clone())
+            .await
+            .expect("scheduler cycle");
+        holders[step.holder] = state;
+        assert_eq!(
+            (cycle.leader, cycle.ticks, cycle.wait_for),
+            (
+                step.expected_leader,
+                step.expected_ticks,
+                step.expected_wait
+            ),
+            "{description}: holder {} at +{}s",
+            step.holder,
+            step.at_seconds
+        );
+    }
 }

@@ -215,8 +215,7 @@ class CustomHostInterruptIntegrationTestCase:
     description: str
     model_count: int
     hosts: int
-    interrupt_after_seconds: float
-    expected_max_seconds: float
+    expected_host_launches: int
 
 
 @dataclass(frozen=True)

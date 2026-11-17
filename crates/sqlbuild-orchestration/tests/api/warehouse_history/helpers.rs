@@ -1,6 +1,7 @@
 //! A seeded target with scoped people, password sessions, fixtures and audit reads for warehouse history API tests.
 
 use chrono::{Duration, Utc};
+use futures_util::future::BoxFuture;
 use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -23,11 +24,14 @@ use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::errors::ControlError;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
 use crate::store::models::{ControlStore, TransactionMode};
-use crate::warehouse_metadata::models::MetadataBatch;
+use crate::warehouse_metadata::main::ingest::ingest_audit_results::ingest_audit_results;
+use crate::warehouse_metadata::main::ingest::ingest_resource_costs::ingest_resource_costs;
+use crate::warehouse_metadata::models::{MetadataBatch, WarehouseSyncResponse};
 
 pub(crate) const ORIGIN: &str = "https://control.example.com";
 pub(crate) const PASSWORD: &str = "orders-password-2026";
@@ -259,4 +263,22 @@ pub(crate) fn cost_groups(summary: &Value, field: &str) -> Vec<(Value, f64, Valu
             )
         })
         .collect()
+}
+
+/// Mirrors one audit results page.
+pub(crate) fn audit_page<'a>(
+    store: &'a ControlStore,
+    scope: (Uuid, &'a str),
+    page: &'a MetadataBatch,
+) -> BoxFuture<'a, Result<WarehouseSyncResponse, ControlError>> {
+    Box::pin(ingest_audit_results(store, scope, page))
+}
+
+/// Mirrors one resource costs page.
+pub(crate) fn cost_page<'a>(
+    store: &'a ControlStore,
+    scope: (Uuid, &'a str),
+    page: &'a MetadataBatch,
+) -> BoxFuture<'a, Result<WarehouseSyncResponse, ControlError>> {
+    Box::pin(ingest_resource_costs(store, scope, page))
 }

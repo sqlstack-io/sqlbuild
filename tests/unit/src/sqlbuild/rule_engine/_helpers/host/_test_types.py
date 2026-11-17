@@ -40,14 +40,29 @@ class HostCancellationTestCase:
 
 @dataclass(frozen=True)
 class HostInterruptTestCase:
-    """An interrupt while split hosts are still busy with slow invocations."""
+    """An interrupt sent once `interrupt_at_hosts` host processes are busy with slow invocations."""
 
     description: str
     model_count: int
     hosts: int
     delay_seconds: float
-    interrupt_after_seconds: float
-    expected_max_seconds: float
+    interrupt_at_hosts: int
+    expected_host_launches: int
+    failing: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class SingleHostInterruptTestCase:
+    """An interrupt sent once `interrupt_after` model invocations have started on one host."""
+
+    description: str
+    model_count: int
+    hosts: int
+    delay_seconds: float
+    interrupt_after: int
+    expected_host_launches: int
+    expected_max_started_after_interrupt: int
+    failing: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -367,8 +367,11 @@ const R_CUSTOM_RULE_RUN: RecordSpec = RecordSpec {
 };
 const R_CUSTOM_HOST_PARTITION: RecordSpec = RecordSpec {
     name: "CustomHostPartition",
-    doc: "How one host of a split run detects module state and learns the run was cancelled.",
-    fields: &[FieldSpec::required("cancelled")],
+    doc: "How a host learns of a cancelled run and whether it detects module state.",
+    fields: &[
+        FieldSpec::required("cancelled"),
+        FieldSpec::new("detect_state", FieldDefault::False),
+    ],
 };
 
 /// The rule engine value records.

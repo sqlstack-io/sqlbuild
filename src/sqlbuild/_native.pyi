@@ -16258,10 +16258,12 @@ class CustomRuleRun(NativeRecord):
     ) -> None: ...
 
 class CustomHostPartition(NativeRecord):
-    """How one host of a split run detects module state and learns the run was cancelled."""
+    """How a host learns of a cancelled run and whether it detects module state."""
 
     cancelled: Callable[[], bool]
+    detect_state: bool
     def __init__(
         self,
         cancelled: Callable[[], bool],
+        detect_state: bool = ...,
     ) -> None: ...
