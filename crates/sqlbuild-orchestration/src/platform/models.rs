@@ -1,18 +1,18 @@
 //! Platform health is a typed stream of observations, independent of user code.
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use crate::api::models::ControlClient;
 use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use crate::snapshots::models::SnapshotRetention;
+use crate::warehouse_metadata::models::StateHistoryRetention;
 use crate::warehouse_metadata::models::{
     StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
 };
-use crate::warehouse_metadata::models::{StateHistoryRetention};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Every retention horizon one server's maintenance role enforces.
 #[derive(Clone, Copy, Debug, Default)]

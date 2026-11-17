@@ -19,7 +19,6 @@ use crate::bindings::_helpers::command_runtime::connection::resolve_project_conn
 use crate::bindings::_helpers::diff_report::support::call;
 use crate::bindings::_helpers::diff_report::support::cli_error;
 use crate::bindings::_helpers::diff_report::support::error_text;
-use crate::bindings::_helpers::diff_report::support::none;
 use crate::bindings::_helpers::diff_report::support::object;
 use crate::bindings::_helpers::diff_report::support::progress_line;
 use crate::bindings::_helpers::diff_report::tolerances::cli_tolerance_overrides;
@@ -32,7 +31,6 @@ use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cl
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;

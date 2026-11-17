@@ -1,10 +1,10 @@
-//! The cycle every plan refuses with, since plans order the whole execution graph before selecting.
+//! `execution_cycle(project)`: the execution-order cycle every plan refuses with.
 
-use crate::planner_identity::_helpers::graph::ExecutionGates;
-use crate::planner_identity::_helpers::graph::execution_deps_with;
-use crate::planner_identity::_helpers::graph::execution_origins_with;
-use crate::planner_identity::_helpers::graph::ordered_keys;
+use crate::planner_identity::_helpers::execution::ordered_keys;
+use crate::planner_identity::main::execution_deps_with::execution_deps_with;
+use crate::planner_identity::main::execution_origins_with::execution_origins_with;
 use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
+use crate::references::types::ExecutionGates;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// The cycle every plan refuses with, since plans order the whole execution graph before selecting.

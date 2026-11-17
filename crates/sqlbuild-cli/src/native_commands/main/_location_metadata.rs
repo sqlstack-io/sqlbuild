@@ -4,6 +4,7 @@ use std::future::Future;
 use std::path::Path;
 use std::time::Duration;
 
+use chrono::Utc;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::models::{
     LocationWorkClient, LocationWorkPoll, WarehouseSyncFailure,
@@ -11,7 +12,6 @@ use sqlbuild_orchestration::platform::models::{
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
 use tokio::time::Instant;
-use chrono::Utc;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
@@ -185,14 +185,20 @@ async fn failed_read(
     let shrinks: bool = state.shrinks(failure.page_size());
     let outcome: String = match state.fail_read(failure.page_size(), Utc::now()) {
         Some(wait) if shrinks => {
-            format!(" Sync incomplete; retaining mirror and retrying a smaller page in {} s.\n", wait.as_secs())
+            format!(
+                " Sync incomplete; retaining mirror and retrying a smaller page in {} s.\n",
+                wait.as_secs()
+            )
         }
         Some(wait) => {
             location_warning(
                 "warehouse read failed",
                 format!("retrying in {}s: {}", wait.as_secs(), failure.reason()),
             );
-            format!(" Sync incomplete; retaining mirror and retrying in {} s.\n", wait.as_secs())
+            format!(
+                " Sync incomplete; retaining mirror and retrying in {} s.\n",
+                wait.as_secs()
+            )
         }
         None => {
             state = close_metadata_reader(state).await?;
@@ -213,7 +219,10 @@ async fn failed_read(
             )
         }
     };
-    drop(write_output(&[(Stream::Stderr, &format!("{line}{outcome}"))]));
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!("{line}{outcome}"),
+    )]));
     Ok(Some(state))
 }
 

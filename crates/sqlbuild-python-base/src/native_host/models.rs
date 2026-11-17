@@ -1,8 +1,11 @@
 //! Public records of native host.
 
+use crate::native_host::_helpers::dialect::syntax;
 use crate::native_host::_helpers::interrupt::INTERRUPTED;
 use crate::native_host::_helpers::interrupt::SIGINT;
 use crate::native_host::_helpers::interrupt::restore_signal_handler;
+use crate::native_host::types::Syntax;
+use pyo3::exceptions::PyAttributeError;
 use pyo3::exceptions::PyKeyboardInterrupt;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -11,17 +14,14 @@ use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::PyErr;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
+use pyo3::prelude::pyclass;
+use pyo3::prelude::pymethods;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::PyCFunction;
 use pyo3::types::PyDict;
 use pyo3::types::PyDictMethods;
 use pyo3::types::PyTuple;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
-use crate::native_host::_helpers::dialect::syntax;
-use crate::native_host::types::Syntax;
-use pyo3::exceptions::PyAttributeError;
-use pyo3::prelude::pyclass;
-use pyo3::prelude::pymethods;
 
 /// Factory results, source locations and the cached public audit tuple are Python-owned edges.
 pub struct AuditProjection {

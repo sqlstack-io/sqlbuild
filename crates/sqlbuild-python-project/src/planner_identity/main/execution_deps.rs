@@ -1,6 +1,6 @@
 //! Execution dependencies kept native until a public graph or plan asks for its dict view.
 
-use crate::planner_identity::_helpers::graph::execution_deps_with;
+use crate::planner_identity::main::execution_deps_with::execution_deps_with;
 use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;

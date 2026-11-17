@@ -23,7 +23,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import REPO_ROOT
 
 
 def prepare_python_nodes_integration_project(root: Path) -> Path:
-    """Create a small project with Python task, asset, loader, and check nodes."""
+    """Create a small project with Python task, asset, loader, and check nodes.
+
+    Its loader depends on a task that reads SQL, so the project allows warehouse round trips.
+    """
 
     project_dir: Path = root / "python_nodes_project"
     models_dir: Path = project_dir / "models"
@@ -46,6 +49,9 @@ def prepare_python_nodes_integration_project(root: Path) -> Path:
                 "",
                 "[targets.dev]",
                 'schema = "main"',
+                "",
+                "[settings]",
+                "allow_warehouse_round_trips = true",
             )
         )
         + "\n",

@@ -1,4 +1,4 @@
-//! The lifecycle regions of a `PythonSqlRunSelection` over a `PythonNodeGraph`.
+//! `native_run_lifecycle(selection, python_graph)`: the lifecycle regions of a run's Python nodes.
 
 use crate::graph::_helpers::python_nodes::python_lifecycle::lifecycle_node;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};

@@ -1,7 +1,5 @@
 //! Job group wait contracts, derived from node lineage without a control store.
 
-
-
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
 

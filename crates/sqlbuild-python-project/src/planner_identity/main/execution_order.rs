@@ -1,6 +1,6 @@
 //! Stable native execution order, projecting no Python graph or key objects.
 
-use crate::planner_identity::_helpers::graph::ordered_keys;
+use crate::planner_identity::_helpers::execution::ordered_keys;
 use crate::planner_identity::_helpers::graph::planner_input_error;
 use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;

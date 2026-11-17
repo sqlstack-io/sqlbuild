@@ -1,8 +1,6 @@
 //! The Python-free SQLBuild control plane.
 #![forbid(unsafe_code)]
 
-
-
 pub mod acknowledgements;
 
 pub mod api;

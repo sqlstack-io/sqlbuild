@@ -1,5 +1,3 @@
-
-
 pub(crate) struct OrderTestCase {
     pub(crate) description: &'static str,
     pub(crate) selected: &'static [&'static str],

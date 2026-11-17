@@ -5,11 +5,11 @@ use crate::state_tables::main::create_table_sql::create_table_sql;
 use crate::state_tables::main::read_history_sql::read_history_sql;
 use crate::state_tables::main::values_insert_sql::values_insert_sql;
 use crate::state_tables::models::HistoryRead;
+use crate::state_tables::models::NewestVersions;
 use crate::state_tables::tests::helpers::column;
 use crate::state_tables::tests::test_types::{
     CreateTableTestCase, EventKeyTestCase, HistoryReadTestCase, ValuesInsertTestCase,
 };
-use crate::state_tables::models::{NewestVersions};
 
 #[test]
 fn given_columns_when_rendering_ddl_then_required_columns_are_not_null() {

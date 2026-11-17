@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
+
 use crate::python_plan::main::run_lifecycle::run_lifecycle;
-use crate::python_plan::tests::helpers::{edges, lifecycle_nodes};
-use crate::python_plan::tests::test_types::LifecycleTestCase;
 use crate::python_plan::models::{RoundTripLoader, RunLifecycle};
-use crate::python_plan::tests::helpers::{names};
+use crate::python_plan::tests::helpers::{edges, lifecycle_nodes, names};
+use crate::python_plan::tests::test_types::LifecycleTestCase;
 
 #[test]
 fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {

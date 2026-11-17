@@ -1,5 +1,3 @@
-
-
 pub mod change_person_trigger;
 
 pub mod change_trigger;

@@ -393,8 +393,9 @@ impl NativeProjectGraph {
 }
 
 /// A compiled project's sources and discovered Python nodes, which publication resolves selectors over.
+#[derive(Debug)]
 pub struct ProjectSelection {
-    sources: Vec<(String, Option<String>)>,
+    pub(crate) sources: Vec<(String, Option<String>)>,
     allow_warehouse_round_trips: bool,
     pub nodes: PythonSelectionGraph,
 }
@@ -409,7 +410,7 @@ impl ProjectSelection {
     }
 
     /// The `kind:name` keys `sqb build --select` runs for these selectors.
-    pub(crate) fn run_keys(
+    pub fn run_keys(
         &self,
         graph: &ProjectGraph,
         select: &[String],
@@ -419,7 +420,7 @@ impl ProjectSelection {
     }
 
     /// The `kind:name` keys these selectors name, Python checks included.
-    pub(crate) fn node_keys(
+    pub fn node_keys(
         &self,
         graph: &ProjectGraph,
         select: &[String],
@@ -470,7 +471,7 @@ impl ProjectSelection {
     }
 
     /// The key a selected Python node's run reports under; a loader reports as the source it writes.
-    fn run_key(&self, name: &str) -> Option<String> {
+    pub(crate) fn run_key(&self, name: &str) -> Option<String> {
         let node = self
             .nodes
             .nodes
@@ -493,7 +494,10 @@ impl ProjectSelection {
             .any(|(_, loader)| loader.as_deref() == Some(name))
     }
 
-    fn sql<'graph>(&'graph self, graph: &'graph ProjectGraph) -> SqlSelectionGraph<'graph> {
+    pub(crate) fn sql<'graph>(
+        &'graph self,
+        graph: &'graph ProjectGraph,
+    ) -> SqlSelectionGraph<'graph> {
         SqlSelectionGraph {
             graph,
             sources: &self.sources,
@@ -501,7 +505,7 @@ impl ProjectSelection {
         }
     }
 
-    fn keys(
+    pub(crate) fn keys(
         &self,
         selection: Result<RunSelection, SelectorError>,
     ) -> Result<BTreeSet<String>, String> {

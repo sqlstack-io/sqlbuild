@@ -1,8 +1,10 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
-use crate::state_tables::constants::{EVENT_ID_COLUMN, MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
+use crate::state_tables::constants::{
+    EVENT_ID_KEY_PROJECTION, NEWEST_FIRST_COLUMN, NEWEST_VERSION_COLUMN,
+};
+use crate::state_tables::constants::{MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
 use crate::state_tables::models::HistoryRead;
-use crate::state_tables::constants::{EVENT_ID_KEY_PROJECTION, NEWEST_FIRST_COLUMN, NEWEST_VERSION_COLUMN};
 
 /// Rendered cursor values, `None` first; a trailing event ID repeating an `event_id` key is ignored.
 pub fn read_history_sql(

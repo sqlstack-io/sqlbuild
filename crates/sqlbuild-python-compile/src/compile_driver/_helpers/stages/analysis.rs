@@ -1,13 +1,7 @@
 //! The compile analysis sequence: discovery, graph, lineage, contracts, selection and rules.
 
-use crate::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
-use std::time::Instant;
-use pyo3::IntoPyObject;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple, PyTupleMethods};
-use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use crate::compile_driver::_helpers::setup::project::build_project_graph_with_analysis_selection;
+use crate::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use crate::lineage::main::build_project_column_lineage::build_project_column_lineage;
 use crate::rules::constants::RULE_FIX_AVAILABLE_NOTE;
 use crate::rules::main::checking::rules_progress::rules_progress;
@@ -16,6 +10,12 @@ use crate::rules::main::rule::evaluate_rules::evaluate_rules;
 use crate::rules::models::EarlyRulesScope;
 use crate::rules::models::EarlyRulesSettings;
 use crate::rules::models::EarlySqlLint;
+use pyo3::IntoPyObject;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple, PyTupleMethods};
+use sqlbuild_analysis::graph::constants::PLANNER_DEFAULT_CODE;
+use sqlbuild_analysis::graph::errors::SelectorError;
+use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -33,14 +33,14 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_project::contracts::main::evaluate_model_contracts::evaluate_model_contracts;
+use sqlbuild_python_project::graph::main::python_nodes::project_graph_error::project_graph_error;
 use sqlbuild_python_project::graph::models::CompiledProjectGraph;
+use sqlbuild_python_project::planner_identity::main::execution_cycle::execution_cycle;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 use sqlbuild_python_project::project_snapshot::main::job_group_cycles::job_group_cycles;
-use sqlbuild_analysis::graph::constants::PLANNER_DEFAULT_CODE;
-use sqlbuild_analysis::graph::errors::SelectorError;
-use sqlbuild_python_project::graph::main::python_nodes::project_graph_error::project_graph_error;
-use sqlbuild_python_project::planner_identity::main::execution_cycle::execution_cycle;
+use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
+use std::time::Instant;
 
 const RICH_LINEAGE: &str = "rich";
 

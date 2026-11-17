@@ -1,11 +1,12 @@
 //! Load the project and local configuration files into their Python config objects.
 
-use std::path::PathBuf;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
 use sqlbuild_config::project::errors::{ConfigFailure, FailureClass, LoadFailure};
+use sqlbuild_config::project::main::load_pool_limits::load_pool_limits;
+use sqlbuild_config::project::models::PoolLimits;
 use sqlbuild_config::project::models::{Built, ConfigFile, ConfigPaths};
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_python_base::boundary::main::config_value_to_python::config_value_to_python;
@@ -14,8 +15,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::registry::record_named::record_named;
 use sqlbuild_python_base::records::types::ErrorId;
-use sqlbuild_config::project::main::load_pool_limits::load_pool_limits;
-use sqlbuild_config::project::models::PoolLimits;
+use std::path::PathBuf;
 
 const FILE_NAMES: [&str; 4] = [
     PROJECT_CONFIG_FILENAME,

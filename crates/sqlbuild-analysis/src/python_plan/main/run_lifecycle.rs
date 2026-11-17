@@ -1,11 +1,11 @@
 //! Classify selected run nodes into lifecycle-aware execution regions.
 
 use std::collections::{BTreeSet, HashMap};
-use crate::python_plan::main::upstream_closure::upstream_closure;
-use crate::python_plan::models::{LifecycleNode, RunLifecycle};
-use crate::python_selection::constants::{ASSET_KIND, LOADER_KIND, TASK_KIND};
+
 use crate::assembly::project::types::ObjectKey;
-use crate::python_plan::models::{RoundTripLoader};
+use crate::python_plan::main::upstream_closure::upstream_closure;
+use crate::python_plan::models::{LifecycleNode, RoundTripLoader, RunLifecycle};
+use crate::python_selection::constants::{ASSET_KIND, LOADER_KIND, TASK_KIND};
 
 /// Ingress is each selected loader whose selected upstream reads no SQL, with that upstream; the rest load after the SQL.
 #[must_use]

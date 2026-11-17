@@ -1,8 +1,10 @@
 //! Build `BuildExecutionResult` with aggregate counts and overall status from typed results.
 
+use crate::result_output::_helpers::results::projection::Projection;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObjectExt, pyfunction};
+use sqlbuild_core::build_aggregate::constants::IGNORED_AUDIT_FAILURE;
 use sqlbuild_core::build_aggregate::main::aggregate_build_counts::aggregate_build_counts;
 use sqlbuild_core::build_aggregate::models::{BuildCounts, BuildResultFacts, ModelResultFacts};
 use sqlbuild_host::entries::models::ExecutorHost;
@@ -11,12 +13,10 @@ use sqlbuild_host::models::{
     ModelExecutionResult, SeedExecutionResult, SqlTestExecutionResult,
 };
 use sqlbuild_host::types::ResultEnum;
-use crate::result_output::_helpers::results::projection::Projection;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_core::build_aggregate::constants::IGNORED_AUDIT_FAILURE;
 
 /// Borrowed executor results with canonical terminals, used by the build JSON projection.
 pub(crate) struct RetainedBuildResults<'a, V> {

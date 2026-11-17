@@ -1,8 +1,8 @@
-//! The project's first whole-graph boundary error across SQL resources and Python nodes, as every selection reports it.
+//! `project_graph_error(project_graph, discovered_inputs)`: the first whole-graph boundary error.
 
-use crate::graph::_helpers::python_nodes::python_selection::allows_round_trips;
-use crate::graph::_helpers::python_nodes::python_selection::project_sources;
-use crate::graph::_helpers::python_nodes::python_selection::selection_graph;
+use crate::graph::_helpers::python_nodes::python_selection::{
+    allows_round_trips, project_sources, selection_graph,
+};
 use crate::graph::main::python_nodes::python_node_graph::python_node_graph;
 use crate::graph::models::{CompiledProjectGraph, NativeProjectGraph};
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};

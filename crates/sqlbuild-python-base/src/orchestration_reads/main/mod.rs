@@ -1,5 +1,6 @@
 pub mod callback_code_hash;
 pub mod declared_at;
+pub mod dependency_failures;
 pub mod environment_hash;
 pub mod imported_declarations;
 pub mod missing_secrets;
@@ -12,4 +13,3 @@ pub mod run_controls;
 pub mod run_resources;
 pub mod secret_variables;
 pub mod setting_rows;
-pub mod dependency_failures;

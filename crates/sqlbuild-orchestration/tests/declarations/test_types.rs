@@ -1,7 +1,5 @@
 //! Group members, the nodes they build and read, and the waits and cycle report expected.
 
-
-
 pub(crate) type Pairs = &'static [(&'static str, &'static [&'static str])];
 
 pub(crate) struct GroupWaitGraphTestCase {

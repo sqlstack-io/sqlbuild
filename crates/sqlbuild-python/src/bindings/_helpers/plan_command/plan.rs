@@ -29,7 +29,6 @@ use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::changed_json;
 use crate::bindings::_helpers::plan_command::changed::changed_text;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

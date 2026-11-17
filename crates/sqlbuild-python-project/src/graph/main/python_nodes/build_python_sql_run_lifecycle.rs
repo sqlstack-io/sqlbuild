@@ -1,9 +1,9 @@
 //! `build_python_sql_run_lifecycle(*, selection, python_graph)`: a `PythonSqlRunLifecyclePlan`.
 
 use crate::graph::main::python_nodes::native_run_lifecycle::native_run_lifecycle;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::pyfunction;
-use pyo3::types::{PyDict, PyFrozenSet};
+use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet};
 use sqlbuild_analysis::python_plan::models::RunLifecycle;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::types::RecordId;

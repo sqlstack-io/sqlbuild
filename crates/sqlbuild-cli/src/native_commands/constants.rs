@@ -1,7 +1,5 @@
 //! Names and limits of the Python-free command path.
 
-
-
 /// `type=` converters the native parse applies itself; any other needs Python.
 pub(crate) const INT_CONVERTER: &str = "int";
 

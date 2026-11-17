@@ -1,23 +1,25 @@
-use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
-use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseStateLocation,
-};
-use chrono::Utc;
-use sqlbuild_config::project::models::ControlConfig;
-use std::time::Duration;
-use tokio::time::Instant;
 use crate::native_commands::_helpers::execution::metadata_sync;
+use crate::native_commands::_helpers::execution::{
+    history_request, read_metadata_page, rows_text, safety_sync_setting, scan_line, sync_progress,
+};
+use crate::native_commands::constants::METADATA_SAFETY_SYNC_SECONDS;
+use crate::native_commands::main::_location_metadata::read_failure_line;
+use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
     MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
     SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
-use sqlbuild_orchestration::warehouse_metadata::constants::{MAX_HISTORY_PAGE_RECORDS};
-use crate::native_commands::_helpers::execution::{history_request, read_metadata_page, rows_text, safety_sync_setting, scan_line, sync_progress};
-use crate::native_commands::constants::METADATA_SAFETY_SYNC_SECONDS;
-use crate::native_commands::main::_location_metadata::read_failure_line;
-use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::test_types::{NewestVersionsTestCase, ReadFailureTestCase};
+use chrono::Utc;
+use sqlbuild_config::project::models::ControlConfig;
+use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
+use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseStateLocation,
+};
+use std::time::Duration;
+use tokio::time::Instant;
 
 #[test]
 fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_scan_completes() {
@@ -128,7 +130,11 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
         let mut waits: Vec<Option<u64>> = test_case
             .failures
             .into_iter()
-            .map(|page_size| state.fail_read(page_size, Utc::now()).map(|wait| wait.as_secs()))
+            .map(|page_size| {
+                state
+                    .fail_read(page_size, Utc::now())
+                    .map(|wait| wait.as_secs())
+            })
             .collect();
         state.request_sync();
         if state.idle && state.sync_due(None) {
@@ -139,7 +145,11 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             test_case
                 .failures_after_request
                 .into_iter()
-                .map(|page_size| state.fail_read(page_size, Utc::now()).map(|wait| wait.as_secs())),
+                .map(|page_size| {
+                    state
+                        .fail_read(page_size, Utc::now())
+                        .map(|wait| wait.as_secs())
+                }),
         );
         assert_eq!(
             (

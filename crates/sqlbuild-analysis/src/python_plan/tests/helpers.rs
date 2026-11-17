@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use crate::python_plan::models::LifecycleNode;
 use crate::python_plan::tests::test_types::LifecycleNodeSpec;
+use std::collections::HashMap;
 
 pub(crate) fn edges(rows: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
     rows.iter()

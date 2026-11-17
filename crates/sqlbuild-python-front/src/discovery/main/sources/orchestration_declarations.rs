@@ -1,15 +1,15 @@
 //! Every job, job group, calendar and sensor of `project_dir`, or `OrchestrationDeclarationError` (D017).
 
 use crate::discovery::_helpers::failures::raised::failure_error;
+use crate::discovery::_helpers::project::project_config::project_pool_limits;
 use crate::discovery::_helpers::sources::orchestration_files::orchestration_error;
 use crate::discovery::_helpers::sources::orchestration_values::check_orchestration_values;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use sqlbuild_discovery::orchestration_files::main::check_pools::check_pools;
 use sqlbuild_discovery::orchestration_files::main::orchestration_inventory::orchestration_inventory;
 use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_discovery::tree::models::ProjectTree;
 use std::path::PathBuf;
-use crate::discovery::_helpers::project::project_config::project_pool_limits;
-use sqlbuild_discovery::orchestration_files::main::check_pools::check_pools;
 
 /// Every job, job group, calendar and sensor of `project_dir`, or `OrchestrationDeclarationError` (D017).
 pub fn orchestration_declarations(

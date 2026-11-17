@@ -3,14 +3,14 @@
 use crate::discovery::main::project::project_facts::project_facts;
 use crate::discovery::main::project::validation_error::validation_error;
 use crate::discovery::main::sources::orchestration_declarations::orchestration_declarations;
+use crate::discovery::models::NodeRow;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
+use sqlbuild_discovery::orchestration_files::models::{FilePosition, OrchestrationInventory};
 use sqlbuild_discovery::project_validation::main::validate_project_inputs::validate_project_inputs;
 use sqlbuild_discovery::project_validation::models::ProjectFacts;
-use crate::discovery::models::NodeRow;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_discovery::orchestration_files::models::{FilePosition, OrchestrationInventory};
 use sqlbuild_python_base::native_host::main::write_console::write_console;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(crate) const CSV_MODULE: &str = "csv";
 

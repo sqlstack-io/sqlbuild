@@ -1,42 +1,88 @@
 //! Running a Python-free command: its checks, then its output with the observed services.
 
+use crate::adhoc::main::adhoc_planner::adhoc_planner;
+use crate::argv::models::{Namespace, Stream, Value};
+use crate::compute_logs::constants::DEFAULT_RETENTION_COUNT;
+use crate::compute_logs::main::abandon_capture::abandon_capture;
+use crate::compute_logs::main::finish_capture::finish_capture;
+use crate::compute_logs::main::open_log_root::open_log_root;
+use crate::compute_logs::main::start_capture::start_capture;
+use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
 use crate::dev_screen::models::ScreenSetup;
+use crate::dev_screen::models::{DevStep, ScreenMessage};
+use crate::dev_screen::types::DevScreenParts;
+use crate::dev_session::main::run_dev_session::run_dev_session;
+use crate::dev_session::models::{DevProject, LocationPipes};
+use crate::native_commands::_helpers::decision::{
+    control_address, control_database, control_database_variable, flag, text,
+};
+use crate::native_commands::_helpers::init::run_init;
+use crate::native_commands::_helpers::package::installed_package;
 use crate::native_commands::_helpers::paths::exclude_location_databases;
+use crate::native_commands::_helpers::paths::{location_database_files, project_location};
+use crate::native_commands::_helpers::project_facts::has_no_runtime_extensions;
 use crate::native_commands::_helpers::project_facts::{
     development_project_name, project_directory_name, project_name,
 };
+use crate::native_commands::_helpers::rules::run_rules;
+use crate::native_commands::_helpers::skills::{run_skills, skill_freshness_notice};
+use crate::native_commands::_helpers::terminal::share_terminal;
+use crate::native_commands::_helpers::terminal::{
+    finish_lost_stdout, terminal_columns, write_output,
+};
 use crate::native_commands::_helpers::terminal::{live_screen, stderr_columns};
 use crate::native_commands::constants::SCREEN_INDENT;
+use crate::native_commands::constants::{
+    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_ERROR_CHARS,
+    METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
+    METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
+    METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
+    UNKNOWN_COMMAND,
+};
+use crate::native_commands::constants::{
+    METADATA_PAGE_SECONDS, PLAN_NOT_PRODUCED, STATISTICS_RELATION_SECONDS,
+};
+use crate::native_commands::errors::PythonNeeded;
+use crate::native_commands::main::_run_admin::run_admin;
+use crate::native_commands::main::_run_control::run_control;
+use crate::native_commands::main::_run_cost::run_cost;
+use crate::native_commands::models::{
+    CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
+    LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
+    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
+};
+use crate::native_commands::models::{
+    LocationLoad, LocationRuntimeRequest, ReadFailure, SyncProgress,
+};
+use crate::native_commands::types::LoadOutcome;
 use crate::native_commands::types::{NextGeneration, Settled};
-use sqlbuild_orchestration::platform::models::LocationRuleFailure;
-use sqlbuild_core::cli_text::models::CliStyle;
-use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
-use sqlbuild_orchestration::credentials::main::identities::development_person::development_person;
-use sqlbuild_orchestration::credentials::main::locations::development_location::development_location;
-use sqlbuild_orchestration::credentials::models::AuditContext;
-use sqlbuild_orchestration::declarations::main::pause_development_triggers::pause_development_triggers;
-use std::collections::{BTreeMap, HashMap};
-use std::future::Future;
-use std::io;
-use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use std::time::{Duration, SystemTime};
-use tokio::sync::mpsc::UnboundedSender;
+use crate::server_config::models::ServerSection;
+use crate::workers::main::docker_image_sources::docker_image_sources;
+use crate::workers::main::open_development_workers::open_development_workers;
+use crate::workers::main::open_workers::open_workers;
+use crate::workers::main::terminate_child::terminate_child;
+use crate::workers::models::{Launchers, Workers};
+use chrono::DateTime;
 use chrono::Utc;
 use serde_json::json;
-use sqlbuild_orchestration::api::constants::BODY_BYTES;
-use sqlbuild_orchestration::api::errors::ClientError;
-use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use sqlbuild_cache::project_snapshot::models::PathStamp;
 use sqlbuild_config::project::main::load_control_config::load_control_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
 use sqlbuild_config::project::models::ControlConfig;
+use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
+use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
+use sqlbuild_orchestration::api::constants::BODY_BYTES;
+use sqlbuild_orchestration::api::errors::ClientError;
+use sqlbuild_orchestration::api::main::serve_api::serve_api;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
+use sqlbuild_orchestration::credentials::main::identities::development_person::development_person;
+use sqlbuild_orchestration::credentials::main::locations::development_location::development_location;
+use sqlbuild_orchestration::credentials::models::AuditContext;
+use sqlbuild_orchestration::declarations::main::pause_development_triggers::pause_development_triggers;
 use sqlbuild_orchestration::dev_events::constants::{DEV_EVENTS_ON, DEV_EVENTS_VARIABLE};
 use sqlbuild_orchestration::dev_events::main::dev_event_line::dev_event_line;
 use sqlbuild_orchestration::dev_events::main::dev_events_enabled::dev_events_enabled;
@@ -47,6 +93,8 @@ use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
+use sqlbuild_orchestration::platform::models::LocationRuleFailure;
+use sqlbuild_orchestration::platform::models::{ConnectionCheckTrigger, WarehouseSyncProgress};
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
@@ -60,6 +108,7 @@ use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::main::set_release_version::set_release_version;
 use sqlbuild_orchestration::store::models::ControlStore;
+use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, WarehouseHistoryFailure,
@@ -71,66 +120,20 @@ use sqlbuild_orchestration::webhooks::main::{
     connect_webhook::connect_webhook, run_webhook::run_webhook,
 };
 use sqlbuild_orchestration::webhooks::models::{Webhook, WebhookSource};
+use std::collections::{BTreeMap, HashMap};
+use std::future::Future;
+use std::io;
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio::time::{Instant, Interval, MissedTickBehavior};
 use uuid::Uuid;
-use crate::argv::models::{Namespace, Stream, Value};
-use crate::compute_logs::constants::DEFAULT_RETENTION_COUNT;
-use crate::compute_logs::main::abandon_capture::abandon_capture;
-use crate::compute_logs::main::finish_capture::finish_capture;
-use crate::compute_logs::main::open_log_root::open_log_root;
-use crate::compute_logs::main::start_capture::start_capture;
-use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
-use crate::dev_screen::models::{DevStep, ScreenMessage};
-use crate::dev_screen::types::DevScreenParts;
-use crate::dev_session::main::run_dev_session::run_dev_session;
-use crate::dev_session::models::{DevProject, LocationPipes};
-use crate::native_commands::_helpers::decision::{
-    control_address, control_database, control_database_variable, flag, text,
-};
-use crate::native_commands::_helpers::init::run_init;
-use crate::native_commands::_helpers::package::installed_package;
-use crate::native_commands::_helpers::paths::{location_database_files, project_location};
-use crate::native_commands::_helpers::project_facts::has_no_runtime_extensions;
-use crate::native_commands::_helpers::rules::run_rules;
-use crate::native_commands::_helpers::skills::{run_skills, skill_freshness_notice};
-use crate::native_commands::_helpers::terminal::{
-    finish_lost_stdout, terminal_columns, write_output,
-};
-use crate::native_commands::constants::{
-    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_ERROR_CHARS,
-    METADATA_FAILURE_LIMIT, METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS,
-    METADATA_READER_CLOSE_SECONDS, METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES,
-    METADATA_SAFETY_SYNC_SECONDS, METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND,
-    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
-};
-use crate::native_commands::errors::PythonNeeded;
-use crate::native_commands::main::_run_admin::run_admin;
-use crate::native_commands::main::_run_control::run_control;
-use crate::native_commands::main::_run_cost::run_cost;
-use crate::native_commands::models::{
-    CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
-    LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
-    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
-};
-use crate::native_commands::types::LocationPublication;
-use crate::server_config::models::ServerSection;
-use crate::workers::main::docker_image_sources::docker_image_sources;
-use crate::workers::main::open_development_workers::open_development_workers;
-use crate::workers::main::open_workers::open_workers;
-use crate::workers::main::terminate_child::terminate_child;
-use crate::workers::models::{Launchers, Workers};
-use chrono::{DateTime};
-use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
-use sqlbuild_orchestration::platform::models::{ConnectionCheckTrigger, WarehouseReadFailure, WarehouseSyncProgress};
-use sqlbuild_orchestration::warehouse_metadata::constants::{MAX_HISTORY_PAGE_RECORDS};
-use crate::native_commands::_helpers::terminal::{share_terminal};
-use crate::native_commands::constants::{METADATA_PAGE_SECONDS, PLAN_NOT_PRODUCED, STATISTICS_RELATION_SECONDS};
-use crate::native_commands::models::{LocationLoad, LocationRuntimeRequest, ReadFailure, SyncProgress};
-use crate::native_commands::types::LoadOutcome;
 
 /// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`.
 pub(crate) async fn run_development_roles(
