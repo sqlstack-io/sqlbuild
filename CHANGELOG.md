@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.238.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.0...v0.238.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **rules:** report custom rule node findings at model file positions ([#1546](https://github.com/sqlstack-io/sqlbuild/issues/1546)) ([48e4132](https://github.com/sqlstack-io/sqlbuild/commit/48e4132371aa42374dc2b41cf98ee4f6d7519031))
+
 ## [0.238.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.237.0...v0.238.0) (2026-11-17)
 
 
