@@ -3,8 +3,9 @@
 use crate::compile_driver::main::session_warehouse_support::session_warehouse_support;
 use crate::compile_driver::models::ProjectConfiguration;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyString, PyTuple};
+use pyo3::types::{PyBool, PyString, PyTuple};
 use sqlbuild_config::project::main::unsupported_target_warehouse::unsupported_target_warehouse;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use crate::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use crate::contracts::main::resolve_target_config::resolve_target_config;
@@ -21,15 +22,7 @@ const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 const WAREHOUSE_GROUPS: [&str; 2] = ["build", "query"];
 
 fn project_config_error(py: Python<'_>, message: &str, help: Option<&str>) -> PyErr {
-    let raised = (|| -> PyResult<Bound<'_, PyAny>> {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("help", help)?;
-        error_class(py, ErrorId::ProjectConfig)?.call((message,), Some(&keywords))
-    })();
-    match raised {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(failure) => failure,
-    }
+    new_error(py, ErrorId::ProjectConfig, message, (None, help))
 }
 
 /// The target names of one configuration's `targets` mapping.

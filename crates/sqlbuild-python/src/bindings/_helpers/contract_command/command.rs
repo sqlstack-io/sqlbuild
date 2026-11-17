@@ -1,5 +1,6 @@
 //! `sqb contract`: compare selected contracts with one target, optionally adopt them.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::time::Instant;
 
 use pyo3::exceptions::{PyException, PyValueError};
@@ -30,7 +31,6 @@ use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -43,15 +43,7 @@ const GENERATE_ACTION: &str = "generate";
 
 /// A `CliUserError` with its code.
 fn user_error(py: Python<'_>, message: &str, code: &str) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", code)?;
-        error_class(py, ErrorId::CliUser)?.call((message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(py, ErrorId::CliUser, message, (Some(code), None))
 }
 
 fn optional_text(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {

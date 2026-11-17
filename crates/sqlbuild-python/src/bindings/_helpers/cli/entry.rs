@@ -748,8 +748,8 @@ fn report_dispatch<'py>(invocation: &Invocation<'py>) -> PyResult<Bound<'py, PyA
         Some(message) => Err(new_error(
             py,
             ErrorId::CliUser,
-            message.clone(),
-            RECALL_SETTINGS_CODE,
+            message,
+            (Some(RECALL_SETTINGS_CODE), None),
         )),
         None => observed_dispatch(invocation, policy),
     };

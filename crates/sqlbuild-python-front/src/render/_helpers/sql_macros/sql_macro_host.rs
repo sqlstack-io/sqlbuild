@@ -34,7 +34,7 @@ use crate::render::_helpers::declarations::declaration_expansion::{
 use crate::render::models::{DeclarationExpansion, ExpandedDeclarations};
 use crate::sqltext::main::declaration_scan::declaration_scan;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -256,11 +256,11 @@ fn macro_error(request: &DeclarationExpansion<'_, '_>, error: &SqlMacroError) ->
         Ok(model) => model,
         Err(failure) => return failure,
     };
-    new_helped_error(
+    new_error(
         request.classes.compile_error.py(),
         ErrorId::CompileInput,
-        (error.located_message(model.as_deref()), error.code),
-        error.help.as_deref(),
+        &error.located_message(model.as_deref()),
+        (Some(error.code), error.help.as_deref()),
     )
 }
 

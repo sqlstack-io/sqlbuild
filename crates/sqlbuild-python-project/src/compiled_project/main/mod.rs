@@ -13,6 +13,5 @@ pub mod python_column_fact;
 pub mod python_column_facts;
 pub mod reference_row_tuple;
 pub mod register_project;
-pub mod text_value;
 pub mod triggered_jobs;
 pub mod with_job_scope;

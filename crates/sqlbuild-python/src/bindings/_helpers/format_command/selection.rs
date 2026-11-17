@@ -1,11 +1,12 @@
 //! Resolve `sqb format` selectors to the adapter, discovered inputs and selected files.
 
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyStringMethods, PyTuple};
+use pyo3::types::{PyBool, PyFrozenSet, PyString, PyStringMethods, PyTuple};
 use sqlbuild_core::format_command::errors::FormatSelectorError;
 use sqlbuild_core::format_command::main::exact_selector_names::exact_selector_names;
 use sqlbuild_core::format_command::main::lint_sql_paths::lint_sql_paths;
@@ -18,7 +19,6 @@ use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -54,15 +54,7 @@ struct Scope<'a, 'py> {
 }
 
 fn planner_error(py: Python<'_>, message: &str, code: &str) -> PyErr {
-    let raised = (|| -> PyResult<Bound<'_, PyAny>> {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("code", code)?;
-        error_class(py, ErrorId::PlannerInput)?.call((message,), Some(&keywords))
-    })();
-    match raised {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(failure) => failure,
-    }
+    new_error(py, ErrorId::PlannerInput, message, (Some(code), None))
 }
 
 fn selector_error(py: Python<'_>, error: &FormatSelectorError) -> PyErr {

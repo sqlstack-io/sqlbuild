@@ -380,7 +380,7 @@ impl EventExporterCommandScope {
     pub(crate) fn bind_extensions<'py>(
         &self,
         py: Python<'py>,
-        project_dir: Option<Bound<'py, PyAny>>,
+        (project_dir, setup_context): (Option<Bound<'py, PyAny>>, Bound<'py, PyAny>),
         (providers, event_exporters, command_output_sinks): (
             Bound<'py, PyAny>,
             Bound<'py, PyAny>,
@@ -413,6 +413,7 @@ impl EventExporterCommandScope {
             &host_entry(py, UserCodeHost::BuildProviderSession)?,
             &[
                 ("discovered_providers", providers),
+                ("setup_context", setup_context),
                 ("allow_shared", PyBool::new(py, false).to_owned().into_any()),
             ],
         )?;
@@ -508,7 +509,7 @@ impl EventExporterCommandScope {
     ) -> PyResult<()> {
         self.bind_extensions(
             py,
-            None,
+            (None, py.None().into_bound(py)),
             (
                 native_field(discovered_inputs, "providers")?,
                 native_field(discovered_inputs, "event_exporters")?,
@@ -530,7 +531,7 @@ impl EventExporterCommandScope {
             options,
             (
                 &["providers", "event_exporters"],
-                &["project_dir", "command_output_sinks"],
+                &["project_dir", "command_output_sinks", "setup_context"],
             ),
         )?;
         let project_dir: Bound<'_, PyAny> = options.value("project_dir")?;
@@ -542,7 +543,10 @@ impl EventExporterCommandScope {
         };
         self.bind_extensions(
             py,
-            (!project_dir.is_none()).then_some(project_dir),
+            (
+                (!project_dir.is_none()).then_some(project_dir),
+                options.value("setup_context")?,
+            ),
             (
                 options.value("providers")?,
                 options.value("event_exporters")?,

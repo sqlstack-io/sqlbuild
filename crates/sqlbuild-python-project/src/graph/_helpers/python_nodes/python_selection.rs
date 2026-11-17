@@ -2,11 +2,12 @@
 
 use crate::graph::main::python_nodes::python_node_names::python_node_names;
 use sqlbuild_python_base::positional_record;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::borrow::Cow;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
-use pyo3::types::{PyDict, PyFrozenSet};
+use pyo3::types::PyFrozenSet;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::errors::SelectorError;
 use sqlbuild_analysis::graph::models::ProjectGraph;
@@ -21,7 +22,6 @@ use sqlbuild_analysis::python_selection::models::{
 use crate::compiled_project::main::needed_jobs::needed_jobs;
 use crate::graph::models::{CompiledProjectGraph, NativeProjectGraph};
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -52,16 +52,12 @@ positional_record! {
 
 /// The `PlannerInputError` Python raises for a selector failure.
 pub(crate) fn planner_error(py: Python<'_>, error: SelectorError) -> PyErr {
-    let raised = (|| -> PyResult<Bound<'_, PyAny>> {
-        let keywords: Bound<'_, PyDict> = PyDict::new(py);
-        keywords.set_item("code", error.code)?;
-        keywords.set_item("help", error.help)?;
-        error_class(py, ErrorId::PlannerInput)?.call((error.message,), Some(&keywords))
-    })();
-    match raised {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(failure) => failure,
-    }
+    new_error(
+        py,
+        ErrorId::PlannerInput,
+        &error.message,
+        (Some(error.code), error.help.as_deref()),
+    )
 }
 
 fn strings(values: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {

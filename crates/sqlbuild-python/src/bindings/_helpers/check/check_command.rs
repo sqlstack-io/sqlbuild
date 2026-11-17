@@ -1,6 +1,7 @@
 //! `sqb check`: run the selected Python checks after their Python dependencies.
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
@@ -26,6 +27,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
+use sqlbuild_python_compile::compile_driver::main::setup::model_free_locations::model_free_locations;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
@@ -50,7 +52,6 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_com
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
@@ -77,15 +78,7 @@ struct Prepared<'py> {
 }
 
 fn user_error(py: Python<'_>, (code, message): (&str, &str)) -> PyErr {
-    let raised = (|| {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", code)?;
-        error_class(py, ErrorId::CliUser)?.call((message,), Some(&options))
-    })();
-    match raised {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_error(py, ErrorId::CliUser, message, (Some(code), None))
 }
 
 fn selection_error(py: Python<'_>, error: &CheckSelectionError) -> PyErr {
@@ -279,19 +272,6 @@ fn compile_pipeline<'py>(
     )
 }
 
-fn target_default<'py>(
-    project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    (field, fallback): (&str, &str),
-) -> PyResult<Bound<'py, PyAny>> {
-    let value: Bound<'py, PyAny> = native_field(project, field)?;
-    if value.is_none() {
-        adapter.call_method0(fallback)
-    } else {
-        Ok(value)
-    }
-}
-
 /// The discovered Python graph, after refusing unit-test selectors, and the selected checks.
 fn python_selection<'py>(
     request: &Bound<'py, PyAny>,
@@ -368,18 +348,7 @@ fn prepare<'py>(
         lifecycle_plan,
         relation_targets,
         relation_refs,
-        defaults: (
-            target_default(
-                &project,
-                &adapter,
-                ("effective_target_database", "default_database"),
-            )?,
-            target_default(
-                &project,
-                &adapter,
-                ("effective_target_schema", "default_schema"),
-            )?,
-        ),
+        defaults: model_free_locations(&project, |method| adapter.call_method0(method))?,
         project_relations: object(
             py,
             build_project_relation_targets(

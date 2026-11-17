@@ -1,6 +1,6 @@
 //! Build or validate a SQLBuild project from a dbt project, its profile and `dbt debug`.
 
-use sqlbuild_python_base::native_host::main::host_error::host_error;
+use crate::bindings::_helpers::dbt_interop::profile_connection::profile_error;
 use std::io;
 
 use pyo3::exceptions::PyRuntimeError;
@@ -347,10 +347,6 @@ fn path_of<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bound<'p
 
 fn is_value_error(py: Python<'_>, error: &PyErr) -> bool {
     error.is_instance_of::<pyo3::exceptions::PyValueError>(py)
-}
-
-fn profile_error(py: Python<'_>, message: String) -> PyErr {
-    host_error(py, ThirdPartyHost::DbtProfileError, &message)
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

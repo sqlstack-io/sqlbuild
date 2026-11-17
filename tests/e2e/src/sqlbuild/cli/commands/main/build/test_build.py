@@ -24,6 +24,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     PythonTargetConfigBuildE2ETestCase,
     PythonTargetIsolationBuildE2ETestCase,
     SelectionAwareStalenessBuildE2ETestCase,
+    UnresolvedTargetSinkE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     assert_defer_clone_build_case,
@@ -45,6 +46,13 @@ _TARGET_CONFIG_RECORDER: str = (
     "    line = {'node': node, **dataclasses.asdict(ctx.target_config)}\n"
     "    with Path(__file__).parents[1].joinpath('target_config.jsonl').open('a') as out:\n"
     "        out.write(json.dumps(line) + '\\n')\n"
+)
+_TARGET_PROBE_SINK: str = (
+    "from providers.target_probe import TargetProbe\n"
+    "from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink\n\n"
+    "@lifecycle_event_sink\n"
+    "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
+    "    del event, target_probe\n"
 )
 
 
@@ -1836,6 +1844,20 @@ def test_given_loader_status_result_when_building_then_persists_loader_status_ro
             },
         ),
         PythonTargetConfigBuildE2ETestCase(
+            description="a lifecycle sink shares the provider and its target",
+            project_target_lines='schema = "dev"\nloader_schema = "raw_dev"\n',
+            local_target_lines='schema = "dev_local"\nloader_schema = "raw_local"\n',
+            expected_settings={
+                "name": "dev",
+                "database": None,
+                "schema": "dev_local",
+                "loader_schema": "raw_local",
+                "database_preserved": False,
+                "schema_preserved": False,
+            },
+            extra_files=(("sinks/events.py", _TARGET_PROBE_SINK),),
+        ),
+        PythonTargetConfigBuildE2ETestCase(
             description="loader_schema falls back to the target schema",
             project_target_lines='schema = "dev"\n',
             local_target_lines='schema = "dev_local"\n',
@@ -1916,6 +1938,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "      - name: order_id\n"
                 "        type: INTEGER\n"
             ),
+            **dict(test_case.extra_files),
         },
     )
     (project_dir / "sqlbuild_local.toml").write_text(
@@ -1949,6 +1972,82 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
         "check",
     ]
     assert all(line == test_case.expected_settings for line in recorded), recorded
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UnresolvedTargetSinkE2ETestCase(
+            description="build fails before any sink provider is set up",
+            command=("build",),
+            expected_returncode=1,
+            expected_output="Unknown connection 'warehouse' selected by target",
+            expected_setups=[],
+        ),
+        UnresolvedTargetSinkE2ETestCase(
+            description="compile also needs the target and fails before provider setup",
+            command=("compile",),
+            expected_returncode=1,
+            expected_output="Unknown connection 'warehouse' selected by target",
+            expected_setups=[],
+        ),
+        UnresolvedTargetSinkE2ETestCase(
+            description="format needs no target and sets the provider up with None",
+            command=("format", "--check"),
+            expected_returncode=0,
+            expected_output="Completed.",
+            expected_setups=[None],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_free_commands_run(
+    test_case: UnresolvedTargetSinkE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="unresolved_target_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "unresolved_target_project"\n'
+                'adapter = "duckdb"\n'
+                'default_target = "dev"\n\n'
+                "[targets.dev]\n"
+                'connection = "warehouse"\n'
+                'schema = "dev"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Test model orders.', materialized table);\n\n"
+                "SELECT 1 AS order_id\n"
+            ),
+            "providers/target_probe.py": (
+                "import json\n"
+                "from pathlib import Path\n"
+                "from sqlbuild.providers import Provider\n\n"
+                "class TargetProbe(Provider):\n"
+                '    """Test provider TargetProbe."""\n\n'
+                "    def setup(self, ctx):\n"
+                "        line = None if ctx is None else ctx.target_config.name\n"
+                "        with Path(__file__).parents[1].joinpath('setups.jsonl').open('a') as out:\n"
+                "            out.write(json.dumps(line) + '\\n')\n"
+            ),
+            "sinks/events.py": _TARGET_PROBE_SINK,
+            "setups.jsonl": "",
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project_dir
+    )
+
+    assert result.returncode == test_case.expected_returncode, result.stdout + result.stderr
+    assert test_case.expected_output in result.stdout + result.stderr
+    setups: list[object] = [
+        json.loads(line)
+        for line in (project_dir / "setups.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert setups == test_case.expected_setups
 
 
 @pytest.mark.parametrize(
@@ -1991,6 +2090,15 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "    record(ctx, 'loader')\n"
                 "    return [{'order_id': 1}]\n"
             ),
+            "python/tasks/configured.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.tasks import task\n\n"
+                "@task\n"
+                "def configured_task(ctx):\n"
+                '    """Test task configured_task."""\n'
+                "    record(ctx, 'task')\n"
+                "    return ctx.result()\n"
+            ),
             "sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
@@ -2006,7 +2114,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
 
     results: list[subprocess.CompletedProcess[str]] = [
         run_sqb(command=("--no-color", *command), project_dir=project_dir)
-        for command in (("build", "--select", "orders"), ("load",), ("check",))
+        for command in (("build",), ("load",), ("check",))
     ]
 
     for result in results:
@@ -2021,8 +2129,19 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
         for line in (project_dir / "target_config.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert [(line["node"], line["name"], line["loader_schema"]) for line in recorded] == [
-        ("loader", "dev", test_case.expected_loader_schema)
+        ("loader", "dev", test_case.expected_loader_schema),
+        ("task", "dev", test_case.expected_loader_schema),
+        ("loader", "dev", test_case.expected_loader_schema),
     ], recorded
+    # Python node results land in the adapter's default schema; no schema keeps the template.
+    assert table_exists(db_path=db_path, table_name="_sqlbuild_node_results", schema="main")
+    assert (
+        query_duckdb(
+            db_path=db_path,
+            sql="SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE '%${%'",
+        )
+        == []
+    )
 
 
 @pytest.mark.parametrize(

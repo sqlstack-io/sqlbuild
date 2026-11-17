@@ -19,7 +19,7 @@ use crate::render::_helpers::expansion::macro_evaluation::{CallText, Evaluation,
 use crate::render::_helpers::expansion::macro_expansion_facts::ResourceRef;
 use crate::render::_helpers::expansion::macro_generated_references::GeneratedReferenceClasses;
 use crate::render::models::SpanTuple;
-use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
@@ -233,11 +233,11 @@ pub(crate) fn sorted_names(names: &Bound<'_, PyAny>) -> PyResult<String> {
 
 /// The `CompileInputError(message, code=code, help=help)` the classes' compile error builds.
 pub(crate) fn coded(class: &Bound<'_, PyAny>, message: &str, (code, help): (&str, &str)) -> PyErr {
-    new_helped_error(
+    new_error(
         class.py(),
         ErrorId::CompileInput,
-        (message.to_owned(), code),
-        Some(help),
+        message,
+        (Some(code), Some(help)),
     )
 }
 
