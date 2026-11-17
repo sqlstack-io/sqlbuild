@@ -7,7 +7,7 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { onMount } from 'svelte';
 	import type { RunNode } from '$lib/api';
-	import { nodeStatusTone } from '$lib/operate/labels';
+	import { nodeLabel, nodeStatusTone } from '$lib/operate/labels';
 	import { axisTicks as ticksFor, formatSpan, formatTick, tickStep as stepFor } from './utils';
 
 	export type GanttGroup = { runId: string; label: string; tone: string; href: string };
@@ -18,6 +18,7 @@
 		now,
 		selected = [],
 		groups = [],
+		active = false,
 		onselect
 	}: {
 		nodes: RunNode[];
@@ -27,6 +28,8 @@
 		selected?: string[];
 		/** Child runs of a group, to section the rows. */
 		groups?: GanttGroup[];
+		/** The run is still going, so a node that hasn't started is waiting, not left out. */
+		active?: boolean;
 		/** `add` is true for Ctrl-, Cmd- or Shift-click. */
 		onselect: (nodeKey: string, add: boolean) => void;
 	} = $props();
@@ -52,6 +55,8 @@
 	const trackW = $derived(trackBaseW * zoom);
 	const pxPerSec = $derived(trackW / (total * 1.08));
 	const xOf = (sec: number) => sec * pxPerSec;
+	/** Past this share of the track a bar's duration reads on its left, inside the track. */
+	const FLIP_AT = 0.9;
 	const tickStep = $derived(stepFor(total, Math.max(4, Math.floor(trackW / 110))));
 	const axisTicks = $derived(ticksFor(total, tickStep));
 
@@ -59,7 +64,7 @@
 		const ctx = document.createElement('canvas').getContext('2d');
 		if (!ctx) return 250;
 		ctx.font = '12px "IBM Plex Mono", ui-monospace, monospace';
-		const widest = Math.max(0, ...nodes.map((n) => ctx.measureText(n.nodeKey).width));
+		const widest = Math.max(0, ...nodes.map((n) => ctx.measureText(nodeLabel(n.nodeKey)).width));
 		return Math.min(360, Math.max(GUTTER_MIN, Math.ceil(widest) + 60));
 	}
 
@@ -107,7 +112,7 @@
 			const across = n.skippedBecauseOf.runId !== n.runId;
 			return `skipped: ${n.skippedBecauseOf.nodeKey} failed${across ? ` in ${n.skippedBecauseOf.jobKey ?? n.skippedBecauseOf.runId}` : ''}`;
 		}
-		if (n.status === 'pending') return 'Pending';
+		if (n.status === 'pending') return active ? 'Waiting' : 'Not run';
 		if (n.status === 'not_run') return 'Not run';
 		if (n.status === 'cancelled') return 'Cancelled';
 		return n.status;
@@ -128,7 +133,8 @@
 <div class="pane">
 	<div bind:this={measureEl} class="probe"></div>
 	<div bind:this={ganttEl} class="sb-scroll scroller" class:select-none={gutterDragging} onscroll={(e) => (scrolledX = e.currentTarget.scrollLeft > 1)}>
-		<div class="content" style:width="{gutterW + trackW + 24}px">
+		<!-- Bars are placed by their times in seconds and one --pps (pixels per second), so zooming changes one value, not every bar. -->
+		<div class="content" style:width="{gutterW + trackW + 24}px" style:--pps={pxPerSec} style:--track-w="{trackW}px">
 			<div class="grid" style:left="{gutterW}px" style:width="{trackW}px">
 				{#each axisTicks as tk (tk)}<span style:left="{xOf(tk)}px"></span>{/each}
 			</div>
@@ -185,14 +191,14 @@
 							title={n.nodeKey}
 						>
 							{#if selected.includes(n.nodeKey)}<span class="sel-bar"></span>{/if}
-							{n.nodeKey}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
+							{nodeLabel(n.nodeKey)}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
 						</span>
-						<span class="track" style:width="{trackW}px">
+						<span class="track">
 							{#if s == null || e == null}
 								<span class="note">{skipText(n)}</span>
 							{:else}
-								<span class="bar" class:live={n.status === 'running'} style:left="{xOf(s)}px" style:width="{Math.max(xOf(e - s), 3)}px" style:background={nodeStatusTone[n.status]}></span>
-								<span class="dur" style:left="{xOf(e) > trackW - 56 ? xOf(s) - 8 : xOf(e) + 8}px" class:flip={xOf(e) > trackW - 56}>{formatSpan(e - s)}{n.status === 'running' ? ' so far' : ''}</span>
+								<span class="bar" class:live={n.status === 'running'} style:--s={s} style:--e={e} style:background={nodeStatusTone[n.status]}></span>
+								<span class="dur" style:--s={s} style:--e={e} class:flip={e / (total * 1.08) > FLIP_AT}>{formatSpan(e - s)}{n.status === 'running' ? ' so far' : ''}</span>
 							{/if}
 						</span>
 					</button>
@@ -336,11 +342,15 @@
 		background: var(--primary);
 		content: '';
 	}
+	/* Rows out of view are neither laid out nor painted, so scrolling a long run, or zooming it out, only
+	   draws the rows on screen; each row's sticky name cell would otherwise be its own compositor layer. */
 	.row {
 		position: relative;
 		display: flex;
 		width: 100%;
 		height: 32px;
+		content-visibility: auto;
+		contain-intrinsic-size: auto 32px;
 		align-items: center;
 		border-bottom: 1px solid var(--border-subtle);
 		text-align: left;
@@ -421,24 +431,40 @@
 	}
 	.track {
 		position: relative;
+		width: var(--track-w);
 		height: 100%;
 	}
 	.bar {
 		position: absolute;
 		top: 50%;
+		left: calc(var(--s) * var(--pps) * 1px);
+		width: max(3px, calc((var(--e) - var(--s)) * var(--pps) * 1px));
 		height: 16px;
 		transform: translateY(-50%);
 		border-radius: 2px;
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 	}
+	/* A running bar's stripes move by transform, which the compositor animates without repainting. */
 	.bar.live {
-		background-image: linear-gradient(90deg, transparent 0 60%, rgba(255, 255, 255, 0.28) 60% 80%, transparent 80%) !important;
+		overflow: hidden;
+	}
+	.bar.live::after {
+		position: absolute;
+		inset: 0 0 0 -24px;
+		background-image: linear-gradient(90deg, transparent 0 60%, rgba(255, 255, 255, 0.28) 60% 80%, transparent 80%);
 		background-size: 24px 100%;
 		animation: slide 1.2s linear infinite;
+		content: '';
+		will-change: transform;
 	}
 	@keyframes slide {
 		to {
-			background-position: 24px 0;
+			transform: translateX(24px);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.bar.live::after {
+			animation: none;
 		}
 	}
 	.dur,
@@ -450,7 +476,11 @@
 		font-size: 11.5px;
 		white-space: nowrap;
 	}
+	.dur {
+		left: calc(var(--e) * var(--pps) * 1px + 8px);
+	}
 	.dur.flip {
+		left: calc(var(--s) * var(--pps) * 1px - 8px);
 		transform: translate(-100%, -50%);
 	}
 	.note {

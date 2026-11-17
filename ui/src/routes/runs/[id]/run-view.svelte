@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -79,6 +80,11 @@
 			<div class="flex min-h-0 flex-col" style:flex={hasBottom ? topFrac : 1}>
 				<div class="exec-head">
 					<span class="label">Nodes over time</span>
+					{#if view.statusFilter}
+						{@const g = view.nodeGroups.find((x) => x.key === view.statusFilter)}
+						<span class="faint" data-testid="timeline-filter">{g?.label} only · {g?.nodes.length} of {nodes.length}</span>
+						<Button variant="link" size="inline" class="text-[12px]" onclick={() => view.filterStatus(null)}>Show all</Button>
+					{/if}
 					{#if detail.children.length}<span class="faint">{detail.children.length} job runs · nodes from all of them</span>{/if}
 					{#if hasGraph}
 					<div class="seg"><SegmentedFilter label="View" bind:value={topView} options={[{ value: 'timeline', label: 'Timeline' }, { value: 'graph', label: 'Graph' }]} /></div>
@@ -89,7 +95,7 @@
 						{#if !nodes.length}
 							<div class="empty">{detail.children.length ? 'No nodes yet.' : 'Not started.'}</div>
 						{:else if topView === 'timeline' || !hasGraph}
-							<RunGantt {nodes} {origin} now={app.now} selected={view.selected} {groups} onselect={(key, add) => view.selectNode(key, add)} />
+							<RunGantt nodes={view.shownNodes} {origin} now={app.now} active={view.active} selected={view.selected} {groups} onselect={(key, add) => view.selectNode(key, add)} />
 						{:else}
 							<RunGraph {nodes} edges={detail.edges} ownRunId={detail.run.id} />
 						{/if}

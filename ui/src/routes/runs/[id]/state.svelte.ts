@@ -5,8 +5,8 @@ import { app } from '$lib/state/app.svelte';
 import { rerunHref } from '$lib/run/command';
 import { createResource } from '$lib/state/resource.svelte';
 import { isActiveRun } from '$lib/status';
-import type { BottomTab } from './types';
-import { bannersFor, primaryChoice, progressOf, rerunChoices, runCostOf } from './utils';
+import type { BottomTab, NodeGroupKey } from './types';
+import { bannersFor, groupNodes, primaryChoice, progressOf, rerunChoices, runCostOf } from './utils';
 
 function message(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
@@ -15,6 +15,10 @@ function message(error: unknown): string {
 /** Run detail state: data, the node selection that filters the bottom pane, and actions. */
 export function createRunDetailState(runId: string) {
 	const topics = [`run:${runId}`, 'runs'];
+	// A running run changes about once a second. Its node states are small and reload after each burst;
+	// its log, statements, output and cost read the whole run each time, so they reload at most every
+	// few seconds, and the page keeps up instead of falling ever further behind.
+	const BULKY = { every: 3000 };
 	const detailRes = createResource((client, scope) => client.getRunDetail(scope, runId), topics);
 	// A group run's own reads are nearly empty, so its log and statements gather its job runs' too.
 	// A string, so the reads below reload only when the set of runs changes, not on every detail reload.
@@ -22,23 +26,33 @@ export function createRunDetailState(runId: string) {
 	const eachRun = async <T>(read: (id: string) => Promise<T[]>): Promise<T[]> => (await Promise.all(runKey.split(',').map(read))).flat();
 	const eventsRes = createResource(
 		(client, scope) => (client.supports('listRunEvents') ? eachRun(async (id) => (await client.listRunEvents(scope, id, { limit: 5000 })).events).then((events) => events.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) : Promise.resolve([])),
-		topics
+		topics,
+		BULKY
 	);
 	const outputRes = createResource(
 		(client, scope) =>
 			client.supports('listRunOutput') && app.can('view.evidence')
 				? eachRun(async (id) => (await client.listRunOutput(scope, id)).map((line) => ({ ...line, runId: id }))).then((lines) => lines.sort((a, b) => a.at.localeCompare(b.at)))
 				: Promise.resolve([]),
-		topics
+		topics,
+		BULKY
 	);
-	const statementsRes = createResource((client, scope) => (client.supports('listRunStatements') ? eachRun((id) => client.listRunStatements(scope, id)) : Promise.resolve([])), topics);
-	const costRes = createResource((client, scope) => (client.supports('listRunCost') ? eachRun((id) => client.listRunCost(scope, id)) : Promise.resolve([])), topics);
+	const statementsRes = createResource((client, scope) => (client.supports('listRunStatements') ? eachRun((id) => client.listRunStatements(scope, id)) : Promise.resolve([])), topics, BULKY);
+	const costRes = createResource((client, scope) => (client.supports('listRunCost') ? eachRun((id) => client.listRunCost(scope, id)) : Promise.resolve([])), topics, BULKY);
 
 	const detail = $derived(detailRes.data ?? null);
 	const run = $derived(detail?.run ?? null);
 	const nodes = $derived(detail?.nodes ?? []);
 	const active = $derived(!!run && isActiveRun(run.status));
 	const progress = $derived(progressOf(nodes));
+	// ---- the timeline narrowed to one outcome, picked in the panel's summary ----
+	let statusFilter = $state<NodeGroupKey | null>(null);
+	const nodeGroups = $derived(groupNodes(nodes, active));
+	/** The timeline's nodes: those of the outcome picked, else all; a picked outcome no node has any more shows all. */
+	const shownNodes = $derived.by(() => {
+		const group = statusFilter && nodeGroups.find((g) => g.key === statusFilter);
+		return group ? group.nodes : nodes;
+	});
 	const cause = $derived(outputRes.data?.find((l) => l.error)?.text ?? null);
 	const banners = $derived(detail ? bannersFor(detail, app.now, cause) : []);
 	const statements = $derived(statementsRes.data ?? []);
@@ -115,6 +129,19 @@ export function createRunDetailState(runId: string) {
 		},
 		get nodes() {
 			return nodes;
+		},
+		get nodeGroups() {
+			return nodeGroups;
+		},
+		get shownNodes() {
+			return shownNodes;
+		},
+		get statusFilter() {
+			return nodeGroups.some((g) => g.key === statusFilter) ? statusFilter : null;
+		},
+		/** Shows only the nodes of `key` on the timeline, or all again when it is already picked. */
+		filterStatus(key: NodeGroupKey | null) {
+			statusFilter = statusFilter === key ? null : key;
 		},
 		get active() {
 			return active;
