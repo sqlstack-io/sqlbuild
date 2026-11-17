@@ -1190,51 +1190,6 @@ fn assemble<'py>(
     Ok(snapshots)
 }
 
-/// Plan previews: target `MAX` values from the synced copy; inputs are read when the run starts.
-fn synced_copy_values<'py>(
-    facade: &SyncedCopyAdapter,
-    models: &mut [CursorModel<'py>],
-) -> PyResult<Values<'py>> {
-    let mut values = Values::new();
-    for info in models {
-        let reads_inputs: bool = !info.upstreams.is_empty();
-        info.upstreams.clear();
-        let observed: Option<&str> = info
-            .target_tag
-            .as_ref()
-            .and_then(|_| facade.target_max(&info.model_name));
-        match (&info.target_tag, observed) {
-            (Some(tag), Some(observed)) => {
-                let value = parse_warehouse_cursor(&text(info.effective_grain.py(), observed))?;
-                let lifted = floor_lifts(info, &value)?;
-                values.insert(tag.clone(), value);
-                if reads_inputs && (info.replays || lifted) {
-                    facade.mark_unknown(format!(
-                        "cursor window of {} (the run starts it away from the last build's cursor)",
-                        info.model_name
-                    ));
-                } else if reads_inputs {
-                    facade.mark_window(&info.model_name, observed);
-                }
-                if !info.start_cursor_config.is_none()
-                    && !native_field(&info.start_cursor_config, "max_ahead")?.is_none()
-                {
-                    facade.mark_unknown(format!("future-cursor safety of {}", info.model_name));
-                }
-            }
-            (Some(_), None) => facade.mark_unknown(format!(
-                "cursor position of {} (no successful build recorded it)",
-                info.model_name
-            )),
-            (None, _) if reads_inputs => {
-                facade.mark_unknown(format!("cursor window of {}", info.model_name));
-            }
-            (None, _) => {}
-        }
-    }
-    Ok(values)
-}
-
 /// Cursor MIN/MAX values by model name, and whether the reads left cursor inputs to the run.
 pub(crate) fn cursor_snapshots<'py>(
     request: &SnapshotRequest<'py>,

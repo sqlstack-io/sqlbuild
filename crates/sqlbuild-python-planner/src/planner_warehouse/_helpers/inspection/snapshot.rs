@@ -251,31 +251,6 @@ fn metadata_name_filter(
     Ok(Some(names))
 }
 
-fn active_catalog<'py>(
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    call_with(
-        &host_entry(adapter.py(), ACTIVE_CATALOG)?,
-        &[
-            ("adapter", adapter.clone()),
-            ("connection", connection.clone()),
-        ],
-    )
-}
-
-/// The concurrency of the active inspection catalog, one without a catalog.
-pub(crate) fn inspection_concurrency(
-    adapter: &Bound<'_, PyAny>,
-    connection: &Bound<'_, PyAny>,
-) -> PyResult<i64> {
-    let catalog = active_catalog(adapter, connection)?;
-    if catalog.is_none() {
-        return Ok(1);
-    }
-    native_field(&catalog, "concurrency")?.extract()
-}
-
 fn prefetch_schemas<'py>(
     request: &SnapshotRequest<'py>,
     database: &Bound<'py, PyAny>,

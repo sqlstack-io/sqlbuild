@@ -117,31 +117,6 @@ struct PlanInvocation<'py> {
     preview: Option<SyncedPlan<'py>>,
 }
 
-/// The synced-copy adapter when a location asked for a preview; a preview never defers.
-fn synced_copy<'py>(
-    request: &Bound<'py, PyAny>,
-    adapter: Bound<'py, PyAny>,
-) -> PyResult<Option<Bound<'py, SyncedCopyAdapter>>> {
-    let py: Python<'py> = request.py();
-    let Ok(path) = std::env::var(PLAN_SYNCED_COPY_ENV) else {
-        return Ok(None);
-    };
-    if native_field(request, "defer_to")?.is_truthy()? {
-        return Err(raised(
-            py,
-            CommandConnectionError::User {
-                code: None,
-                message: SYNCED_COPY_DEFER_REFUSAL.to_owned(),
-                help: Some(SYNCED_COPY_DEFER_HELP.to_owned()),
-            },
-        ));
-    }
-    Ok(Some(Bound::new(
-        py,
-        SyncedCopyAdapter::load(py, adapter, &path)?,
-    )?))
-}
-
 fn resolve_invocation<'py>(
     request: &Bound<'py, PyAny>,
     (project, state): (PlanProject<'_, 'py>, Option<&Arc<WarehouseState>>),

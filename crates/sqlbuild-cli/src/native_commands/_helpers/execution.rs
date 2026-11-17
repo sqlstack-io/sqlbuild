@@ -967,23 +967,6 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
     })
 }
 
-/// The safety sync interval from the flag, then the environment, then the project, then thirty minutes.
-pub(crate) fn safety_sync_seconds(
-    flag: Option<&str>,
-    environment: Option<&str>,
-    project: impl FnOnce() -> Result<ControlConfig, String>,
-) -> Result<u64, String> {
-    if let Some(text) = flag {
-        return sync_interval_seconds(text).map_err(|help| format!("--sync-at-least-every {help}"));
-    }
-    if let Some(text) = environment.filter(|text| !text.trim().is_empty()) {
-        return sync_interval_seconds(text).map_err(|help| format!("{SAFETY_SYNC_ENV} {help}"));
-    }
-    Ok(project()?
-        .sync_at_least_every_seconds
-        .unwrap_or(METADATA_SAFETY_SYNC_SECONDS))
-}
-
 /// Reconcile from the server after restarts or lost acknowledgements; transient outages retry.
 pub(crate) async fn location_generation(
     options: &LocationServe,
