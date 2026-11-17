@@ -10,7 +10,7 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import type { RunEventLevel } from '$lib/api';
 	import { formatStamp } from '$lib/format/time';
-	import { clockTime, shortRunId } from '$lib/operate/labels';
+	import { clockTime, nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { EventCategory } from './types';
 	import { EVENT_CATEGORIES, type LogEntry } from './utils';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
@@ -111,7 +111,7 @@
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'}>
 				<td class="faint nowrap" title={formatStamp(e.at)}>{clockTime(e.at)}</td>
 				{#if grouped}<td class="mono faint"><a href={to(`/runs/${e.runId}`)}>{shortRunId(e.runId)}</a></td>{/if}
-				<td class="mono" class:faint={!e.nodeKey}>{e.nodeKey ?? e.stream ?? 'run'}</td>
+				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ?? undefined}>{e.nodeKey ? nodeLabel(e.nodeKey) : (e.stream ?? 'run')}</td>
 				<td class:out={e.stream}>
 					{#if e.stream}
 						{@const lines = e.text.split('\n')}
