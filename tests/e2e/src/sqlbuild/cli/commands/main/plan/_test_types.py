@@ -82,6 +82,7 @@ class PreviewPerformanceTestCase:
     built_share: float
     expected_unbuilt: tuple[int, int]
     expected_definition_changes: tuple[int, int]
+    #: The warm preview's wall time, from queueing the request to the stored plan.
     expected_max_warm_seconds: float
     #: The warm preview's share of the location's publish, a linear 10K compile on one machine.
     expected_max_warm_to_publish: float
