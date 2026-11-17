@@ -101,10 +101,12 @@ pub(crate) struct DirectPythonLifecycle {
     ingress_python_results: Py<PyAny>,
     ingress_load_results: Py<PyAny>,
     ingress_loader_names: Py<PyAny>,
-    /// Each round-trip loader's selected upstream tasks and assets, `(kind, name)`, which must succeed.
-    round_trip_gates: HashMap<String, Vec<ObjectKey>>,
+    /// Each round-trip loader's selected upstream tasks and assets, `(kind, name)`, and whether each is on its frontier.
+    round_trip_gates: RoundTripGates,
     /// Each round-trip loader's source load key and the SQL keys it waits for.
     round_trip_waits: Vec<(ObjectKey, Vec<ObjectKey>)>,
+    /// Whether the build runs read-side tasks and assets; `--no-python` turns this off.
+    include_python: bool,
 }
 
 #[pymethods]
@@ -469,7 +471,8 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
     let connection_config: Bound<'py, PyAny> = context.get("connection_config")?;
     let project: Bound<'py, PyAny> = native_field(pipeline, "project")?;
     let plan_output: Bound<'py, PyAny> = native_field(pipeline, "plan_output")?;
-    let selected: Vec<String> = if context.request_flag("include_python")? {
+    let include_python: bool = context.request_flag("include_python")?;
+    let selected: Vec<String> = if include_python {
         task_asset_names(&discovered, pipeline)?
     } else {
         Vec::new()
@@ -618,11 +621,12 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             ingress_loader_names: native_field(&lifecycle.plan, "ingress_loader_names")?.unbind(),
             round_trip_gates,
             round_trip_waits,
+            include_python,
         },
     )
 }
 
-type RoundTripGates = HashMap<String, Vec<ObjectKey>>;
+type RoundTripGates = HashMap<String, Vec<(ObjectKey, bool)>>;
 type RoundTripWaits = Vec<(ObjectKey, Vec<ObjectKey>)>;
 
 /// Each round-trip loader's gating upstreams, and its source load key with the SQL it waits for.
@@ -634,10 +638,10 @@ fn round_trip_ordering(
     let mut gates: RoundTripGates = HashMap::new();
     let mut waits: RoundTripWaits = Vec::new();
     for loader in &lifecycle.round_trips {
-        let mut kinds: Vec<ObjectKey> = Vec::new();
+        let mut kinds: Vec<(ObjectKey, bool)> = Vec::new();
         for name in &loader.gates {
             let kind: String = native_field(&nodes.get_item(name)?, "kind")?.extract()?;
-            kinds.push((kind, name.clone()));
+            kinds.push(((kind, name.clone()), loader.frontier.contains(name)));
         }
         gates.insert(loader.name.clone(), kinds);
         for entry in native_field(plan_output, "source_load_entries")?.try_iter()? {
@@ -665,7 +669,7 @@ pub(crate) struct SourceLoadGate {
 
 #[pymethods]
 impl SourceLoadGate {
-    /// Why a round-trip load is skipped: `hard` after a failed or skipped upstream, `soft` when it never ran.
+    /// Why a round-trip load is skipped: `hard` for any failed or hard-skipped gate, else `soft` unless a frontier gate succeeded.
     fn __call__(
         &self,
         py: Python<'_>,
@@ -676,24 +680,63 @@ impl SourceLoadGate {
         let Some(gates) = loader.and_then(|loader| lifecycle.round_trip_gates.get(&loader)) else {
             return Ok(None);
         };
-        let mut statuses: HashMap<String, String> = HashMap::new();
+        let mut statuses: HashMap<String, (String, Option<String>)> = HashMap::new();
         for result in lifecycle.python_results(py)?.try_iter()? {
             let result: Bound<'_, PyAny> = result?;
+            let skip_mode: Bound<'_, PyAny> = native_field(&result, "skip_mode")?;
             statuses.insert(
                 native_field(&result, "node_name")?.extract()?,
-                native_field(&result, "status")?.str()?.extract()?,
+                (
+                    native_field(&result, "status")?.str()?.extract()?,
+                    (!skip_mode.is_none())
+                        .then(|| skip_mode.str()?.extract())
+                        .transpose()?,
+                ),
             );
         }
-        for (kind, name) in gates {
-            let (outcome, mode): (&str, &'static str) = match statuses.get(name).map(String::as_str)
-            {
-                Some(SUCCESS_STATUS) => continue,
-                Some(SKIPPED_STATUS) => ("was skipped", HARD_SKIP),
-                Some(_) => ("failed", HARD_SKIP),
-                None => ("did not run; the SQL it reads was not rebuilt", SOFT_SKIP),
+        let mut succeeded: bool = false;
+        let mut soft_reason: Option<String> = None;
+        let mut not_run_reason: Option<String> = None;
+        for ((kind, name), frontier) in gates {
+            let status = statuses
+                .get(name)
+                .map(|(status, mode)| (status.as_str(), mode.as_deref()));
+            let outcome: &str = match status {
+                Some((SUCCESS_STATUS, _)) => {
+                    succeeded |= *frontier;
+                    continue;
+                }
+                Some((SKIPPED_STATUS, Some(SOFT_SKIP))) => "was skipped",
+                Some((SKIPPED_STATUS, _)) => {
+                    return Ok(Some((
+                        format!("Upstream {kind} '{name}' was skipped"),
+                        HARD_SKIP,
+                    )));
+                }
+                Some(_) => {
+                    return Ok(Some((
+                        format!("Upstream {kind} '{name}' failed"),
+                        HARD_SKIP,
+                    )));
+                }
+                None if !lifecycle.include_python => {
+                    not_run_reason.get_or_insert_with(|| {
+                        format!(
+                            "Upstream {kind} '{name}' did not run; --no-python skips read-side tasks and assets"
+                        )
+                    });
+                    continue;
+                }
+                None => "did not run; the SQL it reads was not rebuilt",
             };
-            return Ok(Some((format!("Upstream {kind} '{name}' {outcome}"), mode)));
+            soft_reason.get_or_insert_with(|| format!("Upstream {kind} '{name}' {outcome}"));
         }
-        Ok(None)
+        if let Some(reason) = not_run_reason {
+            return Ok(Some((reason, SOFT_SKIP)));
+        }
+        if succeeded {
+            return Ok(None);
+        }
+        Ok(soft_reason.map(|reason| (reason, SOFT_SKIP)))
     }
 }

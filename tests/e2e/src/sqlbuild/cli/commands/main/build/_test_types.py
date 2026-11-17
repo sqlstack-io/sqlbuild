@@ -1715,9 +1715,11 @@ class WarehouseRoundTripE2ETestCase:
 
 @dataclass(frozen=True)
 class ChangedRoundTripE2ETestCase:
-    """A second `--changed` build of a round trip after an optional change to `orders`."""
+    """A second round-trip build with `build_flags`, after changing `orders` and `extra_files`."""
 
     description: str
     orders_sql: str
     expected_output_fragments: tuple[str, ...]
     expected_scored_rows: tuple[tuple[object, ...], ...]
+    build_flags: tuple[str, ...] = ("--changed",)
+    extra_files: dict[str, str] = field(default_factory=dict)
