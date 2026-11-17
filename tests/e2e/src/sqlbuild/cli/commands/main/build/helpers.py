@@ -1544,9 +1544,23 @@ SCORING_TASK: str = (
 FAILING_SCORING_TASK: str = '    raise RuntimeError("partner service unavailable")\n'
 
 
-def round_trip_project_files(*, project_settings: str, task_body: str) -> dict[str, str]:
-    """Orders -> score task -> partner loader -> partner_scores source -> scored_orders model."""
+ROUND_TRIP_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/loaders/round_trip")
 
+
+def round_trip_project_files(*, project_settings: str, task_body: str) -> dict[str, str]:
+    """DuckShop's round trip: orders -> score task -> partner loader -> source -> scored_orders."""
+
+    project: Path = ROUND_TRIP_FIXTURE / "project"
+    files: dict[str, str] = {
+        path.relative_to(project).as_posix(): path.read_text()
+        for path in sorted(
+            [*project.rglob("*.py"), *project.rglob("*.sql"), *project.rglob("*.yml")]
+        )
+    }
+    assert SCORING_TASK in files["python/tasks/scoring.py"]
+    files["python/tasks/scoring.py"] = files["python/tasks/scoring.py"].replace(
+        SCORING_TASK, task_body
+    )
     return {
         "sqlbuild_project.toml": (
             'name = "partner_scoring"\n'
@@ -1558,45 +1572,14 @@ def round_trip_project_files(*, project_settings: str, task_body: str) -> dict[s
             'connection = "local"\n'
             'schema = "main"\n' + project_settings
         ),
-        "models/orders.sql": (
-            'MODEL (description "Orders to score", materialized table);\n\n'
-            "SELECT 1 AS order_id UNION ALL SELECT 2 AS order_id\n"
-        ),
-        "sources/partner.yml": (
-            "sources:\n"
-            "  - name: partner_scores\n"
-            "    description: Scores the partner returned for each order\n"
-            "    managed: true\n"
-            "    write_strategy: table\n"
-            "    columns:\n"
-            "      - name: order_id\n"
-            "        type: INTEGER\n"
-            "      - name: score\n"
-            "        type: INTEGER\n"
-        ),
-        "models/scored_orders.sql": (
-            'MODEL (description "Orders with their partner score", materialized table);\n\n'
-            "SELECT o.order_id, s.score\n"
-            'FROM __ref("orders") AS o\n'
-            'JOIN __source("partner_scores") AS s ON o.order_id = s.order_id\n'
-        ),
-        "python/tasks/scoring.py": (
-            "from sqlbuild.refs import model\n"
-            "from sqlbuild.tasks import task\n\n\n"
-            '@task(depends_on=model("orders"))\n'
-            "def score_orders(ctx):\n"
-            '    """Send the orders to the partner and keep the scores it returns."""\n' + task_body
-        ),
-        "python/loaders/partner.py": (
-            "from sqlbuild.loaders import loader\n\n"
-            "from python.tasks.scoring import score_orders\n\n\n"
-            "@loader(depends_on=[score_orders])\n"
-            "def partner_scores(ctx):\n"
-            '    """Load the scores the partner returned."""\n'
-            "    result = ctx.result_of(node_function=score_orders)\n"
-            '    return [{"order_id": o, "score": s} for o, s in result.payload["scores"]]\n'
-        ),
+        **files,
     }
+
+
+def round_trip_refusal(name: str) -> str:
+    """One of DuckShop's round-trip refusal variants, such as `cycle_task.py`."""
+
+    return (ROUND_TRIP_FIXTURE / "refusals" / name).read_text()
 
 
 def build_round_trip_project(

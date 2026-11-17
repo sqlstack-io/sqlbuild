@@ -11,6 +11,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     ALLOW_ROUND_TRIPS,
     SCORING_TASK,
     round_trip_project_files,
+    round_trip_refusal,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     GraphBoundaryCompileTestCase,
@@ -18,30 +19,6 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
-)
-
-CYCLE_TASK: str = (
-    "from sqlbuild.refs import model\n"
-    "from sqlbuild.tasks import task\n\n\n"
-    '@task(depends_on=model("scored_orders"))\n'
-    "def score_orders(ctx):\n"
-    '    """Send the scored orders to the partner."""\n'
-    "    return ctx.result(payload={})\n"
-)
-UNREAD_TASK: str = (
-    "from sqlbuild.tasks import task\n\n\n"
-    "@task()\n"
-    "def score_orders(ctx):\n"
-    '    """Fetch the partner scores."""\n'
-    "    return ctx.result(payload={})\n"
-)
-TERMINAL_LOADER_READER: str = (
-    "from sqlbuild.tasks import task\n\n"
-    "from python.loaders.partner import partner_scores\n\n\n"
-    "@task(depends_on=[partner_scores])\n"
-    "def report_scores(ctx):\n"
-    '    """Report the scores the partner returned."""\n'
-    "    return ctx.result(payload={})\n"
 )
 
 
@@ -58,7 +35,7 @@ TERMINAL_LOADER_READER: str = (
         GraphBoundaryCompileTestCase(
             description="a cycle through a task, models, a source and its loader fails compile",
             project_settings=ALLOW_ROUND_TRIPS,
-            edited_files={"python/tasks/scoring.py": CYCLE_TASK},
+            edited_files={"python/tasks/scoring.py": round_trip_refusal("cycle_task.py")},
             expected_exit_code=1,
             expected_output_fragments=(
                 "S000",
@@ -71,14 +48,8 @@ TERMINAL_LOADER_READER: str = (
             description="a cycle of model refs alone fails compile with the plan's message",
             project_settings=ALLOW_ROUND_TRIPS,
             edited_files={
-                "models/order_totals.sql": (
-                    'MODEL (description "Totals per order", materialized table);\n\n'
-                    'SELECT order_id FROM __ref("order_ranks")\n'
-                ),
-                "models/order_ranks.sql": (
-                    'MODEL (description "Ranks per order", materialized table);\n\n'
-                    'SELECT order_id FROM __ref("order_totals")\n'
-                ),
+                "models/order_totals.sql": round_trip_refusal("order_totals.sql"),
+                "models/order_ranks.sql": round_trip_refusal("order_ranks.sql"),
             },
             expected_exit_code=1,
             expected_output_fragments=(
@@ -100,8 +71,8 @@ TERMINAL_LOADER_READER: str = (
             description="a task depending on a terminal loader instead of its source fails compile",
             project_settings="",
             edited_files={
-                "python/tasks/scoring.py": UNREAD_TASK,
-                "python/tasks/reporting.py": TERMINAL_LOADER_READER,
+                "python/tasks/scoring.py": round_trip_refusal("unread_task.py"),
+                "python/tasks/reporting.py": round_trip_refusal("terminal_loader_reader.py"),
             },
             expected_exit_code=1,
             expected_output_fragments=(
