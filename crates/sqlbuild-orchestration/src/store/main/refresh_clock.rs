@@ -9,6 +9,12 @@ use crate::store::models::{Connection, ControlTransaction};
 pub(crate) async fn refresh_clock(
     transaction: ControlTransaction,
 ) -> Result<ControlTransaction, ControlError> {
+    #[cfg(test)]
+    if let Some(now) = crate::store::tests::clock_helpers::database_clock() {
+        let mut transaction = transaction;
+        transaction.now = now;
+        return Ok(transaction);
+    }
     let sql = match transaction.connection {
         Some(Connection::Postgres(_)) => "SELECT clock_timestamp() AS now",
         _ => "SELECT strftime('%Y-%m-%dT%H:%M:%f000Z','now') AS now",

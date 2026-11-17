@@ -1,5 +1,7 @@
 //! Recall storage integration contracts for SQLite and PostgreSQL.
 
+#[path = "clock/helpers.rs"]
+pub(crate) mod clock_helpers;
 #[path = "faults/helpers.rs"]
 pub(crate) mod fault_helpers;
 #[path = "faults/test_types.rs"]
