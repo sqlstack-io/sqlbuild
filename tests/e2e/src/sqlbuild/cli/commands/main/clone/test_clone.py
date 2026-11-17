@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 import subprocess
 from pathlib import Path
 from textwrap import dedent
@@ -13,8 +15,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clone._test_types import (
     CloneDeferredSourceFunctionE2ETestCase,
     CloneE2ETestCase,
     CloneFunctionGraphE2ETestCase,
+    CloneMissingUpstreamE2ETestCase,
     ClonePolicyErrorTestCase,
     ClonePythonFunctionE2ETestCase,
+    MissingUpstreamFixesE2ETestCase,
+)
+from tests.e2e.src.sqlbuild.cli.commands.main.clone.helpers import (
+    MISSING_UPSTREAMS,
+    plan_missing_upstreams,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     REPO_ROOT,
@@ -24,6 +32,14 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 )
 
 _CHANGED_CLONE_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_clone"
+_UPSTREAMS: tuple[str, ...] = (
+    "customers",
+    "orders",
+    "payments",
+    "products",
+    "returns",
+    "shipments",
+)
 
 
 @pytest.mark.parametrize(
@@ -968,3 +984,96 @@ def test_given_cloned_table_when_planning_changed_then_it_rebuilds(
         assert fragment in output + plan.stdout, output + plan.stdout
     for fragment in test_case.unexpected_fragments:
         assert fragment not in plan.stdout, plan.stdout
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        MissingUpstreamFixesE2ETestCase(
+            description="a clone destination is offered deferring to and cloning from each origin",
+            destination_allowed=True,
+            expected_fragments=(
+                "  If they exist in prod:\n"
+                "    read them from it for this run:  --defer-to prod\n"
+                "    copy them into this target:      sqb clone --from prod -s "
+                + " ".join(MISSING_UPSTREAMS)
+                + "\n  Or build them too:                 add + before your selection",
+            ),
+            unexpected_fragments=(),
+        ),
+        MissingUpstreamFixesE2ETestCase(
+            description="a target that may not be cloned into is offered only building",
+            destination_allowed=False,
+            expected_fragments=("  Build them too:  add + before your selection",),
+            unexpected_fragments=("sqb clone", "--defer-to"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_missing_upstreams_when_planning_then_s301_lists_them_with_fixes(
+    test_case: MissingUpstreamFixesE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir, plan_command, refused = plan_missing_upstreams(
+        tmp_path=tmp_path,
+        default_target="dev",
+        destination_allowed=test_case.destination_allowed,
+        target_args=(),
+    )
+
+    as_json: subprocess.CompletedProcess[str] = run_sqb(
+        command=(*plan_command, "--json"), project_dir=project_dir
+    )
+
+    output: str = refused.stdout + refused.stderr
+    assert refused.returncode == 1, output
+    assert "error[S301]: 6 upstream models this build reads don't exist in target 'dev'\n" in output
+    assert "  returns\n  ... 1 more (sqb plan --json lists all)\n" in output
+    assert all(fragment in output for fragment in test_case.expected_fragments), output
+    assert not any(fragment in output for fragment in test_case.unexpected_fragments), output
+    assert json.loads(as_json.stdout)["error"]["missing"] == list(MISSING_UPSTREAMS)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CloneMissingUpstreamE2ETestCase(
+            description="the default target is cloned into without naming it",
+            default_target="dev",
+            target_args=(),
+            expected_clone_command="sqb clone --from prod -s " + " ".join(MISSING_UPSTREAMS),
+        ),
+        CloneMissingUpstreamE2ETestCase(
+            description="a target other than the default is named in the clone command",
+            default_target="prod",
+            target_args=("--target", "dev"),
+            expected_clone_command="sqb clone --from prod --to dev -s "
+            + " ".join(MISSING_UPSTREAMS),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_missing_upstreams_when_running_printed_clone_then_plan_succeeds(
+    test_case: CloneMissingUpstreamE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir, plan_command, refused = plan_missing_upstreams(
+        tmp_path=tmp_path,
+        default_target=test_case.default_target,
+        destination_allowed=True,
+        target_args=test_case.target_args,
+    )
+    printed: list[str] = re.findall(
+        r"^ +copy them into this target: +(sqb clone .+)$", refused.stdout + refused.stderr, re.M
+    )
+
+    cloned: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *printed[0].split()[1:]), project_dir=project_dir
+    )
+    planned: subprocess.CompletedProcess[str] = run_sqb(
+        command=plan_command, project_dir=project_dir
+    )
+
+    assert printed == [test_case.expected_clone_command], refused.stdout + refused.stderr
+    assert cloned.returncode == 0, cloned.stdout + cloned.stderr
+    assert planned.returncode == 0, planned.stdout + planned.stderr

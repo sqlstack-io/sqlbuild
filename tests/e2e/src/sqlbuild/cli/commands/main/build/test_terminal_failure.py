@@ -27,7 +27,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             model_replacements=(),
             expected_screen_fragments=(
                 "Inspected warehouse state.",
-                "error[S301]: cannot build selected scope: 2 missing upstream dependencies",
+                "error[S301]: 2 upstream models this build reads don't exist in the warehouse",
             ),
         ),
         TerminalBuildFailureE2ETestCase(

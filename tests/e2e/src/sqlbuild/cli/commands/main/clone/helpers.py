@@ -189,3 +189,59 @@ def copy_project(*, origin_project: Path, tmp_path: Path) -> Path:
     project_dir: Path = tmp_path / origin_project.name
     shutil.copytree(origin_project, project_dir)
     return project_dir
+
+
+MISSING_UPSTREAMS: tuple[str, ...] = (
+    "customers",
+    "orders",
+    "payments",
+    "products",
+    "returns",
+    "shipments",
+)
+
+
+def plan_missing_upstreams(
+    *, tmp_path: Path, default_target: str, destination_allowed: bool, target_args: tuple[str, ...]
+) -> tuple[Path, tuple[str, ...], subprocess.CompletedProcess[str]]:
+    """Build `MISSING_UPSTREAMS` in `prod`, then plan `report`, which reads them, in empty `dev`."""
+
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="missing_upstream_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "missing_upstream_project"\nadapter = "duckdb"\n'
+                f'default_target = "{default_target}"\n\n'
+                '[connection]\ndatabase = "shop.duckdb"\n\n'
+                '[targets.prod]\nschema = "prod"\n\n'
+                "[targets.prod.clone]\nallow_as_clone_origin = true\n\n"
+                '[targets.dev]\nschema = "dev"\n\n'
+                "[targets.dev.clone]\n"
+                f"allow_as_clone_destination = {str(destination_allowed).lower()}\n"
+            ),
+            **{
+                f"models/{name}.sql": (
+                    f"MODEL (description '{name}.', materialized table);\n\nSELECT 1 AS id\n"
+                )
+                for name in MISSING_UPSTREAMS
+            },
+            "models/report.sql": (
+                "MODEL (description 'Report.', materialized table);\n\n"
+                'SELECT customers.id FROM __ref("customers") AS customers\n'
+                + "".join(
+                    f'JOIN __ref("{name}") AS {name} USING (id)\n' for name in MISSING_UPSTREAMS[1:]
+                )
+            ),
+        },
+    )
+    built: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", "--target", "prod"), project_dir=project_dir
+    )
+    assert built.returncode == 0, built.stdout + built.stderr
+    plan_command: tuple[str, ...] = ("--no-color", "plan", "--select", "report", *target_args)
+    return (
+        project_dir,
+        plan_command,
+        run_sqb(command=plan_command, project_dir=project_dir),
+    )

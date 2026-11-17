@@ -173,14 +173,16 @@ def test_given_scope_and_snapshot_when_checking_buildability_then_returns_expect
     "test_case",
     [
         MissingUpstreamMessageTestCase(
-            description="data-lineage misses keep the existing wording",
+            description="data-lineage misses are listed with how to build them",
             missing=(
                 MissingUpstream(key=model_key("a"), required_by=(model_key("b"),)),
                 MissingUpstream(key=model_key("c"), required_by=(model_key("b"),)),
             ),
             edge_origins={},
             expected_message=(
-                "cannot build selected scope: 2 missing upstream dependencies (a, c)"
+                "2 upstream models this build reads don't exist in the warehouse\n"
+                "  a\n  c\n\n"
+                "  Build them too:  add + before your selection"
             ),
         ),
         MissingUpstreamMessageTestCase(
@@ -211,7 +213,9 @@ def test_given_scope_and_snapshot_when_checking_buildability_then_returns_expect
                 (model_key("stg_orders"), seed_key("waffle_types")): _RELATIONSHIPS_ORIGIN
             },
             expected_message=(
-                "cannot build selected scope: 1 missing upstream dependencies (waffle_types)"
+                "1 upstream seed this build reads doesn't exist in the warehouse\n"
+                "  waffle_types\n\n"
+                "  Build it too:  add + before your selection"
             ),
         ),
         MissingUpstreamMessageTestCase(
@@ -228,7 +232,10 @@ def test_given_scope_and_snapshot_when_checking_buildability_then_returns_expect
                 (model_key("orders"), seed_key("order_statuses")): _STATUS_ORIGIN,
             },
             expected_message=(
-                "cannot build selected scope: 1 missing upstream dependencies (a); 2 audit reads "
+                "1 upstream model this build reads doesn't exist in the warehouse\n"
+                "  a\n\n"
+                "  Build it too:  add + before your selection\n\n"
+                "  Also, 2 audit reads "
                 f"are not selected and do not exist in the warehouse ({_RELATIONSHIPS_ORIGIN}; "
                 f"{_STATUS_ORIGIN}); select them or build them first"
             ),

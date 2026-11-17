@@ -4,6 +4,7 @@ pub mod error_class;
 pub mod exception_from;
 pub mod new_annotated_error;
 pub mod new_error;
+pub mod new_error_with_fields;
 pub mod new_plain_error;
 pub mod new_record;
 pub mod new_record_with;
