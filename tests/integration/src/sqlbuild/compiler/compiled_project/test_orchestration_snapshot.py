@@ -2289,11 +2289,27 @@ def test_given_python_dependencies_across_jobs_when_publishing_a_group_then_jobs
     "test_case",
     [
         PythonJobGroupCycleTestCase(
+            description="a Python task's input from another job holds its own job back, "
+            "so reading that job's model closes a cycle naming the nodes",
+            jobs=(
+                ("staging_job", "stg_orders task:request_carrier_collection"),
+                ("export_job", "asset:partner_orders_file"),
+            ),
+            expected_message=(
+                "group dependencies contain a cycle in job group orders_nightly_job_group: "
+                "asset:partner_orders_file (export_job) waits for model:stg_orders "
+                "(staging_job); model:stg_orders (staging_job) waits for the start of job "
+                "staging_job; the start of job staging_job waits for asset:partner_orders_file "
+                "(export_job)"
+            ),
+        ),
+        PythonJobGroupCycleTestCase(
             description="a Python edge that closes a cycle names both jobs and the edges",
             jobs=(
                 ("staging_job", "stg_orders task:request_carrier_collection"),
                 ("export_job", "asset:partner_orders_file"),
             ),
+            wait_for="job",
             expected_message=(
                 "group dependencies contain a cycle in job group orders_nightly_job_group: "
                 "export_job waits for staging_job (model:orders reads model:stg_orders); "
@@ -2309,7 +2325,9 @@ def test_given_a_python_dependency_cycle_across_jobs_when_publishing_a_group_the
 ) -> None:
     jobs: dict[str, str] = dict(test_case.jobs)
     with pytest.raises(ValueError, match=re.escape(test_case.expected_message)):
-        python_pipeline_snapshot(tmp_path, jobs, {"orders_nightly_job_group": tuple(jobs)})
+        python_pipeline_snapshot(
+            tmp_path, jobs, {"orders_nightly_job_group": tuple(jobs)}, test_case.wait_for
+        )
 
 
 @pytest.mark.parametrize(

@@ -3,17 +3,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::declarations::_helpers::group_waits::{describe_cycle, record_wait, upstream_keys};
-use crate::declarations::_helpers::node_waits::{GroupMembers, node_wait_cycle};
-use crate::declarations::models::{GroupWaits, JobDefinition};
+use crate::declarations::_helpers::node_waits::{GroupMembers, node_wait_plan};
+use crate::declarations::models::{GroupOrder, GroupWaits, JobDefinition};
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
 
-/// Each member's upstream member jobs; a group whose members all wait for jobs must order them without a cycle, and one with members that wait per node must order its nodes.
+/// Each member's upstream member jobs, and the ones a member that waits per node waits for whole because they share a pool; a group whose members all wait for jobs must order them without a cycle, and one with members that wait per node must order its nodes.
 pub fn group_dependencies(
     (group, input): (&str, &SnapshotInput),
     jobs: &BTreeMap<String, JobDefinition>,
     (members, node_waits): (&BTreeSet<String>, &BTreeSet<String>),
-) -> Result<BTreeMap<String, BTreeSet<String>>, ControlError> {
+) -> Result<GroupOrder, ControlError> {
     if members.is_empty()
         || members.iter().any(|name| !jobs.contains_key(name))
         || !node_waits.is_subset(members)
@@ -23,17 +23,26 @@ pub fn group_dependencies(
     let waits = lineage_dependencies(input, jobs, members);
     if node_waits.is_empty() {
         ensure_acyclic(group, &waits.edges, &waits.reasons)?;
-    } else if let Some(cycle) = node_wait_cycle(&GroupMembers {
+        return Ok(GroupOrder {
+            jobs: waits.edges,
+            pool_waits: BTreeMap::new(),
+        });
+    }
+    let pool_waits = node_wait_plan(&GroupMembers {
         input,
         jobs,
         edges: &waits.edges,
         node_waits,
-    }) {
-        return Err(ControlError::Invalid(format!(
+    })
+    .map_err(|cycle| {
+        ControlError::Invalid(format!(
             "group dependencies contain a cycle in job group {group}: {cycle}"
-        )));
-    }
-    Ok(waits.edges)
+        ))
+    })?;
+    Ok(GroupOrder {
+        jobs: waits.edges,
+        pool_waits,
+    })
 }
 
 /// Each member waits for the members that build the first nodes it reaches upstream, and no further:

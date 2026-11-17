@@ -359,10 +359,11 @@ pub(crate) fn compile_declarations(
                     on_failure: controls.on_failure,
                     resources: None,
                 },
-                wait_reasons: group_wait_reasons(&input, &jobs, &dependencies),
-                jobs: dependencies,
+                wait_reasons: group_wait_reasons(&input, &jobs, &dependencies.jobs),
+                jobs: dependencies.jobs,
                 dependency_failure: dependency_failures(&group.dependencies, &members),
                 node_waits,
+                pool_waits: dependencies.pool_waits,
             },
         );
     }

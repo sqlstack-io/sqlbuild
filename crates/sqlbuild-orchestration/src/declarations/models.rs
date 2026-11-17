@@ -162,6 +162,9 @@ pub struct GroupDefinition {
     /// Members whose nodes each wait only for the nodes they read (`wait_for = "node"`); the others wait for whole jobs, as every member of an older publication does.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub node_waits: BTreeSet<String>,
+    /// For a member that waits per node, the members it waits for as whole jobs: they share a pool, so they run one at a time, and it reads their nodes.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub pool_waits: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl GroupDefinition {
@@ -480,6 +483,13 @@ pub(crate) struct PreviousTriggerState {
     pub(crate) started_at: DateTime<Utc>,
     pub(crate) last_tick_for: Option<DateTime<Utc>>,
     pub(crate) status_override: Option<TriggerStatus>,
+}
+
+/// How a group's members are ordered: each member's upstream member jobs, and the ones a member that waits per node still waits for whole because they share a pool.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GroupOrder {
+    pub jobs: BTreeMap<String, BTreeSet<String>>,
+    pub pool_waits: BTreeMap<String, BTreeSet<String>>,
 }
 
 /// Each member job's waits, and why it waits: the first lineage edge found.

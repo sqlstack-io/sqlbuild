@@ -529,3 +529,10 @@ pub(crate) struct NodeGateTestCase {
     pub(crate) expected_orders: crate::runs::models::NodeGate,
     pub(crate) expected_inventory: crate::runs::models::NodeGate,
 }
+
+pub(crate) struct CrossingGroupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each step: the member that builds a node, then the nodes each member's gate opens.
+    pub(crate) expected_open_after: Vec<(&'static str, Vec<&'static str>)>,
+}

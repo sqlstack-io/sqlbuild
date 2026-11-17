@@ -37,3 +37,13 @@ class SchedulerIdentityTestCase:
     description: str
     expected_invocation_id: str
     expected_run_id: str
+
+
+@dataclass(frozen=True)
+class SchedulerNodeGateTestCase:
+    """A group member's nodes behind the gate: which wait, open after a few polls, or skip."""
+
+    description: str
+    max_concurrency: int
+    expected_executed: tuple[str, ...]
+    expected_skipped: tuple[str, ...]

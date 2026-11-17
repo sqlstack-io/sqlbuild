@@ -1,11 +1,12 @@
 //! A worker interpreter retains the native claim owner; it never opens the control database.
 
+use std::collections::BTreeSet;
 use std::sync::Mutex;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::{PyRef, PyResult, Python};
 use pyo3::{pyclass, pymethods};
-use sqlbuild_orchestration::runs::models::RunChange;
+use sqlbuild_orchestration::runs::models::{NodeGates, RunChange};
 use sqlbuild_orchestration::worker::errors::WorkerError;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
@@ -71,6 +72,34 @@ impl NativeOrchestrationWorker {
                     attempts += 1;
                     match owner.client.report(event_id, change.clone()).await {
                         Ok(_) => return Ok(()),
+                        Err(error)
+                            if attempts < REPORT_ATTEMPTS
+                                && match &error {
+                                    WorkerError::Transport(_) => true,
+                                    WorkerError::Rejected(status) => {
+                                        status.as_u16() == STORE_BUSY_STATUS
+                                    }
+                                    _ => false,
+                                } =>
+                        {
+                            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                        }
+                        Err(error) => return Err(PyRuntimeError::new_err(error.to_string())),
+                    }
+                }
+            })
+        })
+    }
+
+    /// Ask the server for `nodes`' gates, retrying a transport failure or busy store a few times.
+    pub(crate) fn gates(&self, py: Python<'_>, nodes: &BTreeSet<String>) -> PyResult<NodeGates> {
+        self.with_owner(py, |owner| {
+            owner.runtime.block_on(async {
+                let mut attempts = 0;
+                loop {
+                    attempts += 1;
+                    match owner.client.gates(nodes).await {
+                        Ok(gates) => return Ok(gates),
                         Err(error)
                             if attempts < REPORT_ATTEMPTS
                                 && match &error {

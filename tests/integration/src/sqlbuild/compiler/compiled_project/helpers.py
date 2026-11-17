@@ -775,7 +775,10 @@ def published_texts(test_case: SnapshotExpressionRangeTestCase, tmp_path: Path) 
 
 
 def python_pipeline_snapshot(
-    tmp_path: Path, jobs: dict[str, str], groups: dict[str, tuple[str, ...]] | None = None
+    tmp_path: Path,
+    jobs: dict[str, str],
+    groups: dict[str, tuple[str, ...]] | None = None,
+    wait_for: str | None = None,
 ) -> NativeOrchestrationSnapshot:
     """Publish the Python pipeline project with TOML jobs, by name and selector, and groups."""
     files: dict[str, str] = {
@@ -787,6 +790,7 @@ def python_pipeline_snapshot(
         f"orchestration/job_groups/{name}.toml": (
             f'name = {json.dumps(name)}\ndescription = "Nightly orders."\n'
             f"jobs = {json.dumps(list(members))}\n"
+            + (f"\n[dependencies]\nwait_for = {json.dumps(wait_for)}\n" if wait_for else "")
         )
         for name, members in (groups or {}).items()
     }

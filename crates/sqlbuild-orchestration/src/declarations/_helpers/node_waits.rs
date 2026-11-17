@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::declarations::_helpers::group_waits::upstream_keys;
-use crate::declarations::constants::PHASE_NODE_KINDS;
+use crate::declarations::main::phase_node::phase_node;
 use crate::declarations::models::JobDefinition;
 use crate::snapshots::models::SnapshotInput;
 
@@ -34,13 +34,6 @@ pub(crate) struct GroupMembers<'a> {
     pub(crate) jobs: &'a BTreeMap<String, JobDefinition>,
     pub(crate) edges: &'a BTreeMap<String, BTreeSet<String>>,
     pub(crate) node_waits: &'a BTreeSet<String>,
-}
-
-/// Whether a node runs in a Python or load phase of its member's build, where waiting would hold the member's other nodes back.
-#[must_use]
-pub(crate) fn phase_node(key: &str) -> bool {
-    key.split_once(':')
-        .is_some_and(|(kind, _)| PHASE_NODE_KINDS.contains(&kind))
 }
 
 /// Each node's nearest upstream nodes some member selects, reached through nodes none selects.
@@ -108,8 +101,11 @@ fn owners<'a>(group: &GroupMembers<'a>) -> BTreeMap<&'a str, BTreeSet<&'a str>> 
     owners
 }
 
-/// The waits that close a cycle, each naming its nodes, or `None` when the group can run.
-pub(crate) fn node_wait_cycle(group: &GroupMembers<'_>) -> Option<String> {
+/// Every vertex and what it waits for: each node its own upstream nodes and, for a member that waits per node, its inputs from other members; a member that waits for jobs, or for `serialized` members, waits for their ends.
+fn wait_graph<'a>(
+    group: &GroupMembers<'a>,
+    serialized: &BTreeMap<String, BTreeSet<String>>,
+) -> BTreeMap<Vertex<'a>, BTreeSet<Vertex<'a>>> {
     let owners = owners(group);
     let mut memo: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     let cross = cross_member_inputs(group);
@@ -132,6 +128,16 @@ pub(crate) fn node_wait_cycle(group: &GroupMembers<'_>) -> Option<String> {
                 }
             }
         }
+        let job_ends: Vec<&str> = if per_node {
+            serialized
+                .get(member)
+                .into_iter()
+                .flatten()
+                .filter_map(|job| group.edges.get_key_value(job).map(|(job, _)| job.as_str()))
+                .collect()
+        } else {
+            upstream_jobs.iter().map(String::as_str).collect()
+        };
         for node in own {
             let vertex = Vertex::Node(member.as_str(), node.as_str());
             let mut node_waits: BTreeSet<Vertex<'_>> = BTreeSet::new();
@@ -147,19 +153,92 @@ pub(crate) fn node_wait_cycle(group: &GroupMembers<'_>) -> Option<String> {
                 if starts_late {
                     node_waits.insert(Vertex::MemberStart(member));
                 }
-            } else {
-                node_waits.extend(upstream_jobs.iter().map(|job| Vertex::JobEnd(job)));
             }
+            node_waits.extend(job_ends.iter().map(|job| Vertex::JobEnd(job)));
             waits.entry(vertex).or_default().extend(node_waits);
         }
     }
-    cycle(waits)
+    waits
 }
 
-/// Peel vertices with nothing left to wait for; any left over wait on each other, so following waits closes a loop.
-fn cycle(mut remaining: BTreeMap<Vertex<'_>, BTreeSet<Vertex<'_>>>) -> Option<String> {
+/// For each member that waits per node, the members it waits for as whole jobs because they share a pool and it reads their nodes; or the waits that close a cycle, naming the nodes.
+pub(crate) fn node_wait_plan(
+    group: &GroupMembers<'_>,
+) -> Result<BTreeMap<String, BTreeSet<String>>, String> {
+    let mut serialized: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     loop {
-        let ready: BTreeSet<Vertex<'_>> = remaining
+        let waits = wait_graph(group, &serialized);
+        let order = match peel(&waits) {
+            Ok(order) => order,
+            Err(remaining) => {
+                let cycle = describe(&remaining);
+                return Err(if serialized.is_empty() {
+                    cycle
+                } else {
+                    format!(
+                        "{cycle} (members that share a pool run one at a time, so one that reads \
+                         another's nodes waits for that whole job)"
+                    )
+                });
+            }
+        };
+        let mut reached: BTreeMap<Vertex<'_>, BTreeSet<&str>> = BTreeMap::new();
+        for vertex in &order {
+            let mut members: BTreeSet<&str> = BTreeSet::new();
+            for wait in &waits[vertex] {
+                match wait {
+                    Vertex::Node(owner, _) | Vertex::JobEnd(owner) => {
+                        members.insert(owner);
+                    }
+                    Vertex::MemberStart(_) => {}
+                }
+                members.extend(reached.get(wait).into_iter().flatten().copied());
+            }
+            reached.insert(*vertex, members);
+        }
+        let mut added = false;
+        for member in group.node_waits {
+            let pools = &group.jobs[member].pools;
+            let mut needs: BTreeSet<&str> = BTreeSet::new();
+            for node in &group.jobs[member].selection {
+                needs.extend(
+                    reached
+                        .get(&Vertex::Node(member.as_str(), node.as_str()))
+                        .into_iter()
+                        .flatten()
+                        .copied(),
+                );
+            }
+            for other in needs {
+                if other != member
+                    && group.jobs[other]
+                        .pools
+                        .keys()
+                        .any(|pool| pools.contains_key(pool))
+                    && serialized
+                        .entry(member.clone())
+                        .or_default()
+                        .insert(other.to_owned())
+                {
+                    added = true;
+                }
+            }
+        }
+        serialized.retain(|_, jobs| !jobs.is_empty());
+        if !added {
+            return Ok(serialized);
+        }
+    }
+}
+
+/// Vertices in an order where each comes after everything it waits for, or the ones left waiting on each other.
+fn peel<'a>(
+    waits: &BTreeMap<Vertex<'a>, BTreeSet<Vertex<'a>>>,
+) -> Result<Vec<Vertex<'a>>, BTreeMap<Vertex<'a>, BTreeSet<Vertex<'a>>>> {
+    let mut remaining = waits.clone();
+    let mut order: Vec<Vertex<'_>> = Vec::new();
+    loop {
+        let ready: Vec<Vertex<'_>> = remaining
             .iter()
             .filter(|(_, waits)| waits.iter().all(|wait| !remaining.contains_key(wait)))
             .map(|(vertex, _)| *vertex)
@@ -167,8 +246,20 @@ fn cycle(mut remaining: BTreeMap<Vertex<'_>, BTreeSet<Vertex<'_>>>) -> Option<St
         if ready.is_empty() {
             break;
         }
-        remaining.retain(|vertex, _| !ready.contains(vertex));
+        for vertex in &ready {
+            remaining.remove(vertex);
+        }
+        order.extend(ready);
     }
+    if remaining.is_empty() {
+        Ok(order)
+    } else {
+        Err(remaining)
+    }
+}
+
+/// Following waits among vertices that all wait on each other closes a loop; name each wait in it.
+fn describe(remaining: &BTreeMap<Vertex<'_>, BTreeSet<Vertex<'_>>>) -> String {
     let mut path: Vec<Vertex<'_>> = Vec::new();
     let mut current: Option<Vertex<'_>> = remaining.keys().next().copied();
     while let Some(vertex) = current {
@@ -182,14 +273,9 @@ fn cycle(mut remaining: BTreeMap<Vertex<'_>, BTreeSet<Vertex<'_>>>) -> Option<St
             .find(|wait| remaining.contains_key(wait))
             .copied();
     }
-    if path.is_empty() {
-        return None;
-    }
-    Some(
-        path.iter()
-            .zip(path.iter().cycle().skip(1))
-            .map(|(vertex, wait)| format!("{} waits for {}", vertex.describe(), wait.describe()))
-            .collect::<Vec<_>>()
-            .join("; "),
-    )
+    path.iter()
+        .zip(path.iter().cycle().skip(1))
+        .map(|(vertex, wait)| format!("{} waits for {}", vertex.describe(), wait.describe()))
+        .collect::<Vec<_>>()
+        .join("; ")
 }

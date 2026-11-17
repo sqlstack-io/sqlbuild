@@ -157,6 +157,16 @@ def _test_result_authored_order(*, plan: PlanOutput, result: SqlTestExecutionRes
     return len(plan.test_entries)
 
 
+_GATE_POLL_SECONDS: float = 2.0
+"""How long a held node waits between asking whether its inputs from other members are built."""
+
+
+def _gate_key(key: CompiledObjectKey) -> str:
+    """The snapshot node key a group member's gate names `key` by."""
+
+    return f"{key.resource_type}:{key.name}"
+
+
 def _resource_result_failed(result: object) -> bool:
     if isinstance(result, SqlTestExecutionResult):
         return result.outcome != SqlTestOutcome.PASS
@@ -218,6 +228,11 @@ class BuildScheduler:
         self._source_load_gate: Callable[[SourceEntry], tuple[str, str] | None] | None = (
             customizations.source_load_gate
         )
+        self._node_gate: Callable[[list[str]], list[tuple[str, str | None]]] | None = (
+            customizations.node_gate
+        )
+        self._gated: list[CompiledObjectKey] = []
+        self._gates_checked_at: float = 0.0
         self._loader_functions_by_name: dict[str, DiscoveredLoaderFunction] = {
             loader.name: loader for loader in customizations.loader_functions
         }
@@ -422,15 +437,22 @@ class BuildScheduler:
     def _run_serial(self) -> None:
         connection: Any = self._connection_pool.get()
         try:
-            while self._ready:
+            while self._ready or self._gated:
                 enforce_execution_deadline()
                 if self._stop:
                     break
+                if not self._ready:
+                    time.sleep(_GATE_POLL_SECONDS)
+                    self._release_gated(force=True)
+                    continue
+                self._release_gated(force=False)
                 key: CompiledObjectKey = self._ready.popleft()
                 if key.resource_type == CompiledResourceType.SOURCE:
                     if key in self._blocked_keys:
                         self._record_skipped(key)
                         self._mark_complete(key)
+                        continue
+                    if self._held_at_gate(key):
                         continue
                     if not self._pre_dispatch(key):
                         self._mark_complete(key)
@@ -444,6 +466,8 @@ class BuildScheduler:
                 if key in self._blocked_keys:
                     self._record_skipped(key)
                     self._mark_complete(key)
+                    continue
+                if self._held_at_gate(key):
                     continue
                 if not self._pre_dispatch(key):
                     self._mark_complete(key)
@@ -463,10 +487,11 @@ class BuildScheduler:
     def _run_concurrent(self) -> None:
         with ThreadPoolExecutor(max_workers=self._max_concurrency) as pool:
             self._report_scheduler_state()
-            while self._ready or self._in_flight:
+            while self._ready or self._in_flight or self._gated:
                 enforce_execution_deadline()
                 if self._stop and not self._in_flight:
                     break
+                self._release_gated(force=False)
 
                 with self._microbatch_coordinator_lock:
                     queued_coordinators: int = sum(
@@ -486,6 +511,8 @@ class BuildScheduler:
                             self._record_skipped(key)
                             self._mark_complete(key)
                             continue
+                        if self._held_at_gate(key):
+                            continue
                         if not self._pre_dispatch(key):
                             self._mark_complete(key)
                             continue
@@ -500,6 +527,8 @@ class BuildScheduler:
                         not self._is_concurrent_microbatch(candidate) for candidate in self._ready
                     ):
                         self._ready.append(key)
+                        continue
+                    if self._held_at_gate(key):
                         continue
                     if not self._pre_dispatch(key):
                         self._mark_complete(key)
@@ -526,12 +555,77 @@ class BuildScheduler:
 
                 self._report_scheduler_state()
                 if not self._in_flight:
+                    if self._gated and not self._ready and not self._stop:
+                        time.sleep(_GATE_POLL_SECONDS)
+                        self._release_gated(force=True)
+                        continue
                     break
 
-                completion: NodeCompletion = self._completion_queue.get()
+                if self._gated:
+                    try:
+                        completion: NodeCompletion = self._completion_queue.get(
+                            timeout=_GATE_POLL_SECONDS
+                        )
+                    except queue.Empty:
+                        continue
+                else:
+                    completion = self._completion_queue.get()
                 self._in_flight.discard(completion.key)
                 self._handle_completion(key=completion.key, result=completion.result)
             self._report_scheduler_state()
+
+    def _held_at_gate(self, key: CompiledObjectKey) -> bool:
+        """Hold `key` back while a node it reads from another group member is unbuilt.
+
+        A held node waits outside the executor's threads, so it never takes a slot from the
+        member's other nodes; one whose input failed is skipped under the member's policy.
+        """
+
+        if self._node_gate is None:
+            return False
+        closed: list[tuple[str, str | None]] = self._node_gate([_gate_key(key)])
+        if not closed:
+            return False
+        if closed[0][1] is None:
+            self._gated.append(key)
+        else:
+            self._skip_at_gate(key)
+        return True
+
+    def _release_gated(self, *, force: bool) -> None:
+        """Ask again about held nodes, at most once per poll unless forced; dispatch opened ones."""
+
+        if self._node_gate is None or not self._gated:
+            return
+        now: float = time.monotonic()
+        if not force and now - self._gates_checked_at < _GATE_POLL_SECONDS:
+            return
+        self._gates_checked_at = now
+        held: dict[str, CompiledObjectKey] = {_gate_key(key): key for key in self._gated}
+        closed: dict[str, str | None] = dict(self._node_gate(list(held)))
+        self._gated = []
+        name: str
+        key: CompiledObjectKey
+        for name, key in held.items():
+            if name not in closed:
+                self._ready.append(key)
+            elif closed[name] is None:
+                self._gated.append(key)
+            else:
+                self._skip_at_gate(key)
+
+    def _skip_at_gate(self, key: CompiledObjectKey) -> None:
+        """Skip a node whose input from another member was not built, and everything downstream."""
+
+        self._blocked_keys.update(
+            downstream_blocked_keys(
+                failed_key=key,
+                downstream_deps=self._plan.downstream_deps,
+                selected_keys=self._selected_execution_keys,
+            )
+        )
+        self._record_skipped(key)
+        self._mark_complete(key)
 
     def _report_scheduler_state(self) -> None:
         callback: Callable[[SchedulerState], None] | None = self._callbacks.on_scheduler_state

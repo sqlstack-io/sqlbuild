@@ -4,6 +4,7 @@ pub(crate) mod defer_clone;
 pub(crate) mod execution;
 pub(crate) mod invocation;
 pub(crate) mod lifecycle;
+pub(crate) mod node_gate;
 pub(crate) mod planning;
 pub(crate) mod policies;
 pub(crate) mod registration;

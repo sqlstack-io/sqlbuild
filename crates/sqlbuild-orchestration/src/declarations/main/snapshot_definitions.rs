@@ -45,7 +45,8 @@ pub fn snapshot_definitions(input: &SnapshotInput) -> Result<Definitions, Contro
             || definitions.jobs.contains_key(name)
             || group.job.description.trim().is_empty()
             || group.job.selection != selection
-            || group.jobs != dependencies
+            || group.jobs != dependencies.jobs
+            || group.pool_waits != dependencies.pool_waits
             || !group.job.settings.is_empty()
         {
             return Err(ControlError::Invalid(format!(

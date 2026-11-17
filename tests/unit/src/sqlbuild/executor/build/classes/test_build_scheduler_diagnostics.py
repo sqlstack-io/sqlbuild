@@ -51,6 +51,8 @@ def test_given_unchanged_concurrent_state_when_reporting_then_emits_once(
     scheduler._max_concurrency = test_case.expected_limit
     scheduler._last_scheduler_state = None
     scheduler._stop = False
+    scheduler._node_gate = None
+    scheduler._gated = []
 
     scheduler._report_scheduler_state()
     scheduler._report_scheduler_state()
@@ -99,6 +101,8 @@ def test_given_initial_fail_fast_failure_when_reporting_then_state_is_terminal(
     scheduler._max_concurrency = test_case.expected_limit
     scheduler._last_scheduler_state = None
     scheduler._stop = True
+    scheduler._node_gate = None
+    scheduler._gated = []
 
     scheduler._report_scheduler_state()
 
@@ -147,6 +151,8 @@ def test_given_concurrent_fail_fast_when_workers_drain_then_final_state_is_termi
     scheduler._max_concurrency = test_case.expected_limit
     scheduler._last_scheduler_state = None
     scheduler._stop = True
+    scheduler._node_gate = None
+    scheduler._gated = []
 
     scheduler._report_scheduler_state()
     scheduler._in_flight.clear()

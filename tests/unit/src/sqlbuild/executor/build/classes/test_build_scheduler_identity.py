@@ -45,6 +45,8 @@ def test_given_regular_primary_work_when_scheduler_submits_then_identity_is_prop
     scheduler._blocked_keys = set()
     scheduler._max_concurrency = 1
     scheduler._stop = False
+    scheduler._node_gate = None
+    scheduler._gated = []
     scheduler._microbatch_coordinator_lock = threading.Lock()
     scheduler._microbatch_coordinators = set()
     scheduler._microbatch_subworkers = 0
@@ -100,6 +102,8 @@ def test_given_microbatch_primary_work_when_scheduler_submits_then_identity_is_p
     scheduler._blocked_keys = set()
     scheduler._max_concurrency = 2
     scheduler._stop = False
+    scheduler._node_gate = None
+    scheduler._gated = []
     scheduler._microbatch_coordinator_lock = threading.Lock()
     scheduler._microbatch_coordinators = set()
     scheduler._microbatch_subworkers = 0

@@ -19,7 +19,7 @@ pub(crate) async fn child_ready(
     Ok((transaction, waits.is_empty()))
 }
 
-/// What holds a group child back: its group not running, or upstream jobs of the group not finished; a member that waits per node starts with its group and gates each node instead.
+/// What holds a group child back: its group not running, or upstream jobs of the group not finished; a member that waits per node waits only for the members it shares a pool with and reads from, and gates each node instead.
 pub(crate) async fn child_waits(
     transaction: ControlTransaction,
     request: &RunRequest,
@@ -53,9 +53,17 @@ pub(crate) async fn child_waits(
             vec![QueueWait::GroupParent { run_id: parent_id }],
         ));
     }
-    if per_node {
-        return Ok((transaction, Vec::new()));
-    }
+    let dependencies: BTreeSet<&str> = if per_node {
+        declaration
+            .pool_waits
+            .get(name)
+            .into_iter()
+            .flatten()
+            .map(String::as_str)
+            .collect()
+    } else {
+        dependencies
+    };
     let waits: Vec<QueueWait> = group
         .children
         .iter()

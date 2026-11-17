@@ -17,7 +17,7 @@ use crate::runs::models::{
 };
 use crate::runs::tests::claim_helpers::{finish, report};
 use crate::runs::tests::helpers::snapshot;
-use crate::runs::tests::test_types::NodeGateTestCase;
+use crate::runs::tests::test_types::{CrossingGroupTestCase, NodeGateTestCase};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
@@ -255,4 +255,160 @@ fn given_members_waiting_per_node_when_inputs_build_fail_or_retry_then_each_node
         });
     }
     assert_eq!(completed, 8, "every case runs on both backends");
+}
+
+#[test]
+fn given_job_waits_that_cycle_over_acyclic_nodes_when_the_group_runs_then_every_member_starts_and_nodes_open_in_lineage_order()
+ {
+    let test_cases = [Backend::Sqlite, Backend::Postgres].map(|backend| CrossingGroupTestCase {
+        description: "each build opens exactly the node that reads it",
+        backend,
+        expected_open_after: vec![
+            ("start", vec!["customers"]),
+            ("customers", vec!["customers", "orders"]),
+            ("orders", vec!["customers", "inventory", "orders"]),
+            (
+                "inventory",
+                vec!["customers", "inventory", "orders", "products"],
+            ),
+        ],
+    });
+    let mut completed = 0;
+    for test_case in test_cases {
+        let description = format!("{:?}: {}", test_case.backend, test_case.description);
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = snapshot(location);
+            for (node, deps) in [
+                ("orders", json!(["customers"])),
+                ("inventory", json!(["orders"])),
+                ("products", json!(["inventory"])),
+            ] {
+                input.nodes.get_mut(node).expect("node").definition["deps"] = deps;
+            }
+            input.documents.insert(
+                "jobs".into(),
+                json!({
+                    "c_job": {"description": "Build customers and products",
+                        "selection": ["customers", "products"]},
+                    "b_job": {"description": "Build orders", "selection": ["orders"]},
+                    "a_job": {"description": "Build inventory", "selection": ["inventory"]}
+                }),
+            );
+            input.documents.insert("groups".into(), json!({"nightly_job_group": {
+                "description": "Three jobs whose job waits cycle",
+                "selection": ["customers", "inventory", "orders", "products"],
+                "jobs": {"a_job": ["b_job"], "b_job": ["c_job"], "c_job": ["a_job"]},
+                "wait_reasons": {
+                    "a_job": [{"upstream_job": "b_job", "from_node": "orders", "to_node": "inventory"}],
+                    "b_job": [{"upstream_job": "c_job", "from_node": "customers", "to_node": "orders"}],
+                    "c_job": [{"upstream_job": "a_job", "from_node": "inventory", "to_node": "products"}]
+                },
+                "node_waits": ["a_job", "b_job", "c_job"]
+            }}));
+            publish_snapshot(store, &input).await.expect("publish");
+            let context = AuditContext {
+                actor: "test-operator".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            request_job_run(
+                store,
+                (&context, None),
+                &JobRunRequest {
+                    run_id: Uuid::now_v7(),
+                    location_id: location,
+                    target: "development".into(),
+                    job_key: "nightly_job_group".into(),
+                    reason: "Build the nightly group".into(),
+                    priority: 0,
+                    window: None,
+                    full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
+                },
+            )
+            .await
+            .expect("request group");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::new();
+            let scope = (location, "development");
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("start group");
+            let mut claims = BTreeMap::new();
+            while let Some(claim) = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim member")
+            {
+                claims.insert(claim.request.job_key.clone().expect("member"), claim);
+            }
+            assert_eq!(
+                claims.len(),
+                3,
+                "{description}: every member starts at once"
+            );
+            let owner = |node: &str| match node {
+                "orders" => "b_job",
+                "inventory" => "a_job",
+                _ => "c_job",
+            };
+            for claim in claims.values() {
+                report(store, claim, vec![RunChange::Started]).await;
+            }
+            for (built, expected_open) in &test_case.expected_open_after {
+                if *built != "start" {
+                    report(
+                        store,
+                        &claims[owner(built)],
+                        vec![RunChange::NodeFinished {
+                            node_key: (*built).into(),
+                            outcome: NodeOutcome::Success,
+                            rows_affected: None,
+                            error_code: None,
+                            skipped_because_of: None,
+                            error_message: None,
+                        }],
+                    )
+                    .await;
+                }
+                let mut open: Vec<String> = Vec::new();
+                for claim in claims.values() {
+                    let gates = read_node_gates(
+                        store,
+                        (claim.request.run_id, claim.claim_id),
+                        &NodeGatesRequest {
+                            nodes: claim.request.selection.clone(),
+                        },
+                    )
+                    .await
+                    .expect("gates")
+                    .expect("active claim");
+                    open.extend(
+                        gates
+                            .nodes
+                            .into_iter()
+                            .filter(|(_, gate)| *gate == NodeGate::Open)
+                            .map(|(node, _)| node),
+                    );
+                }
+                open.sort();
+                assert_eq!(open, *expected_open, "{description}: after {built}");
+            }
+            completed += 1;
+            close_test_store(fixture).await;
+        });
+    }
+    assert_eq!(completed, 2, "every case runs on both backends");
 }

@@ -1,12 +1,16 @@
 //! A worker's authenticated HTTP requests carry only its own run and claim.
 
+use std::collections::BTreeSet;
+
 use sqlbuild_recall::records::models::OutputChunk;
 use uuid::Uuid;
 
 use crate::api::errors::ClientError;
 use crate::api::main::client_response::client_response;
 use crate::api::models::{HeartbeatResponse, MutationResponse};
-use crate::runs::models::{OutputPublication, RunChange, RunChangeRequest, RunExecution};
+use crate::runs::models::{
+    NodeGates, NodeGatesRequest, OutputPublication, RunChange, RunChangeRequest, RunExecution,
+};
 use crate::worker::errors::WorkerError;
 use crate::worker::models::WorkerClient;
 
@@ -63,6 +67,19 @@ impl WorkerClient {
                 .client
                 .post(format!("{}output", self.run_url))
                 .json(chunks),
+        )
+        .await?)
+    }
+
+    /// Which of the member's gated `nodes` may run now, must wait, or are skipped.
+    pub async fn gates(&self, nodes: &BTreeSet<String>) -> Result<NodeGates, WorkerError> {
+        Ok(client_response(
+            self.connection
+                .client
+                .post(format!("{}gates", self.run_url))
+                .json(&NodeGatesRequest {
+                    nodes: nodes.clone(),
+                }),
         )
         .await?)
     }

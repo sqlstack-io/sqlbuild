@@ -1,6 +1,6 @@
 //! Execute only the API's frozen request after compiling and verifying the unmodified baseline.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
@@ -146,7 +146,7 @@ fn command_request<'py>(
     py: Python<'py>,
     discovered: &Bound<'py, PyAny>,
     arguments: &KeywordArguments<'py>,
-    worker: &Bound<'py, NativeOrchestrationWorker>,
+    (worker, excluded): (&Bound<'py, NativeOrchestrationWorker>, &BTreeSet<String>),
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let execution = worker.get().execution(py)?;
     let frozen = execution.claim.request;
@@ -192,7 +192,7 @@ fn command_request<'py>(
         PyString::new(py, "--json"),
     ]);
     for key in &frozen.selection {
-        if execution.skipped_nodes.contains_key(key) {
+        if excluded.contains(key) {
             continue;
         }
         let (kind, name) = key
@@ -365,7 +365,8 @@ pub(super) fn execute_worker<'py>(
             Some(Arc::clone(&worker));
     }
     let result = (|| {
-        if !worker.has_work() {
+        worker.wait_at_start(py)?;
+        if !worker.has_work()? {
             write_stderr(
                 py,
                 "Run inputs verified. All selected nodes are blocked by upstream failures.\n",
@@ -379,7 +380,8 @@ pub(super) fn execute_worker<'py>(
             return Err(PyValueError::new_err(reason));
         }
         record_compiled_vars(py, (&owner, &frozen), (arguments, input, &project))?;
-        let (request, scope) = command_request(py, &discovered, arguments, &owner)?;
+        let excluded = worker.excluded()?;
+        let (request, scope) = command_request(py, &discovered, arguments, (&owner, &excluded))?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
         let _rules = RulesAtLoadScope::enter();
         within(&scope, |_| {

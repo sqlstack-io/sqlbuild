@@ -11,6 +11,7 @@ pub mod list_person_triggers;
 pub mod list_trigger_events;
 pub mod list_triggers;
 pub mod pause_development_triggers;
+pub mod phase_node;
 pub(crate) mod publish_definitions;
 pub(crate) mod published_job;
 pub mod read_person_job;

@@ -11,15 +11,17 @@ use sqlbuild_core::models::{CompiledResourceType, ResourceKind};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_host::models::SqlTestOutcome;
 use sqlbuild_host::types::ResultEnum;
+use sqlbuild_orchestration::declarations::main::phase_node::phase_node;
 use sqlbuild_orchestration::runs::models::{
-    NodeOutcome, RunChange, RunCommand, RunExecution, RunOutcome,
+    GateInput, NodeGate, NodeOutcome, RunChange, RunCommand, RunExecution, RunOutcome,
 };
 
 use crate::bindings::_helpers::compiled_project::constants::{
-    NO_CHANGE_REASON, SKIP_ACTION, SQL_TEST_KEY_PREFIX,
+    GATE_POLL, NO_CHANGE_REASON, SKIP_ACTION, SQL_TEST_KEY_PREFIX,
 };
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::native_host::deferred_cost::DeferredCost;
+use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::records::fields::field;
 
 /// Node keys by snapshot node key, such as the models each test checks.
@@ -57,6 +59,14 @@ pub(crate) struct WorkerBuild {
     ignored_audit_failures: AtomicU32,
     /// The build's cost finalization, collected once the run has reported its outcome.
     deferred_cost: DeferredCost,
+    /// For a group member that waits per node, each gated node's inputs from other members.
+    gated: BTreeMap<String, Vec<GateInput>>,
+    /// Gated nodes whose gate opened, so the executor stops asking about them.
+    opened: Mutex<BTreeSet<String>>,
+    /// Nodes skipped at their gate, or downstream of one skipped before the command started, each with its failed input.
+    gate_skips: Mutex<BTreeMap<String, String>>,
+    /// Gated nodes already reported as waiting.
+    announced: Mutex<BTreeSet<String>>,
 }
 
 impl WorkerBuild {
@@ -64,8 +74,10 @@ impl WorkerBuild {
         worker: &Bound<'_, NativeOrchestrationWorker>,
         (attached, blocked, upstream): (NodeKeys, NodeKeys, NodeKeys),
     ) -> PyResult<Arc<Self>> {
+        let execution = worker.get().execution(worker.py())?;
+        let gated = execution.gated_nodes.clone();
         let state = Arc::new(Self {
-            execution: worker.get().execution(worker.py())?,
+            execution,
             worker: worker.clone().unbind(),
             completed: Mutex::default(),
             checks: Mutex::default(),
@@ -80,6 +92,10 @@ impl WorkerBuild {
             ignored_audit_failures: AtomicU32::new(0),
             refusal: Mutex::default(),
             deferred_cost: DeferredCost::default(),
+            gated,
+            opened: Mutex::default(),
+            gate_skips: Mutex::default(),
+            announced: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
             state.complete(worker.py(), key, (NodeOutcome::Skipped, None, (None, None)))?;
@@ -124,13 +140,165 @@ impl WorkerBuild {
         self.returned.store(true, Ordering::SeqCst);
     }
 
-    pub(crate) fn has_work(&self) -> bool {
-        self.execution
+    pub(crate) fn has_work(&self) -> PyResult<bool> {
+        let excluded = self.excluded()?;
+        Ok(self
+            .execution
             .claim
             .request
             .selection
             .iter()
-            .any(|key| !self.execution.skipped_nodes.contains_key(key))
+            .any(|key| !excluded.contains(key)))
+    }
+
+    /// Selected nodes the frozen command leaves out because they are skipped before it starts.
+    pub(crate) fn excluded(&self) -> PyResult<BTreeSet<String>> {
+        let mut excluded: BTreeSet<String> = self.execution.skipped_nodes.keys().cloned().collect();
+        excluded.extend(
+            self.gate_skips
+                .lock()
+                .map_err(|_| poisoned())?
+                .keys()
+                .cloned(),
+        );
+        Ok(excluded)
+    }
+
+    /// Why `key` is skipped before it runs: a sibling's failure found at claim, or its closed gate.
+    fn skip_cause(&self, key: &str) -> PyResult<Option<String>> {
+        if let Some(cause) = self.execution.skipped_nodes.get(key) {
+            return Ok(Some(cause.clone()));
+        }
+        Ok(self
+            .gate_skips
+            .lock()
+            .map_err(|_| poisoned())?
+            .get(key)
+            .cloned())
+    }
+
+    /// Whether the executor must ask before running nodes, because this member waits per node.
+    pub(crate) fn gates_nodes(&self) -> bool {
+        !self.gated.is_empty()
+    }
+
+    /// The gated nodes among `keys` that may not run yet: each with its failed input when skipped, or none while it waits.
+    pub(crate) fn gate(
+        &self,
+        py: Python<'_>,
+        keys: &[String],
+    ) -> PyResult<Vec<(String, Option<String>)>> {
+        self.check_cancelled(py)?;
+        let asked: BTreeSet<String> = {
+            let opened = self.opened.lock().map_err(|_| poisoned())?;
+            keys.iter()
+                .filter(|key| self.gated.contains_key(*key) && !opened.contains(*key))
+                .cloned()
+                .collect()
+        };
+        if asked.is_empty() {
+            return Ok(Vec::new());
+        }
+        let gates = self.worker.bind(py).get().gates(py, &asked)?;
+        let mut closed: Vec<(String, Option<String>)> = Vec::new();
+        for (key, gate) in gates.nodes {
+            match gate {
+                NodeGate::Open => {
+                    self.opened.lock().map_err(|_| poisoned())?.insert(key);
+                }
+                NodeGate::Waiting { waiting_for } => {
+                    if self
+                        .announced
+                        .lock()
+                        .map_err(|_| poisoned())?
+                        .insert(key.clone())
+                    {
+                        let inputs: Vec<String> = waiting_for
+                            .iter()
+                            .map(|input| format!("{} ({})", input.node_key, input.job_key))
+                            .collect();
+                        write_stderr(
+                            py,
+                            &format!("{key} is waiting for {}.\n", inputs.join(", ")),
+                        )?;
+                    }
+                    closed.push((key, None));
+                }
+                NodeGate::Skipped { cause } => {
+                    self.gate_skips
+                        .lock()
+                        .map_err(|_| poisoned())?
+                        .insert(key.clone(), cause.clone());
+                    self.complete(py, &key, (NodeOutcome::Skipped, None, (None, None)))?;
+                    closed.push((key, Some(cause)));
+                }
+            }
+        }
+        Ok(closed)
+    }
+
+    /// Before the command starts, wait for the gated nodes that cannot wait inside it: its Python and load nodes, or all of a command other than build; one skipped here leaves the command with everything selected downstream of it.
+    pub(crate) fn wait_at_start(&self, py: Python<'_>) -> PyResult<()> {
+        let build = self.command().is_build();
+        let selection = &self.execution.claim.request.selection;
+        let mut pending: Vec<String> = self
+            .gated
+            .keys()
+            .filter(|key| {
+                (!build || phase_node(key))
+                    && selection.contains(*key)
+                    && !self.execution.skipped_nodes.contains_key(*key)
+            })
+            .cloned()
+            .collect();
+        while !pending.is_empty() {
+            let mut waiting: Vec<String> = Vec::new();
+            for (key, cause) in self.gate(py, &pending)? {
+                match cause {
+                    Some(cause) => self.skip_downstream(py, &key, &cause)?,
+                    None => waiting.push(key),
+                }
+            }
+            pending = waiting;
+            if !pending.is_empty() {
+                py.detach(|| std::thread::sleep(GATE_POLL));
+            }
+        }
+        Ok(())
+    }
+
+    /// Skip every selected node downstream of `key`, through any nodes, because of `cause`.
+    fn skip_downstream(&self, py: Python<'_>, key: &str, cause: &str) -> PyResult<()> {
+        let mut downstream: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        for (node, upstream) in &self.upstream {
+            for up in upstream {
+                downstream
+                    .entry(up.as_str())
+                    .or_default()
+                    .push(node.as_str());
+            }
+        }
+        let mut seen: BTreeSet<&str> = BTreeSet::from([key]);
+        let mut pending: Vec<&str> = vec![key];
+        while let Some(node) = pending.pop() {
+            for next in downstream.get(node).into_iter().flatten() {
+                if !seen.insert(next) {
+                    continue;
+                }
+                pending.push(next);
+                if self.execution.claim.request.selection.contains(*next)
+                    && !self.execution.skipped_nodes.contains_key(*next)
+                {
+                    self.gate_skips
+                        .lock()
+                        .map_err(|_| poisoned())?
+                        .entry((*next).to_owned())
+                        .or_insert_with(|| cause.to_owned());
+                    self.complete(py, next, (NodeOutcome::Skipped, None, (None, None)))?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Record why the run is refused; the terminal report carries it as the run's status reason.
@@ -267,8 +435,8 @@ impl WorkerBuild {
             return Ok(());
         }
         let skipped_because_of = match outcome {
-            NodeOutcome::Skipped => match self.execution.skipped_nodes.get(key) {
-                Some(cause) => Some(cause.clone()),
+            NodeOutcome::Skipped => match self.skip_cause(key)? {
+                Some(cause) => Some(cause),
                 None if !self.checks_only() => self.failed_upstream(key)?,
                 None => None,
             },

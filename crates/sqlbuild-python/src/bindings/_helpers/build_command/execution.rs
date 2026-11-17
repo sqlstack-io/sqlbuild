@@ -1,5 +1,7 @@
 //! Prepare build execution, run the build pipeline and the post-build Python checks.
 
+use std::sync::Arc;
+
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -16,6 +18,7 @@ use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::lifecycle::{
     DirectPythonLifecycle, LifecycleInputs, prepare_direct_python_lifecycle,
 };
+use crate::bindings::_helpers::build_command::node_gate::NodeGateCallback;
 use crate::bindings::_helpers::build_command::support::{
     boolean, display_text, emit, frozenset, joined, keyword_relay, line_writer, none, text, tuple,
 };
@@ -450,6 +453,7 @@ pub(crate) fn execute_build_plan<'py>(
                 "source_load_gate",
                 DirectPythonLifecycle::source_load_gate(&preparation.lifecycle)?.into_any(),
             ),
+            ("node_gate", node_gate(py, context)?),
         ],
     )?;
     let initial_state: Bound<'py, PyAny> = call_with(
@@ -510,6 +514,24 @@ pub(crate) fn execute_build_plan<'py>(
 }
 
 /// Report what `--changed` runs and skips, and any warnings from reading records.
+/// The scheduler's gate for a group member that waits per node; none for any other build.
+fn node_gate<'py>(py: Python<'py>, context: &BuildContext<'py>) -> PyResult<Bound<'py, PyAny>> {
+    match context
+        .worker
+        .as_ref()
+        .filter(|worker| worker.gates_nodes())
+    {
+        Some(worker) => Ok(Bound::new(
+            py,
+            NodeGateCallback {
+                worker: Arc::clone(worker),
+            },
+        )?
+        .into_any()),
+        None => Ok(py.None().into_bound(py)),
+    }
+}
+
 fn report_changed_decision(context: &BuildContext<'_>, prepared: &Prepared<'_>) -> PyResult<()> {
     for warning in &prepared.warnings {
         emit(&context.stream, &format!("warning: {warning}\n"))?;

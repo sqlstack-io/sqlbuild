@@ -126,6 +126,9 @@ class BuildCustomizations:
     loader_functions: tuple[DiscoveredLoaderFunction, ...] = ()
     source_load_gate: Callable[[SourceEntry], tuple[str, str] | None] | None = None
     """Why and how (`hard` or `soft`) a source load is skipped before it starts."""
+    node_gate: Callable[[list[str]], list[tuple[str, str | None]]] | None = None
+    """For a group member that waits per node: which of the asked node keys may not run yet,
+    each with its failed input when skipped or `None` while it waits."""
 
 
 @dataclass(frozen=True)
