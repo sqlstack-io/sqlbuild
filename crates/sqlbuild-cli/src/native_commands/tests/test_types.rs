@@ -224,3 +224,20 @@ pub(super) struct WorkCheckTestCase {
     pub(super) sync: bool,
     pub(super) expected_wait: std::time::Duration,
 }
+
+/// One failed read after earlier failures in a row, on a warehouse whose reads may wake compute.
+pub(crate) struct FailedReadHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) failure: crate::native_commands::models::ReadFailure,
+    pub(crate) failures_before: usize,
+    pub(crate) billed: bool,
+    /// Whether the page shrinks, the closed cause, the reported error, whether the sync stops,
+    /// and the seconds until the next sync the report announces.
+    pub(crate) expected: (
+        bool,
+        Option<sqlbuild_orchestration::platform::models::WarehouseReadFailure>,
+        Option<&'static str>,
+        bool,
+        Option<i64>,
+    ),
+}

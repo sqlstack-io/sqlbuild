@@ -1,18 +1,23 @@
-use crate::native_commands::_helpers::execution::metadata_sync;
 use crate::native_commands::_helpers::execution::{
     history_request, read_metadata_page, rows_text, safety_sync_setting, scan_line, sync_progress,
 };
+use crate::native_commands::_helpers::execution::{metadata_health_of, metadata_sync};
 use crate::native_commands::constants::METADATA_SAFETY_SYNC_SECONDS;
 use crate::native_commands::main::_location_metadata::read_failure_line;
 use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
+    FailedReadHealthTestCase, NewestVersionsTestCase, ReadFailureTestCase,
+};
+use crate::native_commands::tests::test_types::{
     MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
     SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
-use crate::native_commands::tests::test_types::{NewestVersionsTestCase, ReadFailureTestCase};
 use chrono::Utc;
 use sqlbuild_config::project::models::ControlConfig;
+use sqlbuild_orchestration::platform::models::{
+    LocationHealth, WarehouseReadFailure, WarehouseSyncFailure,
+};
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
@@ -88,7 +93,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             failures: vec![false, false, false],
             failures_after_request: vec![],
             expected_waits: vec![Some(30), Some(60), Some(120)],
-            expected_limit: MAX_HISTORY_RECORDS,
+            expected_limit: MAX_HISTORY_PAGE_RECORDS,
             expected_halted: false,
             expected_paging: (true, true),
         },
@@ -97,7 +102,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             failures: vec![],
             failures_after_request: vec![false, false, false, false, false],
             expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None],
-            expected_limit: MAX_HISTORY_RECORDS,
+            expected_limit: MAX_HISTORY_PAGE_RECORDS,
             expected_halted: true,
             expected_paging: (true, false),
         },
@@ -106,7 +111,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             failures: vec![true, true],
             failures_after_request: vec![],
             expected_waits: vec![Some(30), Some(30)],
-            expected_limit: MAX_HISTORY_RECORDS / 4,
+            expected_limit: MAX_HISTORY_PAGE_RECORDS / 4,
             expected_halted: false,
             expected_paging: (false, false),
         },
@@ -115,7 +120,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             failures: vec![false, false, false, false, false],
             failures_after_request: vec![false],
             expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None, Some(30)],
-            expected_limit: MAX_HISTORY_RECORDS,
+            expected_limit: MAX_HISTORY_PAGE_RECORDS,
             expected_halted: false,
             expected_paging: (true, false),
         },
@@ -803,4 +808,128 @@ fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_o
     let mut requested = idle(true, false);
     requested.request_sync();
     assert!(requested.sync_due(None), "a request still syncs");
+}
+
+#[test]
+fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whether_it_stops() {
+    let denied = || {
+        ReadFailure::Read(WarehouseHistoryFailure {
+            reason: "permission denied for table _sqlbuild_fingerprints".into(),
+            page_size: false,
+        })
+    };
+    let test_cases = [
+        FailedReadHealthTestCase {
+            description: "a time-out halves the page and never counts toward a stop",
+            failure: ReadFailure::TimedOut(30),
+            failures_before: 4,
+            billed: false,
+            expected: (
+                true,
+                Some(WarehouseReadFailure::TimedOut { seconds: 30 }),
+                Some("no reply within 30 s"),
+                false,
+                None,
+            ),
+        },
+        FailedReadHealthTestCase {
+            description: "a read error before the limit backs off with its cause and error",
+            failure: denied(),
+            failures_before: 3,
+            billed: false,
+            expected: (
+                false,
+                Some(WarehouseReadFailure::ReadError {}),
+                Some("permission denied for table _sqlbuild_fingerprints"),
+                false,
+                None,
+            ),
+        },
+        FailedReadHealthTestCase {
+            description: "the read error that stops the sync announces its safety retry",
+            failure: denied(),
+            failures_before: 4,
+            billed: false,
+            expected: (
+                false,
+                Some(WarehouseReadFailure::ReadError {}),
+                Some("permission denied for table _sqlbuild_fingerprints"),
+                true,
+                Some(1800),
+            ),
+        },
+        FailedReadHealthTestCase {
+            description: "on a billed warehouse the stop waits for a run, request or publication",
+            failure: denied(),
+            failures_before: 4,
+            billed: true,
+            expected: (
+                false,
+                Some(WarehouseReadFailure::ReadError {}),
+                Some("permission denied for table _sqlbuild_fingerprints"),
+                true,
+                None,
+            ),
+        },
+        FailedReadHealthTestCase {
+            description: "a reader that did not start reports its own cause",
+            failure: ReadFailure::ReaderStart("no such file".into()),
+            failures_before: 0,
+            billed: false,
+            expected: (
+                false,
+                Some(WarehouseReadFailure::ReaderStart {}),
+                Some("the metadata reader did not start: no such file"),
+                false,
+                None,
+            ),
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 1800));
+        state.index = WarehouseHistoryKind::ALL
+            .iter()
+            .position(|kind| *kind == WarehouseHistoryKind::Fingerprints)
+            .expect("kind is listed");
+        state.reads_wake_compute = test_case.billed;
+        state.safety_explicit = false;
+        state.begin_sync(Utc::now());
+        for _ in 0..test_case.failures_before {
+            state.fail_read(false, Utc::now());
+        }
+        let page_size: bool = test_case.failure.page_size();
+        let halts: bool = state.halts(page_size);
+        let now = Utc::now();
+        let health = metadata_health_of(
+            &state,
+            (
+                Instant::now(),
+                Some(WarehouseSyncFailure::Read),
+                Some((&test_case.failure, halts)),
+            ),
+            now,
+        );
+        let LocationHealth::WarehouseSync {
+            read_failure,
+            error,
+            progress,
+            next_sync_at,
+            ..
+        } = health
+        else {
+            panic!("{}: not a warehouse sync report", test_case.description);
+        };
+        assert_eq!(
+            (
+                state.shrinks(page_size),
+                read_failure,
+                error.as_deref(),
+                progress.expect("progress").halted,
+                next_sync_at.map(|at| (at - now).num_seconds()),
+            ),
+            test_case.expected,
+            "{}",
+            test_case.description
+        );
+    }
 }

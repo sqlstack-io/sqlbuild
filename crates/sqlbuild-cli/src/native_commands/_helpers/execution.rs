@@ -1966,6 +1966,46 @@ pub(crate) fn safety_sync_at(
 
 /// A failed read also reports its closed cause, its redacted error and the page size it asked
 /// for, and whether it stops the sync; a stopped sync's next sync is its safety retry, if any.
+pub(crate) fn metadata_health_of(
+    state: &LocationMetadataSync,
+    (started, failure, read): (
+        Instant,
+        Option<WarehouseSyncFailure>,
+        Option<(&ReadFailure, bool)>,
+    ),
+    now: DateTime<Utc>,
+) -> LocationHealth {
+    let halted: bool = read.is_some_and(|(_, halts)| halts);
+    let next_sync_at = if halted {
+        safety_sync_at(state, now)
+    } else {
+        completed_sync_next_at(state, failure, now)
+    };
+    let read_failure = read.and_then(|(read, _)| read.cause());
+    LocationHealth::WarehouseSync {
+        generation: state.generation,
+        location: state.location().clone(),
+        table: state.kind(),
+        failure,
+        records_sent: state
+            .pending
+            .as_ref()
+            .map_or(0, |page| page.batch.records.len()) as u64,
+        elapsed_millis: started.elapsed().as_millis() as u64,
+        page_limit: read_failure.map(|_| page_limit(state) as u64),
+        read_failure,
+        error: read
+            .filter(|(read, _)| read.cause().is_some())
+            .map(|(read, _)| read.reason().chars().take(METADATA_ERROR_CHARS).collect()),
+        progress: Some(WarehouseSyncProgress {
+            halted,
+            ..sync_progress(state, failure.is_none())
+        }),
+        next_sync_at,
+    }
+}
+
+/// Send `metadata_health_of` for this page; a failed report is logged, never fatal.
 pub(crate) async fn report_metadata_health(
     state: &LocationMetadataSync,
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
@@ -1975,39 +2015,11 @@ pub(crate) async fn report_metadata_health(
         Option<(&ReadFailure, bool)>,
     ),
 ) {
-    let now = Utc::now();
-    let halted: bool = read.is_some_and(|(_, halts)| halts);
-    let next_sync_at = if halted {
-        safety_sync_at(state, now)
-    } else {
-        completed_sync_next_at(state, failure, now)
-    };
-    let read_failure = read.and_then(|(read, _)| read.cause());
     let report = LocationHealthReport {
         event_id: Uuid::now_v7(),
         session_id: poll.session_id,
         target: poll.target.clone(),
-        health: LocationHealth::WarehouseSync {
-            generation: state.generation,
-            location: state.location().clone(),
-            table: state.kind(),
-            failure,
-            records_sent: state
-                .pending
-                .as_ref()
-                .map_or(0, |page| page.batch.records.len()) as u64,
-            elapsed_millis: started.elapsed().as_millis() as u64,
-            page_limit: read_failure.map(|_| page_limit(state) as u64),
-            read_failure,
-            error: read
-                .filter(|(read, _)| read.cause().is_some())
-                .map(|(read, _)| read.reason().chars().take(METADATA_ERROR_CHARS).collect()),
-            progress: Some(WarehouseSyncProgress {
-                halted,
-                ..sync_progress(state, failure.is_none())
-            }),
-            next_sync_at,
-        },
+        health: metadata_health_of(state, (started, failure, read), Utc::now()),
     };
     if let Err(error) = client.report_health(&report).await {
         drop(write_output(&[(
