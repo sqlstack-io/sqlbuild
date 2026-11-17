@@ -7,6 +7,7 @@ import type {
 	NodeCounts,
 	OnFailure,
 	OverlapPolicy,
+	ResolvedConcurrency,
 	PoolUse,
 	QueueWait,
 	RunCost,
@@ -108,21 +109,45 @@ export function shortRunId(id: string): string {
 /** How many of the jobs sharing a pool are named before "+N more". */
 export const SHARED_SHOWN = 3;
 
-/**
- * A pool the job takes in plain words: "One run at a time", "At most 3 runs at a time" or "Takes 2 of
- * 4 slots", the other jobs and groups sharing it (the first `SHARED_SHOWN`, then `more`), and the pool
- * itself as a secondary detail.
- */
-export function poolText(use: PoolUse): { rule: string; shared: string[]; more: number; detail: string } {
-	const shared = use.sharedWith.slice(0, SHARED_SHOWN);
-	const more = use.sharedWith.length - shared.length;
-	const rule = use.amount === 1 ? (use.limit === 1 ? 'One run at a time' : `At most ${use.limit} runs at a time`) : `Takes ${use.amount} of ${use.limit} slots`;
-	return { rule, shared, more, detail: `pool ${use.pool}, ${use.amount} of ${use.limit} slots` };
+/** The docs page the Concurrency panel links to. */
+export const CONCURRENCY_DOCS = 'https://sqlbuild.com/docs/concepts/concurrency/';
+
+/** Which layer set a run's concurrency, as the panel names it; a target by its name when known. */
+export function concurrencySource(source: ResolvedConcurrency['source'], target: string | null): string {
+	switch (source) {
+		case 'job':
+			return 'job setting';
+		case 'target':
+			return target ? `target ${target}` : 'target setting';
+		case 'local':
+			return 'local setting';
+		case 'project':
+			return 'project setting';
+		case 'default':
+			return 'SQLBuild default';
+	}
 }
 
-/** A pool's name in words, e.g. `warehouse_heavy` → `warehouse heavy`. */
-export function slotLabel(pool: string): string {
-	return pool.replace(/[_-]+/g, ' ');
+/** What a job does when triggered while a run of it is active, finishing "If triggered while running: …". */
+export const overlapWhileRunning: Record<OverlapPolicy, string> = { queue: 'waits', skip: 'is skipped' };
+
+/**
+ * A pool the job takes, in plain words. Normally "supplier_api: takes 1 of 2", against the limit on
+ * this server, with the cap as a quiet detail when the server lowered the project's limit. When the
+ * job asks for more than this server allows, it takes the whole pool, and `clamped` says so: "Takes
+ * the whole warehouse_heavy pool on this server (capped at 1; the project asks for 3)". The other
+ * jobs and groups sharing it follow: the first `SHARED_SHOWN`, then `more`.
+ */
+export function poolText(use: PoolUse): { text: string; detail: string | null; clamped: boolean; shared: string[]; more: number } {
+	const shared = use.sharedWith.slice(0, SHARED_SHOWN);
+	const more = use.sharedWith.length - shared.length;
+	if (use.clamped) {
+		// copy-allow: the Concurrency panel's wording, agreed with the product owner
+		return { text: `Takes the whole ${use.pool} pool on this server`, detail: `capped at ${use.serverLimit}; the project asks for ${use.amount}`, clamped: true, shared, more };
+	}
+	const capped = use.serverLimit < use.limit;
+	// copy-allow: the Concurrency panel's wording, agreed with the product owner
+	return { text: `${use.pool}: takes ${use.amount} of ${use.serverLimit}`, detail: capped ? `capped on this server; the project allows ${use.limit}` : null, clamped: false, shared, more };
 }
 
 const runLink = (id: string): WaitPart => ({ text: `run ${shortRunId(id)}`, href: `/runs/${id}` });
@@ -143,11 +168,11 @@ export function describeWait(wait: QueueWait): WaitPart[] {
 			];
 		case 'pool_full':
 			return [
-				{ text: `${slotLabel(wait.pool)} pool full · ` },
+				{ text: `${wait.pool} pool full · ` },
 				...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)])
 			];
 		case 'earlier_run':
-			return [{ text: 'Behind ' }, wait.runId ? runLink(wait.runId) : { text: 'a run elsewhere' }, { text: ` · ${slotLabel(wait.pool)} pool` }];
+			return [{ text: 'Behind ' }, wait.runId ? runLink(wait.runId) : { text: 'a run elsewhere' }, { text: ` · ${wait.pool} pool` }];
 		case 'job_running':
 			return [{ text: 'Job running · ' }, runLink(wait.runId)];
 		case 'upstream_job':

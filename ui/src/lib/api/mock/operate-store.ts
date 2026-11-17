@@ -57,7 +57,7 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import {
-	POOL_LIMITS,
+	serverLimitOf,
 	IMAGE_ID,
 	JOB_DEFS,
 	DECLARED_WAITS,
@@ -1003,7 +1003,7 @@ export class MockOperate {
 			const fullPools: string[] = [];
 			for (const [pool, amount] of Object.entries(rec.script.pools)) {
 				const inPool = holders.filter((h) => pool in h.script.pools);
-				const limit = POOL_LIMITS[pool] ?? 1;
+				const limit = serverLimitOf(pool);
 				const held = inPool.reduce((sum, h) => sum + h.script.pools[pool], 0);
 				if (held + Math.min(amount, limit) > limit) {
 					waits.push({ kind: 'pool_full', pool, holders: inPool.map((h) => h.run.id) });
