@@ -1985,6 +1985,13 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
             expected_setups=[],
         ),
         UnresolvedTargetSinkE2ETestCase(
+            description="compile also needs the target and fails before provider setup",
+            command=("compile",),
+            expected_returncode=1,
+            expected_output="Unknown connection 'warehouse' selected by target",
+            expected_setups=[],
+        ),
+        UnresolvedTargetSinkE2ETestCase(
             description="format needs no target and sets the provider up with None",
             command=("format", "--check"),
             expected_returncode=0,
