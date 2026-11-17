@@ -46,6 +46,10 @@ pub struct QueuedEvent<T> {
     pub invocation_terminal: bool,
     /// Whether the event reports a run or invocation outcome, which the queue always admits.
     pub outcome: bool,
+    /// The invocation the event belongs to, when it names one.
+    pub invocation_id: Option<String>,
+    /// Whether the event starts its invocation and so goes before that invocation's other events.
+    pub invocation_start: bool,
     pub eligible_exporters: Vec<usize>,
 }
 

@@ -35,8 +35,10 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_project::contracts::main::evaluate_model_contracts::evaluate_model_contracts;
+use sqlbuild_python_project::graph::models::CompiledProjectGraph;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
+use sqlbuild_python_project::project_snapshot::main::job_group_cycles::job_group_cycles;
 
 const RICH_LINEAGE: &str = "rich";
 const FAST_LINEAGE: &str = "fast";
@@ -222,6 +224,13 @@ fn analyzed<'py>(
             early_rules.stop(py);
         }
         early_lint_wait_ms = early_lint.borrow().stop(py)?.into_pyobject(py)?.into_any();
+    } else {
+        let compiled: &Bound<'py, CompiledProjectGraph> = graph.cast()?;
+        job_group_cycles(
+            &options.project_dir,
+            (&project, &discovered),
+            compiled.get().native(py).get().graph(),
+        )?;
     }
     let (lineage, lineage_ms): (Bound<'py, PyAny>, u64) = driver.lineage(&graph, &dialect)?;
     let contracts: ContractPhase<'py> = driver.contracts(&project, (&dialect, &adapter))?;

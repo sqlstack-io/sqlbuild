@@ -1,6 +1,6 @@
 //! Location publication assembles catalog data and planner-owned local identities.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use pyo3::exceptions::PyValueError;
@@ -35,9 +35,6 @@ use sqlbuild_python_project::project_snapshot::main::model_nodes::model_nodes;
 use sqlbuild_python_project::project_snapshot::main::python_declarations::python_declarations;
 use sqlbuild_python_project::project_snapshot::main::resource_nodes::resource_nodes;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
-
-/// The Python node kind whose functions load sources.
-const LOADER_KIND: &str = "loader";
 
 /// Compile catalog nodes and identities in the location, never in the server.
 #[pyfunction]
@@ -156,34 +153,17 @@ fn python_nodes(
             tags.entry(name.as_str()).or_default().push(tag.as_str());
         }
     }
-    let upstream: BTreeMap<&str, &[String]> = graph
-        .upstream
-        .iter()
-        .map(|(name, names)| (name.as_str(), names.as_slice()))
-        .collect();
     let mut outputs: Vec<(String, SnapshotNode)> = Vec::new();
-    for node in &graph.nodes {
-        let key = format!("{}:{}", node.kind, node.name);
+    for (node, (key, deps)) in graph.nodes.iter().zip(selected.node_deps()) {
         let Some(published) = nodes.get_mut(&key) else {
             return Err(PyValueError::new_err(format!(
                 "Python node {key} is missing from the snapshot"
             )));
         };
-        let deps: BTreeSet<String> = upstream
-            .get(node.name.as_str())
-            .into_iter()
-            .flat_map(|names| names.iter())
-            .filter_map(|name| selected.node_key(name))
-            .chain(
-                node.sql_deps
-                    .iter()
-                    .map(|(kind, name)| format!("{kind}:{name}")),
-            )
-            .collect();
         published.definition["deps"] = json!(deps);
         published.definition["tags"] =
             json!(tags.get(node.name.as_str()).cloned().unwrap_or_default());
-        if node.kind == LOADER_KIND && selected.intermediate_loader(&node.name) {
+        if let Some(source) = selected.intermediate_source(&node.kind, &node.name) {
             let mut definition = json!({
                 "name": node.name,
                 "entry": {"loader": node.name},
@@ -194,7 +174,7 @@ fn python_nodes(
                 definition["path"] = path.clone();
             }
             outputs.push((
-                format!("source:{}", node.name),
+                source,
                 SnapshotNode {
                     kind: "source".into(),
                     definition,

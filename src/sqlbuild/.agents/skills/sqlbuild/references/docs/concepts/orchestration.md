@@ -105,7 +105,8 @@ reports a job or sensor `select` that names more than three nodes one by one; se
 ## Group jobs
 
 A job group runs its jobs as one run. A job waits for another job in the group when it reads a node
-that job builds.
+that job builds. Jobs that wait on each other, directly or through other members, are a cycle, and
+`sqb compile` reports every cycle in the group as one `D017` error.
 
 ```toml
 # orchestration/job_groups/daily_orders_job_group.toml
@@ -118,6 +119,9 @@ schedule = { cron = "0 3 * * *", timezone = "UTC" }
 A group takes `name`, `description` and `jobs`, and the same `targets`, `owner`, `overlap`,
 `concurrency_groups`, `schedule` and `[on_failure]` as a job. Its members are jobs, never other
 groups.
+
+A job that reads a seed or a node that several members build waits for all of those members. Give
+seeds and shared nodes their own job, so the jobs that read them wait only for that job.
 
 ## Schedule a job
 
@@ -226,6 +230,7 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | `schedule cron: invalid cron expression: Pattern must have 5 fields when seconds are disallowed.` | Write a five-field cron, such as `0 2 * * *` |
 | `job nightly_orders_job resources: cpus must be a positive number` | Set `cpus` above zero |
 | `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
+| `group dependencies contain a cycle in job group daily_orders_job_group: orders_marts_job waits for staging_orders_job (model:orders reads model:stg_orders); staging_orders_job waits for orders_marts_job (model:stg_orders reads seed:regions)` | Move each node to one job, and give seeds and nodes that several members read their own job that runs first |
 
 Details:
 

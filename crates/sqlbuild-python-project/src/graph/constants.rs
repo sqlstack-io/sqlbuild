@@ -5,6 +5,9 @@ use crate::graph::models::CompiledProjectGraph;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 
+/// The Python node kind whose functions load sources.
+pub(crate) const LOADER_KIND: &str = "loader";
+
 /// The getter readers of this module's native pyclasses.
 pub const GETTERS: &[GetterEntry] = &[GetterEntry {
     class: class_of::<CompiledProjectGraph>,
