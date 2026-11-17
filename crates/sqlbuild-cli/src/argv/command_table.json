@@ -1854,6 +1854,18 @@
         "group": 1
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--timings"
+        ],
+        "dest": "timings",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Print how long each planning step took, after the plan.",
+        "group": 1
+       },
+       {
         "kind": "store_false",
         "options": [
          "--no-python"

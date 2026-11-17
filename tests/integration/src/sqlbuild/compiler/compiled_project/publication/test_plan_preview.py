@@ -236,6 +236,15 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
     assert "synced_copy" in preview, log.read_text()
     synced: dict[str, Any] = preview.pop("synced_copy")
     assert synced["synced_at"] is not None
+    timings: dict[str, Any] = preview.pop("timings")
+    assert "timings" not in live
+    assert timings["planned_from"] == "synced_state"
+    step_names: list[str] = [step["name"] for step in timings["steps"]]
+    assert step_names[-1] == "Other"
+    assert "Other" not in step_names[:-1]
+    assert sum(step["seconds"] for step in timings["steps"]) == pytest.approx(
+        timings["total_seconds"], abs=0.01
+    )
     assert synced["unknown_until_run"] == [*_UNKNOWN, *test_case.expected_added_unknowns]
     live_models: dict[str, dict[str, Any]] = {model["name"]: model for model in live.pop("models")}
     preview_models: dict[str, dict[str, Any]] = {

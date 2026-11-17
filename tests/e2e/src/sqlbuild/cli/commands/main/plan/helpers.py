@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -237,6 +238,49 @@ def migrated_project(tmp_path: Path) -> Path:
     )
     assert migrated.returncode == 0, migrated.stdout + migrated.stderr
     return project_dir
+
+
+PLAN_TIMINGS_HEADER: str = "Plan timings"
+_TIMING_STEP_ROW: re.Pattern[str] = re.compile(r"^  (\S.*?)\s+(\d+\.\d)\s+\d+%$", re.MULTILINE)
+_TIMING_TOTAL_ROW: re.Pattern[str] = re.compile(r"^  Total\s+(\d+\.\d)$", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class PlanTimingTable:
+    """A `--timings` table: its header words, every row line, the parsed steps and the total."""
+
+    header: list[str]
+    row_count: int
+    steps: list[tuple[str, float]]
+    total_seconds: float
+
+
+def migrated_plan_output(tmp_path: Path, plan_args: tuple[str, ...]) -> str:
+    """`sqb plan` output over the migrated project; the plan must succeed."""
+
+    project_dir: Path = migrated_project(tmp_path)
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", *plan_args),
+        project_dir=project_dir,
+    )
+    output: str = result.stdout + result.stderr
+    assert result.returncode == 0, output
+    return output
+
+
+def plan_timing_table(output: str) -> PlanTimingTable:
+    """The `--timings` table at the end of `output`."""
+
+    table: str = output[output.index(PLAN_TIMINGS_HEADER) :].rstrip("\n")
+    lines: list[str] = table.splitlines()
+    total: re.Match[str] | None = _TIMING_TOTAL_ROW.search(table)
+    assert total is not None, output
+    return PlanTimingTable(
+        header=lines[0].split(),
+        row_count=len(lines) - 2,
+        steps=[(name, float(seconds)) for name, seconds in _TIMING_STEP_ROW.findall(table)],
+        total_seconds=float(total.group(1)),
+    )
 
 
 # ---- the DuckShop 10K plan preview guard ----

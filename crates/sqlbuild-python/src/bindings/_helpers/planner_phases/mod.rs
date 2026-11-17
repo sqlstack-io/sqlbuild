@@ -15,4 +15,5 @@ pub(crate) mod registration;
 pub(crate) mod retention;
 pub(crate) mod runtime;
 pub(crate) mod scopes;
+pub(crate) mod timings;
 pub(crate) mod warehouse_state;

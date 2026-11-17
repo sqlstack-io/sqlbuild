@@ -329,6 +329,27 @@ pub struct PlanSummaryRead {
     pub expires_at: DateTime<Utc>,
     /// `None` until the location answers; a plan's document is its summary.
     pub outcome: Option<LocationWorkOutcome>,
+    /// How long the location took to plan, step by step; `None` for plans recorded without timings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timings: Option<PlanTimings>,
+}
+
+/// How long one plan took: its steps in pipeline order with `Other` last, and what it read.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanTimings {
+    pub total_seconds: f64,
+    pub steps: Vec<PlanTimingStep>,
+    /// `synced_state` for a preview over the synced warehouse state; `live` when it read the warehouse.
+    pub planned_from: String,
+}
+
+/// One planning step and its wall time.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanTimingStep {
+    pub name: String,
+    pub seconds: f64,
 }
 
 /// A person asks a location for one named read-only operation, such as a connection test.

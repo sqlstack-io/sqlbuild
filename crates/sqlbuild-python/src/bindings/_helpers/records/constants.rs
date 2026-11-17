@@ -576,6 +576,7 @@ const PLAN_COMMAND_REQUEST: RecordSpec = RecordSpec {
         FieldSpec::new("no_cache", FieldDefault::False),
         FieldSpec::new("max_microbatches", FieldDefault::None),
         FieldSpec::new("selection_diagnostics", FieldDefault::False),
+        FieldSpec::new("timings", FieldDefault::False),
     ],
 };
 const PLAYGROUND_COMMAND_REQUEST: RecordSpec = RecordSpec {

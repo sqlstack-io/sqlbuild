@@ -6961,6 +6961,7 @@ class PlanCommandRequest(NativeRecord):
     no_cache: bool
     max_microbatches: int | None
     selection_diagnostics: bool
+    timings: bool
     def __init__(
         self,
         project_dir: Path | None = None,
@@ -6985,6 +6986,7 @@ class PlanCommandRequest(NativeRecord):
         no_cache: bool = False,
         max_microbatches: int | None = None,
         selection_diagnostics: bool = False,
+        timings: bool = False,
     ) -> None: ...
 
 class PlaygroundCommandRequest(NativeRecord):

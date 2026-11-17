@@ -1,5 +1,9 @@
 //! Top-level planner orchestration producing an execution plan.
 
+use crate::bindings::_helpers::planner_phases::timings::{
+    ASSEMBLING, BUILDING_ENTRIES, DETECTING_CHANGES, READING_WAREHOUSE, SOURCE_FRESHNESS,
+    TEST_FIXTURES, record, timed,
+};
 use sqlbuild_analysis::planner_scope::constants::MODEL;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
@@ -149,9 +153,12 @@ fn planned_output<'py>(
     let deferral = args.value("deferral")?;
     let policies = args.value("policies")?;
     let origin_failures = deferred_migration_origins(args, scopes, &deferral)?;
-    let warehouse = gather_planner_warehouse_state(runtime, scopes, overrides, &deferral)?;
+    let warehouse = timed(READING_WAREHOUSE, || {
+        gather_planner_warehouse_state(runtime, scopes, overrides, &deferral)
+    })?;
     let started = Instant::now();
     let snapshot = warehouse_field(&warehouse, |warehouse| &warehouse.snapshot)?;
+    let changes_started = Instant::now();
     let identities = build_planner_identity_context(
         &project,
         (scopes, &snapshot),
@@ -166,15 +173,19 @@ fn planned_output<'py>(
     )?;
     let inspection_scope = class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?;
     let resolved_actions = resolve_model_actions(&inspection_scope, &changes)?;
-    let source_freshness = build_planner_source_freshness_result(
-        (&project, &inspection_scope),
-        (
-            &Dialect::passed(args.value("dialect")?)?,
-            &PlannerReads::passed(args.value("reads")?)?,
-        ),
-        &warehouse_field(&warehouse, |warehouse| &warehouse.inspection_relations)?,
-        &native_field(&snapshot, "source_freshness_state_schemas")?,
-    )?;
+    record(DETECTING_CHANGES, changes_started.elapsed().as_secs_f64());
+    let source_freshness = timed(SOURCE_FRESHNESS, || {
+        build_planner_source_freshness_result(
+            (&project, &inspection_scope),
+            (
+                &Dialect::passed(args.value("dialect")?)?,
+                &PlannerReads::passed(args.value("reads")?)?,
+            ),
+            &warehouse_field(&warehouse, |warehouse| &warehouse.inspection_relations)?,
+            &native_field(&snapshot, "source_freshness_state_schemas")?,
+        )
+    })?;
+    let entries_started = Instant::now();
     let reconciliation = reconcile_execution_changes(
         (&inspection_scope, &snapshot),
         &identities,
@@ -187,7 +198,9 @@ fn planned_output<'py>(
         (&inspection_scope, &reconciliation),
         &source_freshness,
     )?;
-    let planned_sql_tests = test_planning.result(py)?.into_bound(py);
+    record(BUILDING_ENTRIES, entries_started.elapsed().as_secs_f64());
+    let planned_sql_tests = timed(TEST_FIXTURES, || test_planning.result(py))?.into_bound(py);
+    let assembling_started = Instant::now();
     let output = base_plan_output(
         PlanOutputContext {
             runtime,
@@ -225,6 +238,7 @@ fn planned_output<'py>(
     let output =
         add_deferred_origin_notes(output, (&project, scopes), (&deferral, &origin_failures))?;
     let plan_output = add_plan_metadata(output, &source_freshness, &policies)?.build(py)?;
+    record(ASSEMBLING, assembling_started.elapsed().as_secs_f64());
     let on_progress = args.value("on_progress")?;
     if !on_progress.is_none() {
         on_progress.call1((format!(

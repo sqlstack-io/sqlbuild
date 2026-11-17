@@ -2020,7 +2020,7 @@ export interface components {
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
             /**
-             * Format: int32
+             * Format: int64
              * @description The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
              */
             concurrency?: number | null;
@@ -2063,7 +2063,7 @@ export interface components {
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
             /**
-             * Format: int32
+             * Format: int64
              * @description The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
              */
             concurrency?: number | null;
@@ -2725,6 +2725,21 @@ export interface components {
             /** Format: date-time */
             expires_at: string;
             outcome?: null | components["schemas"]["LocationWorkOutcome"];
+            timings?: null | components["schemas"]["PlanTimings"];
+        };
+        /** @description One planning step and its wall time. */
+        PlanTimingStep: {
+            name: string;
+            /** Format: double */
+            seconds: number;
+        };
+        /** @description How long one plan took: its steps in pipeline order with `Other` last, and what it read. */
+        PlanTimings: {
+            /** @description `synced_state` for a preview over the synced warehouse state; `live` when it read the warehouse. */
+            planned_from: string;
+            steps: components["schemas"]["PlanTimingStep"][];
+            /** Format: double */
+            total_seconds: number;
         };
         PlatformEvent: {
             /** @enum {string} */

@@ -591,7 +591,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				if (outcome) {
 					const result = planResultOf(outcome);
 					if (!result.plan) return result;
-					let plan = result.plan;
+					let plan = data.timings ? { ...result.plan, timings: data.timings } : result.plan;
 					for (const [section, total] of Object.entries(plan.pages ?? {}) as [PlanPageSection, number][]) {
 						if (total) plan = mergePlanPage(plan, section, await planRows(scope, requestId, section, 0, PLAN_FIRST_PAGE));
 					}

@@ -667,6 +667,8 @@ export type PlanDocument = {
 	synced_copy: PlanSyncedCopy | null;
 	/** What `--changed` runs, holds back and skips; `null` without `--changed`. */
 	changed: PlanChanged | null;
+	/** How long the location took to plan, step by step; absent for plans recorded without timings. */
+	timings?: PlanTimings | null;
 	/** A server summary's every built model, of which `models` holds the changed ones and the routine ones loaded so far. */
 	built_model_names?: string[];
 	/** A server summary's large sections, by size; their rows load a page at a time. */
@@ -692,6 +694,14 @@ export type PlanChanged = {
 };
 
 /** The server's synced copy of warehouse metadata a location's plan preview planned from. */
+/** How long one plan took: steps in pipeline order with `Other` last, and what it read. */
+export type PlanTimings = {
+	total_seconds: number;
+	steps: { name: string; seconds: number }[];
+	/** `synced_state` for a location preview over the synced warehouse state; `live` when it read the warehouse. */
+	planned_from: string;
+};
+
 export type PlanSyncedCopy = {
 	/** When every table the preview reads last synced; `null` until all of them have. */
 	synced_at: string | null;

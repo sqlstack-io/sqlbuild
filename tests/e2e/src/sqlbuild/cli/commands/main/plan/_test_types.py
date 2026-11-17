@@ -86,3 +86,18 @@ class PreviewPerformanceTestCase:
     #: The warm preview's share of the location's publish, a linear 10K compile on one machine.
     expected_max_warm_to_publish: float
     expected_max_check_seconds: float
+
+
+@dataclass(frozen=True)
+class PlanTimingsE2ETestCase:
+    description: str
+    plan_args: tuple[str, ...]
+    expected_first_step: str
+    expected_last_step: str
+
+
+@dataclass(frozen=True)
+class PlanWithoutTimingsE2ETestCase:
+    description: str
+    plan_args: tuple[str, ...]
+    expected_table_printed: bool

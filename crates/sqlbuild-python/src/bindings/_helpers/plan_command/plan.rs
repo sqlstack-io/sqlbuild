@@ -1,5 +1,8 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
+use crate::bindings::_helpers::planner_phases::timings::{
+    BUILD_HISTORY, PlanTimingScope, PlanTimings, WRITING, timed,
+};
 use std::sync::Arc;
 
 use pyo3::prelude::{
@@ -12,6 +15,7 @@ use sqlbuild_core::plan_display::constants::{
     SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY, SYNCED_COPY_READING,
 };
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_state::consumption::models::ChangedPolicy;
 use sqlbuild_state::warehouse_state::models::WarehouseState;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
@@ -44,6 +48,12 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
 
 const COMMAND_NAME: &str = "plan";
+/// The plan document's field holding how long each planning step took.
+const TIMINGS_KEY: &str = "timings";
+/// `timings.planned_from` for a location preview over the synced warehouse state.
+const SYNCED_STATE: &str = "synced_state";
+/// `timings.planned_from` for a plan that read the warehouse.
+const LIVE: &str = "live";
 const DEFAULT_SECTION_ENTRIES: i64 = 50;
 /// The `severity` value of a plan finding that blocks a build.
 const ERROR_SEVERITY: &str = "error";
@@ -343,8 +353,20 @@ fn changed_preview(
     let Some(policy) = changed_policy(&invocation.project_dir, request, &project)? else {
         return Ok(None);
     };
+    timed(BUILD_HISTORY, || {
+        changed_decision(request, invocation, (pipeline, &project), &policy)
+    })
+}
+
+/// The `--changed` decision under `policy`, read from recorded consumption.
+fn changed_decision(
+    request: &Bound<'_, PyAny>,
+    invocation: &PlanInvocation<'_>,
+    (pipeline, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    policy: &ChangedPolicy,
+) -> PyResult<Option<ChangedDecision>> {
     let plan: (&Bound<'_, PyAny>, &Bound<'_, PyAny>) =
-        (&native_field(pipeline, "plan_output")?, &project);
+        (&native_field(pipeline, "plan_output")?, project);
     let full_refresh: bool = native_field(request, "full_refresh")?.is_truthy()?;
     let py = request.py();
     let reads: Bound<'_, PlannerReads> = match &invocation.preview {
@@ -355,7 +377,7 @@ fn changed_preview(
             Some(&native_field(&invocation.context, "connection_config")?),
         )?,
     };
-    let changed = preview_changed(plan, reads.get().reads(), (&policy, full_refresh));
+    let changed = preview_changed(plan, reads.get().reads(), (policy, full_refresh));
     reads.get().reads().close_consumption(py)?;
     let (decision, warnings) = changed?;
     for warning in warnings {
@@ -503,6 +525,7 @@ fn plan<'py>(
     (project, state): (PlanProject<'_, 'py>, Option<&Arc<WarehouseState>>),
 ) -> PyResult<(i32, Option<String>)> {
     let py: Python<'py> = request.py();
+    let timing: PlanTimingScope = PlanTimingScope::enter();
     let invocation: PlanInvocation<'py> = resolve_invocation(request, (project, state))?;
     if !native_field(request, "json_output")?.is_truthy()? {
         write_progress(&invocation.stream, "\n")?;
@@ -512,16 +535,39 @@ fn plan<'py>(
         compile_pipeline(request, &invocation, project)
     })?;
     let changed: Option<ChangedDecision> = changed_preview(request, &invocation, &pipeline)?;
-    let output: Option<String> = write_output(
-        request,
-        (&invocation, state.is_some()),
-        &pipeline,
-        changed.as_ref(),
-    )?;
+    let output: Option<String> = timed(WRITING, || {
+        write_output(
+            request,
+            (&invocation, state.is_some()),
+            &pipeline,
+            changed.as_ref(),
+        )
+    })?;
+    let timings: PlanTimings = timing.timings();
+    let output: Option<String> = output.map(|document| {
+        with_timings(
+            document,
+            &timings.json(if state.is_some() { SYNCED_STATE } else { LIVE }),
+        )
+    });
+    if native_field(request, "timings")?.is_truthy()? {
+        write_progress(&invocation.stream, &format!("\n{}\n", timings.table()))?;
+    }
     Ok((
         i32::from(plan_has_errors(&native_field(&pipeline, "plan_output")?)?),
         output,
     ))
+}
+
+/// `document` with its `timings` as the first field; the plan is written before its own timings are known.
+fn with_timings(document: String, timings: &serde_json::Value) -> String {
+    match document.strip_prefix('{') {
+        Some(fields) if fields.trim_start().starts_with('}') => {
+            format!("{{\"{TIMINGS_KEY}\": {timings}}}")
+        }
+        Some(fields) => format!("{{\"{TIMINGS_KEY}\": {timings}, {fields}"),
+        None => document,
+    }
 }
 
 /// Whether any plan finding has error severity, which `sqb build` refuses.

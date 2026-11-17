@@ -26,6 +26,9 @@ pub(crate) const HEARTBEAT_PAGE: usize = 1000;
 /// A plan document larger than this is refused by the server and replaced by an error on the location.
 pub const PLAN_DOCUMENT_BYTES: usize = 8 * 1024 * 1024;
 
+/// The plan document's field holding how long each planning step took.
+pub(crate) const PLAN_TIMINGS_KEY: &str = "timings";
+
 /// How long a location may hold a plan before another instance may claim it.
 pub(crate) const PLAN_LEASE_SECONDS: i64 = 300;
 

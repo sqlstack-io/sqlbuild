@@ -12,3 +12,8 @@ pub(crate) const MISSING_UPSTREAM_CODE: &str = "S301";
 pub(crate) const RETENTION_DECREASE: &str = "decrease";
 pub(crate) const RETENTION_INCREASE: &str = "increase";
 pub(crate) const RETENTION_MATCH: &str = "match";
+
+/// A step's share of the plan's total time is shown as a percentage.
+pub(crate) const PERCENT: f64 = 100.0;
+/// Plan document timings are rounded to the millisecond.
+pub(crate) const MILLISECONDS: f64 = 1000.0;

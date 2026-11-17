@@ -1,6 +1,7 @@
 //! The compile-and-plan pipeline of execution commands: compile, rules gate, then planning.
 
 use crate::bindings::_helpers::native_host::live_reads::LiveReads;
+use crate::bindings::_helpers::planner_phases::timings::{COMPILING, timed};
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
@@ -93,12 +94,14 @@ pub(crate) fn planned_project<'py>(
         None => {
             let on_inputs_ready: Bound<'py, PyAny> =
                 EarlySqlLint::inputs_ready_hook(&expansion_reuse, GENERIC_DIALECT, adapter);
-            compiled_phase(
-                (discovered, adapter),
-                &options,
-                &on_progress,
-                Some(&on_inputs_ready),
-            )?
+            timed(COMPILING, || {
+                compiled_phase(
+                    (discovered, adapter),
+                    &options,
+                    &on_progress,
+                    Some(&on_inputs_ready),
+                )
+            })?
         }
     };
     if !rules_ran_at_load() {

@@ -16,7 +16,7 @@ use crate::platform::main::read_person_plan_summary::read_person_plan_summary;
 use crate::platform::main::request_location_work::request_location_work;
 use crate::platform::models::{
     LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult, PlanRequest,
-    PlanRowSection, PlanRowsQuery,
+    PlanRowSection, PlanRowsQuery, PlanTimingStep, PlanTimings,
 };
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -333,6 +333,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                     {"name": "customers", "action": "create_view", "reason": "no_change", "config_diff": ["-a", "+b"]}],
                 "warnings": [{"severity": "warning", "message": "connect failed: db_password=orders-pass"}],
                 "python_nodes": [{"name": "orders_export", "identity_diff": {"source_diff": ["-a", "+b"]}}],
+                "timings": {"total_seconds": 1.5, "steps": [{"name": "Reading warehouse state", "seconds": 1.0}, {"name": "Other", "seconds": 0.5}], "planned_from": "synced_state"},
             });
             assert!(
                 complete_location_work(
@@ -392,8 +393,27 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             let summary = read_person_plan_summary(store, (&context, viewer), plan)
                 .await
                 .expect("summary")
-                .and_then(|summary| summary.outcome);
-            let Some(LocationWorkOutcome::Plan { document: summary }) = summary else {
+                .expect("own plan");
+            assert_eq!(
+                summary.timings,
+                Some(PlanTimings {
+                    total_seconds: 1.5,
+                    steps: vec![
+                        PlanTimingStep {
+                            name: "Reading warehouse state".to_owned(),
+                            seconds: 1.0,
+                        },
+                        PlanTimingStep {
+                            name: "Other".to_owned(),
+                            seconds: 0.5,
+                        },
+                    ],
+                    planned_from: "synced_state".to_owned(),
+                }),
+                "{description}: typed plan timings",
+                description = test_case.description
+            );
+            let Some(LocationWorkOutcome::Plan { document: summary }) = summary.outcome else {
                 panic!(
                     "{description}: plan summary",
                     description = test_case.description

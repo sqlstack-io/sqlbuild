@@ -18,6 +18,7 @@ import type {
 	SelectionVocabulary,
 	PlanChanged,
 	PlanResult,
+	PlanTimings,
 	AdhocRunRequest,
 	BuiltInRole,
 	BulkRunResult,
@@ -130,6 +131,23 @@ export type OperateContext = {
 	/** Name of the location's one target. */
 	target: (scope: Scope) => string;
 	reply: <T>(value: T) => Promise<T>;
+};
+
+/** A location preview's planning steps, as the plan summary reports them. */
+const MOCK_PLAN_TIMINGS: PlanTimings = {
+	total_seconds: 10.6,
+	steps: [
+		{ name: 'Reading warehouse state', seconds: 3.3 },
+		{ name: 'Detecting changes', seconds: 2.4 },
+		{ name: 'Checking source freshness', seconds: 0.2 },
+		{ name: 'Building plan entries', seconds: 2.9 },
+		{ name: 'Preparing test fixtures', seconds: 0.1 },
+		{ name: 'Assembling the plan', seconds: 0.6 },
+		{ name: 'Reading build history', seconds: 0.3 },
+		{ name: 'Writing the plan', seconds: 0.4 },
+		{ name: 'Other', seconds: 0.4 }
+	],
+	planned_from: 'synced_state'
 };
 
 export class MockOperate {
@@ -708,7 +726,7 @@ export class MockOperate {
 			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas', 'recorded migrations']
 		};
 		return this.#ctx.reply({
-			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision },
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision, timings: MOCK_PLAN_TIMINGS },
 			error: null
 		});
 	}
