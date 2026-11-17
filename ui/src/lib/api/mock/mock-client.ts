@@ -1,3 +1,4 @@
+import { recordPlanRows } from './plan-rows-log';
 import type { ApiClient } from '../client';
 import { ApiError } from '../client';
 import { LocalChangeBus, type ConnectionState } from '../signals';
@@ -9,6 +10,7 @@ import type {
 	SelectionVocabulary,
 	PlanResult,
 	PlanPage,
+	PlanDiff,
 	PlanPageSection,
 	AdhocRunRequest,
 	Bootstrap,
@@ -355,11 +357,20 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.planBuild(scope, command, changed);
 	}
 
-	/** The mock plans whole documents, so no section is paged. */
-	async planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number): Promise<PlanPage> {
+	/** The mock plans whole documents, so no section is paged; `?large` serves a paged plan (large-project.ts). */
+	async planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number): Promise<PlanPage> {
 		this.#location(scope);
-		void [requestId, section, offset];
-		return { total: 0, rows: [], runs: [] };
+		recordPlanRows(section, offset, limit);
+		void requestId;
+		return { total: 0, section_total: 0, rows: [], runs: [], warnings: [], cursor_window_starts: {} };
+	}
+
+	/** The mock's plans carry their diffs whole, so none is read apart. */
+	async planDiff(scope: Scope, requestId: string, model: string): Promise<PlanDiff | null> {
+		this.#location(scope);
+		void requestId;
+		void model;
+		return null;
 	}
 
 	async listJobs(scope: Scope): Promise<Job[]> {

@@ -135,6 +135,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_plans::rows),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/diff",
+            get(crate::api::_helpers::resources::person_plans::diff),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs",
             get(crate::api::_helpers::resources::person_operations::recent_runs),
         )

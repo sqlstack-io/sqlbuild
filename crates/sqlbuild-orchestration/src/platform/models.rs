@@ -58,6 +58,11 @@ pub enum LocationHealth {
         generation: i64,
         missing: u64,
     },
+    /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
+    PoolCapped {
+        generation: i64,
+        jobs: Vec<PoolCapWarning>,
+    },
     WarehouseSync {
         generation: i64,
         location: WarehouseStateLocation,
@@ -78,6 +83,19 @@ pub enum LocationHealth {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         next_sync_at: Option<DateTime<Utc>>,
     },
+}
+
+/// A job or group asking for more of a pool than this server's cap, so it runs alone in that pool.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PoolCapWarning {
+    pub job_key: String,
+    pub kind: crate::runs::models::RunKind,
+    pub pool: String,
+    pub amount: u32,
+    pub cap: u32,
+    /// Such as "job X takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool".
+    pub message: String,
 }
 
 /// When a location checks its warehouse connection on its own.
@@ -208,10 +226,10 @@ impl LocationState {
             .collect();
         let silence =
             chrono::TimeDelta::seconds(crate::platform::constants::LOCATION_SILENCE_SECONDS);
-        if !own
-            .iter()
-            .any(|observation| now - observation.received_at <= silence)
-        {
+        if !own.iter().any(|observation| {
+            !matches!(observation.report.health, LocationHealth::PoolCapped { .. })
+                && now - observation.received_at <= silence
+        }) {
             return Self::Broken;
         }
         let mut failed: Option<(DateTime<Utc>, i64)> = None;
@@ -290,36 +308,95 @@ pub struct PlanRequest {
     pub command: Vec<String>,
 }
 
-/// A plan's large sections, read a page at a time beside its summary.
+/// A plan section, read a page at a time beside its summary, in the order the plan reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanRowSection {
-    /// Built models with no change of their own, each with its `--changed` run when it has one.
+    /// Built models the plan rebuilds in full.
+    FullRefresh,
+    QueryChanged,
+    FunctionChanged,
+    ConfigChanged,
+    SchemaChanged,
+    /// Built models with no recorded build.
+    FirstRun,
+    Renamed,
+    /// Built models with no change of their own.
     RoutineModels,
+    Migrations,
+    ColumnMigrations,
+    TableTypeConversions,
+    Retention,
+    LoaderReloads,
+    LoaderLoads,
+    SourceReloads,
+    SourceLoads,
+    /// Functions whose definition changed.
+    ChangedFunctions,
+    /// Functions without a change.
+    Functions,
+    /// Seeds the run loads or reports on.
+    Seeds,
+    PythonNodes,
     /// `--changed` nodes held back for a job's own run.
     HeldBack,
     /// `--changed` nodes that run only when something they read changed.
     Unchanged,
+    Warnings,
 }
 
-/// One page of a plan section, in plan order; `offset` defaults to 0 and `limit` to the cap.
-#[derive(Clone, Copy, Debug, Deserialize)]
+/// One page of a section's rows whose name contains `name`, ignoring case; `offset` defaults to 0 and `limit` to the cap.
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PlanRowsQuery {
     pub section: PlanRowSection,
     pub offset: Option<usize>,
     pub limit: Option<usize>,
+    pub name: Option<String>,
 }
 
-/// A page of a plan section, how many rows the section holds, and the `--changed` runs of its models.
+/// A page of a plan section with the `--changed` runs, warnings and cursor window starts of its models.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlanRows {
+    /// Rows matching the name filter; the section's size without one.
     pub total: usize,
+    /// Rows in the section, filter or not.
+    pub section_total: usize,
+    /// Model rows carry `diff_stats` in place of their diff text, which `plans/{request_id}/diff` serves.
     #[schema(value_type = Vec<Object>)]
     pub rows: Vec<serde_json::Value>,
     #[schema(value_type = Vec<Object>)]
     pub runs: Vec<serde_json::Value>,
+    #[schema(value_type = Vec<Object>)]
+    pub warnings: Vec<serde_json::Value>,
+    pub cursor_window_starts: std::collections::BTreeMap<String, String>,
+}
+
+/// One planned model's diff text, as `sqb plan` prints it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanModelDiff {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_diff: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_diff: Option<Vec<String>>,
+}
+
+/// The model whose diff to read.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanDiffQuery {
+    pub model: String,
+}
+
+/// A planned model's diff text, from the plan document or, where the document left it out, apart from it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanDiffRead {
+    pub model: String,
+    #[serde(flatten)]
+    pub diff: PlanModelDiff,
 }
 
 /// A plan request's state with its summary: changed models in full, large sections as counts to page.
@@ -390,6 +467,9 @@ pub enum LocationWorkOutcome {
     Plan {
         #[schema(value_type = Object)]
         document: serde_json::Value,
+        /// Model diff text the document left out to stay under its cap; stored apart, never read back here.
+        #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+        diffs: std::collections::BTreeMap<String, PlanModelDiff>,
     },
     /// The location took the request; its next metadata sync reads the warehouse.
     SyncStarted {},

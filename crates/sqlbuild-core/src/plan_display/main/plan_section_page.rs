@@ -1,54 +1,31 @@
-//! One page of a plan document section the summary only counts.
-
-use std::collections::HashSet;
+//! One page of a plan section's rows, found by name, with what the page's models need beside them.
 
 use serde_json::Value;
 
-use crate::plan_display::_helpers::plan_pages::{
-    changed_runs, model_key, routine_models, run_node,
-};
+use crate::plan_display::_helpers::plan_pages::PlanRows;
+use crate::plan_display::_helpers::plan_sections::{matching, page_extras, shown_row};
 use crate::plan_display::models::{PlanPage, PlanPageSection};
 
-/// Rows `offset..offset + limit` of `section` in plan order, with the section's size; a page of
-/// routine models also carries their `--changed` runs.
+/// Rows `offset..offset + limit` of the section whose name contains `name`, with their runs, warnings and window starts.
 pub fn plan_section_page(
     document: &Value,
     section: PlanPageSection,
-    (offset, limit): (usize, usize),
+    ((offset, limit), name): ((usize, usize), Option<&str>),
 ) -> PlanPage {
-    let rows: Vec<&Value> = match section {
-        PlanPageSection::RoutineModels => routine_models(document, changed_runs(document).as_ref()),
-        PlanPageSection::HeldBack => changed_section(document, "held_back"),
-        PlanPageSection::Unchanged => changed_section(document, "unchanged"),
-    };
-    let page: Vec<Value> = rows
-        .iter()
-        .skip(offset)
-        .take(limit)
-        .map(|row| (*row).clone())
-        .collect();
-    let runs: Vec<Value> = if section == PlanPageSection::RoutineModels {
-        let keys: HashSet<String> = page.iter().map(model_key).collect();
-        changed_section(document, "runs")
-            .into_iter()
-            .filter(|run| run_node(run).is_some_and(|node| keys.contains(node)))
-            .cloned()
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let plan = PlanRows::new(document);
+    let rows = plan.rows(section);
+    let found = matching(section, &rows, name);
+    let page: Vec<&Value> = found.iter().copied().skip(offset).take(limit).collect();
+    let extras = page_extras(&plan, section, &page);
     PlanPage {
-        total: rows.len(),
-        rows: page,
-        runs,
+        total: found.len(),
+        section_total: rows.len(),
+        rows: page
+            .into_iter()
+            .map(|row| shown_row(section, row))
+            .collect(),
+        runs: extras.runs,
+        warnings: extras.warnings,
+        cursor_window_starts: extras.cursor_window_starts,
     }
-}
-
-fn changed_section<'document>(document: &'document Value, section: &str) -> Vec<&'document Value> {
-    document
-        .get("changed")
-        .and_then(|changed| changed.get(section))
-        .and_then(Value::as_array)
-        .map(|rows| rows.iter().collect())
-        .unwrap_or_default()
 }

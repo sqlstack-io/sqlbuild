@@ -23,15 +23,16 @@ pub async fn read_person_plan_summary(
     };
     let timings: Option<PlanTimings> = match &record.result_json {
         Some(result) => match &result.outcome {
-            LocationWorkOutcome::Plan { document } => plan_timings(document)?,
+            LocationWorkOutcome::Plan { document, .. } => plan_timings(document)?,
             _ => None,
         },
         None => None,
     };
     let outcome: Option<LocationWorkOutcome> =
         record.result_json.map(|result| match result.outcome {
-            LocationWorkOutcome::Plan { document } => LocationWorkOutcome::Plan {
+            LocationWorkOutcome::Plan { document, diffs } => LocationWorkOutcome::Plan {
                 document: plan_summary(&document),
+                diffs,
             },
             outcome => outcome,
         });

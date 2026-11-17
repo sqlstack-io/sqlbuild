@@ -8,7 +8,8 @@ use uuid::Uuid;
 
 use crate::api::errors::ApiError;
 use crate::api::models::{
-    CostQuery, PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery,
+    CostQuery, PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, ServerFacts,
+    StatementSqlQuery,
 };
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::declarations::main::list_person_jobs::list_person_jobs;
@@ -402,7 +403,7 @@ pub(crate) async fn run_output(
     security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn job(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(default_role): Extension<DefaultRole>,
+    (Extension(default_role), Extension(facts)): (Extension<DefaultRole>, Extension<ServerFacts>),
     Path((location_id, target, job_key)): Path<(Uuid, String, String)>,
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<JobDetailRecord>, ApiError> {
@@ -410,7 +411,7 @@ pub(crate) async fn job(
         &store,
         (&context, principal),
         (location_id, &target, &job_key),
-        default_role,
+        (default_role, &facts.pool_caps),
     )
     .await?
     .map(Json)
@@ -423,7 +424,7 @@ pub(crate) async fn job(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn jobs(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(default_role): Extension<DefaultRole>,
+    (Extension(default_role), Extension(facts)): (Extension<DefaultRole>, Extension<ServerFacts>),
     Path((location_id, target)): Path<(Uuid, String)>,
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Vec<JobRecord>>, ApiError> {
@@ -432,7 +433,7 @@ pub(crate) async fn jobs(
             &store,
             (&context, principal),
             (location_id, &target),
-            default_role,
+            (default_role, &facts.pool_caps),
         )
         .await?,
     ))
@@ -602,7 +603,7 @@ pub(crate) async fn snapshots(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn health(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(default_role): Extension<DefaultRole>,
+    (Extension(default_role), Extension(facts)): (Extension<DefaultRole>, Extension<ServerFacts>),
     Path((location_id, target)): Path<(Uuid, String)>,
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Vec<LocationHealthObservation>>, ApiError> {
@@ -611,7 +612,7 @@ pub(crate) async fn health(
             &store,
             (&context, principal),
             (location_id, &target),
-            default_role,
+            (default_role, &facts.pool_caps),
         )
         .await?,
     ))

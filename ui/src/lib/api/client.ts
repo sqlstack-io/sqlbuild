@@ -2,6 +2,7 @@ import type {
 	AdhocRunCheck,
 	PlanResult,
 	PlanPage,
+	PlanDiff,
 	PlanPageSection,
 	AdhocRunRequest,
 	Bootstrap,
@@ -143,7 +144,10 @@ export interface ApiClient extends PlatformApi {
 	/** Asks the location to run `sqb plan` on a build command against the warehouse, and waits for it. */
 	planBuild(scope: Scope, command: string[]): Promise<PlanResult>;
 	/** One page of a large section of the plan `requestId` names, which its summary only counts. */
-	planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number): Promise<PlanPage>;
+	/** One page of a plan section; `name` finds rows whose name contains it, ignoring case. */
+	planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number, name?: string): Promise<PlanPage>;
+	/** One planned model's diff text, read on demand; null without one. */
+	planDiff(scope: Scope, requestId: string, model: string): Promise<PlanDiff | null>;
 
 	listJobs(scope: Scope): Promise<Job[]>;
 	getJob(scope: Scope, key: string): Promise<JobDetail | null>;

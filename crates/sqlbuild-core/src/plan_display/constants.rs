@@ -43,9 +43,32 @@ pub const SYNCED_COPY_READING: &str = "Reading the synced warehouse state...";
 pub const SYNCED_COPY_DEFER_REFUSAL: &str =
     "plan previews from the synced copy cannot use --defer-to";
 pub const SYNCED_COPY_DEFER_HELP: &str = "Run re-plans live, including deferral.";
-/// Change reasons of a model that builds as it always does; a plan summary counts and pages them.
-pub(crate) const ROUTINE_PLAN_REASONS: [&str; 2] = ["no_change", "normal_incremental"];
 /// The planner's action for a model the run leaves alone.
 pub(crate) const SKIP_ACTION: &str = "skip";
-/// The plan document sections a summary pages instead of carrying.
-pub(crate) const PAGED_CHANGED_SECTIONS: [&str; 2] = ["held_back", "unchanged"];
+/// The reason of a function or seed without a change.
+pub(crate) const NO_CHANGE_REASON: &str = "no_change";
+/// The plan document field of per-model metadata, which a summary leaves out.
+pub(crate) const METADATA_FIELD: &str = "metadata";
+/// The plan document's row lists, which a summary empties and counts by section instead.
+pub(crate) const PLAN_ROW_LISTS: [&str; 10] = [
+    "models",
+    "seeds",
+    "source_loads",
+    "functions",
+    "python_nodes",
+    "warnings",
+    "migrations",
+    "column_migrations",
+    "table_type_conversions",
+    "retention",
+];
+/// The `--changed` row lists, which a summary empties and counts by section instead.
+pub(crate) const CHANGED_ROW_LISTS: [&str; 3] = ["runs", "held_back", "unchanged"];
+/// The most distinct notes a summary counts for one section, the most frequent first.
+pub const MAX_SECTION_NOTES: usize = 20;
+/// The unified diff header lines, which are neither added nor removed lines.
+pub(crate) const DIFF_HEADER_PREFIXES: [&str; 3] = ["---", "+++", "@@"];
+/// The model fields that hold diff text, which pages leave out and serve one model at a time.
+pub const MODEL_DIFF_FIELDS: [&str; 2] = ["query_diff", "config_diff"];
+/// The model field holding the counts of its diffs, kept when the diff text is not.
+pub const DIFF_STATS_FIELD: &str = "diff_stats";

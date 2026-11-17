@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
+use crate::declarations::_helpers::job_detail::Caps;
 use crate::declarations::_helpers::reads::jobs_in;
 use crate::declarations::models::{ProviderRecord, ProvidersRead};
 use crate::snapshots::main::read_current_record::read_current_record;
@@ -38,7 +39,7 @@ pub async fn read_person_providers(
     };
     let (transaction, documents) =
         read_snapshot_documents(transaction, snapshot.snapshot_id, Some(&["providers"])).await?;
-    let (transaction, jobs) = jobs_in(transaction, (location_id, target)).await?;
+    let (transaction, jobs) = jobs_in(transaction, (location_id, target), &Caps::new()).await?;
     commit(transaction).await?;
     let mut providers = match documents.get("providers") {
         Some(document) => Vec::<ProviderRecord>::deserialize(&document["providers"])

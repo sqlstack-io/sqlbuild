@@ -15,6 +15,7 @@ use sqlbuild_discovery::project_validation::main::validate_orchestration_names::
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
+use crate::bindings::_helpers::command_runtime::concurrency::published_concurrency;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
     compile_declarations, python_declarations,
@@ -123,10 +124,18 @@ pub(crate) fn orchestration_snapshot<'py>(
         facts.orchestration = inventory.names();
         validate_orchestration_names(&facts).map_err(|failure| validation_error(py, failure))?;
         let declarations = python_declarations(py, &project_dir, &inventory)?;
+        let concurrency = published_concurrency(
+            &project_dir,
+            &discovered_inputs,
+            project.effective_target_name().as_deref(),
+        )?;
         input = compile_declarations(
             py,
             input,
-            (&project_dir, graph.bind(py).get().graph(), &selected),
+            (
+                (&project_dir, graph.bind(py).get().graph(), &selected),
+                concurrency,
+            ),
             (&inventory, declarations),
         )?;
     }

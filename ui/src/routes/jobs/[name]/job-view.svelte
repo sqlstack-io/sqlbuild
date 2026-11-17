@@ -8,6 +8,7 @@
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import PlayIcon from '@lucide/svelte/icons/play';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
 	import { openRow, to } from '$lib/paths';
 	import { goto } from '$app/navigation';
@@ -22,7 +23,7 @@
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, poolText, shortRunId } from '$lib/operate/labels';
+	import { CONCURRENCY_DOCS, concurrencySource, formatCost, narrowingText, onFailureText, overlapHelp, overlapWhileRunning, poolText, shortRunId } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
 	import { memberLinks, publishedLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
@@ -93,7 +94,7 @@
 	const pools = $derived(def?.pools ?? []);
 	/** Runs holding a pool's slots now, where the server reports them. */
 	const holdersOf = (pool: string) => def?.poolHolders?.find((g) => g.pool === pool)?.holders ?? [];
-	const hasSettings = $derived(!!def && (!!def.overlap || !!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length) || pools.length > 0));
+	const hasSettings = $derived(!!def && (!!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length)));
 	let actionError = $state<string | null>(null);
 
 	async function toggleTrigger(t: Trigger) {
@@ -298,29 +299,42 @@
 								{/if}
 							</dl>
 						</InspectorSection>
-						{#if hasSettings}
-							<InspectorSection title="Settings">
-								<dl>
-									{#if def.overlap}<div><dt>Overlap</dt><dd title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">{overlapPlain[def.overlap]}</dd></div>{/if}
-									{#if def.onFailure}<div><dt>Retries</dt><dd title="[retry] attempts = {def.onFailure.retries + 1}, delay_seconds = {def.onFailure.retryDelaySeconds}{def.memberOf?.length ? '. Inside a group run, the group retries this job while the jobs that depend on it wait' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
-									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
-									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
+						<!-- Concurrency as plain facts: models at once inside a run, write claims, overlap and pools. -->
+						<InspectorSection title="Concurrency">
+							{@const resolved = def.resolvedConcurrency}
+							<ul class="concurrency">
+								{#if resolved}
+									<li>Inside a run: {resolved.limit} at once <span class="muted">({concurrencySource(resolved.source, app.target?.name ?? null)})</span></li>
+								{/if}
+								<li>Never alongside runs writing the same tables <span class="muted">(automatic)</span></li>
+								{#if def.overlap}
+									<li title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">If triggered while running: {overlapWhileRunning[def.overlap]}</li>
+								{/if}
+								{#if !pools.length}
+									<li>Pools: none</li>
+								{:else}
 									{#each pools as use (use.pool)}
 										{@const text = poolText(use)}
 										{@const holders = holdersOf(use.pool)}
-										<div class="concurrency">
-											<dt>Pool</dt>
-											<dd>
-												<span
-													>{text.rule}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span
-												>
-												<span class="detail">({text.detail})</span>
-												{#if holders.length}
-													<span class="detail">Running now: {#each holders as h, i (h)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}</span>
-												{/if}
-											</dd>
-										</div>
+										<li class="pool" class:clamped={text.clamped}>
+											<span
+												>{#if text.clamped}<TriangleAlertIcon size={12} class="inline-icon" />{/if}{text.text}{#if text.detail}&nbsp;<span class:muted={!text.clamped}>({text.detail})</span>{/if}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span
+											>
+											{#if holders.length}
+												<span class="muted">Running now: {#each holders as h, i (h)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}</span>
+											{/if}
+										</li>
 									{/each}
+								{/if}
+							</ul>
+							<a class="docs" href={CONCURRENCY_DOCS} target="_blank" rel="noreferrer">How concurrency works ↗</a>
+						</InspectorSection>
+						{#if hasSettings}
+							<InspectorSection title="Settings">
+								<dl>
+									{#if def.onFailure}<div><dt>Retries</dt><dd title="[retry] attempts = {def.onFailure.retries + 1}, delay_seconds = {def.onFailure.retryDelaySeconds}{def.memberOf?.length ? '. Inside a group run, the group retries this job while the jobs that depend on it wait' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
+									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
+									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
 								</dl>
 								{#if def.settings && Object.keys(def.settings).length}
 									<p class="label">Options</p>
@@ -507,21 +521,47 @@
 	.picked li {
 		padding: 2px 0;
 	}
-	/* A sentence, so it takes the row's width under its label: the rule, then the group it comes from
-	   and any runs holding it now, quieter, each on its line. */
-	dl div.concurrency {
+	/* The Concurrency panel: one plain fact per line, where it came from quieter beside it. */
+	.concurrency {
+		display: flex;
 		flex-direction: column;
-		gap: 2px;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: 12.5px;
+		line-height: 1.4;
 	}
-	.concurrency dd {
+	.concurrency .muted {
+		color: var(--muted-foreground);
+	}
+	.concurrency .pool {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		text-align: left;
 	}
-	.concurrency .detail {
-		color: var(--muted-foreground);
-		font-size: 11.5px;
+	/* A pool this server caps below what the job asks: it takes the whole pool, so it runs alone there. */
+	.concurrency .pool.clamped {
+		padding: 4px 8px;
+		border-left: 3px solid var(--sb-warning);
+		border-radius: 2px;
+		background: color-mix(in srgb, var(--sb-warning) 10%, transparent);
+		color: var(--sb-warning);
+	}
+	.concurrency .pool.clamped a {
+		color: inherit;
+		text-decoration: underline;
+	}
+	.concurrency :global(.inline-icon) {
+		display: inline;
+		margin-right: 4px;
+		vertical-align: -1px;
+	}
+	.docs {
+		display: inline-block;
+		margin-top: 10px;
+		color: var(--primary);
+		font-size: 12px;
 	}
 	code,
 	.mono {

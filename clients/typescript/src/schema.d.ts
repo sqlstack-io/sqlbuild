@@ -674,6 +674,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlanDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/rows": {
         parameters: {
             query?: never;
@@ -1830,6 +1846,11 @@ export interface components {
             /** Format: uuid */
             snapshot_id?: string | null;
         };
+        /**
+         * @description The layer that set a run's concurrency.
+         * @enum {string}
+         */
+        ConcurrencySource: "job" | "target" | "local" | "project" | "default";
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -2046,6 +2067,7 @@ export interface components {
             owner?: string | null;
             /** @description Each pool the job takes, by pool name. */
             pools: components["schemas"]["PoolUse"][];
+            resolved_concurrency?: null | components["schemas"]["ResolvedConcurrency"];
             select?: string | null;
             selection: string[];
             /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
@@ -2083,6 +2105,7 @@ export interface components {
             owner?: string | null;
             /** @description Each pool the job takes, by pool name. */
             pools: components["schemas"]["PoolUse"][];
+            resolved_concurrency?: null | components["schemas"]["ResolvedConcurrency"];
             /** @description A job's selectors as written; absent for a group and for snapshots published before they were recorded. */
             select?: string | null;
             selection: string[];
@@ -2158,6 +2181,12 @@ export interface components {
             kind: "provider_secrets";
             /** Format: int64 */
             missing: number;
+        } | {
+            /** Format: int64 */
+            generation: number;
+            jobs: components["schemas"]["PoolCapWarning"][];
+            /** @enum {string} */
+            kind: "pool_capped";
         } | {
             /** Format: int64 */
             elapsed_millis: number;
@@ -2250,6 +2279,10 @@ export interface components {
             kind: "sensor_evaluation";
             outcome: components["schemas"]["CustomSensorOutcome"];
         } | {
+            /** @description Model diff text the document left out to stay under its cap; stored apart, never read back here. */
+            diffs?: {
+                [key: string]: components["schemas"]["PlanModelDiff"];
+            };
             document: Record<string, never>;
             /** @enum {string} */
             kind: "plan";
@@ -2714,17 +2747,34 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description A planned model's diff text, from the plan document or, where the document left it out, apart from it. */
+        PlanDiffRead: components["schemas"]["PlanModelDiff"] & {
+            model: string;
+        };
+        /** @description One planned model's diff text, as `sqb plan` prints it. */
+        PlanModelDiff: {
+            config_diff?: string[] | null;
+            query_diff?: string[] | null;
+        };
         /** @description A person's build command to plan on the location; the server freezes it like an ad-hoc run. */
         PlanRequest: {
             command: string[];
             /** Format: uuid */
             request_id: string;
         };
-        /** @description A page of a plan section, how many rows the section holds, and the `--changed` runs of its models. */
+        /** @description A page of a plan section with the `--changed` runs, warnings and cursor window starts of its models. */
         PlanRows: {
+            cursor_window_starts: {
+                [key: string]: string;
+            };
+            /** @description Model rows carry `diff_stats` in place of their diff text, which `plans/{request_id}/diff` serves. */
             rows: Record<string, never>[];
             runs: Record<string, never>[];
+            /** @description Rows in the section, filter or not. */
+            section_total: number;
+            /** @description Rows matching the name filter; the section's size without one. */
             total: number;
+            warnings: Record<string, never>[];
         };
         /** @description A plan request's state with its summary: changed models in full, large sections as counts to page. */
         PlanSummaryRead: {
@@ -2823,6 +2873,18 @@ export interface components {
              */
             scheduler_lease_expires_at?: string | null;
         };
+        /** @description A job or group asking for more of a pool than this server's cap, so it runs alone in that pool. */
+        PoolCapWarning: {
+            /** Format: int32 */
+            amount: number;
+            /** Format: int32 */
+            cap: number;
+            job_key: string;
+            kind: components["schemas"]["RunKind"];
+            /** @description Such as "job X takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool". */
+            message: string;
+            pool: string;
+        };
         /** @description How many slots of a pool a job takes, and the pool's limit on the job's target. */
         PoolSlots: {
             /** Format: int32 */
@@ -2832,11 +2894,29 @@ export interface components {
         };
         /** @description A pool a job takes: its slots, the pool's limit, and the other jobs and groups taking it. */
         PoolUse: {
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description The slots the job asks for.
+             */
             amount: number;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description This server's `pool_caps` entry for the location and target; absent when it sets none.
+             */
+            cap?: number | null;
+            /** @description The job asks for more slots than `server_limit`, so on this server it takes the whole pool. */
+            clamped: boolean;
+            /**
+             * Format: int32
+             * @description The project's limit on the target.
+             */
             limit: number;
             pool: string;
+            /**
+             * Format: int32
+             * @description The limit on this server: the project's limit, lowered to the cap.
+             */
+            server_limit: number;
             shared_with: string[];
         };
         /** @description What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly. */
@@ -3042,6 +3122,12 @@ export interface components {
             run_id: string;
             /** Format: uuid */
             source_run_id: string;
+        };
+        /** @description The models a run builds at once on its target, and the layer that set it. */
+        ResolvedConcurrency: {
+            /** Format: int64 */
+            limit: number;
+            source: components["schemas"]["ConcurrencySource"];
         };
         RoleAssignmentRequest: {
             /** Format: uuid */
@@ -5842,15 +5928,65 @@ export interface operations {
             };
         };
     };
+    readPlanDiff: {
+        parameters: {
+            query: {
+                /** @description The planned model whose diff to read */
+                model: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDiffRead"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description No diff of that model, or no view.sql on every current node */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     readPlanRows: {
         parameters: {
             query: {
                 /** @description The section to page */
-                section: "routine_models" | "held_back" | "unchanged";
+                section: "full_refresh" | "query_changed" | "function_changed" | "config_changed" | "schema_changed" | "first_run" | "renamed" | "routine_models" | "migrations" | "column_migrations" | "table_type_conversions" | "retention" | "loader_reloads" | "loader_loads" | "source_reloads" | "source_loads" | "changed_functions" | "functions" | "seeds" | "python_nodes" | "held_back" | "unchanged" | "warnings";
                 /** @description Rows to skip; 0 by default */
                 offset?: number;
                 /** @description At most this many rows, capped at 1000 */
                 limit?: number;
+                /** @description Only rows whose name contains this, ignoring case */
+                name?: string;
             };
             header?: never;
             path: {

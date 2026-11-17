@@ -20,8 +20,8 @@ use sqlbuild_orchestration::declarations::main::group_dependencies::group_depend
 use sqlbuild_orchestration::declarations::main::group_wait_reasons::group_wait_reasons;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    DeclaredAt, Definitions, GroupDefinition, JobDefinition, PoolSlots, Schedule,
-    TriggerDeclaration, TriggerDefinition, TriggerStatus,
+    ConcurrencySource, DeclaredAt, Definitions, GroupDefinition, JobDefinition, PoolSlots,
+    ResolvedConcurrency, Schedule, TriggerDeclaration, TriggerDefinition, TriggerStatus,
 };
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
@@ -169,10 +169,27 @@ fn run_pools(
     Ok(pools)
 }
 
+/// The job's own `concurrency` setting when it has one, otherwise the target's resolved value.
+fn job_concurrency(
+    settings: &BTreeMap<String, Value>,
+    target: ResolvedConcurrency,
+) -> ResolvedConcurrency {
+    match settings.get("concurrency").and_then(Value::as_u64) {
+        Some(limit) => ResolvedConcurrency {
+            limit,
+            source: ConcurrencySource::Job,
+        },
+        None => target,
+    }
+}
+
 pub(crate) fn compile_declarations(
     py: Python<'_>,
     mut input: SnapshotInput,
-    (project_dir, graph, selected): (&Path, &ProjectGraph, &ProjectSelection),
+    ((project_dir, graph, selected), concurrency): (
+        (&Path, &ProjectGraph, &ProjectSelection),
+        ResolvedConcurrency,
+    ),
     (inventory, declarations): (&OrchestrationInventory, Vec<Bound<'_, PyAny>>),
 ) -> PyResult<SnapshotInput> {
     if inventory.is_empty() && declarations.is_empty() {
@@ -281,6 +298,7 @@ pub(crate) fn compile_declarations(
                 selection,
                 settings: job.settings.clone(),
                 pools: run_pools(run, limits)?,
+                resolved_concurrency: Some(job_concurrency(&job.settings, concurrency)),
                 select: Some(job.select.value.clone()),
                 exclude,
                 targets: run.targets.iter().cloned().collect(),
@@ -330,6 +348,7 @@ pub(crate) fn compile_declarations(
                     selection,
                     settings: BTreeMap::new(),
                     pools: run_pools(run, limits)?,
+                    resolved_concurrency: Some(concurrency),
                     select: None,
                     exclude: None,
                     targets: run.targets.iter().cloned().collect(),

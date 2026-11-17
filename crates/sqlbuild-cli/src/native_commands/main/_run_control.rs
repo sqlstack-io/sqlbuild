@@ -33,7 +33,7 @@ pub(crate) async fn run_control(
 ) -> Result<(), ControlError> {
     let config = read_server_config(namespace)?;
     let address = control_address(namespace, standalone, &config.server)?;
-    let (authentication, facts) = control_api_settings(namespace, standalone, &config)?;
+    let (authentication, mut facts) = control_api_settings(namespace, standalone, &config)?;
     let store = open_control_store(namespace, Some(&config.server)).await?;
     let (workers, handoff) = open_control_workers(
         (&store, namespace),
@@ -41,6 +41,7 @@ pub(crate) async fn run_control(
         facts.scheduler,
     )
     .await?;
+    facts.pool_caps = workers.pool_caps();
     let (stop, shutdown) = watch::channel(false);
     let mut tasks = JoinSet::new();
     if let Some(address) = address {

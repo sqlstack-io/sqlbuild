@@ -334,6 +334,7 @@ pub(crate) fn control_api_settings(
             snapshots,
             run_logs,
             state_history,
+            pool_caps: Default::default(),
         },
     ))
 }

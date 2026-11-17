@@ -270,6 +270,12 @@ CREATE TABLE sqb_location_work (
     completed_at {time}
 );
 CREATE INDEX sqb_location_work_pending ON sqb_location_work(location_id, target, requested_at);
+CREATE TABLE sqb_plan_diffs (
+    request_id {uuid} NOT NULL REFERENCES sqb_location_work(request_id),
+    model TEXT NOT NULL,
+    diff_json {json} NOT NULL,
+    PRIMARY KEY (request_id, model)
+);
 CREATE TABLE sqb_platform_sink_deliveries (
     sink_id TEXT NOT NULL,
     storage_id BIGINT NOT NULL,

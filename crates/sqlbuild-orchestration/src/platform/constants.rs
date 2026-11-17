@@ -25,6 +25,10 @@ pub(crate) const HEARTBEAT_PAGE: usize = 1000;
 
 /// A plan document larger than this is refused by the server and replaced by an error on the location.
 pub const PLAN_DOCUMENT_BYTES: usize = 8 * 1024 * 1024;
+/// The most diff text a plan may store apart from its document, as JSON.
+pub const PLAN_DIFF_BYTES: usize = 56 * 1024 * 1024;
+/// Plan diffs stored per insert statement.
+pub(crate) const PLAN_DIFF_INSERT_ROWS: usize = 200;
 
 /// The plan document's field holding how long each planning step took.
 pub(crate) const PLAN_TIMINGS_KEY: &str = "timings";

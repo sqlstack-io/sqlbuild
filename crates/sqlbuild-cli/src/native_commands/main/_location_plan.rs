@@ -14,24 +14,25 @@ use uuid::Uuid;
 
 use crate::argv::main::accepted_settings_arguments::accepted_settings_arguments;
 use crate::argv::models::Stream;
-use crate::native_commands::_helpers::execution::{plan_error, plan_failure};
+use crate::native_commands::_helpers::execution::{plan_error, plan_failure, without_diffs};
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::constants::{PLAN_COMMAND, PLAN_NOT_PRODUCED};
 use crate::native_commands::main::_plan_document::plan_document;
 use crate::native_commands::models::{LocationPlanRequest, LocationRuntimeRequest, LocationServe};
+use crate::native_commands::types::LocationPlan;
 
-/// The plan document, an `{"error": ...}` report when planning failed, or `None` when stopped first.
+/// The plan document with the diffs it left out, an `{"error": ...}` report, or `None` when stopped first.
 pub(super) async fn plan_location(
     (options, runtime): (&LocationServe, &mpsc::Sender<LocationRuntimeRequest>),
     (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
     (client, session_id, generation): (&LocationWorkClient, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<Value>, ControlError> {
+) -> Result<Option<LocationPlan>, ControlError> {
     let (argv, select) = match plan_arguments(options, settings)
         .and_then(|argv| Ok((argv, selected_names(selection)?)))
     {
         Ok(planned) => planned,
-        Err(message) => return Ok(Some(plan_failure(&message))),
+        Err(message) => return Ok(Some(without_diffs(plan_failure(&message)))),
     };
     let consumption: bool = settings
         .get("changed")
@@ -53,9 +54,9 @@ pub(super) async fn plan_location(
     {
         Ok(copy) => copy,
         Err(error) => {
-            return Ok(Some(plan_failure(&format!(
+            return Ok(Some(without_diffs(plan_failure(&format!(
                 "the synced warehouse copy is unavailable: {error}"
-            ))));
+            )))));
         }
     };
     let planned: HeldCopy = match held {
@@ -209,7 +210,7 @@ async fn run_plan(
     runtime: &mpsc::Sender<LocationRuntimeRequest>,
     request: Value,
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<Value>, ControlError> {
+) -> Result<Option<LocationPlan>, ControlError> {
     let (reply, answer) = oneshot::channel();
     runtime
         .send(LocationRuntimeRequest::Plan(LocationPlanRequest {
@@ -230,15 +231,15 @@ async fn run_plan(
                 Stream::Stderr,
                 &format!("Location plan failed: {error}\n"),
             )]));
-            return Ok(Some(plan_failure(PLAN_NOT_PRODUCED)));
+            return Ok(Some(without_diffs(plan_failure(PLAN_NOT_PRODUCED))));
         }
-        Err(_) => return Ok(Some(plan_failure(PLAN_NOT_PRODUCED))),
+        Err(_) => return Ok(Some(without_diffs(plan_failure(PLAN_NOT_PRODUCED)))),
     };
     Ok(Some(
         match (reply["output"].as_str(), reply["exit_code"].as_i64()) {
             (Some(output), Some(code)) => plan_document(output.as_bytes(), matches!(code, 0 | 1)),
-            _ if reply["failed"].is_object() => plan_error(&reply["failed"]),
-            _ => plan_failure(PLAN_NOT_PRODUCED),
+            _ if reply["failed"].is_object() => without_diffs(plan_error(&reply["failed"])),
+            _ => without_diffs(plan_failure(PLAN_NOT_PRODUCED)),
         },
     ))
 }

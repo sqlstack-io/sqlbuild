@@ -10,6 +10,7 @@ import type {
 	LaunchVerb,
 	PoolHolders,
 	PoolUse,
+	ResolvedConcurrency,
 	Principal,
 	Run,
 	RunOrigin,
@@ -37,14 +38,25 @@ export const SNAPSHOT_GENERATION = 42;
 type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 
 type JobDef = Known<
-	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'pools' | 'concurrency' | 'poolHolders' | 'memberOf' | 'cursorType' | 'groupMembers'>,
+	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'pools' | 'concurrency' | 'resolvedConcurrency' | 'poolHolders' | 'memberOf' | 'cursorType' | 'groupMembers'>,
 	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
 > & {
 	/** Each pool the job takes, with its amount. */
 	pools: Record<string, number>;
 };
 
-export const POOL_LIMITS: Record<string, number> = { warehouse_heavy: 1 };
+/** Each pool's limit in the mock project, and this mock server's `pool_caps`, which lower it. */
+export const POOL_LIMITS: Record<string, number> = { warehouse_heavy: 3, supplier_api: 2 };
+export const POOL_CAPS: Record<string, number> = { warehouse_heavy: 1 };
+/** A pool's limit on this server: the project's, lowered to the cap. */
+export const serverLimitOf = (pool: string) => Math.min(POOL_LIMITS[pool] ?? 1, POOL_CAPS[pool] ?? Infinity);
+
+/** Where each job's run concurrency comes from, when not its own setting: one of every layer. */
+const CONCURRENCY_FROM: Record<string, ResolvedConcurrency> = {
+	marts_only: { limit: 6, source: 'target' },
+	activity_microbatch: { limit: 2, source: 'local' },
+	load_sources: { limit: 4, source: 'default' }
+};
 
 const decl = (sourceFile: string, line: number, code: string) => ({ sourceFile, line, code });
 
@@ -58,7 +70,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: { retries: 1, retryDelaySeconds: 300 },
-		pools: {},
+		pools: { supplier_api: 1 },
 		priority: 5,
 		sourceFile: 'orchestration/jobs.py',
 		settings: {},
@@ -233,7 +245,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		pools: { warehouse_heavy: 1 },
+		pools: { warehouse_heavy: 1, supplier_api: 1 },
 		priority: 10,
 		sourceFile: 'orchestration/reporting.py',
 		settings: {},
@@ -291,7 +303,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: ['revenue_refresh', 'activity_microbatch', 'customer_segments'],
 		overlap: 'queue',
 		onFailure: { retries: 1, retryDelaySeconds: 900 },
-		pools: { warehouse_heavy: 1 },
+		pools: { warehouse_heavy: 3 },
 		priority: 20,
 		sourceFile: 'orchestration/groups.py',
 		settings: {},
@@ -383,12 +395,33 @@ export function poolUsesOf(job: JobDef | undefined): PoolUse[] {
 		pool,
 		amount,
 		limit: POOL_LIMITS[pool] ?? 1,
+		cap: POOL_CAPS[pool] ?? null,
+		serverLimit: serverLimitOf(pool),
+		clamped: amount > serverLimitOf(pool),
 		sharedWith: JOB_DEFS.filter((other) => other.key !== job?.key && pool in other.pools).map((other) => other.key)
 	}));
 }
 
 export function poolHoldersOf(job: JobDef | undefined): PoolHolders[] {
-	return Object.keys(job?.pools ?? {}).map((pool) => ({ pool, limit: POOL_LIMITS[pool] ?? 1, holders: [] }));
+	return Object.keys(job?.pools ?? {}).map((pool) => ({ pool, limit: serverLimitOf(pool), holders: [] }));
+}
+
+/** What a run of the job uses: its own setting, else the layer the mock gives it, else the mock project's 4. */
+export function resolvedConcurrencyOf(job: JobDef | undefined): ResolvedConcurrency {
+	const own = runConcurrencyOf(job);
+	return own ? { limit: own, source: 'job' } : (CONCURRENCY_FROM[job?.key ?? ''] ?? { limit: 4, source: 'project' });
+}
+
+/** The jobs and groups asking a pool for more than this server allows, as the server's pool_capped warning names them. */
+export function poolCapWarnings(): { jobKey: string; kind: 'job' | 'group'; pool: string; amount: number; cap: number; message: string }[] {
+	return JOB_DEFS.flatMap((job) =>
+		Object.entries(job.pools)
+			.filter(([pool, amount]) => amount > serverLimitOf(pool))
+			.map(([pool, amount]) => {
+				const cap = serverLimitOf(pool);
+				return { jobKey: job.key, kind: job.kind, pool, amount, cap, message: `${job.kind} ${job.key} takes ${amount} of pool ${pool}; this server caps it at ${cap}, so it runs alone in that pool` };
+			})
+	);
 }
 
 /** The job's own `concurrency` setting, as the server reports it. */

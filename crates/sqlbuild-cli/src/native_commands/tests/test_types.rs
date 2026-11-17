@@ -96,6 +96,8 @@ pub(super) struct PlanDocumentTestCase {
     pub(super) output: Vec<u8>,
     pub(super) planned: bool,
     pub(super) expected_first_model: serde_json::Value,
+    /// How many models' diffs travel beside the document, and the first one's query diff.
+    pub(super) expected_diffs: (usize, Option<Vec<String>>),
 }
 
 /// One failed metadata read and the statistics page size the sync uses afterwards.

@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -37,23 +37,65 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			retention: list(document.retention),
 			synced_copy: document.synced_copy ?? null,
 			changed: document.changed ?? null,
-			...(document.built_model_names ? { built_model_names: document.built_model_names } : {}),
-			...(document.pages ? { pages: document.pages } : {})
+			...(document.pages ? { pages: document.pages } : {}),
+			...(document.sections ? { sections: document.sections } : {})
 		},
 		error: null
 	};
 }
 
-/** `plan` with one more page of a paged section: routine models with their `--changed` runs, or held-back or unchanged nodes. */
+/** The plan list a section's rows join: models for model sections, `changed` lists for held-back and unchanged nodes. */
+const SECTION_LIST: Record<PlanPageSection, keyof PlanDocument | 'held_back' | 'unchanged'> = {
+	full_refresh: 'models',
+	query_changed: 'models',
+	function_changed: 'models',
+	config_changed: 'models',
+	schema_changed: 'models',
+	first_run: 'models',
+	renamed: 'models',
+	routine_models: 'models',
+	migrations: 'migrations',
+	column_migrations: 'column_migrations',
+	table_type_conversions: 'table_type_conversions',
+	retention: 'retention',
+	loader_reloads: 'source_loads',
+	loader_loads: 'source_loads',
+	source_reloads: 'source_loads',
+	source_loads: 'source_loads',
+	changed_functions: 'functions',
+	functions: 'functions',
+	seeds: 'seeds',
+	python_nodes: 'python_nodes',
+	held_back: 'held_back',
+	unchanged: 'unchanged',
+	warnings: 'warnings'
+};
+
+/** A warning once, however many pages bring it. */
+const warningKey = (w: PlanWarning) => `${w.model_name ?? ''}\u0000${w.message}`;
+
+/**
+ * `plan` with one more page of a section: its rows join their list, with the `--changed` runs, warnings and
+ * cursor window starts of its models, and the section's loaded count moves on.
+ */
 export function mergePlanPage(plan: PlanDocument, section: PlanPageSection, page: PlanPage): PlanDocument {
-	const pages = { ...plan.pages, [section]: page.total };
-	if (section === 'routine_models') {
-		const changed = plan.changed && { ...plan.changed, runs: [...plan.changed.runs, ...page.runs] };
-		return { ...plan, pages, changed, models: [...plan.models, ...(page.rows as PlanDocument['models'])] };
+	const pages = { ...plan.pages, [section]: page.section_total ?? page.total };
+	const loaded = { ...plan.loaded, [section]: (plan.loaded?.[section] ?? 0) + page.rows.length };
+	const seen = new Set(plan.warnings.map(warningKey));
+	const extra = [...(page.warnings ?? []), ...(section === 'warnings' ? (page.rows as PlanWarning[]) : [])].filter((w) => !seen.has(warningKey(w)) && (seen.add(warningKey(w)), true));
+	const starts = page.cursor_window_starts ?? {};
+	const synced_copy = plan.synced_copy && Object.keys(starts).length ? { ...plan.synced_copy, cursor_window_starts: { ...plan.synced_copy.cursor_window_starts, ...starts } } : plan.synced_copy;
+	const runs = plan.changed && page.runs.length ? { ...plan.changed, runs: [...plan.changed.runs, ...page.runs] } : plan.changed;
+	const next: PlanDocument = { ...plan, pages, loaded, synced_copy, changed: runs, warnings: [...plan.warnings, ...extra] };
+	const list = SECTION_LIST[section];
+	if (list === 'warnings') return next;
+	if (list === 'held_back' || list === 'unchanged') {
+		if (!next.changed) return next;
+		return list === 'held_back'
+			? { ...next, changed: { ...next.changed, held_back: [...next.changed.held_back, ...(page.rows as PlanChanged['held_back'])] } }
+			: { ...next, changed: { ...next.changed, unchanged: [...next.changed.unchanged, ...(page.rows as string[])] } };
 	}
-	if (!plan.changed) return { ...plan, pages };
-	if (section === 'held_back') return { ...plan, pages, changed: { ...plan.changed, held_back: [...plan.changed.held_back, ...(page.rows as PlanChanged['held_back'])] } };
-	return { ...plan, pages, changed: { ...plan.changed, unchanged: [...plan.changed.unchanged, ...(page.rows as string[])] } };
+	return { ...next, [list]: [...(next[list] as unknown[]), ...page.rows] };
 }
 
 /** The server's dry run of an ad-hoc command. */

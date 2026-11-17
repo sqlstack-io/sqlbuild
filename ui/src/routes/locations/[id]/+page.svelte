@@ -149,6 +149,20 @@
 					</span>
 				</div>
 			{/if}
+			{#if detail.poolCapWarnings.length}
+				<!-- The server's own warning, from its pool caps: it doesn't touch the location's health or last check-in. -->
+				<div class="alert note pool-caps">
+					<TriangleAlertIcon size={14} />
+					<span class="summary-text">
+						<b title="This server's pool_caps lower a pool's limit below what these jobs ask for; each takes the whole pool, so it runs alone in it">Pool caps on this server</b>
+						{#each detail.poolCapWarnings as w (`${w.jobKey}:${w.pool}`)}
+							<span class="cap" title={w.message}>
+								· {w.kind} <a href={to(`/jobs/${w.jobKey}`)}>{w.jobKey}</a> takes {w.amount} of pool {w.pool}; capped at {w.cap}, so it runs alone in that pool
+							</span>
+						{/each}
+					</span>
+				</div>
+			{/if}
 
 			<details class="facts">
 				<summary>Details</summary>

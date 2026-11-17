@@ -646,7 +646,15 @@ export type PlanModel = {
 	/** Unified diff lines of the model's config since its last build. */
 	config_diff?: string[];
 	schema_findings?: { kind: string; column: string; expected_type: string | null; actual_type: string | null }[];
+	/** A paged row's diff counts in place of its diff text, which `planDiff` reads on demand. */
+	diff_stats?: { query?: PlanDiffStats; config?: PlanDiffStats };
 };
+
+/** A diff's changed lines; `whitespace_only` when they read the same with all whitespace taken out (a case change is a change). */
+export type PlanDiffStats = { added: number; removed: number; whitespace_only: boolean };
+
+/** One model's diff text, read on demand. */
+export type PlanDiff = { model: string; query_diff?: string[]; config_diff?: string[] };
 
 export type PlanWarning = { severity: string; message: string; model_name?: string; code?: string };
 
@@ -671,17 +679,58 @@ export type PlanDocument = {
 	timings?: PlanTimings | null;
 	/** Set when audit failures won't stop the build this plan previews; absent otherwise. */
 	ignore_audit_failures?: boolean;
-	/** A server summary's every built model, of which `models` holds the changed ones and the routine ones loaded so far. */
-	built_model_names?: string[];
-	/** A server summary's large sections, by size; their rows load a page at a time. */
+	/** A server summary's sections, by size; their rows load a page at a time. */
 	pages?: Partial<Record<PlanPageSection, number>>;
+	/** A server summary's nonempty sections in plan order, each with the notes its rows share most. */
+	sections?: PlanSectionCount[];
+	/** Rows of each paged section loaded so far, which is the offset of its next page. */
+	loaded?: Partial<Record<PlanPageSection, number>>;
 };
 
-/** The large plan sections a server summary pages: routine models, and `--changed`'s held-back and unchanged nodes. */
-export type PlanPageSection = 'routine_models' | 'held_back' | 'unchanged';
+/** Every plan section a server summary counts and pages, in plan order. */
+export type PlanPageSection =
+	| 'full_refresh'
+	| 'query_changed'
+	| 'function_changed'
+	| 'config_changed'
+	| 'schema_changed'
+	| 'first_run'
+	| 'renamed'
+	| 'routine_models'
+	| 'migrations'
+	| 'column_migrations'
+	| 'table_type_conversions'
+	| 'retention'
+	| 'loader_reloads'
+	| 'loader_loads'
+	| 'source_reloads'
+	| 'source_loads'
+	| 'changed_functions'
+	| 'functions'
+	| 'seeds'
+	| 'python_nodes'
+	| 'held_back'
+	| 'unchanged'
+	| 'warnings';
 
-/** One page of a plan section: its rows, the section's size, and the `--changed` runs of the page's models. */
-export type PlanPage = { total: number; rows: unknown[]; runs: PlanChanged['runs'] };
+/** A note rows of a section carry, such as `run_reason` "no completed record", and how many rows carry it. */
+export type PlanSectionNote = { kind: string; value: string | null; count: number };
+
+/** A section's size and its most frequent notes, so the page can say a note applies to all rows, or N of M. */
+export type PlanSectionCount = { section: PlanPageSection; total: number; notes: PlanSectionNote[] };
+
+/**
+ * One page of a plan section's rows matching a name filter: `total` matches of the section's `section_total`
+ * rows, and the `--changed` runs, warnings and cursor window starts of the page's models.
+ */
+export type PlanPage = {
+	total: number;
+	section_total: number;
+	rows: unknown[];
+	runs: PlanChanged['runs'];
+	warnings: PlanWarning[];
+	cursor_window_starts: Record<string, string>;
+};
 
 /** `sqb plan --changed`'s decision. Nodes are keys such as `model:orders`. */
 export type PlanChanged = {
@@ -695,7 +744,6 @@ export type PlanChanged = {
 	unchanged: string[];
 };
 
-/** The server's synced copy of warehouse metadata a location's plan preview planned from. */
 /** How long one plan took: steps in pipeline order with `Other` last, and what it read. */
 export type PlanTimings = {
 	total_seconds: number;
@@ -704,6 +752,7 @@ export type PlanTimings = {
 	planned_from: string;
 };
 
+/** The server's synced copy of warehouse metadata a location's plan preview planned from. */
 export type PlanSyncedCopy = {
 	/** When every table the preview reads last synced; `null` until all of them have. */
 	synced_at: string | null;
@@ -762,6 +811,8 @@ export type Job = {
 	pools: PoolUse[];
 	/** The job's own `concurrency` setting, models building at once in a run; null uses the project's or target's. */
 	concurrency: number | null;
+	/** What a run uses on the target and which layer set it; null for a snapshot published before it was recorded. */
+	resolvedConcurrency: ResolvedConcurrency | null;
 	priority: number | null;
 	owner: string | null;
 	sourceFile: string | null;
@@ -772,10 +823,21 @@ export type Job = {
 /** A pool a job takes: `amount` of its `limit` slots, shared with the other jobs and groups taking it. */
 export type PoolUse = {
 	pool: string;
+	/** The slots the job asks for. */
 	amount: number;
+	/** The project's limit on the target. */
 	limit: number;
+	/** This server's `pool_caps` entry; null when it sets none. */
+	cap: number | null;
+	/** The limit on this server: `limit` lowered to `cap`. */
+	serverLimit: number;
+	/** `amount` is above `serverLimit`, so on this server the job takes the whole pool. */
+	clamped: boolean;
 	sharedWith: string[];
 };
+
+/** Models a run builds at once, and the layer that set it. */
+export type ResolvedConcurrency = { limit: number; source: 'job' | 'target' | 'local' | 'project' | 'default' };
 
 /** One reason a member waits: `fromNode` of `upstreamJob` feeds its `toNode`, directly or through nodes no member selects. */
 export type WaitReason = { upstreamJob: string; fromNode: string; toNode: string };

@@ -110,6 +110,13 @@ pub(crate) struct LocationHealthTestCase {
     pub(crate) expected_observations: usize,
 }
 
+pub(crate) struct PoolCapHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) caps: &'static [(&'static str, u32)],
+    /// Each warning as `(job_key, pool, amount, cap, message)`; empty when no pool_capped observation is expected.
+    pub(crate) expected_warnings: &'static [(&'static str, &'static str, u32, u32, &'static str)],
+}
+
 pub(crate) struct LocationWorkTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -262,6 +269,13 @@ pub(crate) struct OlderNodeFinished {
     rows_affected: Option<i64>,
     error_code: Option<String>,
     skipped_because_of: Option<String>,
+}
+
+pub(crate) struct PlanDiffTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The diff of a model the document left out, as it reads back.
+    pub(crate) expected_detached_diff: &'static [&'static str],
 }
 
 pub(crate) struct PlanTestCase {

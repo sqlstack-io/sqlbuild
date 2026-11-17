@@ -58,7 +58,7 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import {
-	POOL_LIMITS,
+	serverLimitOf,
 	IMAGE_ID,
 	JOB_DEFS,
 	DECLARED_WAITS,
@@ -66,6 +66,7 @@ import {
 	TRIGGER_DEFS,
 	poolHoldersOf,
 	poolUsesOf,
+	resolvedConcurrencyOf,
 	runConcurrencyOf,
 	createOperateFixtures,
 	jobDef,
@@ -1020,7 +1021,7 @@ export class MockOperate {
 			const fullPools: string[] = [];
 			for (const [pool, amount] of Object.entries(rec.script.pools)) {
 				const inPool = holders.filter((h) => pool in h.script.pools);
-				const limit = POOL_LIMITS[pool] ?? 1;
+				const limit = serverLimitOf(pool);
 				const held = inPool.reduce((sum, h) => sum + h.script.pools[pool], 0);
 				if (held + Math.min(amount, limit) > limit) {
 					waits.push({ kind: 'pool_full', pool, holders: inPool.map((h) => h.run.id) });
@@ -1253,6 +1254,7 @@ export class MockOperate {
 			triggerIds: TRIGGER_DEFS.filter((t) => t.jobKey === key).map((t) => triggerId(t.name)),
 			pools: poolUsesOf(job),
 			concurrency: runConcurrencyOf(job),
+			resolvedConcurrency: resolvedConcurrencyOf(job),
 			poolHolders: poolHoldersOf(job).map((g) => ({ ...g, holders: holders.filter((h) => g.pool in h.script.pools).map((h) => h.run.id) })),
 			memberOf: JOB_DEFS.filter((g) => g.members.includes(key)).map((g) => g.key),
 			cursorType: resolved.map((n) => snapshotNode(n)?.cursor).find((c) => c) ?? null,

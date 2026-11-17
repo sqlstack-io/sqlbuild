@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
 import type { Location, LocationHealth, Snapshot, WarehouseSync } from './types';
-import type { ConnectionDetails, ConnectionTest, LocationDetail, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
+import type { ConnectionDetails, ConnectionTest, LocationDetail, PoolCapWarning, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -13,8 +13,10 @@ function latestOf<K extends Wire['LocationHealth']['kind']>(observations: Wire['
 
 /** Health from the newest observations: down without a recent check-in, then load failures, then missing provider secrets, then connection failures. */
 export function healthOf(observations: Wire['LocationHealthObservation'][], now: number): { health: LocationHealth; liveInstances: number; lastSeenAt: string | null } {
-	const live = new Set(observations.filter((o) => now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
-	const lastSeenAt = observations.reduce<string | null>((latest, o) => (!latest || o.received_at > latest ? o.received_at : latest), null);
+	// The server's own pool-cap warning is not a location check-in.
+	const reported = observations.filter((o) => o.report.health.kind !== 'pool_capped');
+	const live = new Set(reported.filter((o) => now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
+	const lastSeenAt = reported.reduce<string | null>((latest, o) => (!latest || o.received_at > latest ? o.received_at : latest), null);
 	const failed = latestOf(observations, 'compile_failed');
 	const connection = latestOf(observations, 'connection');
 	const secrets = latestOf(observations, 'provider_secrets');
@@ -115,6 +117,11 @@ export function instancesOf(observations: Wire['LocationHealthObservation'][], n
 		.map(([id, lastSeenAt]) => ({ id, imageId: null, gitRevision: null, startedAt: null, lastSeenAt, state: now - Date.parse(lastSeenAt) <= LIVE_WINDOW_MS ? 'live' : 'stale' }));
 }
 
+/** The server's newest pool-cap warning: each job or group asking a pool for more than this server's cap. */
+export function poolCapWarningsOf(observations: Wire['LocationHealthObservation'][]): PoolCapWarning[] {
+	return (latestOf(observations, 'pool_capped')?.report.health.jobs ?? []).map((w) => ({ jobKey: w.job_key, kind: w.kind === 'group' ? 'group' : 'job', pool: w.pool, amount: w.amount, cap: w.cap, message: w.message }));
+}
+
 /** A location's page from its health observations and newest snapshot; locations never send compile error text, so a failed reload shows only as its health. */
 /** The rule findings that failed the newest load, as `sqb compile` prints them; null when that load had none or a newer one connected. */
 export function loadErrorOf(observations: Wire['LocationHealthObservation'][], health: LocationHealth): string | null {
@@ -136,6 +143,7 @@ export function toLocationDetail(location: Location, observations: Wire['Locatio
 		brokenDeployPolicy: null,
 		failedDeploy: null,
 		lastLoadError: loadErrorOf(observations, health),
+		poolCapWarnings: poolCapWarningsOf(observations),
 		instances: instancesOf(observations, now),
 		target: location.target,
 		snapshot: snapshotOf(published),
