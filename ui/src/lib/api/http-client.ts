@@ -141,7 +141,8 @@ export function toBootstrap(wire: Wire['ControlBootstrap']): Bootstrap {
 	const authMode: AuthMode = wire.login_mode;
 	return {
 		authMode,
-		user: { kind: 'user', name: wire.access.name, displayName: wire.access.name },
+		...(wire.logout_url ? { logoutUrl: wire.logout_url } : {}),
+		user: { kind: 'user', name: wire.access.name, displayName: wire.display_name ?? wire.access.name },
 		capabilities: wire.access.actions as Capability[],
 		locations: wire.access.locations.map(
 			(location): Location => ({

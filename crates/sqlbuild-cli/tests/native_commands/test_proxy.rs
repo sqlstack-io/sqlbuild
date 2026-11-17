@@ -4,7 +4,7 @@ use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 
 use crate::helpers::{api_ready, start_control_in, wait_for_exit};
-use crate::test_types::{ProxyCliTestCase, ServerConfigurationTestCase};
+use crate::test_types::{ProxyCliTestCase, ProxyStartupTestCase, ServerConfigurationTestCase};
 
 #[test]
 fn given_an_owner_configured_proxy_when_requests_carry_a_subject_then_only_explicit_people_resolve_without_sessions_or_machine_authority()
@@ -94,16 +94,46 @@ fn given_invalid_or_conflicting_server_configuration_when_a_standalone_server_st
             expected_error: "requires explicit trusted peer IP addresses",
         },
         ServerConfigurationTestCase {
-            description: "non-HTTPS external origin",
-            configuration: "[trusted_proxy]\norigin = \"http://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nidentities = {}\n",
+            description: "neither an HTTP nor an HTTPS external origin",
+            configuration: "[trusted_proxy]\norigin = \"ftp://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\n",
             arguments: &[],
-            expected_error: "trusted-proxy authentication requires an HTTPS origin",
+            expected_error: "trusted-proxy authentication requires an HTTP or HTTPS origin",
+        },
+        ServerConfigurationTestCase {
+            description: "a username header a browser sets",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nusername_header = \"Cookie\"\n",
+            arguments: &[],
+            expected_error: "[trusted_proxy] username_header cannot be cookie",
+        },
+        ServerConfigurationTestCase {
+            description: "the display name in the username header",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nusername_header = \"X-Example-User\"\ndisplay_name_header = \"x-example-user\"\n",
+            arguments: &[],
+            expected_error: "username_header, display_name_header and email_header must differ",
+        },
+        ServerConfigurationTestCase {
+            description: "a script as the sign-out URL",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nproxy_logout_url = \"javascript:alert(1)\"\n",
+            arguments: &[],
+            expected_error: "proxy_logout_url must be an http:// or https:// URL",
+        },
+        ServerConfigurationTestCase {
+            description: "an unknown policy for unknown users",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nunknown_users = \"provision_admin\"\n",
+            arguments: &[],
+            expected_error: "unknown variant `provision_admin`",
+        },
+        ServerConfigurationTestCase {
+            description: "two bindings for one username",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\n\n[trusted_proxy.identities]\n\"Orders-Reader\" = \"00000000-0000-0000-0000-000000000001\"\n\"orders-reader\" = \"00000000-0000-0000-0000-000000000002\"\n",
+            arguments: &[],
+            expected_error: "binds 'orders-reader' more than once",
         },
         ServerConfigurationTestCase {
             description: "subject cannot be represented by the header transport",
             configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\n\n[trusted_proxy.identities]\n\"external-café\" = \"00000000-0000-0000-0000-000000000001\"\n",
             arguments: &[],
-            expected_error: "subjects must be nonempty, unpadded ASCII header values",
+            expected_error: "trusted-proxy usernames must be 1-128 characters",
         },
         ServerConfigurationTestCase {
             description: "a password-origin flag conflicts with the file's trusted proxy",
@@ -203,6 +233,91 @@ fn given_invalid_or_conflicting_server_configuration_when_a_standalone_server_st
                 !log.contains("Control API ready:"),
                 "failed startup must not announce readiness"
             );
+        });
+    }
+}
+
+#[test]
+fn given_an_http_proxy_origin_and_an_unconfigured_proxy_address_when_requests_arrive_then_startup_warns_and_each_peer_is_logged_once()
+ {
+    let test_cases = [ProxyStartupTestCase {
+        description: "the proxy's real address differs from trusted_peers",
+        configuration: "[trusted_proxy]\norigin = \"http://control.example.com\"\ntrusted_peers = [\"192.0.2.1\"]\nusername_header = \"X-Example-User\"\n",
+        username: "orders-confidential-reader",
+        expected_warnings: &[
+            (
+                "warning: the trusted-proxy origin http://control.example.com is plain HTTP",
+                1,
+            ),
+            (
+                "warning: ignored the trusted-proxy username header x-example-user from 127.0.0.1, which is not in [trusted_proxy] trusted_peers",
+                1,
+            ),
+        ],
+    }];
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let directory = tempfile::tempdir().expect("proxy installation");
+            std::fs::write(
+                directory.path().join("server.toml"),
+                test_case.configuration,
+            )
+            .expect("server configuration");
+            let mut control = start_control_in(
+                directory,
+                &[
+                    "server",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    "0",
+                    "--no-scheduler",
+                    "--config",
+                    "server.toml",
+                ],
+            );
+            let url = api_ready(&mut control).await;
+            let client = Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .expect("HTTP client");
+            let mut statuses = Vec::new();
+            for _ in 0..2 {
+                let response = client
+                    .get(format!("{url}/api/control/bootstrap"))
+                    .header("x-forwarded-host", "control.example.com")
+                    .header("x-example-user", test_case.username)
+                    .send()
+                    .await
+                    .expect("untrusted proxy request");
+                statuses.push(response.status());
+            }
+            let log = std::fs::read_to_string(&control.stderr).expect("server log");
+            let counts: Vec<(&str, usize)> = test_case
+                .expected_warnings
+                .iter()
+                .map(|(warning, _)| (*warning, log.matches(warning).count()))
+                .collect();
+            assert_eq!(
+                (
+                    statuses,
+                    counts.as_slice(),
+                    log.contains(test_case.username)
+                ),
+                (
+                    vec![StatusCode::UNAUTHORIZED; 2],
+                    test_case.expected_warnings,
+                    false
+                ),
+                "{}: {log}",
+                test_case.description
+            );
+            #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
         });
     }
 }

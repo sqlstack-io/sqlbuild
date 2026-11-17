@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::api::models::{
     ApiAuthentication, HumanLogin, OidcAuthentication, TrustedProxyAuthentication,
+    UnknownProxyUsers,
 };
 use crate::api::tests::helpers::start_api_with_authentication;
 use crate::api::tests::oidc_helpers::{callback, login};
@@ -37,6 +38,11 @@ pub(crate) async fn browser_sessions(
                 origin: origin.into(),
                 trusted_peers: BTreeSet::from(["127.0.0.1".parse().expect("socket peer")]),
                 identities: BTreeMap::from([("orders-person".into(), person)]),
+                username_header: "X-SQB-User".into(),
+                display_name_header: None,
+                email_header: None,
+                unknown_users: UnknownProxyUsers::Reject,
+                proxy_logout_url: None,
             }),
             ..Default::default()
         },
