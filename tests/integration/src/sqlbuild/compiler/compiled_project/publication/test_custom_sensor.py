@@ -183,9 +183,9 @@ def test_given_a_custom_polling_sensor_when_a_callback_fails_or_times_out_then_a
             evaluated: list[dict[str, Any]] = sensor_calls(calls, {"phase": "evaluate"})
             assert {record["target"] for record in evaluated} == {"development"}
             # The provider is set up with the settings of the target the sensor evaluates for.
-            assert [
-                record["target_config"] for record in sensor_calls(calls, {"phase": "setup"})
-            ][: len(evaluated)] == [["development", "main"]] * len(evaluated)
+            assert [record["target_config"] for record in sensor_calls(calls, {"phase": "setup"})][
+                : len(evaluated)
+            ] == [["development", "main"]] * len(evaluated)
             assert len({record["pid"] for record in evaluated}) == len(evaluated)
             assert {
                 record["cursor"]
