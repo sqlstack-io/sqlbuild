@@ -101,8 +101,8 @@ pub(crate) struct DirectPythonLifecycle {
     ingress_python_results: Py<PyAny>,
     ingress_load_results: Py<PyAny>,
     ingress_loader_names: Py<PyAny>,
-    /// Each round-trip loader's selected upstream tasks and assets, `(kind, name)`, which must succeed.
-    round_trip_gates: HashMap<String, Vec<ObjectKey>>,
+    /// Each round-trip loader's selected upstream tasks and assets, `(kind, name)`, and whether each is on its frontier.
+    round_trip_gates: RoundTripGates,
     /// Each round-trip loader's source load key and the SQL keys it waits for.
     round_trip_waits: Vec<(ObjectKey, Vec<ObjectKey>)>,
     /// Whether the build runs read-side tasks and assets; `--no-python` turns this off.
@@ -626,7 +626,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
     )
 }
 
-type RoundTripGates = HashMap<String, Vec<ObjectKey>>;
+type RoundTripGates = HashMap<String, Vec<(ObjectKey, bool)>>;
 type RoundTripWaits = Vec<(ObjectKey, Vec<ObjectKey>)>;
 
 /// Each round-trip loader's gating upstreams, and its source load key with the SQL it waits for.
@@ -638,10 +638,10 @@ fn round_trip_ordering(
     let mut gates: RoundTripGates = HashMap::new();
     let mut waits: RoundTripWaits = Vec::new();
     for loader in &lifecycle.round_trips {
-        let mut kinds: Vec<ObjectKey> = Vec::new();
+        let mut kinds: Vec<(ObjectKey, bool)> = Vec::new();
         for name in &loader.gates {
             let kind: String = native_field(&nodes.get_item(name)?, "kind")?.extract()?;
-            kinds.push((kind, name.clone()));
+            kinds.push(((kind, name.clone()), loader.frontier.contains(name)));
         }
         gates.insert(loader.name.clone(), kinds);
         for entry in native_field(plan_output, "source_load_entries")?.try_iter()? {
@@ -669,10 +669,7 @@ pub(crate) struct SourceLoadGate {
 
 #[pymethods]
 impl SourceLoadGate {
-    /// Why a round-trip load is skipped, by the Python fan-in rule over its gating upstreams.
-    ///
-    /// A failed or hard-skipped upstream skips it `hard`. Otherwise it runs when any upstream
-    /// succeeded, and skips `soft`, naming the first upstream, when every one soft-skipped or never ran.
+    /// Why a round-trip load is skipped: `hard` for any failed or hard-skipped gate, else `soft` unless a frontier gate succeeded.
     fn __call__(
         &self,
         py: Python<'_>,
@@ -699,13 +696,14 @@ impl SourceLoadGate {
         }
         let mut succeeded: bool = false;
         let mut soft_reason: Option<String> = None;
-        for (kind, name) in gates {
+        let mut not_run_reason: Option<String> = None;
+        for ((kind, name), frontier) in gates {
             let status = statuses
                 .get(name)
                 .map(|(status, mode)| (status.as_str(), mode.as_deref()));
             let outcome: &str = match status {
                 Some((SUCCESS_STATUS, _)) => {
-                    succeeded = true;
+                    succeeded |= *frontier;
                     continue;
                 }
                 Some((SKIPPED_STATUS, Some(SOFT_SKIP))) => "was skipped",
@@ -722,11 +720,19 @@ impl SourceLoadGate {
                     )));
                 }
                 None if !lifecycle.include_python => {
-                    "did not run; --no-python skips read-side tasks and assets"
+                    not_run_reason.get_or_insert_with(|| {
+                        format!(
+                            "Upstream {kind} '{name}' did not run; --no-python skips read-side tasks and assets"
+                        )
+                    });
+                    continue;
                 }
                 None => "did not run; the SQL it reads was not rebuilt",
             };
             soft_reason.get_or_insert_with(|| format!("Upstream {kind} '{name}' {outcome}"));
+        }
+        if let Some(reason) = not_run_reason {
+            return Ok(Some((reason, SOFT_SKIP)));
         }
         if succeeded {
             return Ok(None);

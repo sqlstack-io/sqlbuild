@@ -1545,6 +1545,16 @@ FAILING_SCORING_TASK: str = '    raise RuntimeError("partner service unavailable
 
 
 ROUND_TRIP_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/loaders/round_trip")
+_TWO_GATE_LOADER: str = (
+    "from sqlbuild.loaders import loader\n\n"
+    "from python.tasks.ranking import rank_orders\n"
+    "from python.tasks.scoring import score_orders\n\n\n"
+    "@loader(depends_on=[score_orders, rank_orders])\n"
+    "def partner_scores(ctx):\n"
+    '    """Load the scores the partner returned."""\n'
+    "    result = ctx.result_of(node_function=score_orders)\n"
+    '    return [{"order_id": o, "score": s} for o, s in result.payload["scores"]]\n'
+)
 
 
 def round_trip_project_files(*, project_settings: str, task_body: str) -> dict[str, str]:
@@ -1580,6 +1590,39 @@ def round_trip_refusal(name: str) -> str:
     """One of DuckShop's round-trip refusal variants, such as `cycle_task.py`."""
 
     return (ROUND_TRIP_FIXTURE / "refusals" / name).read_text()
+
+
+def round_trip_variant(variant: str, files: dict[str, str]) -> dict[str, str]:
+    """DuckShop's round-trip `variant` files, keyed by where each goes in the project."""
+
+    return {
+        target: (ROUND_TRIP_FIXTURE / "variants" / variant / name).read_text()
+        for target, name in files.items()
+    }
+
+
+def scoring_task_files(body: str) -> dict[str, str]:
+    """The round trip's score task with `body`, keyed by where it goes in the project."""
+
+    path: str = "python/tasks/scoring.py"
+    return {
+        path: round_trip_project_files(project_settings=ALLOW_ROUND_TRIPS, task_body=body)[path]
+    }
+
+
+def ranking_task_files(body: str) -> dict[str, str]:
+    """A second task gating the partner loader, with `body`, and the loader depending on both."""
+
+    return {
+        "python/tasks/ranking.py": (
+            "from sqlbuild.refs import model\n"
+            "from sqlbuild.tasks import task\n\n\n"
+            '@task(depends_on=model("orders"))\n'
+            "def rank_orders(ctx):\n"
+            '    """Rank the orders for the partner."""\n' + body
+        ),
+        "python/loaders/partner.py": _TWO_GATE_LOADER,
+    }
 
 
 def build_round_trip_project(

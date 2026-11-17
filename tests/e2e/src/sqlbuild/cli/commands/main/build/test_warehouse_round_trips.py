@@ -16,6 +16,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     FAILING_SCORING_TASK,
     SCORING_TASK,
     build_round_trip_project,
+    ranking_task_files,
+    round_trip_variant,
+    scoring_task_files,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
@@ -27,31 +30,6 @@ _ORDERS_WITH_A_THIRD: str = (
     'MODEL (description "Orders to score", materialized table);\n\n'
     "SELECT 1 AS order_id UNION ALL SELECT 2 UNION ALL SELECT 3\n"
 )
-_TWO_GATE_LOADER: str = (
-    "from sqlbuild.loaders import loader\n\n"
-    "from python.tasks.ranking import rank_orders\n"
-    "from python.tasks.scoring import score_orders\n\n\n"
-    "@loader(depends_on=[score_orders, rank_orders])\n"
-    "def partner_scores(ctx):\n"
-    '    """Load the scores the partner returned."""\n'
-    "    result = ctx.result_of(node_function=score_orders)\n"
-    '    return [{"order_id": o, "score": s} for o, s in result.payload["scores"]]\n'
-)
-
-
-def _ranking_task(body: str) -> dict[str, str]:
-    """A second task gating the partner loader, with `body`, and the loader depending on both."""
-
-    return {
-        "python/tasks/ranking.py": (
-            "from sqlbuild.refs import model\n"
-            "from sqlbuild.tasks import task\n\n\n"
-            '@task(depends_on=model("orders"))\n'
-            "def rank_orders(ctx):\n"
-            '    """Rank the orders for the partner."""\n' + body
-        ),
-        "python/loaders/partner.py": _TWO_GATE_LOADER,
-    }
 
 
 @pytest.mark.parametrize(
@@ -186,7 +164,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 'MODEL (description "Orders to score", materialized table);\n\n'
                 "SELECT 1 AS order_id UNION ALL SELECT 2 UNION ALL SELECT 3\n"
             ),
-            task_body='    return ctx.skip(reason="partner offline")\n',
+            extra_files=scoring_task_files('    return ctx.skip(reason="partner offline")\n'),
             expected_output_fragments=(
                 "soft skip: Upstream task 'score_orders' was skipped",
                 "table     scored_orders        OK",
@@ -200,7 +178,9 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 'MODEL (description "Orders to score", materialized table);\n\n'
                 "SELECT 1 AS order_id UNION ALL SELECT 2 UNION ALL SELECT 3\n"
             ),
-            task_body='    return ctx.skip(reason="partner offline", mode="hard")\n',
+            extra_files=scoring_task_files(
+                '    return ctx.skip(reason="partner offline", mode="hard")\n'
+            ),
             expected_output_fragments=(
                 "hard skip: Upstream task 'score_orders' was skipped",
                 "table     scored_orders        SKIP",
@@ -210,8 +190,10 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
         ChangedRoundTripE2ETestCase(
             description="one gating task soft-skips and another succeeds, so the load runs",
             orders_sql=_ORDERS_WITH_A_THIRD,
-            task_body='    return ctx.skip(reason="partner offline")\n',
-            extra_files=_ranking_task('    return ctx.result(payload={"ranked": True})\n'),
+            extra_files={
+                **scoring_task_files('    return ctx.skip(reason="partner offline")\n'),
+                **ranking_task_files('    return ctx.result(payload={"ranked": True})\n'),
+            },
             expected_output_fragments=(
                 "task      rank_orders OK",
                 "source    partner_scores       OK",
@@ -222,8 +204,10 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
         ChangedRoundTripE2ETestCase(
             description="every gating task soft-skips, so the load soft-skips",
             orders_sql=_ORDERS_WITH_A_THIRD,
-            task_body='    return ctx.skip(reason="partner offline")\n',
-            extra_files=_ranking_task('    return ctx.skip(reason="nothing to rank")\n'),
+            extra_files={
+                **scoring_task_files('    return ctx.skip(reason="partner offline")\n'),
+                **ranking_task_files('    return ctx.skip(reason="nothing to rank")\n'),
+            },
             expected_output_fragments=(
                 "partner_scores       SKIP",
                 "soft skip: Upstream task '",
@@ -234,13 +218,54 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
         ChangedRoundTripE2ETestCase(
             description="one gating task hard-skips while another succeeds, so the load hard-skips",
             orders_sql=_ORDERS_WITH_A_THIRD,
-            task_body='    return ctx.skip(reason="partner offline", mode="hard")\n',
-            extra_files=_ranking_task('    return ctx.result(payload={"ranked": True})\n'),
+            extra_files={
+                **scoring_task_files(
+                    '    return ctx.skip(reason="partner offline", mode="hard")\n'
+                ),
+                **ranking_task_files('    return ctx.result(payload={"ranked": True})\n'),
+            },
             expected_output_fragments=(
                 "hard skip: Upstream task 'score_orders' was skipped",
                 "table     scored_orders        SKIP",
             ),
             expected_scored_rows=((1, 10), (2, 20)),
+        ),
+        ChangedRoundTripE2ETestCase(
+            description="a task behind the load's soft-skipped upstream succeeding does not run it",
+            orders_sql=_ORDERS_WITH_A_THIRD,
+            extra_files=round_trip_variant(
+                "transitive_gate",
+                {
+                    "python/tasks/packaging.py": "packaging.py",
+                    "python/loaders/partner.py": "partner.py",
+                },
+            ),
+            expected_output_fragments=(
+                "soft skip: Upstream task 'package_scores'",
+                "table     scored_orders        OK",
+                "Completed successfully",
+            ),
+            expected_scored_rows=((1, 10), (2, 20)),
+        ),
+        ChangedRoundTripE2ETestCase(
+            description="--no-python soft-skips the load even when an ingress gate succeeds",
+            orders_sql=_ORDERS_WITH_A_THIRD,
+            extra_files=round_trip_variant(
+                "ingress_gate",
+                {
+                    "python/tasks/rates.py": "rates_task.py",
+                    "python/loaders/rates.py": "rates_loader.py",
+                    "sources/rates.yml": "rates.yml",
+                    "python/loaders/partner.py": "partner.py",
+                },
+            ),
+            expected_output_fragments=(
+                "soft skip: Upstream task 'score_orders' did not run; --no-python skips "
+                "read-side tasks and assets",
+                "Completed successfully",
+            ),
+            expected_scored_rows=((1, 10), (2, 20)),
+            build_flags=("--no-python",),
         ),
     ],
     ids=lambda case: case.description,
@@ -265,13 +290,6 @@ def test_given_a_built_round_trip_when_rebuilding_then_the_decision_follows_the_
     (project_dir / "models" / "orders.sql").write_text(test_case.orders_sql, encoding="utf-8")
     for relative, text in test_case.extra_files.items():
         (project_dir / relative).write_text(text, encoding="utf-8")
-    if test_case.task_body is not None:
-        task_file: Path = project_dir / "python" / "tasks" / "scoring.py"
-        task_source: str = task_file.read_text(encoding="utf-8")
-        task_file.write_text(
-            task_source[: task_source.index("    relation = ")] + test_case.task_body,
-            encoding="utf-8",
-        )
 
     result: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build", *test_case.build_flags), project_dir=project_dir

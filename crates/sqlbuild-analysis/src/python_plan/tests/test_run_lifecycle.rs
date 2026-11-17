@@ -55,6 +55,35 @@ fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
                 "partner_scores",
                 &[("model", "orders")],
                 &["package_scores", "score_orders"],
+                &["package_scores"],
+            )],
+        },
+        LifecycleTestCase {
+            description: "only the tasks and assets a loader reads directly can let it run",
+            selected: &[
+                "fetch_rates",
+                "score_orders",
+                "package_scores",
+                "partner_scores",
+            ],
+            nodes: &[
+                ("fetch_rates", "task", &[]),
+                ("score_orders", "task", &[("model", "orders")]),
+                ("package_scores", "asset", &[]),
+                ("partner_scores", "loader", &[]),
+            ],
+            upstream: &[
+                ("partner_scores", &["package_scores", "fetch_rates"]),
+                ("package_scores", &["score_orders"]),
+            ],
+            expected_ingress: &[],
+            expected_loaders: &[],
+            expected_read_side: &["fetch_rates", "package_scores", "score_orders"],
+            expected_round_trips: &[(
+                "partner_scores",
+                &[("model", "orders")],
+                &["fetch_rates", "package_scores", "score_orders"],
+                &["fetch_rates", "package_scores"],
             )],
         },
         LifecycleTestCase {
@@ -94,13 +123,14 @@ fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
                 round_trip_loaders: test_case
                     .expected_round_trips
                     .iter()
-                    .map(|(name, waits_for, gates)| RoundTripLoader {
+                    .map(|(name, waits_for, gates, frontier)| RoundTripLoader {
                         name: (*name).to_owned(),
                         waits_for: waits_for
                             .iter()
                             .map(|(kind, name)| ((*kind).to_owned(), (*name).to_owned()))
                             .collect(),
                         gates: names(gates),
+                        frontier: names(frontier),
                     })
                     .collect(),
             },
