@@ -173,7 +173,7 @@ Both `setup` and `teardown` are optional. A provider with only field declaration
 
 ### The setup context
 
-In `sqb build`, `sqb check` and `sqb load`, `setup(ctx)` receives the active target's resolved settings as `ctx.target_config`, the same values Python nodes see (see [Target settings](overview.md#target-settings)):
+`setup(ctx)` receives the active target's resolved settings as `ctx.target_config`, the same values Python nodes see (see [Target settings](overview.md#target-settings)):
 
 ```python
 class PartnerStage(Provider):
@@ -184,9 +184,21 @@ class PartnerStage(Provider):
         self.stage = f"{target.database}.{target.loader_schema}.partner_stage"
 ```
 
+Which target `ctx.target_config` describes depends on what uses the provider:
+
+| Used by | `ctx` |
+| --- | --- |
+| Python nodes in `sqb build`, `sqb check` and `sqb load` | The command's target |
+| Event exporters and command output sinks | The command's target: `--target`, or the project's default target |
+| Orchestration sensors | The target the sensor evaluates for |
+| Orchestration calendars | `None` |
+
 Details:
 
-- A provider first used by an event exporter or command output sink, or by an orchestration sensor or calendar, is set up with `ctx` set to `None`. Check for `None` when such a provider also reads the target.
+- When the project can't resolve the target's settings, for example because the target names a connection that isn't defined, every command that uses the target, such as `sqb build`, `sqb compile` or `sqb query`, fails before any exporter or sink provider is set up.
+- Commands that don't use the target, such as `sqb format`, still run, and their exporter and sink providers get `ctx` set to `None`.
+- In a project that defines providers, a sensor evaluation whose target's settings can't be resolved fails, and the sensor's cursor doesn't advance.
+- Check for `None` in a provider that calendars, exporters or sinks use.
 
 ## Configuration from environment variables
 

@@ -27,6 +27,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
+use sqlbuild_python_compile::compile_driver::main::setup::model_free_locations::model_free_locations;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
@@ -271,19 +272,6 @@ fn compile_pipeline<'py>(
     )
 }
 
-fn target_default<'py>(
-    project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
-    (field, fallback): (&str, &str),
-) -> PyResult<Bound<'py, PyAny>> {
-    let value: Bound<'py, PyAny> = native_field(project, field)?;
-    if value.is_none() {
-        adapter.call_method0(fallback)
-    } else {
-        Ok(value)
-    }
-}
-
 /// The discovered Python graph, after refusing unit-test selectors, and the selected checks.
 fn python_selection<'py>(
     request: &Bound<'py, PyAny>,
@@ -360,18 +348,7 @@ fn prepare<'py>(
         lifecycle_plan,
         relation_targets,
         relation_refs,
-        defaults: (
-            target_default(
-                &project,
-                &adapter,
-                ("effective_target_database", "default_database"),
-            )?,
-            target_default(
-                &project,
-                &adapter,
-                ("effective_target_schema", "default_schema"),
-            )?,
-        ),
+        defaults: model_free_locations(&project, |method| adapter.call_method0(method))?,
         project_relations: object(
             py,
             build_project_relation_targets(

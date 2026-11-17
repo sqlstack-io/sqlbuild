@@ -2878,6 +2878,7 @@ class EventExporterCommandScope:
         providers: tuple[DiscoveredProvider, ...],
         event_exporters: tuple[DiscoveredEventExporter, ...],
         command_output_sinks: tuple[DiscoveredCommandOutputSink, ...] | None = None,
+        setup_context: ProviderSetupContext | None = None,
     ) -> None: ...
     def cached_extensions(
         self, *, project_dir: Path

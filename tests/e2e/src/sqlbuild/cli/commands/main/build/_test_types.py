@@ -1642,6 +1642,18 @@ class PythonTargetConfigBuildE2ETestCase:
     project_target_lines: str
     local_target_lines: str
     expected_settings: dict[str, object]
+    extra_files: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True)
+class UnresolvedTargetSinkE2ETestCase:
+    """Test case for a sink provider under a target the project can't resolve."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_returncode: int
+    expected_output: str
+    expected_setups: list[object]
 
 
 @dataclass(frozen=True)
