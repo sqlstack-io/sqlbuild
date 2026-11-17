@@ -87,6 +87,12 @@ class PreviewPerformanceTestCase:
     #: The warm preview's share of the location's publish, a linear 10K compile on one machine.
     expected_max_warm_to_publish: float
     expected_max_check_seconds: float
+    #: A live plan of the same warehouse, compile included, as a multiple of the warm preview.
+    expected_max_live_to_warm: float
+    #: Selected models analysed again against inspected source columns in the live plan.
+    expected_source_rebinding: tuple[int, int]
+    #: Every statement the live plan sends the warehouse, cursor batches included.
+    expected_max_warehouse_statements: int
 
 
 @dataclass(frozen=True)
