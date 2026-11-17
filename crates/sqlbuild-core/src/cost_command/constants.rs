@@ -27,3 +27,12 @@ pub const MISSING_METRIC_STATUSES: [&str; 4] =
 /// Statuses a delayed refresh may still improve.
 pub const REFRESHABLE_STATUSES: [&str; 2] = ["pending", "partial"];
 pub const LEDGER_PERSISTENCE_FAILURE_PREFIX: &str = "Statement-ledger persistence failed (";
+/// The limitation of a run whose statements query history still showed running, which a re-read can complete.
+pub const INCOMPLETE_HISTORY_LIMITATION: &str =
+    "One or more run statements were still incomplete in query history.";
+/// The limitation of a run whose recent statements had no warehouse metadata yet, which a re-read can complete.
+pub const MISSING_METADATA_LIMITATION: &str =
+    "One or more run statements had missing Snowflake warehouse metadata.";
+/// The limitations a re-read of a run that saw every statement can still lift.
+pub const CHANGEABLE_LIMITATIONS: [&str; 2] =
+    [INCOMPLETE_HISTORY_LIMITATION, MISSING_METADATA_LIMITATION];

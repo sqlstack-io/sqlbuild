@@ -28,9 +28,12 @@ use crate::bindings::_helpers::compile_outputs::runtime_target::{
     write_python_check_runtime_target, write_runtime_target,
 };
 use crate::bindings::_helpers::cost_report::degradation::{
-    finalize_build_cost as finalize_cost, render_build_cost,
+    RUN_END_SWEEP_SECONDS, finalize_build_cost as finalize_cost,
+    finalize_build_cost_within as finalize_cost_within, render_build_cost,
 };
 use crate::bindings::_helpers::cost_report::functions::cost_output_payload;
+use crate::bindings::_helpers::cost_telemetry::values::cost_aware;
+use crate::bindings::_helpers::native_host::history_clock::reports_cost_capability;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -46,6 +49,8 @@ const CHECK_KIND: &str = "check";
 const CHECK_WARNED: &str = "check warned";
 const PENDING_MESSAGE: &str = "Build cost collection has not completed.";
 const INTERRUPTED_MESSAGE: &str = "Build was interrupted before cost collection completed.";
+const DEFERRED_MESSAGE: &str = "Warehouse costs are collected after the run finishes.";
+const COLLECTING_LINE: &str = "Collecting warehouse costs...\n";
 
 /// How one cost finalization differs from a completed collection.
 pub(crate) struct CostRequest<'py> {
@@ -57,6 +62,15 @@ pub(crate) struct CostRequest<'py> {
 
 /// `finalize_build_cost(BuildCostFinalization(...))`.
 pub(crate) fn finalize_build_cost<'py>(
+    context: &BuildContext<'py>,
+    pipeline: &Bound<'py, PyAny>,
+    cost: CostRequest<'py>,
+) -> PyResult<Bound<'py, PyAny>> {
+    finalize_cost(&cost_finalization(context, pipeline, cost)?)
+}
+
+/// The `BuildCostFinalization` of one cost request.
+fn cost_finalization<'py>(
     context: &BuildContext<'py>,
     pipeline: &Bound<'py, PyAny>,
     cost: CostRequest<'py>,
@@ -101,9 +115,56 @@ pub(crate) fn finalize_build_cost<'py>(
         ));
     }
     fields.extend(cost.overrides);
-    let finalization: Bound<'py, PyAny> =
-        new_record_with(py, RecordId::BuildCostFinalization, &fields)?;
-    finalize_cost(&finalization)
+    new_record_with(py, RecordId::BuildCostFinalization, &fields)
+}
+
+/// A finished build's cost: a worker's waits until its run has finished; the CLI sweeps briefly.
+fn finished_build_cost<'py>(
+    context: &BuildContext<'py>,
+    pipeline: &Bound<'py, PyAny>,
+    (status, started_at, completed_at): (&'static str, &Bound<'py, PyAny>, Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = context.py();
+    let request = |overrides: Vec<(&'static str, Bound<'py, PyAny>)>| CostRequest {
+        status,
+        started_at: started_at.clone(),
+        completed_at: completed_at.clone(),
+        overrides,
+    };
+    let adapter: Bound<'py, PyAny> = context.get("adapter")?;
+    if !cost_aware(&adapter)? || !reports_cost_capability(&adapter)? {
+        return finalize_build_cost(
+            context,
+            pipeline,
+            request(vec![("render", boolean(py, false))]),
+        );
+    }
+    if let Some(worker) = &context.worker {
+        worker.defer_cost(&cost_finalization(
+            context,
+            pipeline,
+            request(vec![("render", boolean(py, false))]),
+        )?)?;
+        return finalize_build_cost(
+            context,
+            pipeline,
+            request(vec![
+                ("collect", boolean(py, false)),
+                ("render", boolean(py, false)),
+                ("cost_status", cost_status(py, "PENDING")?),
+                ("cost_message", text(py, DEFERRED_MESSAGE)),
+            ]),
+        );
+    }
+    emit(&context.stream, COLLECTING_LINE)?;
+    finalize_cost_within(
+        &cost_finalization(
+            context,
+            pipeline,
+            request(vec![("render", boolean(py, false))]),
+        )?,
+        Some(RUN_END_SWEEP_SECONDS),
+    )
 }
 
 fn cost_status<'py>(py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -382,23 +443,6 @@ pub(crate) fn complete_direct_build<'py>(
         joined(&context.get("effective_project_dir")?, &["target"])?;
     write_runtime_target(&target_dir, &plan, result)?;
     write_python_check_runtime_target(&target_dir, check_results)?;
-    let cost_started: Instant = Instant::now();
-    let record: PyResult<Bound<'py, PyAny>> = finalize_build_cost(
-        context,
-        pipeline,
-        CostRequest {
-            status: if exit_code == 0 {
-                SUCCESS_STATUS
-            } else {
-                "failed"
-            },
-            started_at: started_at.clone(),
-            completed_at,
-            overrides: vec![("render", boolean(py, false))],
-        },
-    );
-    let cost_seconds: f64 = finish_cost_timing(context, cost_started);
-    let record: Bound<'py, PyAny> = record?;
     let checks: Vec<PythonNodeText> = check_results
         .try_iter()?
         .map(|check| Ok(check_node_text(&check_result_text(&check?)?)))
@@ -413,6 +457,22 @@ pub(crate) fn complete_direct_build<'py>(
         checks,
     )?;
     emit(&context.stream, &format!("\n{footer}\n"))?;
+    let cost_started: Instant = Instant::now();
+    let record: PyResult<Bound<'py, PyAny>> = finished_build_cost(
+        context,
+        pipeline,
+        (
+            if exit_code == 0 {
+                SUCCESS_STATUS
+            } else {
+                "failed"
+            },
+            started_at,
+            completed_at,
+        ),
+    );
+    let cost_seconds: f64 = finish_cost_timing(context, cost_started);
+    let record: Bound<'py, PyAny> = record?;
     let payload: Bound<'py, PyAny> = format_build_execution_json_with(
         py,
         result,

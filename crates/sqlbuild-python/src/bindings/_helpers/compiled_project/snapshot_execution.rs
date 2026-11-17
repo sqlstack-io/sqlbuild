@@ -19,6 +19,7 @@ use crate::bindings::_helpers::compiled_project::constants::{
     NO_CHANGE_REASON, SKIP_ACTION, SQL_TEST_KEY_PREFIX,
 };
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
+use crate::bindings::_helpers::native_host::deferred_cost::DeferredCost;
 use crate::bindings::_helpers::records::fields::field;
 
 /// Node keys by snapshot node key, such as the models each test checks.
@@ -54,6 +55,8 @@ pub(crate) struct WorkerBuild {
     refusal: Mutex<Option<String>>,
     /// Error-severity audit failures the build let through, reported before the run finishes.
     ignored_audit_failures: AtomicU32,
+    /// The build's cost finalization, collected once the run has reported its outcome.
+    deferred_cost: DeferredCost,
 }
 
 impl WorkerBuild {
@@ -76,6 +79,7 @@ impl WorkerBuild {
             returned: AtomicBool::new(false),
             ignored_audit_failures: AtomicU32::new(0),
             refusal: Mutex::default(),
+            deferred_cost: DeferredCost::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
             state.complete(worker.py(), key, (NodeOutcome::Skipped, None, (None, None)))?;
@@ -90,6 +94,16 @@ impl WorkerBuild {
     /// The server run this build executes.
     pub(crate) fn run_id(&self) -> uuid::Uuid {
         self.execution.claim.request.run_id
+    }
+
+    /// Keep the build's cost finalization to collect after the run's outcome is published.
+    pub(crate) fn defer_cost(&self, finalization: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.deferred_cost.defer(finalization)
+    }
+
+    /// The cost finalization the build deferred, once.
+    pub(crate) fn take_deferred_cost(&self) -> PyResult<Option<pyo3::Py<PyAny>>> {
+        self.deferred_cost.take()
     }
 
     /// The build let `count` error-severity audit failures through.

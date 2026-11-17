@@ -59,6 +59,8 @@ pub const LATEST_RUN_COST_COLUMNS: [&str; 11] = [
 pub const RESOURCE_COST_TAG: &str = "resource_cost";
 /// Statuses a later build re-reads while the warehouse is awake.
 pub const REFRESHABLE_COST_STATUSES: [&str; 3] = ["pending", "partial", "collection_failed"];
+/// Status re-read only while a statement was not visible yet or still running in query history.
+pub const PARTIAL_STATUS: &str = "partial";
 /// Status whose re-reads are bounded by `MAX_FAILED_COLLECTION_ATTEMPTS`.
 pub const COLLECTION_FAILED_STATUS: &str = "collection_failed";
 /// Collections of a run, the first included, after which a failed collection is not retried.
@@ -67,5 +69,7 @@ pub const MAX_FAILED_COLLECTION_ATTEMPTS: i64 = 3;
 pub const REFRESH_WINDOW_DAYS: i64 = 6;
 /// Most runs one build re-reads, newest first.
 pub const MAX_REFRESHED_RUNS: usize = 3;
+/// Seconds after a run ends before a later build re-reads it, once its history has settled.
+pub const REFRESH_SETTLE_SECONDS: i64 = 120;
 /// Seconds in one day, for the refresh window.
 pub const SECONDS_PER_DAY: i64 = 86_400;
