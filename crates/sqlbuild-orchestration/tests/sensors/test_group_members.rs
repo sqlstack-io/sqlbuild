@@ -18,11 +18,10 @@ use crate::runs::models::{
 };
 use crate::runs::tests::claim_helpers::finish;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::sensors::main::{
-    begin_sensor_evaluation::begin_sensor_evaluation,
-    complete_builtin_sensor::complete_builtin_sensor,
+use crate::sensors::tests::helpers::{evaluate_sensors, node_finished};
+use crate::sensors::tests::test_types::{
+    GroupMemberSensorTestCase, SensorTestCase, SkippedMemberSensorTestCase,
 };
-use crate::sensors::tests::test_types::{GroupMemberSensorTestCase, SensorTestCase};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -36,6 +35,7 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
             description: "SQLite member succeeds",
             backend: Backend::Sqlite,
             staging: (NodeOutcome::Success, RunOutcome::Success),
+            marts: (NodeOutcome::Success, RunOutcome::Success),
             expected_firing: &["staging_success"],
             expected_after_marts: &["staging_success"],
         },
@@ -43,6 +43,7 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
             description: "PostgreSQL member succeeds",
             backend: Backend::Postgres,
             staging: (NodeOutcome::Success, RunOutcome::Success),
+            marts: (NodeOutcome::Success, RunOutcome::Success),
             expected_firing: &["staging_success"],
             expected_after_marts: &["staging_success"],
         },
@@ -50,6 +51,7 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
             description: "SQLite member fails and its dependent is skipped",
             backend: Backend::Sqlite,
             staging: (NodeOutcome::Failed, RunOutcome::Failed),
+            marts: (NodeOutcome::Skipped, RunOutcome::Failed),
             expected_firing: &["staging_failed"],
             expected_after_marts: &["marts_failed", "staging_failed"],
         },
@@ -57,6 +59,7 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
             description: "PostgreSQL member fails and its dependent is skipped",
             backend: Backend::Postgres,
             staging: (NodeOutcome::Failed, RunOutcome::Failed),
+            marts: (NodeOutcome::Skipped, RunOutcome::Failed),
             expected_firing: &["staging_failed"],
             expected_after_marts: &["marts_failed", "staging_failed"],
         },
@@ -156,19 +159,10 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
                 .expect("triggers");
             let mut fired: BTreeMap<String, usize> = BTreeMap::new();
             let evaluate = async |fired: &mut BTreeMap<String, usize>| {
-                for trigger in &triggers {
-                    let Some(requested) =
-                        begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                            .await
-                            .expect("begin evaluation")
-                    else {
-                        continue;
-                    };
-                    let count = complete_builtin_sensor(store, &lease, &requested)
-                        .await
-                        .expect("complete evaluation");
-                    *fired.entry(trigger.name.clone()).or_default() += count;
-                }
+                evaluate_sensors(store, &lease, &triggers)
+                    .await
+                    .into_iter()
+                    .for_each(|(name, count)| *fired.entry(name).or_default() += count);
             };
             evaluate(&mut fired).await;
             let firing: Vec<&str> = fired
@@ -202,12 +196,7 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
                 .expect("claim marts")
                 .expect("marts ready");
             assert_eq!(marts.request.job_key.as_deref(), Some("marts_job"));
-            let marts_outcome = if test_case.staging.1 == RunOutcome::Success {
-                (NodeOutcome::Success, RunOutcome::Success)
-            } else {
-                (NodeOutcome::Skipped, RunOutcome::Failed)
-            };
-            finish(store, &marts, marts_outcome).await;
+            finish(store, &marts, test_case.marts).await;
             advance_groups(store, &lease, (&limits, scope))
                 .await
                 .expect("finish group");
@@ -283,9 +272,9 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
             ] {
                 let mut when =
                     json!({"kind": "run_event", "job_key": "staging_job", "kinds": [kind]});
-                if let Some(nodes) = nodes {
-                    when["executed_successfully"] = json!(nodes);
-                }
+                when.as_object_mut()
+                    .expect("when")
+                    .extend(nodes.map(|nodes| ("executed_successfully".to_owned(), json!(nodes))));
                 sensors.insert(
                     name.into(),
                     json!({
@@ -370,20 +359,7 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
                 .await
                 .expect("triggers");
             let evaluate = async || {
-                let mut fired: BTreeMap<String, usize> = BTreeMap::new();
-                for trigger in &triggers {
-                    let Some(requested) =
-                        begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                            .await
-                            .expect("begin evaluation")
-                    else {
-                        continue;
-                    };
-                    let count = complete_builtin_sensor(store, &lease, &requested)
-                        .await
-                        .expect("complete evaluation");
-                    *fired.entry(trigger.name.clone()).or_default() += count;
-                }
+                let mut fired = evaluate_sensors(store, &lease, &triggers).await;
                 fired.retain(|_, count| *count > 0);
                 fired
             };
@@ -446,9 +422,21 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
 
 #[test]
 fn given_a_member_the_group_skips_when_sensors_and_alerts_watch_it_then_it_is_skipped_not_failed() {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases =
+        [Backend::Sqlite, Backend::Postgres].map(|backend| SkippedMemberSensorTestCase {
+            description: match backend {
+                Backend::Sqlite => "SQLite group skips its dependent member",
+                Backend::Postgres => "PostgreSQL group skips its dependent member",
+            },
+            backend,
+            expected_marts_status: RunStatus::Skipped,
+            expected_fired: &[("marts_completed", 1), ("marts_skipped", 1)],
+        });
+    for test_case in test_cases {
         run(async {
-            let fixture = open_test_store(backend).await.expect("required backend");
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
             let location = create_location(store, "orders", "test-admin")
@@ -532,7 +520,11 @@ fn given_a_member_the_group_skips_when_sensors_and_alerts_watch_it_then_it_is_sk
                 .iter()
                 .find(|record| record.job_key.as_deref() == Some("marts_job"))
                 .expect("marts run");
-            assert_eq!(marts.status, RunStatus::Skipped, "{backend:?}");
+            assert_eq!(
+                marts.status, test_case.expected_marts_status,
+                "{}",
+                test_case.description
+            );
             let alerts = crate::runs::tests::helpers::rows(
                 store,
                 "SELECT run_id FROM recall_events WHERE event_type='platform_run_failed'",
@@ -545,46 +537,25 @@ fn given_a_member_the_group_skips_when_sensors_and_alerts_watch_it_then_it_is_sk
                     .map(|row| row["run_id"].as_str().unwrap_or_default().to_owned())
                     .collect::<Vec<_>>(),
                 vec![staging.request.run_id.to_string()],
-                "{backend:?}: only the failed member alerts"
+                "{}: only the failed member alerts",
+                test_case.description
             );
-            let mut fired: BTreeMap<String, usize> = BTreeMap::new();
-            for trigger in list_triggers(store, location, "development")
+            let triggers = list_triggers(store, location, "development")
                 .await
-                .expect("triggers")
-            {
-                let Some(requested) = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                    .await
-                    .expect("begin evaluation")
-                else {
-                    continue;
-                };
-                let count = complete_builtin_sensor(store, &lease, &requested)
-                    .await
-                    .expect("complete evaluation");
-                if count > 0 {
-                    fired.insert(trigger.name.clone(), count);
-                }
-            }
+                .expect("triggers");
+            let mut fired = evaluate_sensors(store, &lease, &triggers).await;
+            fired.retain(|_, count| *count > 0);
             assert_eq!(
                 fired,
-                BTreeMap::from([
-                    ("marts_completed".to_owned(), 1),
-                    ("marts_skipped".to_owned(), 1),
-                ]),
-                "{backend:?}: a skipped member fires skipped, never failed"
+                test_case
+                    .expected_fired
+                    .iter()
+                    .map(|(name, count)| ((*name).to_owned(), *count))
+                    .collect::<BTreeMap<_, _>>(),
+                "{}: a skipped member fires skipped, never failed",
+                test_case.description
             );
             close_test_store(fixture).await;
         });
-    }
-}
-
-fn node_finished(node_key: &str, outcome: NodeOutcome) -> RunChange {
-    RunChange::NodeFinished {
-        node_key: node_key.into(),
-        outcome,
-        rows_affected: None,
-        error_code: None,
-        skipped_because_of: None,
-        error_message: None,
     }
 }

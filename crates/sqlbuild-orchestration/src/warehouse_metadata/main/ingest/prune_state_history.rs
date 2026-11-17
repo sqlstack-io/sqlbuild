@@ -20,10 +20,7 @@ const AUDIT_RESULTS: &str = "DELETE FROM sqb_warehouse_audit_results WHERE event
     COALESCE(binding_key, audit_name) ORDER BY observed_at DESC, event_id DESC) AS version \
     FROM sqb_warehouse_audit_results) ranked WHERE version > $1 LIMIT $2) RETURNING event_id";
 
-/// Removes one page of builds and one page of check results past the limit.
-///
-/// Returns the rows deleted and whether a page came back full, so more may remain. Each page
-/// commits on its own, so a repeated or interrupted pass only finds rows still stored.
+/// Remove one page of builds and of check results past the limit; returns rows deleted and whether more remain.
 pub(crate) async fn prune_state_history(
     store: &ControlStore,
     retention: StateHistoryRetention,

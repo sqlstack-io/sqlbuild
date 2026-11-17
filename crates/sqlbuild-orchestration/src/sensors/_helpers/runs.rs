@@ -1,6 +1,4 @@
-//! Terminal projections carry the durable finish cursor; late observations cannot move it.
-//!
-//! A group member's attempts that the group retried are not outcomes: only its final attempt fires.
+//! Terminal projections carry the durable finish cursor; a retried member fires on its final attempt.
 
 use std::collections::BTreeSet;
 
@@ -57,8 +55,7 @@ pub(crate) async fn consume_run_events(
     Ok((transaction, (cursor, requests)))
 }
 
-/// Each chunk intersects the previous matches: every selected node must qualify. A group member's
-/// node qualifies from any of its attempts in that group run, since a retry reruns only what failed.
+/// Each chunk narrows the previous matches; a member's node qualifies from any attempt in its group run.
 async fn matching_executions(
     mut transaction: ControlTransaction,
     mut eligible: BTreeSet<Uuid>,

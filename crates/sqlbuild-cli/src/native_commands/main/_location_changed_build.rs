@@ -99,8 +99,6 @@ pub(super) async fn report_changed_build(
             downstream: Vec::new(),
             failing: Some(reason.chars().take(MAX_FAILING_REASON_CHARS).collect()),
         };
-        // A project error the server holds waits for the copy or the project to change; a plan
-        // that could not run at all, such as one without the synced copy, is tried after the next sync.
         let reported = match client.report_changed_build(&options.target, &request).await {
             Ok(_) => document["error"]["code"].as_str() != Some("plan_failed"),
             Err(error) => {

@@ -23,10 +23,7 @@ pub struct HistoryRead<'a> {
     pub newest: Option<NewestVersions<'a>>,
 }
 
-/// The identity a version count applies to, and how many of its newest observations a read keeps.
-///
-/// Copies of one observation, such as a retried write, count once and arrive together, ranked by
-/// their first copy, so the copy a mirror keeps is the same with or without the limit.
+/// The identity a version count applies to and how many newest observations a read keeps.
 #[derive(Clone, Copy, Debug)]
 pub struct NewestVersions<'a> {
     pub partition: &'a [&'a str],

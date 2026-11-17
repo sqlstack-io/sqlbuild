@@ -18,8 +18,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
 
-/// Query fingerprints by dialect and SQL text: the text alone decides them, and every plan computes
-/// each model's several times, as do a location's later previews of the same publication.
+/// Query fingerprints by dialect and SQL text, reused across a plan and a location's later previews.
 static QUERY_FINGERPRINTS: Mutex<Option<QueryFingerprints>> = Mutex::new(None);
 /// Distinct SQL texts the memo keeps before starting over; a 10K-model project holds about 10K.
 const QUERY_FINGERPRINTS_LIMIT: usize = 100_000;

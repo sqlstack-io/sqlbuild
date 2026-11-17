@@ -311,6 +311,7 @@ pub(crate) struct NodeStatesTestCase {
 pub(crate) struct ChangedBuildTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
+    pub(crate) expected_before_plan: serde_json::Value,
 }
 
 pub(crate) struct PushedStatesTestCase {
@@ -331,6 +332,13 @@ pub(crate) struct StateHistoryRetentionTestCase {
     pub(crate) backend: Backend,
     pub(crate) configured: Option<u16>,
     pub(crate) expected_versions: u16,
+}
+
+/// A SQLite store in one auto-vacuum mode whose pruning frees most of its pages.
+pub(crate) struct SqliteReclaimTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) auto_vacuum: &'static str,
+    pub(crate) expected_mode: i64,
 }
 
 pub(crate) struct PlanDiffTestCase {

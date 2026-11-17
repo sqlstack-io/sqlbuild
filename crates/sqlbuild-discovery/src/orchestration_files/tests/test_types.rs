@@ -52,7 +52,7 @@ pub(super) struct InventoryErrorTestCase {
 pub(super) struct GroupDependenciesTestCase {
     pub(super) description: &'static str,
     pub(super) dependencies: &'static str,
-    pub(super) expected: Result<GroupDependencies, (&'static str, FilePosition)>,
+    pub(super) expected_dependencies: Result<GroupDependencies, (&'static str, FilePosition)>,
 }
 
 pub(super) struct PoolCheckTestCase {

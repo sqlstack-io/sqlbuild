@@ -262,3 +262,43 @@ pub(crate) async fn finish_claimed_run(
         .await
         .expect("complete parent");
 }
+
+pub(crate) fn node_finished(node_key: &str, outcome: NodeOutcome) -> RunChange {
+    RunChange::NodeFinished {
+        node_key: node_key.into(),
+        outcome,
+        rows_affected: None,
+        error_code: None,
+        skipped_because_of: None,
+        error_message: None,
+    }
+}
+
+/// Evaluates each trigger whose evaluation is due and returns how many runs each one requested.
+pub(crate) async fn evaluate_sensors(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    triggers: &[crate::declarations::models::TriggerRecord],
+) -> std::collections::BTreeMap<String, usize> {
+    let mut fired = std::collections::BTreeMap::new();
+    for trigger in triggers {
+        let Some(requested) =
+            crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation(
+                store,
+                lease,
+                trigger.trigger_id,
+            )
+            .await
+            .expect("begin evaluation")
+        else {
+            continue;
+        };
+        let count = crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor(
+            store, lease, &requested,
+        )
+        .await
+        .expect("complete evaluation");
+        *fired.entry(trigger.name.clone()).or_default() += count;
+    }
+    fired
+}

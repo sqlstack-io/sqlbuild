@@ -62,7 +62,6 @@ pub(crate) async fn publish_change(
         } => {
             let retried;
             (transaction, retried) = queue_retry(transaction, request.run_id).await?;
-            // Alerts fire on a member's final outcome; a top-level run alerts on every failed attempt.
             if retried != QueuedRetry::Member {
                 transaction = publish_run_failure(transaction, request, outcome).await?;
             }

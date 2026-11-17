@@ -2,67 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::json;
-use uuid::Uuid;
-
-use crate::declarations::main::group_dependencies::group_dependencies;
-use crate::declarations::models::JobDefinition;
-use crate::declarations::tests::test_types::GroupWaitsTestCase;
-use crate::snapshots::models::{SnapshotInput, SnapshotNode};
-use crate::store::errors::ControlError;
-
-fn input(lineage: &[(&str, Vec<&str>)]) -> SnapshotInput {
-    SnapshotInput {
-        location_id: Uuid::nil(),
-        target: "development".into(),
-        generation: 1,
-        git_revision: None,
-        git_dirty: false,
-        git_author: None,
-        image_id: None,
-        environment_hash: "orders-environment".into(),
-        sqb_version: "1.0.0".into(),
-        nodes: lineage
-            .iter()
-            .map(|(key, deps)| {
-                (
-                    (*key).to_owned(),
-                    SnapshotNode {
-                        kind: "model".into(),
-                        definition: json!({"deps": deps}),
-                        raw_sql: None,
-                        compiled_sql: None,
-                        python_source: None,
-                    },
-                )
-            })
-            .collect(),
-        documents: BTreeMap::new(),
-    }
-}
-
-fn jobs(selections: &[(&str, Vec<&str>)]) -> BTreeMap<String, JobDefinition> {
-    selections
-        .iter()
-        .map(|(name, selection)| {
-            let definition =
-                json!({"description": format!("Build {name}"), "selection": selection});
-            (
-                (*name).to_owned(),
-                serde_json::from_value(definition).expect("job definition"),
-            )
-        })
-        .collect()
-}
-
-fn waits(
-    lineage: &[(&str, Vec<&str>)],
-    selections: &[(&str, Vec<&str>)],
-) -> Result<BTreeMap<String, BTreeSet<String>>, ControlError> {
-    let jobs = jobs(selections);
-    let members: BTreeSet<String> = jobs.keys().cloned().collect();
-    group_dependencies(("orders_job_group", &input(lineage)), &jobs, &members)
-}
+use crate::declarations::tests::helpers::waits;
+use crate::declarations::tests::test_types::{GroupCycleTestCase, GroupWaitsTestCase};
 
 #[test]
 fn given_member_lineage_when_deriving_group_waits_then_each_member_waits_for_the_first_owners_upstream()
@@ -80,7 +21,7 @@ fn given_member_lineage_when_deriving_group_waits_then_each_member_waits_for_the
                 ("staging_job", vec!["model:stg_orders"]),
                 ("marts_job", vec!["model:orders"]),
             ],
-            expected: vec![
+            expected_waits: vec![
                 ("load_job", vec![]),
                 ("staging_job", vec!["load_job"]),
                 ("marts_job", vec!["staging_job"]),
@@ -110,7 +51,7 @@ fn given_member_lineage_when_deriving_group_waits_then_each_member_waits_for_the
                 ),
                 ("inventory_job", vec!["model:inventory"]),
             ],
-            expected: vec![
+            expected_waits: vec![
                 ("inventory_staging_job", vec![]),
                 ("orders_staging_job", vec![]),
                 ("customers_staging_job", vec![]),
@@ -129,7 +70,7 @@ fn given_member_lineage_when_deriving_group_waits_then_each_member_waits_for_the
                 ("load_job", vec!["model:raw_customers"]),
                 ("customers_job", vec!["model:customers"]),
             ],
-            expected: vec![("load_job", vec![]), ("customers_job", vec!["load_job"])],
+            expected_waits: vec![("load_job", vec![]), ("customers_job", vec!["load_job"])],
         },
         GroupWaitsTestCase {
             description: "a shared node reached first waits for every member building it",
@@ -142,7 +83,7 @@ fn given_member_lineage_when_deriving_group_waits_then_each_member_waits_for_the
                 ("inventory_staging_job", vec!["function:normalise_sku"]),
                 ("inventory_job", vec!["model:inventory"]),
             ],
-            expected: vec![
+            expected_waits: vec![
                 ("orders_staging_job", vec![]),
                 ("inventory_staging_job", vec![]),
                 (
@@ -166,17 +107,43 @@ fn given_member_lineage_when_deriving_group_waits_then_each_member_waits_for_the
                     vec!["function:normalise_sku", "model:stg_inventory"],
                 ),
             ],
-            expected: vec![
+            expected_waits: vec![
                 ("load_job", vec![]),
                 ("orders_staging_job", vec!["load_job"]),
                 ("inventory_staging_job", vec!["load_job"]),
             ],
         },
-        widely_shared_test_case(),
+        GroupWaitsTestCase {
+            description: "a member reading another's node past a widely shared function waits once",
+            lineage: vec![
+                ("function:normalise_sku", vec![]),
+                ("model:orders_a", vec!["function:normalise_sku"]),
+                ("model:orders_b", vec!["function:normalise_sku"]),
+                ("model:orders_c", vec!["function:normalise_sku"]),
+                ("model:stg_orders", vec!["model:orders_a"]),
+                ("model:orders", vec!["model:stg_orders"]),
+            ],
+            jobs: vec![
+                ("a_job", vec!["function:normalise_sku", "model:orders_a"]),
+                ("b_job", vec!["function:normalise_sku", "model:orders_b"]),
+                ("c_job", vec!["function:normalise_sku", "model:orders_c"]),
+                ("staging_job", vec!["model:stg_orders"]),
+                ("marts_job", vec!["model:orders"]),
+                ("functions_job", vec!["function:normalise_sku"]),
+            ],
+            expected_waits: vec![
+                ("a_job", vec![]),
+                ("b_job", vec![]),
+                ("c_job", vec![]),
+                ("functions_job", vec![]),
+                ("staging_job", vec!["a_job"]),
+                ("marts_job", vec!["staging_job"]),
+            ],
+        },
     ];
     for test_case in test_cases {
         let expected: BTreeMap<String, BTreeSet<String>> = test_case
-            .expected
+            .expected_waits
             .iter()
             .map(|(name, deps)| {
                 (
@@ -190,52 +157,30 @@ fn given_member_lineage_when_deriving_group_waits_then_each_member_waits_for_the
     }
 }
 
-fn widely_shared_test_case() -> GroupWaitsTestCase {
-    GroupWaitsTestCase {
-        description: "a member reading another's node past a widely shared function waits once",
-        lineage: vec![
-            ("function:normalise_sku", vec![]),
-            ("model:orders_a", vec!["function:normalise_sku"]),
-            ("model:orders_b", vec!["function:normalise_sku"]),
-            ("model:orders_c", vec!["function:normalise_sku"]),
-            ("model:stg_orders", vec!["model:orders_a"]),
-            ("model:orders", vec!["model:stg_orders"]),
-        ],
-        jobs: vec![
-            ("a_job", vec!["function:normalise_sku", "model:orders_a"]),
-            ("b_job", vec!["function:normalise_sku", "model:orders_b"]),
-            ("c_job", vec!["function:normalise_sku", "model:orders_c"]),
-            ("staging_job", vec!["model:stg_orders"]),
-            ("marts_job", vec!["model:orders"]),
-            ("functions_job", vec!["function:normalise_sku"]),
-        ],
-        expected: vec![
-            ("a_job", vec![]),
-            ("b_job", vec![]),
-            ("c_job", vec![]),
-            ("functions_job", vec![]),
-            ("staging_job", vec!["a_job"]),
-            ("marts_job", vec!["staging_job"]),
-        ],
-    }
-}
-
 #[test]
 fn given_members_reading_each_other_when_deriving_group_waits_then_the_cycle_names_both_waits() {
-    let lineage = [
-        ("model:stg_orders", vec!["model:customers"]),
-        ("model:customers", vec!["model:stg_orders"]),
-    ];
-    let selections = [
-        ("orders_job", vec!["model:stg_orders"]),
-        ("customers_job", vec!["model:customers"]),
-    ];
-    let error = waits(&lineage, &selections).expect_err("a cycle is rejected");
-    assert_eq!(
-        error.to_string(),
-        "invalid control-plane data: group dependencies contain a cycle in job group \
-         orders_job_group: customers_job waits for orders_job (model:customers reads \
-         model:stg_orders); orders_job waits for customers_job (model:stg_orders reads \
-         model:customers)"
-    );
+    let test_cases = [GroupCycleTestCase {
+        description: "two members reading each other's nodes",
+        lineage: vec![
+            ("model:stg_orders", vec!["model:customers"]),
+            ("model:customers", vec!["model:stg_orders"]),
+        ],
+        jobs: vec![
+            ("orders_job", vec!["model:stg_orders"]),
+            ("customers_job", vec!["model:customers"]),
+        ],
+        expected_error: "invalid control-plane data: group dependencies contain a cycle in job group \
+                         orders_job_group: customers_job waits for orders_job (model:customers reads \
+                         model:stg_orders); orders_job waits for customers_job (model:stg_orders reads \
+                         model:customers)",
+    }];
+    for test_case in test_cases {
+        let error = waits(&test_case.lineage, &test_case.jobs).expect_err("a cycle is rejected");
+        assert_eq!(
+            error.to_string(),
+            test_case.expected_error,
+            "{}",
+            test_case.description
+        );
+    }
 }

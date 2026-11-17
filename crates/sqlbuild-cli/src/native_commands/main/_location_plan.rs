@@ -140,8 +140,7 @@ fn held_copy_path(options: &LocationServe) -> PathBuf {
     ))
 }
 
-/// Write `copy` over the held copy file, through a temporary file renamed into place; a copy
-/// without a version gets a fresh one, so the runtime never reuses a state built from it.
+/// Atomically replace the held copy file; a copy without a version gets a fresh one.
 fn hold_copy(
     options: &LocationServe,
     generation: i64,
@@ -175,8 +174,7 @@ fn hold_copy(
     Ok(held)
 }
 
-/// The `sqb plan` command line of a frozen request: JSON output and its flags; the frozen node names
-/// travel beside it, so the runtime need not parse one `--select` per node.
+/// The `sqb plan` command line of a frozen request; its node names travel beside it.
 fn plan_arguments(
     options: &LocationServe,
     settings: &BTreeMap<String, Value>,

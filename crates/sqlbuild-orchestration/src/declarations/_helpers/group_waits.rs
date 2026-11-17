@@ -8,9 +8,7 @@ use crate::declarations::constants::{
 use crate::declarations::models::GroupCycle;
 use crate::snapshots::models::SnapshotInput;
 
-/// The members that build the first nodes `name` reaches upstream, and no further, each with the
-/// first lineage edge that makes it wait: the node and the upstream it reads. Those members wait for
-/// whatever their own nodes read; a node `name` builds itself, such as a shared function, is walked past.
+/// The members building the first nodes `name` reaches upstream, each with the edge that makes it wait.
 pub(crate) fn member_waits(
     (name, selection): (&str, &BTreeSet<String>),
     deps: &BTreeMap<String, BTreeSet<String>>,

@@ -67,8 +67,7 @@ pub(crate) fn run_compile_pipeline<'py>(
     )
 }
 
-/// Compile unless `held` is a `CompiledProjectPhaseResult`, gate on rules unless they ran at load, and
-/// plan; `planned_through` reads, such as a preview's synced state, are used instead of connecting.
+/// Compile unless `held` is compiled, gate on rules unless they ran at load, and plan.
 pub(crate) fn planned_project<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, Bound<'py, PyAny>),

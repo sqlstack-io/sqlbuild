@@ -124,11 +124,9 @@ pub(super) struct MetadataBackoffTestCase {
 /// A sync that applied a page and stopped at statistics on a server whose clock runs an hour ahead.
 pub(super) struct StoppedPassTestCase {
     pub(super) description: &'static str,
-    /// When the last run ended, in seconds after the stop by the server's clock; the reads fail
-    /// as the sync begins, so the stop is at the sync's server start time.
+    /// When the last run ended, in seconds after the stop by the server's clock.
     pub(super) run_ended_after_stop: i64,
-    /// Whether it resumed, whether its pass starts again at the first table, and whether its
-    /// completion plans what changed.
+    /// Whether it resumed, whether its pass restarts, and whether its completion plans what changed.
     pub(super) expected_outcome: (bool, bool, bool),
 }
 
@@ -191,7 +189,7 @@ pub(crate) struct NewestVersionsTestCase {
     pub(crate) kind: WarehouseHistoryKind,
     pub(crate) incremental: bool,
     pub(crate) server_limit: Option<u16>,
-    pub(crate) expected: Option<u16>,
+    pub(crate) expected_newest_versions: Option<u16>,
 }
 
 pub(crate) struct ReadFailureTestCase {
@@ -218,7 +216,7 @@ pub(super) struct SyncCompletionTestCase {
 pub(super) struct ChangedBuildNodesTestCase {
     pub(super) description: &'static str,
     pub(super) document: serde_json::Value,
-    pub(super) expected: Result<(Vec<&'static str>, Vec<&'static str>), &'static str>,
+    pub(super) expected_nodes: Result<(Vec<&'static str>, Vec<&'static str>), &'static str>,
 }
 
 pub(super) struct LineResetTestCase {
@@ -242,13 +240,61 @@ pub(crate) struct FailedReadHealthTestCase {
     pub(crate) failure: crate::native_commands::models::ReadFailure,
     pub(crate) failures_before: usize,
     pub(crate) billed: bool,
-    /// Whether the page shrinks, the closed cause, the reported error, whether the sync stops,
-    /// and the seconds until the next sync the report announces.
-    pub(crate) expected: (
+    /// Shrinks, closed cause, reported error, whether the sync stops, and seconds to the announced next sync.
+    pub(crate) expected_report: (
         bool,
         Option<sqlbuild_orchestration::platform::models::WarehouseReadFailure>,
         Option<&'static str>,
         bool,
         Option<i64>,
     ),
+}
+
+/// A table's progress line after a sync read it or found it unchanged.
+pub(crate) struct ScanLineTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) index: usize,
+    pub(crate) scan_rows: u64,
+    pub(crate) unchanged: bool,
+    pub(crate) expected_prefix: &'static str,
+}
+
+/// A row count as the progress lines write it.
+pub(crate) struct RowsTextTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) rows: u64,
+    pub(crate) expected_text: &'static str,
+}
+
+/// A delivered or failed page's progress report at one kind of history.
+pub(crate) struct SyncProgressTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) index: usize,
+    pub(crate) more_pages: bool,
+    pub(crate) clean: bool,
+    /// Position, kinds, rows and whether the sync completed.
+    pub(crate) expected_progress: (u64, u64, u64, bool),
+}
+
+/// An idle location on a warehouse whose reads may wake compute, after a run or a request.
+pub(crate) struct WakingIdleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) wakes: bool,
+    pub(crate) explicit: bool,
+    pub(crate) run_ended: bool,
+    pub(crate) requested: bool,
+    pub(crate) expected_due: bool,
+}
+
+/// The options a changed build is frozen with.
+pub(super) struct ChangedBuildSettingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) expected_settings: serde_json::Value,
+}
+
+/// Completed syncs in order, each as (applied a page, plan reached the server), after a publication.
+pub(super) struct ReplanTestCase {
+    pub(super) description: &'static str,
+    pub(super) syncs: Vec<(bool, bool)>,
+    pub(super) expected_replans: Vec<bool>,
 }

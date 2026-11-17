@@ -12,7 +12,7 @@ fn given_connection_settings_when_details_are_published_then_only_named_non_secr
             settings: json!({"account": "orders-account", "user": "orders_loader", "role": "LOADER",
                 "warehouse": "ORDERS_WH", "database": "ORDERS", "schema": "PUBLIC",
                 "private_key_path": "/keys/orders.p8", "private_key_file_pwd": "hunter2"}),
-            expected: json!({"adapter": "snowflake", "account": "orders-account", "host": null,
+            expected_details: json!({"adapter": "snowflake", "account": "orders-account", "host": null,
                 "user": "orders_loader", "role": "LOADER", "warehouse": "ORDERS_WH",
                 "database": "ORDERS", "auth_method": "key_pair"}),
         },
@@ -20,7 +20,7 @@ fn given_connection_settings_when_details_are_published_then_only_named_non_secr
             description: "a Snowflake authenticator names the method; unknown ones are kept as written",
             adapter: "snowflake",
             settings: json!({"account": "orders-account", "authenticator": "ExternalBrowser"}),
-            expected: json!({"adapter": "snowflake", "account": "orders-account", "host": null,
+            expected_details: json!({"adapter": "snowflake", "account": "orders-account", "host": null,
                 "user": null, "role": null, "warehouse": null, "database": null,
                 "auth_method": "external_browser"}),
         },
@@ -29,7 +29,7 @@ fn given_connection_settings_when_details_are_published_then_only_named_non_secr
             adapter: "postgres",
             settings: json!({"host": "db.example.com", "user": "inventory", "dbname": "inventory",
                 "password": "hunter2", "port": "5432"}),
-            expected: json!({"adapter": "postgres", "account": null, "host": "db.example.com",
+            expected_details: json!({"adapter": "postgres", "account": null, "host": "db.example.com",
                 "user": "inventory", "role": null, "warehouse": null, "database": "inventory",
                 "auth_method": "password"}),
         },
@@ -37,7 +37,7 @@ fn given_connection_settings_when_details_are_published_then_only_named_non_secr
             description: "a DuckDB file is the host, with no database or sign-in",
             adapter: "duckdb",
             settings: json!({"database": "warehouse/customers.duckdb"}),
-            expected: json!({"adapter": "duckdb", "account": null, "host": "warehouse/customers.duckdb",
+            expected_details: json!({"adapter": "duckdb", "account": null, "host": "warehouse/customers.duckdb",
                 "user": null, "role": null, "warehouse": null, "database": null,
                 "auth_method": "none"}),
         },
@@ -45,7 +45,7 @@ fn given_connection_settings_when_details_are_published_then_only_named_non_secr
             description: "a token-only connection names the method and no value",
             adapter: "motherduck",
             settings: json!({"database": "md:customers", "token": "hunter2"}),
-            expected: json!({"adapter": "motherduck", "account": null, "host": null,
+            expected_details: json!({"adapter": "motherduck", "account": null, "host": null,
                 "user": null, "role": null, "warehouse": null, "database": "md:customers",
                 "auth_method": "token"}),
         },
@@ -53,7 +53,11 @@ fn given_connection_settings_when_details_are_published_then_only_named_non_secr
     for test_case in test_cases {
         let settings = test_case.settings.as_object().expect("settings").clone();
         let published = json!(connection_details(test_case.adapter, &settings));
-        assert_eq!(published, test_case.expected, "{}", test_case.description);
+        assert_eq!(
+            published, test_case.expected_details,
+            "{}",
+            test_case.description
+        );
         assert!(
             !published.to_string().contains("hunter2"),
             "{}: never a secret",

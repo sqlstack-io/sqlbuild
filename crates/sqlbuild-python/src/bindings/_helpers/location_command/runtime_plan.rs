@@ -1,5 +1,4 @@
-//! A location's plan previews run in its runtime interpreter from the project it last published, over
-//! the synced warehouse state it holds until the server's mirror version changes.
+//! A location's plan previews, run in its runtime from its last publication over its synced state.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -31,8 +30,7 @@ struct HeldState {
 /// One state for the runtime's life; a newer mirror version replaces it.
 static HELD_STATE: Mutex<Option<HeldState>> = Mutex::new(None);
 
-/// The state a request plans from: the held state when it is at the request's mirror version, else
-/// built from the copy file at `request["copy"]` and held under its version.
+/// The state a request plans from: the held state at its mirror version, else built from its copy file.
 fn requested_state(request: &Value) -> PyResult<Arc<WarehouseState>> {
     let mut held = HELD_STATE.lock().unwrap_or_else(PoisonError::into_inner);
     let version: Option<&str> = request["version"].as_str();

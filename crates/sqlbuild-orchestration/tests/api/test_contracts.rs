@@ -10,6 +10,8 @@ mod fingerprint_reads_helpers;
 pub(crate) mod helpers;
 #[path = "node_sql/helpers.rs"]
 mod node_sql_helpers;
+#[path = "node_states/helpers.rs"]
+mod node_states_helpers;
 #[path = "node_status/helpers.rs"]
 mod node_status_helpers;
 #[path = "oidc/helpers.rs"]
@@ -26,6 +28,8 @@ mod person_sessions_test_types;
 mod plans_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
+#[path = "state_history/helpers.rs"]
+mod state_history_helpers;
 #[path = "statistics/eligibility/helpers.rs"]
 mod statistics_eligibility;
 #[path = "statistics/helpers.rs"]

@@ -47,7 +47,6 @@ pub(crate) fn open_sqlite(path: PathBuf) -> Result<ControlStore, ControlError> {
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
     connection.busy_timeout(Duration::from_secs(30))?;
-    // Takes effect only in a new file; existing stores convert when maintenance vacuums them.
     connection.execute_batch("PRAGMA auto_vacuum=INCREMENTAL; PRAGMA journal_mode=WAL")?;
     connection.query_row("SELECT count(*) FROM sqlite_schema", [], |_| Ok(()))?;
     Ok(ControlStore::Sqlite(SqliteStore {

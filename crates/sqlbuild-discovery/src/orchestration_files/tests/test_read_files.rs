@@ -366,12 +366,12 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
         GroupDependenciesTestCase {
             description: "no dependencies table keeps today's behaviour",
             dependencies: "",
-            expected: Ok(GroupDependencies::default()),
+            expected_dependencies: Ok(GroupDependencies::default()),
         },
         GroupDependenciesTestCase {
             description: "defaults and a member override",
             dependencies: "[dependencies]\nwait_for = \"job\"\non_failure = \"run\"\n\n[dependencies.partner_export_job]\non_failure = \"skip\"\n",
-            expected: Ok(GroupDependencies {
+            expected_dependencies: Ok(GroupDependencies {
                 defaults: DependencySettings {
                     wait_for: Some(WaitFor::Job),
                     on_failure: Some(DependencyFailure::Run),
@@ -389,7 +389,7 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
         GroupDependenciesTestCase {
             description: "partial is the explicit default",
             dependencies: "dependencies = { on_failure = \"partial\" }\n",
-            expected: Ok(GroupDependencies {
+            expected_dependencies: Ok(GroupDependencies {
                 defaults: DependencySettings {
                     wait_for: None,
                     on_failure: Some(DependencyFailure::Partial),
@@ -400,7 +400,7 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
         GroupDependenciesTestCase {
             description: "an override must name a member",
             dependencies: "[dependencies.inventory_job]\non_failure = \"skip\"\n",
-            expected: Err((
+            expected_dependencies: Err((
                 "dependencies.inventory_job is neither `wait_for`, `on_failure` nor a job in `jobs`",
                 at(5, 15),
             )),
@@ -408,7 +408,7 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
         GroupDependenciesTestCase {
             description: "an unknown failure policy",
             dependencies: "[dependencies]\non_failure = \"retry\"\n",
-            expected: Err((
+            expected_dependencies: Err((
                 "on_failure must be one of \"partial\", \"skip\", \"run\"",
                 at(6, 14),
             )),
@@ -416,7 +416,7 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
         GroupDependenciesTestCase {
             description: "an unknown override key",
             dependencies: "[dependencies.orders_job]\nretries = 2\n",
-            expected: Err((
+            expected_dependencies: Err((
                 "unknown dependencies.orders_job key 'retries'; expected `wait_for` or `on_failure`",
                 at(6, 1),
             )),
@@ -424,7 +424,7 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
         GroupDependenciesTestCase {
             description: "waiting node by node is not available yet",
             dependencies: "[dependencies]\nwait_for = \"node\"\n",
-            expected: Err((
+            expected_dependencies: Err((
                 "wait_for = \"node\" is not supported yet; it is planned, so use \"job\" for now",
                 at(6, 12),
             )),

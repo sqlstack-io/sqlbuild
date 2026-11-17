@@ -1908,9 +1908,7 @@ pub(crate) fn scan_line(state: &LocationMetadataSync, scans: usize) -> String {
     )
 }
 
-/// Where a synchronization has got to when a page is delivered or a table is found unchanged.
-///
-/// A clean report of the last table's last page completes the synchronization.
+/// Where a sync has got to; a clean report of the last table's last page completes it.
 pub(crate) fn sync_progress(state: &LocationMetadataSync, clean: bool) -> WarehouseSyncProgress {
     let kinds = (state.locations.len() * WarehouseHistoryKind::ALL.len()) as u64;
     let page = state.pending.as_ref();
@@ -1941,10 +1939,7 @@ pub(crate) fn rows_text(rows: u64) -> String {
     format!("{grouped} {}", if rows == 1 { "row" } else { "rows" })
 }
 
-/// When the next safety sync is due, if this report's page completes the sync: the last page of the last scan, without failure.
-///
-/// None where no timed sync follows: the interval is off, or reads wake billed compute and the
-/// interval is only the default, so the next run or a request syncs instead.
+/// When the next safety sync is due once this report's page completes the sync; `None` without a timed one.
 pub(crate) fn completed_sync_next_at(
     state: &LocationMetadataSync,
     failure: Option<WarehouseSyncFailure>,
@@ -1965,8 +1960,7 @@ pub(crate) fn safety_sync_at(
         .and_then(|seconds| now.checked_add_signed(chrono::Duration::seconds(seconds)))
 }
 
-/// A failed read also reports its closed cause, its redacted error and the page size it asked
-/// for, and whether it stops the sync; a stopped sync's next sync is its safety retry, if any.
+/// A page's health report: a failed read adds its cause, redacted error, page size and whether it stops the sync.
 pub(crate) fn metadata_health_of(
     state: &LocationMetadataSync,
     (started, failure, read): (
@@ -2030,8 +2024,7 @@ pub(crate) async fn report_metadata_health(
     }
 }
 
-/// The safety sync interval from the flag, then the environment, then the project; `None` when
-/// nothing sets one and the default of thirty minutes applies.
+/// The safety sync interval from the flag, then the environment, then the project; `None` when unset.
 pub(crate) fn safety_sync_setting(
     flag: Option<&str>,
     environment: Option<&str>,
@@ -2067,9 +2060,7 @@ pub(crate) fn plan_error(failed: &serde_json::Value) -> serde_json::Value {
     }})
 }
 
-/// How long one page may take: a statistics page queries each relation it samples, so it scales
-/// with the relations asked for; any other page is bounded by its byte budget and gets a fixed
-/// allowance that also covers resuming a suspended warehouse.
+/// How long one page may take: statistics scale with their relations, other pages get a fixed allowance.
 pub(crate) fn read_timeout_seconds(state: &LocationMetadataSync) -> u64 {
     if state.kind() == WarehouseHistoryKind::Statistics {
         METADATA_POLL_SECONDS + STATISTICS_RELATION_SECONDS * state.statistics_limit as u64

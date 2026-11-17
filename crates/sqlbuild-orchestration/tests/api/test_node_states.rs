@@ -9,28 +9,23 @@ use uuid::Uuid;
 use crate::api::models::{ApiAuthentication, HumanLogin};
 use crate::api::tests::changes_helpers::{next_notice, opened, request_person_feed};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
+use crate::api::tests::node_states_helpers::{builds, notices, orders_snapshot, reader};
 use crate::api::tests::test_types::{
     ChangedBuildTestCase, NodeStatesTestCase, PushedStatesTestCase,
 };
-use crate::credentials::tests::role_helpers::{SUPPORT_ROLE, orders_grant, role_fixture};
+use crate::credentials::tests::role_helpers::role_fixture;
 use crate::node_states::_helpers::views::{current_view, refresh_view, target_cache};
 use crate::node_states::main::report_changed_build::report_changed_build;
 use crate::node_states::main::start_node_states::start_node_states;
 use crate::node_states::models::ChangedBuildReport;
-use crate::platform::main::report_location_health::report_location_health;
-use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::main::request_job_run::request_job_run;
 use crate::runs::models::JobRunRequest;
-use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
-use crate::store::models::ControlStore;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest::ingest_fingerprints::ingest_fingerprints;
-use crate::warehouse_metadata::models::MetadataBatch;
 
 #[test]
 fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_changes_are_pushed_and_snapshots_reset()
@@ -70,17 +65,18 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
             .await;
             let client = reqwest::Client::new();
             let read = |path: &str, bearer: &str, tag: Option<&str>| {
-                let mut request = client
+                let request = client
                     .get(format!(
                         "{}/api/control/locations/{location}/targets/development/{path}",
                         api.url
                     ))
                     .header(header::HOST, "control.example.com")
                     .header(header::COOKIE, format!("__Host-sqb-session={bearer}"));
-                if let Some(tag) = tag {
-                    request = request.header(header::IF_NONE_MATCH, tag);
-                }
-                request.send()
+                tag.into_iter()
+                    .fold(request, |request, tag| {
+                        request.header(header::IF_NONE_MATCH, tag)
+                    })
+                    .send()
             };
             let admin = roles.administrator.bearer.clone();
             let etag = |response: &reqwest::Response| {
@@ -302,10 +298,12 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
         ChangedBuildTestCase {
             description: "SQLite changed build",
             backend: Backend::Sqlite,
+            expected_before_plan: Value::Null,
         },
         ChangedBuildTestCase {
             description: "PostgreSQL changed build",
             backend: Backend::Postgres,
+            expected_before_plan: Value::Null,
         },
     ];
     for test_case in test_cases {
@@ -346,14 +344,14 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
                     .await
                     .expect("states body");
                 let mut build = states["changed_build"].clone();
-                if let Some(build) = build.as_object_mut() {
+                build.as_object_mut().into_iter().for_each(|build| {
                     assert!(build.remove("reported_at").is_some_and(|at| at.is_string()));
-                }
+                });
                 build
             };
             assert_eq!(
                 changed_build().await,
-                Value::Null,
+                test_case.expected_before_plan,
                 "{}: unknown before the location plans it",
                 test_case.description
             );
@@ -528,75 +526,4 @@ fn given_builds_of_many_nodes_when_states_refresh_then_large_changes_ask_clients
             close_test_store(fixture).await;
         });
     }
-}
-
-/// The orders location's snapshot with the support role and one built model per name.
-fn orders_snapshot(location: Uuid, names: &[&str]) -> SnapshotInput {
-    let mut input = snapshot(location);
-    input.documents.insert(
-        "roles".into(),
-        json!({SUPPORT_ROLE: {"description": "Answer order questions",
-            "grants": [orders_grant(json!(["view"]), &["orders"])]}}),
-    );
-    for name in names {
-        input.nodes.insert(
-            format!("model:{name}"),
-            SnapshotNode {
-                kind: "model".into(),
-                definition: json!({"name": name, "destination": {"database": null, "schema": "main", "name": name}}),
-                raw_sql: None,
-                compiled_sql: None,
-                python_source: None,
-            },
-        );
-    }
-    input
-}
-
-/// A registered location reader session, which metadata pages must name.
-async fn reader(store: &ControlStore, location: Uuid) -> Uuid {
-    let session_id = Uuid::now_v7();
-    report_location_health(
-        store,
-        location,
-        &LocationHealthReport {
-            event_id: Uuid::now_v7(),
-            session_id,
-            target: "development".into(),
-            health: LocationHealth::Heartbeat {},
-        },
-    )
-    .await
-    .expect("reader");
-    session_id
-}
-
-/// One recorded build of each named model in this snapshot generation.
-fn builds(session_id: Uuid, (generation, names): (i64, &[&str]), at: &str) -> MetadataBatch {
-    let records: Vec<Value> = names
-        .iter()
-        .map(|name| {
-            json!({"event_id": format!("build-{name}-{at}"), "state_database": null, "state_schema": "build_history",
-                "node_type": "model", "node_name": name, "target_database": null, "target_schema": "main",
-                "target_name": name, "run_id": "orders-run", "definition_hash": format!("definition-{name}"),
-                "version_hash": format!("orders-version-{name}"), "schema_fingerprint": "orders-schema",
-                "definition": "SELECT order_id FROM orders", "metadata_json": "{}", "ts": at})
-        })
-        .collect();
-    serde_json::from_value(json!({"kind": "fingerprints", "session_id": session_id,
-        "generation": generation, "records": records}))
-    .expect("build page")
-}
-
-/// The next `count` events' data by topic, because one commit's events arrive in either order.
-async fn notices(
-    feed: &mut crate::api::tests::test_types::SseConnection,
-    count: usize,
-) -> Vec<Value> {
-    let mut notices = Vec::new();
-    for _ in 0..count {
-        notices.push(next_notice(feed).await.expect("change event"));
-    }
-    notices.sort_by_key(|notice| notice["topic"].to_string());
-    notices
 }

@@ -9,8 +9,7 @@ use sqlbuild_analysis::fingerprint_storage::main::selected_positions::selected_p
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::types::RecordId;
 
-/// The `FingerprintSet` of `latest` fingerprints, narrowed to `node_names` plus unfiltered node types
-/// as a filtered latest read would be; `None` names keep every fingerprint.
+/// `latest` narrowed to `node_names` as a filtered latest read would be; `None` keeps every fingerprint.
 pub fn selected_set<'py>(
     py: Python<'py>,
     schema: &str,

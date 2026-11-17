@@ -1,6 +1,4 @@
-//! Read group membership and failure policy from the parent's immutable publication.
-//!
-//! A member the group retried counts by its latest attempt only: earlier attempts are history.
+//! Group membership and failure policy from the parent's publication; a retried member counts once.
 
 use std::collections::BTreeSet;
 

@@ -581,10 +581,7 @@ fn read_page<'py>(
     Ok((page, stream))
 }
 
-/// Fetch one page from the scan's result, ending it at `limit` rows or the page's byte budget.
-///
-/// Rows fetched past the budget wait in the stream for the next page. A local database file's
-/// stream is never kept, so a page ending early is read again from its cursor.
+/// Fetch one page from the scan's result; rows past the byte budget wait in the stream.
 fn stream_page<'py>(
     py: Python<'py>,
     (session, request): (&HistorySession<'py>, &WarehouseHistoryRead),
@@ -723,9 +720,7 @@ fn discard_stream(
     Ok(())
 }
 
-/// A full read of builds or check results keeps each node's or check's newest ones only.
-///
-/// Returns the identity columns and the count.
+/// A full read of builds or check results keeps each one's newest only: identity columns and count.
 fn newest_versions(request: &WarehouseHistoryRead) -> Option<(&'static [&'static str], u16)> {
     match request {
         WarehouseHistoryRead::Fingerprints(read) if read.observed_since.is_none() => read

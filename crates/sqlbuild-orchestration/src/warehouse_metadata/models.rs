@@ -710,8 +710,7 @@ pub struct WarehouseHistoryPage {
     /// The token still equals the request's: nothing was read and nothing is delivered.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unchanged: bool,
-    /// The adapter's history reads start or wake billed compute, so an idle location defers
-    /// interval syncs.
+    /// The adapter's history reads wake billed compute, so an idle location defers interval syncs.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub wakes_compute: bool,
 }
@@ -947,9 +946,7 @@ impl Default for StatisticsRetention {
     }
 }
 
-/// Installation configuration: builds and check results the store mirrors per node or check.
-///
-/// Unset, the limit follows the store: SQLite keeps fewer versions than PostgreSQL.
+/// Builds and check results the store mirrors per node or check; unset follows the store's default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct StateHistoryRetention {
     versions: Option<u16>,

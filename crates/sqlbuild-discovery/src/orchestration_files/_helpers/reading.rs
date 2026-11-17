@@ -125,8 +125,7 @@ fn schedule(text: &str, raw: Spanned<RawSchedule>) -> Result<ScheduleFile, FileE
 /// A retry key's value under its current name and under its deprecated name.
 type RetryValues = (Option<Spanned<i64>>, Option<Spanned<i64>>);
 
-/// One whole number of a retry table, by the name it is written under: within `ranges.0` under the
-/// current name, or `ranges.1` under the deprecated one, which `true` reports.
+/// One whole number of a retry table, within the range for its current or deprecated name.
 fn retry_number<T: TryFrom<i64>>(
     text: &str,
     (table, keys, values): (&str, (&str, &str), RetryValues),
@@ -207,7 +206,6 @@ fn retry(
     let start: usize = raw.span().start;
     let raw: RawRetry = raw.into_inner();
     let ranges = |range: (u8, u8)| (i64::from(range.0), i64::from(range.1));
-    // The deprecated `retries` counts reruns; `attempts` counts every run, the first included.
     let attempts: Option<u8> = retry_number::<u8>(
         text,
         (table, RETRY_ATTEMPTS_KEY, (raw.attempts, raw.retries)),

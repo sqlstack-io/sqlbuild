@@ -217,7 +217,6 @@ async fn next_event(
                     ChangeTopic::Run(id) => Some(format!("run:{id}")),
                     ChangeTopic::Ticks => Some("ticks".into()),
                     ChangeTopic::Snapshot => Some(format!("snapshot:{}", state.location_id)),
-                    // The node states cache pushes these with the changed states, once it has read them.
                     ChangeTopic::NodeStatus => continue,
                 }
             }

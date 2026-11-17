@@ -156,9 +156,7 @@ fn retry_metadata(
     Ok(Some(state))
 }
 
-/// A busy warehouse file waits a poll interval. Any other failed read reports its cause and
-/// error, then shrinks the page after a time-out or a read too large for memory, and otherwise
-/// backs off; failures in a row stop the sync until the next run, a request or a publication.
+/// Report a failed read, then wait out a busy file, shrink the page, back off or stop the sync.
 async fn failed_read(
     mut state: LocationMetadataSync,
     failure: ReadFailure,
@@ -225,8 +223,7 @@ async fn failed_read(
     Ok(Some(state))
 }
 
-/// A stopped synchronization that resumes says so before its first read; after a request its
-/// failed reads count from zero again, otherwise one more failure stops it.
+/// Say a stopped sync resumes; `one_attempt` when one more failure stops it again.
 fn resumed_line(one_attempt: bool) {
     drop(write_output(&[(
         Stream::Stderr,

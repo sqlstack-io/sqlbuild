@@ -118,7 +118,6 @@ fn held_limits(
 ) -> Vec<QueueWait> {
     let mut waits: Vec<QueueWait> = Vec::new();
     for limit in limits {
-        // A run that takes several slots of the pool holds one row per slot but is named once.
         let mut holders: Vec<Uuid> = Vec::new();
         for slot in slots {
             if &slot.held == limit && slot.run_id != run_id && !holders.contains(&slot.run_id) {

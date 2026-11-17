@@ -76,7 +76,6 @@ async fn watch_location(
     let mut deferred_sync: Option<(Vec<WarehouseStateLocation>, i64)> = None;
     let mut work_at = Instant::now() + LOCATION_WORK_IDLE_POLL;
     let mut published_generation = None;
-    // The first connection check of this process is its startup check.
     let mut checked = false;
     let mut metadata = None;
     let mut clock = location_clock();
@@ -162,10 +161,7 @@ async fn watch_location(
     }
 }
 
-/// Named work and metadata share one idle turn without transferring interpreter ownership.
-///
-/// What changed is planned after a sync completes, never after one that failed reads stopped,
-/// and at once for a generation with no state locations, whose sync never runs.
+/// Named work and metadata share one idle turn; what changed is planned after a sync completes.
 async fn poll_location(
     (options, script, runtime, connected): (
         &LocationServe,
@@ -222,7 +218,6 @@ async fn poll_location(
                 else {
                     return Ok(None);
                 };
-                // With no sync to follow, a plan that did not reach the server is not retried.
                 if !unsynced {
                     state.planned(reported);
                 }

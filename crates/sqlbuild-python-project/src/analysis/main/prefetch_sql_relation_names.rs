@@ -10,8 +10,7 @@ use sqlbuild_analysis::relation_names::models::ExtractedRelations;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::types::CompilerDetach;
 
-/// Extract every SQL text not extracted yet off the GIL with `extract_all`, which runs them in
-/// parallel, so later reads find them.
+/// Extract every SQL text not extracted yet, in parallel off the GIL, so later reads find them.
 pub fn prefetch_sql_relation_names(
     py: Python<'_>,
     sqls: Vec<String>,

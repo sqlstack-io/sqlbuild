@@ -1,7 +1,4 @@
-//! A failed or partial run of a job with `[retry]` queues its next attempt in the same transaction.
-//!
-//! A top-level run's retry is a new linked run. A group member's retry stays inside its group run:
-//! the next attempt is another child of the same group, so the members that depend on it wait.
+//! Queue a failed run's next `[retry]` attempt in the same transaction, inside its group run if any.
 
 use std::collections::BTreeSet;
 
@@ -145,7 +142,6 @@ async fn queue_member_retry(
         vec![Parameter::Id(source.run_id)],
     )
     .await?;
-    // A node skipped because another member failed would only be skipped again.
     let selection: BTreeSet<String> = rows
         .iter()
         .filter(|row| {

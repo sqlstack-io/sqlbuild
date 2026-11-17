@@ -33,5 +33,5 @@ pub(super) struct ConnectionDetailsTestCase {
     pub(super) description: &'static str,
     pub(super) adapter: &'static str,
     pub(super) settings: serde_json::Value,
-    pub(super) expected: serde_json::Value,
+    pub(super) expected_details: serde_json::Value,
 }

@@ -204,8 +204,7 @@ fn work_error(error: &ClientError) -> Result<(), ControlError> {
     Ok(())
 }
 
-/// When to check for named work next: at once after a turn that claimed work, as more is often
-/// queued behind it, such as a person planning again; otherwise after the idle interval.
+/// When to check for named work next: at once after a turn that claimed work, else after the idle interval.
 pub(in crate::native_commands) fn next_work_check(
     turn: &LocationWorkTurn,
     now: Instant,

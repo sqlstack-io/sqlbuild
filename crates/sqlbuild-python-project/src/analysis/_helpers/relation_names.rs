@@ -15,8 +15,7 @@ const RELATION_NAMES_CONTEXT: &str = "native relation name extraction";
 /// Distinct SQL texts the memo keeps before starting over; a 10K-model project holds about 10K.
 const EXTRACTED_LIMIT: usize = 100_000;
 
-/// Extractions by dialect and SQL text: the text alone decides them, so a location's previews of one
-/// publication reuse them.
+/// Extractions by dialect and SQL text, reused by a location's previews of one publication.
 static EXTRACTED: Mutex<Option<ExtractedMemo>> = Mutex::new(None);
 
 /// Extracted rows by `(dialect, SQL text)`.

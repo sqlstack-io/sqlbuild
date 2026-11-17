@@ -49,8 +49,7 @@ fn planned_concurrency(
     .limit)
 }
 
-/// Model plan entries for the execution scope, over the relations the warehouse phase resolved for it,
-/// with the freshness and override inputs they need.
+/// Model plan entries for the execution scope over the relations its warehouse phase resolved.
 pub(crate) fn build_planner_entry_results<'py>(
     (runtime, warehouse): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     overrides: &Bound<'py, PyAny>,

@@ -2,7 +2,7 @@ use crate::native_commands::_helpers::execution::{
     history_request, read_metadata_page, rows_text, safety_sync_setting, scan_line, sync_progress,
 };
 use crate::native_commands::_helpers::execution::{metadata_health_of, metadata_sync};
-use crate::native_commands::constants::METADATA_SAFETY_SYNC_SECONDS;
+use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_SAFETY_SYNC_SECONDS};
 use crate::native_commands::main::_location_metadata::read_failure_line;
 use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
@@ -12,6 +12,9 @@ use crate::native_commands::tests::test_types::{
 use crate::native_commands::tests::test_types::{
     MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
     SafetySyncSettingTestCase, StoppedPassTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
+};
+use crate::native_commands::tests::test_types::{
+    RowsTextTestCase, ScanLineTestCase, SyncProgressTestCase, WakingIdleTestCase,
 };
 use chrono::Utc;
 use sqlbuild_config::project::models::ControlConfig;
@@ -138,9 +141,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs()))
             .collect();
         state.request_sync();
-        if state.idle && state.sync_due(None) {
-            state.begin_sync(Utc::now());
-        }
+        (state.idle && state.sync_due(None)).then(|| state.begin_sync(Utc::now()));
         let paging_after_request = state.paging();
         waits.extend(
             test_case
@@ -222,9 +223,7 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_a
             .ran
             .then(|| Utc::now() + chrono::Duration::seconds(1));
         let resumed: bool = state.idle && state.sync_due(runs_ended_at);
-        if resumed {
-            state.begin_sync(Utc::now());
-        }
+        resumed.then(|| state.begin_sync(Utc::now()));
         let paging: bool = state.paging();
         let wait: Option<Duration> = state.fail_read(false);
         assert_eq!(
@@ -271,14 +270,14 @@ fn given_a_sync_stopped_mid_pass_when_a_later_run_resumes_it_then_the_pass_resta
         state.begin_sync(server_now);
         state.applied = true;
         state = acknowledge_complete_pages(state, statistics);
-        while state.fail_read(false).is_some() {}
+        (0..METADATA_FAILURE_LIMIT).for_each(|_| {
+            let _ = state.fail_read(false);
+        });
         let stopped_at = state.cycle_started_at.expect("stop time");
         let resumed: bool = state.sync_due(Some(
             server_now + chrono::Duration::seconds(test_case.run_ended_after_stop),
         ));
-        if resumed {
-            state.begin_sync(Utc::now() + chrono::Duration::hours(1));
-        }
+        resumed.then(|| state.begin_sync(Utc::now() + chrono::Duration::hours(1)));
         assert_eq!(
             (resumed, state.index == 0, state.take_replan()),
             test_case.expected_outcome,
@@ -599,35 +598,35 @@ fn given_a_state_history_limit_when_requesting_history_then_only_full_reads_of_b
             kind: WarehouseHistoryKind::Fingerprints,
             incremental: false,
             server_limit: Some(5),
-            expected: Some(5),
+            expected_newest_versions: Some(5),
         },
         NewestVersionsTestCase {
             description: "a first read of check results stops at the limit",
             kind: WarehouseHistoryKind::AuditResults,
             incremental: false,
             server_limit: Some(20),
-            expected: Some(20),
+            expected_newest_versions: Some(20),
         },
         NewestVersionsTestCase {
             description: "an incremental read delivers every new build; pruning bounds the store",
             kind: WarehouseHistoryKind::Fingerprints,
             incremental: true,
             server_limit: Some(5),
-            expected: None,
+            expected_newest_versions: None,
         },
         NewestVersionsTestCase {
             description: "other tables are never limited",
             kind: WarehouseHistoryKind::NodeResults,
             incremental: false,
             server_limit: Some(5),
-            expected: None,
+            expected_newest_versions: None,
         },
         NewestVersionsTestCase {
             description: "a server without the setting gets the full history",
             kind: WarehouseHistoryKind::Fingerprints,
             incremental: false,
             server_limit: None,
-            expected: None,
+            expected_newest_versions: None,
         },
     ];
     for test_case in test_cases {
@@ -637,16 +636,14 @@ fn given_a_state_history_limit_when_requesting_history_then_only_full_reads_of_b
             .position(|kind| *kind == test_case.kind)
             .expect("kind is listed");
         state.state_history_versions = test_case.server_limit;
-        if test_case.incremental {
-            state.observed_since = Some(Utc::now());
-        }
+        state.observed_since = test_case.incremental.then(Utc::now);
         let request: serde_json::Value =
             serde_json::from_slice(&history_request(&state).expect("request")).expect("JSON");
         assert_eq!(
             request[test_case.kind.as_str()]
                 .get("newest_versions")
                 .and_then(serde_json::Value::as_u64),
-            test_case.expected.map(u64::from),
+            test_case.expected_newest_versions.map(u64::from),
             "{}",
             test_case.description
         );
@@ -744,110 +741,201 @@ fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_pag
 #[test]
 fn given_a_completed_table_when_reporting_progress_then_the_line_names_its_position_rows_and_time()
 {
-    let mut state = metadata_sync((one_location(), 1), (3600, 0));
-    state.index = 2;
-    state.progress.scan_rows = 31_204;
-    let line = scan_line(&state, 14);
-    assert!(
-        line.starts_with("Warehouse history 3/14: audit results, 31,204 rows in "),
-        "{line}"
-    );
-    state.progress.scan_unchanged = true;
-    assert!(scan_line(&state, 14).contains("audit results, unchanged in "));
-    assert_eq!(
-        [
-            rows_text(0),
-            rows_text(1),
-            rows_text(999),
-            rows_text(1_640),
-            rows_text(1_234_567)
-        ],
-        [
-            "0 rows",
-            "1 row",
-            "999 rows",
-            "1,640 rows",
-            "1,234,567 rows"
-        ]
-        .map(String::from)
-    );
+    let test_cases = [
+        ScanLineTestCase {
+            description: "a table that was read names its rows",
+            index: 2,
+            scan_rows: 31_204,
+            unchanged: false,
+            expected_prefix: "Warehouse history 3/14: audit results, 31,204 rows in ",
+        },
+        ScanLineTestCase {
+            description: "a table found unchanged says so",
+            index: 2,
+            scan_rows: 0,
+            unchanged: true,
+            expected_prefix: "Warehouse history 3/14: audit results, unchanged in ",
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.index = test_case.index;
+        state.progress.scan_rows = test_case.scan_rows;
+        state.progress.scan_unchanged = test_case.unchanged;
+        let line: String = scan_line(&state, 14);
+        assert!(
+            line.starts_with(test_case.expected_prefix),
+            "{}: {line}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_row_count_when_writing_progress_then_it_is_grouped_and_singular_for_one() {
+    let test_cases = [
+        RowsTextTestCase {
+            description: "none",
+            rows: 0,
+            expected_text: "0 rows",
+        },
+        RowsTextTestCase {
+            description: "one is singular",
+            rows: 1,
+            expected_text: "1 row",
+        },
+        RowsTextTestCase {
+            description: "below a thousand",
+            rows: 999,
+            expected_text: "999 rows",
+        },
+        RowsTextTestCase {
+            description: "thousands are grouped",
+            rows: 1_640,
+            expected_text: "1,640 rows",
+        },
+        RowsTextTestCase {
+            description: "millions are grouped",
+            rows: 1_234_567,
+            expected_text: "1,234,567 rows",
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            rows_text(test_case.rows),
+            test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]
 fn given_a_delivered_page_when_reporting_health_then_progress_completes_only_on_the_last_kinds_last_page()
  {
-    let page = |more: bool| LocationMetadataPage {
-        batch: serde_json::from_value(serde_json::json!({
-            "kind": "statistics",
-            "session_id": uuid::Uuid::nil(),
-            "generation": 1,
-            "records": [{}, {}, {}],
-        }))
-        .expect("batch"),
-        next_source_after: more.then(|| vec![Some("inventory".into())]),
-    };
-    let mut state = metadata_sync((one_location(), 1), (3600, 0));
-    state.progress.sync_rows = 100;
-    state.progress.scan_rows = 20;
-    state.index = WarehouseHistoryKind::ALL.len() - 1;
-    state.pending = Some(page(true));
-    let progress = sync_progress(&state, true);
-    assert_eq!(
-        (
-            progress.position,
-            progress.kinds,
-            progress.rows,
-            progress.completed
-        ),
-        (14, 14, 123, false),
-        "a page with more to come leaves the sync running"
-    );
-    state.pending = Some(page(false));
-    assert!(
-        sync_progress(&state, true).completed,
-        "the last page completes the sync"
-    );
-    assert!(
-        !sync_progress(&state, false).completed,
-        "a failed report never completes it"
-    );
-    state.index = 2;
-    assert!(
-        !sync_progress(&state, true).completed,
-        "an earlier kind's last page does not"
-    );
+    let last: usize = WarehouseHistoryKind::ALL.len() - 1;
+    let test_cases = [
+        SyncProgressTestCase {
+            description: "a page with more to come leaves the sync running",
+            index: last,
+            more_pages: true,
+            clean: true,
+            expected_progress: (14, 14, 123, false),
+        },
+        SyncProgressTestCase {
+            description: "the last page completes the sync",
+            index: last,
+            more_pages: false,
+            clean: true,
+            expected_progress: (14, 14, 123, true),
+        },
+        SyncProgressTestCase {
+            description: "a failed report never completes it",
+            index: last,
+            more_pages: false,
+            clean: false,
+            expected_progress: (14, 14, 123, false),
+        },
+        SyncProgressTestCase {
+            description: "an earlier kind's last page does not",
+            index: 2,
+            more_pages: false,
+            clean: true,
+            expected_progress: (3, 14, 123, false),
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.progress.sync_rows = 100;
+        state.progress.scan_rows = 20;
+        state.index = test_case.index;
+        state.pending = Some(LocationMetadataPage {
+            batch: serde_json::from_value(serde_json::json!({
+                "kind": "statistics",
+                "session_id": uuid::Uuid::nil(),
+                "generation": 1,
+                "records": [{}, {}, {}],
+            }))
+            .expect("batch"),
+            next_source_after: test_case.more_pages.then(|| vec![Some("inventory".into())]),
+        });
+        let progress = sync_progress(&state, test_case.clean);
+        assert_eq!(
+            (
+                progress.position,
+                progress.kinds,
+                progress.rows,
+                progress.completed
+            ),
+            test_case.expected_progress,
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]
 fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_or_a_set_interval_sync()
  {
-    let idle = |wakes: bool, explicit: bool| {
+    let test_cases = [
+        WakingIdleTestCase {
+            description: "the default interval never wakes compute on a timer",
+            wakes: true,
+            explicit: false,
+            run_ended: false,
+            requested: false,
+            expected_due: false,
+        },
+        WakingIdleTestCase {
+            description: "metadata-only reads keep the default interval",
+            wakes: false,
+            explicit: false,
+            run_ended: false,
+            requested: false,
+            expected_due: true,
+        },
+        WakingIdleTestCase {
+            description: "an interval someone set still applies",
+            wakes: true,
+            explicit: true,
+            run_ended: false,
+            requested: false,
+            expected_due: true,
+        },
+        WakingIdleTestCase {
+            description: "a run that ended still syncs",
+            wakes: true,
+            explicit: false,
+            run_ended: true,
+            requested: false,
+            expected_due: true,
+        },
+        WakingIdleTestCase {
+            description: "a request still syncs",
+            wakes: true,
+            explicit: false,
+            run_ended: false,
+            requested: true,
+            expected_due: true,
+        },
+    ];
+    for test_case in test_cases {
         let mut state = metadata_sync((one_location(), 1), (3600, 1800));
         state.cycle_started_at = Some(Utc::now());
         state.safety_at = Instant::now() - Duration::from_secs(1);
-        state.reads_wake_compute = wakes;
-        state.safety_explicit = explicit;
-        state
-    };
-    assert!(
-        !idle(true, false).sync_due(None),
-        "the default interval never wakes compute on a timer"
-    );
-    assert!(
-        idle(false, false).sync_due(None),
-        "metadata-only reads keep the default interval"
-    );
-    assert!(
-        idle(true, true).sync_due(None),
-        "an interval someone set still applies"
-    );
-    assert!(
-        idle(true, false).sync_due(Some(Utc::now() + chrono::Duration::seconds(1))),
-        "a run that ended still syncs"
-    );
-    let mut requested = idle(true, false);
-    requested.request_sync();
-    assert!(requested.sync_due(None), "a request still syncs");
+        state.reads_wake_compute = test_case.wakes;
+        state.safety_explicit = test_case.explicit;
+        test_case.requested.then(|| state.request_sync());
+        let runs_ended_at = test_case
+            .run_ended
+            .then(|| Utc::now() + chrono::Duration::seconds(1));
+        assert_eq!(
+            state.sync_due(runs_ended_at),
+            test_case.expected_due,
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]
@@ -864,7 +952,7 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
             failure: ReadFailure::TimedOut(30),
             failures_before: 4,
             billed: false,
-            expected: (
+            expected_report: (
                 true,
                 Some(WarehouseReadFailure::TimedOut { seconds: 30 }),
                 Some("no reply within 30 s"),
@@ -877,7 +965,7 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
             failure: denied(),
             failures_before: 3,
             billed: false,
-            expected: (
+            expected_report: (
                 false,
                 Some(WarehouseReadFailure::ReadError {}),
                 Some("permission denied for table _sqlbuild_fingerprints"),
@@ -890,7 +978,7 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
             failure: denied(),
             failures_before: 4,
             billed: false,
-            expected: (
+            expected_report: (
                 false,
                 Some(WarehouseReadFailure::ReadError {}),
                 Some("permission denied for table _sqlbuild_fingerprints"),
@@ -903,7 +991,7 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
             failure: denied(),
             failures_before: 4,
             billed: true,
-            expected: (
+            expected_report: (
                 false,
                 Some(WarehouseReadFailure::ReadError {}),
                 Some("permission denied for table _sqlbuild_fingerprints"),
@@ -916,7 +1004,7 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
             failure: ReadFailure::ReaderStart("no such file".into()),
             failures_before: 0,
             billed: false,
-            expected: (
+            expected_report: (
                 false,
                 Some(WarehouseReadFailure::ReaderStart {}),
                 Some("the metadata reader did not start: no such file"),
@@ -934,9 +1022,9 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
         state.reads_wake_compute = test_case.billed;
         state.safety_explicit = false;
         state.begin_sync(Utc::now());
-        for _ in 0..test_case.failures_before {
-            state.fail_read(false);
-        }
+        (0..test_case.failures_before).for_each(|_| {
+            let _ = state.fail_read(false);
+        });
         let page_size: bool = test_case.failure.page_size();
         let halts: bool = state.halts(page_size);
         let now = Utc::now();
@@ -967,7 +1055,7 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
                 progress.expect("progress").halted,
                 next_sync_at.map(|at| (at - now).num_seconds()),
             ),
-            test_case.expected,
+            test_case.expected_report,
             "{}",
             test_case.description
         );

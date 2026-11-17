@@ -601,8 +601,7 @@ pub struct WarehouseSyncProgress {
     pub elapsed_millis: u64,
     /// This report's page was the synchronization's last, so it has completed.
     pub completed: bool,
-    /// Failed reads in a row stopped the synchronization. It resumes after the next run, on
-    /// request or on a publication, and at `next_sync_at` when the report sets one.
+    /// Failed reads in a row stopped the sync until a run, a request, a publication or `next_sync_at`.
     #[serde(default)]
     pub halted: bool,
 }

@@ -14,16 +14,14 @@ use crate::runs::main::{
     request_job_run::request_job_run, run_execution::run_execution,
 };
 use crate::runs::models::{JobRunRequest, NodeOutcome, QueueWait, RunOutcome, RunStatus};
-use crate::runs::tests::claim_helpers::finish;
+use crate::runs::tests::claim_helpers::{finish, wait_out_retry_delay};
 use crate::runs::tests::helpers::{rows, snapshot};
 use crate::runs::tests::test_types::GroupMemberRetryTestCase;
 use crate::runs::types::RunsListing;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::store::main::{
-    begin::begin, commit::commit, migrate_store::migrate_store, query::query,
-};
-use crate::store::models::{Parameter, TransactionMode};
+use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
+use crate::store::models::TransactionMode;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
@@ -176,37 +174,13 @@ fn given_a_member_with_retry_when_it_fails_in_a_group_then_it_retries_inside_the
                 test_case.description
             );
 
-            if test_case.delay_seconds > 0 {
-                assert!(
-                    claim_next_run(store, &lease, &limits, Some(scope))
-                        .await
-                        .expect("claim during the delay")
-                        .is_none(),
-                    "{}: nothing starts while the member waits out its delay",
-                    test_case.description
-                );
-                let mut request = rows(
-                    store,
-                    "SELECT request_json FROM sqb_runs WHERE run_id=$1",
-                    vec![Parameter::Id(retry.run_id)],
-                )
-                .await
-                .remove(0)["request_json"]
-                    .clone();
-                if let Some(text) = request.as_str() {
-                    request = serde_json::from_str(text).expect("request");
-                }
-                request["retry"]["not_before"] = json!("2000-01-01T00:00:00Z");
-                let transaction = begin(store, TransactionMode::Write).await.expect("begin");
-                let (transaction, _) = query(
-                    transaction,
-                    "UPDATE sqb_runs SET request_json=$1 WHERE run_id=$2",
-                    vec![Parameter::Json(request), Parameter::Id(retry.run_id)],
-                )
-                .await
-                .expect("end the delay");
-                commit(transaction).await.expect("commit");
-            }
+            wait_out_retry_delay(
+                store,
+                (&lease, (&limits, scope)),
+                (retry.run_id, test_case.delay_seconds),
+                test_case.description,
+            )
+            .await;
             let second = claim_next_run(store, &lease, &limits, Some(scope))
                 .await
                 .expect("claim retry")

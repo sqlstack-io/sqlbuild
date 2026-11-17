@@ -388,8 +388,7 @@ struct ReadCheck {
     deps: Vec<(String, String)>,
 }
 
-/// Force each checked model whose SQL, or a function it calls, reads beyond its declared inputs;
-/// the SQL is parsed in parallel first.
+/// Force each checked model whose SQL or functions read beyond its declared inputs.
 fn undeclared_reads(
     py: Python<'_>,
     (nodes, reads): (&mut [NodeFacts], Vec<ReadCheck>),

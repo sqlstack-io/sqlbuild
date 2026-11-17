@@ -243,11 +243,7 @@ pub(crate) async fn wal_checkpoint(store: &ControlStore) -> Result<(), ControlEr
     .await?
 }
 
-/// Return a SQLite store's free pages to the disk, so the file shrinks after pruning.
-///
-/// A store in incremental auto-vacuum mode frees a bounded step of pages each pass. Any other
-/// store is vacuumed once into that mode when much of its file is free. Returns whether pages
-/// were freed. PostgreSQL reclaims space itself.
+/// Return a SQLite store's free pages to the disk after pruning; returns whether pages were freed.
 pub(crate) async fn reclaim_sqlite_space(store: &ControlStore) -> Result<bool, ControlError> {
     let ControlStore::Sqlite(path) = store else {
         return Ok(false);
@@ -265,9 +261,12 @@ pub(crate) async fn reclaim_sqlite_space(store: &ControlStore) -> Result<bool, C
             return Ok(false);
         }
         if pragma("auto_vacuum")? == 2 {
-            connection.execute_batch(&format!(
+            // Each step frees one page, so step until the pragma finishes.
+            let mut vacuum = connection.prepare(&format!(
                 "PRAGMA incremental_vacuum({SQLITE_RECLAIM_STEP_PAGES})"
             ))?;
+            let mut steps = vacuum.raw_query();
+            while steps.next()?.is_some() {}
             return Ok(true);
         }
         let pages = pragma("page_count")?;
