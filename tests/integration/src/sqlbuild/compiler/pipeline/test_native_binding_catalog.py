@@ -16,12 +16,16 @@ from sqlbuild._native import (
 )
 from sqlbuild._native import run_cli as main
 from sqlbuild.adapter.contract.models import ColumnInfo, ExpressionInferenceProfile
+from sqlbuild.adapters.postgres.classes.postgres_adapter import PostgresAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
     NativeCatalogCase,
+    PhysicalEvidenceCase,
     ValidationCacheCase,
 )
+
+_DECLARED_ORDERS: tuple[tuple[str, str], ...] = (("order_id", "INTEGER"), ("status", "VARCHAR"))
 
 
 @pytest.mark.parametrize(
@@ -191,6 +195,94 @@ def test_given_case_sensitive_snowflake_when_rebinding_listed_columns_then_unquo
         profile=ExpressionInferenceProfile(sql_analysis_dialect="snowflake"),
         selected_keys=frozenset(model.key for model in project.models),
     )
+    assert tuple(item.code for item in diagnostics) == test_case.expected_codes
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PhysicalEvidenceCase(
+            "Snowflake listed names equal to declared names",
+            SnowflakeAdapter,
+            "snowflake",
+            _DECLARED_ORDERS,
+            expected_rebinding=False,
+        ),
+        PhysicalEvidenceCase(
+            "Snowflake new listed column",
+            SnowflakeAdapter,
+            "snowflake",
+            (*_DECLARED_ORDERS, ("region", "VARCHAR")),
+            expected_rebinding=True,
+        ),
+        PhysicalEvidenceCase(
+            "Snowflake lowercase stored name rejects unquoted reader",
+            SnowflakeAdapter,
+            "snowflake",
+            (('"order_id"', "INTEGER"), ("status", "VARCHAR")),
+            expected_rebinding=True,
+            expected_codes=("B002",),
+        ),
+        PhysicalEvidenceCase(
+            "Snowflake changed column type",
+            SnowflakeAdapter,
+            "snowflake",
+            (("order_id", "VARCHAR"), ("status", "VARCHAR")),
+            expected_rebinding=True,
+        ),
+        PhysicalEvidenceCase(
+            "Postgres listed names equal to declared names",
+            PostgresAdapter,
+            "postgres",
+            _DECLARED_ORDERS,
+            expected_rebinding=False,
+        ),
+        PhysicalEvidenceCase(
+            "Postgres mixed-case stored name rejects unquoted reader",
+            PostgresAdapter,
+            "postgres",
+            (("Order_Id", "INTEGER"), ("status", "VARCHAR")),
+            expected_rebinding=True,
+            expected_codes=("B002",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_case_sensitive_dialect_when_listed_columns_bind_as_declared_then_skips_rebinding(
+    test_case: PhysicalEvidenceCase, tmp_path: Path
+) -> None:
+    (tmp_path / "sqlbuild_project.toml").write_text(
+        f'name = "orders"\nadapter = "{test_case.dialect}"\n[rules]\nselect = []\n'
+    )
+    (tmp_path / "models").mkdir()
+    (tmp_path / "sources").mkdir()
+    (tmp_path / "sources/orders.yml").write_text(
+        "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n"
+        "    contract: enforced\n    columns:\n"
+        + "".join(
+            f"      - name: {name}\n        type: {kind}\n" for name, kind in _DECLARED_ORDERS
+        )
+    )
+    (tmp_path / "models/report.sql").write_text(
+        "MODEL (description 'Test model report.', database warehouse, schema analytics);\n"
+        'SELECT order_id, status FROM __source("orders")'
+    )
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discover_project_inputs(project_dir=tmp_path), adapter=test_case.adapter()
+    )
+    _ = sql_analysis_models.compile_stage_work_info(reset=True)
+
+    diagnostics: tuple[CompilerDiagnostic, ...] = source_binding_diagnostics(
+        project=project,
+        columns={"orders": tuple(ColumnInfo(name, kind) for name, kind in test_case.listed)},
+        profile=ExpressionInferenceProfile(sql_analysis_dialect=test_case.dialect),
+        selected_keys=frozenset(model.key for model in project.models),
+    )
+
+    rebinding: int = sql_analysis_models.compile_stage_work_info().get(
+        "source_rebinding_analyses", 0
+    )
+    assert (rebinding > 0) is test_case.expected_rebinding
     assert tuple(item.code for item in diagnostics) == test_case.expected_codes
 
 
