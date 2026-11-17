@@ -205,7 +205,10 @@ fn targeted_project<'py>(
     }
     preserved_loader_schemas(
         discovered,
-        request.selected_target.bind(py),
+        (
+            request.selected_target.bind(py),
+            &native_field(project, "effective_vars")?,
+        ),
         &intermediate_loaders,
     )?;
     managed_write_schemas(adapter, project)?;
