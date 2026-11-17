@@ -7,9 +7,11 @@ use crate::planner_resolution::main::safety::maximum_allowed_start::maximum_allo
 use crate::planner_strategy::main::lineage::resolve_lineage_reference::resolve_lineage_reference;
 use crate::planner_warehouse::_helpers::inspection::watermarks::validate_watermark_column;
 use crate::planner_warehouse::constants::{
-    CURSOR_ALGEBRA_ERROR, CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, DATE_VALUE, LOG_DEBUG_EVENT,
-    PLANNER_LOGGER,
+    CURSOR_ALGEBRA_ERROR, CURSOR_BATCH_SIZE, CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP,
+    DATE_VALUE, LOG_DEBUG_EVENT, PLANNER_LOGGER,
 };
+use crate::planner_warehouse::models::CursorBatch;
+use crate::planner_warehouse::models::CursorStatements;
 use crate::planner_warehouse::models::EligibleCursorQuery;
 use crate::planner_warehouse::models::Read;
 use crate::planner_warehouse::models::SnapshotRequest;
@@ -19,6 +21,7 @@ use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_changes::constants::FORWARD_ONLY_POLICY;
+use sqlbuild_analysis::planner_warehouse::main::cursor_batch_sql::cursor_batch_sql;
 use sqlbuild_analysis::planner_warehouse::main::cursor_bounds::cursor_bounds;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_query_groups;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_identity::cursor_query_identity;
@@ -586,17 +589,19 @@ fn report_cursor_query(
     let error = outcome.get_item(2)?;
     if error.is_none() {
         if !on_progress.is_none() {
-            on_progress.call1((format!(
-                "Inspected cursor bounds {identity} ({elapsed:.2}s)"
-            ),))?;
+            emit_progress(
+                on_progress,
+                format!("Inspected cursor bounds {identity} ({elapsed:.2}s)"),
+            )?;
         }
         return Ok(());
     }
     let error_text: String = error.str()?.extract()?;
     if !on_progress.is_none() {
-        on_progress.call1((format!(
-            "Failed cursor bounds {identity} ({elapsed:.2}s): {error_text}"
-        ),))?;
+        emit_progress(
+            on_progress,
+            format!("Failed cursor bounds {identity} ({elapsed:.2}s): {error_text}"),
+        )?;
     }
     log_debug(
         py,
@@ -614,9 +619,10 @@ fn report_cursor_query(
     )
 }
 
-fn completion_reporter<'py>(
+/// The `on_complete` callback of statements where task `i` reads `queries[reads[i]]`.
+fn reads_reporter<'py>(
     py: Python<'py>,
-    queries: Vec<PhysicalCursorQuery>,
+    (queries, reads): (Vec<PhysicalCursorQuery>, Vec<usize>),
     on_progress: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let completed = Arc::new(AtomicUsize::new(0));
@@ -635,12 +641,66 @@ fn completion_reporter<'py>(
                 .get_item("result")?
                 .unwrap_or_else(|| py.None().into_bound(py));
             let done = completed.fetch_add(1, Ordering::SeqCst) + 1;
-            let query = &queries[index];
-            let identity = cursor_query_identity(query, (done, queries.len()));
+            let query = &queries[reads[index]];
+            let identity = cursor_query_identity(query, (done, reads.len()));
             report_cursor_query(py, query, (&result, &identity), on_progress.bind(py))
         },
     )?
     .into_any())
+}
+
+/// The `on_complete` callback of batched statements answering `sizes[i]` reads each.
+fn batch_reporter<'py>(
+    py: Python<'py>,
+    sizes: Vec<usize>,
+    on_progress: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let completed = Arc::new(AtomicUsize::new(0));
+    let on_progress: Py<PyAny> = on_progress.clone().unbind();
+    Ok(PyCFunction::new_closure(
+        py,
+        None,
+        None,
+        move |args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>| -> PyResult<()> {
+            let py = args.py();
+            let on_progress = on_progress.bind(py);
+            if on_progress.is_none() {
+                return Ok(());
+            }
+            let kwargs = kwargs.cloned().unwrap_or_else(|| PyDict::new(py));
+            let index: usize = kwargs
+                .get_item("index")?
+                .map_or(Ok(0), |value| value.extract())?;
+            let Some(result) = kwargs.get_item("result")? else {
+                return Ok(());
+            };
+            let done = completed.fetch_add(1, Ordering::SeqCst) + 1;
+            let elapsed: f64 = result.get_item(1)?.extract()?;
+            let error = result.get_item(2)?;
+            let relations = sizes[index];
+            let line = if error.is_none() {
+                format!(
+                    "Inspected cursor bounds ({done}/{}): {relations} relations ({elapsed:.2}s)",
+                    sizes.len()
+                )
+            } else {
+                format!(
+                    "Failed cursor bounds ({done}/{}): {relations} relations ({elapsed:.2}s): {}; reading each relation on its own",
+                    sizes.len(),
+                    error.str()?
+                )
+            };
+            emit_progress(on_progress, line)?;
+            Ok(())
+        },
+    )?
+    .into_any())
+}
+
+/// Write one progress `line` through the plan's `on_progress` callback.
+fn emit_progress(on_progress: &Bound<'_, PyAny>, line: String) -> PyResult<()> {
+    on_progress.call1((line,))?;
+    Ok(())
 }
 
 fn fan_out<'py>(query: &PhysicalCursorQuery, row: &Bound<'py, PyAny>) -> PyResult<Values<'py>> {
@@ -675,11 +735,14 @@ fn execute_queries<'py>(
     queries: &[PhysicalCursorQuery],
 ) -> PyResult<Option<(Values<'py>, HashSet<String>)>> {
     let py = request.project.py();
-    let statements = || -> PyResult<Vec<String>> {
-        queries
-            .iter()
-            .map(|query| dialect_cursor_sql(&request.dialect, query))
-            .collect()
+    let statements = || -> PyResult<CursorStatements> {
+        Ok(CursorStatements {
+            singles: queries
+                .iter()
+                .map(|query| dialect_cursor_sql(&request.dialect, query))
+                .collect::<PyResult<_>>()?,
+            batches: dialect_cursor_batches(&request.dialect, queries)?,
+        })
     };
     let progress = (queries, &request.on_progress);
     let Read::Known(outcomes) =
@@ -1075,12 +1138,15 @@ pub(crate) fn cursor_snapshots<'py>(
             .iter()
             .map(|query| query.min_tags.len() + query.max_tags.len())
             .sum();
-        request.on_progress.call1((format!(
-            "Gathered cursor bounds ({}/{logical} logical values; {} physical relation reads). ({:.2}s)",
-            values.len(),
-            queries.len(),
-            started.elapsed().as_secs_f64()
-        ),))?;
+        emit_progress(
+            &request.on_progress,
+            format!(
+                "Gathered cursor bounds ({}/{logical} logical values; {} physical relation reads). ({:.2}s)",
+                values.len(),
+                queries.len(),
+                started.elapsed().as_secs_f64()
+            ),
+        )?;
     }
     Ok((assemble(py, &models, (&values, &failed))?, false))
 }
@@ -1113,13 +1179,62 @@ pub(crate) fn dialect_cursor_sql(
     }
 }
 
+/// `UNION ALL` batches answering `queries`, bounds read as `dialect_cursor_sql` reads them.
+fn dialect_cursor_batches(
+    dialect: &Bound<'_, Dialect>,
+    queries: &[PhysicalCursorQuery],
+) -> PyResult<Vec<CursorBatch>> {
+    if queries.len() <= 1 {
+        return Ok(Vec::new());
+    }
+    let py = dialect.py();
+    let render = dialect.syntax(CURSOR_TEXT_METHOD)?;
+    let failure: RefCell<Option<PyErr>> = RefCell::new(None);
+    let as_text = |query: &PhysicalCursorQuery, expression: &str| -> String {
+        call_with(
+            &render,
+            &[
+                ("expression", text(py, expression)),
+                ("cursor_type", text(py, &query.cursor_type)),
+            ],
+        )
+        .and_then(|rendered| rendered.extract::<String>())
+        .unwrap_or_else(|error| {
+            failure.replace(Some(error));
+            String::new()
+        })
+    };
+    let mut batches: Vec<CursorBatch> = Vec::new();
+    for (chunk, start) in queries
+        .chunks(CURSOR_BATCH_SIZE)
+        .zip((0..).step_by(CURSOR_BATCH_SIZE))
+    {
+        let members: Vec<&PhysicalCursorQuery> = chunk.iter().collect();
+        batches.push(CursorBatch {
+            reads: chunk
+                .iter()
+                .enumerate()
+                .map(|(offset, query)| (start + offset, !query.min_tags.is_empty()))
+                .collect(),
+            sql: cursor_batch_sql(&members, &as_text),
+        });
+    }
+    match failure.into_inner() {
+        Some(error) => Err(error),
+        None => Ok(batches),
+    }
+}
+
 /// Progress lines of one plan's cursor bound statements: the statements' queries and `on_progress`.
 impl<'py> CursorProgress<'py> for (&[PhysicalCursorQuery], &Bound<'py, PyAny>) {
     fn starting(&self, index: usize) -> PyResult<()> {
         let (queries, on_progress) = *self;
         if !on_progress.is_none() {
             let identity = cursor_query_identity(&queries[index], (index + 1, queries.len()));
-            on_progress.call1((format!("Inspecting cursor bounds {identity}..."),))?;
+            emit_progress(
+                on_progress,
+                format!("Inspecting cursor bounds {identity}..."),
+            )?;
         }
         Ok(())
     }
@@ -1127,10 +1242,32 @@ impl<'py> CursorProgress<'py> for (&[PhysicalCursorQuery], &Bound<'py, PyAny>) {
     fn concurrent(&self, concurrency: usize) -> PyResult<()> {
         let (queries, on_progress) = *self;
         if !on_progress.is_none() {
-            on_progress.call1((format!(
-                "Inspecting cursor bounds for {} relations ({concurrency} concurrent)...",
-                queries.len()
-            ),))?;
+            emit_progress(
+                on_progress,
+                format!(
+                    "Inspecting cursor bounds for {} relations ({concurrency} concurrent)...",
+                    queries.len()
+                ),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn batched(&self, batches: usize, concurrency: usize) -> PyResult<()> {
+        let (queries, on_progress) = *self;
+        if !on_progress.is_none() {
+            let statements = if batches == 1 {
+                "statement"
+            } else {
+                "statements"
+            };
+            emit_progress(
+                on_progress,
+                format!(
+                    "Inspecting cursor bounds for {} relations in {batches} {statements} ({concurrency} concurrent)...",
+                    queries.len()
+                ),
+            )?;
         }
         Ok(())
     }
@@ -1146,8 +1283,17 @@ impl<'py> CursorProgress<'py> for (&[PhysicalCursorQuery], &Bound<'py, PyAny>) {
         )
     }
 
-    fn completion_callback(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn completion_callback(
+        &self,
+        py: Python<'py>,
+        reads: Vec<usize>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let (queries, on_progress) = *self;
-        completion_reporter(py, queries.to_vec(), on_progress)
+        reads_reporter(py, (queries.to_vec(), reads), on_progress)
+    }
+
+    fn batch_callback(&self, py: Python<'py>, sizes: Vec<usize>) -> PyResult<Bound<'py, PyAny>> {
+        let (_, on_progress) = *self;
+        batch_reporter(py, sizes, on_progress)
     }
 }

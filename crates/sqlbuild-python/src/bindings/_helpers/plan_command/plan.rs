@@ -2,11 +2,11 @@
 
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
 use sqlbuild_python_planner::planner_phases::constants::BUILD_HISTORY;
+use sqlbuild_python_planner::planner_phases::constants::DISCOVERING;
 use sqlbuild_python_planner::planner_phases::constants::WRITING;
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
 use sqlbuild_python_planner::planner_phases::models::PlanTimings;
-use sqlbuild_python_planner::planner_phases::constants::DISCOVERING;
 use std::sync::Arc;
 
 use pyo3::prelude::{

@@ -38,6 +38,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import (
     write_synthetic_snowflake_project,
 )
 
+_CURSOR_BATCH_SIZE: int = 50
 _ONE_READ_PER_SCHEMA: dict[str, int] = {"STAGING": 1, "INTERMEDIATE": 1, "MARTS": 1, "RAW": 1}
 _SOURCES: int = 260
 _SHOW_READS_PER_SCHEMA: int = 3
@@ -112,14 +113,14 @@ def test_given_large_multi_schema_project_when_planning_then_metadata_reads_stay
     "test_case",
     [
         SnowflakeCursorBoundsBudgetTestCase(
-            description="one statement per relation with bounded parallelism",
+            description="batched statements read each relation once with bounded parallelism",
             statement_latency_seconds=0.002,
             expected_max_concurrency=OfflineSnowflakeAdapter.metadata_inspection_concurrency,
         )
     ],
     ids=lambda case: case.description,
 )
-def test_given_incremental_models_when_planning_then_cursor_bounds_run_one_per_relation_in_parallel(
+def test_given_incremental_models_when_planning_then_cursor_bounds_run_in_parallel_batches(
     test_case: SnowflakeCursorBoundsBudgetTestCase, tmp_path: Path
 ) -> None:
     project: SyntheticSnowflakeProject = write_synthetic_snowflake_project(
@@ -136,9 +137,9 @@ def test_given_incremental_models_when_planning_then_cursor_bounds_run_one_per_r
 
     bounds: tuple[RecordedQuery, ...] = warehouse.queries_of_kind("cursor_bounds")
     relations: tuple[str, ...] = offline_cursor_bound_relations(warehouse)
-    assert len(bounds) >= len(project.incremental_model_names)
-    assert all("UNION" not in query.sql.upper() for query in bounds)
-    assert len(relations) == len(bounds) == len(set(relations))
+    assert len(relations) >= len(project.incremental_model_names)
+    assert len(relations) == len(set(relations))
+    assert len(bounds) == -(-len(relations) // _CURSOR_BATCH_SIZE)
     assert 1 < warehouse.max_concurrent_cursor_bounds <= test_case.expected_max_concurrency
 
 
