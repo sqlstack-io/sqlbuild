@@ -437,6 +437,58 @@ def duckshop_orchestration(fixture: str) -> dict[str, str]:
     }
 
 
+def _group_cycle_model(name: str, reads: str) -> str:
+    """A one-column synthetic model reading `reads`."""
+    return (
+        f"MODEL (description 'Synthetic {name}.', columns (id (type INTEGER)));\n\n"
+        f'SELECT CAST(1 AS INTEGER) AS id FROM __ref("{reads}")\n'
+    )
+
+
+# Models and a seed for the DuckShop `group_cycles` jobs, whose group bundles them into three cycles.
+GROUP_CYCLE_NODES: dict[str, str] = {
+    "seeds/regions.csv": "id\n1\n",
+    "seeds/regions.yml": (
+        "seeds:\n  - name: regions\n    description: Regions\n    columns:\n"
+        "      - name: id\n        type: INTEGER\n"
+    ),
+    "models/stg_orders.sql": (
+        "MODEL (description 'Synthetic stg_orders.', columns (id (type INTEGER)));\n\n"
+        "SELECT CAST(1 AS INTEGER) AS id\n"
+    ),
+    "models/stg_inventory.sql": (
+        "MODEL (description 'Synthetic stg_inventory.', columns (id (type INTEGER)));\n\n"
+        "SELECT CAST(1 AS INTEGER) AS id\n"
+    ),
+    "models/customers.sql": _group_cycle_model("customers", "stg_orders"),
+    "models/orders.sql": _group_cycle_model("orders", "customers"),
+    "models/shipments.sql": _group_cycle_model("shipments", "stg_inventory"),
+    "models/inventory.sql": _group_cycle_model("inventory", "shipments"),
+    "models/region_report.sql": (
+        "MODEL (description 'Synthetic region_report.', columns (id (type INTEGER)));\n\n"
+        'SELECT CAST(1 AS INTEGER) AS id FROM __seed("regions")\n'
+    ),
+    "models/regional_orders.sql": _group_cycle_model("regional_orders", "region_report"),
+}
+# What compile and publish both report for that group: every cycle, then the shared-read hint.
+GROUP_CYCLE_MESSAGE: str = "\n".join(
+    f"group dependencies contain a cycle in job group nightly_job_group: {cycle}"
+    for cycle in (
+        "customers_job waits for orders_job (model:customers reads model:stg_orders); "
+        "orders_job waits for customers_job (model:orders reads model:customers)",
+        "inventory_job waits for shipments_job (model:inventory reads model:shipments); "
+        "shipments_job waits for inventory_job (model:shipments reads model:stg_inventory)",
+        "reference_job waits for region_report_job (model:regional_orders reads "
+        "model:region_report); region_report_job waits for reference_job "
+        "(model:region_report reads seed:regions)",
+    )
+) + (
+    "\nhint: a wait in this cycle reads a seed or a node that more than one member builds, "
+    "so every member that reads it waits for all of its builders; give seeds and shared nodes "
+    "their own job that runs first"
+)
+
+
 def edited_duckshop_orchestration(fixture: str, path: str, old: str, new: str) -> dict[str, str]:
     """A DuckShop orchestration fixture with `old` replaced by `new` in the file at `path`."""
     files: dict[str, str] = duckshop_orchestration(fixture)
