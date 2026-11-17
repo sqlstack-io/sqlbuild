@@ -3,6 +3,7 @@
 use crate::graph::main::project::edge_dict::edge_dict;
 use crate::graph::models::KeyCache;
 use crate::native_host::models::ModelHandle;
+use crate::planner_scope::_helpers::retained::project_scope;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -10,6 +11,7 @@ use pyo3::prelude::PyAny;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use pyo3::pyclass;
+use pyo3::pymethods;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::PyDict;
 use pyo3::types::PyDictMethods;
@@ -127,5 +129,46 @@ impl ScopeData {
             "load_sources" => self.load_sources.into_bound_py_any(py),
             _ => Err(pyo3::exceptions::PyAttributeError::new_err(name.to_owned())),
         }
+    }
+}
+
+/// Resolved planner scopes for one plan build.
+#[pyclass(module = "sqlbuild._native", frozen)]
+#[derive(Debug)]
+pub struct PlannerScopeResolution {
+    pub selected_scope: Py<PyAny>,
+    pub stale_warning_scope: Py<PyAny>,
+    pub inspection_scope: Py<PyAny>,
+}
+
+#[pymethods]
+impl PlannerScopeResolution {
+    #[new]
+    #[pyo3(signature = (*, selected_scope, stale_warning_scope, inspection_scope))]
+    fn new(
+        selected_scope: Py<PyAny>,
+        stale_warning_scope: Py<PyAny>,
+        inspection_scope: Py<PyAny>,
+    ) -> Self {
+        Self {
+            selected_scope,
+            stale_warning_scope,
+            inspection_scope,
+        }
+    }
+
+    #[getter]
+    fn selected_scope<'py>(&self, py: pyo3::Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        project_scope(self.selected_scope.bind(py))
+    }
+
+    #[getter]
+    fn stale_warning_scope<'py>(&self, py: pyo3::Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        project_scope(self.stale_warning_scope.bind(py))
+    }
+
+    #[getter]
+    fn inspection_scope<'py>(&self, py: pyo3::Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        project_scope(self.inspection_scope.bind(py))
     }
 }

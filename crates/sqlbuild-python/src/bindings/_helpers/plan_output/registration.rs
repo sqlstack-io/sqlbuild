@@ -2,16 +2,16 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::plan_output::display;
-use crate::bindings::_helpers::plan_output::migrations;
-use crate::bindings::_helpers::plan_output::plan_json;
-use crate::bindings::_helpers::plan_output::plan_text;
-use crate::bindings::_helpers::plan_output::safety;
+use sqlbuild_python_planner::plan_output::main::register_display::register_display;
+use sqlbuild_python_planner::plan_output::main::register_migrations::register_migrations;
+use sqlbuild_python_planner::plan_output::main::register_plan_json::register_plan_json;
+use sqlbuild_python_planner::plan_output::main::register_plan_text::register_plan_text;
+use sqlbuild_python_planner::plan_output::main::register_safety::register_safety;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    display::register(module)?;
-    migrations::register(module)?;
-    plan_json::register(module)?;
-    plan_text::register(module)?;
-    safety::register(module)
+    register_display(module)?;
+    register_migrations(module)?;
+    register_plan_json(module)?;
+    register_plan_text(module)?;
+    register_safety(module)
 }

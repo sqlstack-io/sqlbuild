@@ -17,7 +17,6 @@ use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_a
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::manifest::builder::build_manifest;
-use crate::bindings::_helpers::plan_output::plan_text::format_plan;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;
@@ -29,6 +28,7 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_planner::plan_output::main::format_plan::format_plan;
 
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 

@@ -3,10 +3,10 @@
 use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::types::PyDict;
 
-use crate::bindings::_helpers::freshness::observation::require_aware_utc_datetime;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_planner::freshness::main::require_aware_utc_datetime::require_aware_utc_datetime;
 
 /// `SourceFreshnessRecord.observed_at` position.
 const OBSERVED_AT_FIELD: usize = 9;

@@ -8,6 +8,7 @@ pub mod command_runtime;
 pub mod compile_attachment;
 pub mod compile_driver;
 pub mod contracts;
+pub mod cost_context;
 pub mod cursor;
 pub mod discovery;
 pub mod macro_bridge;

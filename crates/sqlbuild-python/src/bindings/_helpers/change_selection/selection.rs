@@ -26,10 +26,10 @@ use crate::bindings::_helpers::change_selection::definition_snapshot::declaratio
 use crate::bindings::_helpers::change_selection::definition_snapshot::definition_snapshot;
 use crate::bindings::_helpers::change_selection::definition_snapshot::project_wide_keys;
 use crate::bindings::_helpers::change_selection::environment_nodes::with_current_dependencies;
-use crate::bindings::_helpers::planner_scenario::graph::plan_scenario_graph;
 use crate::bindings::_helpers::scenario_command::setup::flush;
 use crate::bindings::_helpers::scenario_command::setup::write;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_planner::planner_scenario::main::plan_scenario_graph::plan_scenario_graph;
 use sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;

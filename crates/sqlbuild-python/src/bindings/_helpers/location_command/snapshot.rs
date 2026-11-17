@@ -16,7 +16,6 @@ use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
 use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
 use crate::bindings::_helpers::location_command::snapshot_providers::providers_document;
-use crate::bindings::_helpers::planner_identity::identities::direct_model_version_identities;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::orchestration_reads::main::environment_hash::environment_hash;
 use sqlbuild_python_base::records::main::fields::field::field;
@@ -25,6 +24,7 @@ use sqlbuild_python_front::discovery::main::project::named_node_rows::named_node
 use sqlbuild_python_front::discovery::main::project::project_facts::project_facts;
 use sqlbuild_python_front::discovery::main::project::validation_error::validation_error;
 use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
+use sqlbuild_python_planner::planner_identity::main::direct_model_version_identities::direct_model_version_identities;
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
 use sqlbuild_python_project::graph::models::ProjectSelection;
 use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;

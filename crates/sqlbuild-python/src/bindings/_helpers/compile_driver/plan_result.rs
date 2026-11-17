@@ -1,8 +1,8 @@
 //! Plan a compiled project over an open warehouse connection, and open that connection.
 
-use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_planner::planner_warehouse::models::PlannerReads;
 
 use crate::bindings::_helpers::compile_driver::deferral::build_deferred_locations;
 use crate::bindings::_helpers::compile_driver::deferral::gather_deferred_relations;
@@ -10,10 +10,10 @@ use crate::bindings::_helpers::compile_driver::deferral::resolve_deferred_target
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_project_graph_from_compiled_project;
 use crate::bindings::_helpers::compile_driver::python_plan_entries::build_python_run_plan_outputs;
 use crate::bindings::_helpers::compile_driver::python_plan_entries::python_read_source_names_for;
-use crate::bindings::_helpers::planner_entries::execution_plan::build_execution_plan;
 use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_planner::planner_entries::main::plans::build_execution_plan::build_execution_plan;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::models::KeyCache;
 use sqlbuild_python_project::planner_phases::main::object::object;

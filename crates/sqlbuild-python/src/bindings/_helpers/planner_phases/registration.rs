@@ -1,47 +1,28 @@
 //! Register the native execution-planning phases.
 
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
-use pyo3::wrap_pyfunction;
+use sqlbuild_python_project::planner_scope::main::resolve_planner_scopes_function::resolve_planner_scopes_function;
+use sqlbuild_python_planner::planner_phases::main::outputs::detect_stale_warning_changes_of_function::detect_stale_warning_changes_of_function;
+use sqlbuild_python_planner::planner_phases::main::outputs::planner_identity_work_info_function::planner_identity_work_info_function;
+use sqlbuild_python_planner::planner_phases::main::rebuilds::check_full_rebuild_allowed_function::check_full_rebuild_allowed_function;
+use sqlbuild_python_planner::planner_phases::main::rebuilds::describe_full_rebuild_cause_function::describe_full_rebuild_cause_function;
+use sqlbuild_python_planner::planner_phases::main::rebuilds::plan_retention_function::plan_retention_function;
+use sqlbuild_python_planner::planner_phases::main::rebuilds::plan_table_types_function::plan_table_types_function;
+use sqlbuild_python_planner::planner_phases::main::rebuilds::table_type_copy_name_function::table_type_copy_name_function;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<crate::bindings::_helpers::planner_phases::models::PlannerRuntime>()?;
+    module.add_class::<sqlbuild_python_planner::planner_phases::models::PlannerRuntime>()?;
+    module.add_class::<sqlbuild_python_planner::planner_phases::models::PlannerWarehouseState>()?;
+    module.add_class::<sqlbuild_python_project::planner_scope::models::PlannerScopeResolution>()?;
     module
-        .add_class::<crate::bindings::_helpers::planner_phases::models::PlannerWarehouseState>()?;
-    module
-        .add_class::<crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution>()?;
-    module
-        .add_class::<crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext>()?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::identities::planner_identity_work_info,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::identities::detect_stale_warning_changes_of,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::full_refresh::describe_full_rebuild_cause,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::full_refresh::check_full_rebuild_allowed,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::retention::table_type_copy_name,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::retention::plan_table_types,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::retention::plan_retention,
-        module
-    )?)?;
+        .add_class::<sqlbuild_python_planner::planner_phases::models::PlannerIdentityContext>()?;
+    module.add_function(resolve_planner_scopes_function(module)?)?;
+    module.add_function(planner_identity_work_info_function(module)?)?;
+    module.add_function(detect_stale_warning_changes_of_function(module)?)?;
+    module.add_function(describe_full_rebuild_cause_function(module)?)?;
+    module.add_function(check_full_rebuild_allowed_function(module)?)?;
+    module.add_function(table_type_copy_name_function(module)?)?;
+    module.add_function(plan_table_types_function(module)?)?;
+    module.add_function(plan_retention_function(module)?)?;
     Ok(())
 }

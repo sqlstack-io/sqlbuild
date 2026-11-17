@@ -10,10 +10,6 @@ use sqlbuild_host::models::{
     SqlTestExecutionResult, SqlTestOutcome,
 };
 
-use crate::bindings::_helpers::plan_output::values::any;
-use crate::bindings::_helpers::plan_output::values::dict;
-use crate::bindings::_helpers::plan_output::values::items;
-use crate::bindings::_helpers::plan_output::values::text;
 use crate::bindings::_helpers::result_output::aggregation::RetainedBuildResults;
 use crate::bindings::_helpers::result_output::assets::clone_asset;
 use crate::bindings::_helpers::result_output::assets::function_assets;
@@ -35,6 +31,10 @@ use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_planner::plan_output::main::any::any;
+use sqlbuild_python_planner::plan_output::main::dict::dict;
+use sqlbuild_python_planner::plan_output::main::items::items;
+use sqlbuild_python_planner::plan_output::main::text::text;
 
 const JSON_VERSION: i64 = 1;
 const FAILED: &str = "failed";

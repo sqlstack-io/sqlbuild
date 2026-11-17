@@ -11,6 +11,7 @@ rust-version.workspace = true
 chrono.workspace = true
 mimalloc.workspace = true
 pyo3.workspace = true
+rayon.workspace = true
 rusqlite.workspace = true
 rustc-hash.workspace = true
 serde.workspace = true
