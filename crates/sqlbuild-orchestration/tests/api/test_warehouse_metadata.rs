@@ -515,15 +515,31 @@ fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_
                     .expect("one page");
                 }
             }
+            let mut kept_record = base.clone();
+            kept_record["result_id"] = json!("arrival order");
+            kept_record["occurred_at"] = json!(test_case.expected_row.0);
+            kept_record["outcome"] = json!(test_case.expected_row.1);
+            assert!(
+                !ingest_audit_results(
+                    store,
+                    (location, "development"),
+                    &batch(session_id, "audit_results", vec![kept_record]),
+                )
+                .await
+                .expect("repeated page")
+                .applied,
+                "{}: re-sending the kept row changes nothing",
+                test_case.description
+            );
             let (transaction, rows) = query(
                 begin(store, TransactionMode::Read).await.expect("read"),
-                "SELECT record_json FROM sqb_warehouse_audit_results",
+                "SELECT record_json, observed_at, outcome FROM sqb_warehouse_audit_results",
                 vec![],
             )
             .await
             .expect("mirrored results");
             commit(transaction).await.expect("close read");
-            let mut kept: Vec<(String, DateTime<Utc>, String)> = rows
+            let mut kept: Vec<(String, DateTime<Utc>, String, DateTime<Utc>, String)> = rows
                 .iter()
                 .map(|row| {
                     let record = &row["record_json"];
@@ -535,6 +551,8 @@ fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_
                             .parse()
                             .expect("RFC 3339"),
                         record["outcome"].as_str().expect("outcome").to_owned(),
+                        serde_json::from_value(row["observed_at"].clone()).expect("column time"),
+                        row["outcome"].as_str().expect("column outcome").to_owned(),
                     )
                 })
                 .collect();
@@ -544,6 +562,8 @@ fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_
                 kept,
                 ["arrival order", "reverse order"].map(|order| (
                     order.to_owned(),
+                    expected_at,
+                    test_case.expected_row.1.to_owned(),
                     expected_at,
                     test_case.expected_row.1.to_owned()
                 )),
