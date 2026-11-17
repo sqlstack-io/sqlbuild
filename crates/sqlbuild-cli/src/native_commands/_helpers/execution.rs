@@ -1921,12 +1921,22 @@ pub(crate) fn run_store_migration(namespace: &Namespace, runtime: &tokio::runtim
     }
 }
 
+/// Plan and apply the store's migrations; a dry run never creates a missing SQLite file.
 async fn store_migration(namespace: &Namespace, dry_run: bool) -> Result<String, ControlError> {
     let config = read_server_config(namespace)?;
     let url = control_database(
         namespace,
         &control_database_variable(namespace, &config.server),
     )?;
+    if dry_run
+        && let Some(path) = url
+            .strip_prefix("sqlite://")
+            .or((!url.contains("://")).then_some(url.as_str()))
+        && !matches!(path, "" | ":memory:")
+        && !std::path::Path::new(path).exists()
+    {
+        return Ok(format!("No control store at {path}: would create one.\n"));
+    }
     let store = open_store(&url).await?;
     let plan = plan_store_migration(&store).await?;
     if !dry_run {

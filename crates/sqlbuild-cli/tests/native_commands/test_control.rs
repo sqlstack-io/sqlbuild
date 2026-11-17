@@ -371,19 +371,22 @@ fn given_a_standalone_server_when_exporting_openapi_then_the_worker_contract_is_
 fn given_a_control_store_when_running_server_migrate_then_dry_run_lists_and_migrate_applies() {
     let test_cases = [
         StoreMigrationCommandTestCase {
-            description: "dry run on an empty store",
+            description: "dry run without a store creates nothing",
             arguments: &["server", "migrate", "--dry-run"],
-            expected_stdout: "The control store is empty: would create schema version 1.\n",
+            expected_stdout: "No control store at ./.sqlbuild/control.sqlite3: would create one.\n",
+            expected_store: false,
         },
         StoreMigrationCommandTestCase {
             description: "migrate an empty store",
             arguments: &["server", "migrate"],
             expected_stdout: "The control store is empty: created schema version 1.\n",
+            expected_store: true,
         },
         StoreMigrationCommandTestCase {
             description: "dry run on a current store",
             arguments: &["server", "migrate", "--dry-run"],
             expected_stdout: "The control store is at schema version 1: nothing to migrate.\n",
+            expected_store: true,
         },
     ];
     let directory = tempfile::tempdir().expect("isolated CLI directory");
@@ -399,9 +402,14 @@ fn given_a_control_store_when_running_server_migrate_then_dry_run_lists_and_migr
         assert_eq!(
             (
                 output.status.success(),
-                String::from_utf8_lossy(&output.stdout).into_owned()
+                String::from_utf8_lossy(&output.stdout).into_owned(),
+                directory.path().join(".sqlbuild/control.sqlite3").exists(),
             ),
-            (true, test_case.expected_stdout.to_owned()),
+            (
+                true,
+                test_case.expected_stdout.to_owned(),
+                test_case.expected_store
+            ),
             "{}: {}",
             test_case.description,
             String::from_utf8_lossy(&output.stderr)
