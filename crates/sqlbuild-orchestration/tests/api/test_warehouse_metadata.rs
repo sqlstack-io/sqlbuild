@@ -1,6 +1,7 @@
 //! A scoped HTTP reader mirrors immutable warehouse observations, including external runs.
 
 use chrono::{DateTime, Duration, Utc};
+use futures_util::future::BoxFuture;
 use reqwest::StatusCode;
 use serde_json::json;
 use sqlbuild_core::constants::STATE_TABLE_NAMES;
@@ -20,16 +21,20 @@ use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::errors::ControlError;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
-use crate::store::models::TransactionMode;
+use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest::ingest_audit_results::ingest_audit_results;
-use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
+use crate::warehouse_metadata::main::ingest::ingest_resource_costs::ingest_resource_costs;
+use crate::warehouse_metadata::models::{
+    MetadataBatch, WarehouseHistoryKind, WarehouseSyncResponse,
+};
 
 #[test]
 fn given_state_tables_when_classified_then_each_is_mirrored_by_exactly_one_kind() {
@@ -453,40 +458,116 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
 fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_row_is_kept() {
     let test_cases = [
         MirrorConflictTestCase {
-            description: "SQLite: page two's earlier row arrives second",
+            description: "SQLite audit results: page two's earlier row arrives second",
             backend: Backend::Sqlite,
+            kind: WarehouseHistoryKind::AuditResults,
+            fixture: "audit_result_history.json",
+            fields: ["result_id", "occurred_at", "outcome"],
+            ingest: audit_page,
             rows: [
                 ("2026-02-03T04:05:06.000001Z", "pass"),
                 ("2026-02-03T04:05:06Z", "pass"),
             ],
             expected_row: ("2026-02-03T04:05:06Z", "pass"),
+            expected_column: Some("pass"),
         },
         MirrorConflictTestCase {
-            description: "SQLite: two rows at the same time",
+            description: "SQLite audit results: two rows at the same time",
             backend: Backend::Sqlite,
+            kind: WarehouseHistoryKind::AuditResults,
+            fixture: "audit_result_history.json",
+            fields: ["result_id", "occurred_at", "outcome"],
+            ingest: audit_page,
             rows: [
                 ("2026-02-03T04:05:06Z", "pass"),
                 ("2026-02-03T04:05:06Z", "error"),
             ],
             expected_row: ("2026-02-03T04:05:06Z", "error"),
+            expected_column: Some("error"),
         },
         MirrorConflictTestCase {
-            description: "PostgreSQL: page two's earlier row arrives second",
+            description: "SQLite resource costs: a refreshed observation keeps the later row",
+            backend: Backend::Sqlite,
+            kind: WarehouseHistoryKind::ResourceCosts,
+            fixture: "resource_cost_history.json",
+            fields: ["observation_id", "observed_at", "status"],
+            ingest: cost_page,
+            rows: [
+                ("2026-02-03T04:05:06Z", "partial"),
+                ("2026-02-03T04:05:06.000001Z", "complete"),
+            ],
+            expected_row: ("2026-02-03T04:05:06.000001Z", "complete"),
+            expected_column: None,
+        },
+        MirrorConflictTestCase {
+            description: "SQLite resource costs: two rows at the same time",
+            backend: Backend::Sqlite,
+            kind: WarehouseHistoryKind::ResourceCosts,
+            fixture: "resource_cost_history.json",
+            fields: ["observation_id", "observed_at", "status"],
+            ingest: cost_page,
+            rows: [
+                ("2026-02-03T04:05:06Z", "partial"),
+                ("2026-02-03T04:05:06Z", "complete"),
+            ],
+            expected_row: ("2026-02-03T04:05:06Z", "complete"),
+            expected_column: None,
+        },
+        MirrorConflictTestCase {
+            description: "PostgreSQL audit results: page two's earlier row arrives second",
             backend: Backend::Postgres,
+            kind: WarehouseHistoryKind::AuditResults,
+            fixture: "audit_result_history.json",
+            fields: ["result_id", "occurred_at", "outcome"],
+            ingest: audit_page,
             rows: [
                 ("2026-02-03T04:05:06.000001Z", "pass"),
                 ("2026-02-03T04:05:06Z", "pass"),
             ],
             expected_row: ("2026-02-03T04:05:06Z", "pass"),
+            expected_column: Some("pass"),
         },
         MirrorConflictTestCase {
-            description: "PostgreSQL: two rows at the same time",
+            description: "PostgreSQL audit results: two rows at the same time",
             backend: Backend::Postgres,
+            kind: WarehouseHistoryKind::AuditResults,
+            fixture: "audit_result_history.json",
+            fields: ["result_id", "occurred_at", "outcome"],
+            ingest: audit_page,
             rows: [
                 ("2026-02-03T04:05:06Z", "pass"),
                 ("2026-02-03T04:05:06Z", "error"),
             ],
             expected_row: ("2026-02-03T04:05:06Z", "error"),
+            expected_column: Some("error"),
+        },
+        MirrorConflictTestCase {
+            description: "PostgreSQL resource costs: a refreshed observation keeps the later row",
+            backend: Backend::Postgres,
+            kind: WarehouseHistoryKind::ResourceCosts,
+            fixture: "resource_cost_history.json",
+            fields: ["observation_id", "observed_at", "status"],
+            ingest: cost_page,
+            rows: [
+                ("2026-02-03T04:05:06Z", "partial"),
+                ("2026-02-03T04:05:06.000001Z", "complete"),
+            ],
+            expected_row: ("2026-02-03T04:05:06.000001Z", "complete"),
+            expected_column: None,
+        },
+        MirrorConflictTestCase {
+            description: "PostgreSQL resource costs: two rows at the same time",
+            backend: Backend::Postgres,
+            kind: WarehouseHistoryKind::ResourceCosts,
+            fixture: "resource_cost_history.json",
+            fields: ["observation_id", "observed_at", "status"],
+            ingest: cost_page,
+            rows: [
+                ("2026-02-03T04:05:06Z", "partial"),
+                ("2026-02-03T04:05:06Z", "complete"),
+            ],
+            expected_row: ("2026-02-03T04:05:06Z", "complete"),
+            expected_column: None,
         },
     ];
     for test_case in test_cases {
@@ -496,66 +577,65 @@ fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_
             };
             let store = &fixture_store.store;
             let (location, session_id) = seed_target(store).await;
-            let base = fixture("audit_result_history.json")["record"].clone();
+            let [id_field, time_field, value_field] = test_case.fields;
+            let base = fixture(test_case.fixture)["record"].clone();
+            let record = |id: &str, (time, value): (&str, &str)| {
+                let mut record = base.clone();
+                record[id_field] = json!(id);
+                record[time_field] = json!(time);
+                record[value_field] = json!(value);
+                record
+            };
+            let page = |record| {
+                let page = batch(session_id, test_case.kind.as_str(), vec![record]);
+                async move {
+                    (test_case.ingest)(store, (location, "development"), &page)
+                        .await
+                        .expect("one page")
+                        .applied
+                }
+            };
             for (order, rows) in [
                 ("arrival order", test_case.rows),
                 ("reverse order", [test_case.rows[1], test_case.rows[0]]),
             ] {
-                for (occurred_at, outcome) in rows {
-                    let mut record = base.clone();
-                    record["result_id"] = json!(order);
-                    record["occurred_at"] = json!(occurred_at);
-                    record["outcome"] = json!(outcome);
-                    ingest_audit_results(
-                        store,
-                        (location, "development"),
-                        &batch(session_id, "audit_results", vec![record]),
-                    )
-                    .await
-                    .expect("one page");
+                for row in rows {
+                    page(record(order, row)).await;
                 }
             }
-            let mut kept_record = base.clone();
-            kept_record["result_id"] = json!("arrival order");
-            kept_record["occurred_at"] = json!(test_case.expected_row.0);
-            kept_record["outcome"] = json!(test_case.expected_row.1);
             assert!(
-                !ingest_audit_results(
-                    store,
-                    (location, "development"),
-                    &batch(session_id, "audit_results", vec![kept_record]),
-                )
-                .await
-                .expect("repeated page")
-                .applied,
+                !page(record("arrival order", test_case.expected_row)).await,
                 "{}: re-sending the kept row changes nothing",
                 test_case.description
             );
             let (transaction, rows) = query(
                 begin(store, TransactionMode::Read).await.expect("read"),
-                "SELECT record_json, observed_at, outcome FROM sqb_warehouse_audit_results",
+                &format!("SELECT * FROM {}", test_case.kind.mirror_table()),
                 vec![],
             )
             .await
-            .expect("mirrored results");
+            .expect("mirrored rows");
             commit(transaction).await.expect("close read");
-            let mut kept: Vec<(String, DateTime<Utc>, String, DateTime<Utc>, String)> = rows
-                .iter()
-                .map(|row| {
-                    let record = &row["record_json"];
-                    (
-                        record["result_id"].as_str().expect("id").to_owned(),
-                        record["occurred_at"]
-                            .as_str()
-                            .expect("time")
-                            .parse()
-                            .expect("RFC 3339"),
-                        record["outcome"].as_str().expect("outcome").to_owned(),
-                        serde_json::from_value(row["observed_at"].clone()).expect("column time"),
-                        row["outcome"].as_str().expect("column outcome").to_owned(),
-                    )
-                })
-                .collect();
+            let mut kept: Vec<(String, DateTime<Utc>, String, DateTime<Utc>, Option<String>)> =
+                rows.iter()
+                    .map(|row| {
+                        let record = &row["record_json"];
+                        (
+                            record[id_field].as_str().expect("id").to_owned(),
+                            record[time_field]
+                                .as_str()
+                                .expect("time")
+                                .parse()
+                                .expect("RFC 3339"),
+                            record[value_field].as_str().expect("value").to_owned(),
+                            serde_json::from_value(row["observed_at"].clone())
+                                .expect("column time"),
+                            row.get(value_field)
+                                .and_then(|value| value.as_str())
+                                .map(str::to_owned),
+                        )
+                    })
+                    .collect();
             kept.sort();
             let expected_at: DateTime<Utc> = test_case.expected_row.0.parse().expect("RFC 3339");
             assert_eq!(
@@ -565,12 +645,28 @@ fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_
                     expected_at,
                     test_case.expected_row.1.to_owned(),
                     expected_at,
-                    test_case.expected_row.1.to_owned()
+                    test_case.expected_column.map(str::to_owned)
                 )),
-                "{}: the earliest row, then the smallest record, wins whichever page lands first",
+                "{}: the kind's winning time, then the smallest record, wins whichever page lands first",
                 test_case.description
             );
             close_test_store(fixture_store).await;
         });
     }
+}
+
+fn audit_page<'a>(
+    store: &'a ControlStore,
+    scope: (Uuid, &'a str),
+    page: &'a MetadataBatch,
+) -> BoxFuture<'a, Result<WarehouseSyncResponse, ControlError>> {
+    Box::pin(ingest_audit_results(store, scope, page))
+}
+
+fn cost_page<'a>(
+    store: &'a ControlStore,
+    scope: (Uuid, &'a str),
+    page: &'a MetadataBatch,
+) -> BoxFuture<'a, Result<WarehouseSyncResponse, ControlError>> {
+    Box::pin(ingest_resource_costs(store, scope, page))
 }

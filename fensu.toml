@@ -1953,7 +1953,7 @@ reason = "Every native entry point installs the build identity before anything r
 rule = "FPRSS130"
 path = "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connection.rs"
 symbols = ["connection_config"]
-reason = "The Snowflake-like keys warning prints once per process, which is process state by definition: a command resolves its connection at startup for provider setup and again for its own work. Threading a flag through the 17 callers would not guarantee once per process. Kevin approved this exception, for this module only, on 17 Nov."
+reason = "A once-per-process warning is process state by definition: a command resolves its connection at startup for provider setup and again for its own work, and threading a flag through every caller would not guarantee once. Approved 17 Nov for this module only."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
