@@ -126,11 +126,13 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     if unlisted.is_empty() {
         return Ok(());
     }
-    let relations: Vec<Bound<'py, PyAny>> = unlisted
-        .iter()
-        .map(|(_, entry, _)| read_relation(dialect, entry))
-        .collect::<PyResult<_>>()?;
-    let Read::Known(probes) = reads.get().reads().read_access(py, relations)? else {
+    let relations = || -> PyResult<Vec<Bound<'py, PyAny>>> {
+        unlisted
+            .iter()
+            .map(|(_, entry, _)| read_relation(dialect, entry))
+            .collect()
+    };
+    let Read::Known(probes) = reads.get().reads().read_access(py, &relations)? else {
         return Ok(());
     };
     let mut missing: Vec<_> = Vec::new();

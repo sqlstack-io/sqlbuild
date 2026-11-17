@@ -300,7 +300,7 @@ impl WarehouseReads for SyncedReads {
     fn cursor_bounds<'py>(
         &self,
         _py: Python<'py>,
-        _statements: Vec<String>,
+        _statements: &dyn Fn() -> PyResult<Vec<String>>,
         _progress: &dyn CursorProgress<'py>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>> {
         Ok(Read::Unknown(CURSOR_INPUTS.into()))
@@ -360,7 +360,7 @@ impl WarehouseReads for SyncedReads {
     fn read_access<'py>(
         &self,
         _py: Python<'py>,
-        _relations: Vec<Bound<'py, PyAny>>,
+        _relations: &dyn Fn() -> PyResult<Vec<Bound<'py, PyAny>>>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>> {
         Ok(unknown(self, "read access to these sources"))
     }

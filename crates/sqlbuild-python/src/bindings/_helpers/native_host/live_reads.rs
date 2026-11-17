@@ -396,9 +396,10 @@ impl WarehouseReads for LiveReads {
     fn cursor_bounds<'py>(
         &self,
         py: Python<'py>,
-        statements: Vec<String>,
+        statements: &dyn Fn() -> PyResult<Vec<String>>,
         progress: &dyn CursorProgress<'py>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>> {
+        let statements: Vec<String> = statements()?;
         let connection: Bound<'py, PyAny> = self.connection(py);
         let execute: Bound<'py, PyAny> = self.method(py, "execute")?;
         let concurrency: i64 = self.inspection_concurrency(py)?;
@@ -474,8 +475,9 @@ impl WarehouseReads for LiveReads {
     fn read_access<'py>(
         &self,
         py: Python<'py>,
-        relations: Vec<Bound<'py, PyAny>>,
+        relations: &dyn Fn() -> PyResult<Vec<Bound<'py, PyAny>>>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>> {
+        let relations: Vec<Bound<'py, PyAny>> = relations()?;
         let probe: Bound<'py, PyAny> = self.method(py, "probe_relation_read")?;
         let partial: Bound<'py, PyAny> = imported(py, "functools", "partial")?;
         let tasks: Vec<Bound<'py, PyAny>> = relations

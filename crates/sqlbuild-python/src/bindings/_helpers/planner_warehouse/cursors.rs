@@ -731,16 +731,19 @@ fn execute_queries<'py>(
     queries: &[PhysicalCursorQuery],
 ) -> PyResult<Option<(Values<'py>, HashSet<String>)>> {
     let py = request.project.py();
-    let statements: Vec<String> = queries
-        .iter()
-        .map(|query| dialect_cursor_sql(&request.dialect, query))
-        .collect::<PyResult<_>>()?;
+    let statements = || -> PyResult<Vec<String>> {
+        queries
+            .iter()
+            .map(|query| dialect_cursor_sql(&request.dialect, query))
+            .collect()
+    };
     let progress = (queries, &request.on_progress);
-    let Read::Known(outcomes) = request
-        .reads
-        .get()
-        .reads()
-        .cursor_bounds(py, statements, &progress)?
+    let Read::Known(outcomes) =
+        request
+            .reads
+            .get()
+            .reads()
+            .cursor_bounds(py, &statements, &progress)?
     else {
         return Ok(None);
     };

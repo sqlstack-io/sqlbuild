@@ -92,11 +92,11 @@ pub(crate) trait WarehouseReads: Send + Sync {
     /// Whether listing by schema and name finds relations a name-only listing would.
     fn lists_by_schema(&self, py: Python<'_>) -> PyResult<bool>;
 
-    /// Each cursor bound statement's `(row, seconds, error)`; inputs read when the run starts.
+    /// Each statement's `(row, seconds, error)`; `statements` renders SQL only for reads that run it.
     fn cursor_bounds<'py>(
         &self,
         py: Python<'py>,
-        statements: Vec<String>,
+        statements: &dyn Fn() -> PyResult<Vec<String>>,
         progress: &dyn CursorProgress<'py>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>>;
 
@@ -124,11 +124,11 @@ pub(crate) trait WarehouseReads: Send + Sync {
         sql: &str,
     ) -> PyResult<Read<Vec<String>>>;
 
-    /// Whether each relation can be read, as `RelationReadProbe`s in order.
+    /// Whether each relation `relations` renders can be read, as `RelationReadProbe`s in order.
     fn read_access<'py>(
         &self,
         py: Python<'py>,
-        relations: Vec<Bound<'py, PyAny>>,
+        relations: &dyn Fn() -> PyResult<Vec<Bound<'py, PyAny>>>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>>;
 
     /// The latest recorded source freshness of `(database, schema)`, as a latest-records read.
