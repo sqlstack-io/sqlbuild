@@ -94,6 +94,7 @@ class PlanTimingsE2ETestCase:
     plan_args: tuple[str, ...]
     expected_first_step: str
     expected_last_step: str
+    expected_steps: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
