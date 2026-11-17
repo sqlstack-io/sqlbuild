@@ -15,7 +15,6 @@ use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
 use crate::bindings::_helpers::native_host::setup_context::invocation_setup_context;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -30,6 +29,7 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_output::event_exporting::models::EventExporterDispatcher;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::result_output::main::events::terminal_event_index_scope::terminal_event_index_scope;
 use sqlbuild_python_output::result_output::models::TerminalEventIndex;

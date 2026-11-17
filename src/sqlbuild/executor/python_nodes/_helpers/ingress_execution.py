@@ -22,11 +22,11 @@ from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecord
 from sqlbuild.compiler.python_nodes.types import PythonNodeKind, PythonNodeStatus, SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.load.main._execute import execute_source_load
+from sqlbuild.executor.load.main._persist_result import persist_loader_result
 from sqlbuild.executor.load.main._resource_kind import load_resource_kind
 from sqlbuild.executor.load.main._skipped_result import skipped_load_result
 from sqlbuild.executor.load.models import LoadExecutionResult, LoadRuntimeParams
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
-from sqlbuild.executor.node_results.models import NodeResultRecord
 from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
@@ -99,6 +99,7 @@ def execute_ingress_python_loader_nodes(
                 connection=runtime.connection,
                 database=runtime.default_database,
                 schema=runtime.default_schema,
+                target_config=runtime.target_config,
             )
             if runtime.persist_node_results
             else None
@@ -284,6 +285,8 @@ def _execute_ingress_loader(
                     run_id=runtime.run_id,
                     target=runtime.target,
                     target_config=runtime.target_config,
+                    default_database=runtime.default_database,
+                    default_schema=runtime.default_schema,
                     vars=runtime.vars,
                     is_reload=runtime.is_reload,
                     start_cursor_ts=runtime.start_cursor_ts,
@@ -303,7 +306,7 @@ def _execute_ingress_loader(
                 source_ref_entries=source_map,
             )
             results.record_load_result(name=node.name, result=result)
-            _persist_loader_result(
+            persist_loader_result(
                 result_store=runtime.result_store,
                 loader_name=loader.name,
                 result=result,
@@ -320,8 +323,8 @@ def _execute_ingress_loader(
                         adapter=runtime.adapter,
                         connection=runtime.connection,
                         run_id=runtime.run_id,
-                        database=runtime.adapter.default_database(),
-                        schema=runtime.adapter.default_schema(),
+                        database=runtime.default_database,
+                        schema=runtime.default_schema,
                         target_name=source_entry.name,
                     )
         if attempt is not None and result.status == ExecutionStatus.FAILED:
@@ -334,38 +337,6 @@ def _execute_ingress_loader(
     if callbacks.on_node_complete is not None:
         callbacks.on_node_complete(result)
     return _load_result_to_lifecycle_result(node_name=node.name, result=result)
-
-
-def _persist_loader_result(
-    *,
-    result_store: Any | None,
-    loader_name: str,
-    result: LoadExecutionResult,
-    run_id: str,
-) -> None:
-    if result_store is None:
-        return
-    result_store.write(
-        NodeResultRecord(
-            node_type=PythonNodeKind.LOADER.value,
-            node_name=loader_name,
-            target_database=result_store.database,
-            target_schema=result_store.schema,
-            target_name=None,
-            run_id=run_id,
-            status=result.status.value,
-            payload=result.result_payload,
-            metadata={
-                "source_name": result.source_name,
-                "loader_name": result.loader_name,
-                "rows_loaded": result.rows_loaded,
-                "target": result.target,
-                **result.result_metadata,
-            },
-            error_message=result.error_message or result.skip_reason,
-            materialized=result.result_materialized,
-        )
-    )
 
 
 def _record_scheduler_skips(
@@ -403,7 +374,7 @@ def _record_scheduler_skips(
                         resource_name=result.name,
                         phase="finalize",
                     ):
-                        _persist_loader_result(
+                        persist_loader_result(
                             result_store=result_store,
                             loader_name=result.name,
                             result=skipped_result,

@@ -1,5 +1,6 @@
 //! Public records of compile driver.
 
+use crate::compile_driver::_helpers::setup::model_free_locations::model_free_locations;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -67,8 +68,8 @@ impl InputsRequest {
     }
 }
 
-/// The active target's locations as SQLBuild resolves them; `preserve` stays as written until `record`.
-#[derive(Debug, Clone)]
+/// The active target's locations as SQLBuild resolves them (default: unset); `preserve` stays as written until `record`.
+#[derive(Debug, Clone, Default)]
 pub struct TargetSettingsValues {
     pub(crate) name: Option<String>,
     pub(crate) database: Option<String>,
@@ -77,6 +78,40 @@ pub struct TargetSettingsValues {
 }
 
 impl TargetSettingsValues {
+    /// The resolved schema managed loader data goes to.
+    #[must_use]
+    pub fn loader_schema(&self) -> Option<&str> {
+        self.loader_schema.as_deref()
+    }
+
+    /// Python nodes' `(database, schema)` under these settings, as `model_free_locations` picks.
+    pub fn node_locations<'py>(
+        &self,
+        adapter: &Bound<'py, PyAny>,
+    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+        let py: Python<'py> = adapter.py();
+        self.node_locations_from(
+            (
+                &self.database.as_deref().into_bound_py_any(py)?,
+                &self.schema.as_deref().into_bound_py_any(py)?,
+            ),
+            adapter,
+        )
+    }
+
+    /// `node_locations` from a caller-resolved `(database, schema)`, such as `sqb load`'s, which applies CLI vars.
+    pub fn node_locations_from<'py>(
+        &self,
+        (database, schema): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+        adapter: &Bound<'py, PyAny>,
+    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+        model_free_locations(
+            (database.clone(), schema.clone()),
+            self.loader_schema(),
+            adapter,
+        )
+    }
+
     /// The `TargetSettings` record: a `preserve` location reads `None` with its flag set.
     pub fn record<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let located = |value: &Option<String>| -> PyResult<Bound<'py, PyAny>> {

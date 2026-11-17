@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.240.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.239.0...v0.240.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* a preserve target with Python loaders, tasks, assets or checks now needs loader_schema, which is where their results are kept. Without it, compile fails with S105, which says to set targets.<name>.loader_schema.
+
+### Bug Fixes
+
+* keep Python node results in one location per target ([#1551](https://github.com/sqlstack-io/sqlbuild/issues/1551)) ([0fc54fa](https://github.com/sqlstack-io/sqlbuild/commit/0fc54faac7f5c8a96c704bd8da58b9ebcfdc3d79))
+
+## [0.239.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.2...v0.239.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* the dlt and ingestr integrations are removed. A project that declares `dlt_sources` or a source `ingestr` block no longer compiles; declare the source with `managed: true` and load it with a Python `@loader` named after the source. The `dlt` and `ingestr` package extras no longer exist.
+
+### Features
+
+* remove the dlt and ingestr integrations ([#1554](https://github.com/sqlstack-io/sqlbuild/issues/1554)) ([75d213e](https://github.com/sqlstack-io/sqlbuild/commit/75d213e7d6ba694520467855060bdbf3bb151142))
+
+## [0.238.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.1...v0.238.2) (2026-11-17)
+
+
+### Performance Improvements
+
+* **compile:** stop repeating per-call SQL macro work ([#1549](https://github.com/sqlstack-io/sqlbuild/issues/1549)) ([4740e84](https://github.com/sqlstack-io/sqlbuild/commit/4740e84b4533d1459d03dafa0e820bffd1b4f814))
+
+## [0.238.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.238.0...v0.238.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **rules:** report custom rule node findings at model file positions ([#1546](https://github.com/sqlstack-io/sqlbuild/issues/1546)) ([48e4132](https://github.com/sqlstack-io/sqlbuild/commit/48e4132371aa42374dc2b41cf98ee4f6d7519031))
+
 ## [0.238.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.237.0...v0.238.0) (2026-11-17)
 
 

@@ -431,6 +431,7 @@ impl<'py> FactReplay<'py> {
                     JsonValue::Array(vec![
                         JsonValue::String(authored),
                         JsonValue::String(expanded),
+                        JsonValue::String(view.query_place(py)?),
                     ])
                 }
                 None => {

@@ -17,6 +17,7 @@ DOTTED_SETTING_INSTRUCTION_PATTERN: re.Pattern[str] = re.compile(
 )
 YAML_FILE_TEXT_MODULES: frozenset[str] = frozenset(
     {
+        "crates/sqlbuild-discovery/src/yaml_entries/_helpers/removed_integrations.rs",
         "crates/sqlbuild-discovery/src/yaml_entries/_helpers/sources.rs",
     }
 )

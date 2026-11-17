@@ -446,6 +446,11 @@ fn read_side_references<'py>(
 fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = inputs.adapter.py();
     let project: Bound<'py, PyAny> = native_field(&inputs.pipeline_result, "project")?;
+    let (default_database, default_schema) = inputs
+        .target_config
+        .clone()
+        .unwrap_or_default()
+        .node_locations(&inputs.adapter)?;
     call_with(
         &host_entry(py, ExecutorHost::PythonNodeRuntime)?,
         &[
@@ -463,14 +468,8 @@ fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>
                     None => py.None().into_bound(py),
                 },
             ),
-            (
-                "default_database",
-                inputs.adapter.call_method0("default_database")?,
-            ),
-            (
-                "default_schema",
-                inputs.adapter.call_method0("default_schema")?,
-            ),
+            ("default_database", default_database),
+            ("default_schema", default_schema),
             ("relation_targets", inputs.relation_targets.clone()),
             ("project_relations", inputs.project_relations.clone()),
             ("providers", inputs.providers.clone()),

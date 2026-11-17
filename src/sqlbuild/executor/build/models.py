@@ -81,6 +81,8 @@ class BuildRuntimeParams:
     end_cursor_int: int | None = None
     target: str = ""
     target_config: TargetSettings | None = None
+    default_database: str | None = None
+    default_schema: str | None = None
     effective_vars: dict[str, object] | None = None
     use_color: bool = False
     providers: ProviderContainer | None = None

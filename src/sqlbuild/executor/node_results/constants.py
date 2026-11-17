@@ -43,3 +43,4 @@ RESULT_DEPENDENCY_ATTRIBUTES: tuple[tuple[str, str], ...] = (
     ("__sqlbuild_asset__", PythonNodeKind.ASSET.value),
     ("__sqlbuild_loader__", PythonNodeKind.LOADER.value),
 )
+PRESERVED_SCHEMA_NAME: str = "preserve"

@@ -128,7 +128,9 @@ counts the downstream uses that weren't checked. Independent errors elsewhere ar
 ## Turning analysis off
 
 To skip SQL analysis for one model, use `MODEL (sql_analysis false)`, a path default, or
-`--no-sql-analysis` for a run. This also turns off type inference and lineage for that model.
+`--no-sql-analysis` for a run. This also turns off type inference for that model. Column
+lineage still runs; to turn it off, use `--lineage-mode none` (see
+[Column lineage modes](/docs/cli/compile#column-lineage-modes)).
 To allow those opt-outs only for SQL the parser can't read, set
 `[settings] require_sql_analysis = true`; see
 [Requiring SQL analysis](/docs/concepts/models/configuration#requiring-sql-analysis).

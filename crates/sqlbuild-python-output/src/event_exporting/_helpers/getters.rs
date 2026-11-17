@@ -3,49 +3,15 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
+use crate::event_exporting::models::EventExporterDispatcher;
 use sqlbuild_python_base::event_exporting::models::BoundEventExporter;
 use sqlbuild_python_base::event_exporting::models::EventExportSummary;
 use sqlbuild_python_base::event_exporting::models::EventExporterAccounting;
 use sqlbuild_python_base::event_exporting::models::EventExporterCommandScope;
 use sqlbuild_python_base::event_exporting::models::EventExporterCounts;
 use sqlbuild_python_base::event_exporting::models::EventExporterFailure;
-use sqlbuild_python_base::records::main::registry::class_of::class_of;
-use sqlbuild_python_base::records::models::GetterEntry;
 
-/// The getter readers of this module's native pyclasses.
-pub(crate) const GETTERS: &[GetterEntry] = &[
-    GetterEntry {
-        class: class_of::<EventExporterDispatcher>,
-        read: read_event_exporter_dispatcher,
-    },
-    GetterEntry {
-        class: class_of::<BoundEventExporter>,
-        read: read_bound_event_exporter,
-    },
-    GetterEntry {
-        class: class_of::<EventExportSummary>,
-        read: read_event_export_summary,
-    },
-    GetterEntry {
-        class: class_of::<EventExporterAccounting>,
-        read: read_event_exporter_accounting,
-    },
-    GetterEntry {
-        class: class_of::<EventExporterCounts>,
-        read: read_event_exporter_counts,
-    },
-    GetterEntry {
-        class: class_of::<EventExporterFailure>,
-        read: read_event_exporter_failure,
-    },
-    GetterEntry {
-        class: class_of::<EventExporterCommandScope>,
-        read: read_event_exporter_command_scope,
-    },
-];
-
-fn read_event_exporter_dispatcher<'py>(
+pub(crate) fn read_event_exporter_dispatcher<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {
@@ -63,7 +29,7 @@ fn read_event_exporter_dispatcher<'py>(
     })
 }
 
-fn read_bound_event_exporter<'py>(
+pub(crate) fn read_bound_event_exporter<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {
@@ -88,7 +54,7 @@ fn read_bound_event_exporter<'py>(
     })
 }
 
-fn read_event_export_summary<'py>(
+pub(crate) fn read_event_export_summary<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {
@@ -116,7 +82,7 @@ fn read_event_export_summary<'py>(
     })
 }
 
-fn read_event_exporter_accounting<'py>(
+pub(crate) fn read_event_exporter_accounting<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {
@@ -134,7 +100,7 @@ fn read_event_exporter_accounting<'py>(
     })
 }
 
-fn read_event_exporter_counts<'py>(
+pub(crate) fn read_event_exporter_counts<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {
@@ -155,7 +121,7 @@ fn read_event_exporter_counts<'py>(
     })
 }
 
-fn read_event_exporter_failure<'py>(
+pub(crate) fn read_event_exporter_failure<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {
@@ -177,7 +143,7 @@ fn read_event_exporter_failure<'py>(
     })
 }
 
-fn read_event_exporter_command_scope<'py>(
+pub(crate) fn read_event_exporter_command_scope<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {

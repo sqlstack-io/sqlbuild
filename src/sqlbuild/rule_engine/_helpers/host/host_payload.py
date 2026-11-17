@@ -101,6 +101,10 @@ class _HostModel:
     def query_sql(self) -> str:
         return self._payload.value(self._entry["query"])
 
+    @cached_property
+    def query_place(self) -> str | None:
+        return self._payload.value(self._entry["place"])
+
     def config_value(self, name: str) -> object:
         """Return `config.values.get(name)` for one config value rule facts read."""
 

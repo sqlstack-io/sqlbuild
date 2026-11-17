@@ -21,6 +21,7 @@ _PRESERVED_TARGET_PROJECT: str = (
     'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
     '[connection]\ndatabase = "dev.duckdb"\n\n'
     '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
+    'loader_schema = "landing"\n'
 )
 
 

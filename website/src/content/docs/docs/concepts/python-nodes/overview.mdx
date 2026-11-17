@@ -195,7 +195,19 @@ Within one run, downstream nodes run only if at least one upstream succeeded. If
 
 ## Result persistence
 
-Node results (payload, metadata, status, errors) are persisted after each execution. Results are stored in `_sqlbuild_node_results` in the warehouse alongside your data. Results persist across runs, so they are available for observability, debugging, and downstream consumption.
+Node results (payload, metadata, status, errors) are persisted after each execution in a
+`_sqlbuild_node_results` table. Results persist across runs, so they are available for
+observability, debugging, and downstream consumption through `ctx.result_of`.
+
+Results of loaders, tasks, assets and checks all go to one schema, chosen by the target's `schema`:
+
+| Target `schema` | Results table schema |
+|-----------------|----------------------|
+| A schema name, such as `analytics` | That schema, in the target's database |
+| `preserve` | The target's `loader_schema`; commands that compile the project stop with `S105` until it is set |
+| Unset, or resolved per model, such as `${CTX:...}` | The adapter's default schema, such as `main` on DuckDB or `public` on PostgreSQL |
+
+A target `database` of `preserve` keeps results in the connection's database.
 
 ## Selection
 

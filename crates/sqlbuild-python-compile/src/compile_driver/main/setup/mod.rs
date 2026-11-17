@@ -11,7 +11,6 @@ pub mod compile_project_phase;
 pub mod compiled_phase;
 pub mod expanded_loader_namespace;
 pub mod managed_write_schema;
-pub mod model_free_locations;
 pub mod plan_has_executable_work;
 pub mod preserved_loader_schemas;
 pub mod progress;

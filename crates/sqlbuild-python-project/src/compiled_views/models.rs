@@ -1,5 +1,8 @@
 //! Public records of compiled views.
 
+use sqlbuild_rules::engine::main::model_query_place::model_query_place;
+use sqlbuild_rules::models::ModelQueryPlace;
+
 use crate::compiled_project::main::reference_row_tuple::reference_row_tuple;
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_project::models::ReferenceTuple;
@@ -420,12 +423,23 @@ impl NativeCompiledModel {
 
     /// The model's authored file text and expanded query, from its recorded facts.
     pub fn sql_texts(&self, py: Python<'_>) -> PyResult<(String, String)> {
+        self.with_facts(py, |facts| {
+            (facts.authored_sql.to_string(), facts.query_sql.to_string())
+        })
+    }
+
+    /// `read` applied to the model's recorded facts.
+    pub fn with_facts<T>(
+        &self,
+        py: Python<'_>,
+        read: impl FnOnce(&CompiledModelFacts) -> T,
+    ) -> PyResult<T> {
         let name: String = self.name(py)?;
         let owner = self.owner.bind(py).borrow();
         let facts: &CompiledModelFacts = model_facts(owner.facts(), &name).ok_or_else(|| {
             pyo3::exceptions::PyRuntimeError::new_err("the model was not assembled")
         })?;
-        Ok((facts.authored_sql.to_string(), facts.query_sql.to_string()))
+        Ok(read(facts))
     }
 
     pub(crate) fn model_file<T>(
@@ -683,6 +697,14 @@ impl NativeCompiledModel {
     #[getter]
     pub fn authored_sql<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
         self.model_file(py, |file| Ok(file.contents(py)))
+    }
+
+    /// Where the expanded query sits in the model file, as JSON a rule's SQL document maps positions through.
+    #[getter]
+    pub fn query_place(&self, py: Python<'_>) -> PyResult<String> {
+        let place: ModelQueryPlace = self.with_facts(py, model_query_place)?;
+        serde_json::to_string(&place)
+            .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))
     }
 
     #[getter]
