@@ -235,7 +235,11 @@ fn execution_changes(node: &NodeFacts, context: &Context<'_>, window: &Window<'_
     let mut changes: Vec<Change> = Vec::new();
     for execution in window.executions {
         if !execution.complete {
-            return vec![always(RunReason::Unfinished)];
+            return vec![always(if execution.replaced {
+                RunReason::NoRecord
+            } else {
+                RunReason::Unfinished
+            })];
         }
         if execution.version_hash.as_deref() != Some(node.version_hash.as_str()) {
             changes.push(definition(RunReason::DefinitionChanged));
