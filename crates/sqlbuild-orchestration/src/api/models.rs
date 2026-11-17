@@ -315,6 +315,10 @@ pub(crate) struct BrowserOrigin(pub(crate) String);
 #[serde(deny_unknown_fields)]
 pub struct TrustedProxyAuthentication {
     pub origin: String,
+    /// The proxy's addresses; both loopback addresses when unset, for a proxy on the same host.
+    #[serde(
+        default = "crate::api::_helpers::authentication::proxy_settings::default_trusted_peers"
+    )]
     pub trusted_peers: std::collections::BTreeSet<std::net::IpAddr>,
     /// Usernames pre-bound to existing principals; a binding wins over provisioning.
     #[serde(default)]
@@ -359,9 +363,9 @@ pub(crate) struct ProxyProfile {
 #[derive(Clone, Debug)]
 pub(crate) struct ProxyLogoutUrl(pub(crate) String);
 
-/// Peers trusted to report the browser's host in `X-Forwarded-Host`, as a proxy that rewrites `Host` does.
+/// Peers whose requests a trusted proxy authenticated, under whatever host name it serves.
 #[derive(Clone, Debug)]
-pub(crate) struct ForwardedHostPeers(
+pub(crate) struct ProxyPeers(
     pub(crate) std::sync::Arc<std::collections::BTreeSet<std::net::IpAddr>>,
 );
 

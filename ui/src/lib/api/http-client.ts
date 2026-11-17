@@ -1274,13 +1274,16 @@ function errorText(error: unknown, response: Response): string {
 	return typeof message === 'string' ? message : `${response.status} ${response.statusText}`;
 }
 
-/** The CSRF token the server sets in a readable cookie at sign-in; writes send it back. */
+/** What writes send when no sign-in cookie holds a token: behind a trusted proxy, the header itself is the proof. */
+export const PROXY_CSRF_PROOF = 'trusted-proxy';
+
+/** The CSRF token the server sets in a readable cookie at sign-in, or the trusted-proxy proof; writes send it back. */
 export function csrfToken(cookies: string): string {
 	for (const cookie of cookies.split(';')) {
 		const [name, ...value] = cookie.trim().split('=');
 		if (name === '__Host-sqb-csrf') return value.join('=');
 	}
-	return '';
+	return PROXY_CSRF_PROOF;
 }
 
 /** Signs in with a password; resolves to whether the server accepted it. */

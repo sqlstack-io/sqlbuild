@@ -3,12 +3,13 @@
 use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 
-use crate::api::models::UnknownProxyUsers;
+use crate::api::models::{TrustedProxyAuthentication, UnknownProxyUsers};
 use crate::api::tests::helpers::stop_api;
 use crate::api::tests::proxy_provisioning_helpers::{
-    LOGOUT_URL, NAME_HEADER, ORIGIN, USER_HEADER, forwarded, rows, settings, start,
+    LOGOUT_URL, NAME_HEADER, ORIGIN, PUBLIC_HOST, USER_HEADER, forwarded, rows, settings, start,
 };
-use crate::api::tests::test_types::ProxyProvisioningTestCase;
+use crate::api::tests::test_types::{ProxyPeersDefaultTestCase, ProxyProvisioningTestCase};
+use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::tests::role_helpers::role_fixture;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::Parameter;
@@ -23,10 +24,13 @@ fn given_a_host_rewriting_http_proxy_when_people_sign_in_then_newcomers_become_v
             description: "SQLite proxy provisioning",
             backend: Backend::Sqlite,
             expected_refusals: [StatusCode::UNAUTHORIZED; 5],
+            expected_other_host_read: StatusCode::OK,
             expected_write_statuses: [
                 StatusCode::UNAUTHORIZED,
                 StatusCode::UNAUTHORIZED,
                 StatusCode::UNAUTHORIZED,
+                StatusCode::UNPROCESSABLE_ENTITY,
+                StatusCode::UNPROCESSABLE_ENTITY,
                 StatusCode::UNPROCESSABLE_ENTITY,
             ],
             expected_roles: r#"[{"role_key": "viewer", "location_id": null, "target": null}]"#,
@@ -36,10 +40,13 @@ fn given_a_host_rewriting_http_proxy_when_people_sign_in_then_newcomers_become_v
             description: "PostgreSQL proxy provisioning",
             backend: Backend::Postgres,
             expected_refusals: [StatusCode::UNAUTHORIZED; 5],
+            expected_other_host_read: StatusCode::OK,
             expected_write_statuses: [
                 StatusCode::UNAUTHORIZED,
                 StatusCode::UNAUTHORIZED,
                 StatusCode::UNAUTHORIZED,
+                StatusCode::UNPROCESSABLE_ENTITY,
+                StatusCode::UNPROCESSABLE_ENTITY,
                 StatusCode::UNPROCESSABLE_ENTITY,
             ],
             expected_roles: r#"[{"role_key": "viewer", "location_id": null, "target": null}]"#,
@@ -54,6 +61,9 @@ fn given_a_host_rewriting_http_proxy_when_people_sign_in_then_newcomers_become_v
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
             let roles = role_fixture(store).await;
+            create_principal(store, &roles.context, "Orders-Lead")
+                .await
+                .expect("a principal named in mixed case");
             let api = start(
                 store,
                 settings("127.0.0.1", UnknownProxyUsers::ProvisionViewer),
@@ -87,12 +97,11 @@ fn given_a_host_rewriting_http_proxy_when_people_sign_in_then_newcomers_become_v
                 .await
                 .expect("no username")
                 .status();
-            let wrong_host_status = bootstrap(&api.url)
-                .header("x-forwarded-host", "other.example.com")
-                .header(USER_HEADER, "orders-viewer")
+            let case_taken_status = bootstrap(&api.url)
+                .header(USER_HEADER, "orders-lead")
                 .send()
                 .await
-                .expect("another host")
+                .expect("a name another principal holds in another case")
                 .status();
             let taken_status = bootstrap(&api.url)
                 .header(USER_HEADER, "support-person")
@@ -110,16 +119,16 @@ fn given_a_host_rewriting_http_proxy_when_people_sign_in_then_newcomers_become_v
                 [
                     untrusted_status,
                     missing_status,
-                    wrong_host_status,
+                    case_taken_status,
                     taken_status,
                     rejected_status
                 ],
                 test_case.expected_refusals,
-                "{}: untrusted peer, missing username, other host, taken name, reject mode",
+                "{}: untrusted peer, missing username, name taken in another case, taken name, reject mode",
                 test_case.description
             );
             assert_eq!(
-                rows(store, "SELECT COUNT(*) AS people FROM sqb_principals WHERE name IN ('orders-viewer','orders-newcomer')", vec![]).await,
+                rows(store, "SELECT COUNT(*) AS people FROM sqb_principals WHERE name IN ('orders-viewer','orders-newcomer','orders-lead')", vec![]).await,
                 json!([{"people": 0}]),
                 "{}: refused requests provision nobody",
                 test_case.description
@@ -168,30 +177,49 @@ fn given_a_host_rewriting_http_proxy_when_people_sign_in_then_newcomers_become_v
                 "{}: exactly the installation-wide viewer role",
                 test_case.description
             );
-            let write = |origin: Option<&str>| {
-                let request = forwarded(
-                    &client,
-                    reqwest::Method::POST,
-                    format!("{}/api/control/runs", api.url),
-                )
+            let other_host_read = bootstrap(&api.url)
+                .header("x-forwarded-host", "control-short")
                 .header(USER_HEADER, "orders-viewer")
-                .json(&json!({}));
-                origin.into_iter().fold(request, |request, origin| {
+                .send()
+                .await
+                .expect("the UI under another host name")
+                .status();
+            assert_eq!(
+                other_host_read, test_case.expected_other_host_read,
+                "{}: a proxy serves the UI under any host name",
+                test_case.description
+            );
+            let write = |(origin, host, proof): (Option<&str>, &str, Option<&str>)| {
+                let request = client
+                    .post(format!("{}/api/control/runs", api.url))
+                    .header("x-forwarded-host", host)
+                    .header(USER_HEADER, "orders-viewer")
+                    .json(&json!({}));
+                let request = origin.into_iter().fold(request, |request, origin| {
                     request.header(header::ORIGIN, origin)
+                });
+                proof.into_iter().fold(request, |request, proof| {
+                    request.header("x-sqb-csrf", proof)
                 })
             };
             let mut write_statuses = Vec::new();
-            for origin in [
-                Some("http://other.example.com"),
-                Some("https://control.example.com"),
-                None,
-                Some(ORIGIN),
+            for attempt in [
+                (Some("http://other.example.com"), PUBLIC_HOST, None),
+                (Some("https://control.example.com"), PUBLIC_HOST, None),
+                (None, PUBLIC_HOST, None),
+                (Some(ORIGIN), PUBLIC_HOST, None),
+                (
+                    Some("http://control-short"),
+                    "control-short",
+                    Some("trusted-proxy"),
+                ),
+                (None, "control-short", Some("trusted-proxy")),
             ] {
-                write_statuses.push(write(origin).send().await.expect("write").status());
+                write_statuses.push(write(attempt).send().await.expect("write").status());
             }
             assert_eq!(
                 write_statuses, test_case.expected_write_statuses,
-                "{}: only the configured http origin may write",
+                "{}: a cross-site form post, the https twin and an unproven write are refused; the origin or the CSRF header writes",
                 test_case.description
             );
             let feed = forwarded(
@@ -233,5 +261,27 @@ fn given_a_host_rewriting_http_proxy_when_people_sign_in_then_newcomers_become_v
             stop_api(api).await;
             close_test_store(fixture).await;
         });
+    }
+}
+
+#[test]
+fn given_a_trusted_proxy_without_trusted_peers_when_configured_then_both_loopback_addresses_are_trusted()
+ {
+    let test_cases = [ProxyPeersDefaultTestCase {
+        description: "a proxy on the same host connects over either loopback address",
+        configuration: json!({"origin": ORIGIN}),
+        expected_peers: &["127.0.0.1", "::1"],
+    }];
+    for test_case in test_cases {
+        let settings: TrustedProxyAuthentication =
+            serde_json::from_value(test_case.configuration).expect("proxy settings");
+
+        let peers: Vec<String> = settings
+            .trusted_peers
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+
+        assert_eq!(peers, test_case.expected_peers, "{}", test_case.description);
     }
 }
