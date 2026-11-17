@@ -33,6 +33,7 @@ from tests.integration.src.sqlbuild.cli.recall.helpers import (
     EMITTED_STDERR,
     EMITTED_STDOUT,
     EMITTED_TAIL,
+    INCOMPLETE_HISTORY,
     MEBIBYTE,
     build_while_store_locked,
     build_with_failing_recall_notices,
@@ -546,6 +547,8 @@ def test_given_a_successful_command_when_recorded_then_it_ends_completed(
             builds_before_lock=1,
             expected_exit_code=0,
             expected_notice="Recall delivery did not finish within the shutdown timeout",
+            expected_failed_records=0,
+            expected_recorded_builds=2,
             hang_guard_seconds=60.0,
         ),
         HeldLockTestCase(
@@ -554,6 +557,8 @@ def test_given_a_successful_command_when_recorded_then_it_ends_completed(
             builds_before_lock=0,
             expected_exit_code=0,
             expected_notice="Recall delivery did not finish within the shutdown timeout",
+            expected_failed_records=0,
+            expected_recorded_builds=1,
             hang_guard_seconds=60.0,
         ),
     ],
@@ -568,10 +573,18 @@ def test_given_a_locked_store_when_building_then_it_gives_up_at_the_shutdown_dea
     )
 
     locked, locked_total = build_while_store_locked(project_dir)
+    unlocked: subprocess.CompletedProcess[bytes] = run(project_dir, "build")
+    recorded_builds: list[list[object]] = recall_rows(
+        project_dir, "SELECT count(*) FROM invocations WHERE command = 'build'"
+    )
 
     stderr: str = locked.stderr.decode(errors="replace")
     assert locked.returncode == test_case.expected_exit_code
     assert test_case.expected_notice in stderr
+    assert [
+        (int(dropped) > 0, int(failed)) for dropped, failed in INCOMPLETE_HISTORY.findall(stderr)
+    ] == [(True, test_case.expected_failed_records)], stderr
+    assert (unlocked.returncode, recorded_builds) == (0, [[test_case.expected_recorded_builds]])
     assert stderr.rstrip().endswith("completed successfully; only its Recall history is affected.")
     assert locked_total < test_case.hang_guard_seconds, stderr
 
