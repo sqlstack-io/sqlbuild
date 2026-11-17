@@ -152,10 +152,29 @@ Release note: earlier versions printed `Plan complete with errors` and exited `0
 Planning a scoped selection whose upstream inputs were never built in the target fails with `S301` rather than producing a plan that would break at build time:
 
 ```
-error[S301]: cannot build selected scope: 3 missing upstream dependencies (stg_orders, stg_payments, waffle_types)
+error[S301]: 3 upstream models and seeds this build reads don't exist in target 'dev'
+  stg_orders
+  stg_payments
+  waffle_types
+
+  If they exist in prod:
+    read them from it for this run:  --defer-to prod
+    copy them into this target:      sqb clone --from prod -s stg_orders stg_payments waffle_types
+  Or build them too:                 add + before your selection
 ```
 
-Build the upstream chain first, or select it along with the model: `sqb build --select +fact_orders`.
+The error names the first five missing resources; `sqb plan --json` lists all of them in
+`error.missing`. Each fix fits a different case:
+
+| Fix | When to use it |
+| --- | --- |
+| `--defer-to <origin>` | Read the missing resources from another target for this run only. |
+| `sqb clone --from <origin> -s ...` | Copy them into this target once. The command lists every missing name, so you can run it as printed. |
+| `+` before the selection, such as `sqb build --select +fact_orders` | Build the upstream chain along with the model. |
+
+The error offers an origin only for targets with `clone.allow_as_clone_origin = true`, and only
+when the current target has `clone.allow_as_clone_destination = true`. It does not check that the
+resources exist in the origin.
 
 The check also covers resources that an attached audit on a selected resource reads, even when the
 model SQL does not read them. Selecting `+fact_orders` follows data lineage only, so it does not
@@ -167,7 +186,7 @@ error[S301]: cannot build selected scope: audit 'relationships' on 'stg_orders' 
 ```
 
 Load or build the resource first (for a seed, `sqb seed`), or add it to the selection. When both
-kinds are missing, the error lists the missing upstream dependencies and then the audit reads.
+kinds are missing, the error lists the missing upstream resources and then the audit reads.
 
 ## Missing source tables
 

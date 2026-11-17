@@ -273,13 +273,18 @@ fn write_machine_error(
     } else {
         Some(help.str()?.to_string())
     };
-    let document = serde_json::json!({
-        "error": {
-            "code": code.str()?.to_string(),
-            "message": message.str()?.to_string(),
-            "help": help,
-        }
+    let mut fields = serde_json::json!({
+        "code": code.str()?.to_string(),
+        "message": message.str()?.to_string(),
+        "help": help,
     });
+    if let Some(missing) = error
+        .getattr_opt("missing")?
+        .filter(|value| !value.is_none())
+    {
+        fields["missing"] = serde_json::json!(missing.extract::<Vec<String>>()?);
+    }
+    let document = serde_json::json!({ "error": fields });
     print_object(
         &PyString::new(invocation.py(), &document.to_string()).into_any(),
         None,

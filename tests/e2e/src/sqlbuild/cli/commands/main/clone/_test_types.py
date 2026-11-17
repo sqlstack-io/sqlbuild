@@ -84,3 +84,23 @@ class CloneChangedPlanE2ETestCase:
     commands: tuple[tuple[str, ...], ...]
     expected_fragments: tuple[str, ...]
     unexpected_fragments: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class CloneMissingUpstreamE2ETestCase:
+    """A target missing a selected model's upstreams, and the clone command S301 prints for it."""
+
+    description: str
+    default_target: str
+    target_args: tuple[str, ...]
+    expected_clone_command: str
+
+
+@dataclass(frozen=True)
+class MissingUpstreamFixesE2ETestCase:
+    """Whether the planned target may be cloned into, and what S301 then offers."""
+
+    description: str
+    destination_allowed: bool
+    expected_fragments: tuple[str, ...]
+    unexpected_fragments: tuple[str, ...]
