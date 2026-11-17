@@ -10,6 +10,7 @@ use crate::warehouse_metadata::_helpers::ingestion::{
 };
 use crate::warehouse_metadata::models::{MetadataBatch, StateEventImport, WarehouseSyncResponse};
 
+/// Mirror a state-history page; a source id keeps its earliest row (its latest for kinds whose `mirror_keeps_latest` holds), then its smallest record text in byte order. SQLite and PostgreSQL format that text differently, so on an exact tie each store is deterministic but they may keep different rows; a store migration rebuilds the mirror.
 pub(crate) async fn ingest_events(
     store: &ControlStore,
     (location_id, target): (Uuid, &str),
@@ -33,6 +34,16 @@ pub(crate) async fn ingest_events(
             batch.kind.as_str()
         ))
     })?;
+    let record_text = if matches!(store, ControlStore::Postgres(_)) {
+        "record_json::text COLLATE \"C\""
+    } else {
+        "record_json"
+    };
+    let wins = if batch.kind.mirror_keeps_latest() {
+        ">"
+    } else {
+        "<"
+    };
     let mut transaction = begin_ingestion(
         store,
         (location_id, target),
@@ -78,9 +89,16 @@ pub(crate) async fn ingest_events(
             Parameter::Time(transaction.now),
         ]);
         let placeholders = Parameter::placeholders(1..=parameters.len());
+        let replaced: Vec<String> = columns[3..]
+            .iter()
+            .map(|column| format!("{column}=excluded.{column}"))
+            .collect();
         let sql = format!(
-            "INSERT INTO {table} ({}) VALUES ({placeholders}) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
-            columns.join(",")
+            "INSERT INTO {table} ({}) VALUES ({placeholders}) ON CONFLICT (event_id) DO UPDATE SET {} \
+             WHERE excluded.observed_at{wins}{table}.observed_at OR (excluded.observed_at={table}.observed_at \
+             AND excluded.{record_text}<{table}.{record_text}) RETURNING event_id",
+            columns.join(","),
+            replaced.join(",")
         );
         let inserted;
         (transaction, inserted) = query(transaction, &sql, parameters).await?;

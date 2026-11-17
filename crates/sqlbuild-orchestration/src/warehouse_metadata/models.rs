@@ -439,6 +439,12 @@ impl WarehouseHistoryKind {
     pub const fn mirror_table(self) -> &'static str {
         self.names().1
     }
+
+    /// Two builds refreshing one run's cost estimate at once write the same source id and the warehouse's latest row is current, so cost mirrors keep the latest row; every other kind keeps the earliest.
+    #[must_use]
+    pub const fn mirror_keeps_latest(self) -> bool {
+        matches!(self, Self::ResourceCosts)
+    }
 }
 
 /// Derive progress from committed mirror rows, scoped to the active physical reader.

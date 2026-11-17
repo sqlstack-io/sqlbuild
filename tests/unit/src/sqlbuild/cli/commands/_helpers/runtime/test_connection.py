@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -54,7 +56,6 @@ from tests.unit.src.sqlbuild.cli.commands._helpers.runtime.helpers import write_
 def test_given_project_inputs_when_resolving_connection_then_uses_effective_connection(
     test_case: ResolveProjectConnectionConfigTestCase,
     tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / test_case.project_dir_name
     project_dir.mkdir()
@@ -79,8 +80,23 @@ def test_given_project_inputs_when_resolving_connection_then_uses_effective_conn
     expected_connection: dict[str, object] = dict(test_case.expected_connection)
     expected_connection["database"] = str(tmp_path / str(expected_connection["database"]))
     assert connection == expected_connection
-    captured_err: str = capsys.readouterr().err
-    assert test_case.expected_warning_fragment in captured_err
+    # A fresh process resolves the same connection twice, as a command does, and warns once.
+    warned: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from pathlib import Path\n"
+            "from sqlbuild._native import resolve_connection_config\n"
+            "for _ in range(2):\n"
+            "    resolve_connection_config(raw_config=" + repr(test_case.expected_connection) + ", "
+            "project_dir=Path.cwd(), adapter_name='duckdb')\n",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert warned.stderr.count(test_case.expected_warning_fragment) == 1, warned.stderr
 
 
 @pytest.mark.parametrize(
