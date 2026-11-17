@@ -692,6 +692,6 @@ def test_given_snowflake_keys_and_a_sink_provider_when_running_then_warns_once(
 
     assert result.returncode == 0, result.stdout + result.stderr
     # Startup and the command both resolve the connection; the warning still prints once.
-    assert (result.stdout + result.stderr).count("Snowflake-like keys: warehouse.") == 1, (
-        result.stderr
-    )
+    assert (result.stdout + result.stderr).count(
+        "Snowflake-like keys: warehouse."
+    ) == test_case.expected_warnings, result.stderr

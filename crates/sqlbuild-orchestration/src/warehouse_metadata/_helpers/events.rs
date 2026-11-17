@@ -10,6 +10,7 @@ use crate::warehouse_metadata::_helpers::ingestion::{
 };
 use crate::warehouse_metadata::models::{MetadataBatch, StateEventImport, WarehouseSyncResponse};
 
+/// Mirror a state-history page; a source id keeps its earliest row, then its smallest record text in byte order.
 pub(crate) async fn ingest_events(
     store: &ControlStore,
     (location_id, target): (Uuid, &str),
@@ -33,7 +34,6 @@ pub(crate) async fn ingest_events(
             batch.kind.as_str()
         ))
     })?;
-    // Text comparison is byte order in SQLite; Postgres needs the "C" collation for the same.
     let record_text = if matches!(store, ControlStore::Postgres(_)) {
         "record_json::text COLLATE \"C\""
     } else {
@@ -88,8 +88,6 @@ pub(crate) async fn ingest_events(
             .iter()
             .map(|column| format!("{column}=excluded.{column}"))
             .collect();
-        // A source id's earliest row wins, then the smallest record text, so the kept row never
-        // depends on the order scan pages arrive in.
         let sql = format!(
             "INSERT INTO {table} ({}) VALUES ({placeholders}) ON CONFLICT (event_id) DO UPDATE SET {} \
              WHERE excluded.observed_at<{table}.observed_at OR (excluded.observed_at={table}.observed_at \

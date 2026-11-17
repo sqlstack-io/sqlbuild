@@ -451,30 +451,44 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
 
 #[test]
 fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_row_is_kept() {
-    let mut test_cases = Vec::new();
-    for (backend, store_name) in [
-        (Backend::Sqlite, "SQLite"),
-        (Backend::Postgres, "PostgreSQL"),
-    ] {
-        test_cases.push(MirrorConflictTestCase {
-            description: store_name,
-            backend,
+    let test_cases = [
+        MirrorConflictTestCase {
+            description: "SQLite: page two's earlier row arrives second",
+            backend: Backend::Sqlite,
             rows: [
                 ("2026-02-03T04:05:06.000001Z", "pass"),
                 ("2026-02-03T04:05:06Z", "pass"),
             ],
             expected_row: ("2026-02-03T04:05:06Z", "pass"),
-        });
-        test_cases.push(MirrorConflictTestCase {
-            description: store_name,
-            backend,
+        },
+        MirrorConflictTestCase {
+            description: "SQLite: two rows at the same time",
+            backend: Backend::Sqlite,
             rows: [
                 ("2026-02-03T04:05:06Z", "pass"),
                 ("2026-02-03T04:05:06Z", "error"),
             ],
             expected_row: ("2026-02-03T04:05:06Z", "error"),
-        });
-    }
+        },
+        MirrorConflictTestCase {
+            description: "PostgreSQL: page two's earlier row arrives second",
+            backend: Backend::Postgres,
+            rows: [
+                ("2026-02-03T04:05:06.000001Z", "pass"),
+                ("2026-02-03T04:05:06Z", "pass"),
+            ],
+            expected_row: ("2026-02-03T04:05:06Z", "pass"),
+        },
+        MirrorConflictTestCase {
+            description: "PostgreSQL: two rows at the same time",
+            backend: Backend::Postgres,
+            rows: [
+                ("2026-02-03T04:05:06Z", "pass"),
+                ("2026-02-03T04:05:06Z", "error"),
+            ],
+            expected_row: ("2026-02-03T04:05:06Z", "error"),
+        },
+    ];
     for test_case in test_cases {
         run(async {
             let Some(fixture_store) = open_test_store(test_case.backend).await else {

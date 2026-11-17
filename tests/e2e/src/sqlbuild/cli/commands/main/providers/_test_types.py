@@ -155,3 +155,4 @@ class SharedSinkProviderE2ETestCase:
 class SnowflakeKeyWarningE2ETestCase:
     description: str
     command: tuple[str, ...]
+    expected_warnings: int = 1

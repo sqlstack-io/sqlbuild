@@ -1951,6 +1951,12 @@ reason = "Every native entry point installs the build identity before anything r
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
+path = "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connection.rs"
+symbols = ["connection_config"]
+reason = "The Snowflake-like keys warning is once per process by contract: a command resolves its connection at startup for provider setup and again for its own work, and other paths may resolve it more often. The flag is process-wide and monotonic; threading it through every caller would only rebuild the same global."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
 path = "crates/sqlbuild-python-base/src/native_threads/_helpers/exit_signal.rs"
 symbols = ["signal_interpreter_exit"]
 reason = "The existing interpreter-exit signal is process-wide and monotonic: every native daemon wait must observe any exit hook before Python finalization. The atomic replaces the same global threading.Event, not per-command lifecycle state."
