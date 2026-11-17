@@ -35,7 +35,7 @@ pub(crate) async fn principal_enabled(
     Ok(people.first().map(|person| person["disabled_at"].is_null()))
 }
 
-/// Creates the person with the installation-wide viewer role, or false when the name is taken.
+/// Creates the person with the viewer role, or false when a principal's name matches in any case.
 pub(crate) async fn provision_viewer(
     store: &ControlStore,
     context: &AuditContext,
@@ -43,7 +43,7 @@ pub(crate) async fn provision_viewer(
 ) -> Result<bool, ControlError> {
     let (transaction, taken) = query(
         begin(store, TransactionMode::Write).await?,
-        "SELECT principal_id FROM sqb_principals WHERE name=$1",
+        "SELECT principal_id FROM sqb_principals WHERE lower(name)=$1",
         vec![Parameter::Text(username.into())],
     )
     .await?;

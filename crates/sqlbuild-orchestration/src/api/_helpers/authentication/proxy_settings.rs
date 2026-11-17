@@ -11,8 +11,8 @@ use crate::api::_helpers::authentication::proxy_warnings::{
     warn_taken_username, warn_untrusted_overflow, warn_untrusted_source,
 };
 use crate::api::constants::{
-    HTTP_SCHEME, HTTPS_SCHEME, PROXY_NOTED_SOURCES, PROXY_PROFILE_CHARS, PROXY_RESERVED_HEADERS,
-    PROXY_USER_HEADER, PROXY_USERNAME_CHARS,
+    HTTP_SCHEME, HTTPS_SCHEME, LOOPBACK_PROXY_PEERS, PROXY_NOTED_SOURCES, PROXY_PROFILE_CHARS,
+    PROXY_RESERVED_HEADER_PREFIX, PROXY_RESERVED_HEADERS, PROXY_USER_HEADER, PROXY_USERNAME_CHARS,
 };
 use crate::api::models::{ProxyProfile, TrustedProxyAuthentication, UnknownProxyUsers};
 use crate::store::errors::ControlError;
@@ -37,6 +37,11 @@ enum Note {
     First,
     Overflow,
     Quiet,
+}
+
+/// The proxy peers when `[trusted_proxy] trusted_peers` is not set: a proxy on the same host.
+pub(crate) fn default_trusted_peers() -> BTreeSet<IpAddr> {
+    BTreeSet::from(LOOPBACK_PROXY_PEERS)
 }
 
 /// The username header when `[trusted_proxy] username_header` is not set.
@@ -196,7 +201,9 @@ fn header_name(value: &str, key: &str) -> Result<HeaderName, ControlError> {
     let name = HeaderName::from_bytes(value.trim().as_bytes()).map_err(|_| {
         ControlError::Invalid(format!("[trusted_proxy] {key} is not a valid header name"))
     })?;
-    if PROXY_RESERVED_HEADERS.contains(&name.as_str()) {
+    if PROXY_RESERVED_HEADERS.contains(&name.as_str())
+        || name.as_str().starts_with(PROXY_RESERVED_HEADER_PREFIX)
+    {
         return Err(ControlError::Invalid(format!(
             "[trusted_proxy] {key} cannot be {name}: browsers, proxies or the server set it"
         )));

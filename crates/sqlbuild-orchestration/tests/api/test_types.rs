@@ -167,12 +167,20 @@ pub(crate) struct ProxyProvisioningTestCase {
     pub(crate) backend: Backend,
     /// Untrusted peer, missing username, another host, a taken name, and a newcomer under `reject`.
     pub(crate) expected_refusals: [reqwest::StatusCode; 5],
-    /// Writes from another origin, the HTTPS twin of the origin, no origin, and the origin itself.
-    pub(crate) expected_write_statuses: [reqwest::StatusCode; 4],
+    /// A read under another host name the proxy serves.
+    pub(crate) expected_other_host_read: reqwest::StatusCode,
+    /// Cross-site post, HTTPS twin, no proof, the origin, then the CSRF header under another host.
+    pub(crate) expected_write_statuses: [reqwest::StatusCode; 6],
     /// The newcomer's role assignments as JSON rows.
     pub(crate) expected_roles: &'static str,
     /// The change feed's cache-control, buffering and content-type headers.
     pub(crate) expected_feed_headers: [&'static str; 3],
+}
+
+pub(crate) struct ProxyPeersDefaultTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) configuration: serde_json::Value,
+    pub(crate) expected_peers: &'static [&'static str],
 }
 
 pub(crate) struct ExternalSessionTestCase {
