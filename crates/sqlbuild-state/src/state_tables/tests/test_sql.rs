@@ -241,36 +241,6 @@ fn given_event_tables_keyed_by_event_id_when_paging_history_then_each_column_and
 }
 
 #[test]
-fn given_event_id_among_the_columns_when_paging_history_then_the_cursor_key_is_aliased() {
-    let sql: Result<String, String> = read_history_sql(
-        "s.t",
-        None,
-        HistoryRead {
-            columns: &["event_id", "ts"],
-            key_columns: Some(&["event_id", "ts"]),
-            timestamp_column: "ts",
-            observed_since: None,
-            adapter: "snowflake",
-            has_event_id: true,
-            limit: 5,
-            newest: None,
-        },
-    );
-
-    assert_eq!(
-        sql,
-        Ok(
-            "SELECT event_id, ts, event_id AS sqb_event_id_key FROM s.t ORDER BY \
-            CASE WHEN event_id IS NULL THEN 0 ELSE 1 END, TO_BINARY(event_id, 'UTF-8'), \
-            CASE WHEN ts IS NULL THEN 0 ELSE 1 END, ts, \
-            CASE WHEN event_id IS NULL THEN 0 ELSE 1 END, TO_BINARY(event_id, 'UTF-8') LIMIT 5"
-                .to_owned()
-        ),
-        "each output column name appears once, so Snowflake can resolve ORDER BY event_id"
-    );
-}
-
-#[test]
 fn given_a_version_limit_when_reading_history_then_only_each_identitys_newest_rows_are_selected() {
     let sql: Result<String, String> = read_history_sql(
         "s.t",

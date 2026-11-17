@@ -8,10 +8,6 @@ pub(crate) const MISSING_EVENT_ID_KEY: &str = "NULL";
 /// The column every event table identifies its rows by.
 pub(crate) const EVENT_ID_COLUMN: &str = "event_id";
 
-/// The trailing cursor key of a table whose projected columns already include `event_id`: aliased,
-/// so `ORDER BY event_id` names one output column (Snowflake rejects a duplicated output name).
-pub(crate) const EVENT_ID_KEY_PROJECTION: &str = ", event_id AS sqb_event_id_key";
-
 /// The rank a newest-versions read filters on; never projected, so it never reaches a record.
 pub(crate) const NEWEST_VERSION_COLUMN: &str = "sqb_version";
 

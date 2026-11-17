@@ -1,9 +1,7 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
-use crate::state_tables::constants::{
-    EVENT_ID_KEY_PROJECTION, NEWEST_FIRST_COLUMN, NEWEST_VERSION_COLUMN,
-};
-use crate::state_tables::constants::{MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
+use crate::state_tables::constants::{EVENT_ID_COLUMN, MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
+use crate::state_tables::constants::{NEWEST_FIRST_COLUMN, NEWEST_VERSION_COLUMN};
 use crate::state_tables::models::HistoryRead;
 
 /// Rendered cursor values, `None` first; a trailing event ID repeating an `event_id` key is ignored.
@@ -23,19 +21,21 @@ pub fn read_history_sql(
         newest,
     } = read;
     let mut projection = columns.join(", ");
-    projection.push_str(if !has_event_id {
-        ", NULL AS event_id"
-    } else if columns.contains(&"event_id") {
-        EVENT_ID_KEY_PROJECTION
-    } else {
-        ", event_id"
-    });
-    let mut columns = key_columns.unwrap_or(columns).to_vec();
-    columns.push(if has_event_id {
-        "event_id"
-    } else {
-        MISSING_EVENT_ID_KEY
-    });
+    if !columns.contains(&EVENT_ID_COLUMN) {
+        projection.push_str(if has_event_id {
+            ", event_id"
+        } else {
+            ", NULL AS event_id"
+        });
+    }
+    let mut columns: Vec<&str> = key_columns.unwrap_or(columns).to_vec();
+    if !columns.contains(&EVENT_ID_COLUMN) {
+        columns.push(if has_event_id {
+            EVENT_ID_COLUMN
+        } else {
+            MISSING_EVENT_ID_KEY
+        });
+    }
     let ordered = columns
         .iter()
         .map(|column| {
