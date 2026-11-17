@@ -29,6 +29,7 @@ class SqlFacts:
                 source=compiled.query_sql,
                 dialect=self._dialect,
                 place=getattr(compiled, "query_place", None),
+                file=compiled.authored_sql,
             ),
         )
         self._documents[model.path] = documents

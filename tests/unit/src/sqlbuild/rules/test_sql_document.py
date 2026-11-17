@@ -63,15 +63,13 @@ def test_given_wide_model_query_when_placing_every_column_then_time_stays_linear
     source: str = (
         "SELECT\n" + ",\n".join(f"  c{index}" for index in range(test_case.columns)) + "\nFROM t"
     )
+    file: str = "\n" * test_case.line_offset + source
     place: str = json.dumps(
-        {
-            "authored_sql": source,
-            "line_offset": test_case.line_offset,
-            "column_offset": 0,
-            "authored_query": None,
-        }
+        {"authored_query": {"range": [test_case.line_offset, len(file)]}, "passes": []}
     )
-    document: SqlDocument = SqlDocument(source=source, dialect=test_case.dialect, place=place)
+    document: SqlDocument = SqlDocument(
+        source=source, dialect=test_case.dialect, place=place, file=file
+    )
 
     started: float = time.perf_counter()
     positions: list[tuple[int, int] | None] = [
@@ -108,14 +106,8 @@ def test_given_node_position_when_placing_it_then_only_integers_map_into_the_fil
     document: SqlDocument = SqlDocument(
         source="SELECT 1",
         dialect="duckdb",
-        place=json.dumps(
-            {
-                "authored_sql": "SELECT 1",
-                "line_offset": 2,
-                "column_offset": 0,
-                "authored_query": None,
-            }
-        ),
+        place=json.dumps({"authored_query": {"range": [2, 10]}, "passes": []}),
+        file="\n\nSELECT 1",
     )
 
     node: SimpleNamespace = SimpleNamespace(line=test_case.line, column=test_case.column)

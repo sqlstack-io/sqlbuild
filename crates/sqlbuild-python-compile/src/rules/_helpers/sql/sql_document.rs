@@ -13,8 +13,8 @@ use sqlbuild_analysis::sql_tree::main::sql_tree_nodes::sql_tree_nodes;
 use sqlbuild_analysis::sql_tree::models::{
     NodeExtent, NodeLiteral, NodeName, SqlTreeNode as TreeNode,
 };
+use sqlbuild_rules::engine::main::query_file_positions::query_file_positions;
 use sqlbuild_rules::models::ModelQueryPlace;
-use sqlbuild_rules::query_facts::main::query_file_positions::query_file_positions;
 
 use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -180,6 +180,8 @@ pub(crate) struct SqlDocument {
     dialect: String,
     /// Where `source`, a model's expanded query, sits in the model file; `None` for other SQL.
     place: Option<ModelQueryPlace>,
+    /// The model file `place` points into.
+    file: Option<String>,
     tree: PyOnceLock<Arc<Tree>>,
     positions: PyOnceLock<FilePositions>,
 }
@@ -187,8 +189,13 @@ pub(crate) struct SqlDocument {
 #[pymethods]
 impl SqlDocument {
     #[new]
-    #[pyo3(signature = (*, source, dialect, place=None))]
-    fn new(source: String, dialect: String, place: Option<&str>) -> PyResult<Self> {
+    #[pyo3(signature = (*, source, dialect, place=None, file=None))]
+    fn new(
+        source: String,
+        dialect: String,
+        place: Option<&str>,
+        file: Option<String>,
+    ) -> PyResult<Self> {
         let place: Option<ModelQueryPlace> = place
             .map(serde_json::from_str)
             .transpose()
@@ -197,6 +204,7 @@ impl SqlDocument {
             source,
             dialect,
             place,
+            file,
             tree: PyOnceLock::new(),
             positions: PyOnceLock::new(),
         })
@@ -232,7 +240,7 @@ impl SqlDocument {
     /// Where `node`, read from this model query, is in the model file; `None` for other SQL.
     #[pyo3(signature = (*, node))]
     fn file_position(&self, node: &Bound<'_, PyAny>) -> PyResult<Option<(u64, u64)>> {
-        let Some(place) = self.place.as_ref() else {
+        let (Some(place), Some(file)) = (self.place.as_ref(), self.file.as_deref()) else {
             return Ok(None);
         };
         let (Some(line), Some(column)) = (node_index(node, "line")?, node_index(node, "column")?)
@@ -241,14 +249,16 @@ impl SqlDocument {
         };
         let positions: &FilePositions = self
             .positions
-            .get_or_init(node.py(), || self.file_positions(node.py(), place));
+            .get_or_init(node.py(), || self.file_positions(node.py(), (file, place)));
         let character: usize = positions.character(line, column);
         Ok(Some(
             positions
                 .node_starts
                 .get(&character)
                 .copied()
-                .unwrap_or_else(|| query_file_positions(&self.source, place, &[character])[0]),
+                .unwrap_or_else(|| {
+                    query_file_positions(&self.source, (file, place), &[character])[0]
+                }),
         ))
     }
 
@@ -290,7 +300,7 @@ impl SqlDocument {
     }
 
     /// Line starts and the file positions of every tree node's start, mapped through `place` at once.
-    fn file_positions(&self, py: Python<'_>, place: &ModelQueryPlace) -> FilePositions {
+    fn file_positions(&self, py: Python<'_>, located: (&str, &ModelQueryPlace)) -> FilePositions {
         let mut line_starts: Vec<usize> = vec![0];
         let mut length: usize = 0;
         for character in self.source.chars() {
@@ -315,7 +325,7 @@ impl SqlDocument {
         );
         starts.sort_unstable();
         starts.dedup();
-        let mapped: Vec<(u64, u64)> = query_file_positions(&self.source, place, &starts);
+        let mapped: Vec<(u64, u64)> = query_file_positions(&self.source, located, &starts);
         positions.node_starts = starts.into_iter().zip(mapped).collect();
         positions
     }

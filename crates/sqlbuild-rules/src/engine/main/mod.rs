@@ -9,5 +9,6 @@ pub mod json_grains;
 pub mod model_query_place;
 pub mod needs_json_grains;
 pub mod project_model_rows;
+pub mod query_file_positions;
 pub mod retained_request;
 pub mod start_speculative_rows;
