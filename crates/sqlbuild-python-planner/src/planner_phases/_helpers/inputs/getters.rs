@@ -56,6 +56,7 @@ pub(crate) fn read_planner_runtime<'py>(
         "local_config" => (&this.local_config).into_bound_py_any(py),
         "on_progress" => (&this.on_progress).into_bound_py_any(py),
         "invocation_time" => (&this.invocation_time).into_bound_py_any(py),
+        "node_results_location" => (&this.node_results_location).into_bound_py_any(py),
         _ => return None,
     })
 }

@@ -3,6 +3,7 @@
 use crate::compile_driver::_helpers::setup::model_free_locations::kept_loader_schema;
 use crate::compile_driver::_helpers::setup::targets::planner_error;
 use crate::compile_driver::main::setup::expanded_loader_namespace::expanded_loader_namespace;
+use crate::compile_driver::main::setup::python_node_count::python_node_count;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
@@ -13,14 +14,6 @@ use sqlbuild_core::text::main::python_strip::python_strip;
 use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
-/// The discovered inputs' Python node functions, each kind of which keeps node results.
-const PYTHON_NODE_FIELDS: [&str; 4] = [
-    "loader_functions",
-    "task_functions",
-    "asset_functions",
-    "check_functions",
-];
-
 /// Raise when a `preserve` target has Python nodes but no usable loader schema, after `effective_vars`, to keep their results in.
 pub(crate) fn require_node_results_schema(
     discovered: &Bound<'_, PyAny>,
@@ -28,8 +21,7 @@ pub(crate) fn require_node_results_schema(
     effective_vars: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
     let loader_schema: Option<String> = resolved_loader_schema(target_config, effective_vars)?;
-    if kept_loader_schema(loader_schema.as_deref()).is_some()
-        || python_node_count(discovered)? == 0
+    if kept_loader_schema(loader_schema.as_deref()).is_some() || python_node_count(discovered)? == 0
     {
         return Ok(());
     }
@@ -60,17 +52,11 @@ fn resolved_loader_schema(
     match expanded_loader_namespace(namespace.as_any(), effective_vars) {
         Ok(expanded) => {
             let schema: Bound<'_, PyAny> = expanded.get_item("schema")?;
-            Ok((!schema.is_none()).then(|| schema.str()?.extract()).transpose()?)
+            Ok((!schema.is_none())
+                .then(|| schema.str()?.extract())
+                .transpose()?)
         }
         Err(error) if error.is_instance_of::<PyException>(py) => Ok(None),
         Err(error) => Err(error),
     }
-}
-
-/// How many loaders, tasks, assets and checks the project declares in Python.
-fn python_node_count(discovered: &Bound<'_, PyAny>) -> PyResult<usize> {
-    PYTHON_NODE_FIELDS
-        .iter()
-        .map(|field| native_field(discovered, field)?.len())
-        .sum()
 }
