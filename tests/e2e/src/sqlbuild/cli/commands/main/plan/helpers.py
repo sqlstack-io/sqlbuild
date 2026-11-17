@@ -507,6 +507,9 @@ DRIFT_EVERY: int = 50
 _DRIFT_COLUMN: FakeColumn = FakeColumn(name="_LOADED_AT", data_type="TIMESTAMP_NTZ")
 _NUMBER_TYPE: re.Pattern[str] = re.compile(r"NUMBER\((\d+),(\d+)\)")
 _RELATION_TYPES: dict[str, str] = {"TABLE": "BASE TABLE", "VIEW": "VIEW"}
+#: Declared string types Snowflake stores, and lists, as TEXT of its default length.
+_LISTED_TYPES: dict[str, str] = {"VARCHAR": "TEXT", "STRING": "TEXT", "TEXT": "TEXT"}
+_TEXT_LENGTHS: dict[str, int] = dict.fromkeys(_LISTED_TYPES, 16_777_216)
 
 
 @dataclass(frozen=True)
@@ -533,14 +536,16 @@ def _number_column(name: str, declared: re.Match[str]) -> FakeColumn:
 
 
 def _column(column: dict[str, str]) -> FakeColumn:
-    """The warehouse column a declared column lists as, its type spelled as declared."""
+    """The warehouse column a declared column lists as, its type spelled as Snowflake lists it."""
 
     declared: str = column["data_type"].upper()
     number: re.Match[str] | None = _NUMBER_TYPE.fullmatch(declared)
     builders: dict[bool, Callable[[], FakeColumn]] = {
         True: lambda: _number_column(column["name"], cast(re.Match[str], number)),
         False: lambda: FakeColumn(
-            name=column["name"], data_type=declared, character_maximum_length=None
+            name=column["name"],
+            data_type=_LISTED_TYPES.get(declared, declared),
+            character_maximum_length=_TEXT_LENGTHS.get(declared),
         ),
     }
     return builders[number is not None]()
