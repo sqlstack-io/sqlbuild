@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { configChange, cursorWords, diffPreview, diffStats, groupWarnings, planGroups, planSummaryLine, selectedGroup, sharedNote, whitespaceOnly, type PlanRow } from './plan-index';
+import { configChange, cursorWords, diffPreview, diffStats, sectionNote, groupWarnings, planGroups, planSummaryLine, selectedGroup, sharedNote, whitespaceOnly, type PlanRow } from './plan-index';
 
 const empty: PlanDocument = {
 	selected_count: 0,
@@ -65,7 +65,7 @@ describe('cursor ranges in words', () => {
 });
 
 describe('notes every row shares', () => {
-	const row = (name: string, detail: string, notes: string[] = []): PlanRow => ({ name, action: 'table', detail, notes, diff: null, diffOf: null, warnings: [], linked: true });
+	const row = (name: string, detail: string, notes: string[] = []): PlanRow => ({ name, action: 'table', detail, notes, diff: null, diffOf: null, warnings: [], linked: true, fetch: null, pendingConfig: false });
 
 	it('finds the note every row carries, and none when one differs', () => {
 		expect(sharedNote([row('a', 'no completed record'), row('b', 'no completed record')])).toBe('no completed record');
@@ -151,5 +151,64 @@ describe('an opened diff', () => {
 		expect(preview.cut).toBe(true);
 		expect(preview.more).toBe(8);
 		expect(diffPreview(diff.slice(0, 5), 12)).toEqual({ lines: diff.slice(0, 5), cut: false, more: 0 });
+	});
+});
+
+describe('a plan from a server summary', () => {
+	it('says the note the counts show every row shares as "all N", and a majority as "N of M"', () => {
+		const notes = (count: number) => [{ kind: 'run_reason', value: 'no completed record', count }, { kind: 'materialization', value: 'table', count: 1507 }];
+		expect(sectionNote({ section: 'routine_models', total: 1507, notes: notes(1507) })).toEqual({ row: 'no completed record', all: true, text: 'no completed record (all 1,507)' });
+		expect(sectionNote({ section: 'routine_models', total: 1507, notes: notes(1200) })?.text).toBe('no completed record (1,200 of 1,507)');
+		expect(sectionNote({ section: 'routine_models', total: 1507, notes: notes(700) })).toBeNull();
+		expect(sectionNote({ section: 'routine_models', total: 3, notes: [{ kind: 'reads', value: 'orders', count: 3 }] })?.text).toBe('reads orders (all 3)');
+	});
+
+	const summary: PlanDocument = {
+		...empty,
+		models: [
+			model('orders', 'query_changed', { diff_stats: { query: { added: 82, removed: 104, whitespace_only: false } } }),
+			model('payments', 'query_changed', { diff_stats: { query: { added: 2, removed: 2, whitespace_only: true } } }),
+			model('refunds', 'config_changed', { diff_stats: { config: { added: 1, removed: 1, whitespace_only: false } } }),
+			model('regions', 'no_change')
+		],
+		sections: [
+			{ section: 'query_changed', total: 2, notes: [] },
+			{ section: 'config_changed', total: 1, notes: [] },
+			{ section: 'routine_models', total: 1507, notes: [{ kind: 'run_reason', value: 'no completed record', count: 1507 }] },
+			{ section: 'seeds', total: 10, notes: [{ kind: 'reason', value: 'first_run', count: 2 }] },
+			{ section: 'unchanged', total: 300, notes: [] }
+		],
+		pages: { query_changed: 2, config_changed: 1, routine_models: 1507, seeds: 10, unchanged: 300 },
+		loaded: { query_changed: 2, config_changed: 1, routine_models: 1 },
+		changed: { counts: ['definition'], reach: 'all', runs: ['orders', 'payments', 'refunds', 'regions'].map((n) => ({ node: `model:${n}`, reason: n === 'regions' ? 'no completed record' : 'definition changed', downstream_of: null })), held_back: [], unchanged: [] }
+	};
+
+	it("counts groups from the server's sections, and pages their rows in plan order", () => {
+		const groups = planGroups(summary);
+		expect(groups.map((g) => [g.key, g.count])).toEqual([
+			['changed', 3],
+			['unchanged', 1517],
+			['skipped', 300]
+		]);
+		const unchanged = groups[1];
+		expect(unchanged.subtitle).toBe('1,507 models · 10 seeds · models: no completed record (all 1,507) · seeds: 2 first run');
+		expect(unchanged.rows.map((r) => [r.name, r.action, r.detail])).toEqual([['regions', 'table', '']]);
+		expect(unchanged.pages).toEqual([
+			{ section: 'routine_models', loaded: 1, total: 1507 },
+			{ section: 'seeds', loaded: 0, total: 10 }
+		]);
+	});
+
+	it("reads changed rows' counts from diff_stats, and reads a diff it doesn't carry on demand", () => {
+		const rows = (diffs?: Map<string, null | { model: string; config_diff?: string[] }>) => Object.fromEntries(planGroups(summary, undefined, diffs)[0].rows.map((r) => [r.name, r]));
+		const before = rows();
+		expect(before.orders).toMatchObject({ detail: 'query +82 −104', diff: null, fetch: 'diff', pendingConfig: false });
+		expect(before.payments.detail).toBe('whitespace only');
+		// A config change of up to two lines a side is read to show inline.
+		expect(before.refunds).toMatchObject({ detail: 'config', fetch: 'diff', pendingConfig: true });
+		const read = rows(new Map([['refunds', { model: 'refunds', config_diff: ['-  "full_refresh": true,', '+  "full_refresh": false,'] }], ['orders', null]]));
+		expect(read.refunds).toMatchObject({ detail: 'config · full_refresh true → false', fetch: null, diffOf: null });
+		// The server has no diff to give, as without permission to read the model's SQL.
+		expect(read.orders).toMatchObject({ detail: 'query +82 −104', diff: null, fetch: 'unavailable' });
 	});
 });

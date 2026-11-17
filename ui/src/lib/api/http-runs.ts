@@ -37,7 +37,6 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			retention: list(document.retention),
 			synced_copy: document.synced_copy ?? null,
 			changed: document.changed ?? null,
-			...(document.built_model_names ? { built_model_names: document.built_model_names } : {}),
 			...(document.pages ? { pages: document.pages } : {}),
 			...(document.sections ? { sections: document.sections } : {})
 		},

@@ -1,7 +1,7 @@
 // The plan page's list as an index and a pane: the plan's sections (plan-text.ts) gathered into a few
 // groups, one shown at a time, each row one line of name · action · detail. Pure.
 
-import type { PlanDocument, PlanPageSection, PlanWarning } from '$lib/api';
+import type { PlanDiff, PlanDocument, PlanPageSection, PlanSectionCount, PlanWarning } from '$lib/api';
 import { plural } from '$lib/format/plural';
 import { changedSections, loadedRows, looseWarnings, planSections, sectionSize, type PlanEntry, type PlanSection } from './plan-text';
 
@@ -22,31 +22,64 @@ const TITLES: Record<PlanGroupKey, string> = {
 	unchanged: 'Unchanged',
 	skipped: 'Skipped by --changed'
 };
-/** Each plan-text section's group, with the kind of change it is for the Changed group. */
-const SECTION_GROUP: Record<string, [PlanGroupKey, ChangeKind?]> = {
-	'Full refresh': ['full_refresh'],
-	'Query changed': ['changed', 'query'],
-	'Function changed': ['changed', 'function'],
-	'Config changed': ['changed', 'config'],
-	'Schema changed': ['changed', 'schema'],
-	'Changed functions': ['changed', 'function'],
-	Migrations: ['renames'],
-	'Column migrations': ['renames'],
-	'Table type changes': ['renames'],
-	Retention: ['renames'],
-	Renamed: ['renames'],
-	'First run': ['first_run'],
-	'Loaders to reload': ['loads'],
-	'Loaders to load': ['loads'],
-	'Sources to reload': ['loads'],
-	'Sources to load': ['loads'],
-	Python: ['python'],
-	'Held back': ['held_back'],
-	Models: ['unchanged'],
-	Functions: ['unchanged'],
-	Seeds: ['unchanged'],
-	Unchanged: ['skipped']
+/** Each server section's group in the index. */
+const GROUP_OF: Record<PlanPageSection, PlanGroupKey> = {
+	full_refresh: 'full_refresh',
+	query_changed: 'changed',
+	function_changed: 'changed',
+	config_changed: 'changed',
+	schema_changed: 'changed',
+	changed_functions: 'changed',
+	renamed: 'renames',
+	migrations: 'renames',
+	column_migrations: 'renames',
+	table_type_conversions: 'renames',
+	retention: 'renames',
+	first_run: 'first_run',
+	loader_reloads: 'loads',
+	loader_loads: 'loads',
+	source_reloads: 'loads',
+	source_loads: 'loads',
+	python_nodes: 'python',
+	held_back: 'held_back',
+	warnings: 'warnings',
+	routine_models: 'unchanged',
+	functions: 'unchanged',
+	seeds: 'unchanged',
+	unchanged: 'skipped'
 };
+/** The kind of change a Changed section counts as, for its breakdown. */
+const CHANGE_KIND: Partial<Record<PlanPageSection, ChangeKind>> = {
+	query_changed: 'query',
+	config_changed: 'config',
+	function_changed: 'function',
+	changed_functions: 'function',
+	schema_changed: 'schema'
+};
+/** A section's rows in words, for the breakdown of a group of several sections. */
+const SECTION_WORD: Partial<Record<PlanPageSection, string>> = {
+	routine_models: 'models',
+	functions: 'functions',
+	seeds: 'seeds',
+	renamed: 'renamed',
+	migrations: 'migrations',
+	column_migrations: 'column migrations',
+	table_type_conversions: 'table type changes',
+	retention: 'retention',
+	loader_reloads: 'loader reloads',
+	loader_loads: 'loader loads',
+	source_reloads: 'source reloads',
+	source_loads: 'source loads'
+};
+const sectionWord = (section: PlanPageSection) => SECTION_WORD[section] ?? section.replace(/_/g, ' ');
+/** Sections whose rows are catalog models, so they link to the catalog. */
+const MODEL_ROWS = new Set<PlanPageSection>(['query_changed', 'function_changed', 'config_changed', 'schema_changed', 'first_run', 'renamed', 'routine_models', 'migrations', 'column_migrations', 'table_type_conversions', 'retention', 'held_back', 'unchanged']);
+/** A whole plan's full refresh, which plan-text sums by materialization rather than listing as a section of models. */
+const TITLE_SECTION: Record<string, PlanPageSection> = { 'Full refresh': 'full_refresh' };
+/** The notes a section's subtitle can say once for its rows: why `--changed` runs them. */
+const ROW_NOTES = new Set(['run_reason', 'reads']);
+/** A seed's plan reason in words, for the Seeds breakdown; a current seed goes unsaid. */
+const SEED_REASON: Record<string, string> = { first_run: 'first run', config_changed: 'changed' };
 
 export type ChangeKind = 'query' | 'config' | 'function' | 'schema';
 
@@ -68,8 +101,12 @@ export type PlanRow = {
 	warnings: PlanWarning[];
 	/** Rows of plan-text's catalog-linked sections link to the catalog. */
 	linked: boolean;
-	/** A changed row's kinds of change, for its group's breakdown. */
+	/** A changed row's kinds of change. */
 	kinds?: string[];
+	/** The row's diff is read on demand ('diff'), or the server has none to give ('unavailable'). */
+	fetch: 'diff' | 'unavailable' | null;
+	/** A config change of at most two keys, read on demand to show inline. */
+	pendingConfig: boolean;
 };
 
 export type PlanGroup = {
@@ -80,10 +117,12 @@ export type PlanGroup = {
 	/** The breakdown under the title, such as "87 query · 6 config · 1 function", and a note every row shares. */
 	subtitle: string;
 	rows: PlanRow[];
-	/** The server pages still to load, in the order their rows follow the loaded ones. */
+	/** Its server sections' rows loaded so far, in the order their rows read. */
 	pages: { section: PlanPageSection; loaded: number; total: number }[];
 	/** The Warnings group's warnings, grouped by message. */
 	warningGroups?: WarningGroup[];
+	/** The server sections the group gathers, in plan order. */
+	sections: PlanPageSection[];
 };
 
 /** A warnings group: one message template and the warnings that fill it in. */
@@ -143,39 +182,53 @@ export function cursorWords(line: string): string {
 /** The order a row's kinds of change read in, as "config + query". */
 const KIND_ORDER: ChangeKind[] = ['config', 'query', 'function', 'schema'];
 
-/** A changed model's row: the kinds of change, line counts or the config change, and the diff it opens. */
-function changedRow(e: PlanEntry, kind: ChangeKind | undefined, linked: boolean): PlanRow {
+type Stats = { added: number; removed: number; whitespace_only: boolean };
+
+/**
+ * A changed model's row: the kinds of change, line counts (from the diff text when the row has it,
+ * else the server's counts) or the config change, and the diff it opens. `fetched` is the model's diff
+ * read on demand, null when the server has none to give.
+ */
+function changedRow(e: PlanEntry, kind: ChangeKind | undefined, linked: boolean, fetched?: PlanDiff | null): PlanRow {
+	const queryText = e.queryDiff ?? fetched?.query_diff;
+	const configText = e.configDiff ?? fetched?.config_diff;
+	const query: Stats | undefined = queryText?.length ? { ...diffStats(queryText), whitespace_only: whitespaceOnly(queryText) } : e.diffStats?.query;
+	const configStats: Stats | undefined = configText?.length ? { ...diffStats(configText), whitespace_only: false } : e.diffStats?.config;
 	const kinds = new Set<ChangeKind>();
 	if (kind) kinds.add(kind);
-	if (e.queryDiff?.length) kinds.add('query');
-	if (e.configDiff?.length) kinds.add('config');
+	if (query) kinds.add('query');
+	if (configStats) kinds.add('config');
 	if (e.schema?.length) kinds.add('schema');
 	const cause = e.detail.find((d) => d.startsWith('cause: function '));
 	if (cause) kinds.add('function');
-	const parts: string[] = [];
-	const config = e.configDiff?.length ? configChange(e.configDiff) : null;
-	const query = e.queryDiff?.length ? e.queryDiff : null;
-	const quiet = query ? whitespaceOnly(query) : false;
+	const config = configText?.length ? configChange(configText) : null;
+	// A config change of at most two keys reads inline once its text is read; until then the row waits for it.
+	const pendingConfig = !configText && !!configStats && configStats.added <= 2 && configStats.removed <= 2 && fetched === undefined;
+	const quiet = !!query?.whitespace_only;
 	const label = KIND_ORDER.filter((k) => kinds.has(k)).join(' + ');
+	const counts = query && !quiet ? `+${query.added} −${query.removed}` : null;
+	const parts: string[] = [];
 	if (quiet && kinds.size === 1) parts.push('whitespace only');
 	else {
-		const stats = query && !quiet ? diffStats(query) : null;
-		parts.push(stats && kinds.size === 1 ? `${label} +${stats.added} −${stats.removed}` : label);
+		parts.push(counts && kinds.size === 1 ? `${label} ${counts}` : label);
 		if (config) parts.push(config);
-		if (stats && kinds.size > 1) parts.push(`+${stats.added} −${stats.removed}`);
+		if (counts && kinds.size > 1) parts.push(counts);
 		if (quiet) parts.push('query whitespace only');
 	}
 	if (cause) parts.push(cause.slice('cause: function '.length));
 	if (e.schema?.length) parts.push(plural(e.schema.length, 'column'));
-	// The diff the link opens: the query, else a config too long to show inline, else the schema.
-	const diffOf = query ? 'query' : e.configDiff?.length && !config ? 'config' : e.schema?.length ? 'schema' : null;
-	const diff: DiffLine[] | null = diffOf
-		? [
-				...(e.configDiff?.length && !config ? e.configDiff.map((text) => ({ text, cls: lineClass(text) })) : []),
-				...(e.schema ?? []).map((f) => ({ text: `${f.sign} ${f.text}`, cls: (f.sign === '+' ? 'add' : f.sign === '-' ? 'del' : 'hunk') as DiffLine['cls'] })),
-				...(query ?? []).map((text) => ({ text, cls: lineClass(text) }))
-			]
-		: null;
+	// The diff the link opens: the query, else a config too long to read inline, else the schema.
+	const diffOf = query ? 'query' : configStats && !config && !pendingConfig ? 'config' : e.schema?.length ? 'schema' : null;
+	// Whether the row holds the text of the diff its link opens; if not, opening it reads it.
+	const held = diffOf === 'query' ? !!queryText : diffOf === 'config' ? !!configText : true;
+	const diff: DiffLine[] | null =
+		diffOf && held
+			? [
+					...(configText?.length && !config ? configText.map((text) => ({ text, cls: lineClass(text) })) : []),
+					...(e.schema ?? []).map((f) => ({ text: `${f.sign} ${f.text}`, cls: (f.sign === '+' ? 'add' : f.sign === '-' ? 'del' : 'hunk') as DiffLine['cls'] })),
+					...(queryText ?? []).map((text) => ({ text, cls: lineClass(text) }))
+				]
+			: null;
 	return {
 		name: e.name,
 		action: e.value,
@@ -185,23 +238,18 @@ function changedRow(e: PlanEntry, kind: ChangeKind | undefined, linked: boolean)
 		diffOf,
 		warnings: e.warnings ?? [],
 		linked,
-		// Its plan reason's kind first: the group's breakdown counts the row by it.
-		kinds: [...kinds]
+		kinds: [...kinds],
+		fetch: (diffOf && !held && fetched === undefined) || pendingConfig ? 'diff' : diffOf && !held ? 'unavailable' : null,
+		pendingConfig
 	};
 }
 
 const plainRow = (e: PlanEntry, linked: boolean): PlanRow => {
 	const [first = '', ...rest] = e.detail.map(cursorWords);
-	return { name: e.name, action: e.value, detail: first, notes: rest, diff: null, diffOf: null, warnings: e.warnings ?? [], linked };
+	return { name: e.name, action: e.value, detail: first, notes: rest, diff: null, diffOf: null, warnings: e.warnings ?? [], linked, fetch: null, pendingConfig: false };
 };
 
-/** Sections whose rows are catalog models. */
-const linkedSection = (title: string) => !/unction|^Sources|^Loaders|^Full refresh|^Python/.test(title);
-
-/**
- * A note every row of a group shares, such as "no completed record", said once in its subtitle and
- * left off the rows. Only the loaded rows are known, so a paged group is judged by those.
- */
+/** A note every loaded row shares, such as "no completed record": for a whole plan, which comes without counted notes. */
 export function sharedNote(rows: PlanRow[]): string | null {
 	if (rows.length < 2) return null;
 	const lines = (r: PlanRow) => [r.detail, ...r.notes].filter(Boolean);
@@ -215,6 +263,19 @@ function withoutNote(row: PlanRow, note: string): PlanRow {
 		return { ...row, detail: next, notes: rest };
 	}
 	return { ...row, notes: row.notes.filter((n) => n !== note) };
+}
+
+/**
+ * The note most of a section's rows share, from the server's counts: its text on a row, and as the
+ * subtitle says it, "no completed record (all 1,507)" or "(1,200 of 1,507)". Said only when more than
+ * half the rows carry it; `all` when every row does, so the rows can leave it off.
+ */
+export function sectionNote(count: PlanSectionCount): { row: string; text: string; all: boolean } | null {
+	const top = count.notes.filter((n) => ROW_NOTES.has(n.kind) && n.value).sort((a, b) => b.count - a.count)[0];
+	if (!top || top.count * 2 <= count.total) return null;
+	const row = top.kind === 'reads' ? `reads ${top.value}` : top.value!;
+	const all = top.count >= count.total;
+	return { row, all, text: `${row} (${all ? `all ${count.total.toLocaleString()}` : `${top.count.toLocaleString()} of ${count.total.toLocaleString()}`})` };
 }
 
 /**
@@ -251,85 +312,94 @@ export function groupWarnings(warnings: PlanWarning[]): WarningGroup[] {
 		.sort((a, b) => b.warnings.length - a.warnings.length);
 }
 
-/** The plan's groups in index order, empty ones left out; `refresh` words what refreshes a held-back job's nodes. */
-export function planGroups(plan: PlanDocument, refresh: (job: string) => string = (job) => `job ${job}`): PlanGroup[] {
+/** The plan's sections with their sizes and notes: the server summary's, else counted from a whole plan's rows. */
+export function sectionCounts(plan: PlanDocument, sections: PlanSection[]): PlanSectionCount[] {
+	if (plan.sections) return plan.sections;
+	const counts: PlanSectionCount[] = sections.flatMap((s) => {
+		const section = s.section ?? TITLE_SECTION[s.title];
+		return section ? [{ section, total: sectionSize(s), notes: [] }] : [];
+	});
+	const warnings = looseWarnings(plan, sections).length;
+	return warnings ? [...counts, { section: 'warnings', total: warnings, notes: [] }] : counts;
+}
+
+/**
+ * The plan's groups in index order, empty ones left out: counts and notes from the server's sections,
+ * rows those loaded so far. `refresh` words what refreshes a held-back job's nodes; `diffs` holds the
+ * diffs read on demand, by model (null: the server has none to give).
+ */
+export function planGroups(plan: PlanDocument, refresh: (job: string) => string = (job) => `job ${job}`, diffs: ReadonlyMap<string, PlanDiff | null> = new Map()): PlanGroup[] {
 	const sections: PlanSection[] = [...planSections(plan), ...(plan.changed ? changedSections(plan.changed, refresh, plan.pages) : [])];
-	// A group gathers plan sections, each with its rows and size. Its rows read section by section; the
-	// sections after a paged one wait until all its pages have loaded, so loaded rows read in order and
-	// the next page follows them.
-	type Part = { title: string; rows: PlanRow[]; size: number; paged: boolean; complete: boolean };
-	const byKey = new Map<PlanGroupKey, { parts: Part[]; count: number; pages: PlanGroup['pages'] }>();
-	const group = (key: PlanGroupKey) => {
-		let g = byKey.get(key);
-		if (!g) byKey.set(key, (g = { parts: [], count: 0, pages: [] }));
-		return g;
-	};
-	const part = (key: PlanGroupKey, title: string) => {
-		const g = group(key);
-		let p = g.parts.find((x) => x.title === title);
-		if (!p) g.parts.push((p = { title, rows: [], size: 0, paged: false, complete: true }));
-		return p;
-	};
-	// Seeds that aren't current belong with the changes: a first run, or a changed seed.
-	for (const s of sections) {
-		const [key, kind] = SECTION_GROUP[s.title] ?? ['changed'];
-		const linked = linkedSection(s.title);
-		if (s.title === 'Seeds') {
-			for (const e of s.entries) {
-				const to: PlanGroupKey = e.value === 'first_run' ? 'first_run' : e.value === 'seed_changed' ? 'changed' : 'unchanged';
-				const p = part(to, 'Seeds');
-				p.rows.push(to === 'changed' ? { ...plainRow(e, false), detail: 'seed changed', kinds: ['seed'] } : plainRow(e, false));
-				p.size++;
-				group(to).count++;
-			}
-			continue;
-		}
-		const g = group(key);
-		const p = part(key, s.title);
-		p.rows.push(...s.entries.map((e) => (key === 'changed' ? changedRow(e, kind, linked) : plainRow(e, linked))));
-		p.size += sectionSize(s);
-		g.count += sectionSize(s);
-		if (s.page && s.total !== undefined) {
-			g.pages.push({ section: s.page, loaded: s.entries.length, total: s.total });
-			p.paged = true;
-			p.complete = s.entries.length >= s.total;
-		}
-	}
+	const textOf = new Map(sections.map((s) => [s.section ?? TITLE_SECTION[s.title], s]));
+	const counts = sectionCounts(plan, sections);
 	const warnings = looseWarnings(plan, sections);
 	const grouped = warnings.length ? groupWarnings(warnings) : [];
-	// A server summary pages the warnings like any section: its count stands until they load.
-	const warningTotal = plan.pages?.warnings;
-	if (warnings.length || warningTotal) {
-		const g = group('warnings');
-		g.count = warningTotal ?? warnings.length;
-		if (warningTotal !== undefined) g.pages.push({ section: 'warnings', loaded: loadedRows(plan, 'warnings'), total: warningTotal });
-	}
+	// A whole plan (an older server's, or the mock's) has every row and no counted notes.
+	const whole = !plan.sections;
 	return ORDER.flatMap((key) => {
-		const g = byKey.get(key);
-		if (!g || !g.count) return [];
-		// The big paged section first (an Unchanged group's models), then the small ones once it is all loaded.
-		const parts = [...g.parts].sort((a, b) => Number(b.paged) - Number(a.paged));
+		const mine = counts.filter((c) => GROUP_OF[c.section] === key && c.total > 0);
+		if (!mine.length) return [];
+		const count = mine.reduce((n, c) => n + c.total, 0);
 		const notes: string[] = [];
 		const rows: PlanRow[] = [];
-		for (const [i, p] of parts.entries()) {
-			if (i > 0 && !parts[i - 1].complete) break;
-			const note = key === 'warnings' ? null : sharedNote(p.rows);
-			if (note) notes.push(parts.length > 1 ? `${p.title.toLowerCase()}: ${note}` : note);
-			rows.push(...(note ? p.rows.map((r) => withoutNote(r, note)) : p.rows));
+		const pages: PlanGroup['pages'] = [];
+		let complete = true;
+		for (const c of mine) {
+			const entries = textOf.get(c.section)?.entries ?? [];
+			const loaded = key === 'warnings' ? loadedRows(plan, 'warnings') : entries.length;
+			if (!whole) pages.push({ section: c.section, loaded, total: c.total });
+			if (c.section === 'seeds') {
+				const reasons = c.notes.filter((n) => n.kind === 'reason' && n.value && SEED_REASON[n.value]).map((n) => `${n.count.toLocaleString()} ${SEED_REASON[n.value!]}`);
+				if (reasons.length) notes.push(`seeds: ${reasons.join(', ')}`);
+			}
+			// A section's rows follow the one before only once that one is all loaded, so rows read in order.
+			if (key === 'warnings' || !complete) continue;
+			const linked = MODEL_ROWS.has(c.section);
+			let sectionRows = entries.map((e) => (key === 'changed' ? changedRow(e, CHANGE_KIND[c.section], linked, diffs.get(e.name)) : plainRow(e, linked)));
+			// A changed row's run reason is its change, which the row already says.
+			const note = key === 'changed' ? null : whole ? sharedNote(sectionRows) : sectionNote(c);
+			const said = typeof note === 'string' ? note : note?.text;
+			if (said) notes.push(mine.length > 1 ? `${sectionWord(c.section)}: ${said}` : said);
+			// A note every row carries is said once, in the subtitle, and left off the rows.
+			const off = typeof note === 'string' ? note : note?.all ? note.row : null;
+			if (off) sectionRows = sectionRows.map((r) => withoutNote(r, off));
+			rows.push(...sectionRows);
+			complete = whole || entries.length >= c.total;
 		}
-		// A row with a config and a query change counts once, by its plan reason.
 		const kinds = new Map<string, number>();
-		for (const r of rows) if (r.kinds?.length) kinds.set(r.kinds[0], (kinds.get(r.kinds[0]) ?? 0) + 1);
+		if (key === 'changed') for (const c of mine) kinds.set(CHANGE_KIND[c.section] ?? sectionWord(c.section), (kinds.get(CHANGE_KIND[c.section] ?? sectionWord(c.section)) ?? 0) + c.total);
 		const breakdown =
 			key === 'changed'
 				? [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n.toLocaleString()} ${k}`)
 				: key === 'warnings'
-					? [plural(grouped.length, 'kind')]
-					: parts.length > 1
-						? parts.map((p) => `${p.size.toLocaleString()} ${p.title.toLowerCase()}`)
+					? grouped.length && (whole || loadedRows(plan, 'warnings') >= count)
+						? [plural(grouped.length, 'kind')]
+						: []
+					: mine.length > 1
+						? mine.map((c) => `${c.total.toLocaleString()} ${sectionWord(c.section)}`)
 						: [];
-		return [{ key, title: TITLES[key], count: g.count, subtitle: [...breakdown, ...notes].join(' · '), rows, pages: g.pages, ...(key === 'warnings' ? { warningGroups: grouped } : {}) }];
+		return [{ key, title: TITLES[key], count, subtitle: [...breakdown, ...notes].join(' · '), rows, pages, sections: mine.map((c) => c.section), ...(key === 'warnings' ? { warningGroups: grouped } : {}) }];
 	});
+}
+
+/** `plan` without its loaded rows: the start of a name-filtered view of it, whose pages hold only matching rows. */
+export function withoutRows(plan: PlanDocument): PlanDocument {
+	return {
+		...plan,
+		models: [],
+		seeds: [],
+		source_loads: [],
+		functions: [],
+		python_nodes: [],
+		warnings: [],
+		migrations: [],
+		column_migrations: [],
+		table_type_conversions: [],
+		retention: [],
+		loaded: {},
+		changed: plan.changed && { ...plan.changed, runs: [], held_back: [], unchanged: [] },
+		synced_copy: plan.synced_copy && { ...plan.synced_copy, cursor_window_starts: {} }
+	};
 }
 
 /** The index's one-line summary, such as "94 changed, 672 new, 121 renames, 64 loads, 433 Python · 1,507 unchanged". */

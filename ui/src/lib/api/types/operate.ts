@@ -675,8 +675,6 @@ export type PlanDocument = {
 	synced_copy: PlanSyncedCopy | null;
 	/** What `--changed` runs, holds back and skips; `null` without `--changed`. */
 	changed: PlanChanged | null;
-	/** A server summary's every built model, of which `models` holds the changed ones and the routine ones loaded so far. */
-	built_model_names?: string[];
 	/** A server summary's sections, by size; their rows load a page at a time. */
 	pages?: Partial<Record<PlanPageSection, number>>;
 	/** A server summary's nonempty sections in plan order, each with the notes its rows share most. */

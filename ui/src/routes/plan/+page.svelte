@@ -31,7 +31,7 @@
 	import PlanBrowser from '$lib/run/plan-browser.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { builtModelNames, builtSeeds, changedModelKeys, jobRefreshText, loadedRows } from '$lib/run/plan-text';
+	import { changedModelKeys, jobRefreshText, loadedRows } from '$lib/run/plan-text';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
@@ -161,6 +161,20 @@
 		const page = await app.client.planRows(scope, requestId, paged, loadedRows(plan, paged), limit);
 		if (planRequestId === requestId && plan) plan = mergePlanPage(plan, paged, page);
 	}
+	/** A page of a plan section's rows whose name contains `name`, for the plan list's filter. */
+	async function findPlanRows(paged: PlanPageSection, offset: number, limit: number, name: string) {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		if (!scope || !requestId) throw new Error('The plan has expired; plan again.');
+		return app.client.planRows(scope, requestId, paged, offset, limit, name);
+	}
+	/** A model's diff in the plan, read when its row opens it; null when the server has none to give. */
+	async function planDiff(model: string) {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		if (!scope || !requestId) return null;
+		return app.client.planDiff(scope, requestId, model);
+	}
 	function replan() {
 		plannedKey = '';
 		planError = null;
@@ -171,17 +185,42 @@
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const picked = $derived(shown?.selection ?? []);
 	let view = $state<'plan' | 'graph' | 'checks'>('plan');
-	/** The recorded checks on the models and seeds the plan builds, which run after them. */
+	/**
+	 * The recorded checks on the models and seeds the command selects, which run after them. The
+	 * selection is the one the command resolves to, as the plan request froze it; the plan's summary
+	 * carries no list of the nodes it builds.
+	 */
 	const planChecks = $derived.by(() => {
 		if (!plan) return [];
-		const built = new Set([...builtModelNames(plan), ...builtSeeds(plan).map((s) => s.name)]);
-		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && built.has(c.node.slice(c.node.indexOf(':') + 1)));
+		const selected = new Set(picked);
+		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && selected.has(c.node));
 	});
 	/** The tab shown: a replan with no checks leaves the Checks tab for the plan. */
 	const tab = $derived(view === 'checks' && !(shown?.verb === 'build' && planChecks.length) ? 'plan' : view);
 	/** A large selection draws only what the plan changes; the whole of it would be unreadable. */
 	const GRAPH_LIMIT = 150;
-	const graphKeys = $derived(picked.length > GRAPH_LIMIT && plan ? changedModelKeys(plan) : picked);
+	/** Sections of models the plan changes, read a page each for the graph of a large selection. */
+	const CHANGED_MODEL_SECTIONS: PlanPageSection[] = ['full_refresh', 'query_changed', 'function_changed', 'config_changed', 'schema_changed', 'first_run', 'renamed'];
+	let changedKeys = $state<{ requestId: string; keys: string[] } | null>(null);
+	$effect(() => {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		const sections = plan?.sections;
+		if (view !== 'graph' || picked.length <= GRAPH_LIMIT || !scope || !requestId || !sections || changedKeys?.requestId === requestId) return;
+		changedKeys = { requestId, keys: [] };
+		(async () => {
+			const keys: string[] = [];
+			for (const s of sections.filter((c) => CHANGED_MODEL_SECTIONS.includes(c.section) && c.total)) {
+				if (keys.length >= GRAPH_LIMIT) break;
+				const page = await app.client.planRows(scope, requestId, s.section, 0, GRAPH_LIMIT - keys.length);
+				keys.push(...(page.rows as { name: string }[]).map((m) => `model:${m.name}`));
+			}
+			if (planRequestId === requestId) changedKeys = { requestId, keys };
+		})().catch(() => {});
+	});
+	/** The models the plan changes: read from the server a section at a time, or from a whole plan's rows. */
+	const planChanged = $derived(plan?.sections ? (changedKeys?.requestId === planRequestId ? changedKeys.keys : []) : plan ? changedModelKeys(plan) : []);
+	const graphKeys = $derived(picked.length > GRAPH_LIMIT && plan ? planChanged : picked);
 
 	// ---- autocomplete ----
 	let caret = $state(0);
@@ -271,7 +310,8 @@
 	);
 
 	/** The banner shows only problems that stop this run or touch what it builds; the rest stay on the Overview. */
-	const planRelations = $derived(new Set([...(plan?.models ?? []).flatMap((m) => [m.name, m.qualified_name?.split('.').at(-1)]), ...(plan?.built_model_names ?? [])].filter((n): n is string => !!n).map((n) => n.toLowerCase())));
+	// The command's selection names every relation the plan can build; the loaded rows add their warehouse names.
+	const planRelations = $derived(new Set([...(plan?.models ?? []).flatMap((m) => [m.name, m.qualified_name?.split('.').at(-1)]), ...picked.map((key) => key.slice(key.indexOf(':') + 1))].filter((n): n is string => !!n).map((n) => n.toLowerCase())));
 	function affectsPlan(event: PlatformEvent): boolean {
 		if (event.kind === 'scheduler_no_leader') return true;
 		if (event.locationId !== app.location?.id) return false;
@@ -398,7 +438,7 @@
 					{/snippet}
 				</DataTable>
 			{:else if shown?.verb === 'build' && plan}
-				<PlanBrowser {plan} {refresh} {section} onselect={(key) => (section = key)} more={planRequestId ? morePlan : undefined} />
+				<PlanBrowser {plan} {refresh} {section} onselect={(key) => (section = key)} more={planRequestId ? morePlan : undefined} load={planRequestId ? findPlanRows : undefined} diff={planRequestId ? planDiff : undefined} />
 			{:else if shown?.verb && shown.verb !== 'build'}
 				<DataTable class="static compact" embedded columns={nodeColumns} rows={picked} key={(key) => key} rowHeight={32} empty="No nodes selected.">
 					{#snippet row(key)}

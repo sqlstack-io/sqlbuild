@@ -14,6 +14,8 @@ export type PlanEntry = {
 	detail: string[];
 	queryDiff?: string[];
 	configDiff?: string[];
+	/** A server page's diff counts, in place of the diff text, which is read on demand. */
+	diffStats?: PlanModel['diff_stats'];
 	schema?: { sign: '+' | '-' | '~'; text: string }[];
 	/** The plan's warnings about this model, such as the CLI's forward-only replay warning, shown with it. */
 	warnings?: PlanWarning[];
@@ -23,7 +25,8 @@ export type PlanEntry = {
  * `collapsed` sections show one line, such as "4 unchanged, skipped by --changed", until opened. A `page`d section
  * holds the rows loaded so far of its `total`; the rest load from the server's plan a page at a time.
  */
-export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolean; collapsed?: boolean; page?: PlanPageSection; total?: number };
+/** `section` is the server's section the rows are; `page` and `total` are set when its rows come a page at a time. */
+export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolean; collapsed?: boolean; section?: PlanPageSection; page?: PlanPageSection; total?: number };
 
 /** The section's size: its paged total, or the rows it holds. */
 export const sectionSize = (s: PlanSection) => s.total ?? s.entries.length;
@@ -54,7 +57,6 @@ export function loadedRows(plan: PlanDocument, section: PlanPageSection): number
 }
 
 /** The names of every model the run builds, including routine ones a server summary has not loaded yet. */
-export const builtModelNames = (plan: PlanDocument): string[] => plan.built_model_names ?? builtModels(plan).map((m) => m.name);
 
 /** Each plan's `--changed` run nodes as a set, worked out once per plan: a large plan has thousands. */
 const runNodes = new WeakMap<PlanChanged, Set<string>>();
@@ -123,6 +125,7 @@ function changedEntry(m: PlanModel, reason: string, windowStart?: string): PlanE
 		],
 		queryDiff: m.query_diff,
 		configDiff: m.config_diff,
+		diffStats: m.diff_stats,
 		schema: m.schema_findings?.map((f) => {
 			const kind = SCHEMA_SIGNS[f.kind] ?? { sign: '~' as const, label: f.kind };
 			const types = f.kind === 'column_type_changed' ? `  ${f.expected_type ?? 'None'} → ${f.actual_type ?? 'None'}` : f.expected_type ? `  ${f.expected_type}` : '';
@@ -143,7 +146,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	const sections: PlanSection[] = [];
 	const add = (title: string, entries: PlanEntry[], changed = false, page?: PlanPageSection) => {
 		const total = page && plan.pages?.[page];
-		if (entries.length || total) sections.push({ title, entries, changed, ...(page && total !== undefined ? { page, total } : {}) });
+		if (entries.length || total) sections.push({ title, entries, changed, ...(page ? { section: page } : {}), ...(page && total !== undefined ? { page, total } : {}) });
 	};
 	// Work that runs before any model builds comes first, as in the CLI.
 	add('Migrations', plan.migrations.map((r) => ({ name: r.model, value: [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · '), detail: [] })), true, 'migrations');
@@ -214,8 +217,8 @@ export function changedSections(changed: PlanChanged, refresh: (job: string) => 
 	const sections: PlanSection[] = [];
 	const paged = (page: 'held_back' | 'unchanged') => (pages?.[page] !== undefined ? { page, total: pages[page] } : {});
 	const held = changed.held_back.map((h) => ({ name: keyName(h.node), value: 'refreshed_by' in h ? h.refreshed_by.map(refresh).join(' · ') : `reads ${keyName(h.reads)}, which is held back`, detail: [] }));
-	if (held.length || pages?.held_back) sections.push({ title: 'Held back', entries: held, changed: false, ...paged('held_back') });
-	if (changed.unchanged.length || pages?.unchanged) sections.push({ title: 'Unchanged', entries: changed.unchanged.map((key) => ({ name: keyName(key), value: 'skipped by --changed', detail: [] })), changed: false, collapsed: true, ...paged('unchanged') });
+	if (held.length || pages?.held_back) sections.push({ title: 'Held back', entries: held, changed: false, section: 'held_back', ...paged('held_back') });
+	if (changed.unchanged.length || pages?.unchanged) sections.push({ title: 'Unchanged', section: 'unchanged', entries: changed.unchanged.map((key) => ({ name: keyName(key), value: 'skipped by --changed', detail: [] })), changed: false, collapsed: true, ...paged('unchanged') });
 	return sections;
 }
 

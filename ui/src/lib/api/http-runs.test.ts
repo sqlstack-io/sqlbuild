@@ -317,7 +317,6 @@ describe('mergePlanPage', () => {
 		kind: 'plan',
 		document: {
 			models: [{ name: 'orders', action: 'create_table', reason: 'query_changed' }],
-			built_model_names: ['orders', 'customers', 'payments'],
 			pages: { routine_models: 2, unchanged: 3 },
 			changed: { counts: ['definition'], reach: 'all', runs: [{ node: 'model:orders', reason: 'definition changed', downstream_of: null }], held_back: [], unchanged: [] }
 		}

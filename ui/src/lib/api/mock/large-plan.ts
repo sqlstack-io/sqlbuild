@@ -3,7 +3,7 @@
 // first runs, renames, loads, Python nodes, repeated warnings and 1,507 routine models. Served as the
 // server does: a summary, with routine models, held-back and skipped nodes a page at a time. Pure.
 
-import type { PlanDiff, PlanDocument, PlanModel, PlanPage, PlanPageSection, PlanSectionCount, PlanSectionNote, PlanWarning } from '../types';
+import type { PlanDiff, PlanDiffStats, PlanDocument, PlanModel, PlanPage, PlanPageSection, PlanSectionCount, PlanSectionNote, PlanWarning } from '../types';
 
 const DOMAINS = ['orders', 'customers', 'inventory', 'payments', 'shipping', 'returns', 'pricing', 'suppliers', 'regions', 'finance', 'marketing', 'support'];
 const LAYERS = ['stg', 'int', 'mart'];
@@ -179,16 +179,33 @@ export function planPage(doc: PlanDocument, section: PlanPageSection, offset: nu
 	return {
 		total: matching.length,
 		section_total: all.length,
-		rows,
+		rows: models ? (rows as PlanModel[]).map(withDiffStats) : rows,
 		runs: (doc.changed?.runs ?? []).filter((r) => names.has(keyName(r.node))),
 		warnings: doc.warnings.filter((w) => names.has(w.model_name ?? w.message.split(':', 1)[0])),
 		cursor_window_starts: Object.fromEntries(Object.entries(starts).filter(([model]) => names.has(model)))
 	};
 }
 
+/** A diff's changed lines, and whether they differ only in whitespace, as the server counts them. */
+function stats(diff: string[]): PlanDiffStats {
+	const side = (sign: string) => diff.filter((l) => l.startsWith(sign) && !/^(---|\+\+\+)/.test(l));
+	const text = (lines: string[]) => lines.map((l) => l.slice(1)).join('').replace(/\s+/g, '');
+	const [added, removed] = [side('+'), side('-')];
+	return { added: added.length, removed: removed.length, whitespace_only: text(added) === text(removed) };
+}
+
+/** A model row as a page carries it: its diff counted, the text left for the diff read. */
+function withDiffStats({ query_diff, config_diff, ...m }: PlanModel): PlanModel {
+	if (!query_diff && !config_diff) return m;
+	return { ...m, diff_stats: { ...(query_diff ? { query: stats(query_diff) } : {}), ...(config_diff ? { config: stats(config_diff) } : {}) } };
+}
+
+/** A model whose diff the server won't give, as for a user without permission to read its SQL. */
+export const DIFF_WITHHELD = name(79);
+
 /** A model's diff text from the whole document, as the server's plan diff read returns it. */
 export function planModelDiff(doc: PlanDocument, model: string): PlanDiff | null {
 	const found = doc.models.find((m) => m.name === model);
-	if (!found || !(found.query_diff || found.config_diff)) return null;
+	if (!found || model === DIFF_WITHHELD || !(found.query_diff || found.config_diff)) return null;
 	return { model, ...(found.query_diff ? { query_diff: found.query_diff } : {}), ...(found.config_diff ? { config_diff: found.config_diff } : {}) };
 }
