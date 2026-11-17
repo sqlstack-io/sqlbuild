@@ -6,6 +6,8 @@ pub(crate) mod helpers;
 mod test_crash_recovery;
 #[path = "test_foreign_key_indexes.rs"]
 mod test_foreign_key_indexes;
+#[path = "test_store_migrations.rs"]
+mod test_store_migrations;
 #[path = "test_store_upgrade.rs"]
 mod test_store_upgrade;
 #[path = "test_types.rs"]
