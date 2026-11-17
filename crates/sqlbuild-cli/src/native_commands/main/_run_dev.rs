@@ -7,12 +7,12 @@ use sqlbuild_orchestration::store::errors::ControlError;
 use crate::argv::models::Namespace;
 use crate::dev_screen::main::start_dev_screen::start_dev_screen;
 use crate::dev_screen::models::DevScreenHandle;
-use crate::native_commands::_helpers::decision::{flag, text};
-use crate::native_commands::_helpers::execution::run_development_roles;
-use crate::native_commands::_helpers::execution::{
+use crate::native_commands::_helpers::command::decision::{flag, text};
+use crate::native_commands::_helpers::command::project_facts::development_target;
+use crate::native_commands::_helpers::location::execution::run_development_roles;
+use crate::native_commands::_helpers::location::execution::{
     announced_store, loopback_address, screen_setup,
 };
-use crate::native_commands::_helpers::project_facts::development_target;
 
 pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
     let project =

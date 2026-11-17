@@ -6,9 +6,7 @@ use std::time::Duration;
 
 use sqlbuild_cache::project_snapshot::models::PathStamp;
 use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
-use sqlbuild_orchestration::platform::models::{
-    ConnectionCheckTrigger, LocationWorkClient, LocationWorkPoll,
-};
+use sqlbuild_orchestration::platform::models::{LocationWorkClient, LocationWorkPoll};
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 use tokio::sync::{mpsc, watch};
@@ -16,21 +14,22 @@ use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::argv::models::Stream;
-use crate::native_commands::_helpers::execution::{
-    apply_dev_controls, compile_next_generation, finish_compile,
-};
-use crate::native_commands::_helpers::execution::{
-    dev_controls, location_clock, location_heartbeats, next_turn, shutdown_signal,
-};
-use crate::native_commands::_helpers::paths::{
+use crate::native_commands::_helpers::command::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
-use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::{
+    apply_dev_controls, compile_next_generation, finish_compile,
+};
+use crate::native_commands::_helpers::location::execution::{
+    dev_controls, location_clock, location_heartbeats, next_turn, shutdown_signal,
+};
+use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_changed_build::report_changed_build;
 use crate::native_commands::main::_location_compiler::run_location_compiler;
 use crate::native_commands::main::_location_metadata::sync_location_metadata;
-use crate::native_commands::main::_location_work::{next_work_check, run_location_work};
+use crate::native_commands::main::_location_work::run_location_work;
 use crate::native_commands::models::{
     DevControlState, LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
 };
@@ -76,7 +75,6 @@ async fn watch_location(
     let mut deferred_sync: Option<(Vec<WarehouseStateLocation>, i64)> = None;
     let mut work_at = Instant::now() + LOCATION_WORK_IDLE_POLL;
     let mut published_generation = None;
-    let mut checked = false;
     let mut metadata = None;
     let mut clock = location_clock();
     let stopped = shutdown_signal();
@@ -111,7 +109,7 @@ async fn watch_location(
         if !ready {
             let connected: bool = controls.borrow().warehouse == Some(true);
             let Some(idle) = poll_location(
-                (options, script, &requests, connected),
+                (options, script, (&requests, connected)),
                 (client, poll, published_generation),
                 (watch, work_at, metadata),
                 stopped.as_mut(),
@@ -139,16 +137,13 @@ async fn watch_location(
             watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
             continue;
         };
-        let published: bool = load.is_ok();
-        published_generation = published.then_some(generation);
-        let trigger = if checked {
-            ConnectionCheckTrigger::Publish
-        } else {
-            ConnectionCheckTrigger::Startup
+        published_generation = match &load {
+            Ok(_) => Some(generation),
+            Err(_) => None,
         };
         let Some(settled) = finish_compile(
             (options, script, (bearer, poll.session_id)),
-            (load, generation, trigger),
+            (load, generation),
             (watch, metadata, deferred_sync),
             (&mut controls, stopped.as_mut()),
         )
@@ -156,18 +151,16 @@ async fn watch_location(
         else {
             return Ok(());
         };
-        checked |= published;
         (watch, metadata, deferred_sync) = settled;
     }
 }
 
 /// Named work and metadata share one idle turn; what changed is planned after a sync completes.
 async fn poll_location(
-    (options, script, runtime, connected): (
+    (options, script, (runtime, connected)): (
         &LocationServe,
         &Path,
-        &mpsc::Sender<LocationRuntimeRequest>,
-        bool,
+        (&mpsc::Sender<LocationRuntimeRequest>, bool),
     ),
     (client, poll, generation): (&LocationWorkClient, &LocationWorkPoll, Option<i64>),
     (mut watch, mut work_at, mut metadata): (LocationWatch, Instant, Option<LocationMetadataSync>),
@@ -177,7 +170,7 @@ async fn poll_location(
     if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
         if Instant::now() >= work_at {
             let Some(turn) = run_location_work(
-                (options, script, runtime, connected),
+                (options, script, (runtime, connected)),
                 (client, poll, &watch),
                 generation,
                 stopped.as_mut(),

@@ -1,4 +1,4 @@
-use crate::native_commands::_helpers::project_facts::{
+use crate::native_commands::_helpers::command::project_facts::{
     development_project_name, has_no_runtime_extensions,
 };
 use crate::native_commands::tests::helpers::write_tree;

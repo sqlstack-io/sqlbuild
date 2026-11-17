@@ -16,7 +16,7 @@ use sqlbuild_rules::rules::main::builtin_options::builtin_options;
 use sqlbuild_rules::rules::main::catalogue::catalogue;
 use sqlbuild_rules::rules::models::{BuiltinOption, BuiltinOptionKind};
 
-use crate::native_commands::_helpers::project_facts::has_custom_rules;
+use crate::native_commands::_helpers::command::project_facts::has_custom_rules;
 use crate::native_commands::constants::{
     DICT_TYPE_NAME, EMPTY_TUPLE_REPR, FALSE_REPR, FAMILY_SUFFIX_LENGTH, MODEL_SUBJECT,
     PROJECT_SUBJECT, RULE_SELECTOR_REQUIRED, RULES_USAGE_EXIT_CODE, UNKNOWN_RULE_PREFIX,

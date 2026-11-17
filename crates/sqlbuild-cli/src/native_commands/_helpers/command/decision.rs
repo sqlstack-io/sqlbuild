@@ -22,7 +22,7 @@ use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
 use crate::argv::models::{ArgvOutcome, Namespace, Value};
 use crate::dispatch::main::invocation_policy::invocation_policy;
 use crate::dispatch::models::{CommandFacts, InvocationPolicy};
-use crate::native_commands::_helpers::terminal::read_password;
+use crate::native_commands::_helpers::command::terminal::read_password;
 use crate::native_commands::constants::{
     CLEAN_COMMAND, INIT_COMMAND, RULES_COMMAND, RULES_LIST_ACTION, RULES_SHOW_ACTION,
     SKILLS_COMMAND,

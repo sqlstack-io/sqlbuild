@@ -36,6 +36,7 @@ pub(crate) fn location_watch(root: &Path) -> LocationWatch {
         changed_at: tokio::time::Instant::now(),
         retry_at: None,
         commit_checked_at: tokio::time::Instant::now(),
+        checked: false,
     }
 }
 

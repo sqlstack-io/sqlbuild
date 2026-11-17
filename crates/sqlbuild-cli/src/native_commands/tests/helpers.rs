@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
 use crate::argv::models::{ArgvOutcome, ArgvSettings};
-use crate::native_commands::_helpers::argv_host::{NativeArgvHost, namespace_defaults};
-use crate::native_commands::_helpers::execution::acknowledge_metadata_page;
+use crate::native_commands::_helpers::command::argv_host::{NativeArgvHost, namespace_defaults};
+use crate::native_commands::_helpers::location::execution::acknowledge_metadata_page;
 use crate::native_commands::models::{LocationMetadataPage, LocationMetadataSync};
 
 /// Parse `argv` onto the `CliNamespace` defaults with the native host.

@@ -2,7 +2,7 @@ use std::io;
 
 use crate::argv::models::Stream;
 use crate::launcher::constants::{PROGRAM_NAME, PROGRAM_VERSION};
-use crate::native_commands::_helpers::terminal::{line_reset, lost_stdout};
+use crate::native_commands::_helpers::command::terminal::{line_reset, lost_stdout};
 use crate::native_commands::models::LostStdout;
 use crate::native_commands::tests::helpers::parse;
 use crate::native_commands::tests::test_types::{

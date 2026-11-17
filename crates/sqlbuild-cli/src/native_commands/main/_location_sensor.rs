@@ -7,7 +7,7 @@ use std::time::Duration;
 use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use sqlbuild_orchestration::store::errors::ControlError;
 
-use crate::native_commands::_helpers::execution::location_result;
+use crate::native_commands::_helpers::location::execution::location_result;
 use crate::native_commands::constants::{SENSOR_EVALUATION_SECONDS, SENSOR_RESULT_BYTES};
 use crate::native_commands::models::LocationServe;
 

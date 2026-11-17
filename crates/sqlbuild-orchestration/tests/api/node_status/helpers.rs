@@ -22,8 +22,12 @@ use crate::warehouse_metadata::main::{
 };
 use crate::warehouse_metadata::models::{CatalogNodeRecord, MetadataBatch, NodeStatusQuery};
 
-/// Statements a catalog listing issues besides one build read per 100 nodes: 8 fixed, 1 per extra namespace shape.
-const WIDE_LISTING_FIXED_STATEMENTS: usize = 9;
+/// Statements a cold node-list cache issues besides one build read per 100 nodes, 12 in all.
+/// The authorization transaction makes 5: its clock read, the node keys the listing authorizes, the principal,
+/// its roles and the current snapshot. The view transaction makes 6: its clock read, the current snapshot again,
+/// the snapshot's node definitions, the latest attempts, the check counts and the changed build.
+/// The 12th is the build read for the second namespace shape (nodes with and without a database).
+const WIDE_LISTING_FIXED_STATEMENTS: usize = 12;
 
 /// A new server's node list, so every listing reads the store.
 async fn list_person_catalog_nodes(

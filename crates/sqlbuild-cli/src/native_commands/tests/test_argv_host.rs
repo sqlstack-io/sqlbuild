@@ -1,6 +1,6 @@
 use crate::argv::models::{TypeFailure, Value};
 use crate::argv::types::ArgvHost;
-use crate::native_commands::_helpers::argv_host::NativeArgvHost;
+use crate::native_commands::_helpers::command::argv_host::NativeArgvHost;
 use crate::native_commands::tests::test_types::ConversionTestCase;
 
 /// Integer expectations recorded from CPython 3.12 `int(text)`.

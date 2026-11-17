@@ -13,35 +13,36 @@ use crate::dev_screen::models::{DevStep, ScreenMessage};
 use crate::dev_screen::types::DevScreenParts;
 use crate::dev_session::main::run_dev_session::run_dev_session;
 use crate::dev_session::models::{DevProject, LocationPipes};
-use crate::native_commands::_helpers::decision::{
+use crate::native_commands::_helpers::command::decision::{
     control_address, control_database, control_database_variable, flag, text,
 };
-use crate::native_commands::_helpers::init::run_init;
-use crate::native_commands::_helpers::package::installed_package;
-use crate::native_commands::_helpers::paths::exclude_location_databases;
-use crate::native_commands::_helpers::paths::{location_database_files, project_location};
-use crate::native_commands::_helpers::project_facts::has_no_runtime_extensions;
-use crate::native_commands::_helpers::project_facts::{
+use crate::native_commands::_helpers::command::init::run_init;
+use crate::native_commands::_helpers::command::package::installed_package;
+use crate::native_commands::_helpers::command::paths::exclude_location_databases;
+use crate::native_commands::_helpers::command::paths::{location_database_files, project_location};
+use crate::native_commands::_helpers::command::project_facts::has_no_runtime_extensions;
+use crate::native_commands::_helpers::command::project_facts::{
     development_project_name, project_directory_name, project_name,
 };
-use crate::native_commands::_helpers::rules::run_rules;
-use crate::native_commands::_helpers::skills::{run_skills, skill_freshness_notice};
-use crate::native_commands::_helpers::terminal::share_terminal;
-use crate::native_commands::_helpers::terminal::{
+use crate::native_commands::_helpers::command::rules::run_rules;
+use crate::native_commands::_helpers::command::skills::{run_skills, skill_freshness_notice};
+use crate::native_commands::_helpers::command::terminal::share_terminal;
+use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
-use crate::native_commands::_helpers::terminal::{live_screen, stderr_columns};
+use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_columns};
+use crate::native_commands::_helpers::location::sync_report::{
+    metadata_health, read_timeout_seconds, rows_text, scan_line,
+};
 use crate::native_commands::constants::SCREEN_INDENT;
 use crate::native_commands::constants::{
-    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_ERROR_CHARS,
+    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS,
     METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
     METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
     UNKNOWN_COMMAND,
 };
-use crate::native_commands::constants::{
-    METADATA_PAGE_SECONDS, PLAN_NOT_PRODUCED, STATISTICS_RELATION_SECONDS,
-};
+use crate::native_commands::constants::{METADATA_PAGE_SECONDS, PLAN_NOT_PRODUCED};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
@@ -62,7 +63,6 @@ use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
 use crate::workers::main::terminate_child::terminate_child;
 use crate::workers::models::{Launchers, Workers};
-use chrono::DateTime;
 use chrono::Utc;
 use serde_json::json;
 use sqlbuild_cache::project_snapshot::models::PathStamp;
@@ -93,8 +93,8 @@ use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
+use sqlbuild_orchestration::platform::models::ConnectionCheckTrigger;
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
-use sqlbuild_orchestration::platform::models::{ConnectionCheckTrigger, WarehouseSyncProgress};
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
@@ -779,15 +779,6 @@ pub(crate) fn location_warning(title: &str, detail: String) {
     }));
 }
 
-/// Operational cost is elapsed IO time, not an estimate of warehouse billing.
-pub(crate) async fn metadata_health(
-    state: &LocationMetadataSync,
-    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
-    (started, failure): (Instant, Option<WarehouseSyncFailure>),
-) {
-    report_metadata_health(state, (client, poll), (started, failure, None)).await;
-}
-
 /// Health IO remains native even while a user-code child holds its interpreter's GIL.
 pub(crate) async fn report_location_health(
     options: &LocationServe,
@@ -951,7 +942,7 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
 /// Check the connection after a publication: the first in a process is its startup check.
 pub(crate) async fn check_published_location(
     (options, script, connect): (&LocationServe, &Path, bool),
-    (bearer, session_id, generation, trigger): (&str, Uuid, i64, ConnectionCheckTrigger),
+    ((bearer, session_id), generation, trigger): ((&str, Uuid), i64, ConnectionCheckTrigger),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Vec<PathBuf>>, ControlError> {
     drop(write_output(&[(
@@ -1420,6 +1411,7 @@ pub(crate) async fn read_metadata_page(
         ) => match result {
             Ok((reader, Ok(MetadataReply::Page(page)))) => {
                 state.reader = Some(reader);
+                state.failed_reads = 0;
                 Ok(page)
             }
             Ok((reader, Ok(MetadataReply::Busy))) => {
@@ -1438,9 +1430,6 @@ pub(crate) async fn read_metadata_page(
             Err(_) => Err(ReadFailure::TimedOut(seconds)),
         },
     };
-    if read.is_ok() {
-        state.failed_reads = 0;
-    }
     Ok(Some((state, read)))
 }
 
@@ -1633,9 +1622,8 @@ pub(crate) fn note_compiled_inputs(
 /// Sync a published generation's warehouse state, or defer it until the warehouse connects, then check the location.
 pub(crate) async fn settle_publication(
     (options, script, (bearer, session_id)): (&LocationServe, &Path, (&str, Uuid)),
-    (locations, generation, connect, trigger): (
-        Vec<WarehouseStateLocation>,
-        i64,
+    ((locations, generation), connect, trigger): (
+        (Vec<WarehouseStateLocation>, i64),
         bool,
         ConnectionCheckTrigger,
     ),
@@ -1657,7 +1645,7 @@ pub(crate) async fn settle_publication(
     };
     let Some(files) = check_published_location(
         (options, script, connect),
-        (bearer, session_id, generation, trigger),
+        ((bearer, session_id), generation, trigger),
         stopped,
     )
     .await?
@@ -1683,7 +1671,11 @@ pub(crate) async fn apply_dev_controls(
     };
     let settled: Option<Settled> = settle_publication(
         (options, script, session),
-        (locations, generation, true, ConnectionCheckTrigger::Publish),
+        (
+            (locations, generation),
+            true,
+            ConnectionCheckTrigger::Publish,
+        ),
         (watch, metadata),
         stopped,
     )
@@ -1789,7 +1781,7 @@ pub(crate) async fn development_store(
 /// After a compile: a publication waits for the `sqb dev` warehouse verdict and settles; a failure keeps the last good snapshot.
 pub(crate) async fn finish_compile(
     (options, script, session): (&LocationServe, &Path, (&str, Uuid)),
-    (load, generation, trigger): (LoadOutcome, i64, ConnectionCheckTrigger),
+    (load, generation): (LoadOutcome, i64),
     (mut watch, metadata, deferred): Settled,
     (controls, stopped): (
         &mut watch::Receiver<DevControlState>,
@@ -1813,6 +1805,12 @@ pub(crate) async fn finish_compile(
         }
     };
     watch.retry_at = refresh_at;
+    let trigger = if watch.checked {
+        ConnectionCheckTrigger::Publish
+    } else {
+        ConnectionCheckTrigger::Startup
+    };
+    watch.checked = true;
     let connect: bool = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         verdict = controls.wait_for(|control| control.warehouse.is_some()) => {
@@ -1821,7 +1819,7 @@ pub(crate) async fn finish_compile(
     };
     settle_publication(
         (options, script, session),
-        (locations, generation, connect, trigger),
+        ((locations, generation), connect, trigger),
         (watch, metadata),
         stopped.as_mut(),
     )
@@ -1884,146 +1882,6 @@ pub(crate) async fn exchange_location_plan(
         .map_err(|_| ControlError::Invalid("location interpreter returned an invalid plan".into()))
 }
 
-/// One table's line as its scan completes, e.g. `Warehouse history 3/14: audit results, 1,204 rows in 0.8 s`.
-pub(crate) fn scan_line(state: &LocationMetadataSync, scans: usize) -> String {
-    let namespace = if state.locations.len() > 1 {
-        let location = state.location();
-        match &location.database {
-            Some(database) => format!(" in {database}.{}", location.schema),
-            None => format!(" in {}", location.schema),
-        }
-    } else {
-        String::new()
-    };
-    let read = if state.progress.scan_unchanged {
-        "unchanged".to_owned()
-    } else {
-        rows_text(state.progress.scan_rows)
-    };
-    format!(
-        "Warehouse history {}/{scans}: {}{namespace}, {read} in {:.1} s\n",
-        state.index + 1,
-        state.kind().as_str().replace('_', " "),
-        state.progress.scan_started.elapsed().as_secs_f64()
-    )
-}
-
-/// Where a sync has got to; a clean report of the last table's last page completes it.
-pub(crate) fn sync_progress(state: &LocationMetadataSync, clean: bool) -> WarehouseSyncProgress {
-    let kinds = (state.locations.len() * WarehouseHistoryKind::ALL.len()) as u64;
-    let page = state.pending.as_ref();
-    let rows = state.progress.sync_rows
-        + state.progress.scan_rows
-        + page.map_or(0, |page| page.batch.records.len() as u64);
-    let scan_done = page.is_none_or(|page| page.next_source_after.is_none());
-    WarehouseSyncProgress {
-        position: state.index as u64 + 1,
-        kinds,
-        rows,
-        elapsed_millis: state.progress.sync_started.elapsed().as_millis() as u64,
-        completed: clean && scan_done && state.index as u64 + 1 == kinds,
-        halted: state.halted,
-    }
-}
-
-/// A row count with thousands separators, e.g. `31,204 rows`.
-pub(crate) fn rows_text(rows: u64) -> String {
-    let digits = rows.to_string();
-    let mut grouped = String::new();
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(digit);
-    }
-    format!("{grouped} {}", if rows == 1 { "row" } else { "rows" })
-}
-
-/// When the next safety sync is due once this report's page completes the sync; `None` without a timed one.
-pub(crate) fn completed_sync_next_at(
-    state: &LocationMetadataSync,
-    failure: Option<WarehouseSyncFailure>,
-    now: DateTime<Utc>,
-) -> Option<DateTime<Utc>> {
-    let completes = sync_progress(state, failure.is_none()).completed;
-    completes.then(|| safety_sync_at(state, now)).flatten()
-}
-
-/// When a timed safety sync follows from `now`, under the same rules as `completed_sync_next_at`.
-pub(crate) fn safety_sync_at(
-    state: &LocationMetadataSync,
-    now: DateTime<Utc>,
-) -> Option<DateTime<Utc>> {
-    (state.safety_seconds > 0 && !state.defers_safety_sync())
-        .then(|| i64::try_from(state.safety_seconds).ok())
-        .flatten()
-        .and_then(|seconds| now.checked_add_signed(chrono::Duration::seconds(seconds)))
-}
-
-/// A page's health report: a failed read adds its cause, redacted error, page size and whether it stops the sync.
-pub(crate) fn metadata_health_of(
-    state: &LocationMetadataSync,
-    (started, failure, read): (
-        Instant,
-        Option<WarehouseSyncFailure>,
-        Option<(&ReadFailure, bool)>,
-    ),
-    now: DateTime<Utc>,
-) -> LocationHealth {
-    let halted: bool = read.is_some_and(|(_, halts)| halts);
-    let next_sync_at = if halted {
-        safety_sync_at(state, now)
-    } else {
-        completed_sync_next_at(state, failure, now)
-    };
-    let read_failure = read.and_then(|(read, _)| read.cause());
-    LocationHealth::WarehouseSync {
-        generation: state.generation,
-        location: state.location().clone(),
-        table: state.kind(),
-        failure,
-        records_sent: state
-            .pending
-            .as_ref()
-            .map_or(0, |page| page.batch.records.len()) as u64,
-        elapsed_millis: started.elapsed().as_millis() as u64,
-        page_limit: read_failure.map(|_| page_limit(state) as u64),
-        read_failure,
-        error: read
-            .filter(|(read, _)| read.cause().is_some())
-            .map(|(read, _)| read.reason().chars().take(METADATA_ERROR_CHARS).collect()),
-        progress: Some(WarehouseSyncProgress {
-            halted,
-            ..sync_progress(state, failure.is_none())
-        }),
-        next_sync_at,
-    }
-}
-
-/// Send `metadata_health_of` for this page; a failed report is logged, never fatal.
-pub(crate) async fn report_metadata_health(
-    state: &LocationMetadataSync,
-    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
-    (started, failure, read): (
-        Instant,
-        Option<WarehouseSyncFailure>,
-        Option<(&ReadFailure, bool)>,
-    ),
-) {
-    let report = LocationHealthReport {
-        event_id: Uuid::now_v7(),
-        session_id: poll.session_id,
-        target: poll.target.clone(),
-        health: metadata_health_of(state, (started, failure, read), Utc::now()),
-    };
-    if let Err(error) = client.report_health(&report).await {
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!("Warehouse synchronization health report failed: {error}\n"),
-        )]));
-    }
-}
-
 /// The safety sync interval from the flag, then the environment, then the project; `None` when unset.
 pub(crate) fn safety_sync_setting(
     flag: Option<&str>,
@@ -2058,22 +1916,4 @@ pub(crate) fn plan_error(failed: &serde_json::Value) -> serde_json::Value {
         "message": text("message").unwrap_or_else(|| PLAN_NOT_PRODUCED.to_owned()),
         "help": text("help"),
     }})
-}
-
-/// How long one page may take: statistics scale with their relations, other pages get a fixed allowance.
-pub(crate) fn read_timeout_seconds(state: &LocationMetadataSync) -> u64 {
-    if state.kind() == WarehouseHistoryKind::Statistics {
-        METADATA_POLL_SECONDS + STATISTICS_RELATION_SECONDS * state.statistics_limit as u64
-    } else {
-        state.page_seconds
-    }
-}
-
-/// The page size a read asked for: statistics relations, or rows of any other table.
-pub(crate) fn page_limit(state: &LocationMetadataSync) -> usize {
-    if state.kind() == WarehouseHistoryKind::Statistics {
-        state.statistics_limit
-    } else {
-        state.limit
-    }
 }

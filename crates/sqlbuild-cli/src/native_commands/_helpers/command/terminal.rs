@@ -1,7 +1,7 @@
 //! The process's terminal: its width, colour support and stream writes.
 
 use crate::argv::models::Stream;
-use crate::native_commands::_helpers::argv_host::python_int;
+use crate::native_commands::_helpers::command::argv_host::python_int;
 use crate::native_commands::constants::CLEAR_TERMINAL_LINE;
 use crate::native_commands::constants::{
     BROKEN_PIPE_EXCEPTION, CI_VARIABLE, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE,
@@ -13,6 +13,9 @@ use crate::native_commands::models::LostStdout;
 use sqlbuild_orchestration::store::errors::ControlError;
 use std::io::{self, BufRead, IsTerminal, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Whether a child that may draw a spinner line shares this process's terminal.
+static TERMINAL_SHARED: AtomicBool = AtomicBool::new(false);
 
 /// `int(os.environ["COLUMNS"])`, `0` when unset or not an integer; beyond 64 bits is Python's.
 fn columns_variable() -> Result<i64, PythonNeeded> {
@@ -224,9 +227,6 @@ pub(crate) fn stderr_columns() -> usize {
 pub(crate) fn stderr_columns() -> usize {
     usize::try_from(FALLBACK_COLUMNS).unwrap_or(80)
 }
-
-/// Whether a child that may draw a spinner line shares this process's terminal.
-static TERMINAL_SHARED: AtomicBool = AtomicBool::new(false);
 
 /// A child interpreter now writes to this terminal; later writes clear its spinner line first.
 pub(crate) fn share_terminal() {

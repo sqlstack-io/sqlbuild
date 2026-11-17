@@ -187,6 +187,8 @@ pub(crate) struct LocationWatch {
     pub(crate) retry_at: Option<tokio::time::Instant>,
     /// Git commits matter to publication metadata, but asking git every tick spawns a process each time.
     pub(crate) commit_checked_at: tokio::time::Instant,
+    /// Whether a generation has published, so the next publication's connection check is not the startup check.
+    pub(crate) checked: bool,
 }
 
 /// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
@@ -544,4 +546,14 @@ pub(crate) enum LostStdout {
     Dropped,
     /// Raised by the write: an uncaught exception, with this last line and status 1.
     Raised(String),
+}
+
+/// The copy file the location last read, the mirror version it holds and whether it has consumption.
+#[derive(Clone, Debug)]
+pub(crate) struct HeldCopy {
+    pub(crate) target: String,
+    pub(crate) generation: i64,
+    pub(crate) version: String,
+    pub(crate) consumption: bool,
+    pub(crate) path: PathBuf,
 }

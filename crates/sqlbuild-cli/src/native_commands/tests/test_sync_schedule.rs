@@ -3,7 +3,8 @@ use sqlbuild_orchestration::platform::models::WarehouseSyncFailure;
 use sqlbuild_orchestration::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
 use uuid::Uuid;
 
-use crate::native_commands::_helpers::execution::{completed_sync_next_at, metadata_sync};
+use crate::native_commands::_helpers::location::execution::metadata_sync;
+use crate::native_commands::_helpers::location::sync_report::completed_sync_next_at;
 use crate::native_commands::models::LocationMetadataPage;
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::SyncCompletionTestCase;

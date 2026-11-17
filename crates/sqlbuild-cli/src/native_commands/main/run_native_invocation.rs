@@ -3,8 +3,8 @@
 use std::path::Path;
 
 use crate::argv::models::Namespace;
-use crate::native_commands::_helpers::decision::native_invocation;
-use crate::native_commands::_helpers::execution::run_command;
+use crate::native_commands::_helpers::command::decision::native_invocation;
+use crate::native_commands::_helpers::location::execution::run_command;
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::NativeInvocation;
 

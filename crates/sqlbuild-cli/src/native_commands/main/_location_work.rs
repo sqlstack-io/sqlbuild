@@ -1,34 +1,36 @@
 //! Named outbound work shares the watcher's generation boundary, never its interpreter.
 
-use crate::argv::models::Stream;
-use crate::native_commands::_helpers::execution::check_location_connection;
-use crate::native_commands::_helpers::paths::location_files;
-use crate::native_commands::_helpers::terminal::write_output;
-use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
-use crate::native_commands::main::_location_plan::plan_location;
-use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
-use crate::native_commands::models::{LocationRuntimeRequest, LocationWorkTurn};
-use crate::native_commands::models::{LocationServe, LocationWatch};
+use std::future::Future;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
 use chrono::Utc;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::models::{
     LocationWork, LocationWorkClient, LocationWorkOutcome, LocationWorkPoll, LocationWorkResult,
 };
 use sqlbuild_orchestration::store::errors::ControlError;
-use std::future::Future;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 use uuid::Uuid;
 
+use crate::argv::models::Stream;
+use crate::native_commands::_helpers::command::paths::location_files;
+use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::check_location_connection;
+use crate::native_commands::_helpers::location::work::work_error;
+use crate::native_commands::main::_location_plan::plan_location;
+use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
+use crate::native_commands::models::{
+    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn,
+};
+
 /// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
-    (options, script, runtime, connected): (
+    (options, script, (runtime, connected)): (
         &LocationServe,
         &Path,
-        &mpsc::Sender<LocationRuntimeRequest>,
-        bool,
+        (&mpsc::Sender<LocationRuntimeRequest>, bool),
     ),
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
@@ -66,7 +68,7 @@ pub(super) async fn run_location_work(
         };
         let copy = (client, poll.session_id, claim.generation);
         let checked = perform_work(
-            (options, script, runtime, connected),
+            (options, script, (runtime, connected)),
             claim.request.work,
             copy,
             expires,
@@ -147,11 +149,10 @@ pub(super) async fn run_location_work(
 
 /// One named operation; `None` means it stopped at shutdown or its lease ended; `sqb dev` never signs in here.
 async fn perform_work(
-    (options, script, runtime, connected): (
+    (options, script, (runtime, connected)): (
         &LocationServe,
         &Path,
-        &mpsc::Sender<LocationRuntimeRequest>,
-        bool,
+        (&mpsc::Sender<LocationRuntimeRequest>, bool),
     ),
     work: LocationWork,
     copy: (&LocationWorkClient, Uuid, i64),
@@ -189,29 +190,4 @@ async fn perform_work(
             .await?
             .map(|(document, diffs)| (LocationWorkOutcome::Plan { document, diffs }, Vec::new())),
     })
-}
-
-fn work_error(error: &ClientError) -> Result<(), ControlError> {
-    if matches!(error, ClientError::Configuration(_))
-        || matches!(error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
-    {
-        return Err(ControlError::Invalid(error.to_string()));
-    }
-    drop(write_output(&[(
-        Stream::Stderr,
-        &format!("Location work request failed: {error}\n"),
-    )]));
-    Ok(())
-}
-
-/// When to check for named work next: at once after a turn that claimed work, else after the idle interval.
-pub(in crate::native_commands) fn next_work_check(
-    turn: &LocationWorkTurn,
-    now: Instant,
-) -> Instant {
-    if turn.claimed {
-        now
-    } else {
-        now + LOCATION_WORK_IDLE_POLL
-    }
 }

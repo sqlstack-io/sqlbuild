@@ -16,8 +16,10 @@ use sqlbuild_core::init_command::main::scaffold_blank_project::scaffold_blank_pr
 
 use crate::dispatch::main::failure_report::failure_report;
 use crate::dispatch::models::CommandFailure;
-use crate::native_commands::_helpers::skills::home_dir;
-use crate::native_commands::_helpers::terminal::{error_description, stdout_supports_color};
+use crate::native_commands::_helpers::command::skills::home_dir;
+use crate::native_commands::_helpers::command::terminal::{
+    error_description, stdout_supports_color,
+};
 use crate::native_commands::constants::{INIT_FAILURE_PREFIX, USER_ERROR_CLASS};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{CommandOutput, InstalledPackage};

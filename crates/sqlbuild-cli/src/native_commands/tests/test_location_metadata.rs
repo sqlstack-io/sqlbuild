@@ -1,9 +1,11 @@
-use crate::native_commands::_helpers::execution::{
-    history_request, read_metadata_page, rows_text, safety_sync_setting, scan_line, sync_progress,
+use crate::native_commands::_helpers::location::execution::metadata_sync;
+use crate::native_commands::_helpers::location::execution::{
+    history_request, read_metadata_page, safety_sync_setting,
 };
-use crate::native_commands::_helpers::execution::{metadata_health_of, metadata_sync};
+use crate::native_commands::_helpers::location::sync_report::{
+    metadata_health_of, read_failure_line, rows_text, scan_line, sync_progress,
+};
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_SAFETY_SYNC_SECONDS};
-use crate::native_commands::main::_location_metadata::read_failure_line;
 use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{

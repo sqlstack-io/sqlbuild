@@ -9,11 +9,13 @@ use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::sync::mpsc;
 
 use crate::argv::models::Stream;
-use crate::native_commands::_helpers::execution::{
+use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::{
     exchange_location_generation, exchange_location_plan,
 };
-use crate::native_commands::_helpers::execution::{open_location_runtime, stop_location_runtime};
-use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::{
+    open_location_runtime, stop_location_runtime,
+};
 use crate::native_commands::models::{
     LocationCompileRequest, LocationCompiler, LocationPlanRequest, LocationRuntimeRequest,
     LocationServe,

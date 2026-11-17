@@ -25,8 +25,8 @@ use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
-use crate::native_commands::_helpers::decision::control_admin;
-use crate::native_commands::_helpers::execution::open_control_store;
+use crate::native_commands::_helpers::command::decision::control_admin;
+use crate::native_commands::_helpers::location::execution::open_control_store;
 use crate::native_commands::models::ControlAdmin;
 
 pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlError> {

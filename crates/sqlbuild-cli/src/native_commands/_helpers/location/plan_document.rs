@@ -7,7 +7,7 @@ use sqlbuild_core::plan_display::main::detach_model_diffs::detach_model_diffs;
 use sqlbuild_orchestration::platform::constants::{PLAN_DIFF_BYTES, PLAN_DOCUMENT_BYTES};
 use sqlbuild_orchestration::platform::models::PlanModelDiff;
 
-use crate::native_commands::_helpers::execution::{plan_failure, without_diffs};
+use crate::native_commands::_helpers::location::execution::{plan_failure, without_diffs};
 use crate::native_commands::constants::{PLAN_NOT_PRODUCED, PLAN_OUTPUT_BYTES};
 use crate::native_commands::types::LocationPlan;
 

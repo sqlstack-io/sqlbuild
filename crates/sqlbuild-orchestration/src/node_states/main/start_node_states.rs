@@ -1,4 +1,4 @@
-//! Committed change signals mark held views stale; a lost signal or a resync refreshes every held view.
+//! Committed change signals mark held views stale; a lost signal or a resync refreshes every held view and pushes only what changed, since clients refetch on `all`.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -37,14 +37,17 @@ pub(crate) fn start_node_states(
                         continue;
                     }
                 };
-                let entries = match message {
+                let (entries, announced) = match message {
                     Ok(ChangeMessage::Changed {
                         location_id,
                         target_hash,
                         topic: ChangeTopic::NodeStatus | ChangeTopic::Snapshot,
-                    }) => held_targets(&cache, Some((location_id, &target_hash))),
+                    }) => (
+                        held_targets(&cache, Some((location_id, &target_hash))),
+                        true,
+                    ),
                     Ok(ChangeMessage::Resync) | Err(broadcast::error::RecvError::Lagged(_)) => {
-                        held_targets(&cache, None)
+                        (held_targets(&cache, None), false)
                     }
                     Ok(_) => continue,
                     Err(broadcast::error::RecvError::Closed) => {
@@ -52,6 +55,12 @@ pub(crate) fn start_node_states(
                     }
                 };
                 for entry in entries {
+                    if announced {
+                        entry
+                            .1
+                            .announce
+                            .store(true, std::sync::atomic::Ordering::SeqCst);
+                    }
                     schedule_refresh(&cache, &mut refreshes, entry);
                 }
             }

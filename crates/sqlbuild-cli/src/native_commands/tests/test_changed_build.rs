@@ -2,10 +2,10 @@ use chrono::Utc;
 use serde_json::json;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
 
-use crate::native_commands::_helpers::execution::metadata_sync;
-use crate::native_commands::main::_location_changed_build::{
+use crate::native_commands::_helpers::location::changed_build::{
     changed_build_nodes, changed_build_settings,
 };
+use crate::native_commands::_helpers::location::execution::metadata_sync;
 use crate::native_commands::models::LocationMetadataSync;
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{

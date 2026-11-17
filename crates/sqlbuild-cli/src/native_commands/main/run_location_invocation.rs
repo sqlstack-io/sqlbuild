@@ -9,9 +9,9 @@ use sqlbuild_orchestration::platform::models::LocationState;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::text;
-use crate::native_commands::_helpers::execution::location_options;
-use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::_helpers::command::decision::text;
+use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::location_options;
 use crate::native_commands::main::_run_dev::run_dev;
 use crate::native_commands::main::_run_location::run_location;
 

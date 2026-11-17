@@ -108,7 +108,7 @@ type CommandParts = (
 );
 
 /// Parse `command` and keep only allowed flags, as an ad-hoc run or plan freezes it before resolving selectors.
-fn command_parts(command: &[String]) -> Result<CommandParts, String> {
+pub(crate) fn command_parts(command: &[String]) -> Result<CommandParts, String> {
     let verb = command
         .first()
         .ok_or_else(|| "enter a command, such as build --select orders".to_owned())?;
@@ -156,11 +156,6 @@ fn command_parts(command: &[String]) -> Result<CommandParts, String> {
         command_settings_arguments(verb, &settings)?;
     }
     Ok((verb.clone(), selectors, settings))
-}
-
-/// The validated settings `command` freezes to, the same as a run or plan request of it gets; selectors are not resolved.
-pub(crate) fn command_settings(command: &[String]) -> Result<BTreeMap<String, Json>, String> {
-    command_parts(command).map(|(_, _, settings)| settings)
 }
 
 /// Whole numbers convert as the parser needs them; `--vars` must be a JSON object; paths stay text so the refusal can name them.

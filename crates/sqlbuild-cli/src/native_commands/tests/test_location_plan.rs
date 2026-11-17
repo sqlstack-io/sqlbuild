@@ -1,9 +1,9 @@
 use serde_json::{Value, json};
 use sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
 
+use crate::native_commands::_helpers::location::plan_document::plan_document;
+use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
-use crate::native_commands::main::_location_work::next_work_check;
-use crate::native_commands::main::_plan_document::plan_document;
 use crate::native_commands::models::LocationWorkTurn;
 use crate::native_commands::tests::helpers::plan_output;
 use crate::native_commands::tests::test_types::{PlanDocumentTestCase, WorkCheckTestCase};

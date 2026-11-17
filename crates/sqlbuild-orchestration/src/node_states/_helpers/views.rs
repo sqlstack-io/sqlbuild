@@ -146,7 +146,7 @@ fn changed_states(
         .collect()
 }
 
-/// Mark the target changed and start its debounced refresh unless one is already pending.
+/// Mark the target changed and start its debounced refresh unless one is already pending; only a target a store signal named announces an unchanged refresh.
 pub(crate) fn schedule_refresh(
     cache: &NodeStateCache,
     refreshes: &mut tokio::task::JoinSet<Option<ControlError>>,
@@ -162,10 +162,11 @@ pub(crate) fn schedule_refresh(
         loop {
             tokio::time::sleep(crate::node_states::constants::NODE_STATES_DEBOUNCE).await;
             entry.dirty.store(false, Ordering::SeqCst);
+            let announced: bool = entry.announce.swap(false, Ordering::SeqCst);
             {
                 let _refreshing = entry.refresh.lock().await;
                 if let Err(error) =
-                    refresh_view(&cache, (location_id, &target), (&entry, true)).await
+                    refresh_view(&cache, (location_id, &target), (&entry, announced)).await
                 {
                     failure = Some(error);
                 }

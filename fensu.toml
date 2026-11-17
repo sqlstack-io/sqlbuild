@@ -1962,7 +1962,7 @@ reason = "The existing interpreter-exit signal is process-wide and monotonic: ev
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
-path = "crates/sqlbuild-cli/src/native_commands/_helpers/terminal.rs"
+path = "crates/sqlbuild-cli/src/native_commands/_helpers/command/terminal.rs"
 symbols = ["share_terminal"]
 reason = "Whether a location's interpreter shares the terminal is process-wide and monotonic: once the supervisor starts it, every later write from any location task must first clear its spinner line."
 
@@ -3226,7 +3226,7 @@ paths = ["crates/sqlbuild-analysis/src/warehouse_types/_helpers/type_trees.rs", 
 reason = "Each is a short stack walk over a JSON syntax tree with its own stop and collect rule: cast_targets collects every cast's target type, branch_selects stops at each set-operation branch, and walked lists every object. A shared visitor would need a callback for each rule and save no logic."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-cli/src/native_commands/_helpers/project_facts.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/checking/native_header_parser.rs"]
+paths = ["crates/sqlbuild-cli/src/native_commands/_helpers/command/project_facts.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/checking/native_header_parser.rs"]
 reason = "Field lookups on unrelated value types in different crates: project configuration takes the first matching field of a built object, while rule headers take the last entry of an authored map so a repeated key overrides earlier ones."
 
 [[dupes.allowlist]]

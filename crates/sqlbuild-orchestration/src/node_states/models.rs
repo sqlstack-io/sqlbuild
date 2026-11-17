@@ -96,6 +96,8 @@ pub(crate) struct TargetCache {
     pub(crate) refresh: tokio::sync::Mutex<()>,
     pub(crate) dirty: AtomicBool,
     pub(crate) scheduled: AtomicBool,
+    /// A store signal named this target since its last refresh, so the refresh pushes a notice even when nothing changed.
+    pub(crate) announce: AtomicBool,
 }
 
 /// One version of a target's states; each response body is serialized at most once.
