@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.237.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.4...v0.237.0) (2026-11-17)
+
+
+### Features
+
+* report job group cycles at compile and deliver invocation starts first ([#1539](https://github.com/sqlstack-io/sqlbuild/issues/1539)) ([1dce3d9](https://github.com/sqlstack-io/sqlbuild/commit/1dce3d9581bdf832022dd13cdf9a977241e68945))
+
 ## [0.236.4](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.3...v0.236.4) (2026-11-17)
 
 

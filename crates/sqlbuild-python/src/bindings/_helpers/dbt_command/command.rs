@@ -6,7 +6,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::dbt_command::main::dbt_output_options::dbt_output_options;
 use sqlbuild_core::dbt_command::models::DbtOutputOptions;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
 use crate::bindings::_helpers::dbt_command::auto_init::{args_tuple, ensure_twin_project};
 use crate::bindings::_helpers::dbt_command::debug::run_dbt_debug;
 use crate::bindings::_helpers::dbt_command::support::{color_enabled, effective_dir, flag, stream};
@@ -20,6 +19,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
 use sqlbuild_python_base::records::types::NativeAttr;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
 
 const PLAN_COMMAND: &str = "plan";
 const DEBUG_COMMAND: &str = "debug";

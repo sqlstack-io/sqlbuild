@@ -14,11 +14,11 @@ use sqlbuild_core::check_command::models::{CheckGrouping, CheckResultText, Check
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::json::models::JsonValue;
 
-use crate::bindings::_helpers::result_output::terminal_index::current_terminal_event_index;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::result_output::main::json_value::json_value;
+use sqlbuild_python_output::result_output::main::events::current_terminal_event_index::current_terminal_event_index;
 
 const WARN_SEVERITY: &str = "warn";
 

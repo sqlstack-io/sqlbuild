@@ -8,6 +8,7 @@ use crate::graph::_helpers::project::project_graph::outcome;
 use crate::graph::_helpers::project::views::lineage_graph_views;
 use crate::graph::_helpers::python_nodes::python_selection::project_sources;
 use crate::graph::_helpers::python_nodes::python_selection::selection_graph;
+use crate::graph::constants::LOADER_KIND;
 use crate::graph::main::project::project_graph::project_graph;
 use crate::graph::main::python_nodes::python_node_graph::python_node_graph;
 use pyo3::prelude::Bound;
@@ -47,6 +48,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 
@@ -439,6 +441,32 @@ impl ProjectSelection {
             .map(|node| format!("{}:{name}", node.kind))
     }
 
+    /// Each Python node's published key and the keys it reads: its upstream Python nodes and its SQL deps.
+    pub fn node_deps(&self) -> Vec<(String, BTreeSet<String>)> {
+        let upstream: BTreeMap<&str, &[String]> = self
+            .nodes
+            .upstream
+            .iter()
+            .map(|(name, names)| (name.as_str(), names.as_slice()))
+            .collect();
+        let mut nodes: Vec<(String, BTreeSet<String>)> = Vec::new();
+        for node in &self.nodes.nodes {
+            let mut deps: BTreeSet<String> = BTreeSet::new();
+            for name in upstream
+                .get(node.name.as_str())
+                .copied()
+                .unwrap_or_default()
+            {
+                deps.extend(self.node_key(name));
+            }
+            for (kind, name) in &node.sql_deps {
+                deps.insert(format!("{kind}:{name}"));
+            }
+            nodes.push((format!("{}:{}", node.kind, node.name), deps));
+        }
+        nodes
+    }
+
     /// The key a selected Python node's run reports under; a loader reports as the source it writes.
     pub(crate) fn run_key(&self, name: &str) -> Option<String> {
         let node = self
@@ -448,6 +476,11 @@ impl ProjectSelection {
             .rev()
             .find(|node| node.name == name)?;
         Some(python_run_key(&self.sources, (&node.kind, name)))
+    }
+
+    /// The `source:` key a loader node publishes when it writes no declared source, so its chain's other loaders can read it.
+    pub fn intermediate_source(&self, kind: &str, name: &str) -> Option<String> {
+        (kind == LOADER_KIND && self.intermediate_loader(name)).then(|| format!("source:{name}"))
     }
 
     /// Whether a loader writes no declared source and so runs only as part of another loader's chain.

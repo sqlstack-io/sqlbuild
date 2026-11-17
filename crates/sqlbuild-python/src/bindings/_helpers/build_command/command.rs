@@ -19,7 +19,6 @@ use crate::bindings::_helpers::build_command::planning::{
     write_compile_target, write_plan_text,
 };
 use crate::bindings::_helpers::check::check_core::relevant_check_functions;
-use crate::bindings::_helpers::recall::console::write_stderr;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::build_command::main::frozenset::frozenset;
@@ -34,6 +33,7 @@ use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_use
 use sqlbuild_python_front::discovery::main::sources::provider_uses::provider_uses;
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
 use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
+use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_planner::observations::main::arm_source_capture::arm_source_capture;
 use sqlbuild_python_planner::observations::main::take_source_capture::take_source_capture;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;

@@ -1,0 +1,3 @@
+name = "reference_job"
+description = "Build the regions seed and regional orders."
+select = "regions regional_orders"

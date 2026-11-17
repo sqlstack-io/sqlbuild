@@ -16,16 +16,11 @@ use crate::bindings::_helpers::build_command::execution::{
     Outcome, Preparation, write_run_context,
 };
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
-use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
-use crate::bindings::_helpers::build_progress::result_text::build_result_text;
 use crate::bindings::_helpers::check::check_results::check_result_text;
 use crate::bindings::_helpers::cost_report::degradation::{
     finalize_build_cost as finalize_cost, render_build_cost,
 };
 use crate::bindings::_helpers::cost_report::functions::cost_output_payload;
-use crate::bindings::_helpers::result_output::documents::format_build_execution_json;
-use crate::bindings::_helpers::result_output::documents::format_build_execution_json_with;
-use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use sqlbuild_core::build_progress::models::PythonNodeText;
 use sqlbuild_core::check_command::models::{CheckResultText, CheckStatus};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -43,6 +38,11 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::plan_has_executable_work::plan_has_executable_work;
 use sqlbuild_python_compile::compile_outputs::main::write_python_check_runtime_target::write_python_check_runtime_target;
 use sqlbuild_python_compile::compile_outputs::main::write_runtime_target::write_runtime_target;
+use sqlbuild_python_output::build_progress::main::build_result_text::build_result_text;
+use sqlbuild_python_output::build_progress::main::format_build_footer_with::format_build_footer_with;
+use sqlbuild_python_output::result_output::main::results::format_build_execution_json::format_build_execution_json;
+use sqlbuild_python_output::result_output::main::results::format_build_execution_json_with::format_build_execution_json_with;
+use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 
 const SUCCESS_STATUS: &str = "success";
 const CHECK_KIND: &str = "check";

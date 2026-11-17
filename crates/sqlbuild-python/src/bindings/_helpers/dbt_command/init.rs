@@ -11,7 +11,6 @@ use sqlbuild_core::dbt_command::main::render_dbt_init_summary::render_dbt_init_s
 use sqlbuild_core::dbt_command::models::DbtInitSummary;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::DbtInitProgressReporter;
 use crate::bindings::_helpers::dbt_command::init_project::build_dbt_init_project;
 use crate::bindings::_helpers::dbt_command::init_project::validate_dbt_init_project;
 use crate::bindings::_helpers::dbt_command::support::{color_enabled, flag, path, stream};
@@ -20,6 +19,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_output::build_progress::models::DbtInitProgressReporter;
 
 fn missing_project(py: Python<'_>) -> PyErr {
     new_error(

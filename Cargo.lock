@@ -4269,7 +4269,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.236.4"
+version = "0.237.0"
 dependencies = [
  "blake3",
  "chrono",
@@ -4433,7 +4433,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.236.4"
+version = "0.237.0"
 dependencies = [
  "chrono",
  "fensu-policy",
@@ -4456,6 +4456,7 @@ dependencies = [
  "sqlbuild-python-base",
  "sqlbuild-python-compile",
  "sqlbuild-python-front",
+ "sqlbuild-python-output",
  "sqlbuild-python-planner",
  "sqlbuild-python-project",
  "sqlbuild-recall",
@@ -4548,6 +4549,26 @@ dependencies = [
  "sqlbuild-state",
  "stacker",
  "uuid",
+]
+
+[[package]]
+name = "sqlbuild-python-output"
+version = "0.0.0"
+dependencies = [
+ "pyo3",
+ "serde_json",
+ "sqlbuild-analysis",
+ "sqlbuild-cache",
+ "sqlbuild-cli",
+ "sqlbuild-config",
+ "sqlbuild-core",
+ "sqlbuild-host",
+ "sqlbuild-orchestration",
+ "sqlbuild-python-base",
+ "sqlbuild-python-front",
+ "sqlbuild-python-planner",
+ "sqlbuild-python-project",
+ "sqlbuild-recall",
 ]
 
 [[package]]

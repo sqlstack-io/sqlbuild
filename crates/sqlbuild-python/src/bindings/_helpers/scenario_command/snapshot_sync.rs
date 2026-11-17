@@ -8,9 +8,6 @@ use sqlbuild_core::scenario_command::main::snapshot_capture_warning::snapshot_ca
 use sqlbuild_core::scenario_command::models::ScenarioNamespace;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
-use crate::bindings::_helpers::result_output::documents::format_scenario_snapshot_execution_json;
-use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::scenario_command::conversions::succeeded;
 use crate::bindings::_helpers::scenario_command::presentation::{
     CompletionKind, RelayContext, SectionStatus, begin_section, connection_hooks, progress_relay,
@@ -24,6 +21,9 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
+use sqlbuild_python_output::result_output::main::results::format_scenario_snapshot_execution_json::format_scenario_snapshot_execution_json;
+use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 
 /// The outcome of syncing local snapshots: its exit code and capture results.
 pub(crate) struct LocalSync<'py> {

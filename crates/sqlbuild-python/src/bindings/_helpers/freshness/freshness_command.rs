@@ -16,7 +16,6 @@ use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
 use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
@@ -25,6 +24,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_graph::build_project_graph;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 use sqlbuild_python_planner::freshness::main::observe_freshness::observe_freshness;
 use sqlbuild_python_planner::freshness::main::read_latest::read_latest;
 use sqlbuild_python_planner::freshness::models::Observer;

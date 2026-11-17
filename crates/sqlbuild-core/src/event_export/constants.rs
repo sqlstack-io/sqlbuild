@@ -16,6 +16,8 @@ pub const EVENT_EXPORT_KINDS: [&str; 8] = [
     "run",
     "statement",
 ];
+/// The event that starts an invocation, delivered before that invocation's other queued events.
+pub const INVOCATION_START_EVENT_TYPE: &str = "invocation_started";
 /// Invocation terminals, delivered only after every other queued event.
 pub const INVOCATION_TERMINAL_EVENT_TYPES: [&str; 2] =
     ["invocation_completed", "invocation_failed"];

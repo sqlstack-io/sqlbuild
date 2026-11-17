@@ -101,6 +101,8 @@ class HeldLockTestCase:
     builds_before_lock: int
     expected_exit_code: int
     expected_notice: str
+    expected_failed_records: int
+    expected_recorded_builds: int
     #: Far beyond the budget; only a build that waits for the lock itself reaches it.
     hang_guard_seconds: float
 
