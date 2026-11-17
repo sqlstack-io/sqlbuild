@@ -18,17 +18,33 @@ use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::check_location_connection;
 use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
-use crate::native_commands::models::{LocationRuntimeRequest, LocationServe, LocationWatch};
+use crate::native_commands::models::{
+    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn,
+};
 
-/// Retry the exact completed result without rerunning it; `true` asks the metadata loop to sync.
+/// When to check for named work next: at once after a turn that claimed work, as more is often
+/// queued behind it, such as a person planning again; otherwise after the idle interval.
+pub(in crate::native_commands) fn next_work_check(
+    turn: &LocationWorkTurn,
+    now: Instant,
+) -> Instant {
+    if turn.claimed {
+        now
+    } else {
+        now + LOCATION_WORK_IDLE_POLL
+    }
+}
+
+/// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
     (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(Vec<PathBuf>, bool)>, ControlError> {
+) -> Result<Option<LocationWorkTurn>, ControlError> {
     tokio::pin!(stopped);
     let claim = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
@@ -36,12 +52,12 @@ pub(super) async fn run_location_work(
             Ok(claim) => claim,
             Err(error) => {
                 work_error(&error)?;
-                return Ok(Some((Vec::new(), false)));
+                return Ok(Some(LocationWorkTurn::default()));
             },
         },
     };
     let Some(claim) = claim else {
-        return Ok(Some((Vec::new(), false)));
+        return Ok(Some(LocationWorkTurn::default()));
     };
     let deadline = Instant::now()
         + (claim.lease_expires_at - Utc::now())
@@ -72,7 +88,11 @@ pub(super) async fn run_location_work(
                 Stream::Stderr,
                 "Location work stopped before completion; no result reported.\n",
             )]));
-            return Ok((!shutting_down).then_some((files, false)));
+            return Ok((!shutting_down).then_some(LocationWorkTurn {
+                files,
+                sync: false,
+                claimed: true,
+            }));
         };
         files = local_files;
         let mut expected = watch.observed.clone();
@@ -107,7 +127,11 @@ pub(super) async fn run_location_work(
                     Stream::Stderr,
                     "Location work completed.\n",
                 )]));
-                return Ok(Some((files, sync)));
+                return Ok(Some(LocationWorkTurn {
+                    files,
+                    sync,
+                    claimed: true,
+                }));
             }
             Err(error) => {
                 work_error(&error)?;
@@ -125,7 +149,11 @@ pub(super) async fn run_location_work(
         Stream::Stderr,
         "Location work acknowledgement expired; check the server result before retrying.\n",
     )]));
-    Ok(Some((files, sync)))
+    Ok(Some(LocationWorkTurn {
+        files,
+        sync,
+        claimed: true,
+    }))
 }
 
 /// One named operation; `None` means it stopped at shutdown or its lease ended.

@@ -23,10 +23,11 @@ use crate::native_commands::_helpers::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_changed_build::report_changed_build;
 use crate::native_commands::main::_location_compiler::run_location_compiler;
 use crate::native_commands::main::_location_metadata::sync_location_metadata;
-use crate::native_commands::main::_location_work::run_location_work;
+use crate::native_commands::main::_location_work::{next_work_check, run_location_work};
 use crate::native_commands::models::{
     LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
 };
@@ -62,7 +63,7 @@ async fn watch_location(
     requests: mpsc::Sender<LocationRuntimeRequest>,
 ) -> Result<(), ControlError> {
     let mut watch = location_watch(&options.project_dir);
-    let mut work_at = Instant::now() + Duration::from_secs(2);
+    let mut work_at = Instant::now() + LOCATION_WORK_IDLE_POLL;
     let mut published_generation = None;
     // The first connection check of this process is its startup check.
     let mut checked = false;
@@ -192,7 +193,7 @@ async fn poll_location(
     tokio::pin!(stopped);
     if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
         if Instant::now() >= work_at {
-            let Some((files, sync)) = run_location_work(
+            let Some(turn) = run_location_work(
                 (options, script, runtime),
                 (client, poll, &watch),
                 generation,
@@ -202,9 +203,11 @@ async fn poll_location(
             else {
                 return Ok(None);
             };
-            watch = exclude_location_databases(&options.project_dir, files, watch);
-            work_at = Instant::now() + Duration::from_secs(2);
-            if sync && let Some(state) = metadata.as_mut() {
+            work_at = next_work_check(&turn, Instant::now());
+            watch = exclude_location_databases(&options.project_dir, turn.files, watch);
+            if turn.sync
+                && let Some(state) = metadata.as_mut()
+            {
                 state.request_sync();
             }
         }

@@ -188,3 +188,11 @@ pub(super) struct LineResetTestCase {
     pub(super) terminal: bool,
     pub(super) expected_reset: &'static [u8],
 }
+
+/// One turn of named work and how long the location waits before it checks for work again.
+pub(super) struct WorkCheckTestCase {
+    pub(super) description: &'static str,
+    pub(super) claimed: bool,
+    pub(super) sync: bool,
+    pub(super) expected_wait: std::time::Duration,
+}

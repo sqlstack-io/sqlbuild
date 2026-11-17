@@ -123,6 +123,8 @@ pub(crate) const CHANGED_BUILD_COMMAND: [&str; 2] = ["build", "--changed"];
 pub(crate) const PLAN_OUTPUT_BYTES: usize =
     8 * sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
 
+/// How long an idle location waits between checks for named work; after work it checks at once.
+pub(crate) const LOCATION_WORK_IDLE_POLL: std::time::Duration = std::time::Duration::from_secs(2);
 /// What a location reports when `sqb plan` produced no plan.
 pub(crate) const PLAN_NOT_PRODUCED: &str =
     "sqb plan did not produce a plan; see the location's log";

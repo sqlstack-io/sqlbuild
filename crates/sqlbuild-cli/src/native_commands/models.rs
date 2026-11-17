@@ -56,6 +56,14 @@ pub(crate) enum NativeParse {
 }
 
 /// What `sqb skills` installs.
+/// One turn of named work: the files it wrote, whether metadata should sync, and whether it claimed work.
+#[derive(Debug, Default)]
+pub(crate) struct LocationWorkTurn {
+    pub(crate) files: Vec<std::path::PathBuf>,
+    pub(crate) sync: bool,
+    pub(crate) claimed: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SkillsOptions {
     pub(crate) global_install: bool,

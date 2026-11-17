@@ -1,9 +1,12 @@
 use serde_json::{Value, json};
 use sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
 
+use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
+use crate::native_commands::main::_location_work::next_work_check;
 use crate::native_commands::main::_plan_document::plan_document;
+use crate::native_commands::models::LocationWorkTurn;
 use crate::native_commands::tests::helpers::plan_output;
-use crate::native_commands::tests::test_types::PlanDocumentTestCase;
+use crate::native_commands::tests::test_types::{PlanDocumentTestCase, WorkCheckTestCase};
 
 #[test]
 fn given_plan_output_when_reading_it_on_a_location_then_only_oversized_diffs_are_dropped() {
@@ -34,6 +37,44 @@ fn given_plan_output_when_reading_it_on_a_location_then_only_oversized_diffs_are
             test_case.expected_first_model,
             "{description}",
             description = test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_turn_of_location_work_when_scheduling_the_next_check_then_only_an_idle_turn_waits() {
+    let test_cases = [
+        WorkCheckTestCase {
+            description: "a finished plan checks at once, as a person often plans again",
+            claimed: true,
+            sync: false,
+            expected_wait: std::time::Duration::ZERO,
+        },
+        WorkCheckTestCase {
+            description: "a requested sync checks at once too",
+            claimed: true,
+            sync: true,
+            expected_wait: std::time::Duration::ZERO,
+        },
+        WorkCheckTestCase {
+            description: "nothing to claim waits the idle interval",
+            claimed: false,
+            sync: false,
+            expected_wait: LOCATION_WORK_IDLE_POLL,
+        },
+    ];
+    let now = tokio::time::Instant::now();
+    for test_case in test_cases {
+        let turn = LocationWorkTurn {
+            files: Vec::new(),
+            sync: test_case.sync,
+            claimed: test_case.claimed,
+        };
+        assert_eq!(
+            next_work_check(&turn, now) - now,
+            test_case.expected_wait,
+            "{}",
+            test_case.description
         );
     }
 }
