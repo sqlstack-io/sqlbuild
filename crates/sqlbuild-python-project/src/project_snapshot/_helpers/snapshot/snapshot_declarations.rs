@@ -254,6 +254,13 @@ pub(crate) fn compile_declarations(
                 "job group {name} lists a job twice"
             )));
         }
+        let members: BTreeSet<String> = members
+            .into_iter()
+            .filter(|member| jobs.contains_key(member))
+            .collect();
+        if members.is_empty() {
+            continue;
+        }
         let dependencies = group_dependencies((name, &input), &jobs, &members)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         let selection: BTreeSet<String> = members

@@ -281,7 +281,7 @@ fn is_sql_test(resource: &PlannerResource) -> bool {
     resource.key.split_once(':').map(|(kind, _)| kind) == Some(SQL_TEST_KIND)
 }
 
-/// The published keys the selectors match; Python nodes only when the command runs them.
+/// The published keys the selectors match; Python nodes only when the command runs them, round trips allowed because the launched command enforces the project's setting.
 fn resolved(
     (resources, jobs): (&[PlannerResource], &PublishedJobs),
     select: &[String],
@@ -322,6 +322,7 @@ fn resolved(
         SqlSelectionGraph {
             graph: &graph,
             sources: &sources,
+            allow_warehouse_round_trips: true,
         },
         &python_graph,
         select,

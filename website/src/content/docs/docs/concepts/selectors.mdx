@@ -67,6 +67,21 @@ sqb build --select seed:waffle_types
 sqb build --select source:raw__orders
 ```
 
+### Kind
+
+Select every node of one kind:
+
+```bash
+sqb build --select kind:seed
+sqb build --select "kind:model,path:models/marts"
+sqb build --select +kind:asset
+```
+
+The kinds are `model`, `source`, `seed`, `udf`, `table_fn`, `task`, `asset`, `loader` and
+`check`, as the server's catalog names them. Kind selectors compose with `+`, `,` and `--exclude`
+like tag selectors. An unknown kind is an error that names the closest kinds, and a kind your
+project has no nodes of is an error, as an unused tag is.
+
 ### Job
 
 Select the SQL and Python nodes a [job or job group](/docs/concepts/orchestration) builds. Job names are globally
@@ -161,6 +176,11 @@ sqb build --select "tag:staging,path:models/finance"
 
 This selects only models that match *both* conditions - in this case, models tagged `staging` that are also under the `models/finance` directory.
 
+Graph expansion applies to the part it is written on, before the parts are intersected.
+`+orders,kind:source` selects `orders` and everything upstream of it, then keeps only the sources:
+the sources `orders` reads. `kind:source,+orders` means the same. Spaces separate selectors, whose
+results are unioned, so `tag:finance kind:seed` selects nodes tagged `finance` and every seed.
+
 ## Combining select and exclude
 
 ```bash
@@ -181,6 +201,7 @@ error[S007]: unknown selector name 'nonexistent_model'
 error[S007]: unknown selector name 'missing_*'
 error[S009]: no models found under path 'models/nonexistent'.
 error[S000]: no SQL resources or Python nodes found with tag 'nonexistent_tag'
+error[S007]: unknown node kind 'modle'
 error[S003]: path selector 'fact_orders~' requires names on both sides of '~'
 error[S013]: selector 'order_status_rules' selects a unit test; only `sqb test` and `sqb build` accept unit-test selectors
 ```

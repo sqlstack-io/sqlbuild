@@ -5,15 +5,17 @@ use crate::compiled_views::main::project::compiled_models::compiled_models;
 use crate::compiled_views::main::project::sources::sources;
 use crate::graph::models::NativeProjectGraph;
 use crate::native_host::models::ModelHandle;
-use crate::planner_identity::main::execution_deps::execution_deps;
+use crate::planner_identity::main::execution_deps_with::execution_deps_with;
 use crate::planner_identity::main::execution_order::execution_order;
-use crate::planner_identity::main::execution_origins::execution_origins;
+use crate::planner_identity::main::execution_origins_with::execution_origins_with;
 use crate::planner_scope::main::keys::keys;
 use crate::planner_scope::main::project_graph::project_graph;
 use crate::planner_scope::models::ScopeData;
 use crate::planner_selection::main::py_strings::py_strings;
 use crate::planner_selection::main::resolve_graph_keys::resolve_graph_keys;
 use crate::planner_selection::models::Carrier;
+use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
+use crate::references::types::ExecutionGates;
 use crate::resource_views::main::source_reads::source_entry::source_entry;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyTuple};
@@ -54,7 +56,8 @@ pub(crate) fn build_planner_scope<'py>(
     let select = default_tuple(&args.value("select")?);
     let exclude = default_tuple(&args.value("exclude")?);
     let auto_load = args.value("auto_load_sources")?.is_truthy()?;
-    let mut upstream = execution_deps(&project)?;
+    let gates: ExecutionGates = native_execution_gate_edges(&project)?;
+    let mut upstream = execution_deps_with(&project, &gates)?;
     let lineage: Bound<'py, NativeProjectGraph> =
         native_field(&project, "lineage_graph")?.cast_into()?;
     let lineage = lineage.borrow();
@@ -110,7 +113,7 @@ pub(crate) fn build_planner_scope<'py>(
         .filter(|key| key.0 == SOURCE && (!auto_load || named_sources.contains(key)))
         .cloned()
         .collect();
-    let order = execution_order(py, &upstream, &execution_origins(&project)?)?;
+    let order = execution_order(py, &upstream, &execution_origins_with(&project, &gates)?)?;
     let selected: HashSet<_> = selected.into_iter().collect();
     let mut models: std::collections::HashMap<String, ModelHandle> =
         std::collections::HashMap::new();

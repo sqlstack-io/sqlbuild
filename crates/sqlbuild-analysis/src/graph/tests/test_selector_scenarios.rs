@@ -207,6 +207,20 @@ fn given_selectors_when_resolving_then_selects_expected_names() {
             ],
         },
         SelectedNamesTestCase {
+            description: "kind selects every resource of one kind",
+            project: DIAMOND_PROJECT,
+            select: &["kind:source"],
+            exclude: &[],
+            expected_names: &["raw_customers", "raw_orders"],
+        },
+        SelectedNamesTestCase {
+            description: "+ expands its own comma part before the kind narrows it",
+            project: DIAMOND_PROJECT,
+            select: &["+joined,kind:source"],
+            exclude: &[],
+            expected_names: &["raw_customers", "raw_orders"],
+        },
+        SelectedNamesTestCase {
             description: "downstream expansion",
             project: DIAMOND_PROJECT,
             select: &["orders+"],
@@ -511,6 +525,26 @@ fn given_unresolvable_selectors_when_resolving_then_fails_with_message() {
             project: DIAMOND_PROJECT,
             select: &["nonexistent_model"],
             expected_error: ("S007", "unknown selector name 'nonexistent_model'", None),
+        },
+        ProjectSelectorErrorTestCase {
+            description: "unknown node kind suggests the closest",
+            project: DIAMOND_PROJECT,
+            select: &["kind:modle"],
+            expected_error: (
+                "S007",
+                "unknown node kind 'modle'",
+                Some("did you mean 'model'?"),
+            ),
+        },
+        ProjectSelectorErrorTestCase {
+            description: "a Python node kind needs the Python node graph",
+            project: DIAMOND_PROJECT,
+            select: &["kind:task"],
+            expected_error: (
+                "S010",
+                "selector 'kind:task' selects Python nodes; they cannot be selected here",
+                None,
+            ),
         },
         ProjectSelectorErrorTestCase {
             description: "name glob matching nothing",

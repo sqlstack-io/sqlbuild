@@ -125,11 +125,25 @@ fn inventory_catalog(inventory: &OrchestrationInventory, target: Option<&str>) -
             },
         );
     }
+    let job_targets: BTreeMap<&str, &[String]> = inventory
+        .jobs
+        .iter()
+        .map(|(_, job)| (job.run.name.value.as_str(), job.run.targets.as_slice()))
+        .collect();
     for (_, group) in &inventory.groups {
         add(
             &group.run,
             JobSelection::Group {
-                members: group.jobs.iter().map(|job| job.value.clone()).collect(),
+                members: group
+                    .jobs
+                    .iter()
+                    .filter(|job| {
+                        job_targets
+                            .get(job.value.as_str())
+                            .is_none_or(|targets| declared_for(targets))
+                    })
+                    .map(|job| job.value.clone())
+                    .collect(),
             },
         );
     }

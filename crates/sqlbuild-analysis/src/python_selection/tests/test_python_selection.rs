@@ -184,6 +184,48 @@ fn given_run_selectors_when_resolving_then_selection_matches_python() {
             )),
         },
         RunSelectionTestCase {
+            description: "kind selects every SQL resource of one kind",
+            select: &["kind:model"],
+            exclude: &[],
+            expected_selection: Ok((&[("model", "orders")], &[])),
+        },
+        RunSelectionTestCase {
+            description: "kind selects every Python node of one kind",
+            select: &["kind:task"],
+            exclude: &[],
+            expected_selection: Ok((&[], &["prepare_orders"])),
+        },
+        RunSelectionTestCase {
+            description: "+ expands only the comma part it marks: upstream of a node, then only its sources",
+            select: &["+export_orders,kind:source"],
+            exclude: &[],
+            expected_selection: Ok((&[("source", "raw_orders")], &[])),
+        },
+        RunSelectionTestCase {
+            description: "+ on a kind part expands that part before the intersection",
+            select: &["kind:source,+orders"],
+            exclude: &[],
+            expected_selection: Ok((&[("source", "raw_orders")], &[])),
+        },
+        RunSelectionTestCase {
+            description: "kind excludes like tag",
+            select: &["tag:daily"],
+            exclude: &["kind:asset"],
+            expected_selection: Ok((&[("model", "orders")], &["prepare_orders"])),
+        },
+        RunSelectionTestCase {
+            description: "an unknown kind is refused",
+            select: &["kind:modle"],
+            exclude: &[],
+            expected_selection: Err(("S007", "unknown node kind 'modle'")),
+        },
+        RunSelectionTestCase {
+            description: "a kind the project has no nodes of is refused like an unknown tag",
+            select: &["kind:udf"],
+            exclude: &[],
+            expected_selection: Err(("S000", "no nodes found of kind 'udf'")),
+        },
+        RunSelectionTestCase {
             description: "tag on neither side",
             select: &["tag:missing"],
             exclude: &[],

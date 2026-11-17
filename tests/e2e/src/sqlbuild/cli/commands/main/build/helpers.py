@@ -18,6 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     ChangedBuildStep,
     ChangedWarehouse,
     DeferCloneBuildE2ETestCase,
+    WarehouseRoundTripE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     REPO_ROOT,
@@ -1532,3 +1533,91 @@ def node_results_in(*, db_path: Path, schema: str, node_type: str) -> list[tuple
             f"WHERE node_type = '{node_type}' ORDER BY node_name"
         ),
     )
+
+
+ALLOW_ROUND_TRIPS: str = "\n[settings]\nallow_warehouse_round_trips = true\n"
+SCORING_TASK: str = (
+    '    relation = ctx.relation(model("orders"))\n'
+    '    rows = ctx.query(f"SELECT order_id FROM {relation} ORDER BY order_id").fetchall()\n'
+    '    return ctx.result(payload={"scores": [[row[0], row[0] * 10] for row in rows]})\n'
+)
+FAILING_SCORING_TASK: str = '    raise RuntimeError("partner service unavailable")\n'
+
+
+def round_trip_project_files(*, project_settings: str, task_body: str) -> dict[str, str]:
+    """Orders -> score task -> partner loader -> partner_scores source -> scored_orders model."""
+
+    return {
+        "sqlbuild_project.toml": (
+            'name = "partner_scoring"\n'
+            'adapter = "duckdb"\n'
+            'default_target = "dev"\n\n'
+            "[connections.local]\n"
+            'database = "scoring.duckdb"\n\n'
+            "[targets.dev]\n"
+            'connection = "local"\n'
+            'schema = "main"\n' + project_settings
+        ),
+        "models/orders.sql": (
+            'MODEL (description "Orders to score", materialized table);\n\n'
+            "SELECT 1 AS order_id UNION ALL SELECT 2 AS order_id\n"
+        ),
+        "sources/partner.yml": (
+            "sources:\n"
+            "  - name: partner_scores\n"
+            "    description: Scores the partner returned for each order\n"
+            "    managed: true\n"
+            "    write_strategy: table\n"
+            "    columns:\n"
+            "      - name: order_id\n"
+            "        type: INTEGER\n"
+            "      - name: score\n"
+            "        type: INTEGER\n"
+        ),
+        "models/scored_orders.sql": (
+            'MODEL (description "Orders with their partner score", materialized table);\n\n'
+            "SELECT o.order_id, s.score\n"
+            'FROM __ref("orders") AS o\n'
+            'JOIN __source("partner_scores") AS s ON o.order_id = s.order_id\n'
+        ),
+        "python/tasks/scoring.py": (
+            "from sqlbuild.refs import model\n"
+            "from sqlbuild.tasks import task\n\n\n"
+            '@task(depends_on=model("orders"))\n'
+            "def score_orders(ctx):\n"
+            '    """Send the orders to the partner and keep the scores it returns."""\n' + task_body
+        ),
+        "python/loaders/partner.py": (
+            "from sqlbuild.loaders import loader\n\n"
+            "from python.tasks.scoring import score_orders\n\n\n"
+            "@loader(depends_on=[score_orders])\n"
+            "def partner_scores(ctx):\n"
+            '    """Load the scores the partner returned."""\n'
+            "    result = ctx.result_of(node_function=score_orders)\n"
+            '    return [{"order_id": o, "score": s} for o, s in result.payload["scores"]]\n'
+        ),
+    }
+
+
+def build_round_trip_project(
+    *, tmp_path: Path, test_case: WarehouseRoundTripE2ETestCase
+) -> tuple[Path, str]:
+    """Build the round-trip project once, check its output, and return its database and output."""
+
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="partner_scoring",
+        repo_files=round_trip_project_files(
+            project_settings=test_case.project_settings, task_body=test_case.task_body
+        ),
+    )
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build"), project_dir=project_dir
+    )
+    output: str = result.stdout + result.stderr
+    assert result.returncode == test_case.expected_exit_code, output
+    positions: list[int] = [output.find(line) for line in test_case.expected_output_order]
+    assert all(position >= 0 for position in positions), output
+    assert positions == sorted(positions), output
+    assert all(fragment in output for fragment in test_case.expected_output_fragments), output
+    return project_dir / "scoring.duckdb", output

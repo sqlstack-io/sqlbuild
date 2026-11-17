@@ -817,6 +817,7 @@ const R_PYTHON_SQL_RUN_LIFECYCLE_PLAN: RecordSpec = RecordSpec {
         FieldSpec::required("ingress_python_node_names"),
         FieldSpec::required("ingress_loader_names"),
         FieldSpec::required("read_side_python_node_names"),
+        FieldSpec::new("round_trip_loader_names", FieldDefault::EmptyFrozenset),
     ],
 };
 const R_PYTHON_IDENTITY_DEPENDENCY: RecordSpec = RecordSpec {

@@ -469,6 +469,10 @@ pub(crate) fn execute_build_plan<'py>(
                 native_field(pipeline, "custom_materializations")?,
             ),
             ("loader_functions", lifecycle.loader_functions(py)?),
+            (
+                "source_load_gate",
+                DirectPythonLifecycle::source_load_gate(&preparation.lifecycle)?.into_any(),
+            ),
         ],
     )?;
     let initial_state: Bound<'py, PyAny> = call_with(
@@ -485,7 +489,7 @@ pub(crate) fn execute_build_plan<'py>(
     let result: Bound<'py, PyAny> = call_with(
         &host_entry(py, ExecutorHost::RunBuildPipeline)?,
         &[
-            ("plan", plan.clone()),
+            ("plan", lifecycle.ordered_plan(&plan)?),
             ("connection_config", connection_config.clone()),
             ("adapter", adapter.clone()),
             ("settings", native_field(&project, "settings")?),

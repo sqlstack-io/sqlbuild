@@ -167,6 +167,7 @@ E2E_DUCKDB_BUILD_CORE_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_template_expressions.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_terminal_failure.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_no_load_sources.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_warehouse_round_trips.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_duckdb_storage_key.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_source_end_audits.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_python_check_outcomes.py \
