@@ -23,7 +23,8 @@ use crate::bindings::_helpers::fingerprints::latest_rows::selected_set;
 use crate::bindings::_helpers::native_host::consumption_state::Location;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_warehouse::reads::{
-    CursorProgress, EligibleCursorQuery, FingerprintRead, Read, WarehouseReads, unknown,
+    CursorProgress, CursorStatements, EligibleCursorQuery, FingerprintRead, Read, WarehouseReads,
+    unknown,
 };
 use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -300,7 +301,7 @@ impl WarehouseReads for SyncedReads {
     fn cursor_bounds<'py>(
         &self,
         _py: Python<'py>,
-        _statements: &dyn Fn() -> PyResult<Vec<String>>,
+        _statements: &dyn Fn() -> PyResult<CursorStatements>,
         _progress: &dyn CursorProgress<'py>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>> {
         Ok(Read::Unknown(CURSOR_INPUTS.into()))

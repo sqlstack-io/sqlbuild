@@ -5,6 +5,7 @@ pub(super) struct CursorGroupTestCase {
     pub requests: Vec<crate::planner_warehouse::models::CursorTagRequest>,
     pub expected_sql: Vec<&'static str>,
     pub expected_identities: Vec<&'static str>,
+    pub expected_batch_sql: &'static str,
 }
 
 pub(super) struct RetentionDirectionTestCase {

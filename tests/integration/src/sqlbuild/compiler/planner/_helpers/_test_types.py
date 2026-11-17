@@ -152,6 +152,8 @@ class ConcurrentCursorReadsTestCase:
     failing_relations: frozenset[str]
     expected_start_progress: str
     expected_unreadable: dict[str, tuple[str, ...]]
+    expected_statements: int
+    expected_max_active: int
 
 
 @dataclass(frozen=True)

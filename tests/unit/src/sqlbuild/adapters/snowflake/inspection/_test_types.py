@@ -60,7 +60,7 @@ class SpeculativePrefetchTestCase:
     description: str
     failing_schema: str
     expected_error_fragment: str
-    expected_failed_reads: int
+    expected_failed_reads: tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -214,3 +214,14 @@ class SessionDatabaseSwitchTestCase:
     switch_sql: str
     expected_scopes: tuple[str, ...]
     expected_session_reads: int
+
+
+@dataclass(frozen=True)
+class PartedListingTestCase:
+    """Schemas whose tables and views are listed by separate reads running together."""
+
+    description: str
+    schema_count: int
+    relations_per_schema: int
+    statement_latency_seconds: float
+    expected_max_concurrent: int

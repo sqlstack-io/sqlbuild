@@ -24,8 +24,15 @@ from tests.e2e.src.sqlbuild.cli.commands.main.plan.helpers import (
         PlanTimingsE2ETestCase(
             description="--timings prints each step with Other last, then the total",
             plan_args=("--timings",),
-            expected_first_step="Compiling the project",
+            expected_first_step="Discovering the project",
             expected_last_step="Other",
+            expected_steps=(
+                "Discovering the project",
+                "Compiling the project",
+                "Evaluating rules",
+                "Connecting to the warehouse",
+                "Reading warehouse state",
+            ),
         ),
     ],
     ids=lambda case: case.description,
@@ -41,6 +48,10 @@ def test_given_timings_when_planning_then_the_steps_add_up_to_the_total(
     assert len(table.steps) == table.row_count, output
     assert table.steps[0][0] == test_case.expected_first_step, output
     assert table.steps[-1][0] == test_case.expected_last_step, output
+    step_names: list[str] = [name for name, _ in table.steps]
+    assert list(filter(set(test_case.expected_steps).__contains__, step_names)) == list(
+        test_case.expected_steps
+    ), output
     assert "Reading build history" not in output, output
     assert sum(seconds for _, seconds in table.steps) == pytest.approx(
         table.total_seconds, abs=0.05 * len(table.steps)

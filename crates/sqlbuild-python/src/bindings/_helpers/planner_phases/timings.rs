@@ -7,8 +7,14 @@ use serde_json::{Value, json};
 
 use crate::bindings::_helpers::planner_phases::constants::{MILLISECONDS, PERCENT};
 
+/// Discovering the project's files and Python nodes; a location planning its published project skips it.
+pub(crate) const DISCOVERING: &str = "Discovering the project";
 /// Compiling the project before planning; a location planning its published project skips it.
 pub(crate) const COMPILING: &str = "Compiling the project";
+/// Evaluating the configured rules; skipped where the rules ran when the project loaded.
+pub(crate) const EVALUATING_RULES: &str = "Evaluating rules";
+/// Opening the warehouse connection; a plan from a synced state opens none.
+pub(crate) const CONNECTING: &str = "Connecting to the warehouse";
 /// The warehouse snapshot, model migrations and source relations, live or from a synced state.
 pub(crate) const READING_WAREHOUSE: &str = "Reading warehouse state";
 /// Model identities, buildability and the changes each selected node has.

@@ -2,7 +2,7 @@
 
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
 use crate::bindings::_helpers::planner_phases::timings::{
-    BUILD_HISTORY, PlanTimingScope, PlanTimings, WRITING, timed,
+    BUILD_HISTORY, DISCOVERING, PlanTimingScope, PlanTimings, WRITING, timed,
 };
 use std::sync::Arc;
 
@@ -157,16 +157,18 @@ fn resolve_invocation<'py>(
     };
     let discovered: Bound<'py, PyAny> = match project {
         PlanProject::Held { discovered, .. } => discovered.clone(),
-        PlanProject::Compiled => discover_project_inputs(
-            py,
-            Some(keywords(
+        PlanProject::Compiled => timed(DISCOVERING, || {
+            discover_project_inputs(
                 py,
-                &[
-                    ("project_dir", project_dir.clone()),
-                    ("extract_output_column_locations", flag(py, false)),
-                ],
-            )?),
-        )?,
+                Some(keywords(
+                    py,
+                    &[
+                        ("project_dir", project_dir.clone()),
+                        ("extract_output_column_locations", flag(py, false)),
+                    ],
+                )?),
+            )
+        })?,
     };
     validate_preview_target(
         py,

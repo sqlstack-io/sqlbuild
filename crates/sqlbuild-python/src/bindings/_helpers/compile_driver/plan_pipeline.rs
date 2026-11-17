@@ -1,7 +1,9 @@
 //! The compile-and-plan pipeline of execution commands: compile, rules gate, then planning.
 
 use crate::bindings::_helpers::native_host::live_reads::LiveReads;
-use crate::bindings::_helpers::planner_phases::timings::{COMPILING, timed};
+use crate::bindings::_helpers::planner_phases::timings::{
+    COMPILING, CONNECTING, EVALUATING_RULES, timed,
+};
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
@@ -106,12 +108,14 @@ pub(crate) fn planned_project<'py>(
     };
     if !rules_ran_at_load() {
         let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
-        let graph: Bound<'py, PyAny> = project_graph(&project)?;
-        run_rules_gate(
-            (discovered, adapter, expansion_reuse.as_any()),
-            (&options, &on_progress),
-            (&project, &graph),
-        )?;
+        timed(EVALUATING_RULES, || {
+            let graph: Bound<'py, PyAny> = project_graph(&project)?;
+            run_rules_gate(
+                (discovered, adapter, expansion_reuse.as_any()),
+                (&options, &on_progress),
+                (&project, &graph),
+            )
+        })?;
     }
     planned(
         (discovered, adapter),
@@ -273,11 +277,13 @@ fn planned<'py>(
                 )
             }
             None => {
-                let opened: Bound<'py, PyAny> = connection_with_hooks(
-                    adapter,
-                    &native_field(compiled, "connection_config")?,
-                    hooks,
-                )?;
+                let opened: Bound<'py, PyAny> = timed(CONNECTING, || {
+                    connection_with_hooks(
+                        adapter,
+                        &native_field(compiled, "connection_config")?,
+                        hooks,
+                    )
+                })?;
                 connection = Some(opened.clone());
                 let reads = LiveReads::handle(adapter, &opened, None)?;
                 (opened, reads)

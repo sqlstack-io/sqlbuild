@@ -7,6 +7,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import fields, replace
 from datetime import UTC, datetime
+from itertools import chain
 from pathlib import Path
 from tempfile import gettempdir
 from types import MappingProxyType
@@ -485,7 +486,7 @@ _OFFLINE_METADATA_KINDS: frozenset[str] = frozenset(
 )
 _OFFLINE_INFORMATION_SCHEMA_KINDS: frozenset[str] = frozenset({"tables", "columns"})
 _SHOW_SCHEMA_SCOPE: re.Pattern[str] = re.compile(r' IN SCHEMA (?:"[^"]*"\.)?"([^"]*)"')
-_CURSOR_BOUND_RELATION: re.Pattern[str] = re.compile(r"\sFROM\s+(\S+)\s*$", re.IGNORECASE)
+_CURSOR_BOUND_RELATION: re.Pattern[str] = re.compile(r"\sFROM\s+(\S+)\s*$", re.IGNORECASE | re.M)
 
 
 def plan_offline_snowflake_project(
@@ -538,11 +539,13 @@ def offline_information_schema_queries(
 
 
 def offline_cursor_bound_relations(warehouse: RecordingSnowflakeWarehouse) -> tuple[str, ...]:
-    """Return the single relation each cursor-bound statement reads."""
+    """Return every relation the cursor-bound statements read, in statement order."""
 
     return tuple(
-        _CURSOR_BOUND_RELATION.findall(query.sql)[0]
-        for query in warehouse.queries_of_kind("cursor_bounds")
+        chain.from_iterable(
+            _CURSOR_BOUND_RELATION.findall(query.sql)
+            for query in warehouse.queries_of_kind("cursor_bounds")
+        )
     )
 
 

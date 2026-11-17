@@ -48,6 +48,12 @@ _CURSOR_BOUND_PATTERN: re.Pattern[str] = re.compile(
     r"^SELECT\s+CAST\((?:MIN|MAX)\(.*\)\s+AS\s+VARCHAR\).*\s+FROM\s+(?P<relation>\S+)\s*$",
     re.IGNORECASE | re.DOTALL,
 )
+_CURSOR_BATCH_PATTERN: re.Pattern[str] = re.compile(r"^SELECT \d+ AS _read, ", re.IGNORECASE)
+_CURSOR_BATCH_BRANCH: re.Pattern[str] = re.compile(
+    r"^SELECT (?P<read>\d+) AS _read, (?P<select>.*?)(?:\s+FROM\s+(?P<relation>[^\s()]+))?$",
+    re.IGNORECASE | re.DOTALL,
+)
+_DESCRIBE_PATTERN: re.Pattern[str] = re.compile(r"\) AS __describe_source LIMIT 0$")
 _ANY_PATTERN: re.Pattern[str] = re.compile(r"")
 _CURRENT_DATABASE_PATTERN: re.Pattern[str] = re.compile(r"^SELECT CURRENT_DATABASE\(\)$")
 _USE_DATABASE_PATTERN: re.Pattern[str] = re.compile(
@@ -68,6 +74,7 @@ _QUERY_KINDS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"^SHOW VIEWS IN SCHEMA "), "show_views"),
     (_SHOW_SCHEMA_COLUMNS_PATTERN, "show_schema_columns"),
     (_CURSOR_BOUND_PATTERN, "cursor_bounds"),
+    (_CURSOR_BATCH_PATTERN, "cursor_bounds"),
     (_CURRENT_DATABASE_PATTERN, "session"),
     (_SHOW_SCHEMAS_PATTERN, "show_schemas"),
     (_OTHER_INFORMATION_SCHEMA_PATTERN, "other_metadata"),
@@ -84,6 +91,7 @@ _SHOW_DESCRIPTION: tuple[tuple[str], ...] = (
     ("data_type",),
 )
 _BOUND_MARKERS: tuple[str, str] = ("MIN(", "MAX(")
+_BOUND_VALUE_INDEX: dict[bool, int] = {True: 0, False: 1}
 SHOW_RESULT_CAP: int = 10_000
 _SHOW_TABLE_FIELDS: tuple[str, ...] = (
     "created_on",
@@ -277,7 +285,10 @@ class RecordingSnowflakeWarehouse:
         """Execute one statement and record it."""
 
         started_at: float = time.monotonic()
-        is_cursor_bound: bool = _CURSOR_BOUND_PATTERN.match(sql) is not None
+        is_cursor_bound: bool = (
+            _CURSOR_BOUND_PATTERN.match(sql) is not None
+            or _CURSOR_BATCH_PATTERN.match(sql) is not None
+        )
         with self._lock:
             self.attempted_sql.append(sql)
             self._active[is_cursor_bound] += 1
@@ -319,6 +330,8 @@ class RecordingSnowflakeWarehouse:
             (_SHOW_COLUMNS_PATTERN, self._answer_show_columns),
             (_SHOW_SCHEMA_RELATIONS_PATTERN, self._answer_show_schema_relations),
             (_SHOW_SCHEMA_COLUMNS_PATTERN, self._answer_show_schema_columns),
+            (_DESCRIBE_PATTERN, self._answer_describe),
+            (_CURSOR_BATCH_PATTERN, self._answer_cursor_batch),
             (_CURSOR_BOUND_PATTERN, self._answer_cursor_bounds),
             (_CURRENT_DATABASE_PATTERN, self._answer_current_database),
             (_USE_DATABASE_PATTERN, self._answer_use_database),
@@ -505,6 +518,36 @@ class RecordingSnowflakeWarehouse:
             compress(self.cursor_values, (marker in select_list for marker in _BOUND_MARKERS))
         )
         return [values], tuple((f"_{index}",) for index in range(len(values)))
+
+    def _answer_describe(
+        self, *, sql: str, params: tuple[object, ...]
+    ) -> tuple[list[tuple[Any, ...]], Any]:
+        """A query's columns, named as Snowflake folds unquoted identifiers, and no rows."""
+
+        del params
+        with self._lock:
+            description: Any = self._database.execute(sql).description
+        return [], tuple((str(column[0]).upper(),) for column in description)
+
+    def _answer_cursor_batch(
+        self, *, sql: str, params: tuple[object, ...]
+    ) -> tuple[list[tuple[Any, ...]], Any]:
+        """One ``(_read, _min, _max)`` row per branch; a failing relation fails the statement."""
+
+        del params
+        rows: list[tuple[Any, ...]] = []
+        branch: str
+        for branch in sql.split("\nUNION ALL\n"):
+            matched: re.Match[str] | None = _CURSOR_BATCH_BRANCH.match(branch)
+            assert matched is not None, branch
+            relation: str = matched.group("relation") or ""
+            _MISSING_RELATION_ACTIONS[relation.lower() in self.failing_relations](relation)
+            bounds: tuple[str, ...] = tuple(
+                self.cursor_values[_BOUND_VALUE_INDEX["MIN(" in part]]
+                for part in matched.group("select").split(" AS _")[:-1]
+            )
+            rows.append((int(matched.group("read")), *bounds))
+        return rows, (("_read",), *((f"_{index}",) for index in range(len(rows[0]) - 1)))
 
 
 def _like_pattern(pattern: str) -> re.Pattern[str]:
