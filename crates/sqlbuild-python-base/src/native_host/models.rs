@@ -2,11 +2,13 @@
 
 use crate::native_host::_helpers::interrupt::INTERRUPTED;
 use crate::native_host::_helpers::interrupt::SIGINT;
+use crate::native_host::_helpers::interrupt::restore_signal_handler;
 use pyo3::exceptions::PyKeyboardInterrupt;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
 use pyo3::prelude::PyAnyMethods;
+use pyo3::prelude::PyErr;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use pyo3::sync::PyOnceLock;
@@ -107,19 +109,80 @@ impl InterruptHandler {
 impl Drop for InterruptHandler {
     fn drop(&mut self) {
         Python::attach(|py| {
-            let restored: PyResult<()> = (|| {
-                let signal = py.import("signal")?;
-                if signal
-                    .call_method1("getsignal", (SIGINT,))?
-                    .is(self.installed.bind(py))
-                {
-                    signal.call_method1("signal", (SIGINT, self.previous.bind(py)))?;
-                }
-                Ok(())
-            })();
-            drop(restored);
+            drop(restore_signal_handler(
+                py,
+                SIGINT,
+                (&self.installed, &self.previous),
+            ));
         });
         INTERRUPTED.set(false);
+    }
+}
+
+/// A command's handler on an otherwise unused signal that raises the command's error, so another thread can interrupt the main thread while SIGINT is ignored, without changing how SIGINT is handled.
+#[derive(Debug)]
+pub struct WakeHandler {
+    pub signal: i64,
+    pub(crate) previous: Py<PyAny>,
+    pub(crate) installed: Py<PyAny>,
+}
+
+impl WakeHandler {
+    /// The signal that interrupts the main thread: SIGINT where Python handles it, else the signal of a wake handler raising `error`, installed here; `None` when neither is available.
+    pub fn interrupting_signal(
+        py: Python<'_>,
+        error: fn() -> PyErr,
+    ) -> PyResult<(Option<i64>, Option<Self>)> {
+        let signal = py.import("signal")?;
+        if signal.call_method1("getsignal", (SIGINT,))?.is_callable() {
+            return Ok((Some(SIGINT), None));
+        }
+        let wake: Option<Self> = Self::install(py, error)?;
+        Ok((wake.as_ref().map(|wake| wake.signal), wake))
+    }
+
+    /// Install the handler on SIGRTMIN, or SIGUSR2 where there is none, while that signal takes its default action.
+    fn install(py: Python<'_>, error: fn() -> PyErr) -> PyResult<Option<Self>> {
+        let signal = py.import("signal")?;
+        let name: &str = if signal.hasattr("SIGRTMIN")? {
+            "SIGRTMIN"
+        } else if signal.hasattr("SIGUSR2")? {
+            "SIGUSR2"
+        } else {
+            return Ok(None);
+        };
+        let number: i64 = signal.getattr(name)?.extract()?;
+        let previous = signal.call_method1("getsignal", (number,))?;
+        if !previous.is(signal.getattr("SIG_DFL")?) {
+            return Ok(None);
+        }
+        let installed = PyCFunction::new_closure(
+            py,
+            None,
+            None,
+            move |_: &Bound<'_, PyTuple>, _: Option<&Bound<'_, PyDict>>| -> PyResult<()> {
+                Err(error())
+            },
+        )?;
+        signal.call_method1("signal", (number, &installed))?;
+        Ok(Some(Self {
+            signal: number,
+            previous: previous.unbind(),
+            installed: installed.into_any().unbind(),
+        }))
+    }
+}
+
+impl Drop for WakeHandler {
+    /// Restore the previous handler. A wake still pending raises on the first attempt and is consumed, so the second attempt restores.
+    fn drop(&mut self) {
+        Python::attach(|py| {
+            let handlers = (&self.installed, &self.previous);
+            drop(
+                restore_signal_handler(py, self.signal, handlers)
+                    .or_else(|_pending| restore_signal_handler(py, self.signal, handlers)),
+            );
+        });
     }
 }
 

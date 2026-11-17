@@ -1,4 +1,5 @@
 import json
+import signal
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from tests.integration.src.sqlbuild.cli.recall._test_types import (
 )
 from tests.integration.src.sqlbuild.cli.recall.helpers import (
     EMITTED_TAIL,
+    NATIVE_SQB,
     ORDERS_MODEL,
     recall_rows,
     run,
@@ -113,6 +115,19 @@ def test_given_selectors_when_building_then_the_effective_selection_is_recorded(
             unfinished_output=b"slept through",
         ),
         TerminatedCommandTestCase(
+            description="while a task runs, sqb started with SIGINT ignored",
+            orders_model=ORDERS_MODEL,
+            environment={
+                "ORDERS_TASK_SLEEP_SECONDS": "60",
+                "ORDERS_TASK_AFTER_SLEEP": "slept through\n",
+            },
+            wait_sql="SELECT invocation_id FROM output_tail WHERE text LIKE '%after the warning%'",
+            expected_output=EMITTED_TAIL,
+            unfinished_output=b"slept through",
+            interrupts=signal.SIG_IGN,
+            program=NATIVE_SQB,
+        ),
+        TerminatedCommandTestCase(
             description="while a long warehouse statement runs",
             orders_model=(
                 'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
@@ -138,6 +153,8 @@ def test_given_sigterm_when_a_build_is_stopped_then_it_is_recorded_cancelled_wit
     terminated: subprocess.CompletedProcess[bytes] = terminated_build(
         project_dir,
         wait_sql=test_case.wait_sql,
+        interrupts=test_case.interrupts,
+        program=test_case.program,
         SQLBUILD_RECALL_HEARTBEAT_SECONDS="0.5",
         **test_case.environment,
     )

@@ -121,7 +121,9 @@ def environment(**overrides: str) -> dict[str, str]:
 def run(project_dir: Path, *args: str, **env: str) -> subprocess.CompletedProcess[bytes]:
     """Run the Python CLI once in the project and capture exact streams, or fail with its stacks."""
 
-    process: subprocess.Popen[bytes] = start(project_dir, *args, interrupts=signal.SIG_DFL, **env)
+    process: subprocess.Popen[bytes] = start(
+        project_dir, *args, interrupts=signal.SIG_DFL, program=PYTHON_CLI, **env
+    )
     try:
         stdout, stderr = process.communicate(timeout=HANG_SECONDS)
     except subprocess.TimeoutExpired:
@@ -149,14 +151,15 @@ def start(
     project_dir: Path,
     *args: str,
     interrupts: signal.Handlers = signal.SIG_DFL,
+    program: Path = PYTHON_CLI,
     **env: str,
 ) -> subprocess.Popen[bytes]:
-    """Start the Python CLI in its own process group with SIGINT set to `interrupts`.
+    """Start `program` in its own process group with SIGINT set to `interrupts`.
 
     The default gives the CLI Ctrl-C handling even when this runner ignores SIGINT."""
 
     return subprocess.Popen(
-        [str(PYTHON_CLI), *args],
+        [str(program), *args],
         cwd=project_dir,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -274,11 +277,15 @@ def terminated_build(
     project_dir: Path,
     *,
     wait_sql: str,
+    interrupts: signal.Handlers = signal.SIG_DFL,
+    program: Path = PYTHON_CLI,
     **env: str,
 ) -> subprocess.CompletedProcess[bytes]:
     """A build sent SIGTERM, as an orchestrator stops it, once `wait_sql` returns a row."""
 
-    process: subprocess.Popen[bytes] = start(project_dir, "build", **env)
+    process: subprocess.Popen[bytes] = start(
+        project_dir, "build", interrupts=interrupts, program=program, **env
+    )
     try:
         _ = wait_for(wait_sql, project_dir, timeout=120)
         process.send_signal(signal.SIGTERM)
@@ -336,7 +343,12 @@ def interrupted_build(project_dir: Path, **env: str) -> int | None:
     """Exit code of a build sent SIGINT once its task has printed; `None` when it hung."""
 
     process: subprocess.Popen[bytes] = start(
-        project_dir, "build", interrupts=signal.SIG_DFL, PYTHONUNBUFFERED="1", **env
+        project_dir,
+        "build",
+        interrupts=signal.SIG_DFL,
+        program=PYTHON_CLI,
+        PYTHONUNBUFFERED="1",
+        **env,
     )
     try:
         assert process.stdout is not None

@@ -16,6 +16,7 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::models::WakeHandler;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 create_exception!(
@@ -69,11 +70,12 @@ fn registered_flags() -> Option<&'static SigtermFlags> {
         .as_ref()
 }
 
-/// The SIGTERM handling of one command and the watcher that acts once SIGTERM arrives. Holds only Rust values: while it lives, SIGTERM sets a flag; once dropped, SIGTERM takes its default action again.
+/// The SIGTERM handling of one command and the watcher that acts once SIGTERM arrives. While it lives, SIGTERM sets a flag; once dropped, SIGTERM takes its default action again.
 pub(crate) struct TerminationHandler {
     flags: Option<&'static SigtermFlags>,
     stop: Arc<AtomicBool>,
     watcher: Option<JoinHandle<()>>,
+    wake: Option<WakeHandler>,
 }
 
 impl TerminationHandler {
@@ -86,6 +88,7 @@ impl TerminationHandler {
         if let Some(watcher) = self.watcher.take() {
             py.detach(|| drop(watcher.join()));
         }
+        drop(self.wake.take());
         terminated()
     }
 }
@@ -96,6 +99,7 @@ impl Drop for TerminationHandler {
         if let Some(watcher) = self.watcher.take() {
             Python::attach(|py| py.detach(|| drop(watcher.join())));
         }
+        drop(self.wake.take());
         if let Some(flags) = self.flags {
             flags.default.store(true, Ordering::SeqCst);
             flags.terminated.store(false, Ordering::SeqCst);
@@ -103,11 +107,11 @@ impl Drop for TerminationHandler {
     }
 }
 
-/// Where the watcher sends the interrupt: the main thread, and whether Python handles Ctrl+C there.
+/// The signal the watcher sends the main thread: SIGINT where Python handles Ctrl+C, else the wake signal.
 #[derive(Clone, Copy)]
 struct MainThread {
     ident: u64,
-    handles_interrupt: bool,
+    signal: Option<i64>,
 }
 
 /// Once SIGTERM arrives: let a second one end the process at once, cancel every running statement, and interrupt the main thread the way Ctrl+C does, where the platform can signal one thread.
@@ -119,9 +123,9 @@ fn watch(flags: &SigtermFlags, stop: &AtomicBool, main: MainThread) {
                 let cancelled = host_entry(py, ExecutorHost::CancelRunningStatements)
                     .and_then(|cancel| cancel.call0());
                 drop(cancelled);
-                if main.handles_interrupt {
+                if let Some(signal) = main.signal {
                     let interrupted = imported(py, "signal", "pthread_kill")
-                        .and_then(|kill| kill.call1((main.ident, SIGINT_NUMBER)));
+                        .and_then(|kill| kill.call1((main.ident, signal)));
                     drop(interrupted);
                 }
             });
@@ -148,11 +152,14 @@ pub(crate) fn handle_sigterm(py: Python<'_>) -> PyResult<TerminationHandler> {
             flags: None,
             stop,
             watcher: None,
+            wake: None,
         });
     };
+    let (signal, wake): (Option<i64>, Option<WakeHandler>) =
+        WakeHandler::interrupting_signal(py, || CommandTerminated::new_err(TERMINATED_MESSAGE))?;
     let main = MainThread {
         ident: native_field(&main_thread, "ident")?.extract()?,
-        handles_interrupt: action(SIGINT_NUMBER)?.is_callable(),
+        signal,
     };
     flags.terminated.store(false, Ordering::SeqCst);
     let watched: Arc<AtomicBool> = Arc::clone(&stop);
@@ -164,6 +171,7 @@ pub(crate) fn handle_sigterm(py: Python<'_>) -> PyResult<TerminationHandler> {
         flags: Some(flags),
         stop,
         watcher: Some(watcher),
+        wake,
     })
 }
 

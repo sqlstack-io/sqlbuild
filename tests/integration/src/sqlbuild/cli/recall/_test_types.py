@@ -1,6 +1,9 @@
+import signal
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+
+from tests.integration.src.sqlbuild.cli.recall.helpers import PYTHON_CLI
 
 
 @dataclass(frozen=True)
@@ -378,6 +381,8 @@ class TerminatedCommandTestCase:
     wait_sql: str
     expected_output: bytes
     unfinished_output: bytes
+    interrupts: signal.Handlers = signal.SIG_DFL
+    program: Path = PYTHON_CLI
 
 
 @dataclass(frozen=True)
