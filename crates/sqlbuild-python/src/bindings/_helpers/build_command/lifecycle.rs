@@ -106,6 +106,8 @@ pub(crate) struct DirectPythonLifecycle {
     round_trip_gates: HashMap<String, Vec<ObjectKey>>,
     /// Each round-trip loader's source load key and the SQL keys it waits for.
     round_trip_waits: Vec<(ObjectKey, Vec<ObjectKey>)>,
+    /// Whether the build runs read-side tasks and assets; `--no-python` turns this off.
+    include_python: bool,
 }
 
 #[pymethods]
@@ -470,7 +472,8 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
     let connection_config: Bound<'py, PyAny> = context.get("connection_config")?;
     let project: Bound<'py, PyAny> = native_field(pipeline, "project")?;
     let plan_output: Bound<'py, PyAny> = native_field(pipeline, "plan_output")?;
-    let selected: Vec<String> = if context.request_flag("include_python")? {
+    let include_python: bool = context.request_flag("include_python")?;
+    let selected: Vec<String> = if include_python {
         task_asset_names(&discovered, pipeline)?
     } else {
         Vec::new()
@@ -621,6 +624,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             ingress_loader_names: native_field(&lifecycle.plan, "ingress_loader_names")?.unbind(),
             round_trip_gates,
             round_trip_waits,
+            include_python,
         },
     )
 }
@@ -693,6 +697,10 @@ impl SourceLoadGate {
                 Some(SUCCESS_STATUS) => continue,
                 Some(SKIPPED_STATUS) => ("was skipped", HARD_SKIP),
                 Some(_) => ("failed", HARD_SKIP),
+                None if !lifecycle.include_python => (
+                    "did not run; --no-python skips read-side tasks and assets",
+                    SOFT_SKIP,
+                ),
                 None => ("did not run; the SQL it reads was not rebuilt", SOFT_SKIP),
             };
             return Ok(Some((format!("Upstream {kind} '{name}' {outcome}"), mode)));
