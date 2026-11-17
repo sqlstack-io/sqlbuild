@@ -19,12 +19,12 @@ pub(crate) fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()
 }
 
-/// Run one cursor statement; a failure leaves only that relation unavailable.
-pub(crate) fn read_cursor_query<'py>(
+/// Run one cursor statement and record it: `(rows, seconds, error)`, `rows` `None` on failure.
+fn run_cursor_statement<'py>(
     py: Python<'py>,
     sql: &str,
     (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-) -> PyResult<Bound<'py, PyAny>> {
+) -> PyResult<(Bound<'py, PyAny>, f64, Bound<'py, PyAny>)> {
     let started = Instant::now();
     let outcome = call_with(
         execute,
@@ -32,19 +32,10 @@ pub(crate) fn read_cursor_query<'py>(
     )
     .and_then(|result| result.call_method0("fetchall"));
     let elapsed = started.elapsed().as_secs_f64();
-    let (row, error, count) = match outcome {
+    let (rows, error, count) = match outcome {
         Ok(rows) => {
-            let count = rows.len()?;
-            let row = if count > 0 {
-                rows.get_item(0)?
-            } else {
-                py.None().into_bound(py)
-            };
-            (
-                row,
-                py.None().into_bound(py),
-                count.into_pyobject(py)?.into_any(),
-            )
+            let count = rows.len()?.into_pyobject(py)?.into_any();
+            (rows, py.None().into_bound(py), count)
         }
         Err(error) if error.is_instance_of::<PyException>(py) => {
             let value = error.value(py).clone().into_any();
@@ -67,7 +58,50 @@ pub(crate) fn read_cursor_query<'py>(
         ],
     )?;
     call_with(&host_entry(py, RECORD_QUERY)?, &[("record", record)])?;
+    Ok((rows, elapsed, error))
+}
+
+/// Run one cursor statement; a failure leaves only that relation unavailable.
+pub(crate) fn read_cursor_query<'py>(
+    py: Python<'py>,
+    sql: &str,
+    reader: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let (rows, elapsed, error) = run_cursor_statement(py, sql, reader)?;
+    let row = if !rows.is_none() && rows.len()? > 0 {
+        rows.get_item(0)?
+    } else {
+        py.None().into_bound(py)
+    };
     Ok(PyTuple::new(py, [row, PyFloat::new(py, elapsed).into_any(), error])?.into_any())
+}
+
+/// A bounded-inspection task running one batched cursor statement: `(rows, seconds, error)`.
+pub(crate) fn batch_task<'py>(
+    py: Python<'py>,
+    sql: String,
+    (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let connection: Py<PyAny> = connection.clone().unbind();
+    let execute: Py<PyAny> = execute.clone().unbind();
+    Ok(PyCFunction::new_closure(
+        py,
+        None,
+        None,
+        move |args: &Bound<'_, PyTuple>,
+              _kwargs: Option<&Bound<'_, PyDict>>|
+              -> PyResult<Py<PyAny>> {
+            let py = args.py();
+            let (rows, elapsed, error) =
+                run_cursor_statement(py, &sql, (connection.bind(py), execute.bind(py)))?;
+            Ok(
+                PyTuple::new(py, [rows, PyFloat::new(py, elapsed).into_any(), error])?
+                    .into_any()
+                    .unbind(),
+            )
+        },
+    )?
+    .into_any())
 }
 
 /// A bounded-inspection task running one cursor statement.

@@ -340,8 +340,10 @@ class TrackingCursorExecute:
             self.cursor_sql.append(sql)
         try:
             time.sleep(0.01)
-            relation: str = sql.split(" FROM ", 1)[1].split(" ", 1)[0]
-            failing: bool = relation in self._failing[eligible]
+            relations: set[str] = {
+                part.split(None, 1)[0].rstrip(")") for part in sql.split(" FROM ")[1:]
+            }
+            failing: bool = not relations.isdisjoint(self._failing[eligible])
             return _CURSOR_ANSWERS[(failing, self._fail_on_fetch)](connection, sql, self._lock)
         finally:
             with self._lock:

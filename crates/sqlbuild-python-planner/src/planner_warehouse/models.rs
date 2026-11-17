@@ -427,6 +427,22 @@ pub struct EligibleCursorQuery {
     pub(crate) sql: String,
 }
 
+/// One `UNION ALL` statement answering several cursor reads, one row per read led by `_read`.
+#[derive(Debug)]
+pub struct CursorBatch {
+    /// The reads it answers in `_read` order: each read's index and whether its row has a minimum.
+    pub(crate) reads: Vec<(usize, bool)>,
+    pub(crate) sql: String,
+}
+
+/// A plan's cursor reads: one statement per read, and batches answering the reads together.
+#[derive(Debug)]
+pub struct CursorStatements {
+    pub(crate) singles: Vec<String>,
+    /// Empty when the reads run one statement each.
+    pub(crate) batches: Vec<CursorBatch>,
+}
+
 /// The warehouse reads one plan runs through.
 #[pyclass(frozen, module = "sqlbuild._native", name = "WarehouseReads")]
 #[derive(Debug)]
@@ -645,7 +661,7 @@ impl WarehouseReads for SyncedReads {
     fn cursor_bounds<'py>(
         &self,
         _py: Python<'py>,
-        _statements: &dyn Fn() -> PyResult<Vec<String>>,
+        _statements: &dyn Fn() -> PyResult<CursorStatements>,
         _progress: &dyn CursorProgress<'py>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>> {
         Ok(Read::Unknown(CURSOR_INPUTS.into()))

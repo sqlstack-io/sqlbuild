@@ -54,3 +54,6 @@ pub const PREVIEW_UNKNOWNS: [&str; 5] = [
 
 /// What a preview's cursor reads leave to the run.
 pub const CURSOR_INPUTS: &str = "cursor inputs";
+
+/// Cursor reads one `UNION ALL` statement answers, so a plan runs few statements, each small.
+pub(crate) const CURSOR_BATCH_SIZE: usize = 50;

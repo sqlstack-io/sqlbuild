@@ -6,6 +6,7 @@ use crate::live_reads::_helpers::bounded::eligible_task;
 use crate::live_reads::_helpers::bounded::read_cursor_query;
 use crate::live_reads::_helpers::bounded::run_bounded;
 use crate::live_reads::_helpers::bounded::text;
+use crate::live_reads::_helpers::cursor_batches::run_cursor_batches;
 use crate::live_reads::constants::ACTIVE_CATALOG;
 use crate::live_reads::constants::EXECUTE;
 use crate::live_reads::constants::INSPECTION_CATALOG;
@@ -14,7 +15,8 @@ use crate::live_reads::constants::RELATIONS_MAIN_LIST;
 use crate::live_reads::main::bound_task::bound_task;
 use crate::observations::main::capture_source_columns::capture_source_columns;
 use crate::planner_warehouse::models::{
-    AdapterRead, EligibleCursorQuery, FingerprintRead, PlannerReads, Read, StateHistoryRead,
+    AdapterRead, CursorStatements, EligibleCursorQuery, FingerprintRead, PlannerReads, Read,
+    StateHistoryRead,
 };
 use crate::planner_warehouse::types::CursorProgress;
 use crate::planner_warehouse::types::WarehouseReads;
@@ -250,35 +252,60 @@ impl WarehouseReads for LiveReads {
     fn cursor_bounds<'py>(
         &self,
         py: Python<'py>,
-        statements: &dyn Fn() -> PyResult<Vec<String>>,
+        statements: &dyn Fn() -> PyResult<CursorStatements>,
         progress: &dyn CursorProgress<'py>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>> {
-        let statements: Vec<String> = statements()?;
+        let CursorStatements { singles, batches } = statements()?;
         let connection: Bound<'py, PyAny> = self.connection(py);
         let execute: Bound<'py, PyAny> = self.method(py, "execute")?;
         let concurrency: i64 = self.inspection_concurrency(py)?;
-        let total: usize = statements.len();
-        if concurrency <= 1 || total <= 1 {
-            let mut outcomes: Vec<Bound<'py, PyAny>> = Vec::with_capacity(total);
-            for (index, sql) in statements.iter().enumerate() {
-                progress.starting(index)?;
-                let outcome = read_cursor_query(py, sql, (&connection, &execute))?;
-                progress.finished(index, &outcome)?;
-                outcomes.push(outcome);
+        let total: usize = singles.len();
+        let mut outcomes: Vec<Option<Bound<'py, PyAny>>> = vec![None; total];
+        let pending: Vec<usize> = if batches.is_empty() || total <= 1 {
+            (0..total).collect()
+        } else {
+            progress.batched(
+                batches.len(),
+                (concurrency.max(1) as usize).min(batches.len()),
+            )?;
+            let sizes: Vec<usize> = batches.iter().map(|batch| batch.reads.len()).collect();
+            let (answered, failed) = run_cursor_batches(
+                py,
+                &batches,
+                (&connection, &execute),
+                (concurrency, Some(progress.batch_callback(py, sizes)?)),
+            )?;
+            for (index, outcome) in answered {
+                outcomes[index] = Some(outcome);
             }
-            return Ok(Read::Known(outcomes));
+            failed
+        };
+        if concurrency <= 1 || pending.len() <= 1 {
+            for index in pending {
+                progress.starting(index)?;
+                let outcome = read_cursor_query(py, &singles[index], (&connection, &execute))?;
+                progress.finished(index, &outcome)?;
+                outcomes[index] = Some(outcome);
+            }
+        } else {
+            if batches.is_empty() {
+                progress.concurrent((concurrency as usize).min(pending.len()))?;
+            }
+            let tasks: Vec<Bound<'py, PyAny>> = pending
+                .iter()
+                .map(|index| bound_task(py, singles[*index].clone(), (&connection, &execute)))
+                .collect::<PyResult<_>>()?;
+            let results = run_bounded(
+                py,
+                tasks,
+                concurrency,
+                Some(progress.completion_callback(py, pending.clone())?),
+            )?;
+            for (index, outcome) in pending.into_iter().zip(results) {
+                outcomes[index] = Some(outcome);
+            }
         }
-        progress.concurrent((concurrency as usize).min(total))?;
-        let tasks: Vec<Bound<'py, PyAny>> = statements
-            .into_iter()
-            .map(|sql| bound_task(py, sql, (&connection, &execute)))
-            .collect::<PyResult<_>>()?;
-        Ok(Read::Known(run_bounded(
-            py,
-            tasks,
-            concurrency,
-            Some(progress.completion_callback(py)?),
-        )?))
+        Ok(Read::Known(outcomes.into_iter().flatten().collect()))
     }
 
     fn eligible_cursor_maxes<'py>(
