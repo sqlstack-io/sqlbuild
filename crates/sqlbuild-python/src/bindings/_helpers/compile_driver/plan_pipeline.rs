@@ -1,5 +1,7 @@
 //! The compile-and-plan pipeline of execution commands: compile, rules gate, then planning.
 
+use sqlbuild_python_planner::planner_phases::constants::CONNECTING;
+use sqlbuild_python_planner::planner_phases::constants::EVALUATING_RULES;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
@@ -113,12 +115,14 @@ pub(crate) fn planned_project<'py>(
     };
     if !rules_ran_at_load() {
         let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
-        let graph: Bound<'py, PyAny> = project_graph(&project)?;
-        run_rules_gate(
-            (discovered, adapter, expansion_reuse.as_any()),
-            (&options, &on_progress),
-            (&project, &graph),
-        )?;
+        timed(EVALUATING_RULES, || {
+            let graph: Bound<'py, PyAny> = project_graph(&project)?;
+            run_rules_gate(
+                (discovered, adapter, expansion_reuse.as_any()),
+                (&options, &on_progress),
+                (&project, &graph),
+            )
+        })?;
     }
     planned(
         (discovered, adapter),
@@ -297,8 +301,9 @@ fn planned<'py>(
                 )
             }
             None => {
-                let opened: Bound<'py, PyAny> =
-                    connection_with_hooks(adapter, &connection_config, hooks)?;
+                let opened: Bound<'py, PyAny> = timed(CONNECTING, || {
+                    connection_with_hooks(adapter, &connection_config, hooks)
+                })?;
                 connection = Some(opened.clone());
                 let reads = LiveReads::new(adapter, &opened, None).handle(adapter.py())?;
                 (opened, reads)

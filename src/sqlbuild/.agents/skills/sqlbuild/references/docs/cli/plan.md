@@ -142,20 +142,23 @@ When a removed column and an added column look related but are not an exact rena
 `--timings` prints how long each planning step took, in pipeline order, after the plan:
 
 ```
-Plan timings                 seconds  share
-  Compiling the project          2.1    20%
-  Reading warehouse state        3.3    31%
-  Detecting changes              2.4    23%
-  Checking source freshness      0.2     2%
-  Building plan entries          1.6    15%
-  Preparing test fixtures        0.1     1%
-  Assembling the plan            0.4     4%
-  Writing the plan               0.3     3%
-  Other                          0.2     2%
-  Total                         10.6
+Plan timings                   seconds  share
+  Discovering the project          1.2    10%
+  Compiling the project            2.1    17%
+  Evaluating rules                 0.6     5%
+  Connecting to the warehouse      0.3     2%
+  Reading warehouse state          3.3    26%
+  Detecting changes                2.4    19%
+  Checking source freshness        0.2     2%
+  Building plan entries            1.6    13%
+  Preparing test fixtures          0.1     1%
+  Assembling the plan              0.4     3%
+  Writing the plan                 0.3     2%
+  Other                            0.1     1%
+  Total                           12.6
 ```
 
-`Reading build history` appears with `--changed`. `Preparing test fixtures` counts only the time the plan waits for them, because they are prepared alongside the other steps. `Other` is the time no step covers. A plan a location makes for the web UI records the same steps in its plan document.
+`Reading build history` appears with `--changed`. A plan a location makes for the web UI from its synced warehouse state uses the project it already discovered, compiled and checked against the rules, and opens no connection, so those steps do not appear there. `Preparing test fixtures` counts only the time the plan waits for them, because they are prepared alongside the other steps. `Other` is the time no step covers. A plan a location makes for the web UI records the same steps in its plan document.
 
 ## Exit codes
 

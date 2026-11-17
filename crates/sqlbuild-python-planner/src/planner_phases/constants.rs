@@ -73,8 +73,17 @@ pub const AUDIT_ENTRIES: &str = "audit_entries";
 /// An audit plan entry's field saying its failure holds nothing back.
 pub const IGNORE_FAILURE: &str = "ignore_failure";
 
+/// Discovering the project's files and Python nodes; a location planning its published project skips it.
+pub const DISCOVERING: &str = "Discovering the project";
+
 /// Compiling the project before planning; a location planning its published project skips it.
 pub const COMPILING: &str = "Compiling the project";
+
+/// Evaluating the configured rules; skipped where the rules ran when the project loaded.
+pub const EVALUATING_RULES: &str = "Evaluating rules";
+
+/// Opening the warehouse connection; a plan from a synced state opens none.
+pub const CONNECTING: &str = "Connecting to the warehouse";
 
 /// The warehouse snapshot, model migrations and source relations, live or from a synced state.
 pub const READING_WAREHOUSE: &str = "Reading warehouse state";
