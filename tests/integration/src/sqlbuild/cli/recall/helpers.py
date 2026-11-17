@@ -30,6 +30,7 @@ HANG_DUMP_GRACE_SECONDS: int = 30
 STOP_HANG_SECONDS: int = 120
 EMPTY_RESULT: bytes = b'{"rows": []}'
 NUMBERED_LINE: re.Pattern[bytes] = re.compile(rb"^(\d+) std(?:out|err)$", re.MULTILINE)
+INCOMPLETE_HISTORY: re.Pattern[str] = re.compile(r"incomplete \((\d+) dropped, (\d+) failed\)")
 PROJECT_TOML: str = (
     'name = "orders_shop"\n'
     'adapter = "duckdb"\n'
