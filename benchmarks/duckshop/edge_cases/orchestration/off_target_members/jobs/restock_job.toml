@@ -1,0 +1,4 @@
+name = "restock_job"
+description = "Restock customers, declared only for production."
+select = "customers"
+targets = ["prod"]
