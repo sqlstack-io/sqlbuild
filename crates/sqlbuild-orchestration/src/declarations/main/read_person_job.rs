@@ -49,7 +49,7 @@ pub async fn read_person_job(
             ));
         }
     };
-    let (member_of, concurrency) = snapshot_relations(&definitions, (job_key, &job));
+    let (member_of, pools, concurrency) = snapshot_relations(&definitions, (job_key, &job));
     let (transaction, nodes) =
         read_snapshot_nodes(transaction, snapshot_id, Some(&job.selection)).await?;
     commit(transaction).await?;
@@ -64,7 +64,7 @@ pub async fn read_person_job(
         critical_nodes: critical_nodes(&nodes),
         cursor_type: cursor_type(&nodes),
         selection: job.selection,
-        concurrency_groups: job.concurrency_groups,
+        pools,
         concurrency,
         select: job.select,
         exclude: job.exclude,

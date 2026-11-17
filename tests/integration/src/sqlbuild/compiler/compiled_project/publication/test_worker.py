@@ -592,8 +592,8 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
             warehouse_query="SELECT amount FROM orders UNION ALL SELECT amount FROM inventory ORDER BY amount",
             expected_status="success",
             expected_rows=[(11,), (23,)],
-            concurrency_groups={"orders_limit": 2, "inventory_limit": 2},
-            launcher_settings={"concurrency_caps": {"orders_limit": 1, "inventory_limit": 1}},
+            pools={"orders_limit": 2, "inventory_limit": 2},
+            launcher_settings={"pool_caps": {"orders_limit": 1, "inventory_limit": 1}},
             files={
                 "models/inventory.sql": (
                     "MODEL (description 'Inventory.', materialized table);\nSELECT 23 AS amount\n"
@@ -602,26 +602,26 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
                     'name = "orders_job"\n'
                     'description = "Build orders."\n'
                     'select = "orders"\n'
-                    'concurrency_groups = ["inventory_limit"]\n'
+                    "pools = { inventory_limit = 1 }\n"
                 ),
                 "orchestration/jobs/inventory_job.toml": (
                     'name = "inventory_job"\n'
                     'description = "Build inventory."\n'
                     'select = "inventory"\n'
-                    'concurrency_groups = ["orders_limit"]\n'
+                    "pools = { orders_limit = 1 }\n"
                 ),
                 "orchestration/job_groups/annual_orders_job_group.toml": (
                     'name = "annual_orders_job_group"\n'
                     'description = "Orders group."\n'
                     'jobs = ["orders_job"]\n'
-                    'concurrency_groups = ["orders_limit"]\n'
+                    "pools = { orders_limit = 1 }\n"
                     'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
                 "orchestration/job_groups/annual_inventory_job_group.toml": (
                     'name = "annual_inventory_job_group"\n'
                     'description = "Inventory group."\n'
                     'jobs = ["inventory_job"]\n'
-                    'concurrency_groups = ["inventory_limit"]\n'
+                    "pools = { inventory_limit = 1 }\n"
                     'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },

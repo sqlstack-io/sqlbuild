@@ -204,8 +204,7 @@ CREATE TABLE sqb_concurrency_slots (
     group_key TEXT NOT NULL,
     slot BIGINT NOT NULL CHECK (slot > 0),
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
-    PRIMARY KEY (group_key, slot),
-    UNIQUE (group_key, run_id)
+    PRIMARY KEY (group_key, slot)
 );
 CREATE INDEX sqb_concurrency_slots_run ON sqb_concurrency_slots(run_id);
 CREATE TABLE sqb_principals (

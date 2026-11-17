@@ -6,10 +6,10 @@
 import type {
 	CancelProgress,
 	CatchUpPolicy,
-	ConcurrencyGroup,
-	ConcurrencyRule,
 	JobDetail,
 	LaunchVerb,
+	PoolHolders,
+	PoolUse,
 	Principal,
 	Run,
 	RunOrigin,
@@ -37,11 +37,14 @@ export const SNAPSHOT_GENERATION = 42;
 type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 
 type JobDef = Known<
-	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'concurrencyRules' | 'memberOf' | 'cursorType' | 'groupMembers'>,
+	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'pools' | 'concurrency' | 'poolHolders' | 'memberOf' | 'cursorType' | 'groupMembers'>,
 	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
->;
+> & {
+	/** Each pool the job takes, with its amount. */
+	pools: Record<string, number>;
+};
 
-export const CONCURRENCY_LIMITS: Record<string, number> = { warehouse_heavy: 1, 'target:prod': 4 };
+export const POOL_LIMITS: Record<string, number> = { warehouse_heavy: 1 };
 
 const decl = (sourceFile: string, line: number, code: string) => ({ sourceFile, line, code });
 
@@ -55,7 +58,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: { retries: 1, retryDelaySeconds: 300 },
-		concurrencyGroups: [],
+		pools: {},
 		priority: 5,
 		sourceFile: 'orchestration/jobs.py',
 		settings: {},
@@ -83,7 +86,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'skip',
 		onFailure: { retries: 2, retryDelaySeconds: 600 },
-		concurrencyGroups: ['warehouse_heavy'],
+		pools: { warehouse_heavy: 1 },
 		priority: 0,
 		sourceFile: 'orchestration/jobs.py',
 		settings: { '--concurrency': '8' },
@@ -99,7 +102,7 @@ export const JOB_DEFS: JobDef[] = [
     select=["path:models/staging", "path:models/marts"],
     overlap="skip",
     on_failure=on_failure(retries=2, retry_delay_seconds=600),
-    concurrency_groups=[warehouse_heavy],
+    pools={"warehouse_heavy": 1},
     settings={"--concurrency": 8},
     owner="data-platform",
     schedule=schedule(cron="{cron:core_build}", timezone="UTC"),
@@ -115,7 +118,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/jobs.py',
 		settings: {},
@@ -143,7 +146,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/activity.py',
 		settings: { '--max-microbatches': '4' },
@@ -173,7 +176,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/finance.py',
 		settings: { '--fail-fast': true },
@@ -203,7 +206,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/finance.py',
 		settings: {},
@@ -230,7 +233,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: ['warehouse_heavy'],
+		pools: { warehouse_heavy: 1 },
 		priority: 10,
 		sourceFile: 'orchestration/reporting.py',
 		settings: {},
@@ -244,7 +247,7 @@ export const JOB_DEFS: JobDef[] = [
     "reporting_exports",
     description="Reporting tables and the revenue export",
     select=["path:models/reporting", "export_revenue_csv"],
-    concurrency_groups=[warehouse_heavy],
+    pools={"warehouse_heavy": 1},
     priority=10,
     targets=["prod"],
 )`
@@ -259,7 +262,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: ['load_sources', 'core_build', 'activity_microbatch', 'reporting_exports'],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/groups.py',
 		settings: {},
@@ -288,7 +291,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: ['revenue_refresh', 'activity_microbatch', 'customer_segments'],
 		overlap: 'queue',
 		onFailure: { retries: 1, retryDelaySeconds: 900 },
-		concurrencyGroups: ['warehouse_heavy'],
+		pools: { warehouse_heavy: 1 },
 		priority: 20,
 		sourceFile: 'orchestration/groups.py',
 		settings: {},
@@ -304,7 +307,7 @@ export const JOB_DEFS: JobDef[] = [
     jobs=[revenue_refresh, activity_microbatch, customer_segments],
     on_failure=on_failure(retries=1, retry_delay_seconds=900),
     critical=["daily_revenue"],
-    concurrency_groups=[warehouse_heavy],
+    pools={"warehouse_heavy": 1},
     priority=20,
     targets=["prod"],
 )`
@@ -325,7 +328,7 @@ JOB_DEFS.push(
 			members: [],
 			overlap: 'queue',
 			onFailure: null,
-			concurrencyGroups: [],
+			pools: {},
 			priority: 0,
 			sourceFile: bigGroupFile(key),
 			settings: {},
@@ -344,7 +347,7 @@ JOB_DEFS.push(
 		members: BIG.members,
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/warehouse.py',
 		settings: {},
@@ -374,17 +377,24 @@ export function jobNodes(key: string): string[] {
 	return writeSetOf(selectorTerms(job), job.exclude);
 }
 
-/** Each of the job's groups with its limit and the other jobs naming it, as the server publishes them. */
-export function concurrencyRulesOf(job: JobDef | undefined): ConcurrencyRule[] {
-	return (job?.concurrencyGroups ?? []).map((group) => ({
-		group,
-		limit: CONCURRENCY_LIMITS[group] ?? 1,
-		sharedWith: JOB_DEFS.filter((other) => other.key !== job?.key && other.concurrencyGroups.includes(group)).map((other) => other.key)
+/** Each pool the job takes with its amount, limit and the other jobs taking it, as the server publishes them. */
+export function poolUsesOf(job: JobDef | undefined): PoolUse[] {
+	return Object.entries(job?.pools ?? {}).map(([pool, amount]) => ({
+		pool,
+		amount,
+		limit: POOL_LIMITS[pool] ?? 1,
+		sharedWith: JOB_DEFS.filter((other) => other.key !== job?.key && pool in other.pools).map((other) => other.key)
 	}));
 }
 
-export function concurrencyGroupsOf(job: JobDef | undefined): ConcurrencyGroup[] {
-	return (job?.concurrencyGroups ?? []).map((key) => ({ key, limit: CONCURRENCY_LIMITS[key] ?? 1, holders: [] }));
+export function poolHoldersOf(job: JobDef | undefined): PoolHolders[] {
+	return Object.keys(job?.pools ?? {}).map((pool) => ({ pool, limit: POOL_LIMITS[pool] ?? 1, holders: [] }));
+}
+
+/** The job's own `concurrency` setting, as the server reports it. */
+export function runConcurrencyOf(job: JobDef | undefined): number | null {
+	const value = Number(job?.settings?.concurrency ?? job?.settings?.['--concurrency']);
+	return Number.isInteger(value) && value > 0 ? value : null;
 }
 
 // ---- triggers ----
@@ -800,7 +810,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			lastHeartbeatAt: seed.lastHeartbeatAgoSec != null ? now - seed.lastHeartbeatAgoSec * 1000 : null,
 			imageId: seed.image ?? IMAGE_ID,
 			snapshotGeneration: seed.generation ?? SNAPSHOT_GENERATION,
-			concurrencyGroups: job?.concurrencyGroups ?? []
+			pools: job?.pools ?? {}
 		};
 		const run: Run = {
 			id: seed.id,

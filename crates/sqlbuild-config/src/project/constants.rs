@@ -184,10 +184,10 @@ pub(crate) const MODEL_HEADER_KEYS: [&str; 73] = [
     "valid_from_column",
     "valid_to_column",
 ];
-/// `[concurrency_groups]`: each job concurrency group's most runs at once.
-pub(crate) const CONCURRENCY_GROUPS_KEY: &str = "concurrency_groups";
-/// The highest limit a concurrency group may declare.
-pub(crate) const MAX_CONCURRENCY_GROUP_LIMIT: i64 = 10_000;
+/// `[pools]`: each pool's limit, the most slots its runs may hold at once.
+pub(crate) const POOLS_KEY: &str = "pools";
+/// The highest limit a pool may declare.
+pub(crate) const MAX_POOL_LIMIT: i64 = 10_000;
 pub(crate) const TARGET_KEYS: [&str; 22] = [
     "connection",
     "catalog_connection",
@@ -210,7 +210,7 @@ pub(crate) const TARGET_KEYS: [&str; 22] = [
     "warehouses",
     "recall",
     "concurrency",
-    CONCURRENCY_GROUPS_KEY,
+    POOLS_KEY,
 ];
 pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
 pub(crate) const CHANGES_KEYS: [&str; 2] = ["counts", "reach"];

@@ -9,7 +9,7 @@ pub const JOB_KEYS: [&str; 13] = [
     "targets",
     "owner",
     "overlap",
-    "concurrency_groups",
+    "pools",
     "schedule",
     "retry",
     "on_failure",
@@ -24,7 +24,7 @@ pub const GROUP_KEYS: [&str; 11] = [
     "targets",
     "owner",
     "overlap",
-    "concurrency_groups",
+    "pools",
     "schedule",
     "retry",
     "on_failure",
@@ -52,6 +52,8 @@ pub(crate) const RETRY_ATTEMPTS_KEY: (&str, &str) = ("attempts", "retries");
 pub(crate) const RETRY_DELAY_KEY: (&str, &str) = ("delay_seconds", "retry_delay_seconds");
 /// The job setting that moved under `[settings]`.
 pub(crate) const CONCURRENCY_KEY: &str = "concurrency";
+/// The most slots a job or job group may take of one pool.
+pub(crate) const MAX_POOL_AMOUNT: i64 = 10_000;
 /// How close an unknown key must be to a known one to be suggested.
 pub(crate) const SUGGESTION_CUTOFF: f64 = 0.6;
 /// The folders below `orchestration/`, one per declaration kind.

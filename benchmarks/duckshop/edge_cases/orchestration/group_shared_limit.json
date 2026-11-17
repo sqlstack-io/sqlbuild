@@ -1,8 +1,8 @@
 {
-  "description": "A daily group whose two load jobs share a warehouse limit of one. The group holds the warehouse slot and its children use it one at a time.",
+  "description": "A daily group whose two load jobs share a warehouse pool of one slot. The group holds the warehouse slot and its children use it one at a time.",
   "jobs": {
-    "load_customers": {"description": "Load customers", "selection": ["customers"], "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 1}},
-    "load_inventory": {"description": "Load inventory", "selection": ["inventory"], "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 1}}
+    "load_customers": {"description": "Load customers", "selection": ["customers"], "pools": {"warehouse": {"amount": 1, "limit": 1}}},
+    "load_inventory": {"description": "Load inventory", "selection": ["inventory"], "pools": {"warehouse": {"amount": 1, "limit": 1}}}
   },
   "groups": {
     "daily": {"description": "Daily loads", "selection": ["customers", "inventory"], "jobs": {"load_customers": [], "load_inventory": []}}

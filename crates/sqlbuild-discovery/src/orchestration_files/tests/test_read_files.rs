@@ -18,7 +18,7 @@ exclude = "tag:slow"
 targets = ["production"]
 owner = "Orders team"
 overlap = "skip"
-concurrency_groups = ["warehouse"]
+pools = { warehouse = 2, supplier_api = 1 }
 schedule = { calendar = "trading_days_calendar", timezone = "Europe/London", default_status = "paused" }
 
 [on_failure]
@@ -43,6 +43,7 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_select: written("python/orders/partner_export", 3, 10),
             expected_exclude: Some("tag:slow"),
             expected_overlap: Overlap::Skip,
+            expected_pools: &[("supplier_api", 1), ("warehouse", 2)],
             expected_retry: Some(RetryPolicy {
                 attempts: 3,
                 delay_seconds: 0,
@@ -76,6 +77,7 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_select: written("orders", 3, 10),
             expected_exclude: None,
             expected_overlap: Overlap::Queue,
+            expected_pools: &[],
             expected_retry: None,
             expected_deprecations: Vec::new(),
             expected_schedule: None,
@@ -89,6 +91,7 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_select: written("orders", 3, 10),
             expected_exclude: None,
             expected_overlap: Overlap::Queue,
+            expected_pools: &[],
             expected_retry: Some(RetryPolicy {
                 attempts: 3,
                 delay_seconds: 900,
@@ -105,6 +108,7 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_select: written("orders", 3, 10),
             expected_exclude: None,
             expected_overlap: Overlap::Queue,
+            expected_pools: &[],
             expected_retry: Some(RetryPolicy {
                 attempts: 2,
                 delay_seconds: 60,
@@ -144,6 +148,16 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
         );
         assert_eq!(
             job.run.overlap, test_case.expected_overlap,
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            job.run
+                .pools
+                .iter()
+                .map(|(pool, amount)| (pool.as_str(), *amount))
+                .collect::<Vec<_>>(),
+            test_case.expected_pools,
             "{}",
             test_case.description
         );
@@ -198,6 +212,20 @@ fn given_invalid_job_files_when_reading_then_reports_message_position_and_help()
             expected_message: "unknown job key 'concurrency'",
             expected_position: at(4, 1),
             expected_help: Some("move it under [settings] as `concurrency = ...`"),
+        },
+        FileErrorTestCase {
+            description: "a pool amount of zero",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\npools = { supplier_api = 0 }\n",
+            expected_message: "pools.supplier_api must take a whole number of slots from 1 to 10000, such as supplier_api = 1",
+            expected_position: at(4, 26),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "a pool written as a list",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\npools = [\"supplier_api\"]\n",
+            expected_message: "invalid type: sequence, expected a map",
+            expected_position: at(4, 9),
+            expected_help: None,
         },
         FileErrorTestCase {
             description: "blank select",

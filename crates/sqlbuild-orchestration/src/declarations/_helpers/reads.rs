@@ -1,14 +1,12 @@
 //! Job and trigger reads inside a caller's transaction, so authorization and results share one view.
 
-use std::collections::BTreeSet;
-
 use uuid::Uuid;
 
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 
-use crate::declarations::_helpers::job_detail::concurrency_rules;
+use crate::declarations::_helpers::job_detail::{DeclaredPools, pool_uses, run_concurrency};
 use crate::declarations::models::{
-    ConcurrencyRule, JobRecord, PersonTriggerChange, StoredJob, TriggerChangeRequest, TriggerRecord,
+    JobRecord, PersonTriggerChange, PoolUse, StoredJob, TriggerChangeRequest, TriggerRecord,
 };
 use crate::scheduler::models::TickRecord;
 use crate::store::errors::ControlError;
@@ -80,29 +78,24 @@ pub(crate) async fn jobs_in(
         vec![Parameter::Id(location_id), Parameter::Text(target.into())],
     )
     .await?;
-    let groups: Vec<(&str, &BTreeSet<String>)> = stored
+    let declared: Vec<DeclaredPools<'_>> = stored
         .iter()
-        .map(|job| {
-            (
-                job.job_key.as_str(),
-                &job.definition_json.concurrency_groups,
-            )
-        })
+        .map(|job| (job.job_key.as_str(), &job.definition_json.pools))
         .collect();
-    let concurrency: Vec<Vec<ConcurrencyRule>> = stored
+    let pools: Vec<Vec<PoolUse>> = stored
         .iter()
-        .map(|job| concurrency_rules((&job.job_key, &job.definition_json), &groups))
+        .map(|job| pool_uses((&job.job_key, &job.definition_json), &declared))
         .collect();
     let jobs: Vec<JobRecord> = stored
         .into_iter()
-        .zip(concurrency)
-        .map(|(job, concurrency)| JobRecord {
+        .zip(pools)
+        .map(|(job, pools)| JobRecord {
+            concurrency: run_concurrency(&job.definition_json),
             job_key: job.job_key,
             kind: job.kind,
             description: job.definition_json.description,
             selection: job.definition_json.selection,
-            concurrency_groups: job.definition_json.concurrency_groups,
-            concurrency,
+            pools,
             snapshot_id: job.snapshot_id,
             select: job.definition_json.select,
             declared_at: job.definition_json.declared_at,

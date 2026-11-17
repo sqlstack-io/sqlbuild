@@ -5,9 +5,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 
-use crate::declarations::constants::{DEFER_SETTING_PREFIX, VARS_SETTING, WITHHELD_SETTING};
+use crate::declarations::constants::{
+    CONCURRENCY_SETTING, DEFER_SETTING_PREFIX, VARS_SETTING, WITHHELD_SETTING,
+};
 use crate::declarations::models::{
-    ConcurrencyRule, Definitions, GroupDefinition, JobDefinition, JobMember,
+    Definitions, GroupDefinition, JobDefinition, JobMember, PoolSlots, PoolUse,
 };
 use crate::snapshots::models::SnapshotNode;
 
@@ -48,48 +50,60 @@ fn all_placed(waits: &BTreeSet<String>, placed: &BTreeSet<&str>) -> bool {
     waits.iter().all(|wait| placed.contains(wait.as_str()))
 }
 
-/// Each of `job`'s concurrency groups with its limit and the other declarations in `all` naming it.
-pub(crate) fn concurrency_rules(
+/// The pools a declaration takes, keyed by name.
+pub(crate) type DeclaredPools<'a> = (&'a str, &'a BTreeMap<String, PoolSlots>);
+
+/// Each pool `job` takes, with its slots and the other declarations in `all` taking it.
+pub(crate) fn pool_uses(
     (job_key, job): (&str, &JobDefinition),
-    all: &[(&str, &BTreeSet<String>)],
-) -> Vec<ConcurrencyRule> {
-    let mut rules: Vec<ConcurrencyRule> = Vec::new();
-    for group in &job.concurrency_groups {
-        rules.push(ConcurrencyRule {
-            group: group.clone(),
-            limit: job.concurrency_limits.get(group).map(|limit| limit.get()),
-            shared_with: sharing(group, job_key, all),
+    all: &[DeclaredPools<'_>],
+) -> Vec<PoolUse> {
+    let mut uses: Vec<PoolUse> = Vec::new();
+    for (pool, slots) in &job.pools {
+        uses.push(PoolUse {
+            pool: pool.clone(),
+            amount: slots.amount.get(),
+            limit: slots.limit.get(),
+            shared_with: sharing(pool, job_key, all),
         });
     }
-    rules
+    uses
 }
 
-/// The declarations in `all` other than `job_key` that name `group`.
-fn sharing(group: &str, job_key: &str, all: &[(&str, &BTreeSet<String>)]) -> BTreeSet<String> {
+/// The declarations in `all` other than `job_key` that take `pool`.
+fn sharing(pool: &str, job_key: &str, all: &[DeclaredPools<'_>]) -> BTreeSet<String> {
     let mut shared: BTreeSet<String> = BTreeSet::new();
-    for (other, groups) in all {
-        if *other != job_key && groups.contains(group) {
+    for (other, pools) in all {
+        if *other != job_key && pools.contains_key(pool) {
             shared.insert((*other).to_owned());
         }
     }
     shared
 }
 
-/// The groups running `job_key`, and its concurrency rules among every job and group of its snapshot.
+/// The job's own `concurrency` setting, when it is a whole number.
+pub(crate) fn run_concurrency(job: &JobDefinition) -> Option<u64> {
+    job.settings
+        .get(CONCURRENCY_SETTING)
+        .and_then(Value::as_u64)
+}
+
+/// The groups running `job_key`, its pools among every job and group of its snapshot, and its run concurrency.
 pub(crate) fn snapshot_relations(
     definitions: &Definitions,
     (job_key, job): (&str, &JobDefinition),
-) -> (BTreeSet<String>, Vec<ConcurrencyRule>) {
-    let mut all: Vec<(&str, &BTreeSet<String>)> = Vec::new();
+) -> (BTreeSet<String>, Vec<PoolUse>, Option<u64>) {
+    let mut all: Vec<DeclaredPools<'_>> = Vec::new();
     for (name, other) in &definitions.jobs {
-        all.push((name, &other.concurrency_groups));
+        all.push((name, &other.pools));
     }
     for (name, group) in &definitions.groups {
-        all.push((name, &group.job.concurrency_groups));
+        all.push((name, &group.job.pools));
     }
     (
         groups_running(definitions, job_key),
-        concurrency_rules((job_key, job), &all),
+        pool_uses((job_key, job), &all),
+        run_concurrency(job),
     )
 }
 

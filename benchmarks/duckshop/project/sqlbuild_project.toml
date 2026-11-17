@@ -60,8 +60,8 @@ database = "DUCKSHOP"
 schema = "EDGE"
 # <<< edge-case area
 
-# The edge-case job groups each take the other's limit, so admission must hold both.
-[concurrency_groups]
+# The edge-case job groups each take the other's pool, so admission must hold both.
+[pools]
 edge_inventory_limit = 1
 edge_products_limit = 1
 

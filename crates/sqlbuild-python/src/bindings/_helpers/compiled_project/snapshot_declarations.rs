@@ -9,8 +9,9 @@ use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use serde_json::Value;
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
-use sqlbuild_config::project::main::load_concurrency_groups::load_concurrency_groups;
+use sqlbuild_config::project::main::load_pool_limits::load_pool_limits;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
+use sqlbuild_config::project::models::PoolLimits;
 use sqlbuild_discovery::orchestration_files::models::{
     FilePosition, InitialStatus, NamedModule, OrchestrationInventory, RunFile, ScheduleSource,
 };
@@ -19,8 +20,8 @@ use sqlbuild_orchestration::declarations::main::group_dependencies::group_depend
 use sqlbuild_orchestration::declarations::main::group_wait_reasons::group_wait_reasons;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    DeclaredAt, Definitions, GroupDefinition, JobDefinition, Schedule, TriggerDeclaration,
-    TriggerDefinition, TriggerStatus,
+    DeclaredAt, Definitions, GroupDefinition, JobDefinition, PoolSlots, Schedule,
+    TriggerDeclaration, TriggerDefinition, TriggerStatus,
 };
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
@@ -145,22 +146,27 @@ fn matching_imports(
     Ok(())
 }
 
-/// Each of the run's concurrency groups with the limit the project declares for the target.
-fn run_limits(
+/// Each pool the run takes, with its amount and the pool's limit on the target.
+fn run_pools(
     run: &RunFile,
     limits: &BTreeMap<String, u32>,
-) -> PyResult<BTreeMap<String, NonZeroU32>> {
-    let mut limited: BTreeMap<String, NonZeroU32> = BTreeMap::new();
-    for group in &run.concurrency_groups {
-        let Some(limit) = limits.get(group).copied().and_then(NonZeroU32::new) else {
+) -> PyResult<BTreeMap<String, PoolSlots>> {
+    let mut pools: BTreeMap<String, PoolSlots> = BTreeMap::new();
+    for (pool, amount) in &run.pools {
+        let slots = limits
+            .get(pool)
+            .copied()
+            .and_then(NonZeroU32::new)
+            .zip(NonZeroU32::new(*amount));
+        let Some((limit, amount)) = slots.filter(|(limit, amount)| amount <= limit) else {
             return Err(PyValueError::new_err(format!(
-                "{} names concurrency group {group}, which the project does not declare",
+                "{} takes pool {pool}, which the project does not declare with room for its slots",
                 run.name.value
             )));
         };
-        limited.insert(group.clone(), limit);
+        pools.insert(pool.clone(), PoolSlots { amount, limit });
     }
-    Ok(limited)
+    Ok(pools)
 }
 
 pub(crate) fn compile_declarations(
@@ -233,10 +239,9 @@ pub(crate) fn compile_declarations(
             .map(str::to_owned)
             .collect::<Vec<_>>()
     };
-    let limits: BTreeMap<String, u32> =
-        load_concurrency_groups(&project_config_paths(project_dir), Some(&input.target)).map_err(
-            |_| PyValueError::new_err("cannot read [concurrency_groups] of sqlbuild_project.toml"),
-        )?;
+    let pool_limits: PoolLimits = load_pool_limits(&project_config_paths(project_dir))
+        .map_err(|_| PyValueError::new_err("cannot read [pools] of sqlbuild_project.toml"))?;
+    let limits: &BTreeMap<String, u32> = pool_limits.on(&input.target);
     let mut jobs: BTreeMap<String, JobDefinition> = BTreeMap::new();
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();
     let mut calendar_requests: Vec<CalendarRequest> = Vec::new();
@@ -275,8 +280,7 @@ pub(crate) fn compile_declarations(
                 description: run.description.clone(),
                 selection,
                 settings: job.settings.clone(),
-                concurrency_groups: run.concurrency_groups.iter().cloned().collect(),
-                concurrency_limits: run_limits(run, &limits)?,
+                pools: run_pools(run, limits)?,
                 select: Some(job.select.value.clone()),
                 exclude,
                 targets: run.targets.iter().cloned().collect(),
@@ -325,8 +329,7 @@ pub(crate) fn compile_declarations(
                     description: run.description.clone(),
                     selection,
                     settings: BTreeMap::new(),
-                    concurrency_groups: run.concurrency_groups.iter().cloned().collect(),
-                    concurrency_limits: run_limits(run, &limits)?,
+                    pools: run_pools(run, limits)?,
                     select: None,
                     exclude: None,
                     targets: run.targets.iter().cloned().collect(),

@@ -30,7 +30,7 @@ use crate::project::constants::{
     USD_PER_CREDIT_KEY, ZERO_FIXED_DURATION, ZERO_FLOAT,
 };
 use crate::project::constants::{
-    CHANGE_COUNTS, CHANGE_REACHES, CHANGES_KEYS, CONTROL_KEYS, MAX_CONCURRENCY_GROUP_LIMIT,
+    CHANGE_COUNTS, CHANGE_REACHES, CHANGES_KEYS, CONTROL_KEYS, MAX_POOL_LIMIT,
     MIN_SYNC_INTERVAL_SECONDS, SYNC_INTERVAL_HELP, SYNC_INTERVAL_OFF,
 };
 use crate::project::errors::ConfigFailure;
@@ -644,16 +644,16 @@ pub(crate) fn load_control(
     })
 }
 
-/// A `concurrency_groups` table at `label`: each group's most runs at once, by group name.
-pub(crate) fn load_concurrency_groups(
+/// A `pools` table at `label`: each pool's limit, by pool name.
+pub(crate) fn load_pools(
     payload: Option<&ConfigValue>,
     (label, file): (&str, ConfigFile),
 ) -> Loaded<BTreeMap<String, u32>> {
     let mapping = coerce_mapping(payload, place(file, label))?;
-    let mut groups: BTreeMap<String, u32> = BTreeMap::new();
+    let mut pools: BTreeMap<String, u32> = BTreeMap::new();
     for (key, value) in mapping {
         let name = key_name(key);
-        if !concurrency_group_name(name) {
+        if !pool_name(name) {
             return Err(ConfigFailure::at(
                 file,
                 format!("{label}.{name} must be named with letters, digits, '_' and '-'"),
@@ -663,24 +663,24 @@ pub(crate) fn load_concurrency_groups(
             ConfigFailure::at(
                 file,
                 format!(
-                    "{label}.{name} must be the most runs at once, from 1 to \
-                     {MAX_CONCURRENCY_GROUP_LIMIT}, such as {name} = 1"
+                    "{label}.{name} must be the pool's limit, a whole number of slots from 1 to \
+                     {MAX_POOL_LIMIT}, such as {name} = 1"
                 ),
             )
         };
         let limit: u32 = match value {
-            ConfigValue::Integer(limit) if (1..=MAX_CONCURRENCY_GROUP_LIMIT).contains(limit) => {
+            ConfigValue::Integer(limit) if (1..=MAX_POOL_LIMIT).contains(limit) => {
                 u32::try_from(*limit).map_err(|_| invalid())?
             }
             _ => return Err(invalid()),
         };
-        groups.insert(name.to_owned(), limit);
+        pools.insert(name.to_owned(), limit);
     }
-    Ok(groups)
+    Ok(pools)
 }
 
-/// Group names are TOML bare keys: letters, digits, `_` and `-`.
-fn concurrency_group_name(name: &str) -> bool {
+/// Pool names are TOML bare keys: letters, digits, `_` and `-`.
+fn pool_name(name: &str) -> bool {
     !name.is_empty()
         && name
             .bytes()

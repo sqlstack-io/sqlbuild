@@ -477,10 +477,10 @@ export type RunDetail = {
 /** Why the scheduler can't claim a queued run yet; a run in another location or target is never named (`runId` null). */
 export type QueueWait =
 	| { kind: 'write_claim'; runId: string | null; nodeKey: string; otherNodes: number }
-	/** Running runs of the same location and target hold the slots of a concurrency group this run takes. */
-	| { kind: 'concurrency_limit'; limit: string; holders: string[] }
-	/** An earlier queued run takes the same limit, so it goes first. */
-	| { kind: 'earlier_run'; runId: string | null; limit: string }
+	/** Running runs of the same location and target hold the slots of a pool this run takes. */
+	| { kind: 'pool_full'; pool: string; holders: string[] }
+	/** An earlier queued run takes the same pool, so it goes first. */
+	| { kind: 'earlier_run'; runId: string | null; pool: string }
 	| { kind: 'job_running'; runId: string }
 	/** `attempt` is set while the group retries that job: its attempt number, from 2. */
 	| { kind: 'upstream_job'; runId: string; jobKey: string; attempt: number | null }
@@ -746,9 +746,10 @@ export type Job = {
 	/** Null where the server doesn't report it (also `onFailure`, `priority`, `sourceFile`). */
 	overlap: OverlapPolicy | null;
 	onFailure: OnFailure | null;
-	concurrencyGroups: string[];
-	/** Each group's project limit and the other jobs and groups sharing it, as published. */
-	concurrencyRules: ConcurrencyRule[];
+	/** Each pool the job takes: its slots, the pool's limit and the other jobs and groups taking it, as published. */
+	pools: PoolUse[];
+	/** The job's own `concurrency` setting, models building at once in a run; null uses the project's or target's. */
+	concurrency: number | null;
 	priority: number | null;
 	owner: string | null;
 	sourceFile: string | null;
@@ -756,21 +757,21 @@ export type Job = {
 	lastRun: RunRef | null;
 };
 
-/** A job's concurrency group as the project declares it: "One run at a time, shared with X". */
-export type ConcurrencyRule = {
-	group: string;
-	/** Null for a snapshot published before limits were part of it. */
-	limit: number | null;
+/** A pool a job takes: `amount` of its `limit` slots, shared with the other jobs and groups taking it. */
+export type PoolUse = {
+	pool: string;
+	amount: number;
+	limit: number;
 	sharedWith: string[];
 };
 
 /** One reason a member waits: `fromNode` of `upstreamJob` feeds its `toNode`, directly or through nodes no member selects. */
 export type WaitReason = { upstreamJob: string; fromNode: string; toNode: string };
 
-export type ConcurrencyGroup = {
-	key: string;
+export type PoolHolders = {
+	pool: string;
 	limit: number;
-	/** Active runs holding a slot. */
+	/** Active runs holding its slots. */
 	holders: string[];
 };
 
@@ -785,13 +786,13 @@ export type JobGroupMember = {
 };
 
 export type JobDetail = Job & {
-	/** Null where the server doesn't report it, as for `declaration`, `concurrency` and `targets`. */
+	/** Null where the server doesn't report it, as for `declaration`, `poolHolders` and `targets`. */
 	declaration: { sourceFile: string; line: number; code: string } | null;
 	exclude: string[];
 	/** Settings are CLI flags validated against the command table. */
 	settings: Record<string, string | boolean> | null;
 	resolvedNodes: string[];
-	concurrency: ConcurrencyGroup[] | null;
+	poolHolders: PoolHolders[] | null;
 	/** Null when the job applies to every target. */
 	targets: string[] | null;
 	groupMembers: JobGroupMember[] | null;

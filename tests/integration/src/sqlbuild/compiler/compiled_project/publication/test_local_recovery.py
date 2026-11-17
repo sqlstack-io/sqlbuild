@@ -112,7 +112,7 @@ def test_given_a_running_local_worker_when_scheduler_dies_then_restart_adopts_an
             "failed",
             [],
             launcher="uncooperative",
-            concurrency_groups={"orders_limit": 1},
+            pools={"orders_limit": 1},
             files={
                 **duckshop_orchestration("local_recovery_orders"),
             },

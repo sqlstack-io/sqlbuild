@@ -1,6 +1,6 @@
 //! Published-job requests freeze execution inputs and audit atomically on both databases.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::credentials::models::AuditContext;
 use crate::runs::main::claim_next_run::claim_next_run;
@@ -58,7 +58,7 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
             input.nodes.insert("warehouse_orders".into(), source);
             input.documents.insert("jobs".into(), json!({"daily_orders": {
                 "description": "Build orders from the warehouse source", "selection": ["orders", "warehouse_orders"],
-                "settings": {"full_refresh": true}, "concurrency_groups": ["orders-load"], "concurrency_limits": {"orders-load": 100}
+                "settings": {"full_refresh": true}, "pools": {"orders-load": {"amount": 1, "limit": 100}}
             }}));
             let published = publish_snapshot(store, &input).await.expect("publish job");
             let request = JobRunRequest {
@@ -227,8 +227,13 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 BTreeMap::from([("full_refresh".into(), json!(true))])
             );
             assert_eq!(
-                claim.request.concurrency_groups,
-                ["orders-load".into()].into()
+                claim
+                    .request
+                    .pools
+                    .keys()
+                    .cloned()
+                    .collect::<BTreeSet<String>>(),
+                BTreeSet::from(["orders-load".to_owned()])
             );
             assert_eq!(claim.request.priority, 7);
             assert_eq!(claim.request.requested_by, "test-operator");

@@ -1828,16 +1828,6 @@ export interface components {
             /** Format: uuid */
             snapshot_id?: string | null;
         };
-        /** @description A job's concurrency group: its most runs at once and the other jobs and groups that share it. */
-        ConcurrencyRule: {
-            group: string;
-            /**
-             * Format: int32
-             * @description Absent for a snapshot published before limits were part of it.
-             */
-            limit?: number | null;
-            shared_with: string[];
-        };
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -2029,9 +2019,11 @@ export interface components {
         };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
-            /** @description Each concurrency group's limit and the other jobs sharing it, by group name. */
-            concurrency: components["schemas"]["ConcurrencyRule"][];
-            concurrency_groups: string[];
+            /**
+             * Format: int32
+             * @description The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
+             */
+            concurrency?: number | null;
             /** @description Selected nodes whose failure stops a group. */
             critical_nodes: string[];
             /** @description The cursor type every selected cursor node shares; absent when none has a cursor or types differ. */
@@ -2048,6 +2040,8 @@ export interface components {
             on_failure?: null | components["schemas"]["OnFailure"];
             overlap: components["schemas"]["Overlap"];
             owner?: string | null;
+            /** @description Each pool the job takes, by pool name. */
+            pools: components["schemas"]["PoolUse"][];
             select?: string | null;
             selection: string[];
             /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
@@ -2068,9 +2062,11 @@ export interface components {
         };
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
-            /** @description Each concurrency group's limit and the other jobs sharing it, by group name. */
-            concurrency: components["schemas"]["ConcurrencyRule"][];
-            concurrency_groups: string[];
+            /**
+             * Format: int32
+             * @description The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
+             */
+            concurrency?: number | null;
             declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
             job_key: string;
@@ -2079,6 +2075,8 @@ export interface components {
             on_failure?: null | components["schemas"]["OnFailure"];
             overlap: components["schemas"]["Overlap"];
             owner?: string | null;
+            /** @description Each pool the job takes, by pool name. */
+            pools: components["schemas"]["PoolUse"][];
             /** @description A job's selectors as written; absent for a group and for snapshots published before they were recorded. */
             select?: string | null;
             selection: string[];
@@ -2804,6 +2802,22 @@ export interface components {
              */
             scheduler_lease_expires_at?: string | null;
         };
+        /** @description How many slots of a pool a job takes, and the pool's limit on the job's target. */
+        PoolSlots: {
+            /** Format: int32 */
+            amount: number;
+            /** Format: int32 */
+            limit: number;
+        };
+        /** @description A pool a job takes: its slots, the pool's limit, and the other jobs and groups taking it. */
+        PoolUse: {
+            /** Format: int32 */
+            amount: number;
+            /** Format: int32 */
+            limit: number;
+            pool: string;
+            shared_with: string[];
+        };
         /** @description What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly. */
         PreviewCopy: {
             /** @description Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it. */
@@ -2942,12 +2956,12 @@ export interface components {
         } | {
             holders: string[];
             /** @enum {string} */
-            kind: "concurrency_limit";
-            limit: string;
+            kind: "pool_full";
+            pool: string;
         } | {
             /** @enum {string} */
             kind: "earlier_run";
-            limit: string;
+            pool: string;
             /** Format: uuid */
             run_id?: string | null;
         } | {
@@ -3314,11 +3328,6 @@ export interface components {
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {
             command?: components["schemas"]["RunCommand"];
-            concurrency_groups: string[];
-            /** @description The project's limit of each of `concurrency_groups`, frozen with the run; the server's cap may lower it. */
-            concurrency_limits?: {
-                [key: string]: number;
-            };
             image_id?: string | null;
             job_key?: string | null;
             kind: components["schemas"]["RunKind"];
@@ -3333,6 +3342,10 @@ export interface components {
             origin: components["schemas"]["RunOrigin"];
             /** Format: uuid */
             parent_run_id?: string | null;
+            /** @description Each pool the run takes, its amount and the pool's limit frozen with it; the server's cap may lower the limit. */
+            pools?: {
+                [key: string]: components["schemas"]["PoolSlots"];
+            };
             /** Format: int64 */
             priority: number;
             requested_by: string;

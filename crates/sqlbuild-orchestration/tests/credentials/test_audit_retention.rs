@@ -52,8 +52,7 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_rows_survive_and_retrie
             input.documents.insert(
                 "jobs".into(),
                 json!({"daily_orders": {
-                    "description": "Build orders", "selection": ["orders"], "settings": {},
-                    "concurrency_groups": []
+                    "description": "Build orders", "selection": ["orders"], "settings": {}
                 }}),
             );
             publish_snapshot(store, &input).await.expect("publish job");

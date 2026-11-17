@@ -114,8 +114,8 @@ describe('job mapping', () => {
 			kind: 'job',
 			description: 'Build orders',
 			selection: ['model:customers', 'model:orders'],
-			concurrency_groups: ['warehouse_heavy'],
-			concurrency: [{ group: 'warehouse_heavy', limit: 1, shared_with: ['nightly'] }],
+			pools: [{ pool: 'warehouse_heavy', amount: 1, limit: 2, shared_with: ['nightly'] }],
+			concurrency: 4,
 			snapshot_id: SNAPSHOT,
 			select: '+orders',
 			declared_at: { path: 'orchestration/jobs.py', line: 12 },
@@ -125,16 +125,17 @@ describe('job mapping', () => {
 		};
 		const triggers = [toTrigger(daily, [], null), toTrigger(onInventory, [], null)];
 		const job = toJob(wire, triggers, [run('r-inv', 'inventory', null), run('r-ord', 'orders', null)]);
-		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrencyGroups: ['warehouse_heavy'], select: '+orders', sourceFile: 'orchestration/jobs.py:12', owner: 'Orders team', overlap: 'skip', onFailure: { retries: 2, retryDelaySeconds: 300 }, priority: null });
+		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrency: 4, select: '+orders', sourceFile: 'orchestration/jobs.py:12', owner: 'Orders team', overlap: 'skip', onFailure: { retries: 2, retryDelaySeconds: 300 }, priority: null });
 		expect(toJob({ ...wire, owner: ' ', overlap: 'queue', on_failure: null }, triggers, [])).toMatchObject({ owner: null, overlap: 'queue', onFailure: null });
 		expect(job.lastRun?.id).toBe('r-ord');
-		expect(job.concurrencyRules).toEqual([{ group: 'warehouse_heavy', limit: 1, sharedWith: ['nightly'] }]);
+		expect(job.pools).toEqual([{ pool: 'warehouse_heavy', amount: 1, limit: 2, sharedWith: ['nightly'] }]);
+		expect(toJob({ ...wire, concurrency: null }, triggers, []).concurrency).toBeNull();
 		const detail = jobDetailOf(job, { ...wire, settings: { vars: '[REDACTED]', concurrency: 4, empty_ok: true, models: ['a', 'b'] }, members: [], member_of: ['nightly'], critical_nodes: ['model:orders'], exclude: ' stg_orders  audit_orders', targets: ['production'], cursor_type: 'integer' });
 		expect(detail.resolvedNodes).toEqual(['model:customers', 'model:orders']);
 		expect(detail.settings).toEqual({ vars: '[REDACTED]', concurrency: '4', empty_ok: true, models: '["a","b"]' });
 		expect([detail.groupMembers, detail.members, detail.memberOf, detail.criticalNodes]).toEqual([null, null, ['nightly'], ['model:orders']]);
 		expect([detail.exclude, detail.targets, detail.cursorType]).toEqual([['stg_orders', 'audit_orders'], ['production'], 'integer']);
-		expect([detail.concurrency, detail.declaration]).toEqual([null, null]);
+		expect([detail.poolHolders, detail.declaration]).toEqual([null, null]);
 		expect(toJob({ ...wire, job_key: 'nightly', kind: 'group' }, triggers, []).kind).toBe('group');
 	});
 
@@ -144,8 +145,7 @@ describe('job mapping', () => {
 			kind: 'group',
 			description: 'Everything nightly',
 			selection: [],
-			concurrency_groups: [],
-			concurrency: [],
+			pools: [],
 			snapshot_id: SNAPSHOT,
 			settings: {},
 			member_of: [],

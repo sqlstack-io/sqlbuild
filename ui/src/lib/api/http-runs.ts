@@ -147,10 +147,10 @@ function toQueueWait(wait: Wire['QueueWait']): QueueWait {
 	switch (wait.kind) {
 		case 'write_claim':
 			return { kind: wait.kind, runId: wait.run_id ?? null, nodeKey: wait.node_key, otherNodes: wait.other_nodes };
-		case 'concurrency_limit':
-			return { kind: wait.kind, limit: wait.limit, holders: wait.holders };
+		case 'pool_full':
+			return { kind: wait.kind, pool: wait.pool, holders: wait.holders };
 		case 'earlier_run':
-			return { kind: wait.kind, runId: wait.run_id ?? null, limit: wait.limit };
+			return { kind: wait.kind, runId: wait.run_id ?? null, pool: wait.pool };
 		case 'upstream_job':
 			return { kind: wait.kind, runId: wait.run_id, jobKey: wait.job_key, attempt: wait.attempt ?? null };
 		case 'job_running':

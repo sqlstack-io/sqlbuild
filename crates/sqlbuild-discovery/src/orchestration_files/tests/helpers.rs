@@ -1,4 +1,7 @@
+use std::collections::BTreeMap;
 use std::path::Path;
+
+use sqlbuild_config::project::models::PoolLimits;
 
 use crate::models::{DiscoveryFailure, FailureKind};
 use crate::orchestration_files::_helpers::read_group_file::read_group_file;
@@ -104,4 +107,21 @@ pub(super) fn with_file(
     files.retain(|(existing, _)| *existing != path);
     files.push((path, text));
     files
+}
+
+/// Pool limits: the declared ones, and each target's.
+pub(super) fn limits(declared: &[(&str, u32)], targets: &[(&str, &[(&str, u32)])]) -> PoolLimits {
+    let named = |pools: &[(&str, u32)]| -> BTreeMap<String, u32> {
+        pools
+            .iter()
+            .map(|(pool, limit)| ((*pool).to_owned(), *limit))
+            .collect()
+    };
+    PoolLimits {
+        declared: named(declared),
+        targets: targets
+            .iter()
+            .map(|(target, pools)| ((*target).to_owned(), named(pools)))
+            .collect(),
+    }
 }

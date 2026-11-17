@@ -16,3 +16,5 @@ pub(crate) const SOURCE_KIND: &str = "source";
 pub(crate) const LOADER_KIND: &str = "loader";
 /// Where a published source names the loader that fills it.
 pub(crate) const SOURCE_LOADER_POINTER: &str = "/entry/loader";
+/// The job setting naming how many models a run builds at once.
+pub(crate) const CONCURRENCY_SETTING: &str = "concurrency";
