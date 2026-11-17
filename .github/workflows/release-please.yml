@@ -119,8 +119,9 @@ jobs:
           RELEASE_BRANCH: ${{ steps.release_branch.outputs.name }}
         # Release Please only bumps the sqlbuild-cli and sqlbuild-python crate versions, so updating
         # the workspace entries of Cargo.lock is enough and needs no compile; metadata --locked
-        # proves the lock is complete. The sync proves every locked third-party package installs;
-        # it skips sqlbuild and sqlbuild-cli, which would compile both native packages (~15 min).
+        # proves the lock is complete. The sync proves every locked third-party package for this
+        # platform installs; it skips sqlbuild and sqlbuild-cli, which would compile both native
+        # packages (~15 min).
         run: |
           cargo update --workspace
           cargo metadata --locked --format-version 1 > /dev/null
