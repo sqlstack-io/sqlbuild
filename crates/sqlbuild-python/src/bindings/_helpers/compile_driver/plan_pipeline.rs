@@ -1,13 +1,13 @@
 //! The compile-and-plan pipeline of execution commands: compile, rules gate, then planning.
 
-use sqlbuild_python_planner::planner_phases::constants::CONNECTING;
-use sqlbuild_python_planner::planner_phases::constants::EVALUATING_RULES;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_planner::live_reads::models::LiveReads;
 use sqlbuild_python_planner::planner_phases::constants::COMPILING;
+use sqlbuild_python_planner::planner_phases::constants::CONNECTING;
+use sqlbuild_python_planner::planner_phases::constants::EVALUATING_RULES;
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_warehouse::models::PlannerReads;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;

@@ -10,5 +10,5 @@ pub fn bound_task<'py>(
     sql: String,
     (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<Bound<'py, PyAny>> {
-    bounded::bound_task(py, sql, (connection, execute))
+    bounded::bound_task(py, sql, (connection, execute), true)
 }

@@ -1,5 +1,6 @@
 //! Entry points of warehouse-inspection planning.
 
+pub mod cursor_batch_sql;
 pub mod cursor_bounds;
 pub mod cursor_query_groups;
 pub mod cursor_query_identity;
