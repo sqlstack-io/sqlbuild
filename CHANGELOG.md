@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.236.3](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.2...v0.236.3) (2026-11-17)
+
+
+### Bug Fixes
+
+* stop on SIGTERM when started with SIGINT ignored, and event-driven interrupt tests ([#1531](https://github.com/sqlstack-io/sqlbuild/issues/1531)) ([f113542](https://github.com/sqlstack-io/sqlbuild/commit/f1135424aa6dfbf47339583cf5bb1bb520bfc8c7))
+
 ## [0.236.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.1...v0.236.2) (2026-11-17)
 
 
