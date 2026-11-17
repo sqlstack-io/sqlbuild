@@ -6,44 +6,11 @@ use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::compile_driver::config_validation::{
-    ProjectConfiguration, reject_invalid_project_configuration,
-};
+use crate::bindings::_helpers::compile_driver::config_validation::ProjectConfiguration;
+use crate::bindings::_helpers::compile_driver::config_validation::reject_invalid_project_configuration;
 use sqlbuild_python_base::compile_driver::constants::PROJECT_DISCOVERIES;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use crate::bindings::_helpers::compile_driver::integration_loaders::integration_loader_functions;
-use crate::bindings::_helpers::discovery::constants::{
-    ALLOW_MISSING_SECRETS_ENV, ALLOW_MISSING_SECRETS_SETTING, TRUE_ENV_VALUES,
-};
-use crate::bindings::_helpers::discovery::declaration_records::{
-    discover_adapter_file, discover_audit_files, discover_constant_files, discover_enum_files,
-    discover_macro_files, discover_model_schema_files, discover_seed_files,
-    discover_sql_function_files, discover_sql_hook_files, retained_discovery_session,
-};
-use crate::bindings::_helpers::discovery::imported_providers::{
-    discover_event_exporter_functions, discover_provider_classes,
-};
-use crate::bindings::_helpers::discovery::imported_python_nodes::{
-    discover_hook_functions, discover_materialization_files, discover_python_node_functions,
-};
-use crate::bindings::_helpers::discovery::model_records::{
-    ModelFileSelection, discovered_model_files,
-};
-use crate::bindings::_helpers::discovery::project_config::{
-    load_local_config_file, load_project_config_file, warn_deprecated_settings,
-};
-use crate::bindings::_helpers::discovery::provider_secrets::{
-    SecretPolicy, invocation_allows_missing_secrets,
-};
-use crate::bindings::_helpers::discovery::python_function_files::discover_python_function_files;
-use crate::bindings::_helpers::discovery::python_paths::reject_unsupported_python_paths;
-use crate::bindings::_helpers::discovery::snapshot::in_snapshot;
-use crate::bindings::_helpers::discovery::sql_test_records::{
-    discover_scenario_files, discover_test_files,
-};
-use crate::bindings::_helpers::discovery::yaml_records::{
-    discover_schema_files, discover_source_files,
-};
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, produced};
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -55,6 +22,40 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::compile_driver::main::reject_invalid_project_configuration::reject_invalid_project_configuration;
+use sqlbuild_python_front::compile_driver::models::ProjectConfiguration;
+use sqlbuild_python_front::discovery::constants::ALLOW_MISSING_SECRETS_ENV;
+use sqlbuild_python_front::discovery::constants::ALLOW_MISSING_SECRETS_SETTING;
+use sqlbuild_python_front::discovery::constants::TRUE_ENV_VALUES;
+use sqlbuild_python_front::discovery::main::project::load_local_config_file::load_local_config_file;
+use sqlbuild_python_front::discovery::main::project::load_project_config_file::load_project_config_file;
+use sqlbuild_python_front::discovery::main::project::warn_deprecated_settings::warn_deprecated_settings;
+use sqlbuild_python_front::discovery::main::python_files::discover_event_exporter_functions::discover_event_exporter_functions;
+use sqlbuild_python_front::discovery::main::python_files::discover_hook_functions::discover_hook_functions;
+use sqlbuild_python_front::discovery::main::python_files::discover_materialization_files::discover_materialization_files;
+use sqlbuild_python_front::discovery::main::python_files::discover_provider_classes::discover_provider_classes;
+use sqlbuild_python_front::discovery::main::python_files::discover_python_function_files::discover_python_function_files;
+use sqlbuild_python_front::discovery::main::python_files::discover_python_node_functions::discover_python_node_functions;
+use sqlbuild_python_front::discovery::main::python_files::reject_unsupported_python_paths::reject_unsupported_python_paths;
+use sqlbuild_python_front::discovery::main::records::discover_adapter_file::discover_adapter_file;
+use sqlbuild_python_front::discovery::main::records::discover_audit_files::discover_audit_files;
+use sqlbuild_python_front::discovery::main::records::discover_constant_files::discover_constant_files;
+use sqlbuild_python_front::discovery::main::records::discover_enum_files::discover_enum_files;
+use sqlbuild_python_front::discovery::main::records::discover_macro_files::discover_macro_files;
+use sqlbuild_python_front::discovery::main::records::discover_model_schema_files::discover_model_schema_files;
+use sqlbuild_python_front::discovery::main::records::discover_scenario_files::discover_scenario_files;
+use sqlbuild_python_front::discovery::main::records::discover_schema_files::discover_schema_files;
+use sqlbuild_python_front::discovery::main::records::discover_seed_files::discover_seed_files;
+use sqlbuild_python_front::discovery::main::records::discover_source_files::discover_source_files;
+use sqlbuild_python_front::discovery::main::records::discover_sql_function_files::discover_sql_function_files;
+use sqlbuild_python_front::discovery::main::records::discover_sql_hook_files::discover_sql_hook_files;
+use sqlbuild_python_front::discovery::main::records::discover_test_files::discover_test_files;
+use sqlbuild_python_front::discovery::main::records::discovered_model_files::discovered_model_files;
+use sqlbuild_python_front::discovery::main::records::retained_discovery_session::retained_discovery_session;
+use sqlbuild_python_front::discovery::main::snapshots::in_snapshot::in_snapshot;
+use sqlbuild_python_front::discovery::main::sources::invocation_allows_missing_secrets::invocation_allows_missing_secrets;
+use sqlbuild_python_front::discovery::models::ModelFileSelection;
+use sqlbuild_python_front::discovery::models::SecretPolicy;
 
 const SQL_ANALYSIS_SETTING_KEY: &str = "sql_analysis";
 /// The setting that turns delta compiles, and the project image they read, off.

@@ -1,0 +1,81 @@
+//! Project inputs holding only the project and local configuration.
+
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use pyo3::types::PyString;
+use sqlbuild_host::entries::models::ExecutorHost;
+
+use crate::compile_driver::models::ProjectConfiguration;
+use crate::compile_driver::main::reject_invalid_connection_configuration::reject_invalid_connection_configuration;
+use crate::discovery::_helpers::project::project_config::load_local_config_file;
+use crate::discovery::_helpers::project::project_config::load_project_config_file;
+use crate::compile_driver::main::reject_invalid_project_configuration::reject_invalid_project_configuration;
+use crate::discovery::_helpers::project::project_config::warn_deprecated_settings;
+use crate::discovery::_helpers::python_files::imported_providers::discover_provider_classes;
+use crate::discovery::models::SecretPolicy;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
+
+/// `DiscoveredProjectInputs` with the loaded configuration, inside the project discovery lifecycle.
+pub(crate) fn discover_project_configuration<'py>(
+    py: Python<'py>,
+    project_dir: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    configuration_inputs(py, project_dir, false)
+}
+
+/// The validated configuration without a discovery lifecycle, which reading two files never needs.
+pub(crate) fn discover_connection_configuration<'py>(
+    py: Python<'py>,
+    project_dir: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    loaded_configuration(py, project_dir, true)
+}
+
+fn configuration_inputs<'py>(
+    py: Python<'py>,
+    project_dir: &Bound<'py, PyAny>,
+    validate_connections: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let lifecycle: Bound<'py, PyAny> = call_with(
+        &host_entry(py, ExecutorHost::OperationLifecycle)?,
+        &[
+            ("operation_kind", PyString::new(py, "project").into_any()),
+            (
+                "operation_name",
+                PyString::new(py, "project_discovery").into_any(),
+            ),
+        ],
+    )?;
+    within(&lifecycle, |_| {
+        loaded_configuration(py, project_dir, validate_connections)
+    })
+}
+
+fn loaded_configuration<'py>(
+    py: Python<'py>,
+    project_dir: &Bound<'py, PyAny>,
+    validate_connections: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let project_config: Bound<'py, PyAny> =
+        load_project_config_file(py, project_dir)?.into_bound(py);
+    let local_config: Bound<'py, PyAny> = load_local_config_file(py, project_dir)?.into_bound(py);
+    if validate_connections {
+        reject_invalid_connection_configuration(&ProjectConfiguration {
+            project_dir,
+            project_config: &project_config,
+            local_config: &local_config,
+        })?;
+    }
+    new_record_with(
+        py,
+        RecordId::DiscoveredProjectInputs,
+        &[
+            ("project_dir", project_dir.clone()),
+            ("project_config", project_config),
+            ("local_config", local_config),
+        ],
+    )
+}

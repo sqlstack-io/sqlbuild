@@ -8,7 +8,6 @@ use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;
 use crate::bindings::_helpers::planner_resolution::values::{
     cursor_wrap, filtering_of, method, string,
 };
-use crate::bindings::_helpers::sqltext::code_scanner::SqlCodeScanner;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
@@ -18,6 +17,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_front::sqltext::models::SqlCodeScanner;
 use sqlbuild_sqltext::resolution::main::{ref_alias::ref_alias, reference_spans::reference_spans};
 
 #[pyfunction]

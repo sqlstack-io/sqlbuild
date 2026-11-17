@@ -41,6 +41,7 @@ sqlbuild-orchestration.workspace = true
 sqlbuild-project.workspace = true
 sqlbuild-pysource.workspace = true
 sqlbuild-python-base.workspace = true
+sqlbuild-python-front.workspace = true
 sqlbuild-recall.workspace = true
 sqlbuild-refactor.workspace = true
 sqlbuild-render.workspace = true
@@ -49,7 +50,6 @@ sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlbuild-state.workspace = true
 sqlclean.workspace = true
-stacker.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 

@@ -4,9 +4,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::plan_output::values::{dict, enum_value, items};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
 
 /// `render(value=value)`.
 fn render<'py>(value: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {

@@ -9,8 +9,10 @@ use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::graph::node_set::PyNodeSet;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::graph::views::edge_dict;
-use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_entries::values::{
     native, planner_model, planner_type, string,

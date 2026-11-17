@@ -18,14 +18,23 @@ use sqlbuild_state::resource_costs::models::{ResourceCostKey, RunCostAttempt};
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
 use crate::bindings::_helpers::execution_history::conversion::{parsed_iso, utc};
-use crate::bindings::_helpers::native_host::consumption_io::execute;
-use crate::bindings::_helpers::native_host::consumption_state::{
-    Location, ROWS_PER_STATEMENT, fixed_state_table_sql, integer_literal, literal, optional_text,
-    state_table_name,
-};
+use sqlbuild_python_front::native_host::main::execute::execute;
+use sqlbuild_python_front::native_host::models::Location;
+use crate::bindings::_helpers::native_host::consumption_state::ROWS_PER_STATEMENT;
+use crate::bindings::_helpers::native_host::consumption_state::fixed_state_table_sql;
+use sqlbuild_python_front::native_host::main::integer_literal::integer_literal;
+use crate::bindings::_helpers::native_host::consumption_state::literal;
+use sqlbuild_python_front::native_host::main::optional_text::optional_text;
+use crate::bindings::_helpers::native_host::consumption_state::state_table_name;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::native_host::constants::ROWS_PER_STATEMENT;
+use sqlbuild_python_front::native_host::main::execute::execute;
+use sqlbuild_python_front::native_host::main::fixed_state_table_sql::fixed_state_table_sql;
+use sqlbuild_python_front::native_host::main::literal::literal;
+use sqlbuild_python_front::native_host::main::state_table_name::state_table_name;
+use sqlbuild_python_front::native_host::models::Location;
 
 /// Rate source of a price the project configured, the only one shown as USD.
 const CONFIGURED_RATE_SOURCE: &str = "configured";

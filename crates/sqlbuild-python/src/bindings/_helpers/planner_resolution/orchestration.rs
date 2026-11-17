@@ -1,14 +1,14 @@
 //! Model, function and SQL-hook orchestration through adapter-owned rendering.
 
-use crate::bindings::_helpers::attachments::cursor_intrinsics::resolve_cursor_intrinsics;
-use crate::bindings::_helpers::attachments::reference_markers::assert_no_unresolved_sql_markers;
 use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
-use crate::bindings::_helpers::model_config::typed_config::{
-    config_node_of, config_text_is, config_text_object, config_value, model_values,
-};
+use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
+use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
+use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
@@ -34,6 +34,9 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::assert_no_unresolved_sql_markers;
+use sqlbuild_python_front::attachments::main::resolve_cursor_intrinsics::resolve_cursor_intrinsics;
 
 const APPEND_STRATEGY: &str = "append";
 

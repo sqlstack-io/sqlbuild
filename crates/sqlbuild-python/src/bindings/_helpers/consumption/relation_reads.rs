@@ -9,9 +9,9 @@ use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 use crate::bindings::_helpers::analysis::relation_names::{
     RelationRow, extract_sql_relation_names, prefetch_sql_relation_names,
 };
-use crate::bindings::_helpers::native_host::consumption_state::optional_text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_front::native_host::main::optional_text::optional_text;
 
 /// Function calls, `__udf("name")(...)`, parsed as plain calls; their reads are declared inputs.
 const FUNCTION_CALLS: [&str; 2] = ["__udf", "__table_fn"];

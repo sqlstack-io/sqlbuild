@@ -13,7 +13,6 @@ use crate::bindings::_helpers::clone::clone_command::Invocation;
 use crate::bindings::_helpers::clone::clone_progress::{
     CloneFingerprintReporter, CloneItemPrinter,
 };
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -24,6 +23,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 
 const DESTINATION_ENTRY_GROUPS: [&str; 4] = [
     "destination_source_entries",

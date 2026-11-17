@@ -3,11 +3,11 @@
 use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 
-use crate::bindings::_helpers::cursor::conversion::GRAIN_NAMES;
 use crate::bindings::_helpers::exported_constants::constants::{
     EXPORTED_INTEGERS, EXPORTED_TEXT_SETS, EXPORTED_TEXT_TUPLES, EXPORTED_TEXTS,
 };
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::cursor::constants::GRAIN_NAMES;
 
 /// Registers after the native enums, since `GRAIN_ORDER` is keyed by `CursorGrain` members.
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

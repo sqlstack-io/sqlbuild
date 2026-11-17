@@ -9,10 +9,10 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_execution_limit;
 use sqlbuild_model_config::execution_limits::models::ExecutionLimit;
 
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 
 const INVALID_TIMEOUT_CODE: &str = "C418";
 const LOCAL_FILE: &str = "sqlbuild_local.toml";

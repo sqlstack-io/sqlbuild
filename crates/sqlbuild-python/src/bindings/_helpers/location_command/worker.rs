@@ -27,14 +27,13 @@ use crate::bindings::_helpers::cli::dispatch::{Invocation, command_facts, wareho
 use crate::bindings::_helpers::command_runtime::warehouses::{
     WarehouseInputs, configured_warehouses,
 };
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{NodeKeys, WorkerBuild};
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::compiled_views::project_reads::sql_tests;
-use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::command::compile_snapshot;
 use crate::bindings::_helpers::location_command::constants::{
@@ -53,6 +52,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
 
 /// Each audit and SQL test the snapshot publishes, with the node keys it checks.
 fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Vec<String>> {

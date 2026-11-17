@@ -17,17 +17,14 @@ use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_v
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use crate::bindings::_helpers::state_rows::migration_projections::newest_column;
+use sqlbuild_python_front::state_rows::main::migrations::newest_column::newest_column;
+use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PyTuple};
 use sqlbuild_analysis::planner_migrations::main::column_decision::column_decision;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::RecordId;
 
 pub(super) fn decide<'py>(
     runtime: &Bound<'py, PyAny>,

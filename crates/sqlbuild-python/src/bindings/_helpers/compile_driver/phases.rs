@@ -9,7 +9,6 @@ use crate::bindings::_helpers::compile_command::reuse_recording::ArtifactRecorde
 use crate::bindings::_helpers::compile_command::target_writer::{
     Prepared, planning_diagnostics, write_static_target,
 };
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::dag_artifact::artifact::build_dag_json;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::manifest::builder::build_manifest;
@@ -23,6 +22,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 
 const EMPTY_DAG_PATH: &str = "";
 const TARGET_DIRECTORY: &str = "target";

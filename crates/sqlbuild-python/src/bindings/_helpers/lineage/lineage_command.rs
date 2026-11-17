@@ -33,7 +33,6 @@ use sqlbuild_core::cli_text::models::CliStyle;
 
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::lineage::lineage_cache::{
     lineage_fingerprint, read_lineage_cache, write_lineage_cache,
 };
@@ -56,6 +55,7 @@ use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::NativeAttr;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 
 const UNKNOWN_SELECTOR_ERROR_CODE: &str = "S007";
 const RICH_MODE: &str = "rich";

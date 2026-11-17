@@ -74,9 +74,8 @@ use crate::bindings::_helpers::record_behaviours::values::{
 };
 use crate::bindings::_helpers::{
     analysis, analysis_session, build_progress, compile_command, compiled_views, compute_logs,
-    dbt_events, dbt_interop, discovery, event_exporting, execution_history, graph, model_config,
-    planner_entries, planner_migrations, planner_phases, project_assembly, result_output, rules,
-    scopes,
+    dbt_events, dbt_interop, event_exporting, execution_history, graph, planner_entries,
+    planner_migrations, planner_phases, project_assembly, result_output, rules,
 };
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
@@ -365,11 +364,11 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     dbt_events::getters::GETTERS,
     dbt_interop::getters::GETTERS,
     sqlbuild_python_base::diagnostics::constants::GETTERS,
-    discovery::getters::GETTERS,
+    sqlbuild_python_front::discovery::constants::GETTERS,
     event_exporting::getters::GETTERS,
     execution_history::getters::GETTERS,
     graph::getters::GETTERS,
-    model_config::getters::GETTERS,
+    sqlbuild_python_front::model_config::constants::GETTERS,
     planner_entries::getters::GETTERS,
     planner_migrations::getters::GETTERS,
     planner_phases::getters::GETTERS,
@@ -377,7 +376,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     project_assembly::getters::GETTERS,
     result_output::getters::GETTERS,
     rules::getters::GETTERS,
-    scopes::getters::GETTERS,
+    sqlbuild_python_front::scopes::constants::GETTERS,
 ];
 
 /// Every record behaviour, installed into `records::behaviours` at registration.

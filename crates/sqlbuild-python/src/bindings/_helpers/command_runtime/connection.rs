@@ -19,15 +19,15 @@ use sqlbuild_host::entries::models::ThirdPartyHost;
 
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::command_runtime::warehouses::{WarehouseInputs, apply_warehouse};
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::dbt_interop::profile_connection::resolve_raw_dbt_profile_connection;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 
 const ATTACH_KEY: &str = "attach";
 const ATTACH_PATH_KEY: &str = "path";

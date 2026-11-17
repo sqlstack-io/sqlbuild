@@ -8,8 +8,10 @@ use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::fingerprints::latest_rows::select_latest_fingerprints;
 use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
-use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
 use crate::bindings::_helpers::planner_phases::objects::object;
@@ -40,12 +42,7 @@ use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
-use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
-use sqlbuild_python_base::records::types::RecordId;
 use std::collections::{BTreeSet, HashSet};
 
 /// Everything one snapshot gather needs.

@@ -1,7 +1,8 @@
 //! Boundary calls shared by reference and source resolution.
 
-use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_resolution::models::CursorFiltering;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyString;

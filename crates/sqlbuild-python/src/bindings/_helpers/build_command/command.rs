@@ -20,9 +20,6 @@ use crate::bindings::_helpers::build_command::planning::{
 };
 use crate::bindings::_helpers::check::check_core::relevant_check_functions;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
-use crate::bindings::_helpers::discovery::provider_secrets::{
-    consumer_uses, provider_uses, require_used_secrets, sink_uses,
-};
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::observations::source_capture::{
     arm_source_capture, take_source_capture,
@@ -35,6 +32,10 @@ use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::diagnostics::models::BuildPhaseTimingTracker;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
+use sqlbuild_python_front::discovery::main::sources::provider_uses::provider_uses;
+use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
+use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
 
 fn run_with_providers(context: &BuildContext<'_>) -> PyResult<i32> {
     let py: Python<'_> = context.py();

@@ -1,5 +1,4 @@
 pub(crate) mod assembly;
-pub(crate) mod authored_ctes;
 pub(crate) mod compiled_tests;
 pub(crate) mod constants;
 mod cursor_window;

@@ -18,7 +18,6 @@ use crate::bindings::_helpers::freshness::observation::{
     Observer, observation_record, observation_source, observe_adapter_batch, observe_configured,
     strategy,
 };
-use crate::bindings::_helpers::state_rows::freshness::{age_policy, equivalent};
 use sqlbuild_core::freshness_text::main::freshness_status::freshness_status;
 use sqlbuild_core::freshness_text::models::{
     FreshnessSourceResult, FreshnessStatus, StateComparison,
@@ -27,6 +26,8 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_front::state_rows::main::event_rows::age_policy::age_policy;
+use sqlbuild_python_front::state_rows::main::event_rows::equivalent::equivalent;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const UNAVAILABLE_REASON: &str = "unavailable";

@@ -9,7 +9,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::present;
-use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::rules::lint_expansion::{
     LintExpansionSources, lint_expansion_inputs,
 };
@@ -18,6 +17,7 @@ use crate::bindings::_helpers::rules::lint_pipeline::{
     lint_sources,
 };
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_front::render::models::SqlExpansionInputs;
 
 /// The selected paths, or `None` for every file.
 pub(crate) fn selected_paths(selected: &Bound<'_, PyAny>) -> PyResult<Option<BTreeSet<PathBuf>>> {

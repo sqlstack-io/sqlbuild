@@ -286,6 +286,7 @@ PUBLIC_EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "sinks")
 NATIVE_BINDINGS_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-python/src/",
     "crates/sqlbuild-python-base/src/",
+    "crates/sqlbuild-python-front/src/",
 )
 NATIVE_CROSSING_PATTERNS: tuple[str, ...] = (
     r"\.getattr\(",
@@ -487,7 +488,8 @@ OBSERVATION_ALLOWED_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
     ),
 )
 OBSERVATION_STATE_PATTERN: str = (
-    r"\b(?:observations_state|OBSERVATIONS_TABLE_NAME|WarehouseObservationRecord"
+    r"\b(?:observations_state|register_observations_state|append_observations"
+    r"|OBSERVATIONS_TABLE_NAME|WarehouseObservationRecord"
     r"|WarehouseHistoryKind::Observations|_sqlbuild_observations|sqb_warehouse_observations)\b"
 )
 SYNCED_COPY_ALLOWED_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(

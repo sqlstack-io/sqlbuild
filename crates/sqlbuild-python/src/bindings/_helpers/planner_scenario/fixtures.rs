@@ -9,7 +9,6 @@ use crate::bindings::_helpers::planner_scenario::{
     sql::{required_target, resolve_sql, source_label},
     values::{error, string},
 };
-use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::compiler::main::scenario_reader_ctes::scenario_reader_ctes;
@@ -21,6 +20,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
 use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_references;
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
@@ -30,7 +30,7 @@ pub(super) fn extract_fixtures<'py>(
     scenario: &Bound<'py, PyAny>,
     prefix: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
-    crate::bindings::_helpers::sql_test_glue::authored_ctes::prefixed_ctes(
+    sqlbuild_python_front::sql_test_glue::main::prefixed_ctes::prefixed_ctes(
         &native_field(scenario, "authored_ctes")?,
         prefix,
     )

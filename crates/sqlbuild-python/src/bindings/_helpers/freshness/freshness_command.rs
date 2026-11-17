@@ -20,7 +20,6 @@ use crate::bindings::_helpers::command_runtime::connection::resolve_project_conn
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::VerifiedRun;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::freshness::freshness_observe::{PreviousState, observe_freshness};
 use crate::bindings::_helpers::freshness::observation::Observer;
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
@@ -34,6 +33,7 @@ use sqlbuild_python_base::native_host::main::connection_failure::connection_fail
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME as STATE_TABLE_NAME;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

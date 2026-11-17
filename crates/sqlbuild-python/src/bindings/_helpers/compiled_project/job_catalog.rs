@@ -19,7 +19,7 @@ use sqlbuild_discovery::orchestration_files::models::{OrchestrationInventory, Ru
 use crate::bindings::_helpers::compiled_project::constants::{
     JOB_SELECTOR_KINDS, SELECTOR_INTERSECTION, SENSOR_RUN_ARGUMENT,
 };
-use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
+use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
 
 /// Each job and group's selection, and the names of those a schedule or sensor starts.
 type Catalog = (BTreeMap<String, JobSelection>, BTreeSet<String>);

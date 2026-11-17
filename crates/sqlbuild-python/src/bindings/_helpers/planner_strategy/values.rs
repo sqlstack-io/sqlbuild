@@ -1,13 +1,12 @@
 //! Conversions between the planner's Python models and the native strategy rows.
 
-use crate::bindings::_helpers::model_config::typed_config::{
-    config_value as typed_config_value, model_values,
-};
 use crate::bindings::_helpers::planner_changes::results::native_enum;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString};
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value as typed_config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 use sqlbuild_analysis::planner_changes::models::{
     SchemaChangeKind, SchemaColumnSource, SchemaFindingRow,

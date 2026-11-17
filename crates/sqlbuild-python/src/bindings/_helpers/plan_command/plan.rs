@@ -26,7 +26,6 @@ use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspe
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
@@ -50,6 +49,8 @@ use sqlbuild_python_base::build_command::main::keyword_relay::keyword_relay;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
 
 const COMMAND_NAME: &str = "plan";
 /// The plan document's field holding how long each planning step took.

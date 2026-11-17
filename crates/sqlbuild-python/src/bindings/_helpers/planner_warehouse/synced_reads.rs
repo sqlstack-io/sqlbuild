@@ -20,7 +20,7 @@ use sqlbuild_state::warehouse_state::models::{
 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use crate::bindings::_helpers::fingerprints::latest_rows::selected_set;
-use crate::bindings::_helpers::native_host::consumption_state::Location;
+use sqlbuild_python_front::native_host::models::Location;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use crate::bindings::_helpers::planner_warehouse::reads::{
     CursorProgress, EligibleCursorQuery, FingerprintRead, Read, WarehouseReads, unknown,
@@ -29,7 +29,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use crate::bindings::_helpers::state_rows::models::EventTableLayout;
+use crate::state_rows::models::EventTableLayout;
 
 create_exception!(
     sqlbuild._native,

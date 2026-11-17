@@ -17,18 +17,12 @@ use sqlbuild_core::load_command::main::select_load_entries::select_load_entries 
 use sqlbuild_core::load_command::models::{LoadEntry, LoadGraph};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::compile_attachment::effective_config::{
-    build_effective_connection_config, build_effective_runtime_config,
-};
 use crate::bindings::_helpers::compile_attachment::target::{
     connection_is_default_target, project_location,
 };
 use crate::bindings::_helpers::compile_driver::targets::{
     expanded_loader_namespace, managed_write_schema, preserved_loader_schemas,
 };
-use crate::bindings::_helpers::contracts::spec_resolution::loader_destination_parts;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::model_config::template_data::early_model_templates;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -38,6 +32,11 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
+use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
+use sqlbuild_python_front::contracts::main::loader_destination_parts::loader_destination_parts;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::model_config::main::config::early_model_templates::early_model_templates;
 
 const LOADER_NODE_KEY: &str = "sqlbuild_loader_node";
 const COMPILE_INPUT_CODE: &str = "P001";

@@ -11,7 +11,6 @@ use crate::bindings::_helpers::command_runtime::connection::{
     anchor_local_database_path, with_dbt_profile,
 };
 use crate::bindings::_helpers::command_runtime::warehouses::apply_command_warehouse;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
 use crate::bindings::_helpers::compile_driver::deferral::resolve_model_deferral_inputs;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::planner_entries::display_plan::build_display_only_sqlbuild_plan;
@@ -30,6 +29,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 
 const BUILD_OPTIONS: (&[&str], &[&str]) = (&["environment", "request", "hooks"], &[]);
 const ATTACH_OPTIONS: (&[&str], &[&str]) = (

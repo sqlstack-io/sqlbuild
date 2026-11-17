@@ -9,10 +9,10 @@ use sqlbuild_rules::lint_text::types::FixtureFormatColumn;
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
-use crate::bindings::_helpers::model_config::header_columns::schema_columns;
-use crate::bindings::_helpers::model_config::model_config_builder::raised_config_error;
 use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::model_config::main::headers::schema_columns::schema_columns;
+use sqlbuild_python_front::model_config::main::model_nodes::raised_config_error::raised_config_error;
 
 pub(crate) fn columns(columns: &Bound<'_, PyAny>) -> PyResult<Vec<FixtureFormatColumn>> {
     columns

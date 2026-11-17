@@ -6,10 +6,10 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
-use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_sql;
 use crate::bindings::_helpers::compiled_views::model_input_view::attached_schema;
 use crate::bindings::_helpers::project_assembly::syntax_validation::hook_sql_statements;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
 
 const HOOK_NAMES: [&str; 2] = ["pre_hooks", "post_hooks"];
 

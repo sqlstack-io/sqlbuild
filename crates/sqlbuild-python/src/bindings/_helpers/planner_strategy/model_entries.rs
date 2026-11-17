@@ -19,11 +19,6 @@ use sqlbuild_model_config::model_validation::constants::PHYSICAL_STORAGE_KEYS;
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
-use crate::bindings::_helpers::model_config::typed_config::{
-    ConfigValues, config_cursor_bound, config_flag, config_integer_object, config_text_object,
-    config_text_tuple, config_value, model_values,
-};
 use crate::bindings::_helpers::planner_strategy::constants::{
     CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, MICROBATCH_MODE,
     PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE, TABLE_RECREATING_ACTIONS,
@@ -49,6 +44,15 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
+use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound;
+use sqlbuild_python_front::model_config::main::config::config_flag::config_flag;
+use sqlbuild_python_front::model_config::main::config::config_integer_object::config_integer_object;
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::config_text_tuple::config_text_tuple;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_front::model_config::types::ConfigValues;
 
 /// Model config keys copied to the plan entry as optional strings, with their entry fields.
 const STRING_FIELDS: [(&str, &str); 15] = [

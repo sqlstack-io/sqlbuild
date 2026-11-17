@@ -20,8 +20,6 @@ use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::compiled_views::relation_keys::{
     RelationKeys, project_relation_keys,
 };
-use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
-use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
 use crate::bindings::_helpers::rules::fix_facts::compile_facts;
@@ -43,6 +41,8 @@ use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::render::models::SqlExpansionInputs;
 
 const VERIFICATION_FAILURE: &str =
     "Compilation could not prove unchanged output columns, types, dependencies and lineage";

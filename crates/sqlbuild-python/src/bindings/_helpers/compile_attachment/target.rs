@@ -4,21 +4,22 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 
-use crate::bindings::_helpers::compile_attachment::effective_config::project_vars;
 use crate::bindings::_helpers::compile_command::constants::{
     COMPILE_CACHE_DISABLE_ENV_VAR, COMPILE_CACHE_DISABLE_VALUE, RETIRED_CACHE_DIRECTORY_NAMES,
 };
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
 use crate::bindings::_helpers::frontier::constants::{
     COMPILER_CACHE_DIRECTORY_NAME, RETIRED_CACHE_NAMESPACE_SUFFIXES,
 };
-use crate::bindings::_helpers::model_config::template_data::{early_model_templates, run_id};
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::compile_attachment::main::project_vars::project_vars;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
+use sqlbuild_python_front::model_config::main::config::early_model_templates::early_model_templates;
+use sqlbuild_python_front::model_config::main::config::run_id::run_id;
 
 const DATABASE_KEY: &str = "database";
 const SCHEMA_KEY: &str = "schema";

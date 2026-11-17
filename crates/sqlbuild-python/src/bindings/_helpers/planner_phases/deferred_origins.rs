@@ -6,11 +6,12 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, IntoPyObject, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString};
 
-use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 const MIGRATE_FROM_KEY: &str = "migrate_from";
 /// `database.schema.name`.
