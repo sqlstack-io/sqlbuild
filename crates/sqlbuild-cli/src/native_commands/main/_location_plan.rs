@@ -60,7 +60,7 @@ pub(super) async fn plan_location(
     };
     let planned: HeldCopy = match held {
         Some(held) if copy.unchanged => held,
-        _ => hold_copy((&options.target, generation), (copy, read_consumption))?,
+        _ => hold_copy(options, generation, (copy, read_consumption))?,
     };
     let request = json!({"plan": {
         "argv": argv,
@@ -120,24 +120,45 @@ async fn read_copy(
     }
 }
 
-/// Write `copy` as the held copy file, replacing the previous one; a copy without a version gets a
-/// fresh one, so the runtime never reuses a state built from it.
+/// The location's one held copy file for its target, which each newer copy overwrites.
+fn held_copy_path(options: &LocationServe) -> PathBuf {
+    let target: String = options
+        .target
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    std::env::temp_dir().join(format!(
+        "sqlbuild-plan-copy-{}-{target}.json",
+        options.location_id
+    ))
+}
+
+/// Write `copy` over the held copy file, through a temporary file renamed into place; a copy
+/// without a version gets a fresh one, so the runtime never reuses a state built from it.
 fn hold_copy(
-    (target, generation): (&str, i64),
+    options: &LocationServe,
+    generation: i64,
     (copy, consumption): (PreviewCopy, bool),
 ) -> Result<HeldCopy, ControlError> {
-    let path: PathBuf =
-        std::env::temp_dir().join(format!("sqlbuild-plan-copy-{}.json", Uuid::now_v7()));
+    let path: PathBuf = held_copy_path(options);
+    let written: PathBuf = path.with_extension(format!("{}.tmp", std::process::id()));
     let version: String = copy
         .version
         .clone()
         .unwrap_or_else(|| Uuid::now_v7().to_string());
     std::fs::write(
-        &path,
+        &written,
         serde_json::to_vec(&copy).map_err(std::io::Error::other)?,
     )?;
+    std::fs::rename(&written, &path)?;
     let held = HeldCopy {
-        target: target.to_owned(),
+        target: options.target.clone(),
         generation,
         version,
         consumption,
@@ -147,7 +168,7 @@ fn hold_copy(
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .replace(held.clone());
-    if let Some(previous) = previous {
+    if let Some(previous) = previous.filter(|previous| previous.path != held.path) {
         drop(std::fs::remove_file(previous.path));
     }
     Ok(held)
