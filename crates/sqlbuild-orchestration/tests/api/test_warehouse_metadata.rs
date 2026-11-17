@@ -1,6 +1,6 @@
 //! A scoped HTTP reader mirrors immutable warehouse observations, including external runs.
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use reqwest::StatusCode;
 use serde_json::json;
 use sqlbuild_core::constants::STATE_TABLE_NAMES;
@@ -8,7 +8,10 @@ use uuid::Uuid;
 
 use crate::api::tests::changes_helpers::{connect, expect_topics};
 use crate::api::tests::helpers::{start_api, stop_api};
-use crate::api::tests::test_types::{StateTableClassificationTestCase, WarehouseMetadataTestCase};
+use crate::api::tests::test_types::{
+    MirrorConflictTestCase, StateTableClassificationTestCase, WarehouseMetadataTestCase,
+};
+use crate::api::tests::warehouse_history_helpers::{batch, fixture, seed_target};
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
@@ -25,6 +28,7 @@ use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::warehouse_metadata::main::ingest::ingest_audit_results::ingest_audit_results;
 use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
 
 #[test]
@@ -441,6 +445,98 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             .await;
             stop_api(api).await;
             close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_one_source_id_in_two_pages_when_mirrored_in_either_order_then_the_same_row_is_kept() {
+    let mut test_cases = Vec::new();
+    for (backend, store_name) in [
+        (Backend::Sqlite, "SQLite"),
+        (Backend::Postgres, "PostgreSQL"),
+    ] {
+        test_cases.push(MirrorConflictTestCase {
+            description: store_name,
+            backend,
+            rows: [
+                ("2026-02-03T04:05:06.000001Z", "pass"),
+                ("2026-02-03T04:05:06Z", "pass"),
+            ],
+            expected_row: ("2026-02-03T04:05:06Z", "pass"),
+        });
+        test_cases.push(MirrorConflictTestCase {
+            description: store_name,
+            backend,
+            rows: [
+                ("2026-02-03T04:05:06Z", "pass"),
+                ("2026-02-03T04:05:06Z", "error"),
+            ],
+            expected_row: ("2026-02-03T04:05:06Z", "error"),
+        });
+    }
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture_store) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture_store.store;
+            let (location, session_id) = seed_target(store).await;
+            let base = fixture("audit_result_history.json")["record"].clone();
+            for (order, rows) in [
+                ("arrival order", test_case.rows),
+                ("reverse order", [test_case.rows[1], test_case.rows[0]]),
+            ] {
+                for (occurred_at, outcome) in rows {
+                    let mut record = base.clone();
+                    record["result_id"] = json!(order);
+                    record["occurred_at"] = json!(occurred_at);
+                    record["outcome"] = json!(outcome);
+                    ingest_audit_results(
+                        store,
+                        (location, "development"),
+                        &batch(session_id, "audit_results", vec![record]),
+                    )
+                    .await
+                    .expect("one page");
+                }
+            }
+            let (transaction, rows) = query(
+                begin(store, TransactionMode::Read).await.expect("read"),
+                "SELECT record_json FROM sqb_warehouse_audit_results",
+                vec![],
+            )
+            .await
+            .expect("mirrored results");
+            commit(transaction).await.expect("close read");
+            let mut kept: Vec<(String, DateTime<Utc>, String)> = rows
+                .iter()
+                .map(|row| {
+                    let record = &row["record_json"];
+                    (
+                        record["result_id"].as_str().expect("id").to_owned(),
+                        record["occurred_at"]
+                            .as_str()
+                            .expect("time")
+                            .parse()
+                            .expect("RFC 3339"),
+                        record["outcome"].as_str().expect("outcome").to_owned(),
+                    )
+                })
+                .collect();
+            kept.sort();
+            let expected_at: DateTime<Utc> = test_case.expected_row.0.parse().expect("RFC 3339");
+            assert_eq!(
+                kept,
+                ["arrival order", "reverse order"].map(|order| (
+                    order.to_owned(),
+                    expected_at,
+                    test_case.expected_row.1.to_owned()
+                )),
+                "{}: the earliest row, then the smallest record, wins whichever page lands first",
+                test_case.description
+            );
+            close_test_store(fixture_store).await;
         });
     }
 }

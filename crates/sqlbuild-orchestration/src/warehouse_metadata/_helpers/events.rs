@@ -33,6 +33,12 @@ pub(crate) async fn ingest_events(
             batch.kind.as_str()
         ))
     })?;
+    // Text comparison is byte order in SQLite; Postgres needs the "C" collation for the same.
+    let record_text = if matches!(store, ControlStore::Postgres(_)) {
+        "record_json::text COLLATE \"C\""
+    } else {
+        "record_json"
+    };
     let mut transaction = begin_ingestion(
         store,
         (location_id, target),
@@ -78,9 +84,18 @@ pub(crate) async fn ingest_events(
             Parameter::Time(transaction.now),
         ]);
         let placeholders = Parameter::placeholders(1..=parameters.len());
+        let replaced: Vec<String> = columns[3..]
+            .iter()
+            .map(|column| format!("{column}=excluded.{column}"))
+            .collect();
+        // A source id's earliest row wins, then the smallest record text, so the kept row never
+        // depends on the order scan pages arrive in.
         let sql = format!(
-            "INSERT INTO {table} ({}) VALUES ({placeholders}) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
-            columns.join(",")
+            "INSERT INTO {table} ({}) VALUES ({placeholders}) ON CONFLICT (event_id) DO UPDATE SET {} \
+             WHERE excluded.observed_at<{table}.observed_at OR (excluded.observed_at={table}.observed_at \
+             AND excluded.{record_text}<{table}.{record_text}) RETURNING event_id",
+            columns.join(","),
+            replaced.join(",")
         );
         let inserted;
         (transaction, inserted) = query(transaction, &sql, parameters).await?;

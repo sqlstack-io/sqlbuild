@@ -149,3 +149,9 @@ class SharedSinkProviderE2ETestCase:
     description: str
     unused_provider_name: str
     expected_setups: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SnowflakeKeyWarningE2ETestCase:
+    description: str
+    command: tuple[str, ...]

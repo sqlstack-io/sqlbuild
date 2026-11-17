@@ -116,6 +116,14 @@ pub(crate) struct WarehouseMetadataTestCase {
     pub(crate) expected_observations: usize,
 }
 
+pub(crate) struct MirrorConflictTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Two rows of one source id as (`occurred_at`, `outcome`), each delivered in its own page.
+    pub(crate) rows: [(&'static str, &'static str); 2],
+    pub(crate) expected_row: (&'static str, &'static str),
+}
+
 pub(crate) struct PasswordApiTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
