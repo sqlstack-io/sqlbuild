@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.236.4](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.3...v0.236.4) (2026-11-17)
+
+
+### Bug Fixes
+
+* keep the earliest row per source id in state history mirrors ([#1532](https://github.com/sqlstack-io/sqlbuild/issues/1532)) ([4708af5](https://github.com/sqlstack-io/sqlbuild/commit/4708af5069e7cb000c03187bc6207ed072c6ced6))
+* stop a single custom-rule host at its next invocation when interrupted ([#1535](https://github.com/sqlstack-io/sqlbuild/issues/1535)) ([fce05cd](https://github.com/sqlstack-io/sqlbuild/commit/fce05cdbab676fc95d6db27d714c551b51c8ffdb))
+
 ## [0.236.3](https://github.com/sqlstack-io/sqlbuild/compare/v0.236.2...v0.236.3) (2026-11-17)
 
 
