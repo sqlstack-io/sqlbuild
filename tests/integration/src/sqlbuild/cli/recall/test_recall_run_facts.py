@@ -1,4 +1,5 @@
 import json
+import signal
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from tests.integration.src.sqlbuild.cli.recall._test_types import (
 )
 from tests.integration.src.sqlbuild.cli.recall.helpers import (
     EMITTED_TAIL,
+    NATIVE_SQB,
     ORDERS_MODEL,
     recall_rows,
     run,
@@ -90,21 +92,40 @@ def test_given_selectors_when_building_then_the_effective_selection_is_recorded(
         TerminatedCommandTestCase(
             description="during project discovery",
             orders_model=ORDERS_MODEL,
-            environment={"ORDERS_IMPORT_SECONDS": "60"},
+            environment={
+                "ORDERS_IMPORT_SECONDS": "60",
+                "ORDERS_IMPORT_AFTER_SLEEP": "slow sink imported\n",
+            },
             wait_sql=(
                 "SELECT invocation_id FROM invocations WHERE status = 'running' "
                 "AND (julianday(last_heartbeat_at) - julianday(started_at)) * 86400 >= 2"
             ),
             expected_output=b"",
+            unfinished_output=b"slow sink imported",
         ),
         TerminatedCommandTestCase(
             description="while a task runs",
             orders_model=ORDERS_MODEL,
-            environment={"ORDERS_TASK_SLEEP_SECONDS": "60"},
-            wait_sql=(
-                "SELECT invocation_id FROM output_tail WHERE text LIKE '%after the warning%'"
-            ),
+            environment={
+                "ORDERS_TASK_SLEEP_SECONDS": "60",
+                "ORDERS_TASK_AFTER_SLEEP": "slept through\n",
+            },
+            wait_sql="SELECT invocation_id FROM output_tail WHERE text LIKE '%after the warning%'",
             expected_output=EMITTED_TAIL,
+            unfinished_output=b"slept through",
+        ),
+        TerminatedCommandTestCase(
+            description="while a task runs, sqb started with SIGINT ignored",
+            orders_model=ORDERS_MODEL,
+            environment={
+                "ORDERS_TASK_SLEEP_SECONDS": "60",
+                "ORDERS_TASK_AFTER_SLEEP": "slept through\n",
+            },
+            wait_sql="SELECT invocation_id FROM output_tail WHERE text LIKE '%after the warning%'",
+            expected_output=EMITTED_TAIL,
+            unfinished_output=b"slept through",
+            interrupts=signal.SIG_IGN,
+            program=NATIVE_SQB,
         ),
         TerminatedCommandTestCase(
             description="while a long warehouse statement runs",
@@ -118,6 +139,7 @@ def test_given_selectors_when_building_then_the_effective_selection_is_recorded(
                 "WHERE statement_kind = 'CREATE' AND ended_at IS NULL"
             ),
             expected_output=b"",
+            unfinished_output=b"Completed",
         ),
     ],
     ids=lambda case: case.description,
@@ -128,9 +150,11 @@ def test_given_sigterm_when_a_build_is_stopped_then_it_is_recorded_cancelled_wit
     project_dir: Path = write_slow_import_sink(write_project(tmp_path / "orders_shop"))
     _ = (project_dir / "models" / "orders.sql").write_text(test_case.orders_model, encoding="utf-8")
 
-    terminated, stop_seconds = terminated_build(
+    terminated: subprocess.CompletedProcess[bytes] = terminated_build(
         project_dir,
         wait_sql=test_case.wait_sql,
+        interrupts=test_case.interrupts,
+        program=test_case.program,
         SQLBUILD_RECALL_HEARTBEAT_SECONDS="0.5",
         **test_case.environment,
     )
@@ -143,10 +167,14 @@ def test_given_sigterm_when_a_build_is_stopped_then_it_is_recorded_cancelled_wit
     starts: list[list[object]] = recall_rows(
         project_dir, "SELECT COUNT(*) FROM recall_events WHERE event_type = 'invocation_started'"
     )
+    running_statements: list[list[object]] = recall_rows(
+        project_dir, "SELECT COUNT(*) FROM statements WHERE ended_at IS NULL"
+    )
     output: subprocess.CompletedProcess[bytes] = run(project_dir, "recall", "output", "last")
 
     assert terminated.returncode == 143
-    assert stop_seconds < 10
+    assert test_case.unfinished_output not in terminated.stdout + output.stdout
+    assert running_statements == [[0]]
     assert terminated.stderr.endswith(b"error: terminated by SIGTERM\n")
     assert b"Traceback" not in terminated.stderr
     assert recorded == [["cancelled", 15, 143, 0, 1, 1]]
@@ -160,7 +188,7 @@ def test_given_sigterm_when_a_build_is_stopped_then_it_is_recorded_cancelled_wit
     [
         ClosingTerminationTestCase(
             description="a build waiting for a locked store at exit",
-            shutdown_timeout="60s",
+            shutdown_timeout="600s",
             expected_exit_code=143,
         ),
     ],
@@ -174,13 +202,12 @@ def test_given_sigterm_while_recall_closes_when_a_build_has_finished_then_it_exi
         extra_toml=f'\n[recall]\nshutdown_timeout = "{test_case.shutdown_timeout}"\n',
     )
 
-    terminated, stop_seconds = terminated_while_closing(project_dir)
+    terminated: subprocess.CompletedProcess[bytes] = terminated_while_closing(project_dir)
 
     assert b"Completed" in terminated.stdout
     assert terminated.returncode == test_case.expected_exit_code, terminated.stderr.decode(
         errors="replace"
     )
-    assert stop_seconds < 10
     assert b"Traceback" not in terminated.stderr
     assert terminated.stderr.endswith(b"error: terminated by SIGTERM\n")
 

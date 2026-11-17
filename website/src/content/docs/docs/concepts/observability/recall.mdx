@@ -134,9 +134,11 @@ can contain sensitive SQL, output and audit evidence.
 
 A command stopped by SIGTERM, as an orchestrator stops a job, ends the way Ctrl-C ends it: it
 cancels the statements it is running, records its real end time, its output and exit code 143,
-prints `error: terminated by SIGTERM`, and exits with code 143. A second SIGTERM ends the process
-at once. Recall keeps heartbeating while the command discovers and compiles the project, so a run
-stopped in any phase is never mistaken for one that died. An `abandoned` run cannot record its end:
+prints `error: terminated by SIGTERM`, and exits with code 143. It does this also when it was
+started with SIGINT ignored, as a script starts a background job and some process managers start a
+service; SIGINT and Ctrl-C then stay ignored. A second SIGTERM ends the process at once. Recall
+keeps heartbeating while the command discovers and compiles the project, so a run stopped in any
+phase is never mistaken for one that died. An `abandoned` run cannot record its end:
 its `ended_at` is its last heartbeat and `ended_at_estimated` is `1`.
 
 ## Selection
