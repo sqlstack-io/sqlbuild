@@ -21,6 +21,7 @@ from sqlbuild.cost.models import RunCostSummary
 from sqlbuild.cost.types import CostStatus
 from tests.unit.src.sqlbuild.cost._test_types import (
     CollectSnowflakeCostTestCase,
+    HistoryWindowTestCase,
     ParseQueryTagTestCase,
     RenderQueryHistorySqlTestCase,
     SnowflakeClockSkewTestCase,
@@ -227,7 +228,7 @@ def test_given_exact_create_hook_when_collecting_then_hook_query_text_is_not_req
 def test_given_saturated_open_history_when_bounded_fallback_is_complete_then_not_saturated(
     test_case: SnowflakeSaturationTestCase,
 ) -> None:
-    origin: datetime = datetime(2026, 8, 23, 10, tzinfo=UTC)
+    origin: datetime = datetime.now(UTC) - timedelta(minutes=1)
     row: tuple[Any, ...] = (
         "q-open",
         "",
@@ -565,6 +566,37 @@ def test_given_ledger_persistence_failure_when_collecting_then_summary_is_partia
             expected_limitation_fragment="missing Snowflake warehouse metadata",
         ),
         SnowflakeObservationTestCase(
+            description="a settled query without warehouse size used no warehouse",
+            warehouse_name="DEV_WH",
+            warehouse_size=None,
+            execution_ms=2,
+            execution_status="SUCCESS",
+            expected_status=CostStatus.COMPLETE,
+            expected_query_count=0,
+            observed_after_seconds=121,
+        ),
+        SnowflakeObservationTestCase(
+            description="a settled query with zero execution used no warehouse",
+            warehouse_name="DEV_WH",
+            warehouse_size="X-Small",
+            execution_ms=0,
+            execution_status="SUCCESS",
+            expected_status=CostStatus.COMPLETE,
+            expected_query_count=0,
+            observed_after_seconds=121,
+        ),
+        SnowflakeObservationTestCase(
+            description="a query read just before it settles still lacks metadata",
+            warehouse_name="DEV_WH",
+            warehouse_size=None,
+            execution_ms=1000,
+            execution_status="SUCCESS",
+            expected_status=CostStatus.PARTIAL,
+            expected_query_count=0,
+            expected_limitation_fragment="missing Snowflake warehouse metadata",
+            observed_after_seconds=119,
+        ),
+        SnowflakeObservationTestCase(
             description="cancelled cost-bearing statement remains attributable",
             warehouse_name="DEV_WH",
             warehouse_size="X-Small",
@@ -642,7 +674,7 @@ def test_given_special_history_row_when_collecting_then_coverage_is_explicit(
             test_case.execution_status,
             test_case.query_type,
             test_case.query_text,
-            origin + timedelta(seconds=1),
+            origin + timedelta(seconds=1 + test_case.observed_after_seconds),
         ),
     )
 
@@ -741,15 +773,16 @@ def test_given_metadata_only_create_when_warehouse_size_is_absent_then_cost_is_c
     "test_case",
     [
         CollectSnowflakeCostTestCase(
-            description="delayed insert metadata is retried",
-            expected_status=CostStatus.COMPLETE,
-            expected_query_count=1,
-            expected_resource_name="countries",
+            description="delayed insert metadata is left for a later build's re-read",
+            expected_status=CostStatus.PARTIAL,
+            expected_query_count=0,
+            expected_resource_name="",
+            expected_limitation_fragment="missing Snowflake warehouse metadata",
         )
     ],
     ids=lambda case: case.description,
 )
-def test_given_compute_query_with_delayed_metadata_when_collecting_then_history_is_retried(
+def test_given_compute_query_with_delayed_metadata_when_collecting_then_it_is_not_retried_at_run_end(
     test_case: CollectSnowflakeCostTestCase,
     tmp_path: Path,
 ) -> None:
@@ -808,10 +841,10 @@ def test_given_compute_query_with_delayed_metadata_when_collecting_then_history_
         retry_delay_seconds=0,
     )
 
-    assert connection.call_count == 2
+    assert connection.call_count == 1
     assert summary.status == test_case.expected_status
     assert summary.query_count == test_case.expected_query_count
-    assert summary.resources[0].resource_name == test_case.expected_resource_name
+    assert test_case.expected_limitation_fragment in " ".join(summary.limitations)
 
 
 @pytest.mark.parametrize(
@@ -1168,7 +1201,7 @@ def test_given_saturated_open_history_when_bounded_fallback_completes_then_runni
     test_case: CollectSnowflakeCostTestCase,
     tmp_path: Path,
 ) -> None:
-    origin: datetime = datetime(2026, 8, 23, 10, tzinfo=UTC)
+    origin: datetime = datetime.now(UTC) - timedelta(minutes=1)
     ledger_path: Path = tmp_path / "statements.jsonl"
     ledger_path.write_text(
         json.dumps(
@@ -1295,3 +1328,37 @@ def test_given_run_older_than_retention_when_history_is_missing_then_status_is_u
     assert summary.status == test_case.expected_status
     assert summary.query_count == test_case.expected_query_count
     assert "no longer available" in (summary.message or "")
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        HistoryWindowTestCase(
+            description="a run that just finished reads open-ended history for running queries",
+            completed_minutes_ago=0,
+            expected_bounded=False,
+        ),
+        HistoryWindowTestCase(
+            description="an older run reads only its own window, not the hours since",
+            completed_minutes_ago=30,
+            expected_bounded=True,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_run_age_when_reading_history_then_older_runs_read_a_bounded_window(
+    test_case: HistoryWindowTestCase,
+) -> None:
+    completed_at: datetime = datetime.now(UTC) - timedelta(minutes=test_case.completed_minutes_ago)
+    connection: _Connection = _Connection(())
+
+    snowflake_query_observations(
+        connection=connection,
+        started_at=completed_at - timedelta(minutes=1),
+        completed_at=completed_at,
+        expected_query_ids=frozenset(),
+        classification_query_ids=frozenset(),
+        deadline=float("inf"),
+    )
+
+    assert ("END_TIME_RANGE_END" in connection.sql) is test_case.expected_bounded

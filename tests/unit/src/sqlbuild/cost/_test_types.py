@@ -46,6 +46,7 @@ class SnowflakeObservationTestCase:
     expected_limitation_fragment: str = ""
     query_type: str = "SELECT"
     query_text: str = "SELECT * FROM orders"
+    observed_after_seconds: int = 0
 
 
 @dataclass(frozen=True)
@@ -147,3 +148,10 @@ class SnowflakeCostBudgetTestCase:
     seconds_per_read: float
     expected_status: CostStatus
     expected_message_fragment: str = ""
+
+
+@dataclass(frozen=True)
+class HistoryWindowTestCase:
+    description: str
+    completed_minutes_ago: int
+    expected_bounded: bool

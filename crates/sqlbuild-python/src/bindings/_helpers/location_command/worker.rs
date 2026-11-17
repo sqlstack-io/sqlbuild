@@ -36,6 +36,7 @@ use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSn
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{NodeKeys, WorkerBuild};
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::compiled_views::project_reads::sql_tests;
+use crate::bindings::_helpers::cost_report::deferred::collect_deferred_cost_after_finish;
 use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::command::compile_snapshot;
@@ -389,7 +390,9 @@ pub(super) fn execute_worker<'py>(
     let outcome = if recall.is_some() {
         worker.outcome(py, code)?
     } else {
-        worker.finish(py, code)?
+        let outcome = worker.finish(py, code)?;
+        collect_deferred_cost_after_finish(py, &worker);
+        outcome
     };
     result.map(|code| {
         if matches!(outcome, RunOutcome::Success | RunOutcome::Warn) {

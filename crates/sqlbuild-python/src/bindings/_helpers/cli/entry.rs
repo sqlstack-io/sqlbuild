@@ -36,6 +36,7 @@ use crate::bindings::_helpers::cli::termination::{
 use crate::bindings::_helpers::compile_command::constants::COMPILE_COMMAND_NAME;
 use crate::bindings::_helpers::compile_command::report::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
+use crate::bindings::_helpers::cost_report::deferred::collect_deferred_cost_after_finish;
 use crate::bindings::_helpers::diff_report::output::render_diff_error_json;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::interrupt::{InterruptHandler, interrupted};
@@ -917,6 +918,7 @@ fn execute_parsed_invocation<'py>(
             py,
             &format!("Worker execution completed: {}\n", outcome.as_str()),
         )?;
+        collect_deferred_cost_after_finish(py, &worker);
         if !matches!(outcome, RunOutcome::Success | RunOutcome::Warn) {
             dispatched?;
             finished?;

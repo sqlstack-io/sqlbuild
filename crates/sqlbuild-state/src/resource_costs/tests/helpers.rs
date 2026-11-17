@@ -24,7 +24,16 @@ pub(crate) fn run(run_id: &str, attempt: i64, status: &str, age: i64) -> RunCost
         run_started_at: String::new(),
         run_completed_at: String::new(),
         started_epoch: NOW - age,
+        completed_epoch: NOW - age + 60,
     }
+}
+
+/// A partial run that saw every statement, with `limitations`.
+pub(crate) fn fully_observed(run_id: &str, limitations: &[&str]) -> RunCostAttempt {
+    let mut attempt: RunCostAttempt = run(run_id, 1, "partial", 3_600);
+    attempt.coverage.observed_statement_count = attempt.coverage.expected_statement_count;
+    attempt.coverage.limitations = limitations.iter().map(|text| (*text).to_owned()).collect();
+    attempt
 }
 
 pub(crate) fn observation_id(attempt: i64, cluster_number: Option<i64>) -> String {
