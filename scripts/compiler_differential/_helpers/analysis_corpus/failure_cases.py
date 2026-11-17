@@ -457,6 +457,24 @@ def _target_cases() -> tuple[FailureCase, ...]:
                 + 'database = "ANALYTICS"\n\n[targets.dev]\ndatabase = "ANALYTICS"\n'
             },
         ),
+        failure_case(
+            name="target-preserved-schema-without-node-results-schema",
+            expected_code="S105",
+            expected_message="Target 'dev' keeps each model's own schema",
+            files={
+                FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG.replace(
+                    'adapter = "duckdb"\n', 'adapter = "duckdb"\ndefault_target = "dev"\n'
+                )
+                + '\n[defaults]\nschema = "mart"\n\n[targets.dev]\nschema = "preserve"\n',
+                "python/tasks/announce.py": (
+                    "from sqlbuild.tasks import task\n\n\n"
+                    "@task\n"
+                    "def announce_orders(ctx):\n"
+                    '    """Announce the loaded orders."""\n'
+                    "    return ctx.result(payload={'announced': True})\n"
+                ),
+            },
+        ),
     )
 
 

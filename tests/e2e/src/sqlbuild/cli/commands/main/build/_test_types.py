@@ -1667,6 +1667,39 @@ class CtxTargetSchemaE2ETestCase:
 
 
 @dataclass(frozen=True)
+class PreservedTargetNodeResultsE2ETestCase:
+    """A target's location settings, and where two builds' and a load's node results land."""
+
+    description: str
+    target_lines: str
+    source_location: str
+    expected_results_schema: str
+    expected_runs_per_node: int
+    cli_args: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PreservedTargetRefusalE2ETestCase:
+    """A preserved target without a loader schema and the compile error it must print."""
+
+    description: str
+    python_files: dict[str, str]
+    expected_error: str
+
+
+@dataclass(frozen=True)
+class AdapterDefaultResultsFallbackE2ETestCase:
+    """Results left in the adapter default by an earlier build, and the loader rebuilt after it."""
+
+    description: str
+    target_schema: str
+    rebuilt_loader: str
+    kept_loader: str
+    reading_task: str
+    expected_payload_keys: tuple[str, str]
+
+
+@dataclass(frozen=True)
 class WarehouseRoundTripE2ETestCase:
     """A build of orders -> score task -> partner loader -> source -> scored model."""
 

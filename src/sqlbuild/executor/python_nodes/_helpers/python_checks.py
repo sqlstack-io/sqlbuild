@@ -91,6 +91,7 @@ def execute_python_check_nodes(
                 connection=connection,
                 database=default_database,
                 schema=default_schema,
+                target_config=runtime.target_config,
             )
             if runtime.persist_node_results
             else None

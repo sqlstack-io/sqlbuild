@@ -1,6 +1,7 @@
-//! Raise when the selected target's schema is `preserve` and one of `loaders` names no schema.
+//! Raise when the selected target's schema is `preserve` and a loader or Python node has no schema.
 
 use crate::compile_attachment::main::resolved_target::resolved_target;
+use crate::compile_driver::_helpers::setup::node_results::require_node_results_schema;
 use crate::compile_driver::_helpers::setup::targets::planner_error;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_analysis::assembly::target_checks::constants::{
@@ -13,7 +14,7 @@ use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::HashSet;
 
-/// Raise when the selected target's schema is `preserve` and one of `loaders` names no schema.
+/// Raise when a `preserve` target leaves one of `loaders`, or the Python node results, without a schema.
 pub fn preserved_loader_schemas(
     discovered: &Bound<'_, PyAny>,
     selected_target: &Bound<'_, PyAny>,
@@ -47,5 +48,5 @@ pub fn preserved_loader_schemas(
             )),
         ));
     }
-    Ok(())
+    require_node_results_schema(discovered, (&target_name, &target_config))
 }
