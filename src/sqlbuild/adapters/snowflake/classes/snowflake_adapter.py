@@ -121,6 +121,7 @@ from sqlbuild.adapter.relations.main.run_recorded_inspection_query import (
 )
 from sqlbuild.adapter.relations.models import (
     ListedRelation,
+    RelationChange,
     SchemaColumnListing,
     SchemaRelationListing,
 )
@@ -143,6 +144,7 @@ from sqlbuild.adapters.snowflake._helpers.metadata_types import (
     information_schema_type,
     show_columns_type,
 )
+from sqlbuild.adapters.snowflake._helpers.relation_changes import relation_change_from_row
 from sqlbuild.adapters.snowflake._helpers.relation_usage import read_relation_usage
 from sqlbuild.adapters.snowflake._helpers.show_metadata import (
     is_missing_object_error,
@@ -186,6 +188,7 @@ from sqlbuild.runtime.observability.constants import COST_TELEMETRY_PURPOSE
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 _EXACT_COLUMN_INSPECTION_LIMIT: int = 32
+_CONCURRENT_EXACT_COLUMN_INSPECTION_LIMIT: int = 200
 _STATE_TABLE_RETENTION_ATTRIBUTE: str = "_state_table_retention_fallbacks_state"
 _METADATA_INSPECTION_CONCURRENCY: int = 8
 _SHOW_RESULT_LIMIT: int = 10_000
@@ -201,6 +204,10 @@ _RELATION_LISTING_COLUMNS: str = (
     "table_name, table_schema, table_type, is_transient, created, last_altered, retention_time"
 )
 _BULK_COLUMN_RELATION_CHUNK_SIZE: int = 2_000
+_RELATION_CHANGE_COLUMNS: str = (
+    "table_name, table_schema, table_type, is_transient, created, last_altered, last_ddl, "
+    "retention_time"
+)
 
 
 class SnowflakeAdapter(
@@ -223,7 +230,7 @@ class SnowflakeAdapter(
     statement_limit_excludes_queueing: ClassVar[bool] = True
     metadata_inspection_concurrency: ClassVar[int] = _METADATA_INSPECTION_CONCURRENCY
     concurrent_ddl_limit: ClassVar[int] = 16
-    exact_column_inspection_limit: ClassVar[int] = _EXACT_COLUMN_INSPECTION_LIMIT
+    exact_column_inspection_limit: ClassVar[int] = _CONCURRENT_EXACT_COLUMN_INSPECTION_LIMIT
 
     max_identifier_length: ClassVar[int] = 255
     supports_session_warehouse: ClassVar[bool] = True
@@ -2270,6 +2277,34 @@ class SnowflakeAdapter(
             retention_days=None if row[6] is None else int(row[6]),
         )
 
+    def read_relation_changes(
+        self, *, connection: _SnowflakeConnection, database: str | None, schemas: tuple[str, ...]
+    ) -> dict[str, tuple[RelationChange, ...]]:
+        """List schemas from INFORMATION_SCHEMA.TABLES, whose LAST_DDL moves with each DDL."""
+
+        placeholders: str = ", ".join(["%s"] * len(schemas))
+        query: str = (
+            f"SELECT {_RELATION_CHANGE_COLUMNS} "
+            f"FROM {self._information_schema_relation(database=database, name='tables')} "
+            f"WHERE table_schema IN ({placeholders})"
+        )
+        params: list[str] = [self._information_schema_identifier(schema) for schema in schemas]
+        if database is not None:
+            query += " AND table_catalog = %s"
+            params.append(self._information_schema_identifier(database))
+        rows: list[tuple[Any, ...]] = self._fetch_inspection_rows(
+            connection=connection, query=query, params=tuple(params)
+        )
+        changes: dict[str, list[RelationChange]] = {
+            self.metadata_name_key(schema): [] for schema in schemas
+        }
+        row: tuple[Any, ...]
+        for row in rows:
+            changes.setdefault(self.metadata_name_key(str(row[1])), []).append(
+                relation_change_from_row(row=row, database=database)
+            )
+        return {schema: tuple(listed) for schema, listed in changes.items()}
+
     def read_relation_change_token(
         self, *, connection: _SnowflakeConnection, database: str | None, schema: str, name: str
     ) -> str | None:
@@ -2291,24 +2326,45 @@ class SnowflakeAdapter(
     ) -> SchemaRelationListing:
         """List one schema's tables and views with SHOW, which needs no running warehouse."""
 
+        return self.relation_listing_from_reads(
+            database=database,
+            schema=schema,
+            results=tuple(
+                read()
+                for read in self.relation_listing_reads(
+                    connection=connection, database=database, schema=schema
+                )
+            ),
+        )
+
+    def relation_listing_reads(
+        self, *, connection: _SnowflakeConnection, database: str | None, schema: str
+    ) -> tuple[Callable[[], object], ...]:
+        """SHOW TABLES and SHOW VIEWS of one schema, independent reads that may run together."""
+
         show_database: str = self._show_database(
             connection=connection, database=database, schema=schema
         )
         scope: str = self._show_schema_scope(
             connection=connection, database=database, schema=schema
         )
-        tables: list[dict[str, object]] = self._fetch_paged_show_rows(
-            connection=connection,
-            query=f"SHOW TABLES IN SCHEMA {scope}",
-            show_database=show_database,
-            schema=schema,
+        return tuple(
+            partial(
+                self._fetch_paged_show_rows,
+                connection=connection,
+                query=f"SHOW {kind} IN SCHEMA {scope}",
+                show_database=show_database,
+                schema=schema,
+            )
+            for kind in ("TABLES", "VIEWS")
         )
-        views: list[dict[str, object]] = self._fetch_paged_show_rows(
-            connection=connection,
-            query=f"SHOW VIEWS IN SCHEMA {scope}",
-            show_database=show_database,
-            schema=schema,
-        )
+
+    def relation_listing_from_reads(
+        self, *, database: str | None, schema: str, results: tuple[object, ...]
+    ) -> SchemaRelationListing:
+        """One schema's listing from its SHOW TABLES and SHOW VIEWS rows."""
+
+        tables, views = cast(tuple[list[dict[str, object]], list[dict[str, object]]], results)
         entries: dict[str, ListedRelation] = {}
         row: dict[str, object]
         for row in tables:

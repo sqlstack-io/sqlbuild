@@ -1,8 +1,8 @@
 //! Public records of planner migrations.
 
 use crate::planner_migrations::_helpers::discovery::state_inspection::RelationKey;
+use crate::planner_migrations::_helpers::discovery::state_inspection::fingerprint_key;
 use crate::planner_migrations::_helpers::discovery::state_inspection::lowered;
-use crate::planner_migrations::_helpers::discovery::state_inspection::newest;
 use crate::planner_migrations::_helpers::discovery::state_inspection::pending;
 use crate::planner_migrations::_helpers::discovery::state_inspection::relation_key;
 use crate::planner_migrations::_helpers::discovery::state_inspection::schema_or_empty;
@@ -39,7 +39,8 @@ use sqlbuild_python_front::state_rows::constants::MODEL_KIND;
 use sqlbuild_python_front::state_rows::constants::OLD_NAME_KIND;
 use sqlbuild_python_front::state_rows::main::migrations::layout::layout;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_views::old_name_views;
-use sqlbuild_state::events::models::EventRelation;
+use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
+use sqlbuild_state::events::models::{EventRelation, FingerprintKey};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -192,6 +193,54 @@ pub(crate) struct DiscoveryRequest<'py> {
     pub fingerprints: Bound<'py, PyAny>,
 }
 
+/// One schema's fingerprint positions by lowercased built relation name and by node name.
+#[derive(Debug, Default)]
+struct FingerprintPositions {
+    by_target: HashMap<String, Vec<usize>>,
+    by_node: HashMap<String, Vec<usize>>,
+}
+
+impl FingerprintPositions {
+    fn of(keys: &[FingerprintKey]) -> Self {
+        let mut positions: Self = Self::default();
+        for (position, key) in keys.iter().enumerate() {
+            if let Some(target) = &key.target {
+                positions
+                    .by_target
+                    .entry(target.name.to_lowercase())
+                    .or_default()
+                    .push(position);
+            }
+            positions
+                .by_node
+                .entry(key.node_name.clone())
+                .or_default()
+                .push(position);
+        }
+        positions
+    }
+
+    /// Positions that built a relation named `target` or ran as `model_name`, in stored order.
+    fn candidates(&self, target: &str, model_name: Option<&str>) -> Vec<usize> {
+        let mut found: Vec<usize> = self
+            .by_target
+            .get(&target.to_lowercase())
+            .into_iter()
+            .flatten()
+            .chain(
+                model_name
+                    .and_then(|name| self.by_node.get(name))
+                    .into_iter()
+                    .flatten(),
+            )
+            .copied()
+            .collect();
+        found.sort_unstable();
+        found.dedup();
+        found
+    }
+}
+
 /// Relations, fingerprints and migration events for one planning database.
 #[pyclass(module = "sqlbuild._native", name = "MigrationStateInspection")]
 #[derive(Debug)]
@@ -202,6 +251,10 @@ pub struct MigrationStateInspection {
     read_schemas: HashSet<String>,
     /// Model fingerprints per lowercased schema, in first-read order.
     fingerprints: Vec<(String, Vec<Py<PyAny>>)>,
+    /// Each `fingerprints` entry's lookup keys, read from the fingerprints once.
+    fingerprint_keys: Vec<Vec<FingerprintKey>>,
+    /// Each `fingerprints` entry's positions by lowercased built relation name and by node name.
+    fingerprint_positions: Vec<FingerprintPositions>,
     /// Positions in `fingerprints` (schema, fingerprint) by node name, in the order `fingerprints` lists them.
     fingerprints_by_name: HashMap<String, Vec<(usize, usize)>>,
     events: Vec<Py<PyAny>>,
@@ -332,6 +385,8 @@ impl MigrationStateInspection {
             known_fingerprints: known.unbind(),
             read_schemas: HashSet::new(),
             fingerprints: Vec::new(),
+            fingerprint_keys: Vec::new(),
+            fingerprint_positions: Vec::new(),
             fingerprints_by_name: HashMap::new(),
             events: Vec::new(),
             event_schemas: HashSet::new(),
@@ -557,14 +612,27 @@ impl MigrationStateInspection {
             }
             if state_tables.contains(&(key.clone(), FINGERPRINT_TABLE_NAME.to_owned())) {
                 let models: Vec<Py<PyAny>> = slf.borrow().model_fingerprints(py, &schema, &key)?;
+                let keys: Vec<FingerprintKey> = models
+                    .iter()
+                    .map(|model| fingerprint_key(model.bind(py)))
+                    .collect::<PyResult<_>>()?;
                 let mut this: PyRefMut<'_, Self> = slf.borrow_mut();
                 match this
                     .fingerprints
-                    .iter_mut()
-                    .find(|(stored, _)| *stored == key)
+                    .iter()
+                    .position(|(stored, _)| *stored == key)
                 {
-                    Some((_, stored)) => *stored = models,
-                    None => this.fingerprints.push((key, models)),
+                    Some(index) => {
+                        this.fingerprints[index].1 = models;
+                        this.fingerprint_positions[index] = FingerprintPositions::of(&keys);
+                        this.fingerprint_keys[index] = keys;
+                    }
+                    None => {
+                        this.fingerprints.push((key, models));
+                        this.fingerprint_positions
+                            .push(FingerprintPositions::of(&keys));
+                        this.fingerprint_keys.push(keys);
+                    }
                 }
                 read_fingerprints = true;
             }
@@ -663,7 +731,10 @@ impl MigrationStateInspection {
         model_name: Option<String>,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
         let key: String = lowered(&schema_or_empty(native_field(location, "schema")?))?;
-        let Some((_, candidates)) = self.fingerprints.iter().find(|(stored, _)| *stored == key)
+        let Some(index) = self
+            .fingerprints
+            .iter()
+            .position(|(stored, _)| *stored == key)
         else {
             return Ok(None);
         };
@@ -672,7 +743,19 @@ impl MigrationStateInspection {
             schema: native_field(location, "schema")?.extract()?,
             name: native_field(location, "name")?.extract()?,
         };
-        newest(py, candidates, (Some(&target), model_name.as_deref()))
+        let positions: Vec<usize> =
+            self.fingerprint_positions[index].candidates(&target.name, model_name.as_deref());
+        let keys: Vec<FingerprintKey> = positions
+            .iter()
+            .map(|&position| self.fingerprint_keys[index][position].clone())
+            .collect();
+        Ok(
+            newest_fingerprint(&keys, Some(&target), model_name.as_deref()).map(|candidate| {
+                self.fingerprints[index].1[positions[candidate]]
+                    .bind(py)
+                    .clone()
+            }),
+        )
     }
 
     /// The newest model fingerprint with this node name in any inspected schema.
@@ -682,19 +765,21 @@ impl MigrationStateInspection {
         py: Python<'py>,
         model_name: &str,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
-        let named: Vec<Py<PyAny>> = self
+        let named: Vec<(&Py<PyAny>, FingerprintKey)> = self
             .fingerprints_by_name
             .get(model_name)
             .into_iter()
             .flatten()
-            .filter_map(|(schema, position)| {
-                self.fingerprints
-                    .get(*schema)
-                    .and_then(|(_, fingerprints)| fingerprints.get(*position))
+            .filter_map(|&(schema, position)| {
+                Some((
+                    self.fingerprints.get(schema)?.1.get(position)?,
+                    self.fingerprint_keys.get(schema)?.get(position)?.clone(),
+                ))
             })
-            .map(|fingerprint| fingerprint.clone_ref(py))
             .collect();
-        newest(py, &named, (None, Some(model_name)))
+        let keys: Vec<FingerprintKey> = named.iter().map(|(_, key)| key.clone()).collect();
+        Ok(newest_fingerprint(&keys, None, Some(model_name))
+            .map(|position| named[position].0.bind(py).clone()))
     }
 
     /// Latest model fingerprints whose names are no longer in the project.

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import FakeRelation
 
 
 @dataclass(frozen=True)
@@ -60,7 +64,7 @@ class SpeculativePrefetchTestCase:
     description: str
     failing_schema: str
     expected_error_fragment: str
-    expected_failed_reads: int
+    expected_failed_reads: tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -214,3 +218,44 @@ class SessionDatabaseSwitchTestCase:
     switch_sql: str
     expected_scopes: tuple[str, ...]
     expected_session_reads: int
+
+
+@dataclass(frozen=True)
+class PartedListingTestCase:
+    """Schemas whose tables and views are listed by separate reads running together."""
+
+    description: str
+    schema_count: int
+    relations_per_schema: int
+    statement_latency_seconds: float
+    expected_max_concurrent: int
+
+
+@dataclass(frozen=True)
+class SyncedCatalogTestCase:
+    """A warehouse that moved on after the synced copy, and what a plan from the copy reads."""
+
+    description: str
+    changed: tuple[FakeRelation, ...]
+    dropped: tuple[str, ...]
+    expected_query_kinds: tuple[str, ...]
+    expected_refreshed: int
+
+
+@dataclass(frozen=True)
+class SyncedFallbackTestCase:
+    """A plan from synced state that cannot use the copy for a schema, and reads it live."""
+
+    description: str
+    empty_copy: bool
+    failing_check: bool
+    expected_message: str
+
+
+@dataclass(frozen=True)
+class ExactColumnThresholdTestCase:
+    """A column request of one schema's relations and how many reads of each kind serve it."""
+
+    description: str
+    relation_count: int
+    expected_query_kinds: dict[str, int]

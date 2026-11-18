@@ -16,12 +16,15 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from itertools import chain, compress
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import duckdb
 import pyarrow
 
-from sqlbuild.adapter.contract.models import RelationInfo
+from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
+from sqlbuild.adapter.relations.classes.inspection_catalog import InspectionCatalog
+from sqlbuild.adapter.relations.classes.synced_catalog import SyncedCatalog
+from sqlbuild.adapter.relations.models import SyncedRelation
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_connection import _SnowflakeConnection
 
@@ -48,6 +51,12 @@ _CURSOR_BOUND_PATTERN: re.Pattern[str] = re.compile(
     r"^SELECT\s+CAST\((?:MIN|MAX)\(.*\)\s+AS\s+VARCHAR\).*\s+FROM\s+(?P<relation>\S+)\s*$",
     re.IGNORECASE | re.DOTALL,
 )
+_CURSOR_BATCH_PATTERN: re.Pattern[str] = re.compile(r"^SELECT \d+ AS _read, ", re.IGNORECASE)
+_CURSOR_BATCH_BRANCH: re.Pattern[str] = re.compile(
+    r"^SELECT (?P<read>\d+) AS _read, (?P<select>.*?)(?:\s+FROM\s+(?P<relation>[^\s()]+))?$",
+    re.IGNORECASE | re.DOTALL,
+)
+_DESCRIBE_PATTERN: re.Pattern[str] = re.compile(r"\) AS __describe_source LIMIT 0$")
 _ANY_PATTERN: re.Pattern[str] = re.compile(r"")
 _CURRENT_DATABASE_PATTERN: re.Pattern[str] = re.compile(r"^SELECT CURRENT_DATABASE\(\)$")
 _USE_DATABASE_PATTERN: re.Pattern[str] = re.compile(
@@ -68,6 +77,7 @@ _QUERY_KINDS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"^SHOW VIEWS IN SCHEMA "), "show_views"),
     (_SHOW_SCHEMA_COLUMNS_PATTERN, "show_schema_columns"),
     (_CURSOR_BOUND_PATTERN, "cursor_bounds"),
+    (_CURSOR_BATCH_PATTERN, "cursor_bounds"),
     (_CURRENT_DATABASE_PATTERN, "session"),
     (_SHOW_SCHEMAS_PATTERN, "show_schemas"),
     (_OTHER_INFORMATION_SCHEMA_PATTERN, "other_metadata"),
@@ -84,7 +94,10 @@ _SHOW_DESCRIPTION: tuple[tuple[str], ...] = (
     ("data_type",),
 )
 _BOUND_MARKERS: tuple[str, str] = ("MIN(", "MAX(")
+_BOUND_VALUE_INDEX: dict[bool, int] = {True: 0, False: 1}
 SHOW_RESULT_CAP: int = 10_000
+# The relation count beyond which schema listing tests read a schema's columns in one listing.
+SCHEMA_LISTING_EXACT_COLUMN_LIMIT: int = 32
 _SHOW_TABLE_FIELDS: tuple[str, ...] = (
     "created_on",
     "name",
@@ -162,6 +175,7 @@ class FakeRelation:
     is_transient: bool = False
     columns: tuple[FakeColumn, ...] = (FakeColumn(name="ID", data_type="NUMBER"),)
     retention_time: int = 1
+    last_ddl: datetime = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @dataclass(frozen=True)
@@ -214,7 +228,8 @@ class RecordingSnowflakeWarehouse:
         self._database.execute(
             "CREATE TABLE fake_tables (table_catalog VARCHAR, table_schema VARCHAR, "
             "table_name VARCHAR, table_type VARCHAR, is_transient VARCHAR, "
-            "created TIMESTAMPTZ, last_altered TIMESTAMPTZ, retention_time INTEGER)"
+            "created TIMESTAMPTZ, last_altered TIMESTAMPTZ, last_ddl TIMESTAMPTZ, "
+            "retention_time INTEGER)"
         )
         self._database.execute(
             "CREATE TABLE fake_columns (table_catalog VARCHAR, table_schema VARCHAR, "
@@ -277,7 +292,10 @@ class RecordingSnowflakeWarehouse:
         """Execute one statement and record it."""
 
         started_at: float = time.monotonic()
-        is_cursor_bound: bool = _CURSOR_BOUND_PATTERN.match(sql) is not None
+        is_cursor_bound: bool = (
+            _CURSOR_BOUND_PATTERN.match(sql) is not None
+            or _CURSOR_BATCH_PATTERN.match(sql) is not None
+        )
         with self._lock:
             self.attempted_sql.append(sql)
             self._active[is_cursor_bound] += 1
@@ -319,6 +337,8 @@ class RecordingSnowflakeWarehouse:
             (_SHOW_COLUMNS_PATTERN, self._answer_show_columns),
             (_SHOW_SCHEMA_RELATIONS_PATTERN, self._answer_show_schema_relations),
             (_SHOW_SCHEMA_COLUMNS_PATTERN, self._answer_show_schema_columns),
+            (_DESCRIBE_PATTERN, self._answer_describe),
+            (_CURSOR_BATCH_PATTERN, self._answer_cursor_batch),
             (_CURSOR_BOUND_PATTERN, self._answer_cursor_bounds),
             (_CURRENT_DATABASE_PATTERN, self._answer_current_database),
             (_USE_DATABASE_PATTERN, self._answer_use_database),
@@ -506,6 +526,36 @@ class RecordingSnowflakeWarehouse:
         )
         return [values], tuple((f"_{index}",) for index in range(len(values)))
 
+    def _answer_describe(
+        self, *, sql: str, params: tuple[object, ...]
+    ) -> tuple[list[tuple[Any, ...]], Any]:
+        """A query's columns, named as Snowflake folds unquoted identifiers, and no rows."""
+
+        del params
+        with self._lock:
+            description: Any = self._database.execute(sql).description
+        return [], tuple((str(column[0]).upper(),) for column in description)
+
+    def _answer_cursor_batch(
+        self, *, sql: str, params: tuple[object, ...]
+    ) -> tuple[list[tuple[Any, ...]], Any]:
+        """One ``(_read, _min, _max)`` row per branch; a failing relation fails the statement."""
+
+        del params
+        rows: list[tuple[Any, ...]] = []
+        branch: str
+        for branch in sql.split("\nUNION ALL\n"):
+            matched: re.Match[str] | None = _CURSOR_BATCH_BRANCH.match(branch)
+            assert matched is not None, branch
+            relation: str = matched.group("relation") or ""
+            _MISSING_RELATION_ACTIONS[relation.lower() in self.failing_relations](relation)
+            bounds: tuple[str, ...] = tuple(
+                self.cursor_values[_BOUND_VALUE_INDEX["MIN(" in part]]
+                for part in matched.group("select").split(" AS _")[:-1]
+            )
+            rows.append((int(matched.group("read")), *bounds))
+        return rows, (("_read",), *((f"_{index}",) for index in range(len(rows[0]) - 1)))
+
 
 def _like_pattern(pattern: str) -> re.Pattern[str]:
     return re.compile(
@@ -661,6 +711,7 @@ def _table_row(relation: FakeRelation) -> dict[str, object]:
         ],
         "created": _FIXED_CREATED_AT,
         "last_altered": _FIXED_CREATED_AT,
+        "last_ddl": relation.last_ddl,
         "retention_time": (relation.retention_time, None)[relation.table_type in _VIEW_TABLE_TYPES],
     }
 
@@ -760,6 +811,16 @@ class OfflineSnowflakeAdapter(SnowflakeAdapter):
     def connect(self, config: dict[str, Any]) -> _SnowflakeConnection:
         del config
         return _SnowflakeConnection(self._recording_warehouse.raw_connection())
+
+
+class SchemaListingSnowflakeAdapter(OfflineSnowflakeAdapter):
+    """An offline adapter reading a schema's columns in one listing beyond a few relations.
+
+    Keeps the fixtures of schema listing tests small: production reads up to a few hundred
+    relations one by one.
+    """
+
+    exact_column_inspection_limit: ClassVar[int] = SCHEMA_LISTING_EXACT_COLUMN_LIMIT
 
 
 @dataclass(frozen=True)
@@ -940,6 +1001,16 @@ def build_offline_snowflake(
     return adapter, adapter.connect({}), warehouse
 
 
+def build_schema_listing_snowflake(
+    *, relations: tuple[FakeRelation, ...]
+) -> tuple[OfflineSnowflakeAdapter, _SnowflakeConnection, RecordingSnowflakeWarehouse]:
+    """Build an offline adapter that lists a schema's columns beyond a few relations."""
+
+    warehouse: RecordingSnowflakeWarehouse = RecordingSnowflakeWarehouse(relations=relations)
+    adapter: OfflineSnowflakeAdapter = SchemaListingSnowflakeAdapter(warehouse=warehouse)
+    return adapter, adapter.connect({}), warehouse
+
+
 def sorted_relation_reprs(relations: tuple[RelationInfo, ...]) -> list[str]:
     """Return an order-independent form of listed relations without SHOW-absent LAST_ALTERED."""
 
@@ -1038,3 +1109,71 @@ def attempted_query_kinds(warehouse: RecordingSnowflakeWarehouse) -> tuple[str, 
         ).kind
         for sql in warehouse.attempted_sql
     )
+
+
+type ListedSchema = tuple[
+    list[str], dict[tuple[str | None, str | None, str], tuple[ColumnInfo, ...]]
+]
+
+
+def live_inspection_catalog(warehouse: RecordingSnowflakeWarehouse) -> InspectionCatalog:
+    """A fresh catalog over its own adapter, reading `warehouse` live."""
+
+    adapter: OfflineSnowflakeAdapter = OfflineSnowflakeAdapter(warehouse=warehouse)
+    return InspectionCatalog(adapter=adapter, connection=adapter.connect({}))
+
+
+def unavailable_relation_changes(**_: object) -> object:
+    """A synced state check whose warehouse read fails."""
+
+    raise RuntimeError("information schema unavailable")
+
+
+def listed_schema(*, catalog: InspectionCatalog, database: str, schema: str) -> ListedSchema:
+    """One schema's listing, in an order-independent form, and its relations' columns."""
+
+    relations: tuple[RelationInfo, ...] = catalog.list_relations(
+        database=database, schemas=(schema,)
+    )
+    return sorted_relation_reprs(relations), catalog.get_columns_for_relations(relations=relations)
+
+
+def synced_copy(
+    *, warehouse: RecordingSnowflakeWarehouse, database: str, schema: str, observed_at: datetime
+) -> SyncedCatalog:
+    """The copy a location synced: the live listing and columns, observed at `observed_at`."""
+
+    catalog: InspectionCatalog = live_inspection_catalog(warehouse)
+    relations: tuple[RelationInfo, ...] = catalog.list_relations(
+        database=database, schemas=(schema,)
+    )
+    columns: dict[tuple[str | None, str | None, str], tuple[ColumnInfo, ...]] = (
+        catalog.get_columns_for_relations(relations=relations)
+    )
+    return SyncedCatalog(
+        relations=tuple(
+            SyncedRelation(
+                database=database.upper(),
+                schema=schema.upper(),
+                name=relation.name,
+                columns=columns.get(relation.identity, ()),
+                observed_at=observed_at,
+            )
+            for relation in relations
+        )
+    )
+
+
+def relations_after_sync(
+    *,
+    relations: tuple[FakeRelation, ...],
+    changed: tuple[FakeRelation, ...],
+    dropped: tuple[str, ...],
+) -> tuple[FakeRelation, ...]:
+    """`relations` with `changed` replacing or joining them and `dropped` names removed."""
+
+    replaced: dict[str, FakeRelation] = {relation.name: relation for relation in relations}
+    replaced.update({relation.name: relation for relation in changed})
+    for name in dropped:
+        replaced.pop(name)
+    return tuple(replaced.values())

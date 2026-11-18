@@ -10,15 +10,23 @@ import subprocess
 import sys
 import time
 from bisect import bisect_right
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from itertools import accumulate
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
+import sqlbuild._native as native_module
+from sqlbuild._native import (
+    CompilePipelineOptions,
+    CompilePipelineResult,
+    discover_project_inputs,
+    run_compile_pipeline,
+)
+from sqlbuild.runtime.contracts.models import ConnectionHooks
 from tests.e2e.src.sqlbuild.cli.commands.main.lineage.helpers import DIAMOND_LAYERS
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     REPO_ROOT,
@@ -35,6 +43,15 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalo
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     location_process,
     snapshot_api,
+)
+from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
+    offline_cursor_bound_relations,
+)
+from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import (
+    FakeColumn,
+    FakeRelation,
+    OfflineSnowflakeAdapter,
+    RecordingSnowflakeWarehouse,
 )
 
 DIAMOND_DATABASE_FILE: str = "orders.duckdb"
@@ -479,3 +496,111 @@ def timed_plan(
     elapsed: float = time.monotonic() - started
     document: dict[str, Any] = json.loads(result)["outcome"]["document"]
     return elapsed, document
+
+
+# ---- a live plan of the DuckShop 10K project against its synced warehouse ----
+
+#: The database and schema the synced state places built models, seeds and state tables in.
+_LIVE_TARGET: tuple[str, str] = ("DUCKSHOP_10K", "DEV")
+#: One source table in this many carries a column its declaration lacks, as warehouses drift.
+DRIFT_EVERY: int = 50
+_DRIFT_COLUMN: FakeColumn = FakeColumn(name="_LOADED_AT", data_type="TIMESTAMP_NTZ")
+_NUMBER_TYPE: re.Pattern[str] = re.compile(r"NUMBER\((\d+),(\d+)\)")
+_RELATION_TYPES: dict[str, str] = {"TABLE": "BASE TABLE", "VIEW": "VIEW"}
+#: Declared string types Snowflake stores, and lists, as TEXT of its default length.
+_LISTED_TYPES: dict[str, str] = {"VARCHAR": "TEXT", "STRING": "TEXT", "TEXT": "TEXT"}
+_TEXT_LENGTHS: dict[str, int] = dict.fromkeys(_LISTED_TYPES, 16_777_216)
+
+
+@dataclass(frozen=True)
+class LivePlan:
+    """One live plan's wall time and the work it did against the offline warehouse."""
+
+    seconds: float
+    model_entries: int
+    source_rebinding_analyses: int
+    cursor_relations: int
+    cursor_statements: int
+    warehouse_statements: int
+
+
+def _number_column(name: str, declared: re.Match[str]) -> FakeColumn:
+    precision, scale = declared.groups()
+    return FakeColumn(
+        name=name,
+        data_type="NUMBER",
+        numeric_precision=int(precision),
+        numeric_scale=int(scale),
+        character_maximum_length=None,
+    )
+
+
+def _column(column: dict[str, str]) -> FakeColumn:
+    """The warehouse column a declared column lists as, its type spelled as Snowflake lists it."""
+
+    declared: str = column["data_type"].upper()
+    number: re.Match[str] | None = _NUMBER_TYPE.fullmatch(declared)
+    builders: dict[bool, Callable[[], FakeColumn]] = {
+        True: lambda: _number_column(column["name"], cast(re.Match[str], number)),
+        False: lambda: FakeColumn(
+            name=column["name"],
+            data_type=_LISTED_TYPES.get(declared, declared),
+            character_maximum_length=_TEXT_LENGTHS.get(declared),
+        ),
+    }
+    return builders[number is not None]()
+
+
+def _relation(record: dict[str, Any], drifted: frozenset[str]) -> FakeRelation:
+    location: str = f"{record['state_schema']}.{record['name']}"
+    columns: tuple[FakeColumn, ...] = tuple(map(_column, record["columns"]))
+    return FakeRelation(
+        database=record["state_database"],
+        schema=record["state_schema"],
+        name=record["name"],
+        table_type=_RELATION_TYPES[record["relation_type"]],
+        columns=columns + {True: (_DRIFT_COLUMN,), False: ()}[location in drifted],
+    )
+
+
+def offline_relations(catalog: list[dict[str, Any]]) -> tuple[FakeRelation, ...]:
+    """The synced catalog's relations, every `DRIFT_EVERY`th source with an undeclared column."""
+
+    sources: list[str] = sorted(
+        f"{record['state_schema']}.{record['name']}"
+        for record in filter(
+            lambda record: (record["state_database"], record["state_schema"]) != _LIVE_TARGET,
+            catalog,
+        )
+    )
+    drifted: frozenset[str] = frozenset(sources[::DRIFT_EVERY])
+    return tuple(_relation(record, drifted) for record in catalog)
+
+
+def live_plan(project: Path, catalog: list[dict[str, Any]]) -> LivePlan:
+    """Compile and plan `project` in this process, as `sqb plan` does, against `catalog`."""
+
+    warehouse: RecordingSnowflakeWarehouse = RecordingSnowflakeWarehouse(
+        relations=offline_relations(catalog), current_database=_LIVE_TARGET[0]
+    )
+    _ = native_module.compile_stage_work_info(reset=True)
+    started: float = time.monotonic()
+    inputs: Any = discover_project_inputs(project_dir=project)
+    result: CompilePipelineResult = run_compile_pipeline(
+        discovered_inputs=inputs,
+        adapter=OfflineSnowflakeAdapter(warehouse=warehouse),
+        options=CompilePipelineOptions(
+            no_cache=True, connection_config=dict(inputs.project_config.connection)
+        ),
+        hooks=ConnectionHooks(),
+    )
+    seconds: float = time.monotonic() - started
+    stages: dict[str, int] = native_module.compile_stage_work_info()
+    return LivePlan(
+        seconds=seconds,
+        model_entries=len(result.plan_output.model_entries),
+        source_rebinding_analyses=stages.get("source_rebinding_analyses", 0),
+        cursor_relations=len(offline_cursor_bound_relations(warehouse)),
+        cursor_statements=len(warehouse.queries_of_kind("cursor_bounds")),
+        warehouse_statements=len(warehouse.queries),
+    )

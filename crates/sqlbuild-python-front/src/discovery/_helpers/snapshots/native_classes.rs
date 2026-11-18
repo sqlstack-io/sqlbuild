@@ -42,6 +42,8 @@ pub(crate) struct ModelTextRequest {
 #[derive(Debug)]
 pub(crate) struct NativeDiscoverySession {
     pub(crate) inner: sqlbuild_discovery::declaration_files::models::DiscoverySession,
+    /// The Python nodes' job and tag dependencies, as the latest compile of these inputs resolved them.
+    pub(crate) node_sets: std::sync::Mutex<Option<sqlbuild_python_base::types::NodeSetOutcome>>,
 }
 
 /// One in-memory declaration file parse request; `kind` names the collection it belongs to.

@@ -168,6 +168,9 @@ fn python_nodes(
             )));
         };
         published.definition["deps"] = json!(deps);
+        if let Some(sets) = selected.set_dependencies(&node.name) {
+            published.definition["set_dependencies"] = sets;
+        }
         published.definition["tags"] =
             json!(tags.get(node.name.as_str()).cloned().unwrap_or_default());
         if let Some(source) = selected.intermediate_source(&node.kind, &node.name) {

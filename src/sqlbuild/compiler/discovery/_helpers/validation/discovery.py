@@ -17,7 +17,7 @@ from sqlbuild.python_nodes.main.read_asset_definition import read_asset_definiti
 from sqlbuild.python_nodes.main.read_check_definition import read_check_definition
 from sqlbuild.python_nodes.main.read_loader_definition import read_loader_definition
 from sqlbuild.python_nodes.main.read_task_definition import read_task_definition
-from sqlbuild.python_nodes.models import SqlResourceRef
+from sqlbuild.python_nodes.models import NodeSetRef, SqlResourceRef
 
 type _PythonNode = (
     DiscoveredLoaderFunction
@@ -69,6 +69,7 @@ def _node(*, kind: str, node: _PythonNode, owners: dict[object, int]) -> dict[st
             if isinstance(dependency, SqlResourceRef)
             else (None, owners.get(dependency), _decorated_name(dependency))
             for dependency in node.depends_on
+            if not isinstance(dependency, NodeSetRef)
         ],
     }
 

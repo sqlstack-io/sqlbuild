@@ -93,6 +93,11 @@ symbols = ["resolve_adapter"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.adapter.relations.classes.synced_catalog"]
+symbols = ["SyncedCatalog"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.adapter.relations.main._get_columns_for_inspection"]
 symbols = ["get_columns_for_inspection"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
@@ -669,7 +674,7 @@ reason = "Native code resolves these through the sqlbuild._native_host name tabl
 
 [[targets.python.dead_code.roots]]
 modules = ["sqlbuild.python_nodes.models"]
-symbols = ["AuditCase", "SqlResourceRef"]
+symbols = ["AuditCase", "NodeSetRef", "SqlResourceRef"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
@@ -1492,6 +1497,12 @@ reason = "importlib calls meta-path finders positionally as find_spec(fullname, 
 
 [[targets.python.rule_exceptions]]
 rule = "FFS120"
+path = "src/sqlbuild/refs.py"
+symbols = ["job", "tag"]
+reason = "Like model(name), job and tag take the job or tag name positionally, as authors write depends_on=job(\"orders_job\")."
+
+[[targets.python.rule_exceptions]]
+rule = "FFS120"
 path = "src/sqlbuild/assets.py"
 symbols = ["asset"]
 reason = "Bare @asset is evaluated by Python as asset(function), requiring positional function calling."
@@ -1959,6 +1970,12 @@ rule = "FPRSS130"
 path = "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connection.rs"
 symbols = ["connection_config"]
 reason = "A once-per-process warning is process state by definition: a command resolves its connection at startup for provider setup and again for its own work, and threading a flag through every caller would not guarantee once. Approved 17 Nov for this module only."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
+path = "crates/sqlbuild-analysis/src/sql_macros/_helpers/typing/typed_calls.rs"
+symbols = ["marker_memo"]
+reason = "Verifying typed markers parses the model once per marked call; the result depends only on the SQL, the calls and the dialect, so a bounded process-wide memo serves a compile's repeated reads and recompiles in long-lived processes."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
@@ -2602,7 +2619,7 @@ pending_budgets = [
     "crates/sqlbuild-python-planner/src/planner_strategy/_helpers/values.rs=0",
     "crates/sqlbuild-python-planner/src/planner_strategy/main/audit_entries/audit_is_selected.rs=2",
     "crates/sqlbuild-python-planner/src/planner_strategy/main/values/input_error.rs=1",
-    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/inspection/cursors.rs=11",
+    "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/inspection/cursors.rs=7",
     "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/inspection/fingerprint_cache.rs=6",
     "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/inspection/snapshot.rs=3",
     "crates/sqlbuild-python-planner/src/planner_warehouse/_helpers/inspection/watermarks.rs=2",
@@ -3149,6 +3166,7 @@ module_layers = [
     "native_host/live_reads=plan",
     "native_host/orchestration_sensors=commands",
     "native_host/setup_context=commands",
+    "native_host/synced_catalog=plan",
     "native_host/warehouse_metadata=commands",
     "observations=plan",
     "output_capture=registry",
@@ -3992,3 +4010,15 @@ reason = "Each registers its own module's Python functions; only the add-functio
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-analysis/src/sql_tree/_helpers/source_map.rs"]
 reason = "source_start and source_end apply opposite boundary rules: a start inside a rewrite maps to the start of the replaced text, while an exclusive end inside or closing one maps to its end, and an end at a removal maps to where the removed text began. Only the partition-and-shift shape is alike."
+
+[[dupes.allowlist]]
+paths = ["src/sqlbuild/python_nodes/main/_apply_loader.py", "src/sqlbuild/python_nodes/main/apply_asset.py", "src/sqlbuild/python_nodes/main/apply_check.py", "src/sqlbuild/python_nodes/main/apply_hook.py", "src/sqlbuild/python_nodes/main/apply_task.py", "src/sqlbuild/assets.py", "src/sqlbuild/python_nodes/_helpers/loader_authoring.py"]
+reason = "Each is one public Python node decorator with its own keyword arguments and definition record. Dependency normalisation and description resolution go through the shared normalize_python_node_dependencies and resolve_description; only the decorate-and-attach shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-compile/src/rules/_helpers/configuration/catalogue.rs", "crates/sqlbuild-python-project/src/compiled_views/_helpers/project/project_view.rs", "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_node_graph.rs", "crates/sqlbuild-python-project/src/graph/main/nodes/native_key.rs", "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/compiled.rs", "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/macros.rs"]
+reason = "Each reads a two-field key from a different record type (a SqlResourceRef's kind value, a CompiledObjectKey's resource type, a rule catalogue or graph row); only the read-two-fields shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/credentials/main/locations/location_named.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/location_reads/read_development_location.rs"]
+reason = "One reads the active location with a name, the other the development location of a target whose project path matches; each is one control-store read with its own SQL and filter, and only the read-then-decode-the-identity shape is alike."

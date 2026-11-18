@@ -2,7 +2,7 @@
 
 use crate::semantic_shapes::main::declared_types::declared_types;
 use crate::semantic_shapes::main::function_names::function_names;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -19,6 +19,8 @@ use crate::semantic_shapes::_helpers::shapes::model_inputs;
 use crate::semantic_shapes::_helpers::shapes::project_shapes;
 use crate::semantic_shapes::_helpers::shapes::published_shape;
 use crate::semantic_shapes::constants::SOURCE_REBINDING_ANALYSES;
+use sqlbuild_analysis::analysis_route::main::same_column_type::same_column_type;
+use sqlbuild_analysis::source_drift::main::reads_added_columns::reads_added_columns;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
@@ -91,7 +93,12 @@ pub(crate) fn source_binding_diagnostics<'py>(
         && EXACT_UNQUOTED_DIALECTS.contains(&dialect.extract::<String>()?.as_str());
     let folds_upper: bool =
         !dialect.is_none() && dialect.extract::<String>()?.as_str() == UPPERCASE_FOLDING_DIALECT;
-    let mut changed: HashSet<String> = HashSet::new();
+    let comparison: Comparison = Comparison {
+        dialect: dialect.extract()?,
+        sensitive,
+        folds_upper,
+    };
+    let mut changed: HashMap<String, Drift> = HashMap::new();
     for item in mapping_items(&columns)?.try_iter()? {
         let (name, value): (String, Object<'py>) = item?.extract()?;
         if !value.is_truthy()? {
@@ -107,21 +114,29 @@ pub(crate) fn source_binding_diagnostics<'py>(
                 ))
             })
             .collect::<PyResult<_>>()?;
-        if sensitive || adds_physical_evidence(&physical, shapes.get_item(&name)?.as_ref())? {
-            changed.insert(name.clone());
+        let bound: Vec<(String, Option<String>)> = physical
+            .iter()
+            .map(|(column, column_type)| {
+                let listed_quoted: bool = folds_upper && unquoted_column_name(column) != column;
+                let name: String = if exact_unquoted
+                    || listed_quoted
+                    || (folds_upper && is_folded_identifier(column))
+                {
+                    column.clone()
+                } else {
+                    format!("\"{}\"", column.replace('"', "\"\""))
+                };
+                (name, column_type.clone())
+            })
+            .collect();
+        let known: Option<Object<'py>> = shapes.get_item(&name)?;
+        let listed: &[(String, Option<String>)] = if sensitive { &bound } else { &physical };
+        if let Some(drift) = comparison.drift(listed, known.as_ref())? {
+            changed.insert(name.clone(), drift);
         }
         let quoted: Bound<'py, PyDict> = PyDict::new(py);
-        for (column, column_type) in physical {
-            let listed_quoted: bool = folds_upper && unquoted_column_name(&column) != column;
-            let name: String = if exact_unquoted
-                || listed_quoted
-                || (folds_upper && is_folded_identifier(&column))
-            {
-                column
-            } else {
-                format!("\"{}\"", column.replace('"', "\"\""))
-            };
-            quoted.set_item(name, column_type)?;
+        for (column, column_type) in bound {
+            quoted.set_item(column, column_type)?;
         }
         shapes.set_item(name, quoted)?;
     }
@@ -137,7 +152,7 @@ pub(crate) fn source_binding_diagnostics<'py>(
         &project,
         &request.get("selected_keys")?,
         (&changed, &shapes),
-        &profile,
+        (&profile, &comparison),
     )?;
     if !physical_catalog.is_none() {
         physical_catalog = physical_catalog.call_method1("with_relations", (&shapes,))?;
@@ -145,40 +160,18 @@ pub(crate) fn source_binding_diagnostics<'py>(
     validated_diagnostics(&project, &models, (&shapes, &physical_catalog), &dialect)
 }
 
-/// Selected models reading changed sources, re-analysed in dependency order; shapes updated.
+/// Selected models whose result inspected columns could change, re-analysed in dependency order.
 fn rebound_models<'py>(
     project: &Object<'py>,
     selected_keys: &Object<'py>,
-    (changed, shapes): (&HashSet<String>, &Bound<'py, PyDict>),
-    profile: &Object<'py>,
+    (changed, shapes): (&HashMap<String, Drift>, &Bound<'py, PyDict>),
+    (profile, comparison): (&Object<'py>, &Comparison),
 ) -> PyResult<Vec<Object<'py>>> {
     let py: Python<'py> = project.py();
-    let by_name: Bound<'py, PyDict> = PyDict::new(py);
-    for model in native_field(project, "models")?.try_iter()? {
-        let model: Object<'py> = model?;
-        by_name.set_item(native_field(&model, "name")?, &model)?;
-    }
-    let graph: Bound<'py, PyDict> = PyDict::new(py);
-    for model in native_field(project, "models")?.try_iter()? {
-        let model: Object<'py> = model?;
-        let mut upstream: Vec<Object<'py>> = Vec::new();
-        for reference in native_field(&model, "references")?.try_iter()? {
-            let reference: Object<'py> = reference?;
-            let name: Object<'py> = native_field(&reference, "ref_name")?;
-            if native_field(&reference, "ref_kind")?.eq(REF_KIND)? && by_name.contains(&name)? {
-                upstream.push(name);
-            }
-        }
-        graph.set_item(native_field(&model, "name")?, PyTuple::new(py, upstream)?)?;
-    }
-    let order: Object<'py> = py
-        .import(GRAPHLIB_MODULE)?
-        .getattr("TopologicalSorter")?
-        .call1((graph,))?
-        .call_method0("static_order")?;
+    let (by_name, order) = dependency_order(project)?;
     let query_class: Object<'py> = record_class(py, RecordId::NativeColumnQuery)?;
     let unknown: Object<'py> = enum_member(py, RecordId::InferredNullability, "UNKNOWN")?;
-    let mut affected: HashSet<String> = HashSet::new();
+    let mut affected: HashMap<String, Drift> = HashMap::new();
     let mut models: Vec<Object<'py>> = Vec::new();
     for name in order.try_iter()? {
         let model: Object<'py> = by_name.as_any().get_item(name?)?;
@@ -189,23 +182,11 @@ fn rebound_models<'py>(
         {
             continue;
         }
-        let mut reads_changed: bool = false;
-        for reference in native_field(&model, "references")?.try_iter()? {
-            let reference: Object<'py> = reference?;
-            let kind: String = native_field(&reference, "ref_kind")?.str()?.extract()?;
-            let upstream: String = native_field(&reference, "ref_name")?.extract()?;
-            if (kind == SOURCE_KIND && changed.contains(&upstream))
-                || (kind == REF_KIND && affected.contains(&upstream))
-            {
-                reads_changed = true;
-                break;
-            }
-        }
-        if !reads_changed {
+        if !needs_reanalysis(&model, (changed, &affected), comparison)? {
             continue;
         }
         let model_name: String = native_field(&model, "name")?.extract()?;
-        affected.insert(model_name.clone());
+        let known: Option<Object<'py>> = shapes.get_item(&model_name)?;
         models.push(model.clone());
         let inputs: Bound<'py, PyDict> = model_inputs(&model, shapes)?;
         let nullability: Bound<'py, PyDict> = PyDict::new(py);
@@ -258,15 +239,84 @@ fn rebound_models<'py>(
                 };
                 columns.set_item(native_field(&column, "name")?, column_type)?;
             }
-            shapes.set_item(
-                &model_name,
-                published_shape(&model, &columns, &inputs, profile)?,
-            )?;
-        } else if shapes.contains(&model_name)? {
-            shapes.del_item(&model_name)?;
+            let shape: Bound<'py, PyDict> = published_shape(&model, &columns, &inputs, profile)?;
+            let listed: Vec<(String, Option<String>)> = mapping_items(&shape)?
+                .try_iter()?
+                .map(|item| item?.extract())
+                .collect::<PyResult<_>>()?;
+            if let Some(drift) = comparison.drift(&listed, known.as_ref())? {
+                affected.insert(model_name.clone(), drift);
+            }
+            shapes.set_item(&model_name, shape)?;
+        } else {
+            affected.insert(model_name.clone(), Drift::Changed);
+            if shapes.contains(&model_name)? {
+                shapes.del_item(&model_name)?;
+            }
         }
     }
     Ok(models)
+}
+
+/// The project's models by name, and their names in dependency order.
+fn dependency_order<'py>(project: &Object<'py>) -> PyResult<(Bound<'py, PyDict>, Object<'py>)> {
+    let py: Python<'py> = project.py();
+    let by_name: Bound<'py, PyDict> = PyDict::new(py);
+    for model in native_field(project, "models")?.try_iter()? {
+        let model: Object<'py> = model?;
+        by_name.set_item(native_field(&model, "name")?, &model)?;
+    }
+    let graph: Bound<'py, PyDict> = PyDict::new(py);
+    for model in native_field(project, "models")?.try_iter()? {
+        let model: Object<'py> = model?;
+        let mut upstream: Vec<Object<'py>> = Vec::new();
+        for reference in native_field(&model, "references")?.try_iter()? {
+            let reference: Object<'py> = reference?;
+            let name: Object<'py> = native_field(&reference, "ref_name")?;
+            if native_field(&reference, "ref_kind")?.eq(REF_KIND)? && by_name.contains(&name)? {
+                upstream.push(name);
+            }
+        }
+        graph.set_item(native_field(&model, "name")?, PyTuple::new(py, upstream)?)?;
+    }
+    let order: Object<'py> = py
+        .import(GRAPHLIB_MODULE)?
+        .getattr("TopologicalSorter")?
+        .call1((graph,))?
+        .call_method0("static_order")?;
+    Ok((by_name, order))
+}
+
+/// Whether `model` reads a changed input, or inputs whose added columns could change its result.
+fn needs_reanalysis(
+    model: &Object<'_>,
+    (changed, affected): (&HashMap<String, Drift>, &HashMap<String, Drift>),
+    comparison: &Comparison,
+) -> PyResult<bool> {
+    let mut drifted: Vec<String> = Vec::new();
+    let mut added: BTreeSet<String> = BTreeSet::new();
+    for reference in native_field(model, "references")?.try_iter()? {
+        let reference: Object<'_> = reference?;
+        let kind: String = native_field(&reference, "ref_kind")?.str()?.extract()?;
+        let upstream: String = native_field(&reference, "ref_name")?.extract()?;
+        let drift: Option<&Drift> = match kind.as_str() {
+            SOURCE_KIND => changed.get(&upstream),
+            REF_KIND => affected.get(&upstream),
+            _ => None,
+        };
+        match drift {
+            Some(Drift::Changed) => return Ok(true),
+            Some(Drift::Added(names)) => {
+                drifted.push(upstream);
+                added.extend(names.iter().cloned());
+            }
+            None => {}
+        }
+    }
+    if drifted.is_empty() {
+        return Ok(false);
+    }
+    comparison.reads_added(model, &drifted, &added.into_iter().collect::<Vec<_>>())
 }
 
 /// Each rebound model's binding diagnostics, located in its authored file.
@@ -410,40 +460,99 @@ fn positions<'py>(
     Ok(Bound::new(py, BindingPositions::new(request.extract()?)?)?.into_any())
 }
 
-/// Whether inspected columns differ from the known shape; untyped names match any type.
-fn adds_physical_evidence(
-    physical: &[(String, Option<String>)],
-    known: Option<&Object<'_>>,
-) -> PyResult<bool> {
-    let Some(known) = known else {
-        return Ok(true);
-    };
-    let known: Vec<(String, String)> = mapping_items(known)?
-        .try_iter()?
-        .map(|item| item?.extract())
-        .collect::<PyResult<_>>()?;
-    let physical_names: HashSet<&str> = physical.iter().map(|(name, _)| name.as_str()).collect();
-    let known_names: HashSet<&str> = known.iter().map(|(name, _)| name.as_str()).collect();
-    if physical_names != known_names {
-        return Ok(true);
+/// How a relation's columns differ from what compiling assumed of them.
+enum Drift {
+    /// Every known column is there as it was, and these columns are new.
+    Added(Vec<String>),
+    /// A known column is missing, retyped or listed twice, or nothing was known.
+    Changed,
+}
+
+/// How this dialect binds and stores columns, to compare listed columns with known ones.
+struct Comparison {
+    dialect: Option<String>,
+    /// Whether names bind case-sensitively, compared by `bound_identity`.
+    sensitive: bool,
+    folds_upper: bool,
+}
+
+impl Comparison {
+    fn identity(&self, name: &str) -> String {
+        if self.sensitive {
+            bound_identity(name, self.folds_upper)
+        } else {
+            name.to_owned()
+        }
     }
-    for (name, physical_type) in physical {
-        let Some(physical_type) = physical_type.as_deref() else {
-            continue;
+
+    /// How `listed` columns differ from the `known` shape; `None` when they bind and store alike.
+    fn drift(
+        &self,
+        listed: &[(String, Option<String>)],
+        known: Option<&Object<'_>>,
+    ) -> PyResult<Option<Drift>> {
+        let Some(known) = known else {
+            return Ok(Some(Drift::Changed));
         };
-        if physical_type.is_empty() {
-            continue;
+        let known: HashMap<String, String> = mapping_items(known)?
+            .try_iter()?
+            .map(|item| {
+                let (name, column_type): (String, String) = item?.extract()?;
+                Ok((self.identity(&name), column_type))
+            })
+            .collect::<PyResult<_>>()?;
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut added: Vec<String> = Vec::new();
+        for (name, listed_type) in listed {
+            let identity: String = self.identity(name);
+            if !seen.insert(identity.clone()) {
+                return Ok(Some(Drift::Changed));
+            }
+            match known.get(&identity) {
+                None => added.push(identity),
+                Some(known_type) => {
+                    let listed_type: &str = listed_type.as_deref().unwrap_or_default();
+                    if !listed_type.is_empty()
+                        && !same_column_type(self.dialect.as_deref(), known_type, listed_type)
+                    {
+                        return Ok(Some(Drift::Changed));
+                    }
+                }
+            }
         }
-        let known_type: Option<&String> = known
-            .iter()
-            .rev()
-            .find(|(known_name, _)| known_name == name)
-            .map(|(_, known_type)| known_type);
-        if known_type.is_some_and(|known_type| known_type != physical_type) {
-            return Ok(true);
+        if known.keys().any(|name| !seen.contains(name)) {
+            return Ok(Some(Drift::Changed));
         }
+        Ok((!added.is_empty()).then_some(Drift::Added(added)))
     }
-    Ok(false)
+
+    /// Whether `model`'s result could change once the `drifted` relations gain `added` columns.
+    fn reads_added(
+        &self,
+        model: &Object<'_>,
+        drifted: &[String],
+        added: &[String],
+    ) -> PyResult<bool> {
+        let Some(dialect) = self.dialect.as_deref() else {
+            return Ok(true);
+        };
+        let query_sql: String = native_field(model, "query_sql")?.extract()?;
+        let placeholders: Object<'_> = placeholders(model)?;
+        let placeholders: Vec<(String, String)> = if placeholders.is_none() {
+            Vec::new()
+        } else {
+            mapping_items(&placeholders)?
+                .try_iter()?
+                .map(|item| item?.extract())
+                .collect::<PyResult<_>>()?
+        };
+        Ok(reads_added_columns(
+            dialect,
+            (&query_sql, &placeholders),
+            drifted,
+            added,
+        ))
+    }
 }
 
 /// `{str(key): str(value)}` of a dict `placeholders` config, else None.
@@ -460,6 +569,19 @@ fn placeholders<'py>(model: &Object<'py>) -> PyResult<Object<'py>> {
         placeholders.set_item(key.str()?, value.str()?)?;
     }
     Ok(placeholders.into_any())
+}
+
+/// The column a name binds to on a case-sensitive dialect: quoted exactly, unquoted case-folded.
+fn bound_identity(name: &str, folds_upper: bool) -> String {
+    match name
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+        .filter(|inner| !inner.is_empty())
+    {
+        Some(inner) => inner.replace("\"\"", "\""),
+        None if folds_upper => name.to_uppercase(),
+        None => name.to_lowercase(),
+    }
 }
 
 /// Whether a listed column is a plain identifier in one case, so it binds as an unquoted name.

@@ -16,6 +16,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.lineage.helpers import (
 from tests.e2e.src.sqlbuild.cli.commands.main.plan._test_types import (
     DiamondPlanE2ETestCase,
     DiamondPlanJsonE2ETestCase,
+    PlanFromE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.plan.helpers import (
     prepare_changed_incremental_diamond_project,
@@ -91,3 +92,37 @@ def test_given_changed_diamond_root_when_planning_json_then_lists_each_model_onc
     reasons: dict[str, object] = {str(model["name"]): model["reason"] for model in models}
     assert len(models) == len(reasons)
     assert reasons == test_case.expected_reasons
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PlanFromE2ETestCase(
+            description="planning from synced state on DuckDB plans live and says why",
+            plan_args=("--plan-from", "synced_state"),
+            expected_stderr="Planning live: the duckdb adapter cannot check a synced copy\n",
+            unexpected_stderr="Planned from synced state",
+        ),
+        PlanFromE2ETestCase(
+            description="planning live says nothing about synced state",
+            plan_args=(),
+            expected_stderr="",
+            unexpected_stderr="Planning live",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_duckdb_target_when_planning_from_synced_state_then_plans_live_and_says_why(
+    test_case: PlanFromE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_changed_incremental_diamond_project(tmp_path=tmp_path)
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", *test_case.plan_args), project_dir=project_dir
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert test_case.expected_stderr in result.stderr, result.stderr
+    assert test_case.unexpected_stderr not in result.stderr, result.stderr
+    assert "Query changed (1)" in result.stdout, result.stdout

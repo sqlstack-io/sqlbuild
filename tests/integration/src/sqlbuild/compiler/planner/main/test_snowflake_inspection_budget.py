@@ -34,10 +34,12 @@ from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import (
     OfflineSnowflakeAdapter,
     RecordedQuery,
     RecordingSnowflakeWarehouse,
+    SchemaListingSnowflakeAdapter,
     SyntheticSnowflakeProject,
     write_synthetic_snowflake_project,
 )
 
+_CURSOR_BATCH_SIZE: int = 50
 _ONE_READ_PER_SCHEMA: dict[str, int] = {"STAGING": 1, "INTERMEDIATE": 1, "MARTS": 1, "RAW": 1}
 _SOURCES: int = 260
 _SHOW_READS_PER_SCHEMA: int = 3
@@ -81,7 +83,7 @@ def test_given_large_multi_schema_project_when_planning_then_metadata_reads_stay
     )
 
     result: CompilePipelineResult = plan_offline_snowflake_project(
-        project=project, warehouse=warehouse
+        project=project, warehouse=warehouse, adapter_type=SchemaListingSnowflakeAdapter
     )
 
     metadata: tuple[RecordedQuery, ...] = offline_metadata_queries(warehouse)
@@ -112,14 +114,14 @@ def test_given_large_multi_schema_project_when_planning_then_metadata_reads_stay
     "test_case",
     [
         SnowflakeCursorBoundsBudgetTestCase(
-            description="one statement per relation with bounded parallelism",
+            description="batched statements read each relation once with bounded parallelism",
             statement_latency_seconds=0.002,
             expected_max_concurrency=OfflineSnowflakeAdapter.metadata_inspection_concurrency,
         )
     ],
     ids=lambda case: case.description,
 )
-def test_given_incremental_models_when_planning_then_cursor_bounds_run_one_per_relation_in_parallel(
+def test_given_incremental_models_when_planning_then_cursor_bounds_run_in_parallel_batches(
     test_case: SnowflakeCursorBoundsBudgetTestCase, tmp_path: Path
 ) -> None:
     project: SyntheticSnowflakeProject = write_synthetic_snowflake_project(
@@ -136,9 +138,9 @@ def test_given_incremental_models_when_planning_then_cursor_bounds_run_one_per_r
 
     bounds: tuple[RecordedQuery, ...] = warehouse.queries_of_kind("cursor_bounds")
     relations: tuple[str, ...] = offline_cursor_bound_relations(warehouse)
-    assert len(bounds) >= len(project.incremental_model_names)
-    assert all("UNION" not in query.sql.upper() for query in bounds)
-    assert len(relations) == len(bounds) == len(set(relations))
+    assert len(relations) >= len(project.incremental_model_names)
+    assert len(relations) == len(set(relations))
+    assert len(bounds) == -(-len(relations) // _CURSOR_BATCH_SIZE)
     assert 1 < warehouse.max_concurrent_cursor_bounds <= test_case.expected_max_concurrency
 
 
@@ -178,9 +180,18 @@ def test_given_planned_project_when_planning_again_then_cursor_bounds_are_read_a
             description="many small schemas read model columns once per schema",
             schema_count=24,
             models_per_schema=2,
+            schema_listing_beyond_32=True,
             expected_per_relation_column_reads=30,
             expected_schema_column_reads=24,
-        )
+        ),
+        SnowflakeManySchemasTestCase(
+            description="many small schemas read each relation's columns once in production",
+            schema_count=24,
+            models_per_schema=2,
+            schema_listing_beyond_32=False,
+            expected_per_relation_column_reads=78,
+            expected_schema_column_reads=0,
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -199,7 +210,11 @@ def test_given_many_small_schemas_when_planning_then_columns_are_read_per_schema
     )
 
     result: CompilePipelineResult = plan_offline_snowflake_project(
-        project=project, warehouse=warehouse
+        project=project,
+        warehouse=warehouse,
+        adapter_type=(OfflineSnowflakeAdapter, SchemaListingSnowflakeAdapter)[
+            test_case.schema_listing_beyond_32
+        ],
     )
 
     assert len(result.plan_output.model_entries) == len(project.model_schemas)

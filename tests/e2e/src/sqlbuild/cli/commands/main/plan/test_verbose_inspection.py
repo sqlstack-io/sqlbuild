@@ -19,7 +19,9 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
 
 _INSPECTION_LINE: re.Pattern[str] = re.compile(r"^  inspect +\d+\.\d{2}s  \d+ rows?  \S", re.M)
 _METADATA_LINE: re.Pattern[str] = re.compile(r"^  inspect .*list_relations\(", re.M)
-_CURSOR_LINE: re.Pattern[str] = re.compile(r"^  inspect .*SELECT CAST\(MAX\(", re.M)
+_CURSOR_LINE: re.Pattern[str] = re.compile(
+    r"^  inspect .*SELECT (?:\d+ AS _read, )?CAST\((?:MIN|MAX)\(", re.M
+)
 _TOTAL_LINE: re.Pattern[str] = re.compile(r"^Inspection queries: (\d+) \(", re.M)
 
 

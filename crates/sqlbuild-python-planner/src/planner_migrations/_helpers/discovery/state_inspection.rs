@@ -6,7 +6,6 @@ use std::collections::HashSet;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyString, PyTuple};
-use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
 use sqlbuild_state::events::models::{EventRelation, FingerprintKey, FingerprintOrder};
 
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -58,7 +57,7 @@ pub(crate) fn tuple_of<'py>(py: Python<'py>, items: &[Py<PyAny>]) -> PyResult<Bo
     PyTuple::new(py, items.iter().map(|item| item.bind(py)))
 }
 
-fn fingerprint_key(fingerprint: &Bound<'_, PyAny>) -> PyResult<FingerprintKey> {
+pub(crate) fn fingerprint_key(fingerprint: &Bound<'_, PyAny>) -> PyResult<FingerprintKey> {
     let target_name: Bound<'_, PyAny> = native_field(fingerprint, "target_name")?;
     let target: Option<EventRelation> = if target_name.is_none() {
         None
@@ -79,19 +78,6 @@ fn fingerprint_key(fingerprint: &Bound<'_, PyAny>) -> PyResult<FingerprintKey> {
         node_name: native_field(fingerprint, "node_name")?.extract()?,
         target,
     })
-}
-
-pub(crate) fn newest<'py>(
-    py: Python<'py>,
-    candidates: &[Py<PyAny>],
-    (target, model_name): (Option<&EventRelation>, Option<&str>),
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let keys: Vec<FingerprintKey> = candidates
-        .iter()
-        .map(|candidate| fingerprint_key(candidate.bind(py)))
-        .collect::<PyResult<_>>()?;
-    Ok(newest_fingerprint(&keys, target, model_name)
-        .map(|index| candidates[index].bind(py).clone()))
 }
 
 /// A fresh live-state inspection over the runtime's connection and planning database.

@@ -5,7 +5,7 @@ use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_planner::live_reads::models::LiveReads;
-use sqlbuild_python_planner::planner_phases::constants::COMPILING;
+use sqlbuild_python_planner::planner_phases::constants::{COMPILING, CONNECTING, EVALUATING_RULES};
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_warehouse::models::PlannerReads;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
@@ -43,6 +43,8 @@ use sqlbuild_python_compile::rules::main::checking::rules_progress::rules_progre
 use sqlbuild_python_compile::rules::main::configuration::load_rules_config_with_cache::load_rules_config_with_cache;
 use sqlbuild_python_compile::rules::main::rule::evaluate_rules::evaluate_rules;
 use sqlbuild_python_compile::rules::models::EarlySqlLint;
+use sqlbuild_python_project::native_host::main::attach_synced_catalog::attach_synced_catalog;
+use sqlbuild_python_project::native_host::main::report_synced_catalog::report_synced_catalog;
 
 const GENERIC_DIALECT: &str = "generic";
 
@@ -113,12 +115,14 @@ pub(crate) fn planned_project<'py>(
     };
     if !rules_ran_at_load() {
         let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
-        let graph: Bound<'py, PyAny> = project_graph(&project)?;
-        run_rules_gate(
-            (discovered, adapter, expansion_reuse.as_any()),
-            (&options, &on_progress),
-            (&project, &graph),
-        )?;
+        timed(EVALUATING_RULES, || {
+            let graph: Bound<'py, PyAny> = project_graph(&project)?;
+            run_rules_gate(
+                (discovered, adapter, expansion_reuse.as_any()),
+                (&options, &on_progress),
+                (&project, &graph),
+            )
+        })?;
     }
     planned(
         (discovered, adapter),
@@ -297,10 +301,12 @@ fn planned<'py>(
                 )
             }
             None => {
-                let opened: Bound<'py, PyAny> =
-                    connection_with_hooks(adapter, &connection_config, hooks)?;
+                let opened: Bound<'py, PyAny> = timed(CONNECTING, || {
+                    connection_with_hooks(adapter, &connection_config, hooks)
+                })?;
                 connection = Some(opened.clone());
                 let reads = LiveReads::new(adapter, &opened, None).handle(adapter.py())?;
+                attach_synced_catalog(adapter, (discovered, compiled, options))?;
                 (opened, reads)
             }
         };
@@ -325,6 +331,7 @@ fn planned<'py>(
         tracker.setattr("planning_seconds", planning_seconds)?;
     }
     let result: Bound<'py, PyAny> = result?;
+    report_synced_catalog(adapter)?;
     write_plan_capture(&native_field(&result, "plan_output")?)?;
     replaced(
         &result,

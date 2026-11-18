@@ -37,6 +37,9 @@ use sqlbuild_analysis::graph::models::BuildResources;
 use sqlbuild_analysis::graph::models::EdgeDirection;
 use sqlbuild_analysis::graph::models::GraphIndexes;
 use sqlbuild_analysis::graph::models::ProjectGraph;
+use sqlbuild_analysis::node_set_dependencies::models::GraphNode;
+use sqlbuild_analysis::node_set_dependencies::models::ResolvedNode;
+use sqlbuild_analysis::node_set_dependencies::models::ResolvedSet;
 use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_nodes::resolve_python_sql_nodes;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection as run_selection;
@@ -48,6 +51,7 @@ use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::discovery::main::records::stored_node_sets::stored_node_sets;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -398,6 +402,8 @@ pub struct ProjectSelection {
     pub(crate) sources: Vec<(String, Option<String>)>,
     allow_warehouse_round_trips: bool,
     pub nodes: PythonSelectionGraph,
+    /// Each Python node's resolved `job(...)` and `tag(...)` dependencies.
+    pub sets: Vec<ResolvedNode>,
 }
 
 impl ProjectSelection {
@@ -406,6 +412,10 @@ impl ProjectSelection {
             sources: project_sources(project)?,
             allow_warehouse_round_trips: allows_round_trips(project)?,
             nodes: selection_graph(&python_node_graph(discovered_inputs)?)?,
+            sets: match stored_node_sets(discovered_inputs)? {
+                Some(Ok(sets)) => sets,
+                _ => Vec::new(),
+            },
         })
     }
 
@@ -442,6 +452,31 @@ impl ProjectSelection {
             .rev()
             .find(|node| node.name == name)
             .map(|node| format!("{}:{name}", node.kind))
+    }
+
+    /// A Python node's published `set_dependencies`: each job or tag it depends on and its end node keys.
+    pub fn set_dependencies(&self, name: &str) -> Option<serde_json::Value> {
+        let resolved = self.sets.iter().find(|resolved| resolved.name == name)?;
+        let sets: Vec<serde_json::Value> =
+            resolved.sets.iter().map(|set| self.set_json(set)).collect();
+        Some(serde_json::Value::Array(sets))
+    }
+
+    /// One published job or tag dependency with the keys of its end nodes.
+    fn set_json(&self, set: &ResolvedSet) -> serde_json::Value {
+        let mut ends: Vec<String> = Vec::new();
+        for end in &set.ends {
+            match end {
+                GraphNode::Sql((kind, name)) => ends.push(format!("{kind}:{name}")),
+                GraphNode::Python(name) => ends.extend(self.node_key(name)),
+            }
+        }
+        serde_json::json!({
+            "kind": set.dependency.kind,
+            "name": set.dependency.name,
+            "exclude": set.dependency.exclude,
+            "ends": ends,
+        })
     }
 
     /// Each Python node's published key and the keys it reads: its upstream Python nodes and its SQL deps.

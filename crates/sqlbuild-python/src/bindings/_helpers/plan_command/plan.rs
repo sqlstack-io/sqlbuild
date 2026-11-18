@@ -1,8 +1,7 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
-use sqlbuild_python_planner::planner_phases::constants::BUILD_HISTORY;
-use sqlbuild_python_planner::planner_phases::constants::WRITING;
+use sqlbuild_python_planner::planner_phases::constants::{BUILD_HISTORY, DISCOVERING, WRITING};
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
 use sqlbuild_python_planner::planner_phases::models::PlanTimings;
@@ -66,7 +65,7 @@ const DEFAULT_SECTION_ENTRIES: i64 = 50;
 const ERROR_SEVERITY: &str = "error";
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 /// Request fields passed to the compile pipeline under the same name.
-const PIPELINE_FIELDS: [&str; 12] = [
+const PIPELINE_FIELDS: [&str; 13] = [
     "no_sql_validation",
     "no_cache",
     "verbose",
@@ -79,6 +78,7 @@ const PIPELINE_FIELDS: [&str; 12] = [
     "cli_vars",
     "max_microbatches",
     "selection_diagnostics",
+    "plan_from",
 ];
 
 fn flag(py: Python<'_>, value: bool) -> Bound<'_, PyAny> {
@@ -164,16 +164,18 @@ fn resolve_invocation<'py>(
     };
     let discovered: Bound<'py, PyAny> = match project {
         PlanProject::Held { discovered, .. } => discovered.clone(),
-        PlanProject::Compiled => discover_project_inputs(
-            py,
-            Some(keywords(
+        PlanProject::Compiled => timed(DISCOVERING, || {
+            discover_project_inputs(
                 py,
-                &[
-                    ("project_dir", project_dir.clone()),
-                    ("extract_output_column_locations", flag(py, false)),
-                ],
-            )?),
-        )?,
+                Some(keywords(
+                    py,
+                    &[
+                        ("project_dir", project_dir.clone()),
+                        ("extract_output_column_locations", flag(py, false)),
+                    ],
+                )?),
+            )
+        })?,
     };
     validate_preview_target(
         py,

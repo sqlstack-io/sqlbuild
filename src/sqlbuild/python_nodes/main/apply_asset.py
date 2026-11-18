@@ -16,6 +16,7 @@ from sqlbuild.python_nodes._helpers.lineage_normalization import normalize_colum
 from sqlbuild.python_nodes.models import (
     AssetDefinition,
     ColumnLineageRef,
+    NodeSetRef,
     RetryPolicy,
     SqlResourceRef,
 )
@@ -28,8 +29,9 @@ def apply_asset(
     name: str | None = None,
     depends_on: Callable[..., object]
     | SqlResourceRef
-    | tuple[Callable[..., object] | SqlResourceRef, ...]
-    | list[Callable[..., object] | SqlResourceRef] = (),
+    | NodeSetRef
+    | tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...]
+    | list[Callable[..., object] | SqlResourceRef | NodeSetRef] = (),
     tags: Sequence[str] = (),
     group: str | None = None,
     description: str | None = None,
@@ -40,7 +42,7 @@ def apply_asset(
 ) -> Callable[..., object] | Callable[[Callable[..., object]], Callable[..., object]]:
     """Apply SQLBuild asset metadata to a Python function."""
 
-    normalized_deps: tuple[Callable[..., object] | SqlResourceRef, ...] = (
+    normalized_deps: tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...] = (
         normalize_python_node_dependencies(depends_on)
     )
 

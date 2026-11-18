@@ -224,6 +224,30 @@ _REVENUE_KEY: CompiledObjectKey = CompiledObjectKey(
             expected_column_table_names=frozenset(f"model_{index}" for index in range(251)),
             expected_fingerprint_names=frozenset(),
         ),
+        GatherWarehouseSnapshotTestCase(
+            description=(
+                "lists the whole schema beyond the name threshold but reads columns only for "
+                "the selection and what it reads"
+            ),
+            setup_sql=(
+                *(f"CREATE TABLE staging.model_{index} (id INTEGER)" for index in range(251)),
+                "CREATE TABLE staging.unselected (value VARCHAR)",
+            ),
+            model_locations={
+                **{f"model_{index}": "staging" for index in range(METADATA_NAME_FILTER_LIMIT + 1)},
+                "unselected": "staging",
+            },
+            seed_locations={},
+            selected_keys=frozenset(
+                CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=f"model_{index}")
+                for index in range(METADATA_NAME_FILTER_LIMIT + 1)
+            ),
+            expected_relation_names=frozenset(
+                {*(f"model_{index}" for index in range(251)), "unselected"}
+            ),
+            expected_column_table_names=frozenset(f"model_{index}" for index in range(251)),
+            expected_fingerprint_names=frozenset(),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -361,7 +385,7 @@ def test_given_sources_when_gathering_source_columns_then_filters_metadata_names
                     upstream_maxes=("2024-02-01 00:00:00",),
                 ),
             },
-            expected_progress_calls=5,
+            expected_progress_calls=3,
         ),
         GatherCursorSnapshotTestCase(
             description="derives highest eligible target max without removing future rows",
@@ -393,7 +417,7 @@ def test_given_sources_when_gathering_source_columns_then_filters_metadata_names
                     upstream_maxes=("2024-02-01 00:00:00",),
                 ),
             },
-            expected_progress_calls=5,
+            expected_progress_calls=3,
         ),
         GatherCursorSnapshotTestCase(
             description="gathers cursor bounds for first run with no target table",
@@ -710,7 +734,7 @@ def test_given_timezone_cursor_text_when_gathering_snapshot_then_normalizes_ware
             description="explicit timestamp start skips eligible target query",
             expected_target_max=TimestampValue(value=datetime(2026, 9, 3)),
             expected_eligible_max=None,
-            expected_statement_count=2,
+            expected_statement_count=1,
         )
     ],
     ids=lambda case: case.description,
@@ -845,7 +869,7 @@ def test_given_mixed_model_grains_when_gathering_eligibility_then_warehouse_flow
     cursor_snapshot: ModelCursorSnapshot = snapshot.cursor_snapshots["hourly_events"]
     assert cursor_snapshot.target_eligible_max == test_case.expected_eligible_max
     assert test_case.expected_eligible_sql in statements
-    assert "UNION ALL" not in statements[0]
+    assert statements[0].count("\nUNION ALL\n") == 1
 
 
 @pytest.mark.parametrize(

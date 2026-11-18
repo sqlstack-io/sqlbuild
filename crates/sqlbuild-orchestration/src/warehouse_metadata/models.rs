@@ -738,6 +738,13 @@ pub struct WarehouseCatalogColumn {
     pub data_type: String,
 }
 
+/// One mirrored relation and the time the catalog scan that recorded it observed it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SyncedCatalogRelation {
+    pub record: WarehouseCatalogRecord,
+    pub observed_at: DateTime<Utc>,
+}
+
 /// Physical identity and ordered columns come from the adapter catalog, not fingerprints.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

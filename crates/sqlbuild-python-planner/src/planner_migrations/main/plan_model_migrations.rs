@@ -2,6 +2,7 @@
 
 use crate::planner_migrations::_helpers::model::model_planning::discover;
 use crate::planner_migrations::_helpers::model::model_planning::finish;
+use crate::planner_migrations::_helpers::planning::planning_origin::models_by_name;
 use crate::planner_migrations::models::{MigrationPhase, ModelMigrationPlanning};
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -19,6 +20,7 @@ pub fn plan_model_migrations<'py>(
         &runtime,
         Some(&native_field(&snapshot, "fingerprints")?),
     )?;
-    let discovery = discover((phase, fingerprints), &state, &schemas)?;
-    finish(phase, &state, &schemas, &discovery)
+    let models = models_by_name(&runtime)?;
+    let discovery = discover((phase, fingerprints), (&state, &models), &schemas)?;
+    finish(phase, (&state, &models), &schemas, &discovery)
 }

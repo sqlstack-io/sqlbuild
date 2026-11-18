@@ -1,6 +1,7 @@
 //! The warehouse reads planning consults, as traits.
 
 use crate::planner_warehouse::models::AdapterRead;
+use crate::planner_warehouse::models::CursorStatements;
 use crate::planner_warehouse::models::EligibleCursorQuery;
 use crate::planner_warehouse::models::FingerprintRead;
 use crate::planner_warehouse::models::Read;
@@ -15,10 +16,18 @@ pub trait CursorProgress<'py> {
     fn starting(&self, index: usize) -> PyResult<()>;
     /// Before statements run `concurrency` at a time.
     fn concurrent(&self, concurrency: usize) -> PyResult<()>;
+    /// Before `batches` statements answering every read run `concurrency` at a time.
+    fn batched(&self, batches: usize, concurrency: usize) -> PyResult<()>;
     /// After statement `index` ran, with its `(row, seconds, error)` outcome.
     fn finished(&self, index: usize, outcome: &Bound<'py, PyAny>) -> PyResult<()>;
-    /// The `on_complete(index=, result=)` callback concurrent statements report through.
-    fn completion_callback(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>>;
+    /// The `on_complete(index=, result=)` callback of statements where task `i` reads `reads[i]`.
+    fn completion_callback(
+        &self,
+        py: Python<'py>,
+        reads: Vec<usize>,
+    ) -> PyResult<Bound<'py, PyAny>>;
+    /// The `on_complete(index=, result=)` callback of batches answering `sizes[i]` reads each.
+    fn batch_callback(&self, py: Python<'py>, sizes: Vec<usize>) -> PyResult<Bound<'py, PyAny>>;
 }
 
 /// Everything a plan reads from the warehouse, live or from a synced state that may answer unknown.
@@ -65,11 +74,11 @@ pub trait WarehouseReads: Send + Sync + std::fmt::Debug {
     /// Whether listing by schema and name finds relations a name-only listing would.
     fn lists_by_schema(&self, py: Python<'_>) -> PyResult<bool>;
 
-    /// Each statement's `(row, seconds, error)`; `statements` renders SQL only for reads that run it.
+    /// Each read's `(row, seconds, error)`; a failed batch's reads then run their own statements.
     fn cursor_bounds<'py>(
         &self,
         py: Python<'py>,
-        statements: &dyn Fn() -> PyResult<Vec<String>>,
+        statements: &dyn Fn() -> PyResult<CursorStatements>,
         progress: &dyn CursorProgress<'py>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>>;
 

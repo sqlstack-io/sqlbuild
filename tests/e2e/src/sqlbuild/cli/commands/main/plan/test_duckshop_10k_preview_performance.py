@@ -6,6 +6,12 @@ relations, a fingerprint and `--changed` history per built model, written by
 only the edited models and what reads them run. A quadratic lookup over those 10K models or 13K
 relations, in planning or in the copy it plans from, shows here first.
 
+Each case also plans the project live, as `sqb plan` does, against an offline Snowflake warehouse
+holding the same synced catalog, a few sources carrying an undeclared column. It bounds the models
+analysed again against inspected source columns, the warehouse statements sent, cursor batching
+and the live plan's time as a multiple of the location's publish, which compiles the same
+project on the same machine.
+
 It runs in the 10,000-model cell of the dense compile job, after the compile guards.
 """
 
@@ -24,6 +30,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.plan.helpers import (
     DUCKSHOP_10K_SETUP_SECONDS,
     DUCKSHOP_10K_TARGET,
     PREVIEW_DONE,
+    LivePlan,
+    live_plan,
     mirror_synced_state,
     published_keys,
     served_duckshop_location,
@@ -36,6 +44,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
     provision_person,
 )
 
+#: Cursor reads one batched statement answers.
+_CURSOR_BATCH_SIZE: int = 50
+
 
 @pytest.mark.performance
 @pytest.mark.preview_performance
@@ -47,18 +58,24 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
             built_share=1.0,
             expected_unbuilt=(0, 0),
             expected_definition_changes=(40, 200),
-            expected_max_warm_seconds=30.0,
+            expected_max_warm_seconds=10.0,
             expected_max_warm_to_publish=0.45,
             expected_max_check_seconds=0.5,
+            expected_max_live_to_publish=1.8,
+            expected_source_rebinding=(25, 150),
+            expected_max_warehouse_statements=1_150,
         ),
         PreviewPerformanceTestCase(
             description="one model in twenty never built",
             built_share=0.95,
             expected_unbuilt=(300, 700),
             expected_definition_changes=(40, 200),
-            expected_max_warm_seconds=30.0,
+            expected_max_warm_seconds=10.0,
             expected_max_warm_to_publish=0.45,
             expected_max_check_seconds=0.5,
+            expected_max_live_to_publish=1.8,
+            expected_source_rebinding=(25, 150),
+            expected_max_warehouse_statements=1_150,
         ),
     ),
     ids=lambda case: case.description,
@@ -111,6 +128,7 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
                 session=session,
             )
             checks.append(time.monotonic() - started)
+    live: LivePlan = live_plan(project, batches["catalog"])
     reasons: list[str] = [run["reason"] for run in document["changed"]["runs"]]
     unbuilt: int = reasons.count("relation missing")
     definition_changes: int = sum(
@@ -122,7 +140,12 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
         f"duckshop 10k preview ({test_case.description}): cold={cold:.2f}s warm={warm:.2f}s "
         f"publish={served.published_seconds:.2f}s warm_to_publish={warm_to_publish:.2f} "
         f"check_median={check_seconds * 1000:.0f}ms runs={len(reasons)} unbuilt={unbuilt} "
-        f"definition_changes={definition_changes} models={len(document['models'])}",
+        f"definition_changes={definition_changes} models={len(document['models'])} "
+        f"live={live.seconds:.2f}s live_to_publish={live.seconds / served.published_seconds:.2f} "
+        f"live_entries={live.model_entries} rebinding={live.source_rebinding_analyses} "
+        f"cursor_relations={live.cursor_relations} cursor_statements={live.cursor_statements} "
+        f"warehouse_statements={live.warehouse_statements} "
+        f"warm_steps={json.dumps(document.get('timings', {}).get('steps'))}",
         flush=True,
     )
     assert document.get("error") is None and len(document["models"]) >= 10_000
@@ -135,8 +158,23 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
         <= definition_changes
         <= test_case.expected_definition_changes[1]
     ), "only the edited models changed definition: the synced hashes match the planner's"
-    assert warm < test_case.expected_max_warm_seconds
+    assert warm < test_case.expected_max_warm_seconds, (
+        "a warm preview of 10K models must stay under ten seconds"
+    )
     assert warm_to_publish < test_case.expected_max_warm_to_publish, (
         "planning grew faster than compiling: look for a lookup over every model or relation"
     )
     assert check_seconds < test_case.expected_max_check_seconds
+    assert live.model_entries >= 10_000
+    assert (
+        test_case.expected_source_rebinding[0]
+        <= live.source_rebinding_analyses
+        <= test_case.expected_source_rebinding[1]
+    ), "only models whose result a source's new or changed columns can change are analysed again"
+    assert live.cursor_statements == -(-live.cursor_relations // _CURSOR_BATCH_SIZE), (
+        "cursor bounds are read in full batches"
+    )
+    assert live.warehouse_statements <= test_case.expected_max_warehouse_statements
+    assert live.seconds / served.published_seconds < test_case.expected_max_live_to_publish, (
+        "a live plan grew faster than compiling and publishing the same project"
+    )

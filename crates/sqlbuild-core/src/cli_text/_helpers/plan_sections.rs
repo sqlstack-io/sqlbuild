@@ -252,6 +252,12 @@ pub(crate) fn python_entry_lines(
             width,
             true,
         )];
+        lines.extend(
+            entry
+                .wait_changes
+                .iter()
+                .map(|change| STYLE.muted(&format!("    {change}"))),
+        );
         lines.extend(identity_diff_lines(entry));
         lines
     })

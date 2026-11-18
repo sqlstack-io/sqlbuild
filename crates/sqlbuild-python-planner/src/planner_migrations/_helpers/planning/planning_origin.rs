@@ -6,7 +6,7 @@ use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::PyErr;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PySet, PySetMethods};
+use pyo3::types::{PyDict, PyDictMethods, PySet, PySetMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -30,17 +30,27 @@ pub(crate) fn location<'py>(
     new_record_with(runtime.py(), RecordId::CompiledRelationLocation, &fields)
 }
 
+/// The project's models by name, the first model of a name winning, to resolve origins by name.
+pub(crate) fn models_by_name<'py>(runtime: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+    let models: Bound<'py, PyDict> = PyDict::new(runtime.py());
+    for item in compiled_models(&runtime_field(runtime, |runtime| &runtime.project)?)?.try_iter()? {
+        let item = item?;
+        let name = name_object(&item)?;
+        if !models.contains(&name)? {
+            models.set_item(name, item)?;
+        }
+    }
+    Ok(models)
+}
+
 fn named<'py>(
     name: &Bound<'py, PyAny>,
     destination: &Bound<'py, PyAny>,
-    runtime: &Bound<'py, PyAny>,
+    (runtime, models): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
     state: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-    for item in compiled_models(&runtime_field(runtime, |runtime| &runtime.project)?)?.try_iter()? {
-        let item = item?;
-        if name_object(&item)?.eq(name)? {
-            return Ok((native_field(&item, "destination")?, name.clone()));
-        }
+    if let Some(item) = models.get_item(name)? {
+        return Ok((native_field(&item, "destination")?, name.clone()));
     }
     let fingerprint = call_with(
         &native_field(state, "named_fingerprint")?,
@@ -128,7 +138,7 @@ pub(crate) fn require_same_database(
 /// The origin location and origin model name of one migration request.
 pub(crate) fn resolve_origin<'py>(
     request: &ModelMigrationRequest<'py>,
-    runtime: &Bound<'py, PyAny>,
+    (runtime, models): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
     state: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let py = runtime.py();
@@ -167,7 +177,7 @@ pub(crate) fn resolve_origin<'py>(
         )?);
     }
     if parts.len() == 1 {
-        return named(&parts[0], &destination, runtime, state);
+        return named(&parts[0], &destination, (runtime, models), state);
     }
     let database = if parts.len() == maximum {
         parts[0].clone()

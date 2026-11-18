@@ -6,5 +6,6 @@ pub mod python_node_names;
 pub mod register_python_lifecycle;
 pub mod register_python_node_graph;
 pub mod register_python_selection;
+pub mod resolve_node_sets;
 pub mod resolve_python_check_excludes;
 pub mod run_selection_from_inputs;

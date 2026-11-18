@@ -5,13 +5,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
-    from sqlbuild.adapter.relations.models import SchemaColumnListing, SchemaRelationListing
+    from sqlbuild.adapter.relations.models import (
+        RelationChange,
+        SchemaColumnListing,
+        SchemaRelationListing,
+    )
 
 
 type RelationCacheKey = tuple[str, str | None, str | None, str]
 type RelationCacheVersion = tuple[int, int]
 type SchemaListingScope = tuple[str | None, str]
+type SyncedRow = tuple[str | None, str, str, list[tuple[str, str]], str]
 
 
 class RelationLocation(Protocol):
@@ -66,6 +73,34 @@ class SchemaScopedMetadataReader(Protocol):
 
     def metadata_name_key(self, name: str) -> str:
         """Return the stored metadata name a logical identifier filter matches."""
+        ...
+
+
+@runtime_checkable
+class PartedRelationListingReader(Protocol):
+    """Schema-scoped reader whose relation listing is independent reads that may run together."""
+
+    def relation_listing_reads(
+        self, *, connection: Any, database: str | None, schema: str
+    ) -> tuple[Callable[[], object], ...]:
+        """The reads ``read_schema_relation_listing`` runs one after another for one schema."""
+        ...
+
+    def relation_listing_from_reads(
+        self, *, database: str | None, schema: str, results: tuple[object, ...]
+    ) -> SchemaRelationListing:
+        """The schema's listing from its reads' results, in ``relation_listing_reads`` order."""
+        ...
+
+
+@runtime_checkable
+class RelationChangeReader(Protocol):
+    """Adapter that lists schemas with when each relation's data and definition last changed."""
+
+    def read_relation_changes(
+        self, *, connection: Any, database: str | None, schemas: tuple[str, ...]
+    ) -> dict[str, tuple[RelationChange, ...]]:
+        """Each schema's relations, by the schema's metadata name key, in one read."""
         ...
 
 
