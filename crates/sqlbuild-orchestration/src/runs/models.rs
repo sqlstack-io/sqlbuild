@@ -650,6 +650,17 @@ impl RunChange {
         }
     }
 
+    /// The node or check the change is about, keyed `<kind>:<name>`.
+    pub(crate) fn node_key(&self) -> Option<&str> {
+        match self {
+            Self::NodeStarted { node_key }
+            | Self::NodeFinished { node_key, .. }
+            | Self::CheckStarted { node_key }
+            | Self::CheckFinished { node_key, .. } => Some(node_key),
+            _ => None,
+        }
+    }
+
     pub(crate) fn finished_node(&self) -> Option<(&str, NodeOutcome)> {
         match self {
             Self::NodeFinished {

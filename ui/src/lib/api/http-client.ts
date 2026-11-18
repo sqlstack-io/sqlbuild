@@ -1256,7 +1256,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return data;
 	}
 
-	implemented.changes.subscribe(() => kept.clear());
+	// A change makes every listing read since then out of date: a reload it asks for reads afresh rather
+	// than sharing a request that started before it, which could leave a run's last state unshown.
+	implemented.changes.subscribe(() => {
+		kept.clear();
+		inFlight.clear();
+	});
 	return new Proxy(implemented, {
 		get(target, property, receiver) {
 			if (property in target) return Reflect.get(target, property, receiver);

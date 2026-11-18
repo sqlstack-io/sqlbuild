@@ -38,6 +38,8 @@ mod test_lifecycle;
 mod test_monitor;
 #[path = "test_node_errors.rs"]
 mod test_node_errors;
+#[path = "test_node_event_resources.rs"]
+mod test_node_event_resources;
 #[path = "test_permissions.rs"]
 mod test_permissions;
 #[path = "test_project_limits.rs"]

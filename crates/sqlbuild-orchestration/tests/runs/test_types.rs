@@ -517,3 +517,17 @@ pub(crate) struct GroupMemberSettingsTestCase {
     pub(crate) expected_group_status: RunStatus,
     pub(crate) expected_group_ignored: u32,
 }
+
+pub(crate) struct NodeEventResourcesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each node and check event's type, resource kind and resource name, in the order they happened.
+    pub(crate) expected_named: [(&'static str, &'static str, &'static str); 4],
+}
+
+pub(crate) struct NodeOfTestCase {
+    pub(crate) description: &'static str,
+    /// The node identity columns a run's events read selects from an event's payload.
+    pub(crate) fields: &'static [(&'static str, &'static str)],
+    pub(crate) expected_node: Option<(&'static str, &'static str)>,
+}

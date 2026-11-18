@@ -22,6 +22,18 @@ use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::store::types::Row;
 
+/// Events whose node may be named only in their payload: older node and check events, and audit results.
+const NODE_EVENTS: &str = "'run_node_started','run_node_finished','run_check_started','run_check_finished','audit_completed'";
+
+/// The payload fields that name the node of an event in `NODE_EVENTS`, as `(column, JSON path)`.
+const NODE_FIELDS: [(&str, &str); 5] = [
+    ("node_key", "payload->'change'->'change'->>'node_key'"),
+    ("attached_target_kind", "payload->>'attached_target_kind'"),
+    ("attached_target_name", "payload->>'attached_target_name'"),
+    ("attachment_kind", "payload->>'attachment_kind'"),
+    ("target_name", "payload->>'target_name'"),
+];
+
 /// The Recall invocations of one run and the nodes it selected.
 pub(crate) struct RunRecallScope {
     namespaces: Vec<String>,
@@ -222,7 +234,7 @@ pub(crate) async fn run_events_in(
                 format!("SELECT storage_id, event_id, invocation_id, occurred_at, event_type, severity, producer, resource_id, \
                  resource_kind, resource_name, resource_attempt_id, statement_id, error_type, error_code, duration_ms, outcome, \
                  row_count, affected_rows, CASE WHEN event_type IN ('{MEMBER_RETRYING_EVENT}','{MEMBER_RECOVERED_EVENT}') \
-                 THEN payload END AS member_payload FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", next + 1)
+                 THEN payload END AS member_payload, {} FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", node_columns(), next + 1)
             },
             vec![
                 Parameter::Integer(after),
@@ -233,6 +245,14 @@ pub(crate) async fn run_events_in(
             let payload = row.remove("member_payload").unwrap_or(Value::Null);
             if let Some(message) = member_message(&payload)? {
                 row.insert("message".into(), Value::String(message));
+            }
+            let node = node_of(row);
+            for (column, _) in NODE_FIELDS {
+                row.remove(column);
+            }
+            if let Some((kind, name)) = node {
+                row.insert("resource_kind".into(), Value::String(kind));
+                row.insert("resource_name".into(), Value::String(name));
             }
             Ok(())
         },
@@ -259,6 +279,35 @@ async fn recall_records<T: serde::de::DeserializeOwned>(
         })
         .collect::<Result<_, _>>()?;
     Ok((transaction, records))
+}
+
+/// Selects only the node's identity from the payload of an event without resource columns.
+fn node_columns() -> String {
+    NODE_FIELDS
+        .iter()
+        .map(|(column, path)| {
+            format!("CASE WHEN resource_name IS NULL AND event_type IN ({NODE_EVENTS}) THEN {path} END AS {column}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The `(kind, name)` an event is about, from its `NODE_FIELDS`: a change's node key, else an audit's target.
+pub(crate) fn node_of(row: &Row) -> Option<(String, String)> {
+    let text = |column: &str| {
+        row.get(column)
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+    };
+    if let Some(key) = text("node_key") {
+        let (kind, name) = key.split_once(':')?;
+        return Some((kind.into(), name.into()));
+    }
+    let (kind, name) = match (text("attached_target_kind"), text("attached_target_name")) {
+        (Some(kind), Some(name)) => (kind, name),
+        _ => (text("attachment_kind")?, text("target_name")?),
+    };
+    Some((kind.into(), name.into()))
 }
 
 /// The scheduler's summary of a member retry or recovery on its group run, from its own payload.

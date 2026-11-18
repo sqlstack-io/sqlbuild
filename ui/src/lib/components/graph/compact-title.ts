@@ -1,6 +1,8 @@
 // Text measured to fit a card: the status line's parts, and a zoomed-out pill's name. A pill's name is
-// sized on screen, as large as fits between `PILL.minFont` and `PILL.maxFont`, then cut with an
-// ellipsis at its end. Worked out once per compact level, never per zoom step.
+// sized on screen, as large as fits between `PILL.minFont` and `PILL.maxFont`; a name too long even
+// then loses its middle, keeping its start and, more of, its end: siblings differ at either end
+// (`stg_orders`, `dim_orders`; `region_check`, `region_country`). Worked out once per compact level,
+// never per zoom step.
 
 import { CARD_WIDTH } from '$lib/lineage/fit';
 
@@ -24,6 +26,24 @@ export function pillFont(text: string, room: number, measure: Measure): number {
 	let font = Math.max(minFont, Math.min(maxFont, Math.floor(((maxFont * room) / widest) * 4) / 4));
 	while (font > minFont && measure(text, font, weight) > room) font -= 0.25;
 	return font;
+}
+
+/** `text` without its middle: `kept` characters, a third from its start and the rest from its end. */
+function middleCut(text: string, kept: number): string {
+	const head = Math.floor(kept / 3);
+	return `${text.slice(0, head)}…${kept - head ? text.slice(-(kept - head)) : ''}`;
+}
+
+/** `text` at `font` as it fits `room`: whole, or with its middle cut to the most characters that fit. */
+export function pillText(text: string, font: number, room: number, measure: Measure): string {
+	if (measure(text, font, PILL.weight) <= room) return text;
+	let [lo, hi] = [0, text.length - 1];
+	while (lo < hi) {
+		const mid = Math.ceil((lo + hi) / 2);
+		if (measure(middleCut(text, mid), font, PILL.weight) <= room) lo = mid;
+		else hi = mid - 1;
+	}
+	return middleCut(text, lo);
 }
 
 let context: CanvasRenderingContext2D | null | undefined;
