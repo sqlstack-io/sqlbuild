@@ -16,11 +16,12 @@ from sqlbuild.python_nodes.models import (
     CheckDefinition,
     ColumnLineageRef,
     FactoryDefinition,
+    NodeSetRef,
     RetryPolicy,
     TaskDefinition,
 )
-from sqlbuild.python_nodes.types import PythonCheckSeverity
-from sqlbuild.refs import model, seed
+from sqlbuild.python_nodes.types import NodeSetKind, PythonCheckSeverity
+from sqlbuild.refs import job, model, seed, tag
 from sqlbuild.tasks import get_task_definition, task
 from tests.unit.src.sqlbuild.python_nodes.decorators._test_types import (
     AssetDecoratorMetadataTestCase,
@@ -28,6 +29,7 @@ from tests.unit.src.sqlbuild.python_nodes.decorators._test_types import (
     FactoryDecoratorErrorTestCase,
     FactoryDecoratorMetadataTestCase,
     HookReadsTestCase,
+    NodeSetDependencyTestCase,
     TaskDecoratorMetadataTestCase,
 )
 from tests.unit.src.sqlbuild.python_nodes.decorators.helpers import upstream_asset, upstream_task
@@ -308,3 +310,37 @@ def test_given_non_reference_hook_read_when_decorating_then_raises(
 
     with pytest.raises(SharedInputError, match=test_case.expected_error):
         cast(Any, hook(reads=cast(Any, test_case.reads)))(refresh_orders)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NodeSetDependencyTestCase(
+            description="a job dependency",
+            dependency=job("nightly_job"),
+            expected_dependency=NodeSetRef(kind=NodeSetKind.JOB, name="nightly_job"),
+            expected_text='job("nightly_job")',
+        ),
+        NodeSetDependencyTestCase(
+            description="a tag dependency with an exclude",
+            dependency=tag("finance", exclude="tag:draft orders"),
+            expected_dependency=NodeSetRef(
+                kind=NodeSetKind.TAG, name="finance", exclude="tag:draft orders"
+            ),
+            expected_text='tag("finance", exclude="tag:draft orders")',
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_job_or_tag_dependency_when_decorating_a_task_then_keeps_it_as_declared(
+    test_case: NodeSetDependencyTestCase,
+) -> None:
+    @task(depends_on=cast(Any, test_case.dependency))
+    def report() -> None:
+        """Test task report."""
+
+    definition: TaskDefinition | None = get_task_definition(report)
+
+    assert definition is not None
+    assert definition.depends_on == (test_case.expected_dependency,)
+    assert str(definition.depends_on[0]) == test_case.expected_text

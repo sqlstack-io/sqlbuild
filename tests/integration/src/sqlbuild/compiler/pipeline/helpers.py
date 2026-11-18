@@ -244,3 +244,46 @@ def postgres_semantic_shapes(
         resolved_connection=_OFFLINE_POSTGRES_CONNECTION,
     )
     return semantic_shapes(project=project)
+
+
+def set_dependency_project(
+    *, depends_on: str, job_files: tuple[tuple[str, str], ...] = ()
+) -> dict[str, str]:
+    """Four models, a `nightly_job` over three of them, and a `report` task on `depends_on`."""
+
+    model: str = "MODEL (description 'Test model {name}.', materialized table{tags});\n{sql}\n"
+    files: dict[str, str] = {
+        "sqlbuild_project.toml": (
+            'name = "set_dependencies"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+            '[connection]\ndatabase = ":memory:"\n\n[targets.dev]\nschema = "dev"\n'
+        ),
+        "models/stg_orders.sql": model.format(name="stg_orders", tags="", sql="SELECT 1 AS id"),
+        "models/orders.sql": model.format(
+            name="orders", tags=", tags [finance]", sql='SELECT id FROM __ref("stg_orders")'
+        ),
+        "models/order_items.sql": model.format(
+            name="order_items", tags=", tags [finance]", sql='SELECT id FROM __ref("stg_orders")'
+        ),
+        "models/customers.sql": model.format(name="customers", tags="", sql="SELECT 2 AS id"),
+        "orchestration/jobs/nightly_job.toml": (
+            'name = "nightly_job"\ndescription = "Nightly."\n'
+            'select = "stg_orders orders order_items"\n'
+        ),
+        "python/tasks/report.py": (
+            "from sqlbuild.refs import job, model, tag\nfrom sqlbuild.tasks import task\n\n\n"
+            f"@task(depends_on={depends_on})\n"
+            'def report(ctx):\n    """Test task report."""\n    return None\n'
+        ),
+    }
+    files.update(dict(job_files))
+    return files
+
+
+def python_sql_deps(discovered_inputs: DiscoveredProjectInputs, name: str) -> tuple[str, ...]:
+    """`kind:name` of each SQL resource a Python node's graph edges read, in order."""
+
+    graph: Any = native_module.build_python_node_graph(discovered_inputs=discovered_inputs)
+    return tuple(
+        f"{reference.kind.value}:{reference.name}"
+        for reference in graph.nodes_by_name[name].sql_deps
+    )

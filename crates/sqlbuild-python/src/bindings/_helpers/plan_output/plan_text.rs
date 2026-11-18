@@ -3,6 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::node_set_dependencies::main::wait_changes::wait_changes;
 use sqlbuild_core::cli_text::main::format_plan_completion::format_plan_completion;
 use sqlbuild_core::cli_text::main::format_plan_text::format_plan_text;
 use sqlbuild_core::cli_text::models::{
@@ -298,6 +299,13 @@ fn source_load_text(entry: &Bound<'_, PyAny>) -> PyResult<SourceLoadPlanText> {
     })
 }
 
+/// What a Python entry now also waits on, or no longer, since the build its identity was recorded by.
+pub(crate) fn entry_wait_changes(entry: &Bound<'_, PyAny>, name: &str) -> PyResult<Vec<String>> {
+    let previous: Option<String> = native_field(entry, "previous_metadata_json")?.extract()?;
+    let current: Option<String> = native_field(entry, "current_metadata_json")?.extract()?;
+    Ok(wait_changes(name, previous.as_deref(), current.as_deref()))
+}
+
 /// Both identity diffs of a changed Python entry, each as `format_query_diff` lines.
 fn python_text(entry: &Bound<'_, PyAny>) -> PyResult<PythonPlanText> {
     let identity_status: String = text(&native_field(
@@ -329,8 +337,10 @@ fn python_text(entry: &Bound<'_, PyAny>) -> PyResult<PythonPlanText> {
         }
     }
     let [source_diff, dependency_diff] = diffs;
+    let name: String = text(&native_field(entry, "name")?)?;
     Ok(PythonPlanText {
-        name: text(&native_field(entry, "name")?)?,
+        wait_changes: entry_wait_changes(entry, &name)?,
+        name,
         kind: text(&native_field(&native_field(entry, "kind")?, "value")?)?,
         phase: text(&native_field(&native_field(entry, "phase")?, "value")?)?,
         identity_status,

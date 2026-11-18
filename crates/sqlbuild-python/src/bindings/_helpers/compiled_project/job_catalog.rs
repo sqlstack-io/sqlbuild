@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
@@ -164,11 +164,26 @@ fn job_catalog(py: Python<'_>) -> PyResult<Option<Catalog>> {
     Ok(Some(catalog))
 }
 
+/// Every job and group the project declares, whatever targets they are declared for.
+pub(crate) fn declared_jobs(
+    project_dir: &Bound<'_, PyAny>,
+) -> PyResult<BTreeMap<String, JobSelection>> {
+    let inventory: OrchestrationInventory = orchestration_declarations(project_dir)?;
+    Ok(catalog_where(&inventory, |_| true).0)
+}
+
 /// Each job's selector tokens and each group's members declared for `target`, and the names a schedule or sensor starts there.
 fn inventory_catalog(inventory: &OrchestrationInventory, target: Option<&str>) -> Catalog {
-    let declared_for = |targets: &[String]| {
+    catalog_where(inventory, |targets: &[String]| {
         targets.is_empty() || target.is_some_and(|target| targets.iter().any(|name| name == target))
-    };
+    })
+}
+
+/// Each job's selector tokens and each group's members `declared_for` accepts the targets of.
+fn catalog_where(
+    inventory: &OrchestrationInventory,
+    declared_for: impl Fn(&[String]) -> bool,
+) -> Catalog {
     let tokens = |value: &str| value.split_whitespace().map(str::to_owned).collect();
     let mut catalog: BTreeMap<String, JobSelection> = BTreeMap::new();
     let mut triggered: BTreeSet<String> = BTreeSet::new();
@@ -216,7 +231,7 @@ fn inventory_catalog(inventory: &OrchestrationInventory, target: Option<&str>) -
         );
     }
     for sensor in &inventory.sensors {
-        if sensor.targets.as_deref().is_none_or(declared_for) {
+        if sensor.targets.as_deref().is_none_or(&declared_for) {
             triggered.extend(
                 sensor
                     .job_references

@@ -1,5 +1,6 @@
 //! The JSON plan document, read from the planner's output by attribute.
 
+use crate::bindings::_helpers::plan_output::plan_text::entry_wait_changes;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -470,6 +471,11 @@ fn python_entry_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAn
     let diff: Bound<'py, PyDict> = identity_diff(entry)?;
     if !diff.is_empty() {
         item.set_item("identity_diff", diff)?;
+    }
+    let changes: Vec<String> =
+        entry_wait_changes(entry, &native_field(entry, "name")?.extract::<String>()?)?;
+    if !changes.is_empty() {
+        item.set_item("wait_changes", changes)?;
     }
     Ok(item.into_any())
 }

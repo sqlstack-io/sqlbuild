@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/sql-references/
 - Declaring a reference
 - Resolving with ctx.relation
 - Hard-coded relation names
+- Depending on a job or a tag
 - model vs source
 - Where references are allowed
 
@@ -119,6 +120,61 @@ This is a guard against accidental hard-coding, not a sandbox. SQL sent directly
 the project's sources. To turn both checks off while migrating a project,
 set [`[references] enforce_explicit = false`](../project-configuration.md#references).
 
+## Depending on a job or a tag
+
+Naming every upstream model ties a node to model names that change with each rename or split.
+`job()` and `tag()` from `sqlbuild.refs` depend on a whole set instead:
+
+```python
+from sqlbuild.refs import job, tag
+from sqlbuild.tasks import task
+
+@task(depends_on=(job("orders_job", exclude="tag:experimental"), tag("finance_inputs")))
+def publish_revenue(ctx):
+    """Publish revenue."""
+    ...
+```
+
+- `job(name)` depends on the job's **end nodes**: the models, seeds, sources, loaders, tasks and
+  assets of its selection that nothing else in the selection reads. Everything else in the job is
+  upstream of an end node, so this waits for the whole job without listing every edge. A job group
+  name depends on the union of its jobs.
+- `tag(name)` depends on the end nodes of every node carrying the tag.
+- `exclude=` takes the usual [selectors](../selectors.md) (names, `tag:`, `path:`,
+  `kind:`) and removes those nodes before the set is reduced to its end nodes.
+
+Compile resolves each into ordinary edges to the end nodes, so planning, `--changed`, selector
+expansion (`+task:publish_revenue`), `sqb dag` and job group waits treat them like named
+dependencies. A model named directly and also reached through a job is one edge. Jobs resolve
+whatever targets they are declared for.
+
+The edges only order the node. `ctx.relation(...)` still resolves only the `model()`, `source()`
+and `seed()` references the node names, and column lineage stops at these edges.
+
+When a job's or tag's end nodes change, the plan says so under the node, against the end nodes
+it was last built with:
+
+```text
+Python read-side (1)
+└── publish_revenue      task (unchanged)
+    └── publish_revenue now also waits on model 'refund_totals' through job 'orders_job'
+```
+
+`--json` lists the same lines as `wait_changes` on the Python node.
+
+Compile fails when:
+
+- the job or tag does not exist, or the set is empty after `exclude`;
+- a node of the set reads the dependant's output, directly or through other nodes. The error names
+  the node that reads back and suggests moving it to another job or excluding it;
+- a [job group](../orchestration.md#group-jobs) would wait in a loop: job groups wait job
+  by job, so if the dependant's job waits for the job it depends on while that job reads a node of
+  the dependant's job, neither can start. The error names the nodes that close the loop; move
+  them to another job;
+- a loader declares one: loaders depend on loaders, tasks and assets named one by one;
+- the name has a code location prefix such as `job("billing:nightly_job")`, which is reserved for
+  depending on other locations' jobs.
+
 ## model vs source
 
 | Reference | Resolves to |
@@ -131,7 +187,7 @@ set [`[references] enforce_explicit = false`](../project-configuration.md#refere
 
 ## Where references are allowed
 
-- **Tasks**, **assets**, and **checks** may declare `model()`, `source()`, and `seed()` references and read them with `ctx.relation(...)`.
+- **Tasks**, **assets**, and **checks** may declare `model()`, `source()`, and `seed()` references and read them with `ctx.relation(...)`, and depend on a `job()` or `tag()`.
 - **Python hooks** declare the models, sources, and seeds they read with `@hook(reads=...)`; see [Python Hooks](../models/hooks/python.md#declared-reads).
 - **Loaders** may not reference SQL resources; they read sources with `ctx.source(...)` and upstream loaders with `ctx.loader(...)`.
 - A Python node referencing a SQL resource never turns into a SQL dependency; selector expansion will not pull Python outputs into SQL model dependencies.

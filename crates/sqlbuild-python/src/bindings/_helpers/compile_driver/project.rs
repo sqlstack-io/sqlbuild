@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use crate::bindings::_helpers::graph::set_dependencies::resolve_node_sets;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyCFunction, PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -146,10 +147,12 @@ impl ProjectRequest {
 
 /// The compiled project produced through the `COMPILED_PROJECT` frontier.
 fn compiled_project(py: Python<'_>, request: ProjectRequest) -> PyResult<Bound<'_, PyAny>> {
-    produced(
+    let project: Bound<'_, PyAny> = produced(
         FrontierStage::CompiledProject,
         python_compiled_project(py, &request)?,
-    )
+    )?;
+    let _ = resolve_node_sets(request.discovered_inputs.bind(py), &project)?;
+    Ok(project)
 }
 
 /// `_build_python_compiled_project`.

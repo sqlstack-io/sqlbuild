@@ -11,6 +11,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::errors::SelectorError;
 use sqlbuild_analysis::graph::models::ProjectGraph;
+use sqlbuild_analysis::node_set_dependencies::models::ResolvedNode;
 use sqlbuild_analysis::python_selection::main::attach_python_jobs::attach_python_jobs;
 use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python_node_graph_indexes as graph_indexes;
 use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
@@ -28,10 +29,12 @@ use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::compiled_project::job_catalog::needed_jobs;
 use crate::bindings::_helpers::graph::project_graph::{CompiledProjectGraph, NativeProjectGraph};
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
+use crate::bindings::_helpers::graph::set_dependencies::{node_set_outcome, resolve_node_sets};
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::records::ids::ErrorId;
+use crate::bindings::types::NodeSetOutcome;
 
 type NameRows = Vec<(String, Vec<String>)>;
 positional_record! {
@@ -58,7 +61,7 @@ positional_record! {
 }
 
 /// The `PlannerInputError` Python raises for a selector failure.
-fn planner_error(py: Python<'_>, error: SelectorError) -> PyErr {
+pub(crate) fn planner_error(py: Python<'_>, error: SelectorError) -> PyErr {
     let raised = (|| -> PyResult<Bound<'_, PyAny>> {
         let keywords: Bound<'_, PyDict> = PyDict::new(py);
         keywords.set_item("code", error.code)?;
@@ -104,7 +107,7 @@ fn selection_node(node: &Bound<'_, PyAny>) -> PyResult<PythonSelectionNode> {
 }
 
 /// A `PythonNodeGraph` as the native selection graph.
-fn selection_graph(graph: &Bound<'_, PyAny>) -> PyResult<PythonSelectionGraph> {
+pub(crate) fn selection_graph(graph: &Bound<'_, PyAny>) -> PyResult<PythonSelectionGraph> {
     Ok(PythonSelectionGraph {
         nodes: native_field(graph, "nodes")?
             .try_iter()?
@@ -122,7 +125,9 @@ fn selection_graph(graph: &Bound<'_, PyAny>) -> PyResult<PythonSelectionGraph> {
 }
 
 /// `(name, loader)` of every source in the compiled project.
-fn project_sources(project: &Bound<'_, PyAny>) -> PyResult<Vec<(String, Option<String>)>> {
+pub(crate) fn project_sources(
+    project: &Bound<'_, PyAny>,
+) -> PyResult<Vec<(String, Option<String>)>> {
     native_field(project, "sources")?
         .try_iter()?
         .map(|source| {
@@ -138,7 +143,7 @@ fn project_sources(project: &Bound<'_, PyAny>) -> PyResult<Vec<(String, Option<S
 }
 
 /// `[settings] allow_warehouse_round_trips` of a compiled project.
-fn allows_round_trips(project: &Bound<'_, PyAny>) -> PyResult<bool> {
+pub(crate) fn allows_round_trips(project: &Bound<'_, PyAny>) -> PyResult<bool> {
     native_field(
         &native_field(project, "settings")?,
         "allow_warehouse_round_trips",
@@ -151,6 +156,8 @@ pub(crate) struct ProjectSelection {
     sources: Vec<(String, Option<String>)>,
     allow_warehouse_round_trips: bool,
     pub(crate) nodes: PythonSelectionGraph,
+    /// Each Python node's resolved `job(...)` and `tag(...)` dependencies.
+    pub(crate) sets: Vec<ResolvedNode>,
 }
 
 impl ProjectSelection {
@@ -162,6 +169,10 @@ impl ProjectSelection {
             sources: project_sources(project)?,
             allow_warehouse_round_trips: allows_round_trips(project)?,
             nodes: selection_graph(&python_node_graph(discovered_inputs)?)?,
+            sets: match node_set_outcome(discovered_inputs)? {
+                Some(Ok(sets)) => sets,
+                _ => Vec::new(),
+            },
         })
     }
 
@@ -337,6 +348,13 @@ pub(crate) fn project_graph_error(
     let py: Python<'_> = project_graph.py();
     let project_graph: &Bound<'_, CompiledProjectGraph> = project_graph.cast()?;
     let project: &Bound<'_, PyAny> = project_graph.get().project(py);
+    let sets: Option<NodeSetOutcome> = match node_set_outcome(discovered_inputs)? {
+        Some(outcome) => Some(outcome),
+        None => resolve_node_sets(discovered_inputs, project)?,
+    };
+    if let Some(Err(error)) = sets {
+        return Ok(Some(error));
+    }
     let sources: Vec<(String, Option<String>)> = project_sources(project)?;
     let nodes: PythonSelectionGraph = selection_graph(&python_node_graph(discovered_inputs)?)?;
     let native: &Bound<'_, NativeProjectGraph> = project_graph.get().native(py);

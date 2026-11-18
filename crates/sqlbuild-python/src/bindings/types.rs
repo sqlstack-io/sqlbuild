@@ -17,3 +17,9 @@ pub(crate) trait FromPositional: Sized {
 pub(crate) trait IntoPositional {
     fn into_positional<'py>(self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>>;
 }
+
+/// Each Python node's resolved job and tag dependencies, or why they did not resolve.
+pub(crate) type NodeSetOutcome = Result<
+    Vec<sqlbuild_analysis::node_set_dependencies::models::ResolvedNode>,
+    sqlbuild_analysis::graph::errors::SelectorError,
+>;

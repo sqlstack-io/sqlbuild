@@ -174,6 +174,7 @@ pub enum UserCodeHost {
     AuditCase,
     RelationRenderer,
     SqlResourceRef,
+    NodeSetRef,
     PythonCheckSeverity,
     SqlResourceRefKind,
     LoadCustomRules,
