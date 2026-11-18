@@ -2,9 +2,10 @@
 
 use serde_json::Value;
 use sqlquack_parse::parse_strict;
+use sqlquack_syntax::Expression;
 use sqlquack_syntax::tokens::models::Dialect;
-use sqlquack_syntax::{Expression, ParseOptions};
 
+use crate::parse_guard::main::sqlquack_parse_options::sqlquack_parse_options;
 use crate::warehouse_types::constants::{CAST_KEY, CAST_TARGET_KEY};
 
 /// `spelling` read by `sqlquack-syntax-postgres`'s type grammar.
@@ -17,7 +18,7 @@ pub(crate) fn postgres_type(spelling: &str) -> Result<Value, String> {
 /// `spelling` read as a cast target by SQLQuack's core parser for `dialect`.
 pub(crate) fn core_type(spelling: &str, dialect: Dialect) -> Result<Value, String> {
     let statements: Vec<Expression> =
-        parse_strict(&cast(spelling), dialect, &ParseOptions::default())
+        parse_strict(&cast(spelling), dialect, &sqlquack_parse_options())
             .map_err(|error| format!("{error:?}"))?;
     single_cast_target(spelling, &statements)
 }

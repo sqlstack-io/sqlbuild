@@ -8,6 +8,7 @@ use sqlbuild_analysis::fingerprint_storage::constants::{
     COLUMN_TARGET_DATABASE, COLUMN_TARGET_NAME, COLUMN_TARGET_SCHEMA, COLUMN_TIMESTAMP,
     COLUMN_VERSION_HASH, NODE_TYPE_MODEL, NODE_TYPE_SEED,
 };
+use sqlbuild_analysis::parse_guard::constants::MAX_FUNCTION_CALL_DEPTH;
 use sqlbuild_analysis::snowflake_cost::constants::QUERY_TAG_APP;
 use sqlbuild_cli::compute_logs::constants::{
     COMPUTE_LOG_FORMAT_VERSION, DEFAULT_RETENTION_COUNT, MAX_READ_BYTES,
@@ -140,6 +141,7 @@ pub(crate) const EXPORTED_INTEGERS: &[(&str, i64)] = &[
         "CUSTOM_HOST_PROTOCOL_VERSION",
         CUSTOM_HOST_PROTOCOL_VERSION as i64,
     ),
+    ("MAX_FUNCTION_CALL_DEPTH", MAX_FUNCTION_CALL_DEPTH as i64),
 ];
 /// Text tuples exported under their Python names.
 pub(crate) const EXPORTED_TEXT_TUPLES: &[(&str, &[&str])] = &[(

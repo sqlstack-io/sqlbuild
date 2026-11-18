@@ -1,12 +1,13 @@
 //! Python's dict walk over each parsed statement: tables, CTE names and temporary tables.
 
-use polyglot_sql::{ComplexityGuardOptions, Dialect, Expression, ParseOptions};
-use serde_json::{Map, Value, json};
+use polyglot_sql::{Dialect, Expression};
+use serde_json::{Map, Value};
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::relation_names::constants::{
-    CATALOG_KEY, CREATE_TABLE_KEY, CTE_ALIAS_KEY, CTE_LIST_KEY, GENERIC_DIALECT,
-    MAX_FUNCTION_CALL_DEPTH, NAME_KEY, QUALIFIER_SEPARATOR, SCHEMA_KEY, TABLE_KEYS, TEMPORARY_KEY,
+    CATALOG_KEY, CREATE_TABLE_KEY, CTE_ALIAS_KEY, CTE_LIST_KEY, GENERIC_DIALECT, NAME_KEY,
+    QUALIFIER_SEPARATOR, SCHEMA_KEY, TABLE_KEYS, TEMPORARY_KEY,
 };
 use crate::relation_names::errors::RelationNamesFailure;
 use crate::relation_names::models::{ExtractedRelations, RelationName};
@@ -53,13 +54,7 @@ fn parsed_statements(
     let parser: Dialect = Dialect::get_by_name(dialect).ok_or_else(|| {
         RelationNamesFailure::UnknownDialect(format!("Unknown dialect: {dialect}"))
     })?;
-    let guard: ComplexityGuardOptions =
-        serde_json::from_value(json!({"maxFunctionCallDepth": MAX_FUNCTION_CALL_DEPTH}))
-            .map_err(|error| RelationNamesFailure::Internal(error.to_string()))?;
-    let options: ParseOptions = ParseOptions {
-        complexity_guard: Some(guard),
-    };
-    match parser.parse_with_options(sql, &options) {
+    match parser.parse_with_options(sql, &polyglot_parse_options()) {
         Ok(statements) => Ok(Some(statements)),
         Err(_polyglot_error) => Ok(None),
     }

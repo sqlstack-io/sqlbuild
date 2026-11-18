@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-dupes-new check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client \
+.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-parse-guard check-dupes-new check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client \
 	check-e2e-shards check-test-shards test-shard-core test-shard-publication test-shard-history \
 	test-e2e-duckdb test-e2e-duckdb-build-core \
 	test-e2e-duckdb-build-incremental \
@@ -747,7 +747,7 @@ verify-quick:
 	exit $$status
 
 
-check-ci: check-dupes-new check-e2e-shards check-test-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client rust-lint
+check-ci: check-dupes-new check-e2e-shards check-test-shards check-native-layering check-parse-guard check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client rust-lint
 	uv run ruff format --check .
 	uv run ruff check .
 	uv run ty check src tests
@@ -768,6 +768,10 @@ check-native-layering:
 
 check-native-stub:
 	uv run python -m scripts.check_native_stub
+
+
+check-parse-guard:
+	uv run python -m scripts.check_parse_guard
 
 
 check-build-features:

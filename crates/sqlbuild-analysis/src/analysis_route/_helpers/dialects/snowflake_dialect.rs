@@ -5,7 +5,7 @@ use std::num::IntErrorKind;
 use sqlquack_parse::{StrictFailure, parse_strict};
 use sqlquack_semantics::dialects::constants::{SNOWFLAKE, SNOWFLAKE_QUOTED_IGNORING_CASE};
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_syntax::{Dialect, Error, Expression, ParseOptions, Parsed, TokenizeFailure};
+use sqlquack_syntax::{Dialect, Error, Expression, Parsed, TokenizeFailure};
 
 use crate::analysis_route::_helpers::dialects::engine_types::snowflake_engine_type;
 use crate::analysis_route::_helpers::dialects::type_spelling::respelt;
@@ -14,6 +14,7 @@ use crate::analysis_route::constants::{
 };
 use crate::analysis_route::models::{AnalysisInput, ParserGap, SnowflakeDialect};
 use crate::analysis_route::types::NativeDialect;
+use crate::parse_guard::main::sqlquack_parse_options::sqlquack_parse_options;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::{NormalizedType, TypeDialect, TypeFamily};
 
@@ -67,7 +68,7 @@ impl NativeDialect for SnowflakeDialect {
 
 /// Every statement the shared parser reads from `sql`, or its first refusal, never marked syntax.
 pub(crate) fn shared_parsed(sql: &str, dialect: Dialect) -> Result<Parsed, ParserGap> {
-    let statements: Vec<Expression> = parse_strict(sql, dialect, &ParseOptions::default())
+    let statements: Vec<Expression> = parse_strict(sql, dialect, &sqlquack_parse_options())
         .map_err(|failure| match failure {
             StrictFailure::Tokens(
                 TokenizeFailure::Uncovered { start, .. } | TokenizeFailure::Overlap { start, .. },

@@ -3,13 +3,11 @@
 use std::collections::{HashMap, HashSet};
 
 use polyglot_sql::tokens::TokenType;
-use polyglot_sql::{
-    ComplexityGuardOptions, Dialect, DialectType, Expression, ExpressionWalk, ParseOptions,
-};
+use polyglot_sql::{Dialect, DialectType, Expression, ExpressionWalk};
 
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::semantic_checks::constants::{
-    CLOSE_PARENTHESIS, GENERIC_DIALECT, MAX_FUNCTION_CALL_DEPTH, OPEN_PARENTHESIS,
-    PROJECTION_SEPARATOR,
+    CLOSE_PARENTHESIS, GENERIC_DIALECT, OPEN_PARENTHESIS, PROJECTION_SEPARATOR,
 };
 use crate::semantic_checks::models::SemanticFailure;
 use crate::semantic_validation::main::normalize::normalize_analysis_sql;
@@ -120,14 +118,7 @@ pub(crate) fn parsed_model(
 ) -> Result<Option<Expression>, SemanticFailure> {
     let sql = normalized_sql(query_sql, dialect)?;
     let parser = polyglot_dialect(dialect.unwrap_or(GENERIC_DIALECT))?;
-    let guard: ComplexityGuardOptions = serde_json::from_value(serde_json::json!({
-        "maxFunctionCallDepth": MAX_FUNCTION_CALL_DEPTH,
-    }))
-    .map_err(|_| SemanticFailure::internal("the parse guard options do not build"))?;
-    let options = ParseOptions {
-        complexity_guard: Some(guard),
-    };
-    let Ok(mut statements) = parser.parse_with_options(&sql, &options) else {
+    let Ok(mut statements) = parser.parse_with_options(&sql, &polyglot_parse_options()) else {
         return Ok(None);
     };
     if statements.len() != 1 {

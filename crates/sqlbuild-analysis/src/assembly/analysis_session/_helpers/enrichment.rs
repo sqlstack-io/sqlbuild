@@ -14,14 +14,15 @@ use crate::assembly::analysis_session::_helpers::dict_walk::{truthy, upper};
 use crate::assembly::analysis_session::_helpers::mappings::ShapeTable;
 use crate::assembly::analysis_session::constants::{
     CAST_TRANSFORM, CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, FILTER_CONTEXT,
-    MAX_FUNCTION_CALL_DEPTH, NON_NULL_NULLABILITY, NULL_KEYWORD, RESOLVED_SOURCE_CONFIDENCE,
-    SELECT_SHAPE, SET_OPERATION_SHAPE, TRANSFORM_AGGREGATION, TRANSFORM_CAST, TRANSFORM_CONSTANT,
+    NON_NULL_NULLABILITY, NULL_KEYWORD, RESOLVED_SOURCE_CONFIDENCE, SELECT_SHAPE,
+    SET_OPERATION_SHAPE, TRANSFORM_AGGREGATION, TRANSFORM_CAST, TRANSFORM_CONSTANT,
     TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, TRANSFORM_STAR, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
     WILDCARD,
 };
 use crate::assembly::analysis_session::models::NullabilityCallback;
 use crate::assembly::analysis_session::models::{ColumnFact, LineageRow, ModelRequest};
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
+use crate::parse_guard::main::polyglot_complexity_guard::polyglot_complexity_guard;
 use crate::semantic_validation::main::normalize::normalize_analysis_sql;
 use crate::semantic_validation::models::NormalizationInput;
 
@@ -77,7 +78,7 @@ fn analysed(input: &EnrichmentInput<'_>) -> Result<Enrichment, String> {
     }
     options.insert(
         "complexityGuard".to_owned(),
-        json!({"maxFunctionCallDepth": MAX_FUNCTION_CALL_DEPTH}),
+        serde_json::to_value(polyglot_complexity_guard()).map_err(|error| error.to_string())?,
     );
     let options: AnalyzeQueryOptions = serde_json::from_value(Value::Object(options))
         .map_err(|error| format!("query analysis options: {error}"))?;

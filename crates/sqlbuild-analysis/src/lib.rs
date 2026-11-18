@@ -25,6 +25,7 @@ pub mod lineage_graph;
 pub mod manifest;
 pub mod node_set_dependencies;
 pub mod nullability_rules;
+pub mod parse_guard;
 pub mod planner_changes;
 pub mod planner_fixtures;
 pub mod planner_identity;

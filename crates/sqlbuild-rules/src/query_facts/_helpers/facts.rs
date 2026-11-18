@@ -2,20 +2,18 @@ use crate::query_facts::_helpers::flatten::{flatten_call, flatten_input, whole_v
 use crate::query_facts::_helpers::shape::stub_call;
 use crate::query_facts::_helpers::tokens::{ComparisonOperator, QueryTokens, SelectTokens};
 use crate::query_facts::constants::{
-    MAX_AST_DEPTH, MAX_FUNCTION_CALL_DEPTH, SNOWFLAKE_DATE_PART_ARGUMENTS, TABLE_FUNCTION_STUB,
-    TRIPLE_QUOTE_LENGTH,
+    MAX_AST_DEPTH, SNOWFLAKE_DATE_PART_ARGUMENTS, TABLE_FUNCTION_STUB, TRIPLE_QUOTE_LENGTH,
 };
 use crate::query_facts::models::{
     CallKind, ColumnFact, ComparisonFacts, ComparisonSpan, CteFacts, ExpressionItem, ItemFacts,
     ModelShape, ParsedFixture, QueryFacts, RelationFacts, SelectFacts, SetFacts, SourceText,
 };
+use sqlbuild_analysis::parse_guard::main::sqlquack_parse_options::sqlquack_parse_options;
 use sqlbuild_analysis::sql_tree::main::deeper_than::deeper_than;
 use sqlbuild_analysis::sql_tree::main::shared_dialect::shared_dialect;
 use sqlquack_syntax::expressions::names::models::{Identifier, Literal, TableRef};
 use sqlquack_syntax::expressions::queries::models::{Select, With};
-use sqlquack_syntax::{
-    CallMode, ComplexityGuardOptions, Dialect, Expression, ExpressionWalk, ParseOptions,
-};
+use sqlquack_syntax::{CallMode, Dialect, Expression, ExpressionWalk};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
@@ -23,12 +21,7 @@ use std::ops::Range;
 fn parse_query(sql: &str, dialect_name: &str) -> Result<(Expression, Dialect), String> {
     let dialect = shared_dialect(dialect_name)
         .ok_or_else(|| format!("no SQL parser for dialect {dialect_name}"))?;
-    let options = ParseOptions {
-        complexity_guard: Some(ComplexityGuardOptions {
-            max_function_call_depth: Some(MAX_FUNCTION_CALL_DEPTH),
-            ..Default::default()
-        }),
-    };
+    let options = sqlquack_parse_options();
     let mut statements =
         sqlquack_parse::parse_statements_with(sql, dialect, &options, CallMode::FaithfulLocated)
             .map_err(|error| error.to_string())?;
