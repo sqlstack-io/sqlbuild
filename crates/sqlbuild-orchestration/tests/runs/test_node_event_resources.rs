@@ -1,5 +1,4 @@
-//! A run's node and check events name their node in Recall's resource columns, so a run's event list
-//! can say which node each one is about, including events stored before they carried those columns.
+//! Node and check events name their node, including events stored before they had resource columns.
 
 use std::collections::BTreeMap;
 
@@ -12,6 +11,7 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::execution::{change_run::change_run, claim_next_run::claim_next_run};
 use crate::runs::models::{NodeOutcome, RunAuthority, RunChange, RunChangeRequest};
 use crate::runs::tests::helpers::{queue, request, snapshot, snapshot_node};
+use crate::runs::tests::test_types::{NodeEventResourcesTestCase, NodeOfTestCase};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -19,6 +19,7 @@ use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::helpers::read_recall_events;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::store::types::Row;
 use crate::warehouse_history::_helpers::run_recall::node_of;
 use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
 
@@ -31,9 +32,33 @@ const NODE_EVENTS: [&str; 4] = [
 
 #[test]
 fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_node() {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        NodeEventResourcesTestCase {
+            description: "SQLite node and check events",
+            backend: Backend::Sqlite,
+            expected_named: [
+                ("run_node_started", "model", "payments"),
+                ("run_check_started", "check", "payments_positive"),
+                ("run_check_finished", "check", "payments_positive"),
+                ("run_node_finished", "model", "payments"),
+            ],
+        },
+        NodeEventResourcesTestCase {
+            description: "PostgreSQL node and check events",
+            backend: Backend::Postgres,
+            expected_named: [
+                ("run_node_started", "model", "payments"),
+                ("run_check_started", "check", "payments_positive"),
+                ("run_check_finished", "check", "payments_positive"),
+                ("run_node_finished", "model", "payments"),
+            ],
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let fixture = open_test_store(backend).await.expect("required store");
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required store");
             let store = &fixture.store;
             crate::store::main::migrate_store::migrate_store(store)
                 .await
@@ -114,28 +139,26 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                         )
                     })
                     .collect();
-            let named = |event: &str, kind: &str, name: &str| {
-                (
-                    event.to_owned(),
-                    Some(kind.to_owned()),
-                    Some(name.to_owned()),
-                )
-            };
             assert_eq!(
                 stored,
-                [
-                    named("run_node_started", "model", "payments"),
-                    named("run_check_started", "check", "payments_positive"),
-                    named("run_check_finished", "check", "payments_positive"),
-                    named("run_node_finished", "model", "payments"),
-                ],
-                "{backend:?}: each node and check event stores its node in the resource columns"
+                test_case
+                    .expected_named
+                    .iter()
+                    .map(|(event, kind, name)| (
+                        (*event).to_owned(),
+                        Some((*kind).to_owned()),
+                        Some((*name).to_owned()),
+                    ))
+                    .collect::<Vec<_>>(),
+                "{}: each node and check event stores its node in the resource columns",
+                test_case.description
             );
             assert!(
                 !change_run(store, worker, &node_started)
                     .await
                     .expect("retried report"),
-                "{backend:?}: a retried report is the same report"
+                "{}: a retried report is the same report",
+                test_case.description
             );
 
             // An event stored before node events carried resource columns: the old payload, no columns.
@@ -155,7 +178,8 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                 !change_run(store, worker, &node_started)
                     .await
                     .expect("retried report against the old shape"),
-                "{backend:?}: a report stored by an older server still matches its retry"
+                "{}: a report stored by an older server still matches its retry",
+                test_case.description
             );
 
             let context = AuditContext {
@@ -189,7 +213,8 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                 .collect();
             assert_eq!(
                 read, stored,
-                "{backend:?}: the old event is named from its payload"
+                "{}: the old event is named from its payload",
+                test_case.description
             );
             close_test_store(fixture).await;
         });
@@ -197,57 +222,61 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
 }
 
 #[test]
-fn given_event_payloads_when_reading_their_node_then_only_node_identities_are_taken() {
-    struct Case {
-        description: &'static str,
-        payload: serde_json::Value,
-        expected: Option<(&'static str, &'static str)>,
-    }
-    let cases = [
-        Case {
+fn given_node_fields_when_reading_their_node_then_the_node_key_or_audit_target_names_it() {
+    let test_cases = [
+        NodeOfTestCase {
             description: "a scheduler change keyed <kind>:<name>",
-            payload: json!({"change": {"change": {"kind": "node_started", "node_key": "seed:region_codes"}}}),
-            expected: Some(("seed", "region_codes")),
+            fields: &[("node_key", "seed:region_codes")],
+            expected_node: Some(("seed", "region_codes")),
         },
-        Case {
-            description: "a payload stored as JSON text",
-            payload: json!(json!({"change": {"change": {"node_key": "model:orders"}}}).to_string()),
-            expected: Some(("model", "orders")),
-        },
-        Case {
+        NodeOfTestCase {
             description: "a node key without a kind names no node",
-            payload: json!({"change": {"change": {"node_key": "orders"}}}),
-            expected: None,
+            fields: &[
+                ("node_key", "orders"),
+                ("attachment_kind", "model"),
+                ("target_name", "orders"),
+            ],
+            expected_node: None,
         },
-        Case {
-            description: "an audit names the node it is attached to",
-            payload: json!({"attachment_kind": "seed", "target_name": "region_codes",
-                "attached_target_kind": "seed", "attached_target_name": "region_codes", "attached_column_name": "code"}),
-            expected: Some(("seed", "region_codes")),
+        NodeOfTestCase {
+            description: "a column audit names the table it is attached to",
+            fields: &[
+                ("attachment_kind", "column"),
+                ("target_name", "code"),
+                ("attached_target_kind", "seed"),
+                ("attached_target_name", "region_codes"),
+            ],
+            expected_node: Some(("seed", "region_codes")),
         },
-        Case {
+        NodeOfTestCase {
             description: "an audit without an attached target names its own target",
-            payload: json!({"attachment_kind": "model", "target_name": "orders"}),
-            expected: Some(("model", "orders")),
+            fields: &[("attachment_kind", "model"), ("target_name", "orders")],
+            expected_node: Some(("model", "orders")),
         },
-        Case {
+        NodeOfTestCase {
             description: "a run-scope audit has no node",
-            payload: json!({"attachment_kind": "end"}),
-            expected: None,
+            fields: &[("attachment_kind", "end")],
+            expected_node: None,
         },
-        Case {
-            description: "no payload",
-            payload: serde_json::Value::Null,
-            expected: None,
+        NodeOfTestCase {
+            description: "no fields",
+            fields: &[],
+            expected_node: None,
         },
     ];
-    for case in cases {
+    for test_case in test_cases {
+        let row: Row = test_case
+            .fields
+            .iter()
+            .map(|(column, value)| ((*column).to_owned(), json!(value)))
+            .collect();
         assert_eq!(
-            node_of(&case.payload),
-            case.expected
+            node_of(&row),
+            test_case
+                .expected_node
                 .map(|(kind, name)| (kind.to_owned(), name.to_owned())),
             "{}",
-            case.description
+            test_case.description
         );
     }
 }
