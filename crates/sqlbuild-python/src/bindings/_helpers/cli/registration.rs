@@ -33,6 +33,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     sqlbuild_python_front::native_host::main::register_observations_state::register_observations_state(module)?;
     sqlbuild_python_front::resource_costs::main::register_resource_costs_state::register_resource_costs_state(module)?;
     sqlbuild_python_front::native_host::main::register_audit_results_state::register_audit_results_state(module)?;
+    sqlbuild_python_project::native_host::main::register_runs_state::register_runs_state(module)?;
     clone::registration::register(module)?;
     compute_logs::registration::register(module)?;
     execution_history::registration::register(module)?;

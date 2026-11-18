@@ -111,7 +111,7 @@ class WorkerExecutionTestCase:
     model_sql: str
     warehouse_query: str
     expected_status: str
-    expected_rows: list[tuple[int] | tuple[str]]
+    expected_rows: list[tuple[str | int | bool | None, ...]]
     expected_node_count: int = 1
     # Node counts by status when the nodes don't all share the run's status.
     expected_node_counts: dict[str, int] | None = None

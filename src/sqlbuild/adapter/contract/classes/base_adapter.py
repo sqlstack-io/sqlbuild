@@ -27,6 +27,7 @@ from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import 
     HistoricalTimestampSnapshotSql,
 )
 from sqlbuild.adapter.contract.classes.retention_adapter import RetentionAdapterMixin
+from sqlbuild.adapter.contract.classes.runs_table import RunsTableMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.classes.strict_adapter import StrictAdapter
@@ -104,7 +105,7 @@ _COLLECTION_SQL_VALUE_KINDS: frozenset[SqlValueKind] = frozenset(
 )
 
 
-class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
+class BaseAdapter(RetentionAdapterMixin, RunsTableMixin, StrictAdapter):
     """Adapter base with ANSI SQL defaults."""
 
     adapter_name: ClassVar[str]

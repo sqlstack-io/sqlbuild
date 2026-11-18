@@ -7,6 +7,7 @@ pub mod install;
 pub mod job_names;
 pub mod materialization;
 pub mod model_facts;
+pub mod named_jobs;
 pub mod needed_jobs;
 pub mod plain_value;
 pub mod python_column_fact;

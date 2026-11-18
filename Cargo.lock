@@ -4604,6 +4604,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "pyo3",
+ "serde",
  "serde_json",
  "sha2 0.10.9",
  "sqlbuild-analysis",
@@ -4623,6 +4624,7 @@ dependencies = [
  "sqlbuild-python-front",
  "sqlbuild-rules",
  "sqlbuild-sqltext",
+ "sqlbuild-state",
  "tokio",
  "uuid",
 ]

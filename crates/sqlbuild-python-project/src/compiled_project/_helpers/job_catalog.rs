@@ -54,7 +54,15 @@ pub(crate) fn selected_jobs(
     selectors: &[String],
     catalog: &BTreeMap<String, JobSelection>,
 ) -> BTreeSet<String> {
-    let mut jobs: BTreeSet<String> = BTreeSet::new();
+    ordered_jobs(selectors, catalog).into_iter().collect()
+}
+
+/// The jobs `selectors` name, each once in the order first named.
+pub(crate) fn ordered_jobs(
+    selectors: &[String],
+    catalog: &BTreeMap<String, JobSelection>,
+) -> Vec<String> {
+    let mut jobs: Vec<String> = Vec::new();
     let parts = selectors
         .iter()
         .flat_map(|selector| selector.split(char::is_whitespace))
@@ -63,8 +71,11 @@ pub(crate) fn selected_jobs(
         let Ok(ParsedSelector::Kind { kind, value, .. }) = parse_selector(part) else {
             continue;
         };
-        if JOB_SELECTOR_KINDS.contains(&kind.as_str()) && catalog.contains_key(&value) {
-            jobs.insert(value);
+        if JOB_SELECTOR_KINDS.contains(&kind.as_str())
+            && catalog.contains_key(&value)
+            && !jobs.contains(&value)
+        {
+            jobs.push(value);
         }
     }
     jobs
