@@ -15,7 +15,7 @@ use crate::plan_output::_helpers::plan_json::table_type_json;
 use crate::plan_output::_helpers::plan_json::warning_json;
 use crate::plan_output::_helpers::values::mapped;
 use crate::plan_output::constants::{
-    CHANGED_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY,
+    CHANGED_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY, WAREHOUSE_JOBS_KEY,
 };
 use crate::plan_output::main::any::any;
 use crate::plan_output::main::dict::dict;
@@ -29,7 +29,7 @@ use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_project::compiled_project::constants::{
-    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY,
+    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
 };
 
 /// The plan as one JSON document, `json.dumps(indent=2)`.
@@ -139,6 +139,10 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
                 PyList::new(py, jobs.try_iter()?.collect::<PyResult<Vec<_>>>()?)?,
             )?;
         }
+    }
+    let warehouses: Bound<'_, PyAny> = mapping_get(&metadata, JOB_WAREHOUSES_KEY)?;
+    if !warehouses.is_none() {
+        result.set_item(WAREHOUSE_JOBS_KEY, warehouses)?;
     }
     indented_json(result.as_any())
 }

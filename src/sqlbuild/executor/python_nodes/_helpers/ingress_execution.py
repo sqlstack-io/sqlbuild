@@ -31,6 +31,7 @@ from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
 from sqlbuild.executor.python_nodes._helpers.lifecycle_nodes import build_ingress_lifecycle_nodes
+from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
 from sqlbuild.executor.python_nodes.classes.ingress_results import IngressResultAccumulator
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
 from sqlbuild.executor.python_nodes.models import (
@@ -149,6 +150,7 @@ def _execute_ingress_lifecycle_node(
     results: IngressResultAccumulator,
 ) -> LifecycleNodeResult:
     discovered_node: DiscoveredPythonNode = python_graph.nodes_by_name[node.name]
+    runtime = node_runtime(runtime, node.name)
     if discovered_node.kind == PythonNodeKind.LOADER:
         return _execute_ingress_loader(
             node=discovered_node,

@@ -1,7 +1,9 @@
 pub mod authored_warehouse;
 pub mod check_cli_warehouse;
 pub mod check_expanded_warehouse;
+pub mod check_job_warehouse;
 pub mod check_preview_target;
 pub mod missing_connection_error;
 pub mod snowflake_key_warning;
 pub mod unsupported_cli_warehouse;
+pub mod unsupported_job_warehouse;

@@ -28,10 +28,17 @@ fn date_vars(facts: &RunContextFacts) -> String {
 /// The resolved placement, mode and selection, then the selector files.
 #[must_use]
 pub fn render_run_context(facts: &RunContextFacts, style: CliStyle) -> String {
-    let warehouse: String = facts.warehouse.as_ref().map_or_else(
+    let mut warehouse: String = facts.warehouse.as_ref().map_or_else(
         || NOT_SET.to_owned(),
         |(warehouse, source)| format!("{} ({source})", sanitize(warehouse)),
     );
+    for (job, job_warehouse) in &facts.job_warehouses {
+        warehouse.push_str(&format!(
+            "; nodes of job {} on {}",
+            sanitize(job),
+            sanitize(job_warehouse)
+        ));
+    }
     let rows: Vec<(String, String)> = [
         ("command", sanitize(&facts.command)),
         ("run_id", display_value(facts.run_id.as_deref())),

@@ -344,6 +344,8 @@ struct RuntimeParts<'a, 'py> {
     target_config: TargetSettingsValues,
     relations: (Bound<'py, PyAny>, Bound<'py, PyAny>),
     inputs: &'a LifecycleInputs<'py>,
+    /// Each Python node's job warehouse, by name.
+    warehouses: Bound<'py, PyAny>,
 }
 
 fn node_runtime<'py>(
@@ -375,6 +377,7 @@ fn node_runtime<'py>(
             ("relation_targets", parts.relations.0.clone()),
             ("project_relations", parts.relations.1.clone()),
             ("providers", parts.inputs.providers.clone()),
+            ("node_warehouses", parts.warehouses.clone()),
         ],
     )
 }
@@ -528,6 +531,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         target_config,
         relations: (relation_targets, project_relations),
         inputs,
+        warehouses: native_field(pipeline, "python_node_warehouses")?,
     };
     let mut ingress_python: Bound<'py, PyAny> = tuple(py, &[])?;
     let mut ingress_loads: Bound<'py, PyAny> = tuple(py, &[])?;

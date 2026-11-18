@@ -36,3 +36,5 @@ pub const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];
 pub const JOB_IGNORED_AUDIT_FAILURES_KEY: &str = "job_ignored_audit_failures";
 /// Plan metadata naming the jobs whose own models a build rebuilds from scratch.
 pub const JOB_FULL_REFRESH_KEY: &str = "job_full_refresh";
+/// Plan metadata mapping each named job whose warehouse its nodes run on to that warehouse.
+pub const JOB_WAREHOUSES_KEY: &str = "job_warehouses";

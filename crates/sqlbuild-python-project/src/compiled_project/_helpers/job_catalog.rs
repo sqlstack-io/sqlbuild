@@ -121,6 +121,16 @@ pub(crate) fn job_catalog(py: Python<'_>) -> PyResult<Option<Catalog>> {
     Ok(loaded_jobs(py)?.map(|(catalog, _)| catalog))
 }
 
+/// The project directory of the running command's job scope, if it has one.
+pub(crate) fn job_scope_project_dir() -> Option<PathBuf> {
+    JOB_SCOPE.with(|scope| {
+        scope
+            .borrow()
+            .as_ref()
+            .map(|scope| scope.project_dir.clone())
+    })
+}
+
 /// Each job's `[settings]` and `[retry]` and each group's jobs declared for the command's target; none outside a command.
 pub(crate) fn job_declarations(py: Python<'_>) -> PyResult<Option<BTreeMap<String, DeclaredRun>>> {
     Ok(loaded_jobs(py)?.map(|(_, declared)| declared))

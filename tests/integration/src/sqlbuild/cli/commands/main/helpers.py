@@ -1479,3 +1479,88 @@ def peak_concurrency(*, events_path: Path, names: tuple[str, ...]) -> int:
         + [(end, -1) for end, _ in ends]
     )
     return max(accumulate(change for _, change in changes), default=0)
+
+
+_CONNECT_MARKER: str = "-- connect"
+
+
+def _job_warehouse_model(dep: str | None) -> str:
+    source: str = "" if dep is None else f' FROM __ref("{dep}")'
+    return f"MODEL (description 'Step.', materialized table);\nSELECT 1 AS id{source}\n"
+
+
+def _job_file(name: str, select: str, warehouse: str) -> str:
+    return (
+        f'name = "{name}"\ndescription = "Runs {select}."\nselect = "{select}"\n\n'
+        f'[settings]\nwarehouse = "{warehouse}"\n'
+    )
+
+
+def write_job_warehouse_project(*, project_dir: Path) -> None:
+    """A Snowflake chain stg -> orders -> orders_daily -> refunds -> summary and a task, with jobs
+    on their own warehouses: orders_wh_job, refunds_wh_job, refunds_alt_job (also refunds),
+    tasks_wh_job and bad_wh_job, whose warehouse is not an identifier."""
+
+    write_snowflake_warehouse_project(
+        project_dir=project_dir,
+        warehouses_section='[targets.dev.warehouses]\nbuild = "BUILD_WH"\n',
+        local_config="",
+    )
+    write_project_files(
+        project_dir=project_dir,
+        files={
+            "models/stg.sql": _job_warehouse_model(None),
+            "models/orders.sql": _job_warehouse_model("stg"),
+            "models/orders_daily.sql": _job_warehouse_model("orders"),
+            "models/refunds.sql": _job_warehouse_model("orders_daily"),
+            "models/summary.sql": _job_warehouse_model("refunds"),
+            "python/tasks.py": (
+                "from sqlbuild.tasks import task\n\n\n@task\ndef refresh_marker(ctx):\n"
+                '    """Refresh."""\n    ctx.execute_sql("SELECT \'task marker\'")\n'
+            ),
+            "orchestration/jobs/orders_wh_job.toml": _job_file(
+                "orders_wh_job", "orders orders_daily", "ORDERS_WH"
+            ),
+            "orchestration/jobs/refunds_wh_job.toml": _job_file(
+                "refunds_wh_job", "refunds", "REFUNDS_WH"
+            ),
+            "orchestration/jobs/refunds_alt_job.toml": _job_file(
+                "refunds_alt_job", "refunds", "ALT_WH"
+            ),
+            "orchestration/jobs/tasks_wh_job.toml": _job_file(
+                "tasks_wh_job", "refresh_marker", "TASKS_WH"
+            ),
+            "orchestration/jobs/bad_wh_job.toml": _job_file("bad_wh_job", "stg", "bad wh"),
+        },
+    )
+
+
+def install_writable_offline_snowflake(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[list[dict[str, object]], list[str]]:
+    """The offline connector, accepting writes, with a marker before each connection's setup."""
+
+    connect_calls, executed_sql = install_offline_snowflake_connector(monkeypatch)
+    monkeypatch.setattr(
+        sys.modules[__name__], "_refuse_offline_snowflake_write", _accept_offline_snowflake_read
+    )
+    connector: ModuleType = sys.modules["snowflake.connector"]
+    connect: Callable[..., object] = connector.__dict__["connect"]
+
+    def marked_connect(**kwargs: object) -> object:
+        executed_sql.append(_CONNECT_MARKER)
+        return connect(**kwargs)
+
+    monkeypatch.setitem(connector.__dict__, "connect", marked_connect)
+    return connect_calls, executed_sql
+
+
+def warehouse_switches(executed_sql: list[str]) -> tuple[str, ...]:
+    """The warehouses statements switch to, leaving out each new connection's own setup."""
+
+    prefix: str = "USE WAREHOUSE "
+    return tuple(
+        sql.removeprefix(prefix)
+        for previous, sql in zip([_CONNECT_MARKER, *executed_sql], executed_sql, strict=False)
+        if sql.startswith(prefix) and previous != _CONNECT_MARKER
+    )

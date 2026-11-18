@@ -25,6 +25,14 @@ pub(super) struct NodeJobConflictTestCase {
     pub(super) expected_message: &'static str,
 }
 
+pub(super) struct PythonNodeValuesTestCase {
+    pub(super) description: &'static str,
+    /// The named jobs the Python node is selected through.
+    pub(super) jobs: &'static [&'static str],
+    /// Its settings, or the conflict's message.
+    pub(super) expected_result: Result<BTreeMap<&'static str, Json>, &'static str>,
+}
+
 pub(super) struct BuildJobSettingsTestCase {
     pub(super) description: &'static str,
     pub(super) select: &'static [&'static str],

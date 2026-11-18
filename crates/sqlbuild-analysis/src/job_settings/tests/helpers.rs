@@ -97,6 +97,20 @@ pub(super) fn declared() -> BTreeMap<String, DeclaredRun> {
             job(json!({"full_refresh": true}), None),
         ),
         (
+            "orders_wh_job".to_owned(),
+            job(
+                json!({"warehouse": "ORDERS_WH", "run_tests": false}),
+                Some(JobRetry {
+                    attempts: 2,
+                    delay_seconds: 0,
+                }),
+            ),
+        ),
+        (
+            "refunds_wh_job".to_owned(),
+            job(json!({"warehouse": "REFUNDS_WH"}), None),
+        ),
+        (
             "daily_group".to_owned(),
             DeclaredRun::Group {
                 members: texts(&["orders_job", "refunds_job"]),
@@ -120,6 +134,8 @@ fn selections() -> BTreeMap<String, JobSelection> {
         ("retried_job".to_owned(), job(&["stg_orders"])),
         ("retried_fast_job".to_owned(), job(&["stg_orders"])),
         ("broken_job".to_owned(), job(&["missing_model"])),
+        ("orders_wh_job".to_owned(), job(&["+orders"])),
+        ("refunds_wh_job".to_owned(), job(&["+refunds"])),
         (
             "daily_group".to_owned(),
             JobSelection::Group {

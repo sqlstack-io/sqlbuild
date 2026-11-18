@@ -81,6 +81,7 @@ def test_given_large_microbatch_phase_when_workers_are_blocked_then_future_submi
     scheduler._microbatch_coordinator_demand = 1
     scheduler._microbatch_subworkers = 0
     scheduler._connection_pool = Queue()
+    scheduler._session_warehouses = None
     for index in range(test_case.expected_max_subworker_futures):
         scheduler._connection_pool.put(f"worker-{index}")
 
@@ -173,6 +174,7 @@ def test_given_coordinator_failure_when_subworkers_are_running_then_pending_batc
     scheduler._microbatch_coordinator_demand = 1
     scheduler._microbatch_subworkers = 0
     scheduler._connection_pool = Queue()
+    scheduler._session_warehouses = None
     for index in range(test_case.expected_max_subworker_futures):
         scheduler._connection_pool.put(f"worker-{index}")
 

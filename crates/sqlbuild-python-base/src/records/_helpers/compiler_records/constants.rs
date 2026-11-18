@@ -877,6 +877,8 @@ const R_COMPILE_PIPELINE_RESULT: RecordSpec = RecordSpec {
         FieldSpec::new("python_plan_entries", FieldDefault::EmptyTuple),
         FieldSpec::new("job_limits", FieldDefault::EmptyDict),
         FieldSpec::new("node_jobs", FieldDefault::EmptyDict),
+        FieldSpec::new("node_warehouses", FieldDefault::EmptyDict),
+        FieldSpec::new("python_node_warehouses", FieldDefault::EmptyDict),
         FieldSpec::new("compile_seconds", FieldDefault::None),
         FieldSpec::new("planning_seconds", FieldDefault::None),
     ],

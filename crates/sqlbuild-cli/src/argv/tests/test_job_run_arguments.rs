@@ -11,7 +11,7 @@ fn given_a_server_job_run_when_building_its_arguments_then_it_names_the_job_and_
     let test_cases = [
         JobRunArgumentsTestCase {
             description: "concurrency and node-level settings are left to the build",
-            settings: json!({"concurrency": 8, "run_tests": false, "full_refresh": true}),
+            settings: json!({"concurrency": 8, "run_tests": false, "full_refresh": true, "warehouse": "ORDERS_WH"}),
             expected_arguments: &["--select", "job:orders_job"],
         },
         JobRunArgumentsTestCase {

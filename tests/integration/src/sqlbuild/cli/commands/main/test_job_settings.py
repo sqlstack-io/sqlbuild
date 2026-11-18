@@ -91,6 +91,10 @@ _PROJECT_FILES: dict[str, str] = {
         )
         for name in ("a", "b", "c", "d")
     },
+    "orchestration/jobs/warehouse_job.toml": (
+        'name = "warehouse_job"\ndescription = "On a warehouse."\nselect = "customers"\n\n'
+        '[settings]\nwarehouse = "ORDERS_WH"\n'
+    ),
     "orchestration/jobs/wide_job.toml": (
         'name = "wide_job"\ndescription = "Wide."\nselect = "customers"\n\n'
         '[settings]\nconcurrency = 6\nvars = { amount = "5" }\n'
@@ -389,6 +393,23 @@ def test_given_a_job_concurrency_when_building_then_its_nodes_never_exceed_it(
             expected_exit_code=0,
             expected_present=("(concurrency: 2)",),
             expected_absent=(),
+        ),
+        JobOutputTestCase(
+            description="a job warehouse on an adapter without one fails, naming the job",
+            command_args=("build", "--select", "job:warehouse_job"),
+            expected_exit_code=1,
+            expected_present=(
+                "error[C260]: job warehouse_job sets warehouse ORDERS_WH, but the 'duckdb' "
+                "adapter has no warehouse to select",
+            ),
+            expected_absent=(),
+        ),
+        JobOutputTestCase(
+            description="--no-job-settings leaves a job warehouse out on such an adapter",
+            command_args=("build", "--no-job-settings", "--select", "job:warehouse_job"),
+            expected_exit_code=0,
+            expected_present=(),
+            expected_absent=("C260",),
         ),
         JobOutputTestCase(
             description="a plan shows the job's full refresh",

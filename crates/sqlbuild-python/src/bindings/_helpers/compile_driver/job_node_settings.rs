@@ -2,18 +2,24 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use serde_json::Value;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
-use sqlbuild_analysis::job_settings::constants::CONFLICT_HELP;
+use sqlbuild_analysis::job_settings::constants::{CONFLICT_HELP, WAREHOUSE_SETTING};
 use sqlbuild_analysis::job_settings::errors::{JobSettingConflict, NodeJobSettingsError};
 use sqlbuild_analysis::job_settings::main::build_job_settings::build_job_settings;
 use sqlbuild_analysis::job_settings::main::named_jobs::named_jobs;
 use sqlbuild_analysis::job_settings::main::node_job_settings::node_job_settings;
 use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings};
+use sqlbuild_config::command_connection::main::check_job_warehouse::check_job_warehouse;
+use sqlbuild_config::command_connection::main::unsupported_job_warehouse::unsupported_job_warehouse;
 
+use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
+use crate::bindings::_helpers::command_runtime::warehouses::command_scope;
 use crate::bindings::_helpers::compiled_project::job_settings::{
     job_selector_error, job_setting_conflict,
 };
@@ -21,10 +27,13 @@ use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_compile::compile_driver::main::setup::project_graph::project_graph;
+use sqlbuild_python_front::compile_driver::main::session_warehouse_support::session_warehouse_support;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_project::compiled_project::constants::{
-    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY,
+    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
 };
 use sqlbuild_python_project::compiled_project::main::job_declarations::job_declarations;
+use sqlbuild_python_project::compiled_project::main::job_scope_project_dir::job_scope_project_dir;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::graph::models::KeyCache;
@@ -44,6 +53,61 @@ pub(crate) struct PlannedJobSettings {
     ignoring_jobs: Vec<String>,
     /// The named jobs that set `full_refresh = true` for models they select.
     refreshing_jobs: Vec<String>,
+    /// Each named job whose `warehouse` its own nodes run on, and that warehouse; `--warehouse`
+    /// leaves the jobs' warehouses out before they are resolved.
+    job_warehouses: BTreeMap<String, String>,
+}
+
+fn is_python(key: &ObjectKey) -> bool {
+    PYTHON_NODE_KINDS.contains(&key.0.as_str())
+}
+
+/// The named jobs whose `warehouse` some selected node runs on, checked as `--warehouse` would be:
+/// a valid name (`C261`) on an adapter with a session warehouse (`C260`).
+fn job_warehouses(
+    (project, discovered): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    settings: &NodeJobSettings,
+    declared: &BTreeMap<String, DeclaredRun>,
+) -> PyResult<BTreeMap<String, String>> {
+    let py: Python<'_> = project.py();
+    let mut warehouses: BTreeMap<String, String> = BTreeMap::new();
+    for (key, jobs) in &settings.node_jobs {
+        if !settings
+            .values
+            .get(key)
+            .is_some_and(|values| values.contains_key(WAREHOUSE_SETTING))
+        {
+            continue;
+        }
+        for job in jobs {
+            if warehouses.contains_key(job) {
+                continue;
+            }
+            if let Some(DeclaredRun::Job { settings, .. }) = declared.get(job)
+                && let Some(value) = settings.get(WAREHOUSE_SETTING)
+            {
+                let name: String =
+                    check_job_warehouse(job, value.as_str()).map_err(|error| raised(py, error))?;
+                warehouses.insert(job.clone(), name);
+            }
+        }
+    }
+    let Some((job, warehouse)) = warehouses.iter().next() else {
+        return Ok(warehouses);
+    };
+    let adapter_name: Bound<'_, PyAny> = resolve_effective_adapter_name(
+        &native_field(discovered, "project_config")?,
+        &native_field(discovered, "local_config")?,
+    )?;
+    let project_dir: Bound<'_, PyAny> = job_scope_project_dir().into_pyobject(py)?.into_any();
+    if !session_warehouse_support(py, &adapter_name, &project_dir)? {
+        let adapter: String = adapter_name.str()?.extract()?;
+        return Err(raised(
+            py,
+            unsupported_job_warehouse(job, warehouse, &adapter),
+        ));
+    }
+    Ok(warehouses)
 }
 
 /// The named jobs of `settings` that set `setting` to true for a selected node of `kind`, if given.
@@ -54,7 +118,7 @@ fn jobs_setting(
 ) -> Vec<String> {
     let mut jobs: BTreeSet<String> = BTreeSet::new();
     for (key, node_jobs) in &settings.node_jobs {
-        if kind.is_some_and(|kind| key.0 != kind) {
+        if is_python(key) || kind.is_some_and(|kind| key.0 != kind) {
             continue;
         }
         for job in node_jobs {
@@ -89,9 +153,16 @@ pub(crate) fn planned_job_settings(
         return Ok(None);
     }
     let exclude: Vec<String> = strings(&native_field(options, "exclude")?)?;
-    let Some(declared): Option<BTreeMap<String, DeclaredRun>> = job_declarations(py)? else {
+    let Some(mut declared): Option<BTreeMap<String, DeclaredRun>> = job_declarations(py)? else {
         return Ok(None);
     };
+    if command_scope(py)?.cli_warehouse.is_some() {
+        for run in declared.values_mut() {
+            if let DeclaredRun::Job { settings, .. } = run {
+                settings.remove(WAREHOUSE_SETTING);
+            }
+        }
+    }
     let named: Vec<String> = named_jobs(&select, &declared);
     if named.is_empty() {
         return Ok(None);
@@ -105,10 +176,8 @@ pub(crate) fn planned_job_settings(
         &python_node_graph(discovered)?,
         &all,
     )?;
-    let token_nodes = |token: &str, exclude: &[String]| {
-        let resolved = selection.resolve(&[token.to_owned()], exclude)?;
-        Ok(resolved.sql_keys.into_iter().collect())
-    };
+    let token_nodes =
+        |token: &str, exclude: &[String]| selection.resolve_keys(&[token.to_owned()], exclude);
     let resolved = compiler_guard(|| {
         Ok(node_job_settings(
             selection.graph(),
@@ -121,6 +190,7 @@ pub(crate) fn planned_job_settings(
         Ok(settings) => Ok(Some(PlannedJobSettings {
             ignoring_jobs: jobs_setting(&settings, &declared, (IGNORE_AUDIT_FAILURES, None)),
             refreshing_jobs: jobs_setting(&settings, &declared, (FULL_REFRESH, Some(MODEL_KIND))),
+            job_warehouses: job_warehouses((project, discovered), &settings, &declared)?,
             settings,
         })),
         Err(NodeJobSettingsError::Selector(failure)) => Err(job_selector_error(py, &failure)),
@@ -183,7 +253,7 @@ impl PlannedJobSettings {
             jobs
         };
         let cache = KeyCache::new(py)?;
-        for key in self.settings.node_jobs.keys() {
+        for key in self.settings.node_jobs.keys().filter(|key| !is_python(key)) {
             let jobs: Vec<String> = limited(std::slice::from_ref(key));
             if !jobs.is_empty() {
                 node_jobs.set_item(cache.key(key)?, PyTuple::new(py, jobs)?)?;
@@ -201,6 +271,50 @@ impl PlannedJobSettings {
             }
         }
         Ok((limits, node_jobs))
+    }
+
+    /// The warehouse of a node's named job, when one applies to it.
+    fn warehouse(&self, key: &ObjectKey) -> Option<&str> {
+        if self.job_warehouses.is_empty() {
+            return None;
+        }
+        self.value(key, WAREHOUSE_SETTING).and_then(Value::as_str)
+    }
+
+    /// Each planned SQL node's job warehouse, and each Python node's by name; a SQL test runs on
+    /// the warehouse its models' jobs give when they agree. Empty under `--warehouse`.
+    pub(crate) fn node_warehouses<'py>(
+        &self,
+        plan: &Bound<'py, PyAny>,
+    ) -> PyResult<(Bound<'py, PyDict>, Bound<'py, PyDict>)> {
+        let py: Python<'py> = plan.py();
+        let nodes: Bound<'py, PyDict> = PyDict::new(py);
+        let python: Bound<'py, PyDict> = PyDict::new(py);
+        if self.job_warehouses.is_empty() {
+            return Ok((nodes, python));
+        }
+        for key in native_field(plan, "execution_order")?.try_iter()? {
+            let key: Bound<'py, PyAny> = key?;
+            if let Some(warehouse) = self.warehouse(&native_key(&key)?) {
+                nodes.set_item(key, warehouse)?;
+            }
+        }
+        for entry in native_field(plan, "test_entries")?.try_iter()? {
+            let entry: Bound<'py, PyAny> = entry?;
+            let mut covered: BTreeSet<&str> = BTreeSet::new();
+            for dep in native_field(&entry, "scope_deps")?.try_iter()? {
+                covered.extend(self.warehouse(&native_key(&dep?)?));
+            }
+            if let [warehouse] = covered.into_iter().collect::<Vec<_>>().as_slice() {
+                nodes.set_item(native_field(&entry, "key")?, *warehouse)?;
+            }
+        }
+        for key in self.settings.values.keys().filter(|key| is_python(key)) {
+            if let Some(warehouse) = self.warehouse(key) {
+                python.set_item(&key.1, warehouse)?;
+            }
+        }
+        Ok((nodes, python))
     }
 
     /// The plan with its jobs' `run_tests` and, unless the command line decided, audit failures.
@@ -267,7 +381,10 @@ impl PlannedJobSettings {
         } else {
             &[]
         };
-        if !ignoring.is_empty() || !self.refreshing_jobs.is_empty() {
+        if !ignoring.is_empty()
+            || !self.refreshing_jobs.is_empty()
+            || !self.job_warehouses.is_empty()
+        {
             let metadata: Bound<'py, PyDict> = native_field(plan, "metadata")?
                 .cast_into::<PyDict>()?
                 .copy()?;
@@ -279,6 +396,13 @@ impl PlannedJobSettings {
                     JOB_FULL_REFRESH_KEY,
                     PyTuple::new(py, &self.refreshing_jobs)?,
                 )?;
+            }
+            if !self.job_warehouses.is_empty() {
+                let warehouses: Bound<'py, PyDict> = PyDict::new(py);
+                for (job, warehouse) in &self.job_warehouses {
+                    warehouses.set_item(job, warehouse)?;
+                }
+                metadata.set_item(JOB_WAREHOUSES_KEY, warehouses)?;
             }
             changes.push(("metadata", metadata.into_any()));
         }

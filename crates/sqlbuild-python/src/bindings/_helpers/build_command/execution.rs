@@ -65,6 +65,7 @@ use sqlbuild_python_planner::consumption::models::ConsumptionRecorder;
 use sqlbuild_python_planner::consumption::models::Prepared;
 use sqlbuild_python_planner::freshness::main::append_freshness_records::append_freshness_records;
 use sqlbuild_python_planner::observations::main::append_build_observations::append_build_observations;
+use sqlbuild_python_planner::plan_output::main::job_warehouses::job_warehouses;
 use sqlbuild_python_planner::planner_resolution::main::cursor::type_cursor_overrides::type_cursor_overrides;
 use sqlbuild_python_project::compiled_project::constants::JOB_FULL_REFRESH_KEY;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
@@ -177,6 +178,10 @@ fn run_context_facts(
         concurrency_source: concurrency.source.to_string(),
         full_refresh: context.request_flag("full_refresh")?,
         full_refresh_jobs: full_refresh_jobs(pipeline)?,
+        job_warehouses: job_warehouses(&native_field(
+            &native_field(pipeline, "plan_output")?,
+            "metadata",
+        )?)?,
         selected_count,
         total_count,
         date_vars: (
@@ -437,6 +442,10 @@ pub(crate) fn execute_build_plan<'py>(
                 ("providers", providers.clone()),
                 ("job_limits", native_field(pipeline, "job_limits")?),
                 ("node_jobs", native_field(pipeline, "node_jobs")?),
+                (
+                    "node_warehouses",
+                    native_field(pipeline, "node_warehouses")?,
+                ),
                 (
                     "test_timeouts",
                     timeout_record(
@@ -738,6 +747,10 @@ fn check_runtime<'py>(
                 .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?,
             ),
             ("providers", providers.clone()),
+            (
+                "node_warehouses",
+                native_field(pipeline, "python_node_warehouses")?,
+            ),
         ],
     )
 }
