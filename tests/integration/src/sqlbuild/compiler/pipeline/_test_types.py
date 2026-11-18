@@ -75,6 +75,15 @@ class PhysicalEvidenceCase:
 
 
 @dataclass(frozen=True)
+class AddedColumnsCase:
+    """Models over a source the warehouse lists with one more column, and which are re-analysed."""
+
+    description: str
+    models: tuple[tuple[str, str], ...]
+    expected_reanalysed: int
+
+
+@dataclass(frozen=True)
 class SemanticCompileCase:
     description: str
     upstream: str

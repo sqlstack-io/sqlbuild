@@ -61,7 +61,7 @@ _CURSOR_BATCH_SIZE: int = 50
             expected_max_warm_to_publish=0.45,
             expected_max_check_seconds=0.5,
             expected_max_live_to_warm=6.0,
-            expected_source_rebinding=(300, 1_000),
+            expected_source_rebinding=(25, 150),
             expected_max_warehouse_statements=1_150,
         ),
         PreviewPerformanceTestCase(
@@ -73,7 +73,7 @@ _CURSOR_BATCH_SIZE: int = 50
             expected_max_warm_to_publish=0.45,
             expected_max_check_seconds=0.5,
             expected_max_live_to_warm=6.0,
-            expected_source_rebinding=(300, 1_000),
+            expected_source_rebinding=(25, 150),
             expected_max_warehouse_statements=1_150,
         ),
     ),
@@ -169,7 +169,7 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
         test_case.expected_source_rebinding[0]
         <= live.source_rebinding_analyses
         <= test_case.expected_source_rebinding[1]
-    ), "only models reading a source whose warehouse columns differ are analysed again"
+    ), "only models whose result a source's new or changed columns can change are analysed again"
     assert live.cursor_statements == -(-live.cursor_relations // _CURSOR_BATCH_SIZE), (
         "cursor bounds are read in full batches"
     )
