@@ -47,6 +47,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::event_exporting::constants::DISPATCHER_THREAD_NAME;
 use sqlbuild_python_base::event_exporting::constants::EXIT_JOIN_SECONDS;
 use sqlbuild_python_base::event_exporting::constants::HEALTH_THREAD_NAME;
+use sqlbuild_python_base::event_exporting::constants::IDLE_POLL_SECONDS;
 use sqlbuild_python_base::event_exporting::constants::JOIN_GRACE_SECONDS;
 use sqlbuild_python_base::event_exporting::constants::NO_SECONDS;
 use sqlbuild_python_base::event_exporting::constants::NOTIFIER_THREAD_NAME;
@@ -543,6 +544,7 @@ impl DispatcherWorker {
             notify |= state.feed(py, round)?;
             state.stopping && !state.busy() && state.queue.items.is_empty() && state.held.is_empty()
         };
+        let idle: bool = !stopped && Self::idle_round(&state);
         let blocked: Vec<String> = std::mem::take(&mut state.newly_blocked);
         drop(state);
         for name in blocked {
@@ -552,9 +554,26 @@ impl DispatcherWorker {
             shared.notify_all(py)?;
         }
         if !stopped {
-            shared.wait(py, POLL_SECONDS)?;
+            shared.wait(
+                py,
+                if idle {
+                    IDLE_POLL_SECONDS
+                } else {
+                    POLL_SECONDS
+                },
+            )?;
         }
         Ok(!stopped)
+    }
+
+    /// Whether a round has nothing to watch: no queued, held or pending work, and no shutdown.
+    fn idle_round(state: &State) -> bool {
+        !state.busy()
+            && state.queue.items.is_empty()
+            && state.held.is_empty()
+            && !state.stopping
+            && !state.force_stop
+            && state.deadline.is_none()
     }
 
     /// Every `(token, sanitized error type)` delivery threads reported since the last round.
@@ -593,7 +612,7 @@ impl DispatcherWorker {
                 return Ok(Notification::Stop);
             }
             drop(state);
-            shared.wait(py, POLL_SECONDS)?;
+            shared.wait(py, IDLE_POLL_SECONDS)?;
         }
     }
 

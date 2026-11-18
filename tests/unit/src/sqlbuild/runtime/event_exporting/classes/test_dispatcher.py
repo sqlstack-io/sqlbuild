@@ -29,6 +29,7 @@ from sqlbuild.sinks import CommandOutputRecord, CommandOutputStream
 from tests.unit.src.sqlbuild.runtime.event_exporting.classes._test_types import (
     EventExporterDispatcherTestCase,
     HealthIntervalTestCase,
+    IdleDispatcherTestCase,
     OutcomeDeliveryTestCase,
 )
 from tests.unit.src.sqlbuild.runtime.event_exporting.classes.helpers import (
@@ -121,6 +122,57 @@ def test_given_slow_exporter_when_enqueuing_then_execution_thread_is_not_blocked
     assert exporter_threads[0] != caller_thread
     release.set()
     assert dispatcher.shutdown().delivered == test_case.expected_delivered
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        IdleDispatcherTestCase(
+            description="an idle dispatcher waits for work instead of polling",
+            idle_seconds=0.5,
+            expected_max_waits=10,
+            expected_max_delivery_seconds=0.5,
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_idle_dispatcher_when_waiting_then_it_does_not_poll_and_still_delivers_promptly(
+    test_case: IdleDispatcherTestCase,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    delivered: list[threading.Event] = [threading.Event(), threading.Event()]
+    published: list[int] = []
+    caller_thread: int = threading.get_ident()
+    waits: list[tuple[int, float | None]] = []
+    condition_wait: Callable[[threading.Condition, float | None], bool] = threading.Condition.wait
+
+    def counted_wait(self: threading.Condition, timeout: float | None = None) -> bool:
+        waits.append((threading.get_ident(), timeout))
+        return condition_wait(self, timeout)
+
+    monkeypatch.setattr(threading.Condition, "wait", counted_wait)
+
+    def publish(*, event: LifecycleEvent) -> None:
+        del event
+        delivered[len(published)].set()
+        published.append(1)
+
+    dispatcher: EventExporterDispatcher = EventExporterDispatcher(
+        exporters=(BoundEventExporter("publish", publish, {}),),
+    )
+    dispatcher.enqueue(lifecycle_event())
+    assert delivered[0].wait(timeout=2.0)
+    time.sleep(0.05)
+    waits.clear()
+    time.sleep(test_case.idle_seconds)
+    idle_waits: int = sum(thread != caller_thread for thread, _ in waits)
+    started: float = time.monotonic()
+    dispatcher.enqueue(lifecycle_event())
+
+    assert delivered[1].wait(timeout=2.0)
+    assert time.monotonic() - started < test_case.expected_max_delivery_seconds
+    assert idle_waits <= test_case.expected_max_waits
+    assert dispatcher.shutdown().delivered == 2
 
 
 @pytest.mark.parametrize(
