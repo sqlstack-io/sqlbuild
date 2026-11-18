@@ -425,7 +425,7 @@ def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_
         assert first.index(_SYNCED) < first.index(_PLANNED), (
             "a publication plans what changed once its sync completes, not from the old copy"
         )
-        assert changed_build() == test_case.expected_published
+        assert changed_build() == test_case.expected_published, log.read_text()
 
         _ = wait_for_location_work(api, request_warehouse_sync(control), location, log)
         _ = wait_for_log_count(location, log, _SYNCED, 2)
@@ -439,8 +439,9 @@ def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_
         assert rebuilt.returncode == 0, rebuilt.stderr
         _ = wait_for_location_work(api, request_warehouse_sync(control), location, log)
         _ = wait_for_log_count(location, log, _PLANNED, 2)
+        # The log shows which sync the second plan followed and what each sync read.
         assert changed_build() == test_case.expected_rebuilt, (
-            "a sync that mirrored the new build plans again"
+            f"a sync that mirrored the new build plans again\n{log.read_text()}"
         )
 
 
