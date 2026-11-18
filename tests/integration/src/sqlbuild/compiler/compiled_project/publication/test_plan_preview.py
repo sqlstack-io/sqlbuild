@@ -5,6 +5,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import time
 from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
@@ -28,6 +29,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalo
     request_warehouse_sync,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    ORDER_SKEW_SECONDS,
     changed_build_and_plan_from_copy,
     changed_build_report,
     changed_runs,
@@ -386,6 +388,7 @@ def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_
     write_files(project_dir=project, files=_PROJECT_FILES)
     built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
     assert built.returncode == 0, built.stderr
+    built_at: float = time.monotonic()
     edited: str = _PROJECT_FILES["models/order_count.sql"].replace(*test_case.edit)
     write_files(project_dir=project, files={"models/order_count.sql": edited})
     control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
@@ -433,6 +436,7 @@ def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_
         _ = wait_for_location_work(api, request_plan(control, ["model:orders"]), location, log)
         assert log.read_text().count(_PLANNED) == 1, "a sync that applied nothing keeps the count"
 
+        time.sleep(max(0.0, built_at + ORDER_SKEW_SECONDS - time.monotonic()))
         rebuilt: subprocess.CompletedProcess[str] = run_sqb(
             project, "build", "--target", "development"
         )

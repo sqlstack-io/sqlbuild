@@ -11,6 +11,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ChangedJobTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    ORDER_SKEW_SECONDS,
     changed_job_files,
     duckdb_rows,
     request_job_run,
@@ -18,7 +19,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     sqlite_rows,
 )
 
-ORDER_SKEW_SECONDS: float = 5.2
 EXPECTED_CHANGED_RUNS: tuple[tuple[str, frozenset[str], dict[str, int]], ...] = (
     ("first run", frozenset({"stg_orders", "stg_customers", "customer_orders"}), {"success": 3}),
     ("nothing changed", frozenset(), {"success": 3}),
