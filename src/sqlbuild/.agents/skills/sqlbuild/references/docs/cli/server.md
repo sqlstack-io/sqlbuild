@@ -553,7 +553,7 @@ The location starts the sync within a few seconds, and the top bar shows when it
 | --- | --- | --- | --- |
 | `[control] server` | `SQLBUILD_CONTROL_SERVER` | none | HTTPS origin of the server, as `sqb login --server` takes it |
 | `[control] location` | `SQLBUILD_CONTROL_LOCATION` | none | Location name a signed-in `sqb build` asks to sync |
-| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"`, or off on Databricks, ClickHouse and MotherDuck | Longest a location waits between syncs; `"0"` or `"off"` turns it off. See [warehouse cost](#warehouse-cost-of-an-always-on-location) |
+| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"` | Longest a location waits between syncs; `"0"` or `"off"` turns it off. Databricks, ClickHouse and MotherDuck never sync on the interval. See [warehouse cost](#warehouse-cost-of-an-always-on-location) |
 | none | `SQLBUILD_CONTROL_CA_CERT` | none | Extra trusted PEM CA certificate for the server |
 
 An environment variable overrides the project file. `sqb location serve --sync-at-least-every`
@@ -578,8 +578,8 @@ Details:
   or time retries a smaller page. Any other error, such as a missing permission or table, retries
   after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
   the sync stops until a run ends, you request one, the location publishes again, or the next safety
-  sync is due (`sync_at_least_every`). It then starts again from the first kind of history. A sync
-  resumed by a run or the safety sync tries once, and another failure stops it again.
+  sync is due (`sync_at_least_every`). It then starts again from the first kind of history, and
+  failed reads back off again before they stop it.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 - When a state table holds two rows with the same ID, such as one check result written twice, the
   server keeps the row with the earlier time. Estimated query costs are the exception: when two
@@ -605,7 +605,7 @@ A location syncs when it starts, after each run ends, when someone asks, and on 
 
 Where the interval is off, an idle location syncs only after a run ends or when someone asks, with
 **Sync now**, `sqb control sync` or a signed-in `sqb build`. A run has just used the warehouse, so
-the sync after it rarely resumes anything. Set `sync_at_least_every` to turn the interval back on.
+the sync after it rarely resumes anything. Setting `sync_at_least_every` doesn't change this.
 
 ### Follow a sync
 

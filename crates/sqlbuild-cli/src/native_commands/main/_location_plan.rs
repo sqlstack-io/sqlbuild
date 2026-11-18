@@ -11,9 +11,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::native_commands::_helpers::location::execution::{plan_failure, without_diffs};
-use crate::native_commands::_helpers::location::held_copy::{
-    HELD_COPY, held_copy, hold_copy, read_copy,
-};
+use crate::native_commands::_helpers::location::held_copy::{HELD_COPY, held_copy, hold_copy};
 use crate::native_commands::_helpers::location::plan_request::{
     plan_arguments, run_plan, selected_names,
 };
@@ -38,19 +36,13 @@ pub(super) async fn plan_location(
         .is_some_and(|changed| !matches!(changed, Value::Null | Value::Bool(false)));
     let held: Option<HeldCopy> = held_copy(&HELD_COPY, (&options.target, generation), consumption);
     let read_consumption: bool = consumption || held.as_ref().is_some_and(|held| held.consumption);
-    let copy = match read_copy(
-        client,
-        &options.target,
-        PreviewCopyRead {
-            session_id,
-            generation,
-            consumption: read_consumption,
-            versioned: true,
-            known_version: held.as_ref().map(|held| held.version.clone()),
-        },
-    )
-    .await
-    {
+    let read = PreviewCopyRead {
+        session_id,
+        generation,
+        consumption: read_consumption,
+        known_version: held.as_ref().map(|held| held.version.clone()),
+    };
+    let copy = match client.preview_copy(&options.target, &read).await {
         Ok(copy) => copy,
         Err(error) => {
             return Ok(Some(without_diffs(plan_failure(&format!(

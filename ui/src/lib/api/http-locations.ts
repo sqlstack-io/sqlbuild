@@ -169,11 +169,9 @@ function readCauseOf(health: SyncHealth): string {
 	const reason =
 		cause.kind === 'timed_out'
 			? `no reply within ${cause.seconds} s`
-			: cause.kind === 'reader_start'
-				? 'the metadata reader didn’t start'
-				: health.error
-					? 'the warehouse returned an error'
-					: 'the warehouse returned an error; the location’s log has it';
+			: health.error
+				? 'the read failed'
+				: 'the read failed; the location’s log has why';
 	const page = health.page_limit ? `, on a page of ${health.page_limit.toLocaleString('en-US')} ${health.table === 'statistics' ? 'relations' : 'rows'}` : '';
 	return `: ${reason}${page}`;
 }
@@ -199,16 +197,15 @@ export function connectionDetailsOf(published: Wire['PublishedSnapshot'] | null)
 }
 
 /**
- * A location target's connection from its health reports, newest snapshot and mirrored totals: the
- * settings it published, the newest connection check, where its state tables are read from, each
- * table's newest sync and how many records the server mirrors of it, and when the next sync is due.
- * `totals` is null when the server doesn't report them.
+ * A location target's connection from its health reports and newest snapshot: the settings it
+ * published, the newest connection check, where its state tables are read from, each table's newest
+ * sync and how many records the server mirrored of it as its last read finished, and when the next
+ * sync is due.
  */
 export function toWarehouseConnection(
 	location: Location,
 	observations: Wire['LocationHealthObservation'][],
-	published: Wire['PublishedSnapshot'] | null = null,
-	totals: Wire['MirroredTotal'][] | null = null
+	published: Wire['PublishedSnapshot'] | null = null
 ): WarehouseConnection {
 	const { syncs, newest } = syncsOf(observations);
 	const tables: WarehouseTableSync[] = [...newest.values()]
@@ -221,7 +218,7 @@ export function toWarehouseConnection(
 			error: health.error ?? null,
 			waiting: health.failure === 'busy',
 			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null,
-			mirroredTotal: totals ? (totals.find((t) => t.table === health.table)?.records ?? 0) : null
+			mirroredTotal: syncs.find((s) => s.report.health.table === health.table && s.report.health.mirrored_records != null)?.report.health.mirrored_records ?? null
 		}))
 		.sort((a, b) => a.table.localeCompare(b.table));
 	const state = syncs[0]?.report.health.location;

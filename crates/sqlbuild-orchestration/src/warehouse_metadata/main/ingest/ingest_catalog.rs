@@ -62,7 +62,7 @@ pub async fn ingest_catalog(
     commit_ingestion(
         transaction,
         (CATALOG_MIRROR, scope.0, scope.1),
-        (batch.scan.as_ref(), &keys),
+        (batch.scan.as_ref(), &keys, batch.last_page),
         applied,
     )
     .await

@@ -201,10 +201,6 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::health),
         )
         .route(
-            "/api/control/locations/{location_id}/targets/{target}/mirrored-totals",
-            get(crate::api::_helpers::resources::person_reads::mirrored_totals),
-        )
-        .route(
             "/api/control/platform/problems",
             get(crate::api::_helpers::resources::person_reads::problems),
         )

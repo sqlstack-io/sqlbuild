@@ -1,5 +1,6 @@
 //! Deferred target relation locations, and the warehouse relations they name.
 
+use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods, PyTuple};
 use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
@@ -164,45 +165,47 @@ pub(crate) fn deferred_target_config<'py>(
     targets.get_item(defer_to)
 }
 
-/// `gather_deferred_relations` with its arguments.
+/// `gather_deferred_relations` with its arguments: one listing per database the locations live in.
 pub(crate) fn deferred_relations<'py>(
     adapter: &Bound<'py, PyAny>,
     connection: &Bound<'py, PyAny>,
     locations: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let py: Python<'py> = adapter.py();
-    let mut schemas: Vec<String> = Vec::new();
-    let mut database: Bound<'py, PyAny> = py.None().into_bound(py);
+    let mut databases: Vec<(Option<String>, Vec<String>)> = Vec::new();
     for location in mapping_values(locations)?.try_iter()? {
         let location: Bound<'py, PyAny> = location?;
-        let schema: Bound<'py, PyAny> = native_field(&location, "schema")?;
-        if !schema.is_none() {
-            let schema: String = schema.extract()?;
-            if !schemas.contains(&schema) {
-                schemas.push(schema);
+        let schema: Option<String> = native_field(&location, "schema")?.extract()?;
+        let database: Option<String> = native_field(&location, "database")?.extract()?;
+        let Some(schema) = schema else {
+            continue;
+        };
+        let index: usize = match databases.iter().position(|(listed, _)| *listed == database) {
+            Some(index) => index,
+            None => {
+                databases.push((database, Vec::new()));
+                databases.len() - 1
             }
-        }
-        let location_database: Bound<'py, PyAny> = native_field(&location, "database")?;
-        if !location_database.is_none() && database.is_none() {
-            database = location_database;
+        };
+        if !databases[index].1.contains(&schema) {
+            databases[index].1.push(schema);
         }
     }
     let relations_by_name: Bound<'py, PyDict> = PyDict::new(py);
-    if schemas.is_empty() {
-        return Ok(relations_by_name);
-    }
-    schemas.sort();
-    let relations: Bound<'py, PyAny> = call_with(
-        &native_field(adapter, "list_relations")?,
-        &[
-            ("connection", connection.clone()),
-            ("database", database),
-            ("schemas", PyTuple::new(py, schemas)?.into_any()),
-        ],
-    )?;
-    for relation in relations.try_iter()? {
-        let relation: Bound<'py, PyAny> = relation?;
-        relations_by_name.set_item(native_field(&relation, "name")?, relation)?;
+    for (database, mut schemas) in databases {
+        schemas.sort();
+        let relations: Bound<'py, PyAny> = call_with(
+            &native_field(adapter, "list_relations")?,
+            &[
+                ("connection", connection.clone()),
+                ("database", database.into_pyobject(py)?.into_any()),
+                ("schemas", PyTuple::new(py, schemas)?.into_any()),
+            ],
+        )?;
+        for relation in relations.try_iter()? {
+            let relation: Bound<'py, PyAny> = relation?;
+            relations_by_name.set_item(native_field(&relation, "name")?, relation)?;
+        }
     }
     Ok(relations_by_name)
 }
