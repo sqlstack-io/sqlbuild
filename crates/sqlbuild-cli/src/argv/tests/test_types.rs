@@ -88,3 +88,10 @@ pub(super) struct GivenSettingsTestCase {
     pub(super) argv: &'static [&'static str],
     pub(super) expected_given: Option<&'static [&'static str]>,
 }
+
+/// A server job run's frozen settings and the build arguments it passes.
+pub(super) struct JobRunArgumentsTestCase {
+    pub(super) description: &'static str,
+    pub(super) settings: serde_json::Value,
+    pub(super) expected_arguments: &'static [&'static str],
+}

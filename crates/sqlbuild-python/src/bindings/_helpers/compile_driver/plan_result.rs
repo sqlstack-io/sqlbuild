@@ -158,7 +158,8 @@ pub(crate) fn pipeline_result<'py>(
             ("sql_test_selection", sql_test_selection),
         ],
     )?;
-    let job_settings: Option<PlannedJobSettings> = planned_job_settings(project, options)?;
+    let job_settings: Option<PlannedJobSettings> =
+        planned_job_settings((project, discovered), options)?;
     let mut override_fields: Vec<(&str, Bound<'py, PyAny>)> = option_fields(
         options,
         &[

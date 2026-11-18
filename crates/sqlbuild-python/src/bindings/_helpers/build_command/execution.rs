@@ -4,7 +4,7 @@ use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
-use sqlbuild_config::effective::models::EffectiveConcurrency;
+use sqlbuild_config::effective::models::{ConcurrencySource, EffectiveConcurrency};
 use sqlbuild_core::build_command::main::render_run_context::render_run_context;
 use sqlbuild_core::build_command::models::{RunContextFacts, SelectorFileFact};
 use sqlbuild_core::cli_text::models::CliStyle;
@@ -203,7 +203,7 @@ pub(crate) fn write_run_context(
     context: &BuildContext<'_>,
     pipeline: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
-    let concurrency: EffectiveConcurrency = context.concurrency()?;
+    let concurrency: EffectiveConcurrency = build_concurrency(context.concurrency()?, pipeline)?;
     let facts: RunContextFacts = run_context_facts(context, pipeline, &concurrency)?;
     emit(
         &context.stream,
@@ -268,7 +268,10 @@ pub(crate) fn prepare_build_execution<'py>(
     })
     .and_then(|value| pyo3::Bound::new(py, value))
     .map(pyo3::Bound::into_any)?;
-    let concurrency = connection_limit(context.concurrency()?.limit, pipeline)?;
+    let concurrency = connection_limit(
+        build_concurrency(context.concurrency()?, pipeline)?.limit,
+        pipeline,
+    )?;
     if context.verbose {
         write_run_context(context, pipeline)?;
     } else {
@@ -323,12 +326,39 @@ pub(crate) fn prepare_build_execution<'py>(
     })
 }
 
-/// The build's limit, capped at the sum of its jobs' limits when every planned node has one.
-fn connection_limit(limit: i64, pipeline: &Bound<'_, PyAny>) -> PyResult<i64> {
+/// The named jobs' `concurrency` limits added together; none without a command-line override.
+fn job_limit_total(pipeline: &Bound<'_, PyAny>) -> PyResult<Option<i64>> {
     let limits: Bound<'_, PyDict> = native_field(pipeline, "job_limits")?.cast_into()?;
     if limits.is_empty() {
-        return Ok(limit);
+        return Ok(None);
     }
+    let mut total: i64 = 0;
+    for value in limits.values() {
+        total = total.saturating_add(value.extract::<i64>()?);
+    }
+    Ok(Some(total))
+}
+
+/// The build's limit: the configured one, raised to the named jobs' limits added together.
+fn build_concurrency(
+    configured: EffectiveConcurrency,
+    pipeline: &Bound<'_, PyAny>,
+) -> PyResult<EffectiveConcurrency> {
+    Ok(match job_limit_total(pipeline)? {
+        Some(total) if total > configured.limit => EffectiveConcurrency {
+            limit: total,
+            source: ConcurrencySource::NamedJobs,
+        },
+        _ => configured,
+    })
+}
+
+/// The build's connections: its limit, or the named jobs' limits added together when every planned
+/// node belongs to one of them, so a job never opens connections it cannot use.
+fn connection_limit(limit: i64, pipeline: &Bound<'_, PyAny>) -> PyResult<i64> {
+    let Some(total) = job_limit_total(pipeline)? else {
+        return Ok(limit);
+    };
     let node_jobs: Bound<'_, PyDict> = native_field(pipeline, "node_jobs")?.cast_into()?;
     for key in
         native_field(&native_field(pipeline, "plan_output")?, "execution_order")?.try_iter()?
@@ -336,10 +366,6 @@ fn connection_limit(limit: i64, pipeline: &Bound<'_, PyAny>) -> PyResult<i64> {
         if !node_jobs.contains(key?)? {
             return Ok(limit);
         }
-    }
-    let mut total: i64 = 0;
-    for value in limits.values() {
-        total = total.saturating_add(value.extract::<i64>()?);
     }
     Ok(limit.min(total.max(1)))
 }

@@ -109,7 +109,7 @@ nodes differently:
 | `full_refresh` | The job's incremental models, rebuilt from scratch |
 | `run_tests` | The SQL unit tests of the job's models |
 | `ignore_audit_failures` | The audits of the job's nodes |
-| `concurrency` | How many of the job's nodes build at once. The build keeps its own limit too, and a node in two named jobs fits within both |
+| `concurrency` | How many of the job's nodes build at once, and a node in two named jobs fits within both. The build's own limit becomes the larger of the configured limit and the named jobs' limits added together |
 | `[retry]` | The job's nodes |
 
 A job's settings reach only the nodes its own selection holds. `--select job:nightly_orders_job,orders`

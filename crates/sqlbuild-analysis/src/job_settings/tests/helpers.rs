@@ -1,10 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value as Json, json};
 
 use crate::assembly::project::types::ObjectKey;
 use crate::graph::main::attach_jobs::attach_jobs;
 use crate::graph::main::build_project_graph::build_project_graph;
+use crate::graph::main::resolve_selector_tokens::resolve_selector_tokens;
 use crate::graph::models::{GraphResource, JobSelection, ProjectGraph};
 use crate::job_settings::errors::NodeJobSettingsError;
 use crate::job_settings::main::node_job_settings::node_job_settings;
@@ -142,9 +143,21 @@ pub(super) fn resolved_settings(
     select: &[&str],
     exclude: &[&str],
 ) -> Result<NodeJobSettings, NodeJobSettingsError> {
+    let graph: ProjectGraph = graph_with_jobs();
+    let token_nodes = |token: &str, exclude: &[String]| {
+        let excluded: BTreeSet<ObjectKey> = resolve_selector_tokens(&graph, exclude)?
+            .into_iter()
+            .collect();
+        let selected = resolve_selector_tokens(&graph, &[token.to_owned()])?;
+        Ok(selected
+            .into_iter()
+            .filter(|key| !excluded.contains(key))
+            .collect())
+    };
     node_job_settings(
-        &graph_with_jobs(),
+        &graph,
         (&texts(select), &texts(exclude)),
         &declared(),
+        &token_nodes,
     )
 }

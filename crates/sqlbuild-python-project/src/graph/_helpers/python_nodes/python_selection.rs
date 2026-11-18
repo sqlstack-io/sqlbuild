@@ -20,7 +20,7 @@ use sqlbuild_analysis::python_selection::models::{
 };
 
 use crate::compiled_project::main::needed_jobs::needed_jobs;
-use crate::graph::models::{CompiledProjectGraph, NativeProjectGraph};
+use crate::graph::models::{CompiledProjectGraph, NativeProjectGraph, PythonAwareSelection};
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
@@ -153,6 +153,60 @@ pub(crate) fn resolve_python_node_selection<'py>(
     python_node_names(graph, (select, exclude))
 }
 
+impl<'g> PythonAwareSelection<'g> {
+    /// The graph of `native` with the jobs `selectors` need attached over `python_graph`.
+    pub fn new(
+        (project_graph, native): (&Bound<'_, CompiledProjectGraph>, &'g ProjectGraph),
+        python_graph: &Bound<'_, PyAny>,
+        selectors: &[String],
+    ) -> PyResult<Self> {
+        let py: Python<'_> = project_graph.py();
+        let sources: Vec<(String, Option<String>)> =
+            project_sources(project_graph.get().project(py))?;
+        let allow_warehouse_round_trips: bool =
+            allows_round_trips(project_graph.get().project(py))?;
+        let nodes: PythonSelectionGraph = selection_graph(python_graph)?;
+        let node_names: Vec<&str> = nodes.nodes.iter().map(|node| node.name.as_str()).collect();
+        let graph: Cow<'g, ProjectGraph> = match needed_jobs(py, native, selectors, &node_names)? {
+            Some(catalog) => Cow::Owned(attach_python_jobs(
+                SqlSelectionGraph {
+                    graph: native,
+                    sources: &sources,
+                    allow_warehouse_round_trips,
+                },
+                &nodes,
+                catalog,
+            )),
+            None => Cow::Borrowed(native),
+        };
+        Ok(Self {
+            graph,
+            sources,
+            allow_warehouse_round_trips,
+            nodes,
+        })
+    }
+
+    /// The graph with the needed jobs attached.
+    pub fn graph(&self) -> &ProjectGraph {
+        &self.graph
+    }
+
+    /// The SQL keys and Python node names `select` minus `exclude` resolve to.
+    pub fn resolve(
+        &self,
+        select: &[String],
+        exclude: &[String],
+    ) -> Result<RunSelection, SelectorError> {
+        let sql = SqlSelectionGraph {
+            graph: &self.graph,
+            sources: &self.sources,
+            allow_warehouse_round_trips: self.allow_warehouse_round_trips,
+        };
+        run_selection(sql, &self.nodes, select, exclude)
+    }
+}
+
 /// `(sql keys, python node names)` run selectors resolve to across SQL resources and Python nodes.
 #[pyfunction]
 #[pyo3(signature = (*, project_graph, python_graph, select, exclude))]
@@ -165,37 +219,14 @@ pub(crate) fn resolve_python_sql_run_selection(
     let py: Python<'_> = project_graph.py();
     let project_graph: &Bound<'_, CompiledProjectGraph> = project_graph.cast()?;
     let native: &Bound<'_, NativeProjectGraph> = project_graph.get().native(py);
-    let sources: Vec<(String, Option<String>)> = project_sources(project_graph.get().project(py))?;
-    let allow_warehouse_round_trips: bool = allows_round_trips(project_graph.get().project(py))?;
-    let nodes: PythonSelectionGraph = selection_graph(python_graph)?;
-    let node_names: Vec<&str> = nodes.nodes.iter().map(|node| node.name.as_str()).collect();
     let selectors: Vec<String> = select.iter().chain(&exclude).cloned().collect();
-    let graph: Cow<'_, ProjectGraph> =
-        match needed_jobs(py, native.get().graph(), &selectors, &node_names)? {
-            Some(catalog) => Cow::Owned(attach_python_jobs(
-                SqlSelectionGraph {
-                    graph: native.get().graph(),
-                    sources: &sources,
-                    allow_warehouse_round_trips,
-                },
-                &nodes,
-                catalog,
-            )),
-            None => Cow::Borrowed(native.get().graph()),
-        };
-    let selection: RunSelection = compiler_guard(|| {
-        Ok(run_selection(
-            SqlSelectionGraph {
-                graph: &graph,
-                sources: &sources,
-                allow_warehouse_round_trips,
-            },
-            &nodes,
-            &select,
-            &exclude,
-        ))
-    })?
-    .map_err(|error| planner_error(py, error))?;
+    let resolution = PythonAwareSelection::new(
+        (project_graph, native.get().graph()),
+        python_graph,
+        &selectors,
+    )?;
+    let selection: RunSelection = compiler_guard(|| Ok(resolution.resolve(&select, &exclude)))?
+        .map_err(|error| planner_error(py, error))?;
     Ok((selection.sql_keys, selection.python_node_names))
 }
 

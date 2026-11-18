@@ -17,16 +17,20 @@ use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings};
 use crate::bindings::_helpers::compiled_project::job_settings::{
     job_selector_error, job_setting_conflict,
 };
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_compile::compile_driver::main::setup::project_graph::project_graph;
 use sqlbuild_python_project::compiled_project::constants::{
     JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY,
 };
-use sqlbuild_python_project::compiled_project::main::graph_with_jobs::graph_with_jobs;
 use sqlbuild_python_project::compiled_project::main::job_declarations::job_declarations;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
+use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::graph::models::KeyCache;
-use sqlbuild_python_project::graph::models::NativeProjectGraph;
+use sqlbuild_python_project::graph::models::{
+    CompiledProjectGraph, NativeProjectGraph, PythonAwareSelection,
+};
 
 const MODEL_KIND: &str = "model";
 const FULL_REFRESH: &str = "full_refresh";
@@ -70,7 +74,7 @@ fn strings(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
 
 /// The named jobs' settings per selected node; `None` when ignored, unnamed or unselectable.
 pub(crate) fn planned_job_settings(
-    project: &Bound<'_, PyAny>,
+    (project, discovered): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     options: &Bound<'_, PyAny>,
 ) -> PyResult<Option<PlannedJobSettings>> {
     let py: Python<'_> = project.py();
@@ -95,8 +99,25 @@ pub(crate) fn planned_job_settings(
     build_job_settings(&named, &declared)
         .map_err(|conflict| job_setting_conflict(py, &conflict))?;
     let all: Vec<String> = select.iter().chain(&exclude).cloned().collect();
-    let graph = graph_with_jobs(py, native.graph(), &all, &[])?;
-    match node_job_settings(&graph, (&select, &exclude), &declared) {
+    let compiled: Bound<'_, CompiledProjectGraph> = project_graph(project)?.cast_into()?;
+    let selection = PythonAwareSelection::new(
+        (&compiled, native.graph()),
+        &python_node_graph(discovered)?,
+        &all,
+    )?;
+    let token_nodes = |token: &str, exclude: &[String]| {
+        let resolved = selection.resolve(&[token.to_owned()], exclude)?;
+        Ok(resolved.sql_keys.into_iter().collect())
+    };
+    let resolved = compiler_guard(|| {
+        Ok(node_job_settings(
+            selection.graph(),
+            (&select, &exclude),
+            &declared,
+            &token_nodes,
+        ))
+    })?;
+    match resolved {
         Ok(settings) => Ok(Some(PlannedJobSettings {
             ignoring_jobs: jobs_setting(&settings, &declared, (IGNORE_AUDIT_FAILURES, None)),
             refreshing_jobs: jobs_setting(&settings, &declared, (FULL_REFRESH, Some(MODEL_KIND))),

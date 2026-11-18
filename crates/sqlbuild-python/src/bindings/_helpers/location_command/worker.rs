@@ -1,6 +1,7 @@
 //! Execute only the API's frozen request after compiling and verifying the unmodified baseline.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
@@ -10,6 +11,7 @@ use pyo3::types::PyString;
 use serde_json::Value;
 use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
 use sqlbuild_cli::argv::main::command_settings_arguments::command_settings_arguments;
+use sqlbuild_cli::argv::main::job_run_arguments::job_run_arguments;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_cli::dispatch::main::command_dispatch::command_dispatch;
 use sqlbuild_cli::dispatch::models::Dispatch;
@@ -49,6 +51,7 @@ use sqlbuild_python_front::compile_attachment::main::build_effective_connection_
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_project::constants::SQL_TEST_KEY_PREFIX;
+use sqlbuild_python_project::compiled_project::main::with_frozen_job::with_frozen_job;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationWorker;
@@ -123,13 +126,16 @@ fn upstream_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
         .collect()
 }
 
-/// The frozen command's request and warehouse scope; build carries the verified inputs and compiled project in its request.
+/// A job run's job, the selectors of its frozen nodes and its settings, as its build declares it.
+type FrozenJob = (String, Vec<String>, BTreeMap<String, Value>);
+
+/// The frozen command's request, warehouse scope and, for a job's build, the frozen job it names.
 fn command_request<'py>(
     py: Python<'py>,
     discovered: &Bound<'py, PyAny>,
     arguments: &KeywordArguments<'py>,
     (worker, compiled): (&Bound<'py, NativeOrchestrationWorker>, &Bound<'py, PyAny>),
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>, Option<FrozenJob>)> {
     let execution = worker.get().execution(py)?;
     let frozen = execution.claim.request;
     let mut settings = frozen.settings;
@@ -155,10 +161,14 @@ fn command_request<'py>(
     if frozen.job_key.is_some() {
         settings = job_run_settings(&arguments.value("project_dir")?, settings)?;
     }
-    let flags: Vec<String> = if command == RunCommand::Build {
-        job_settings_arguments(&settings)
-    } else {
-        command_settings_arguments(command.as_str(), &settings)
+    let job_build: Option<&String> = frozen
+        .job_key
+        .as_ref()
+        .filter(|_| command == RunCommand::Build);
+    let flags: Vec<String> = match job_build {
+        Some(job) => job_run_arguments(job, &settings),
+        None if command == RunCommand::Build => job_settings_arguments(&settings),
+        None => command_settings_arguments(command.as_str(), &settings),
     }
     .map_err(PyValueError::new_err)?;
     let mut argv: Vec<Bound<'py, PyString>> = std::iter::once(command.as_str().to_owned())
@@ -173,6 +183,7 @@ fn command_request<'py>(
         PyString::new(py, "--no-color"),
         PyString::new(py, "--json"),
     ]);
+    let mut selectors: Vec<String> = Vec::new();
     for key in &frozen.selection {
         if execution.skipped_nodes.contains_key(key) {
             continue;
@@ -187,7 +198,12 @@ fn command_request<'py>(
         } else {
             name.to_owned()
         };
-        argv.extend([PyString::new(py, "--select"), PyString::new(py, &selector)]);
+        selectors.push(selector);
+    }
+    if job_build.is_none() {
+        for selector in &selectors {
+            argv.extend([PyString::new(py, "--select"), PyString::new(py, selector)]);
+        }
     }
     let parsed = parse_cli_invocation(py, argv, false)?;
     let args = field(&parsed, "args")?;
@@ -214,7 +230,8 @@ fn command_request<'py>(
             ],
         )?;
     }
-    Ok((request, warehouse_scope(&args)?))
+    let frozen_job: Option<FrozenJob> = job_build.map(|job| (job.clone(), selectors, settings));
+    Ok((request, warehouse_scope(&args)?, frozen_job))
 }
 
 /// Run the frozen command from the verified inputs, reporting its progress and outcomes to `worker`.
@@ -371,11 +388,21 @@ pub(super) fn execute_worker<'py>(
             return Err(PyValueError::new_err(reason));
         }
         record_compiled_vars(py, (&owner, &frozen), (arguments, input, &project))?;
-        let (request, scope) = command_request(py, &discovered, arguments, (&owner, compiled))?;
+        let (request, scope, frozen_job) =
+            command_request(py, &discovered, arguments, (&owner, compiled))?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
         let _rules = RulesAtLoadScope::enter();
-        within(&scope, |_| {
-            run_cancellable(py, &worker, (&request, &discovered))
+        let directory: (PathBuf, Option<String>) = (
+            arguments.value("project_dir")?.extract()?,
+            Some(frozen.target.clone()),
+        );
+        within(&scope, |_| match frozen_job {
+            Some((job, selectors, settings)) => {
+                with_frozen_job(directory, (&job, selectors, settings), || {
+                    run_cancellable(py, &worker, (&request, &discovered))
+                })
+            }
+            None => run_cancellable(py, &worker, (&request, &discovered)),
         })
     })();
     let code = result.as_ref().copied().unwrap_or(1);

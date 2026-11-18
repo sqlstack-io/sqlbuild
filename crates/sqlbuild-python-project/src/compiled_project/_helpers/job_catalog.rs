@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyResult, Python};
+use serde_json::Value;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector};
 use sqlbuild_analysis::job_settings::main::declared_runs::declared_runs;
@@ -39,15 +40,48 @@ pub(crate) fn with_job_scope<T>(
     (project_dir, selected_target): (PathBuf, Option<String>),
     run: impl FnOnce() -> T,
 ) -> T {
-    let previous = JOB_SCOPE.with(|scope| {
-        scope.replace(Some(JobScope {
+    within_job_scope(
+        JobScope {
             project_dir,
             selected_target,
             catalog: None,
-        }))
-    });
+        },
+        run,
+    )
+}
+
+/// Run one command with only `job` declared, as its frozen run pins it: its nodes and settings.
+pub(crate) fn with_frozen_job<T>(
+    (project_dir, selected_target): (PathBuf, Option<String>),
+    (job, select, settings): (&str, Vec<String>, BTreeMap<String, Value>),
+    run: impl FnOnce() -> T,
+) -> T {
+    let selection = JobSelection::Job {
+        select,
+        exclude: Vec::new(),
+    };
+    let declared = DeclaredRun::Job {
+        settings,
+        retry: None,
+    };
+    let catalog: Catalog = (
+        BTreeMap::from([(job.to_owned(), selection)]),
+        BTreeSet::new(),
+    );
+    within_job_scope(
+        JobScope {
+            project_dir,
+            selected_target,
+            catalog: Some((catalog, BTreeMap::from([(job.to_owned(), declared)]))),
+        },
+        run,
+    )
+}
+
+fn within_job_scope<T>(scope: JobScope, run: impl FnOnce() -> T) -> T {
+    let previous = JOB_SCOPE.with(|current| current.replace(Some(scope)));
     let result: T = run();
-    JOB_SCOPE.with(|scope| *scope.borrow_mut() = previous);
+    JOB_SCOPE.with(|current| *current.borrow_mut() = previous);
     result
 }
 
