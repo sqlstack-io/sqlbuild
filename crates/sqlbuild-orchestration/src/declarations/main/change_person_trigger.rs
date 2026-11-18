@@ -3,8 +3,8 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_person::authorize_person;
-use crate::authorization::main::deny_authorization::deny;
+use crate::authorization::main::decisions::authorize_person::authorize_person;
+use crate::authorization::main::decisions::deny_authorization::deny;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::_helpers::operator_change::change_trigger_in;
 use crate::declarations::_helpers::trigger_scope::trigger_scope;

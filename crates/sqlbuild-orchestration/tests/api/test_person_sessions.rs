@@ -12,7 +12,7 @@ use crate::api::tests::person_sessions_helpers::{
 use crate::api::tests::person_sessions_test_types::SessionRoleCase;
 use crate::api::tests::test_types::LocationWorkTestCase;
 use crate::authorization::main::{
-    assign_builtin_role::assign_builtin_role, bootstrap_user::bootstrap_user,
+    people::bootstrap_user::bootstrap_user, roles::assign_builtin_role::assign_builtin_role,
 };
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,

@@ -5,7 +5,7 @@ use axum::{Extension, Json};
 
 use crate::api::errors::ApiError;
 use crate::api::models::ReadAuditQuery;
-use crate::authorization::main::read_security_audit::read_security_audit;
+use crate::authorization::main::decisions::read_security_audit::read_security_audit;
 use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AuditContext, SecurityAuditEvent};
 use crate::store::models::ControlStore;

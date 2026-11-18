@@ -1,5 +1,5 @@
 use crate::authorization::main::{
-    assign_builtin_role::assign_builtin_role, bootstrap_user::bootstrap_user,
+    people::bootstrap_user::bootstrap_user, roles::assign_builtin_role::assign_builtin_role,
 };
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, BuiltinRole, DefaultRole, RoleAssignmentRequest};

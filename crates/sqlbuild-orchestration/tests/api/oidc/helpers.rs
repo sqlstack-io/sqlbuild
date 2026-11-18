@@ -23,7 +23,7 @@ use crate::api::models::{ApiAuthentication, HumanLogin, OidcAuthentication};
 use crate::api::tests::helpers::start_api_with_authentication;
 use crate::api::tests::oidc_test_types::{BrowserFlow, ProviderFault, ProviderState, TestProvider};
 use crate::api::types::OidcIdToken;
-use crate::authorization::main::begin_authorized::begin_authorized;
+use crate::authorization::main::decisions::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::store::errors::ControlError;
 use crate::store::main::commit::commit;

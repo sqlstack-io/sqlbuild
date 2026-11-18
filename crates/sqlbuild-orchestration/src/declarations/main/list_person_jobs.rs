@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::_helpers::reads::jobs_in;
 use crate::declarations::models::{JobRecord, ServerPoolCaps};

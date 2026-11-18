@@ -1897,7 +1897,13 @@ export interface components {
         /** @description What the UI needs first: how people sign in, and what this person may see and do. */
         ControlBootstrap: {
             access: components["schemas"]["PersonAccess"];
+            /** @description The display name a trusted proxy reported for this request, if it reports one. */
+            display_name?: string | null;
+            /** @description The email address a trusted proxy reported for this request, if it reports one. */
+            email?: string | null;
             login_mode: components["schemas"]["LoginMode"];
+            /** @description Where signing out goes when a trusted proxy owns the sign-in; absent means no sign-out link. */
+            logout_url?: string | null;
         };
         /** @description Estimated query cost of one group, such as a job, a warehouse size or a node. */
         CostGroup: {

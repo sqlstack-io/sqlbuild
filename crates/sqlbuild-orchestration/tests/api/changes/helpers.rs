@@ -51,7 +51,11 @@ pub(crate) async fn request_person_feed(
 pub(crate) async fn opened(response: reqwest::Response) -> SseConnection {
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     assert_eq!(response.headers()["content-type"], "text/event-stream");
-    assert_eq!(response.headers()["cache-control"], "no-store");
+    assert_eq!(
+        response.headers()["cache-control"],
+        "no-cache, no-transform"
+    );
+    assert_eq!(response.headers()["x-accel-buffering"], "no");
     let mut stream = SseConnection {
         response,
         pending: Vec::new(),

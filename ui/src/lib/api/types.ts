@@ -109,6 +109,8 @@ export type Scope = { locationId: string };
 export type Bootstrap = {
 	serverVersion?: string;
 	authMode: AuthMode;
+	/** Where signing out goes when a trusted proxy owns the sign-in. */
+	logoutUrl?: string;
 	user: CurrentUser;
 	capabilities: Capability[];
 	locations: Location[];

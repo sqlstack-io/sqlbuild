@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::main::{
     execution::advance_groups::advance_groups, execution::change_run::change_run,

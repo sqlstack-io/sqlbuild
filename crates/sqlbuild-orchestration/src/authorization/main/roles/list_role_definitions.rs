@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::authorization::_helpers::role_overview::{read_role_facts, role_overviews};
-use crate::authorization::main::begin_authorized::begin_authorized;
+use crate::authorization::main::decisions::begin_authorized::begin_authorized;
 use crate::credentials::models::{
     Action, AuditContext, DefaultRole, PermissionScope, RoleOverview,
 };

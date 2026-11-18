@@ -2,8 +2,8 @@
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use serde_json::{Value, json};
-use sqlbuild_orchestration::authorization::main::bootstrap_user::bootstrap_user;
-use sqlbuild_orchestration::authorization::main::grant_admin::grant_admin;
+use sqlbuild_orchestration::authorization::main::people::bootstrap_user::bootstrap_user;
+use sqlbuild_orchestration::authorization::main::roles::grant_admin::grant_admin;
 use sqlbuild_orchestration::credentials::main::identities::create_principal::create_principal;
 use sqlbuild_orchestration::credentials::main::locations::create_location::create_location;
 use sqlbuild_orchestration::credentials::main::sessions::set_password::set_password;

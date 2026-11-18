@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::api::models::{
     ApiAuthentication, AuthenticationDenial, HumanLogin, TrustedProxyAuthentication,
+    UnknownProxyUsers,
 };
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::ProxyApiTestCase;
@@ -62,12 +63,18 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 .await
                 .expect("known person");
             let settings = TrustedProxyAuthentication {
+                allowed_hosts: Vec::new(),
                 origin: value("origin").into(),
                 trusted_peers: BTreeSet::from([test_case.trusted_peer.parse().expect("proxy IP")]),
                 identities: BTreeMap::from([
                     (value("subject").into(), person),
                     (value("absent_subject").into(), Uuid::now_v7()),
                 ]),
+                username_header: "X-SQB-User".into(),
+                display_name_header: None,
+                email_header: None,
+                unknown_users: UnknownProxyUsers::Reject,
+                proxy_logout_url: None,
             };
             let api = start_api_with_authentication(
                 store,
@@ -89,6 +96,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 store,
                 ApiAuthentication {
                     login: HumanLogin::TrustedProxy(TrustedProxyAuthentication {
+                        allowed_hosts: Vec::new(),
                         trusted_peers: BTreeSet::from([value("untrusted_peer")
                             .parse()
                             .expect("untrusted IP")]),
@@ -175,12 +183,6 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                     .headers(header::HeaderMap::from_iter([(
                         header::ORIGIN,
                         header::HeaderValue::from_static("https://other.example.com"),
-                    )])),
-                request(&api.url)
-                    .header("x-sqb-user", value("subject"))
-                    .headers(header::HeaderMap::from_iter([(
-                        header::HOST,
-                        header::HeaderValue::from_static("other.example.com"),
                     )])),
                 request(&untrusted.url)
                     .header("x-sqb-user", value("subject"))

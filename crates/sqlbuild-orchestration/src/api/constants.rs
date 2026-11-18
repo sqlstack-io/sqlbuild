@@ -14,6 +14,46 @@ pub(crate) const PASSWORD_COOKIE: &str = "__Host-sqb-session";
 pub(crate) const PASSWORD_CSRF_COOKIE: &str = "__Host-sqb-csrf";
 pub(crate) const PASSWORD_CSRF_HEADER: &str = "x-sqb-csrf";
 pub(crate) const PROXY_USER_HEADER: &str = "x-sqb-user";
+/// Headers a trusted proxy's identity headers may not reuse: browsers, the proxy or this server own them.
+pub(crate) const PROXY_RESERVED_HEADERS: [&str; 18] = [
+    "accept",
+    "authorization",
+    "connection",
+    "content-length",
+    "content-type",
+    "cookie",
+    "forwarded",
+    "host",
+    "origin",
+    "proxy-authorization",
+    "referer",
+    "user-agent",
+    "via",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+    PASSWORD_CSRF_HEADER,
+];
+/// The prefix of the fetch-metadata headers browsers set, which identity headers may not reuse.
+pub(crate) const PROXY_RESERVED_HEADER_PREFIX: &str = "sec-";
+/// The peers a trusted proxy on the server's own host connects from, by IPv4 or IPv6 loopback.
+pub(crate) const LOOPBACK_PROXY_PEERS: [std::net::IpAddr; 2] = [
+    std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+    std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+];
+/// The `Host` names a proxy on the server's own host sends, with any port, besides the origin's.
+pub(crate) const PROXY_LOOPBACK_HOSTS: [&str; 3] = ["127.0.0.1", "localhost", "[::1]"];
+/// The longest proxy username, after trimming and lowercasing.
+pub(crate) const PROXY_USERNAME_CHARS: usize = 128;
+/// The longest display name or email address a proxy may report.
+pub(crate) const PROXY_PROFILE_CHARS: usize = 256;
+/// How many untrusted header-carrying peers are logged before the rest go unlogged.
+pub(crate) const PROXY_NOTED_SOURCES: usize = 32;
+/// What a streamed response sends so a proxy neither caches, compresses nor buffers it.
+pub(crate) const STREAM_CACHE_CONTROL: &str = "no-cache, no-transform";
+pub(crate) const STREAM_BUFFERING_HEADER: &str = "x-accel-buffering";
+pub(crate) const EVENT_STREAM_MEDIA_TYPE: &str = "text/event-stream";
 pub(crate) const OIDC_FLOW_COOKIE: &str = "__Host-sqb-oidc";
 pub(crate) const OIDC_RESPONSE_BYTES: usize = 1024 * 1024;
 #[cfg(unix)]

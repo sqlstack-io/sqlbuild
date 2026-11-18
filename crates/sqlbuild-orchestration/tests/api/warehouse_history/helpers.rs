@@ -10,7 +10,7 @@ use crate::api::models::{ApiAuthentication, HumanLogin};
 use crate::api::tests::helpers::start_api_with_authentication;
 use crate::api::tests::test_types::TestApi;
 use crate::authorization::main::{
-    assign_builtin_role::assign_builtin_role, bootstrap_user::bootstrap_user,
+    people::bootstrap_user::bootstrap_user, roles::assign_builtin_role::assign_builtin_role,
 };
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,

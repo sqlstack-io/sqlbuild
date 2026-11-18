@@ -27,7 +27,8 @@ pub async fn bootstrap_user(
             "people already exist, so bootstrap is closed; use grant-admin".into(),
         ));
     }
-    let (transaction, principal_id) = insert_principal(transaction, context, name).await?;
+    let (transaction, principal_id) =
+        insert_principal(transaction, context, (Uuid::now_v7(), name)).await?;
     let (transaction, _) =
         grant_installation_admin(transaction, context, principal_id, "bootstrap").await?;
     commit(

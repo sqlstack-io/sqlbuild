@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::grant_admin::grant_admin;
+use crate::authorization::main::roles::grant_admin::grant_admin;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;

@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::refuse_unknown::refuse_unknown;
+use crate::authorization::main::decisions::refuse_unknown::refuse_unknown;
 use crate::credentials::models::{Action, AuditContext, PermissionScope};
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::runs::main::requests::frozen_job_request::frozen_job_request;

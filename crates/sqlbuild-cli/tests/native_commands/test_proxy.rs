@@ -4,7 +4,9 @@ use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 
 use crate::helpers::{api_ready, start_control_in, wait_for_exit};
-use crate::test_types::{ProxyCliTestCase, ServerConfigurationTestCase};
+use crate::test_types::{
+    ProxyCliTestCase, ProxyRemotePeerTestCase, ProxyStartupTestCase, ServerConfigurationTestCase,
+};
 
 #[test]
 fn given_an_owner_configured_proxy_when_requests_carry_a_subject_then_only_explicit_people_resolve_without_sessions_or_machine_authority()
@@ -94,16 +96,58 @@ fn given_invalid_or_conflicting_server_configuration_when_a_standalone_server_st
             expected_error: "requires explicit trusted peer IP addresses",
         },
         ServerConfigurationTestCase {
-            description: "non-HTTPS external origin",
-            configuration: "[trusted_proxy]\norigin = \"http://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nidentities = {}\n",
+            description: "an allowed host written as a URL",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\nallowed_hosts = [\"https://control-short\"]\n",
             arguments: &[],
-            expected_error: "trusted-proxy authentication requires an HTTPS origin",
+            expected_error: "[trusted_proxy] allowed_hosts lists host names without a scheme, port or path; 'https://control-short' is not one",
+        },
+        ServerConfigurationTestCase {
+            description: "neither an HTTP nor an HTTPS external origin",
+            configuration: "[trusted_proxy]\norigin = \"ftp://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\n",
+            arguments: &[],
+            expected_error: "trusted-proxy authentication requires an HTTP or HTTPS origin",
+        },
+        ServerConfigurationTestCase {
+            description: "a username header a browser sets",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nusername_header = \"Cookie\"\n",
+            arguments: &[],
+            expected_error: "[trusted_proxy] username_header cannot be cookie",
+        },
+        ServerConfigurationTestCase {
+            description: "a fetch-metadata header a browser sets",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\nusername_header = \"Sec-Fetch-User\"\n",
+            arguments: &[],
+            expected_error: "[trusted_proxy] username_header cannot be sec-fetch-user",
+        },
+        ServerConfigurationTestCase {
+            description: "the display name in the username header",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nusername_header = \"X-Example-User\"\ndisplay_name_header = \"x-example-user\"\n",
+            arguments: &[],
+            expected_error: "username_header, display_name_header and email_header must differ",
+        },
+        ServerConfigurationTestCase {
+            description: "a script as the sign-out URL",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nproxy_logout_url = \"javascript:alert(1)\"\n",
+            arguments: &[],
+            expected_error: "proxy_logout_url must be an http:// or https:// URL",
+        },
+        ServerConfigurationTestCase {
+            description: "an unknown policy for unknown users",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\nunknown_users = \"provision_admin\"\n",
+            arguments: &[],
+            expected_error: "unknown variant `provision_admin`",
+        },
+        ServerConfigurationTestCase {
+            description: "two bindings for one username",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\n\n[trusted_proxy.identities]\n\"Orders-Reader\" = \"00000000-0000-0000-0000-000000000001\"\n\"orders-reader\" = \"00000000-0000-0000-0000-000000000002\"\n",
+            arguments: &[],
+            expected_error: "binds 'orders-reader' more than once",
         },
         ServerConfigurationTestCase {
             description: "subject cannot be represented by the header transport",
             configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\n\n[trusted_proxy.identities]\n\"external-café\" = \"00000000-0000-0000-0000-000000000001\"\n",
             arguments: &[],
-            expected_error: "subjects must be nonempty, unpadded ASCII header values",
+            expected_error: "trusted-proxy usernames must be 1-128 characters",
         },
         ServerConfigurationTestCase {
             description: "a password-origin flag conflicts with the file's trusted proxy",
@@ -203,6 +247,187 @@ fn given_invalid_or_conflicting_server_configuration_when_a_standalone_server_st
                 !log.contains("Control API ready:"),
                 "failed startup must not announce readiness"
             );
+        });
+    }
+}
+
+#[test]
+fn given_a_misconfigured_proxy_when_requests_arrive_then_startup_warns_and_each_refusal_is_logged_once()
+ {
+    let test_cases = [
+        ProxyStartupTestCase {
+            description: "the proxy's real address differs from trusted_peers",
+            configuration: "[trusted_proxy]\norigin = \"http://control.example.com\"\ntrusted_peers = [\"192.0.2.1\"]\nusername_header = \"X-Example-User\"\n",
+            username: "orders-confidential-reader",
+            host: "127.0.0.1",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_warnings: &[
+                (
+                    "warning: the trusted-proxy origin http://control.example.com is plain HTTP",
+                    1,
+                ),
+                (
+                    "warning: ignored the trusted-proxy username header x-example-user from 127.0.0.1, which is not in [trusted_proxy] trusted_peers",
+                    1,
+                ),
+            ],
+        },
+        ProxyStartupTestCase {
+            description: "a trusted peer's Host names neither this server nor allowed_hosts",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\nusername_header = \"X-Example-User\"\n",
+            username: "orders-rebound-reader",
+            host: "evil.example:8000",
+            expected_status: StatusCode::FORBIDDEN,
+            expected_warnings: &[(
+                "warning: refused a request from trusted proxy peer 127.0.0.1 with Host 'evil.example:8000', which is not a loopback name, the [trusted_proxy] origin's host or in [trusted_proxy] allowed_hosts; if your proxy keeps the browser's host name (ProxyPreserveHost On) or forwards to this server by another name or address, add it to allowed_hosts",
+                1,
+            )],
+        },
+    ];
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let directory = tempfile::tempdir().expect("proxy installation");
+            std::fs::write(
+                directory.path().join("server.toml"),
+                test_case.configuration,
+            )
+            .expect("server configuration");
+            let mut control = start_control_in(
+                directory,
+                &[
+                    "server",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    "0",
+                    "--no-scheduler",
+                    "--config",
+                    "server.toml",
+                ],
+            );
+            let url = api_ready(&mut control).await;
+            let client = Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .expect("HTTP client");
+            let mut statuses = Vec::new();
+            for _ in 0..2 {
+                let response = client
+                    .get(format!("{url}/api/control/bootstrap"))
+                    .header(header::HOST, test_case.host)
+                    .header("x-forwarded-host", "control.example.com")
+                    .header("x-example-user", test_case.username)
+                    .send()
+                    .await
+                    .expect("refused proxy request");
+                statuses.push(response.status());
+            }
+            let log = std::fs::read_to_string(&control.stderr).expect("server log");
+            let counts: Vec<(&str, usize)> = test_case
+                .expected_warnings
+                .iter()
+                .map(|(warning, _)| (*warning, log.matches(warning).count()))
+                .collect();
+            assert_eq!(
+                (
+                    statuses,
+                    counts.as_slice(),
+                    log.contains(test_case.username)
+                ),
+                (
+                    vec![test_case.expected_status; 2],
+                    test_case.expected_warnings,
+                    false
+                ),
+                "{}: {log}",
+                test_case.description
+            );
+            #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
+        });
+    }
+}
+
+#[test]
+fn given_the_default_trusted_peers_when_a_non_loopback_peer_sends_the_username_header_then_it_is_ignored_and_logged_once()
+ {
+    let test_cases = [ProxyRemotePeerTestCase {
+        description: "a request from another address of this machine is not from loopback",
+        configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\n",
+        username: "orders-remote-reader",
+        expected_status: StatusCode::UNAUTHORIZED,
+        expected_warnings: 1,
+    }];
+    // The address this machine routes from; connecting a UDP socket sends nothing.
+    let route = std::net::UdpSocket::bind("0.0.0.0:0").expect("UDP socket");
+    route.connect("192.0.2.1:9").expect("a non-loopback route");
+    let host = route.local_addr().expect("route address").ip().to_string();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let directory = tempfile::tempdir().expect("proxy installation");
+            std::fs::write(
+                directory.path().join("server.toml"),
+                test_case.configuration,
+            )
+            .expect("server configuration");
+            let mut control = start_control_in(
+                directory,
+                &[
+                    "server",
+                    "--host",
+                    &host,
+                    "--port",
+                    "0",
+                    "--no-scheduler",
+                    "--config",
+                    "server.toml",
+                ],
+            );
+            let url = api_ready(&mut control).await;
+            let client = Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .expect("HTTP client");
+            let mut statuses = Vec::new();
+            for _ in 0..2 {
+                let response = client
+                    .get(format!("{url}/api/control/bootstrap"))
+                    .header("x-forwarded-host", "control.example.com")
+                    .header("x-forwarded-for", "127.0.0.1")
+                    .header("x-sqb-user", test_case.username)
+                    .send()
+                    .await
+                    .expect("remote request");
+                statuses.push(response.status());
+            }
+            let log = std::fs::read_to_string(&control.stderr).expect("server log");
+            let warning = format!(
+                "warning: ignored the trusted-proxy username header x-sqb-user from {host}, which is not in [trusted_proxy] trusted_peers"
+            );
+            assert_eq!(
+                (
+                    statuses,
+                    log.matches(&warning).count(),
+                    log.contains(test_case.username)
+                ),
+                (
+                    vec![test_case.expected_status; 2],
+                    test_case.expected_warnings,
+                    false
+                ),
+                "{}: {log}",
+                test_case.description
+            );
+            #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
         });
     }
 }

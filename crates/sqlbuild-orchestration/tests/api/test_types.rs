@@ -163,6 +163,50 @@ pub(crate) struct ProxyApiTestCase {
     pub(crate) expected_sessions: i64,
 }
 
+pub(crate) struct ProxyProvisioningTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Untrusted peer, missing username, another host, a taken name, and a newcomer under `reject`.
+    pub(crate) expected_refusals: [reqwest::StatusCode; 5],
+    /// A read under another host name the proxy serves.
+    pub(crate) expected_other_host_read: reqwest::StatusCode,
+    /// Cross-site post, HTTPS twin, no proof, the origin, then the CSRF header under another host.
+    pub(crate) expected_write_statuses: [reqwest::StatusCode; 6],
+    /// The newcomer's role assignments as JSON rows.
+    pub(crate) expected_roles: &'static str,
+    /// The change feed's cache-control, buffering and content-type headers.
+    pub(crate) expected_feed_headers: [&'static str; 3],
+}
+
+/// One identity-header request from one socket peer to a server signing people in one way.
+pub(crate) struct ProxyPeerTrustTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) login: crate::api::models::HumanLogin,
+    pub(crate) peer: &'static str,
+    pub(crate) forwarding_headers: &'static [(&'static str, &'static str)],
+    pub(crate) username: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_provisioned: bool,
+}
+
+/// One request from a trusted proxy peer, naming a person, under one `Host` and set of headers.
+pub(crate) struct ProxyHostTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) allowed_hosts: &'static [&'static str],
+    pub(crate) peer: &'static str,
+    pub(crate) request: (&'static str, &'static str),
+    pub(crate) headers: &'static [(&'static str, &'static str)],
+    pub(crate) username: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_provisioned: bool,
+}
+
+pub(crate) struct ProxyPeersDefaultTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) configuration: serde_json::Value,
+    pub(crate) expected_peers: &'static [&'static str],
+}
+
 pub(crate) struct ExternalSessionTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

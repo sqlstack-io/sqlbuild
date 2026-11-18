@@ -15,8 +15,8 @@ use std::sync::{
 use uuid::Uuid;
 
 use crate::authorization::main::{
-    assign_builtin_role::assign_builtin_role, bootstrap_user::bootstrap_user,
-    read_security_audit::read_security_audit,
+    decisions::read_security_audit::read_security_audit, people::bootstrap_user::bootstrap_user,
+    roles::assign_builtin_role::assign_builtin_role,
 };
 use crate::credentials::main::{
     audit::append_audit::append_audit, identities::create_principal::create_principal,

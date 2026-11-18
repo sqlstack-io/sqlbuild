@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
-use crate::authorization::main::decide_person_scopes::decide_person_scopes;
+use crate::authorization::main::decisions::decide_person_scopes::decide_person_scopes;
 use crate::credentials::models::{Action, PermissionScope};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;

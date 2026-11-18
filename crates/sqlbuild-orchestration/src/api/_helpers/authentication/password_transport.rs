@@ -9,7 +9,11 @@ use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::constants::{PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER};
+use crate::api::_helpers::authentication::proxy_settings::ProxySettings;
+use crate::api::constants::{
+    EVENT_STREAM_MEDIA_TYPE, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER,
+    STREAM_BUFFERING_HEADER, STREAM_CACHE_CONTROL,
+};
 use crate::api::errors::ApiError;
 use crate::api::models::{AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse};
 use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
@@ -18,6 +22,7 @@ use crate::credentials::models::{AuditContext, AuthenticatedPerson, IssuedSessio
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
+/// Refuses a trusted peer under another site's `Host`, as a DNS-rebinding page sends, then checks writes.
 pub(crate) async fn guard(
     Extension(origin): Extension<BrowserOrigin>,
     mut request: Request,
@@ -38,26 +43,85 @@ pub(crate) async fn guard(
         request_id: Uuid::now_v7(),
         ip_address: Some(peer.ip().to_canonical()),
     };
-    let valid_host = single_header(request.headers(), header::HOST.as_str())
-        == origin.0.strip_prefix("https://");
-    let valid_origin = match single_header(request.headers(), header::ORIGIN.as_str()) {
-        Some(value) => value == origin.0,
-        None => request.method().is_safe() && !request.headers().contains_key(header::ORIGIN),
+    let proxy: Option<std::sync::Arc<ProxySettings>> = request
+        .extensions()
+        .get::<std::sync::Arc<ProxySettings>>()
+        .filter(|settings| settings.trusted_peers.contains(&peer.ip().to_canonical()))
+        .cloned();
+    if let Some(settings) = &proxy {
+        let host = single_header(request.headers(), header::HOST.as_str());
+        if !settings.host_allowed(host) {
+            settings.note_refused_host(host, peer.ip().to_canonical());
+            return Err(ApiError {
+                status: StatusCode::FORBIDDEN,
+                message: "the Host header does not name this server; add the proxy's host name to \
+                          [trusted_proxy] allowed_hosts"
+                    .into(),
+                decision_id: None,
+            });
+        }
+    }
+    let allowed: bool = if proxy.is_some() {
+        proxy_request_allowed(&request, &origin)
+    } else {
+        browser_request_allowed(&request, &origin)
     };
-    let mut response = if !valid_host || !valid_origin {
+    let mut response = if !allowed {
         deny(&context)?
     } else {
         request.extensions_mut().insert(context);
         next.run(request).await
     };
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    private_cache_control(&mut response);
     response.headers_mut().insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
     Ok(response)
+}
+
+/// A browser request for this origin's host whose write, if any, comes from the origin itself.
+fn browser_request_allowed(request: &Request, origin: &BrowserOrigin) -> bool {
+    let authority: Option<&str> = origin.0.split_once("://").map(|(_, authority)| authority);
+    single_header(request.headers(), header::HOST.as_str()) == authority
+        && origin_allows(request, origin)
+}
+
+/// A proxied request for an allowed host; a write needs the origin or the CSRF header, which needs CORS.
+fn proxy_request_allowed(request: &Request, origin: &BrowserOrigin) -> bool {
+    origin_allows(request, origin)
+        || single_header(request.headers(), PASSWORD_CSRF_HEADER)
+            .is_some_and(|proof| !proof.is_empty())
+}
+
+/// A write from the origin itself, or a read that names no other origin.
+fn origin_allows(request: &Request, origin: &BrowserOrigin) -> bool {
+    match single_header(request.headers(), header::ORIGIN.as_str()) {
+        Some(value) => value == origin.0,
+        None => request.method().is_safe() && !request.headers().contains_key(header::ORIGIN),
+    }
+}
+
+/// Never store authenticated responses; let no proxy cache, compress or buffer an event stream.
+pub(crate) fn private_cache_control(response: &mut Response) {
+    let streamed = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .is_some_and(|value| {
+            value
+                .as_bytes()
+                .starts_with(EVENT_STREAM_MEDIA_TYPE.as_bytes())
+        });
+    let headers = response.headers_mut();
+    if streamed {
+        headers.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static(STREAM_CACHE_CONTROL),
+        );
+        headers.insert(STREAM_BUFFERING_HEADER, HeaderValue::from_static("no"));
+    } else {
+        headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    }
 }
 
 pub(crate) async fn authenticate(

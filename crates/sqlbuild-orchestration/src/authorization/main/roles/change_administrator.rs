@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::authorization::_helpers::administrator_changes::apply_change;
-use crate::authorization::main::begin_authorized::begin_authorized;
+use crate::authorization::main::decisions::begin_authorized::begin_authorized;
 use crate::credentials::models::{
     Action, AdministratorChange, AuditContext, DefaultRole, PermissionScope,
 };

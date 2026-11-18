@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::begin_authorized::begin_authorized;
+use crate::authorization::main::decisions::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::platform::_helpers::maintenance::watchdog::store_bytes;
 use crate::platform::models::{InstallationRecord, StorageKind, StoredInstallation};

@@ -5,7 +5,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::tests::test_types::UpcomingTestCase;
-use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_person_triggers::list_person_triggers;

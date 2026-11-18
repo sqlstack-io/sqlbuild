@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::authorization::main::authorize_person::authorize_person;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT, SUPERSEDED_CHILD};

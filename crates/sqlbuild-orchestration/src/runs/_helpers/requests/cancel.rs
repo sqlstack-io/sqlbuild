@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_person::authorize_person;
+use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::lifecycle::change_run::change_run_in;
 use crate::runs::_helpers::requests::permissions::authorize_execution;

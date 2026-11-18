@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::_helpers::job_detail::{
     critical_nodes, cursor_type, declared_settings, members_in_order, snapshot_relations,

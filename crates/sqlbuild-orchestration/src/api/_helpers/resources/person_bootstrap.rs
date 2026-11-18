@@ -4,8 +4,8 @@ use axum::http::StatusCode;
 use axum::{Extension, Json, extract::State};
 
 use crate::api::errors::ApiError;
-use crate::api::models::{ControlBootstrap, LoginMode};
-use crate::authorization::main::read_person_access::read_person_access;
+use crate::api::models::{ControlBootstrap, LoginMode, ProxyLogoutUrl, ProxyProfile};
+use crate::authorization::main::people::read_person_access::read_person_access;
 use crate::credentials::models::{AuthenticatedPerson, DefaultRole};
 use crate::store::models::ControlStore;
 
@@ -19,6 +19,10 @@ pub(crate) async fn read(
         Extension<LoginMode>,
     ),
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+    (profile, logout_url): (
+        Option<Extension<ProxyProfile>>,
+        Option<Extension<ProxyLogoutUrl>>,
+    ),
 ) -> Result<Json<ControlBootstrap>, ApiError> {
     let Some(access) = read_person_access(&store, principal, default_role).await? else {
         return Err(ApiError {
@@ -27,5 +31,14 @@ pub(crate) async fn read(
             decision_id: None,
         });
     };
-    Ok(Json(ControlBootstrap { login_mode, access }))
+    let profile = profile
+        .map(|Extension(profile)| profile)
+        .unwrap_or_default();
+    Ok(Json(ControlBootstrap {
+        login_mode,
+        access,
+        display_name: profile.display_name,
+        email: profile.email,
+        logout_url: logout_url.map(|Extension(ProxyLogoutUrl(url))| url),
+    }))
 }

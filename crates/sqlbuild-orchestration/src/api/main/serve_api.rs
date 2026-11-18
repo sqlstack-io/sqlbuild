@@ -8,7 +8,7 @@ use crate::api::_helpers::resources::application::{application_router, developme
 use crate::api::_helpers::resources::changes;
 use crate::api::main::openapi_document::openapi_document;
 use crate::api::models::{ApiAuthentication, GroupRole, ServerFacts};
-use crate::authorization::main::publish_group_roles::publish_group_roles;
+use crate::authorization::main::roles::publish_group_roles::publish_group_roles;
 use crate::node_states::main::start_node_states::start_node_states;
 use crate::runs::types::RunHandoff;
 use crate::store::errors::ControlError;

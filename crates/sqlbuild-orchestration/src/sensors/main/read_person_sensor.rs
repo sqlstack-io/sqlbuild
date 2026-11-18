@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::authorization::main::person_holds_target::person_holds_target;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::person_holds_target::person_holds_target;
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
 use crate::sensors::_helpers::facts::definition_fingerprint;
 use crate::sensors::models::{

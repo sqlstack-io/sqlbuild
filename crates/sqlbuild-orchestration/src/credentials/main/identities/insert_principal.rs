@@ -9,15 +9,15 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
+/// Creates principal `name` with `id`: a fresh v7 id, or one derived from an external username.
 pub(crate) async fn insert_principal(
     transaction: ControlTransaction,
     context: &AuditContext,
-    name: &str,
+    (id, name): (Uuid, &str),
 ) -> Result<(ControlTransaction, Uuid), ControlError> {
     if name.trim().is_empty() {
         return Err(ControlError::Invalid("principal name is required".into()));
     }
-    let id = Uuid::now_v7();
     let now = transaction.now;
     let (transaction, _) = query(
         transaction,

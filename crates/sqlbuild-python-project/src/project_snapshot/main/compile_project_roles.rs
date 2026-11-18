@@ -5,7 +5,7 @@ use crate::project_snapshot::_helpers::snapshot::snapshot_roles::ROLES_FILE;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::graph::models::ProjectGraph;
-use sqlbuild_orchestration::authorization::main::compile_roles::compile_roles;
+use sqlbuild_orchestration::authorization::main::roles::compile_roles::compile_roles;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
 use std::path::Path;

@@ -4,20 +4,21 @@ use std::time::Duration;
 
 use axum::Extension;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, HeaderValue};
-use axum::response::Sse;
+use axum::http::{HeaderMap, HeaderName, HeaderValue, header};
 use axum::response::sse::Event;
-use futures_util::{Stream, stream};
+use axum::response::{IntoResponse, Response, Sse};
+use futures_util::stream;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
 use crate::api::_helpers::authentication::bearer::{bearer, require_location};
 use crate::api::_helpers::authentication::password_transport::session_credentials;
+use crate::api::constants::{STREAM_BUFFERING_HEADER, STREAM_CACHE_CONTROL};
 use crate::api::errors::ApiError;
 use crate::api::models::{ChangeFeed, ChangeNotice, ChangeStream, ChangeSubscriber};
-use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::authorization::main::person_holds_target::person_holds_target;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::person_holds_target::person_holds_target;
 use crate::credentials::main::sessions::authenticate_session::authenticate_session;
 use crate::credentials::main::tokens::authenticate_token::authenticate_token;
 use crate::credentials::models::{
@@ -46,7 +47,7 @@ pub(crate) async fn subscribe(
     ),
     Path((location_id, target)): Path<(Uuid, String)>,
     headers: HeaderMap,
-) -> Result<Sse<impl Stream<Item = Result<Event, ControlError>>>, ApiError> {
+) -> Result<Response, ApiError> {
     require_location(&identity, location_id)?;
     let subscriber = if identity.token_id.is_nil() {
         ChangeSubscriber::Development
@@ -72,7 +73,7 @@ pub(crate) async fn subscribe_person(
         Extension<AuditContext>,
     ),
     (Path((location_id, target)), headers): (Path<(Uuid, String)>, HeaderMap),
-) -> Result<Sse<impl Stream<Item = Result<Event, ControlError>>>, ApiError> {
+) -> Result<Response, ApiError> {
     let transaction = begin(&store, TransactionMode::Write).await?;
     let (transaction, _) = authorize_listing(
         transaction,
@@ -107,7 +108,7 @@ async fn stream_changes(
     feed: ChangeFeed,
     subscriber: ChangeSubscriber,
     (location_id, target): (Uuid, String),
-) -> Result<Sse<impl Stream<Item = Result<Event, ControlError>>>, ApiError> {
+) -> Result<Response, ApiError> {
     let receiver = feed.sender.subscribe();
     let updates = watch_node_states(&cache, (location_id, &target)).await?;
     let state = ChangeStream {
@@ -122,7 +123,11 @@ async fn stream_changes(
         keepalive: tokio::time::interval(Duration::from_secs(15)),
         initial: true,
     };
-    Ok(Sse::new(stream::try_unfold(state, next_event)))
+    let headers = [
+        (header::CACHE_CONTROL, STREAM_CACHE_CONTROL),
+        (HeaderName::from_static(STREAM_BUFFERING_HEADER), "no"),
+    ];
+    Ok((headers, Sse::new(stream::try_unfold(state, next_event))).into_response())
 }
 
 /// Whether the subscriber may still receive this stream, checked before every emission.

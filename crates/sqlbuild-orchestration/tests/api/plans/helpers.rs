@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::assign_builtin_role::assign_builtin_role;
+use crate::authorization::main::roles::assign_builtin_role::assign_builtin_role;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::main::sessions::set_password::set_password;
 use crate::credentials::models::{

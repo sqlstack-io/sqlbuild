@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authorization::main::begin_authorized::begin_authorized;
+use crate::authorization::main::decisions::begin_authorized::begin_authorized;
 use crate::credentials::models::{
     Action, AuditContext, DefaultRole, PermissionScope, PersonSummary,
 };

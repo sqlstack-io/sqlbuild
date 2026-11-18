@@ -8,7 +8,7 @@ use serde_json::Value;
 use tokio::sync::OnceCell;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_person::authorize_person;
+use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::constants::PUBLICATIONS_PER_TARGET;

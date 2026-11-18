@@ -46,6 +46,7 @@ proptest.workspace = true
 rcgen.workspace = true
 rusqlite = { workspace = true, features = ["functions"] }
 tempfile.workspace = true
+tower.workspace = true
 
 [lints]
 workspace = true

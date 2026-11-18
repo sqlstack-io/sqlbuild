@@ -3,11 +3,12 @@
 use std::net::SocketAddr;
 
 use axum::extract::{Request, State};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::Response;
 use uuid::Uuid;
 
+use crate::api::_helpers::authentication::password_transport::private_cache_control;
 use crate::api::errors::ApiError;
 use crate::api::models::{DevelopmentScope, ReadResource};
 use crate::credentials::main::tokens::authenticate_token::authenticate_token;
@@ -39,9 +40,7 @@ pub(crate) async fn authenticate(
         .ok_or_else(unauthorized)?;
     request.extensions_mut().insert(identity);
     let mut response = next.run(request).await;
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    private_cache_control(&mut response);
     Ok(response)
 }
 

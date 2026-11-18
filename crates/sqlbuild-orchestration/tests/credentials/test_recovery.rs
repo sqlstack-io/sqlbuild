@@ -3,7 +3,9 @@
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::authorization::main::{bootstrap_user::bootstrap_user, grant_admin::grant_admin};
+use crate::authorization::main::{
+    people::bootstrap_user::bootstrap_user, roles::grant_admin::grant_admin,
+};
 use crate::credentials::main::{
     sessions::authenticate_bound_person::authenticate_bound_person,
     sessions::authenticate_session::authenticate_session, sessions::login_password::login_password,

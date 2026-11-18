@@ -10,6 +10,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 
 - Configure the server
 - Serve over HTTPS
+- Sign in through a reverse proxy
 - Receive platform events
 - Back up the control database
 - Upgrade
@@ -67,7 +68,7 @@ executable = "/usr/local/bin/sqb"
 | `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`) |
 | `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`; see [Set retention](#set-retention) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
-| `[trusted_proxy]` | `origin`, `trusted_peers` and `identities` |
+| `[trusted_proxy]` | `origin`, and optionally `trusted_peers` (`127.0.0.1` and `::1`), `allowed_hosts`, `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
 | `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
 | `[[launchers.local]]` | `location`, `target`, `server_url`, `max_workers`, absolute `project_dir` and `executable` paths, and an optional `pool_caps` table |
 
@@ -96,6 +97,107 @@ warning: the bearer token for http://control.example.com travels unencrypted ove
 ```
 
 Connections to `localhost`, `127.0.0.1` or `::1` print no warning.
+
+## Sign in through a reverse proxy
+
+A reverse proxy such as Apache or nginx can sign people in and tell the server who they are in a
+request header. The server trusts that header only on requests whose socket peer is listed in
+`trusted_peers`, so it never trusts a header that a browser sends straight to the server. With the
+proxy on the same host, bind the server to loopback so that only local processes reach it:
+
+```toml
+[server]
+host = "127.0.0.1"
+port = 8000
+
+[trusted_proxy]
+origin = "https://control.example.com"
+username_header = "X-SQB-User"
+display_name_header = "X-SQB-Display-Name"
+proxy_logout_url = "https://sign-in.example.com/logout"
+```
+
+| Key | Meaning |
+| --- | --- |
+| `origin` | The URL people open, such as `https://control.example.com`. `http://` works too: the server warns at start-up, and `https://` is recommended. |
+| `trusted_peers` | The proxy's IP addresses. Without this key the server trusts `127.0.0.1` and `::1`, for a proxy on the same host that connects to `localhost` over either IPv4 or IPv6, so any process on the server's host can send the header and sign in as anyone. Setting `trusted_peers` narrows this to the addresses you list: a proxy on another host, listed by its own address, keeps local processes out. The server takes the peer from the connection, never from `X-Forwarded-For` or `Forwarded`. |
+| `allowed_hosts` | Further host names the proxy sends in `Host`, without a scheme or port. A proxy that keeps the browser's host name, such as Apache with `ProxyPreserveHost On`, needs every name people reach the server under. A proxy on another host needs the name or address it forwards to, such as `10.0.0.2`. |
+| `username_header` | The header naming the signed-in person, `X-SQB-User` by default. |
+| `display_name_header`, `email_header` | Optional headers whose values the UI shows. The server doesn't store them. |
+| `unknown_users` | `provision_viewer` (default) gives a person signing in for the first time an account with the `viewer` role; `reject` refuses them. |
+| `proxy_logout_url` | Where the UI's **Sign out** link goes. Only the proxy can end its own sign-in, so without this key the UI shows no sign-out link. |
+| `[trusted_proxy.identities]` | Optional: binds a username to a principal you already created with `sqb admin create-principal`. |
+
+Turn on the proxy's authentication for every location it forwards to the server, and have the proxy
+set every identity header you configured itself. A header the proxy leaves alone passes through
+from the browser, so set the username header and set or unset the display name and email headers
+on every request. With Apache on the same host,
+forwarding port 80 to the server on port 8000:
+
+```apache
+<Location "/">
+    # Your authentication: AuthType, AuthName, providers and Require valid-user
+    RequestHeader set X-SQB-User "expr=%{REMOTE_USER}"
+    # Set this from your provider's display name, or unset it when you have none
+    RequestHeader unset X-SQB-Display-Name
+</Location>
+ProxyPass "/" "http://127.0.0.1:8000/"
+ProxyPassReverse "/" "http://127.0.0.1:8000/"
+```
+
+- **Who can sign in.** Any process that can connect to the server from a trusted peer address can
+  sign in as anyone by sending the username header. Keep the server's port reachable only from the
+  proxy: bind it to `127.0.0.1` when they share a host, or firewall it.
+- **Usernames are case-insensitive.** The server trims and lowercases the username, so `Admin` and
+  `admin` are one person; your identity provider must treat them as the same account. A username
+  must be 1 to 128 characters of `a`-`z`, `0`-`9`, `.`, `_`, `@`, `+` or `-`, starting with a
+  letter or digit. Keys under `[trusted_proxy.identities]` are lowercased too, so no two keys may
+  differ only in case.
+- **New people.** A provisioned person is named after their username, and an administrator grants
+  more roles in the UI. A username that matches another principal's name in any case is refused
+  rather than taken over; bind it under `[trusted_proxy.identities]` to sign that person in.
+- **Removing people.** `unknown_users = "reject"` stops new people from being provisioned; it
+  doesn't remove people already provisioned. Disable a principal to remove their access.
+  Removing someone at the proxy doesn't end their `sqb login` sessions: they last until they expire
+  or the principal is disabled.
+- **Host names.** A request from a trusted peer must carry a `Host` of `127.0.0.1`, `localhost`,
+  `[::1]` or the host of `origin`, with any port, or a name in `allowed_hosts`; the server ignores
+  `X-Forwarded-Host` here. A proxy on the same host that forwards to `127.0.0.1`, `localhost` or
+  `[::1]`, as Apache does by default, needs no `allowed_hosts`. Any other `Host` gets
+  `403 Forbidden`, and the server logs it once.
+- **Writes.** A browser write is accepted when it carries the `X-SQB-CSRF` header, which the UI
+  always sends and which a page on another site cannot send, or when its `Origin` header is exactly
+  `origin`. The server allows no cross-origin requests.
+- **Finding the proxy's address.** When a request carrying the username header comes from a peer
+  that is not in `trusted_peers`, the server ignores the header and logs the peer once, without the
+  header's value:
+
+  ```text
+  warning: ignored the trusted-proxy username header x-sqb-user from 10.0.0.7, which is not in [trusted_proxy] trusted_peers; if 10.0.0.7 is your proxy, add it there
+  ```
+
+- **No browser cookies.** The proxy authenticates every request, so the server issues no session
+  cookie to browsers in this mode, over `http://` or `https://`.
+- **The CLI.** `sqb login` still needs an `https://` server URL, so that its session token never
+  crosses the network unencrypted.
+- **Locations and workers.** They use bearer tokens, not the proxy. On the server's own host, give
+  them `http://127.0.0.1:8000` so their tokens stay on loopback.
+- **Streaming.** The live-update feed sends `Cache-Control: no-cache, no-transform`, which stops
+  `mod_deflate` from compressing it, and `X-Accel-Buffering: no`. It sends a keep-alive comment
+  every 15 seconds, well within Apache's default 60-second `Timeout`. Long work, such as planning a
+  build or testing a connection, runs in the background while the UI polls for the result, so no
+  browser request waits on it.
+
+`[trusted_proxy]` cannot be combined with `password_origin` or `[oidc]`. The server refuses to
+start when they are combined, when `trusted_peers` is an empty list, when the username, display
+name and email headers are not distinct, or when one of them is a header that browsers, proxies or
+the server set, such as `Cookie`, `Host`, `Origin`, `Via`, `X-Forwarded-For`, `X-Real-IP` or any
+`Sec-` header.
+
+To check that streaming passes through the proxy unchanged, sign in through it in a browser, open
+the developer tools' Network tab, select a location, and inspect the `changes` request. Its type is
+`eventsource`, its response headers include `Cache-Control: no-cache, no-transform` and
+`X-Accel-Buffering: no`, and it has no `Content-Encoding`. Its events keep arriving for minutes.
 
 ## Receive platform events
 

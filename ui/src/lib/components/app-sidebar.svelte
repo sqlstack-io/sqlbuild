@@ -7,9 +7,11 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { visibleNav, type NavBadge } from '$lib/nav';
 	import { app } from '$lib/state/app.svelte';
+	import { signOutFor } from '$lib/platform/sign-out';
 	import ScopeSwitcher from './shell/scope-switcher.svelte';
 
 	const visibleGroups = $derived(visibleNav(app.client, app.capabilities));
+	const signOut = $derived(signOutFor(app.bootstrap));
 
 	const badgeTone: Record<NavBadge['tone'], string> = {
 		muted: '#707782',
@@ -87,7 +89,9 @@
 			<div class="text-[var(--sidebar-foreground)] flex items-center gap-2 px-2.5 py-1.5 text-[12.5px]">
 				<span class="bg-primary grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[2px] text-[10px] font-semibold text-white">{initials}</span>
 				<span class="truncate">{app.user.displayName}{#if app.user.role} · <span class="text-muted-foreground">{app.user.role}</span>{/if}</span>
-				{#if app.signOut && app.bootstrap?.authMode !== 'disabled'}
+				{#if signOut?.kind === 'link'}
+					<Button variant="ghost" size="sm" class="ml-auto" href={signOut.href}>Sign out</Button>
+				{:else if signOut?.kind === 'session' && app.signOut}
 					<Button variant="ghost" size="sm" class="ml-auto" onclick={() => app.signOut?.()}>Sign out</Button>
 				{/if}
 			</div>

@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::authorization::main::{
-    bootstrap_user::bootstrap_user, change_administrator::change_administrator,
+    people::bootstrap_user::bootstrap_user, roles::change_administrator::change_administrator,
 };
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,

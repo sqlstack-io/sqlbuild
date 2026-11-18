@@ -4,7 +4,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::authorization::_helpers::administrator_changes::apply_change;
-use crate::authorization::main::deny_authorization::deny;
+use crate::authorization::main::decisions::deny_authorization::deny;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{
     AdministratorChange, AuditContext, BuiltinRole, RoleAssignmentRequest, RoleKey,
