@@ -5,7 +5,9 @@ use serde_json::json;
 use crate::job_settings::errors::NodeJobSettingsError;
 use crate::job_settings::models::NodeJobSettings;
 use crate::job_settings::tests::helpers::resolved_settings;
-use crate::job_settings::tests::test_types::{NodeJobConflictTestCase, NodeJobSettingsTestCase};
+use crate::job_settings::tests::test_types::{
+    JobSelectorFailureTestCase, NodeJobConflictTestCase, NodeJobSettingsTestCase,
+};
 
 #[test]
 fn given_named_jobs_when_resolving_node_settings_then_only_their_own_selected_nodes_take_them() {
@@ -163,6 +165,28 @@ fn given_two_named_jobs_setting_one_node_differently_when_resolving_then_it_is_a
         };
         assert_eq!(
             conflict.message, test_case.expected_message,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_named_job_whose_selection_fails_when_resolving_then_it_fails_naming_the_job() {
+    let test_cases = [JobSelectorFailureTestCase {
+        description: "a job selecting a node that does not exist",
+        select: &["job:broken_job"],
+        expected_failure: (vec!["broken_job"], "job:broken_job", "S007"),
+    }];
+    for test_case in test_cases {
+        let Err(NodeJobSettingsError::Selector(failure)) = resolved_settings(test_case.select, &[])
+        else {
+            panic!("{}: expected a selector failure", test_case.description);
+        };
+        let jobs: Vec<&str> = failure.jobs.iter().map(String::as_str).collect();
+        assert_eq!(
+            (jobs, failure.selector.as_str(), failure.error.code),
+            test_case.expected_failure,
             "{}",
             test_case.description
         );

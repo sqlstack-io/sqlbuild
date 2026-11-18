@@ -25,7 +25,7 @@ pub(crate) struct Run<'a> {
     /// The `prog` of the deepest sub-command parser entered so far.
     pub(crate) command_prog: Option<String>,
     pub(crate) usage_failure: Option<UsageFailure>,
-    /// The destination of every option the arguments wrote, at any parser level.
+    /// The destination of every option the arguments wrote or excluded, at any parser level.
     pub(crate) given: BTreeSet<String>,
 }
 
@@ -365,12 +365,16 @@ impl<'p, 'r, 'h> Level<'p, 'r, 'h> {
         let parser: &ParserSpec = self.parser;
         let action: &ActionSpec = &parser.actions[index];
         self.seen.insert(action.id);
-        if let Some(dest) = action
-            .dest
-            .as_ref()
-            .filter(|_| !action.option_strings.is_empty())
-        {
-            self.run.given.insert(dest.clone());
+        if !action.option_strings.is_empty() {
+            let excluded = parser.actions.iter().filter(|other| {
+                action.mutex_group.is_some() && other.mutex_group == action.mutex_group
+            });
+            for dest in std::iter::once(action)
+                .chain(excluded)
+                .filter_map(|given| given.dest.as_ref())
+            {
+                self.run.given.insert(dest.clone());
+            }
         }
         let values: Option<Value> = self
             .run

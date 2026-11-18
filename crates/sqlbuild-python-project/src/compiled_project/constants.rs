@@ -32,3 +32,7 @@ pub const REACH_SETTING: &str = "reach";
 pub const JOB_RUN_REACH: &str = "all";
 /// What a job run with `changed: True` counts when `[changes] counts` is not set: every change.
 pub const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];
+/// Plan metadata naming the jobs whose own audits a build lets fail.
+pub const JOB_IGNORED_AUDIT_FAILURES_KEY: &str = "job_ignored_audit_failures";
+/// Plan metadata naming the jobs whose own models a build rebuilds from scratch.
+pub const JOB_FULL_REFRESH_KEY: &str = "job_full_refresh";

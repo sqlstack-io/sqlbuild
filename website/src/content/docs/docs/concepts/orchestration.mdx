@@ -95,7 +95,11 @@ Naming a group names each of its jobs. The first value set wins:
 3. The target's setting
 4. The project's setting
 
-`--no-job-settings` leaves out every job's settings.
+A command-line flag replaces the job's setting rather than merging with it: `--vars` replaces the
+job's whole `vars`. An option that rules another out counts as setting both, so `--reload` wins
+over a job's `load_sources = false`. Any `--concurrency` sets the build's limit and turns off the
+per-job limits. The job's settings are added before a `--` on the command line, so selectors after
+it still name jobs. `--no-job-settings` leaves out every job's settings.
 
 Some settings apply to the job's own nodes only, so a build that names two jobs can treat their
 nodes differently:
@@ -113,7 +117,8 @@ gives them to `orders` alone, and `+job:nightly_orders_job` builds the job's ups
 them.
 
 Every other setting, such as `vars` or `changed`, applies to the whole build, so every named job
-must set it the same way. A group whose jobs set different `vars` or `changed` fails to compile.
+must set it the same way. A group whose jobs set any of these differently on a target that declares
+them together fails to compile, with the error a build of the group would give.
 Two named jobs that give one node different values of the same setting fail the build with `S027`,
 naming the node, both jobs and the setting. A setting only one of them sets is no conflict.
 
@@ -303,7 +308,7 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | `job nightly_orders_job resources: cpus must be a positive number` | Set `cpus` above zero |
 | `job 'nightly_orders_job' uses pool 'warehouse_hevy', which [pools] in sqlbuild_project.toml does not declare` | Fix the name, or declare the pool in [`[pools]`](/docs/concepts/project-configuration#pools) |
 | `job 'nightly_orders_job' takes 2 slots of pool 'supplier_api', more than its limit of 1 on target 'production'` | Take fewer slots, or raise the limit in `[targets.production.pools]` |
-| `jobs orders_job and crm_job set vars differently; a group runs its jobs as one build, which has one vars` | Give the group's jobs the same `vars` and `changed`, or move one job to another group |
+| `jobs orders_job and crm_job set vars differently ({"amount":"5"} and {"amount":"9"}); a build applies vars to everything it runs; group daily_job_group builds its jobs together` | Give the group's jobs the same build-wide settings, or move one job to another group |
 | `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
 | `group dependencies contain a cycle in job group daily_orders_job_group: orders_marts_job waits for staging_orders_job (model:orders reads model:stg_orders); staging_orders_job waits for orders_marts_job (model:stg_orders reads seed:regions)` | Move each node to one job, and give seeds and nodes that several members read their own job that runs first |
 

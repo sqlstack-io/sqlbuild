@@ -18,6 +18,9 @@ use crate::bindings::_helpers::compiled_project::job_settings::{
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;
 
+/// Ends the options; job flags go before it so they are never read as selectors.
+const OPTIONS_TERMINATOR: &str = "--";
+
 /// The commands whose selections take the settings of the jobs they name.
 const JOB_SETTING_COMMANDS: [&str; 2] = ["build", "plan"];
 
@@ -93,7 +96,13 @@ fn named_job_argv(
     if flags.is_empty() {
         return Ok(None);
     }
-    Ok(Some(argv.iter().cloned().chain(flags).collect()))
+    let terminator: usize = argv
+        .iter()
+        .position(|argument| argument == OPTIONS_TERMINATOR)
+        .unwrap_or(argv.len());
+    let mut job_argv: Vec<String> = argv.to_vec();
+    job_argv.splice(terminator..terminator, flags);
+    Ok(Some(job_argv))
 }
 
 /// Whether the command meets `error` again, and reports it, when it runs.

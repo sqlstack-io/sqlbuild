@@ -9,9 +9,17 @@ pub struct JobSettingConflict {
     pub help: &'static str,
 }
 
+/// A selector token that names jobs, and why it failed to select their nodes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct JobSelectorError {
+    pub jobs: Vec<String>,
+    pub selector: String,
+    pub error: SelectorError,
+}
+
 /// Why the jobs a selection names cannot give their nodes settings.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NodeJobSettingsError {
-    Selector(SelectorError),
+    Selector(JobSelectorError),
     Conflict(JobSettingConflict),
 }

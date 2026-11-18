@@ -34,6 +34,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
+use sqlbuild_python_project::compiled_project::constants::JOB_IGNORED_AUDIT_FAILURES_KEY;
 
 const SKIP_ACTION: &str = "skip";
 const QUERY_CHANGED: &str = "query_changed";
@@ -529,5 +530,9 @@ pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextRepor
         pruned_models: pruned_models(&metadata)?,
         pre_build_lines: pre_build,
         ignore_audit_failures: native_field(&plan, "ignore_audit_failures")?.is_truthy()?,
+        ignore_audit_failure_jobs: metadata_names(Some(mapping_get(
+            &metadata,
+            JOB_IGNORED_AUDIT_FAILURES_KEY,
+        )?))?,
     })
 }
