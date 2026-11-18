@@ -1,14 +1,23 @@
 //! A proxy that rewrites `Host` over plain HTTP signs people in, provisioning newcomers as viewers.
 
+use axum::body::Body;
+use axum::extract::ConnectInfo;
 use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
+use tower::ServiceExt;
 
-use crate::api::models::{TrustedProxyAuthentication, UnknownProxyUsers};
+use crate::api::_helpers::authentication::configure::configure;
+use crate::api::models::{
+    ApiAuthentication, HumanLogin, TrustedProxyAuthentication, UnknownProxyUsers,
+};
 use crate::api::tests::helpers::stop_api;
 use crate::api::tests::proxy_provisioning_helpers::{
-    LOGOUT_URL, NAME_HEADER, ORIGIN, PUBLIC_HOST, USER_HEADER, forwarded, rows, settings, start,
+    LOGOUT_URL, NAME_HEADER, ORIGIN, PUBLIC_HOST, USER_HEADER, default_proxy_login, forwarded,
+    rows, settings, start,
 };
-use crate::api::tests::test_types::{ProxyPeersDefaultTestCase, ProxyProvisioningTestCase};
+use crate::api::tests::test_types::{
+    ProxyPeerTrustTestCase, ProxyPeersDefaultTestCase, ProxyProvisioningTestCase,
+};
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::tests::role_helpers::role_fixture;
 use crate::store::main::migrate_store::migrate_store;
@@ -284,4 +293,163 @@ fn given_a_trusted_proxy_without_trusted_peers_when_configured_then_both_loopbac
 
         assert_eq!(peers, test_case.expected_peers, "{}", test_case.description);
     }
+}
+
+#[test]
+fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loopback_tcp_peer_signs_in()
+ {
+    let test_cases = [
+        ProxyPeerTrustTestCase {
+            description: "IPv4 loopback peer, the default proxy on the same host",
+            login: default_proxy_login(),
+            peer: "127.0.0.1",
+            forwarding_headers: &[],
+            username: "orders-ipv4-loopback",
+            expected_status: StatusCode::OK,
+            expected_provisioned: true,
+        },
+        ProxyPeerTrustTestCase {
+            description: "IPv6 loopback peer, the default proxy on the same host",
+            login: default_proxy_login(),
+            peer: "::1",
+            forwarding_headers: &[],
+            username: "orders-ipv6-loopback",
+            expected_status: StatusCode::OK,
+            expected_provisioned: true,
+        },
+        ProxyPeerTrustTestCase {
+            description: "IPv4-mapped loopback peer from a dual-stack listener",
+            login: default_proxy_login(),
+            peer: "::ffff:127.0.0.1",
+            forwarding_headers: &[],
+            username: "orders-mapped-loopback",
+            expected_status: StatusCode::OK,
+            expected_provisioned: true,
+        },
+        ProxyPeerTrustTestCase {
+            description: "IPv4 non-loopback peer not in trusted_peers",
+            login: default_proxy_login(),
+            peer: "192.0.2.24",
+            forwarding_headers: &[],
+            username: "orders-ipv4-remote",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_provisioned: false,
+        },
+        ProxyPeerTrustTestCase {
+            description: "IPv6 non-loopback peer not in trusted_peers",
+            login: default_proxy_login(),
+            peer: "2001:db8::24",
+            forwarding_headers: &[],
+            username: "orders-ipv6-remote",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_provisioned: false,
+        },
+        ProxyPeerTrustTestCase {
+            description: "IPv4-mapped non-loopback peer from a dual-stack listener",
+            login: default_proxy_login(),
+            peer: "::ffff:192.0.2.24",
+            forwarding_headers: &[],
+            username: "orders-mapped-remote",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_provisioned: false,
+        },
+        ProxyPeerTrustTestCase {
+            description: "IPv4 non-loopback peer claiming a loopback client in forwarding headers",
+            login: default_proxy_login(),
+            peer: "192.0.2.24",
+            forwarding_headers: &[
+                ("x-forwarded-for", "127.0.0.1"),
+                ("x-real-ip", "127.0.0.1"),
+                ("forwarded", "for=127.0.0.1"),
+            ],
+            username: "orders-ipv4-forwarded",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_provisioned: false,
+        },
+        ProxyPeerTrustTestCase {
+            description: "IPv6 non-loopback peer claiming a loopback client in forwarding headers",
+            login: default_proxy_login(),
+            peer: "2001:db8::24",
+            forwarding_headers: &[
+                ("x-forwarded-for", "::1"),
+                ("x-real-ip", "::1"),
+                ("forwarded", "for=\"[::1]\""),
+            ],
+            username: "orders-ipv6-forwarded",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_provisioned: false,
+        },
+        ProxyPeerTrustTestCase {
+            description: "password sign-in without [trusted_proxy], header from IPv4 loopback",
+            login: HumanLogin::Password(format!("https://{PUBLIC_HOST}")),
+            peer: "127.0.0.1",
+            forwarding_headers: &[],
+            username: "orders-password-ipv4",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_provisioned: false,
+        },
+        ProxyPeerTrustTestCase {
+            description: "password sign-in without [trusted_proxy], header from IPv6 loopback",
+            login: HumanLogin::Password(format!("https://{PUBLIC_HOST}")),
+            peer: "::1",
+            forwarding_headers: &[],
+            username: "orders-password-ipv6",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_provisioned: false,
+        },
+    ];
+    run(async {
+        let Some(fixture) = open_test_store(Backend::Sqlite).await else {
+            return;
+        };
+        let store = &fixture.store;
+        migrate_store(store).await.expect("migrate");
+        for test_case in test_cases {
+            let (_, routes, _) = configure(
+                store,
+                ApiAuthentication {
+                    login: test_case.login,
+                    ..ApiAuthentication::default()
+                },
+                "127.0.0.1:8080".parse().expect("listener"),
+            )
+            .await
+            .expect("sign-in routes");
+            let peer = std::net::SocketAddr::new(test_case.peer.parse().expect("peer IP"), 40_000);
+            let application = routes.with_state(store.clone());
+            let request = axum::http::Request::get("/api/control/bootstrap")
+                .header(header::HOST, PUBLIC_HOST)
+                .header("x-forwarded-host", PUBLIC_HOST)
+                .header(USER_HEADER, test_case.username);
+            let request = test_case
+                .forwarding_headers
+                .iter()
+                .fold(request, |request, (name, value)| {
+                    request.header(*name, *value)
+                });
+            let mut request = request.body(Body::empty()).expect("request");
+            request.extensions_mut().insert(ConnectInfo(peer));
+
+            let response = application.oneshot(request).await.expect("response");
+
+            assert_eq!(
+                response.status(),
+                test_case.expected_status,
+                "{}",
+                test_case.description
+            );
+            assert_eq!(
+                rows(
+                    store,
+                    "SELECT COUNT(*) AS people FROM sqb_principals WHERE name = $1",
+                    vec![Parameter::Text(test_case.username.into())],
+                )
+                .await,
+                json!([{"people": i64::from(test_case.expected_provisioned)}]),
+                "{}: provisioned",
+                test_case.description
+            );
+        }
+        close_test_store(fixture).await;
+    });
 }

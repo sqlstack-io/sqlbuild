@@ -4394,6 +4394,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "toml",
+ "tower",
  "tower-http",
  "utoipa",
  "uuid",

@@ -120,7 +120,7 @@ proxy_logout_url = "https://sign-in.example.com/logout"
 | Key | Meaning |
 | --- | --- |
 | `origin` | The URL people open, such as `https://control.example.com`. `http://` works too: the server warns at start-up, and `https://` is recommended. |
-| `trusted_peers` | The proxy's IP addresses. Without this key the server trusts `127.0.0.1` and `::1`, for a proxy on the same host that connects to `localhost` over either IPv4 or IPv6. |
+| `trusted_peers` | The proxy's IP addresses. Without this key the server trusts `127.0.0.1` and `::1`, for a proxy on the same host that connects to `localhost` over either IPv4 or IPv6, so any process on the server's host can send the header and sign in as anyone. Setting `trusted_peers` narrows this to the addresses you list: a proxy on another host, listed by its own address, keeps local processes out. The server takes the peer from the connection, never from `X-Forwarded-For` or `Forwarded`. |
 | `username_header` | The header naming the signed-in person, `X-SQB-User` by default. |
 | `display_name_header`, `email_header` | Optional headers whose values the UI shows. The server doesn't store them. |
 | `unknown_users` | `provision_viewer` (default) gives a person signing in for the first time an account with the `viewer` role; `reject` refuses them. |
