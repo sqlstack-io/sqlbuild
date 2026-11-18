@@ -85,6 +85,8 @@ pub struct AvailableUpstreams {
     pub satisfied_keys: HashSet<GraphKey>,
     pub existing_relations: HashSet<String>,
     pub deferred_relations: Option<HashSet<String>>,
+    /// Models and seeds are read from the deferred relations only when the active target lacks them.
+    pub fills_missing: bool,
 }
 
 /// What a missing-upstream message offers to fix the misses with, all from configuration.
@@ -100,6 +102,8 @@ pub struct MissingUpstreamFixes {
     pub deferrable: Vec<String>,
     /// The clone command's `--to`, needed when the active target is not the default one.
     pub clone_to: Option<String>,
+    /// The target the active one reads missing models and seeds from, named as where those are missing too.
+    pub missing_from: Option<String>,
 }
 
 /// One upstream dependency missing from both scope and warehouse, with its dependents.
