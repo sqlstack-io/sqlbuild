@@ -1,34 +1,41 @@
-//! A group's members must agree on the build-wide settings that can change any compiled SQL.
+//! A group's jobs must agree on every build-wide setting on each target that declares them.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::Value as Json;
+use sqlbuild_discovery::orchestration_files::models::{GroupFile, OrchestrationInventory};
 
-use crate::job_settings::constants::GROUP_AGREED_SETTINGS;
+use crate::job_settings::main::build_job_settings::build_job_settings;
+use crate::job_settings::main::declared_runs::declared_runs;
 use crate::job_settings::models::DeclaredRun;
 
-/// Why `members` cannot run as one build, naming the setting and two members.
+/// Why `group` cannot run as one build on some target, as building it would say; `None` if never.
 #[must_use]
 pub fn group_setting_mismatch(
-    members: &[String],
-    declared: &BTreeMap<String, DeclaredRun>,
+    inventory: &OrchestrationInventory,
+    group: &GroupFile,
 ) -> Option<String> {
-    let value = |job: &str, key: &str| -> Option<Json> {
-        match declared.get(job) {
-            Some(DeclaredRun::Job { settings, .. }) => settings.get(key).cloned(),
-            _ => None,
+    let mut targets: BTreeSet<Option<&str>> = BTreeSet::from([None]);
+    targets.extend(group.run.targets.iter().map(|target| Some(target.as_str())));
+    for (_, job) in &inventory.jobs {
+        if group
+            .jobs
+            .iter()
+            .any(|member| member.value == job.run.name.value)
+        {
+            targets.extend(job.run.targets.iter().map(|target| Some(target.as_str())));
         }
-    };
-    for key in GROUP_AGREED_SETTINGS {
-        let mut members = members.iter();
-        let Some(first) = members.next() else {
+    }
+    for target in targets {
+        let declared: BTreeMap<String, DeclaredRun> = declared_runs(inventory, target);
+        let Some(DeclaredRun::Group { members }) = declared.get(&group.run.name.value) else {
             continue;
         };
-        let expected: Option<Json> = value(first, key);
-        if let Some(other) = members.find(|member| value(member, key) != expected) {
+        if let Err(conflict) = build_job_settings(members, &declared) {
+            let on: String =
+                target.map_or_else(String::new, |target| format!(" on target {target}"));
             return Some(format!(
-                "jobs {first} and {other} set {key} differently; a group runs its jobs as one \
-                 build, which has one {key}"
+                "{}{on}; group {} builds its jobs together",
+                conflict.message, group.run.name.value
             ));
         }
     }

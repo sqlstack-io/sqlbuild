@@ -13,6 +13,12 @@ use crate::cli_text::constants::{
 };
 use crate::cli_text::models::{CliStyle, ModelPlanText, PlanTextReport};
 
+/// `job a` or `jobs a, b`.
+fn job_list(jobs: &[String]) -> String {
+    let noun: &str = if jobs.len() == 1 { "job" } else { "jobs" };
+    format!("{noun} {}", jobs.join(", "))
+}
+
 fn header_lines(report: &PlanTextReport, full_refresh: bool) -> Vec<String> {
     let style: CliStyle = CliStyle { use_color: true };
     let mut lines: Vec<String> = Vec::new();
@@ -25,6 +31,11 @@ fn header_lines(report: &PlanTextReport, full_refresh: bool) -> Vec<String> {
     }
     if report.ignore_audit_failures {
         lines.push(style.warning(IGNORED_AUDIT_FAILURES_NOTICE));
+    } else if !report.ignore_audit_failure_jobs.is_empty() {
+        lines.push(style.warning(&format!(
+            "{IGNORED_AUDIT_FAILURES_NOTICE} for the audits of {}",
+            job_list(&report.ignore_audit_failure_jobs)
+        )));
     }
     lines
 }

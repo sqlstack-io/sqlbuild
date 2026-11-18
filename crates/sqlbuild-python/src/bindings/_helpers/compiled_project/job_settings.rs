@@ -10,7 +10,7 @@ use serde_json::Value;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::models::ParsedSelector;
 use sqlbuild_analysis::job_settings::constants::JOB_SETTING_CONFLICT_CODE;
-use sqlbuild_analysis::job_settings::errors::JobSettingConflict;
+use sqlbuild_analysis::job_settings::errors::{JobSelectorError, JobSettingConflict};
 use sqlbuild_analysis::job_settings::main::build_job_settings::build_job_settings;
 use sqlbuild_analysis::job_settings::main::named_jobs::named_jobs;
 
@@ -82,5 +82,23 @@ pub(crate) fn job_setting_conflict(py: Python<'_>, conflict: &JobSettingConflict
         ErrorId::CliUser,
         &conflict.message,
         (Some(JOB_SETTING_CONFLICT_CODE), Some(conflict.help)),
+    )
+}
+
+/// A `CliUserError` naming the jobs whose selection a selector failed to resolve, with its code.
+pub(crate) fn job_selector_error(py: Python<'_>, failure: &JobSelectorError) -> PyErr {
+    let jobs: String = if failure.jobs.is_empty() {
+        "the named jobs".to_owned()
+    } else {
+        format!("job {}", failure.jobs.join(", "))
+    };
+    new_error(
+        py,
+        ErrorId::CliUser,
+        &format!(
+            "cannot apply the settings of {jobs}: selector '{}' failed: {}",
+            failure.selector, failure.error.message
+        ),
+        (Some(failure.error.code), failure.error.help.as_deref()),
     )
 }

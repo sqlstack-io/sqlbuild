@@ -14,9 +14,14 @@ use sqlbuild_analysis::job_settings::main::named_jobs::named_jobs;
 use sqlbuild_analysis::job_settings::main::node_job_settings::node_job_settings;
 use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings};
 
-use crate::bindings::_helpers::compiled_project::job_settings::job_setting_conflict;
+use crate::bindings::_helpers::compiled_project::job_settings::{
+    job_selector_error, job_setting_conflict,
+};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_project::compiled_project::constants::{
+    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY,
+};
 use sqlbuild_python_project::compiled_project::main::graph_with_jobs::graph_with_jobs;
 use sqlbuild_python_project::compiled_project::main::job_declarations::job_declarations;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
@@ -31,6 +36,32 @@ const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
 /// What the planned build takes from its named jobs, or nothing when it names none.
 pub(crate) struct PlannedJobSettings {
     settings: NodeJobSettings,
+    /// The named jobs that set `ignore_audit_failures = true` for nodes they select.
+    ignoring_jobs: Vec<String>,
+    /// The named jobs that set `full_refresh = true` for models they select.
+    refreshing_jobs: Vec<String>,
+}
+
+/// The named jobs of `settings` that set `setting` to true for a selected node of `kind`, if given.
+fn jobs_setting(
+    settings: &NodeJobSettings,
+    declared: &BTreeMap<String, DeclaredRun>,
+    (setting, kind): (&str, Option<&str>),
+) -> Vec<String> {
+    let mut jobs: BTreeSet<String> = BTreeSet::new();
+    for (key, node_jobs) in &settings.node_jobs {
+        if kind.is_some_and(|kind| key.0 != kind) {
+            continue;
+        }
+        for job in node_jobs {
+            if let Some(DeclaredRun::Job { settings, .. }) = declared.get(job)
+                && settings.get(setting) == Some(&Value::Bool(true))
+            {
+                jobs.insert(job.clone());
+            }
+        }
+    }
+    jobs.into_iter().collect()
 }
 
 fn strings(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
@@ -66,8 +97,12 @@ pub(crate) fn planned_job_settings(
     let all: Vec<String> = select.iter().chain(&exclude).cloned().collect();
     let graph = graph_with_jobs(py, native.graph(), &all, &[])?;
     match node_job_settings(&graph, (&select, &exclude), &declared) {
-        Ok(settings) => Ok(Some(PlannedJobSettings { settings })),
-        Err(NodeJobSettingsError::Selector(_)) => Ok(None),
+        Ok(settings) => Ok(Some(PlannedJobSettings {
+            ignoring_jobs: jobs_setting(&settings, &declared, (IGNORE_AUDIT_FAILURES, None)),
+            refreshing_jobs: jobs_setting(&settings, &declared, (FULL_REFRESH, Some(MODEL_KIND))),
+            settings,
+        })),
+        Err(NodeJobSettingsError::Selector(failure)) => Err(job_selector_error(py, &failure)),
         Err(NodeJobSettingsError::Conflict(conflict)) => Err(job_setting_conflict(py, &conflict)),
     }
 }
@@ -205,6 +240,26 @@ impl PlannedJobSettings {
             if changed {
                 changes.push(("audit_entries", PyTuple::new(py, audits)?.into_any()));
             }
+        }
+        let ignoring: &[String] = if cli_ignore_audit_failures.is_none() {
+            &self.ignoring_jobs
+        } else {
+            &[]
+        };
+        if !ignoring.is_empty() || !self.refreshing_jobs.is_empty() {
+            let metadata: Bound<'py, PyDict> = native_field(plan, "metadata")?
+                .cast_into::<PyDict>()?
+                .copy()?;
+            if !ignoring.is_empty() {
+                metadata.set_item(JOB_IGNORED_AUDIT_FAILURES_KEY, PyTuple::new(py, ignoring)?)?;
+            }
+            if !self.refreshing_jobs.is_empty() {
+                metadata.set_item(
+                    JOB_FULL_REFRESH_KEY,
+                    PyTuple::new(py, &self.refreshing_jobs)?,
+                )?;
+            }
+            changes.push(("metadata", metadata.into_any()));
         }
         if changes.is_empty() {
             return Ok(plan.clone());

@@ -182,6 +182,8 @@ pub struct RunContextFacts {
     /// The configuration layer the concurrency came from.
     pub concurrency_source: String,
     pub full_refresh: bool,
+    /// The named jobs whose own models the build rebuilds from scratch.
+    pub full_refresh_jobs: Vec<String>,
     pub selected_count: usize,
     pub total_count: usize,
     /// Valid ISO `start_date` and `end_date` variables.

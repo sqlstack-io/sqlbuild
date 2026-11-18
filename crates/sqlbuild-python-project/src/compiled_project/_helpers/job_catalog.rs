@@ -9,7 +9,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector};
-use sqlbuild_analysis::job_settings::models::{DeclaredRun, JobRetry};
+use sqlbuild_analysis::job_settings::main::declared_runs::declared_runs;
+use sqlbuild_analysis::job_settings::models::DeclaredRun;
 use sqlbuild_cli::native_commands::main::effective_target::effective_target;
 use sqlbuild_discovery::orchestration_files::models::{OrchestrationInventory, RunFile};
 
@@ -118,43 +119,6 @@ fn loaded_jobs(py: Python<'_>) -> PyResult<Option<(Catalog, BTreeMap<String, Dec
         }
     });
     Ok(Some(loaded))
-}
-
-/// Each job's settings and retry, and each group's jobs, declared for `target`.
-pub(crate) fn declared_runs(
-    inventory: &OrchestrationInventory,
-    target: Option<&str>,
-) -> BTreeMap<String, DeclaredRun> {
-    let declared_for = |targets: &[String]| {
-        targets.is_empty() || target.is_some_and(|target| targets.iter().any(|name| name == target))
-    };
-    let mut declared: BTreeMap<String, DeclaredRun> = BTreeMap::new();
-    for (_, job) in &inventory.jobs {
-        if declared_for(&job.run.targets) {
-            declared.insert(
-                job.run.name.value.clone(),
-                DeclaredRun::Job {
-                    settings: job.settings.clone(),
-                    retry: job.run.retry.map(|retry| JobRetry {
-                        attempts: retry.attempts,
-                        delay_seconds: retry.delay_seconds,
-                    }),
-                },
-            );
-        }
-    }
-    for (_, group) in &inventory.groups {
-        if declared_for(&group.run.targets) {
-            let members: Vec<String> = group
-                .jobs
-                .iter()
-                .filter(|job| declared.contains_key(&job.value))
-                .map(|job| job.value.clone())
-                .collect();
-            declared.insert(group.run.name.value.clone(), DeclaredRun::Group { members });
-        }
-    }
-    declared
 }
 
 /// Each job's selector tokens and each group's members declared for `target`, and the names a schedule or sensor starts there.

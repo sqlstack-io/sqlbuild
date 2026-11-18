@@ -65,6 +65,7 @@ use sqlbuild_python_planner::consumption::models::Prepared;
 use sqlbuild_python_planner::freshness::main::append_freshness_records::append_freshness_records;
 use sqlbuild_python_planner::observations::main::append_build_observations::append_build_observations;
 use sqlbuild_python_planner::planner_resolution::main::cursor::type_cursor_overrides::type_cursor_overrides;
+use sqlbuild_python_project::compiled_project::constants::JOB_FULL_REFRESH_KEY;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_state::consumption::models::ChangedPolicy;
 
@@ -174,6 +175,7 @@ fn run_context_facts(
         concurrency: concurrency.limit,
         concurrency_source: concurrency.source.to_string(),
         full_refresh: context.request_flag("full_refresh")?,
+        full_refresh_jobs: full_refresh_jobs(pipeline)?,
         selected_count,
         total_count,
         date_vars: (
@@ -182,6 +184,17 @@ fn run_context_facts(
         ),
         selector_files,
     })
+}
+
+/// The named jobs whose own models the planned build rebuilds from scratch.
+fn full_refresh_jobs(pipeline: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+    let metadata: Bound<'_, PyAny> =
+        native_field(&native_field(pipeline, "plan_output")?, "metadata")?;
+    let jobs: Bound<'_, PyAny> = mapping_get(&metadata, JOB_FULL_REFRESH_KEY)?;
+    if jobs.is_none() {
+        return Ok(Vec::new());
+    }
+    jobs.try_iter()?.map(|job| job?.extract()).collect()
 }
 
 /// Write the resolved non-secret placement, mode and selection context.

@@ -8,7 +8,6 @@ use pyo3::prelude::Python;
 use serde_json::Value;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::job_settings::main::group_setting_mismatch::group_setting_mismatch;
-use sqlbuild_analysis::job_settings::models::DeclaredRun;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_discovery::models::{DiscoveryFailure, FailureKind};
 use sqlbuild_discovery::orchestration_files::models::{
@@ -60,20 +59,8 @@ pub(crate) fn check_orchestration_values(
             })?;
         }
     }
-    let declared: BTreeMap<String, DeclaredRun> = inventory
-        .jobs
-        .iter()
-        .map(|(_, job)| {
-            let run = DeclaredRun::Job {
-                settings: job.settings.clone(),
-                retry: None,
-            };
-            (job.run.name.value.clone(), run)
-        })
-        .collect();
     for (path, group) in &inventory.groups {
-        let members: Vec<String> = group.jobs.iter().map(|job| job.value.clone()).collect();
-        if let Some(message) = group_setting_mismatch(&members, &declared) {
+        if let Some(message) = group_setting_mismatch(inventory, group) {
             return Err(failure(path, (group.run.name.position, message)));
         }
     }

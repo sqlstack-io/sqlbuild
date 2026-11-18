@@ -6,6 +6,16 @@ use crate::build_command::models::RunContextFacts;
 use crate::cli_text::models::{CliDocument, CliStyle};
 use crate::number_text::main::format_thousands::format_thousands;
 
+/// `true`, the models of the named jobs that rebuild theirs from scratch, or `false`.
+fn full_refresh(facts: &RunContextFacts) -> String {
+    match facts.full_refresh_jobs.as_slice() {
+        _ if facts.full_refresh => true.to_string(),
+        [] => false.to_string(),
+        [job] => format!("models of job {}", sanitize(job)),
+        jobs => format!("models of jobs {}", sanitize(&jobs.join(", "))),
+    }
+}
+
 fn date_vars(facts: &RunContextFacts) -> String {
     match &facts.date_vars {
         (None, None) => NOT_SET.to_owned(),
@@ -41,7 +51,7 @@ pub fn render_run_context(facts: &RunContextFacts, style: CliStyle) -> String {
                 )
             },
         ),
-        ("full_refresh", facts.full_refresh.to_string()),
+        ("full_refresh", full_refresh(facts)),
         (
             "selected",
             format!(

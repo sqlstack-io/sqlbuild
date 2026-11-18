@@ -27,6 +27,11 @@ fn given_a_command_line_when_reading_its_own_settings_then_every_written_option_
             expected_given: Some(&["ignore_audit_failures", "job_settings"]),
         },
         GivenSettingsTestCase {
+            description: "an option gives every setting of its mutually exclusive group",
+            argv: &["build", "--reload", "orders_job"],
+            expected_given: Some(&["load_sources", "reload"]),
+        },
+        GivenSettingsTestCase {
             description: "a selection alone gives no other setting",
             argv: &["build", "orders_job"],
             expected_given: Some(&[]),

@@ -1498,3 +1498,23 @@ class JobFullRefreshTestCase:
     description: str
     build_args: tuple[str, ...]
     expected_counts: tuple[tuple[int, int], ...]
+
+
+@dataclass(frozen=True)
+class JobConcurrencyTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    job_nodes: tuple[str, ...]
+    build_nodes: tuple[str, ...]
+    expected_job_peak: int
+    expected_least_build_peak: int
+
+
+@dataclass(frozen=True)
+class JobOutputTestCase:
+    description: str
+    command_args: tuple[str, ...]
+    expected_exit_code: int
+    expected_present: tuple[str, ...]
+    expected_absent: tuple[str, ...]
+    extra_files: dict[str, str] = field(default_factory=dict)

@@ -426,6 +426,8 @@ pub struct PlanTextReport {
     pub pre_build_lines: Vec<String>,
     /// Audit failures hold nothing back in the build this plan previews.
     pub ignore_audit_failures: bool,
+    /// The named jobs whose own audit failures hold nothing back.
+    pub ignore_audit_failure_jobs: Vec<String>,
 }
 
 /// The structural kind of a rendered plan line.

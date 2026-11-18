@@ -7,6 +7,7 @@ use crate::graph::errors::SelectorError;
 use crate::graph::main::resolve_selector_tokens::resolve_selector_tokens;
 use crate::graph::models::ProjectGraph;
 use crate::job_settings::_helpers::tokens::token_jobs;
+use crate::job_settings::errors::JobSelectorError;
 use crate::job_settings::models::DeclaredRun;
 
 fn keys(graph: &ProjectGraph, selectors: &[String]) -> Result<BTreeSet<ObjectKey>, SelectorError> {
@@ -18,9 +19,18 @@ pub(crate) fn node_jobs(
     graph: &ProjectGraph,
     (select, exclude): (&[String], &[String]),
     declared: &BTreeMap<String, DeclaredRun>,
-) -> Result<BTreeMap<ObjectKey, Vec<String>>, SelectorError> {
+) -> Result<BTreeMap<ObjectKey, Vec<String>>, JobSelectorError> {
+    let failed = |jobs: &[String], selector: &str| {
+        let (jobs, selector) = (jobs.to_vec(), selector.to_owned());
+        move |error: SelectorError| JobSelectorError {
+            jobs,
+            selector,
+            error,
+        }
+    };
     let mut node_jobs: BTreeMap<ObjectKey, Vec<String>> = BTreeMap::new();
-    let excluded: BTreeSet<ObjectKey> = keys(graph, exclude)?;
+    let excluded: BTreeSet<ObjectKey> =
+        keys(graph, exclude).map_err(failed(&[], &exclude.join(" ")))?;
     let resolved = graph.jobs.as_ref();
     for token in select
         .iter()
@@ -30,17 +40,22 @@ pub(crate) fn node_jobs(
         if jobs.is_empty() {
             continue;
         }
-        let selected: BTreeSet<ObjectKey> = keys(graph, &[token.to_owned()])?;
-        for job in jobs {
-            let Some(Ok(own)) = resolved.and_then(|resolved| resolved.get(&job)) else {
-                continue;
+        let selected: BTreeSet<ObjectKey> =
+            keys(graph, &[token.to_owned()]).map_err(failed(&jobs, token))?;
+        for job in &jobs {
+            let own: &BTreeSet<ObjectKey> = match resolved.and_then(|resolved| resolved.get(job)) {
+                Some(Ok(own)) => own,
+                Some(Err(error)) => {
+                    return Err(failed(std::slice::from_ref(job), token)(error.clone()));
+                }
+                None => continue,
             };
             for key in selected
                 .intersection(own)
                 .filter(|key| !excluded.contains(*key))
             {
                 let jobs: &mut Vec<String> = node_jobs.entry(key.clone()).or_default();
-                if !jobs.contains(&job) {
+                if !jobs.contains(job) {
                     jobs.push(job.clone());
                 }
             }

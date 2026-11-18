@@ -8,8 +8,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections import defaultdict
 from collections.abc import Callable
-from itertools import takewhile
+from datetime import datetime, timedelta
+from itertools import accumulate, takewhile
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
@@ -53,6 +55,9 @@ _REFUND_RATES: str = (
     "final AS (SELECT * FROM by_product)\n"
     "SELECT * FROM final\n"
 )
+
+
+_COMPLETED_EVENT: str = "resource_attempt_completed"
 
 
 def artifact_tree(root: Path) -> dict[str, bytes]:
@@ -1455,3 +1460,22 @@ def prepare_warehouse(*, project_dir: Path, sql: str) -> None:
 
     with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
         warehouse.execute(sql)
+
+
+def peak_concurrency(*, events_path: Path, names: tuple[str, ...]) -> int:
+    """The most of `names` a build's event output shows running at once."""
+
+    events: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        event: dict[str, Any] = json.loads(line)
+        events[(event["event_type"], str(event.get("resource_name")))].append(event)
+    ends: list[tuple[datetime, float]] = [
+        (datetime.fromisoformat(event["occurred_at"]), event["duration_ms"])
+        for name in names
+        for event in events[(_COMPLETED_EVENT, name)]
+    ]
+    changes: list[tuple[datetime, int]] = sorted(
+        [(end - timedelta(milliseconds=duration), 1) for end, duration in ends]
+        + [(end, -1) for end, _ in ends]
+    )
+    return max(accumulate(change for _, change in changes), default=0)

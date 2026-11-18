@@ -92,6 +92,10 @@ pub(super) fn declared() -> BTreeMap<String, DeclaredRun> {
             ),
         ),
         (
+            "broken_job".to_owned(),
+            job(json!({"full_refresh": true}), None),
+        ),
+        (
             "daily_group".to_owned(),
             DeclaredRun::Group {
                 members: texts(&["orders_job", "refunds_job"]),
@@ -114,6 +118,7 @@ fn selections() -> BTreeMap<String, JobSelection> {
         ("crm_us_job".to_owned(), job(&["customers"])),
         ("retried_job".to_owned(), job(&["stg_orders"])),
         ("retried_fast_job".to_owned(), job(&["stg_orders"])),
+        ("broken_job".to_owned(), job(&["missing_model"])),
         (
             "daily_group".to_owned(),
             JobSelection::Group {
