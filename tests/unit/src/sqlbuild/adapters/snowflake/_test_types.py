@@ -143,6 +143,12 @@ class SnowflakeLoadSeedTestCase:
 
 
 @dataclass(frozen=True)
+class SnowflakeSeedReplaceTestCase:
+    description: str
+    expected_statements: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class SnowflakeTableFreshnessMetadataTestCase:
     description: str
     row: tuple[object, ...]

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
 from typing import Any
 
 from sqlbuild._native import NODE_TYPE_SEED, Fingerprint, SeedPlanEntry, write_fingerprint
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.executor.run.classes.fingerprint_writes import FingerprintWrites
+from sqlbuild.executor.run.types import FingerprintTableLocation
 
 
 def try_write_seed_fingerprint(
@@ -17,8 +20,9 @@ def try_write_seed_fingerprint(
     connection: Any,
     run_id: str,
     query_change_tracking: bool,
+    fingerprint_writes: FingerprintWrites | None = None,
 ) -> tuple[str, ...]:
-    """Write active-target seed identity after a successful load, returning warnings."""
+    """Write a loaded seed's identity on the active target, setting each table up once per run."""
 
     if not query_change_tracking:
         return ()
@@ -48,19 +52,31 @@ def try_write_seed_fingerprint(
             metadata_json=seed_entry.fingerprint_metadata_json,
             ts=datetime.now(tz=UTC),
         )
-        _ = write_fingerprint(
-            connection=connection,
-            execute=adapter.execute,
-            database=seed_entry.destination.database,
-            schema=target_schema,
-            fingerprint=fingerprint,
-            render_qualified_name=adapter.render_qualified_name,
-            render_framework_type=adapter.render_framework_type,
-            read_columns=adapter.get_columns,
-            render_add_columns=adapter.render_add_columns,
-            render_create_table_sql=adapter.render_create_fingerprint_table_sql,
-            render_create_index_sqls=adapter.render_create_fingerprint_index_sqls,
+        location: FingerprintTableLocation = (seed_entry.destination.database, target_schema)
+        setting_up: AbstractContextManager[bool] = (
+            nullcontext(True)
+            if fingerprint_writes is None
+            else fingerprint_writes.setting_up(location=location)
         )
+        with setting_up as requested_setup:
+            set_up: bool = write_fingerprint(
+                ensure_table=requested_setup,
+                connection=connection,
+                execute=adapter.execute,
+                database=seed_entry.destination.database,
+                schema=target_schema,
+                fingerprint=fingerprint,
+                render_qualified_name=adapter.render_qualified_name,
+                render_framework_type=adapter.render_framework_type,
+                read_columns=adapter.get_columns,
+                render_add_columns=adapter.render_add_columns,
+                render_create_table_sql=adapter.render_create_fingerprint_table_sql,
+                render_create_index_sqls=adapter.render_create_fingerprint_index_sqls,
+            )
+            if fingerprint_writes is not None:
+                fingerprint_writes.written(
+                    location=location, requested_setup=requested_setup, set_up=set_up
+                )
     except Exception as exc:
         return (
             f"fingerprint write failed for seed '{seed_entry.name}'; "
