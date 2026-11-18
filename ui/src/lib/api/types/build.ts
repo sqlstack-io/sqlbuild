@@ -429,6 +429,8 @@ export type Overview = {
 	/** Newest first, up to the fourth deploy that changed something, with the deploys without changes between. */
 	recentChanges: SnapshotChange[];
 	latestRun: (Pick<Run, 'id' | 'endedAt'> & { status: RunStatus }) | null;
+	/** Set by the page that read it, to tell this read from data remembered or shown from another. */
+	readId?: string;
 	/** How long an acknowledged condition stays hidden unchanged, in seconds; null without a time limit, absent when unknown. */
 	attentionSnoozeSeconds?: number | null;
 	/**

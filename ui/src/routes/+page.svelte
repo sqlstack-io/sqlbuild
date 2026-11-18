@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { newRequestId } from '$lib/browser/request-id';
 	import { plural, noun } from '$lib/format/plural';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
@@ -52,8 +53,11 @@
 			return !client.supports('getWarehouseSync') || (sync !== null && !sync.syncing && !sync.lastError);
 		});
 		return client.overview(scope, nodes).then((read) => {
-			if (read) lastRead = { overview: read, scopeKey: scope.locationId, nodesSettled };
-			return read;
+			if (!read) return read;
+			const readId = newRequestId();
+			const marked = { ...read, readId };
+			lastRead = { overview: marked, readId, scopeKey: scope.locationId, nodesSettled };
+			return marked;
 		});
 	}, ['runs', 'checks', 'snapshot', 'platform_events', 'triggers']);
 	const data = $derived(overview.data ?? null);
@@ -116,6 +120,17 @@
 	// a complete read (the overview lists only what it could see in full) and never while node state is
 	// syncing or its last sync failed, when nodes out of date may just not be known yet. Every viewer sends
 	// the same event, which the server applies once; runs are acknowledged for good and never withdrawn.
+	// The first read on opening the page usually begins before the sync status arrives, so it can't be
+	// judged for nodes out of date; once node state is known to have settled, that read is taken again once.
+	const reread = new WeakSet<object>();
+	$effect(() => {
+		const read = lastRead;
+		const sync = app.warehouseSync;
+		if (!read || read.nodesSettled || read.scopeKey !== app.scope?.locationId) return;
+		if (!sync || sync.syncing || sync.lastError || reread.has(read)) return;
+		reread.add(read);
+		untrack(() => overview.refresh());
+	});
 	const withdrawn = new Set<string>();
 	$effect(() => {
 		const scope = app.scope;

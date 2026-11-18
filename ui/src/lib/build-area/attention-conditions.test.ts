@@ -158,24 +158,28 @@ describe('acknowledgements of conditions that cleared', () => {
 	});
 
 	it('judges only the page’s own latest read, for the target now selected, shown and not failed', () => {
-		const a = read([built([])], [ack('stale_models')]);
-		const b = read([built([])], []);
-		const readA = { overview: a, scopeKey: 'loc-1:dev', nodesSettled: true };
+		// The page shows its data through a proxy, so the shown read is a copy carrying the read's ID.
+		const a = { ...read([built([])], [ack('stale_models')]), readId: 'read-a' };
+		const b = { ...read([built([])], []), readId: 'read-b' };
+		const readA = { overview: a, readId: 'read-a', scopeKey: 'loc-1:dev', nodesSettled: true };
+		expect(judgedRead(readA, { shown: { ...a }, scopeKey: 'loc-1:dev', failed: false })).toBe(readA);
 		expect(judgedRead(readA, { shown: a, scopeKey: 'loc-1:dev', failed: false })).toBe(readA);
 		// Switched to target B: A's data is still shown until B's read lands, and A's withdrawal waits on it.
 		expect(judgedRead(readA, { shown: a, scopeKey: 'loc-2:dev', failed: false })).toBeNull();
 		// Back on A, its remembered data shows before a fresh read: never judged.
-		expect(judgedRead({ overview: b, scopeKey: 'loc-2:dev', nodesSettled: true }, { shown: a, scopeKey: 'loc-1:dev', failed: false })).toBeNull();
+		expect(judgedRead({ overview: b, readId: 'read-b', scopeKey: 'loc-2:dev', nodesSettled: true }, { shown: a, scopeKey: 'loc-1:dev', failed: false })).toBeNull();
+		// Remembered from an earlier visit: a read of the same target, but not this page's latest.
+		expect(judgedRead({ ...readA, readId: 'read-a2' }, { shown: a, scopeKey: 'loc-1:dev', failed: false })).toBeNull();
 		expect(judgedRead(readA, { shown: a, scopeKey: 'loc-1:dev', failed: true })).toBeNull();
 		expect(judgedRead(null, { shown: a, scopeKey: 'loc-1:dev', failed: false })).toBeNull();
 	});
 
 	it('judges nodes out of date only from a read that began after node state settled', () => {
-		const a = read([built([])], [ack('stale_models'), ack('event:scheduler_no_leader::')]);
+		const a = { ...read([built([])], [ack('stale_models'), ack('event:scheduler_no_leader::')]), readId: 'read-a' };
 		// Read during a sync: even once the sync has finished, that read's nodes are not judged; a new read is needed.
-		const duringSync = judgedRead({ overview: a, scopeKey: 'loc-1:dev', nodesSettled: false }, { shown: a, scopeKey: 'loc-1:dev', failed: false })!;
+		const duringSync = judgedRead({ overview: a, readId: 'read-a', scopeKey: 'loc-1:dev', nodesSettled: false }, { shown: a, scopeKey: 'loc-1:dev', failed: false })!;
 		expect(withdrawalsDue(duringSync.overview.clearedAcknowledgements, { failed: false, syncing: !duringSync.nodesSettled }).map((x) => x.key)).toEqual(['event:scheduler_no_leader::']);
-		const afterSync = judgedRead({ overview: a, scopeKey: 'loc-1:dev', nodesSettled: true }, { shown: a, scopeKey: 'loc-1:dev', failed: false })!;
+		const afterSync = judgedRead({ overview: a, readId: 'read-a', scopeKey: 'loc-1:dev', nodesSettled: true }, { shown: a, scopeKey: 'loc-1:dev', failed: false })!;
 		expect(withdrawalsDue(afterSync.overview.clearedAcknowledgements, { failed: false, syncing: !afterSync.nodesSettled }).map((x) => x.key)).toEqual(['stale_models', 'event:scheduler_no_leader::']);
 	});
 

@@ -115,16 +115,19 @@ export function withdrawalsDue(cleared: readonly AttentionAcknowledgement[] | un
 	return (cleared ?? []).filter((a) => a.key !== 'stale_models' || !read.syncing);
 }
 
-/** An Overview read as the page made it: for which scope, and whether node state had settled when it began. */
-export type JudgedRead<T> = { overview: T; scopeKey: string; nodesSettled: boolean };
+/**
+ * An Overview read as the page made it: its own ID (the page holds data in a proxy, so the read is told
+ * apart by ID, not identity), for which scope, and whether node state had settled when it began.
+ */
+export type JudgedRead<T> = { overview: T; readId: string; scopeKey: string; nodesSettled: boolean };
 
 /**
  * The read whose cleared acknowledgements may be withdrawn, or null: only the page's own latest read, while
  * it is what is shown, for the scope now selected, and not after a failed reload. Shown data that came from
  * elsewhere (remembered from an earlier visit, or still the previous target's) is never judged.
  */
-export function judgedRead<T>(read: JudgedRead<T> | null, now: { shown: T | null; scopeKey: string | null; failed: boolean }): JudgedRead<T> | null {
-	if (!read || now.failed || now.shown !== read.overview || now.scopeKey !== read.scopeKey) return null;
+export function judgedRead<T>(read: JudgedRead<T> | null, now: { shown: { readId?: string } | null; scopeKey: string | null; failed: boolean }): JudgedRead<T> | null {
+	if (!read || now.failed || now.shown?.readId !== read.readId || now.scopeKey !== read.scopeKey) return null;
 	return read;
 }
 
