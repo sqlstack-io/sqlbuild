@@ -215,18 +215,24 @@ impl<'py> RunRecorder<'py> {
         }))
     }
 
-    /// Record that the run started, creating the schema and table when missing.
+    /// Record that the run started.
     pub fn started(&self) {
-        self.warn_on_error(STARTED_PHASE, self.write(STARTED_PHASE, None, true));
+        self.warn_on_error(STARTED_PHASE, self.append_row(STARTED_PHASE, None));
     }
 
     /// Record how the run ended and what its nodes did.
     pub fn finished(&self, counts: &RunNodeCounts, ending: RunEnding) {
         let finish = (run_status(counts, ending), counts);
-        let written: PyResult<()> = self
-            .write(FINISHED_PHASE, Some(finish), false)
-            .or_else(|_| self.write(FINISHED_PHASE, Some(finish), true));
-        self.warn_on_error(FINISHED_PHASE, written);
+        self.warn_on_error(
+            FINISHED_PHASE,
+            self.append_row(FINISHED_PHASE, Some(finish)),
+        );
+    }
+
+    /// Insert directly, and create the schema and table only when that fails, as on a first run.
+    fn append_row(&self, phase: &str, finish: Option<(&str, &RunNodeCounts)>) -> PyResult<()> {
+        self.write(phase, finish, false)
+            .or_else(|_| self.write(phase, finish, true))
     }
 
     fn warn_on_error(&self, phase: &str, written: PyResult<()>) {
