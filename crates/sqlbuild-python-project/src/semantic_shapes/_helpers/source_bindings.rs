@@ -19,6 +19,8 @@ use crate::semantic_shapes::_helpers::shapes::model_inputs;
 use crate::semantic_shapes::_helpers::shapes::project_shapes;
 use crate::semantic_shapes::_helpers::shapes::published_shape;
 use crate::semantic_shapes::constants::SOURCE_REBINDING_ANALYSES;
+use sqlbuild_analysis::analysis_route::main::same_column_type::same_column_type;
+use sqlbuild_analysis::source_drift::main::reads_added_columns::reads_added_columns;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
@@ -30,8 +32,6 @@ use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
-use sqlbuild_analysis::analysis_route::main::same_column_type::same_column_type;
-use sqlbuild_analysis::source_drift::main::reads_added_columns::reads_added_columns;
 use sqlbuild_sqltext::resolution::main::unquoted_column_name::unquoted_column_name;
 
 const BINDING_UNKNOWN_TABLE_INTERNAL_CODE: &str = "B000";
