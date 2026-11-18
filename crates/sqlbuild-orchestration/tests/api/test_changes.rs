@@ -263,11 +263,12 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
             .expect("new token");
             let mut live =
                 connect(&client, &first, (location_id, "development", &fresh.bearer)).await;
+            // Long enough to connect on a slow runner before it expires; the wait below runs it out.
             let expiring = issue_token(
                 store,
                 &audit,
                 CredentialScope::Location { location_id },
-                Utc::now() + chrono::Duration::seconds(1),
+                Utc::now() + chrono::Duration::seconds(5),
             )
             .await
             .expect("expiring token");
