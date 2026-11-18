@@ -15,7 +15,7 @@ use crate::store::tests::schema::test_types::StoreDialect;
 use crate::store::tests::store_helpers::run;
 use crate::store::tests::store_test_types::Backend;
 use crate::store::types::Row;
-use crate::store_migrations::constants::{POSTGRES_BASELINE_CHECKSUM, SQLITE_BASELINE_CHECKSUM};
+use crate::store_migrations::constants::{POSTGRES_BASELINE_CHECKSUMS, SQLITE_BASELINE_CHECKSUMS};
 use crate::store_migrations::models::StoreMigration;
 
 const CHILD_STORE_VARIABLE: &str = "SQLBUILD_TEST_CRASH_STORE";
@@ -146,7 +146,7 @@ const SHAPE_POSTGRES: &str = "SELECT 'column ' || table_name || '.' || column_na
 pub(crate) const SQLITE_STORE: StoreDialect = StoreDialect {
     backend: Backend::Sqlite,
     baseline_schema: BASELINE_SQLITE,
-    baseline_checksum: SQLITE_BASELINE_CHECKSUM,
+    baseline_checksum: SQLITE_BASELINE_CHECKSUMS[0],
     time_type: "TEXT",
     shape_sql: SHAPE_SQLITE,
     recreate_command: "rm -f '",
@@ -155,7 +155,7 @@ pub(crate) const SQLITE_STORE: StoreDialect = StoreDialect {
 pub(crate) const POSTGRES_STORE: StoreDialect = StoreDialect {
     backend: Backend::Postgres,
     baseline_schema: BASELINE_POSTGRES,
-    baseline_checksum: POSTGRES_BASELINE_CHECKSUM,
+    baseline_checksum: POSTGRES_BASELINE_CHECKSUMS[0],
     time_type: "TIMESTAMPTZ",
     shape_sql: SHAPE_POSTGRES,
     recreate_command: "dropdb -h '",
@@ -195,7 +195,11 @@ fn blank_line_statements(sql: &str) -> Vec<&str> {
 }
 
 /// A store as a release before schema versions left it: `dialect`'s baseline schema and checksum, and `rows.sql`.
-pub(crate) async fn create_unversioned_baseline(store: &ControlStore, dialect: &StoreDialect) {
+pub(crate) async fn create_unversioned_baseline(
+    store: &ControlStore,
+    dialect: &StoreDialect,
+    checksum: &str,
+) {
     let version_table = format!(
         "CREATE TABLE sqb_schema_version (singleton BIGINT PRIMARY KEY CHECK (singleton = 1), \
          checksum TEXT NOT NULL, applied_at {} NOT NULL)",
@@ -203,15 +207,18 @@ pub(crate) async fn create_unversioned_baseline(store: &ControlStore, dialect: &
     );
     let stamp = format!(
         "INSERT INTO sqb_schema_version (singleton, checksum, applied_at) \
-         VALUES (1, '{}', '2026-11-01T08:00:00Z')",
-        dialect.baseline_checksum
+         VALUES (1, '{checksum}', '2026-11-01T08:00:00Z')"
     );
     let installation = "INSERT INTO sqb_installation (singleton, installation_id, created_at) \
          VALUES (1, '018f0000-0000-7000-8000-000000000000', '2026-11-01T08:00:00Z')";
+    let (schema, rows) = (
+        dialect.baseline_schema.replace("\r\n", "\n"),
+        BASELINE_ROWS.replace("\r\n", "\n"),
+    );
     let mut statements: Vec<&str> = vec![version_table.as_str()];
-    statements.extend(blank_line_statements(dialect.baseline_schema));
+    statements.extend(blank_line_statements(&schema));
     statements.extend([installation, stamp.as_str()]);
-    statements.extend(blank_line_statements(BASELINE_ROWS));
+    statements.extend(blank_line_statements(&rows));
     execute_all(store, &statements).await;
 }
 

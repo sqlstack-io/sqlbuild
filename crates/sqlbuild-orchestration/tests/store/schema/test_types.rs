@@ -49,6 +49,8 @@ pub(crate) struct StoreDialect {
 pub(crate) struct BaselineUpgradeTestCase {
     pub(crate) description: &'static str,
     pub(crate) dialect: &'static StoreDialect,
+    /// The checksum a release before versioning recorded for the baseline schema.
+    pub(crate) recorded_checksum: &'static str,
     pub(crate) expected_version: i64,
 }
 
@@ -76,6 +78,8 @@ pub(crate) struct StoreMigrationPlanTestCase {
 pub(crate) struct PinnedChecksumTestCase {
     pub(crate) description: &'static str,
     pub(crate) dialect: &'static StoreDialect,
+    /// The line endings Git checked the SQL files out with.
+    pub(crate) line_ending: &'static str,
     /// One `(version, checksum)` per schema version: append one with each migration and never edit one.
     pub(crate) expected_checksums: &'static [(i64, &'static str)],
 }

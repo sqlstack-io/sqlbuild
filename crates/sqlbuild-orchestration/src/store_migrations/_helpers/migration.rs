@@ -7,7 +7,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlStore, ControlTransaction};
 use crate::store_migrations::_helpers::recall_schema::recall_schema;
 use crate::store_migrations::constants::{
-    BASELINE_VERSION, POSTGRES_BASELINE_CHECKSUM, SQLITE_BASELINE_CHECKSUM,
+    BASELINE_VERSION, POSTGRES_BASELINE_CHECKSUMS, SQLITE_BASELINE_CHECKSUMS,
 };
 use crate::store_migrations::models::{StoreMigration, StoreMigrationPlan};
 
@@ -29,7 +29,16 @@ pub(crate) fn statements(sql: &str) -> impl Iterator<Item = &str> {
 
 /// The checksum of the schema this build creates, recorded with its version.
 pub(crate) fn schema_digest(store: &ControlStore) -> String {
-    sha256_hex(format!("{}\n{SCHEMA}\n{INDEXES}", recall_schema(store).join(";\n")).as_bytes())
+    schema_text_digest(&recall_schema(store).join(";\n"), SCHEMA, INDEXES)
+}
+
+/// The checksum of a schema's Recall DDL, `schema.sql` and `indexes.sql`, whatever line endings Git used.
+pub(crate) fn schema_text_digest(recall: &str, schema: &str, indexes: &str) -> String {
+    sha256_hex(
+        format!("{recall}\n{schema}\n{indexes}")
+            .replace("\r\n", "\n")
+            .as_bytes(),
+    )
 }
 
 /// The statements of `migration` for `store`'s database type.
@@ -85,13 +94,13 @@ pub(crate) fn migration_plan(
     let Some((checksum, version)) = recorded else {
         return Ok(StoreMigrationPlan::Create { version: current });
     };
-    let baseline_checksum = match store {
-        ControlStore::Sqlite(_) => SQLITE_BASELINE_CHECKSUM,
-        ControlStore::Postgres(_) => POSTGRES_BASELINE_CHECKSUM,
+    let baseline_checksums = match store {
+        ControlStore::Sqlite(_) => SQLITE_BASELINE_CHECKSUMS,
+        ControlStore::Postgres(_) => POSTGRES_BASELINE_CHECKSUMS,
     };
     let version = match version {
         Some(version) => version,
-        None if checksum == baseline_checksum => BASELINE_VERSION,
+        None if baseline_checksums.contains(&checksum) => BASELINE_VERSION,
         None => return Err(refusal(store, Refusal::OlderThanBaseline)),
     };
     if version > current {

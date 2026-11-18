@@ -1,5 +1,6 @@
 //! Numbered control-store migrations: baseline upgrades, table rebuilds, refusals and the dry run.
 
+use crate::store::constants::{INDEXES, SCHEMA};
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::schema::helpers::{
     BASELINE_ROWS, POPULATED_TABLES, POSTGRES_STORE, SQLITE_STORE, create_unversioned_baseline,
@@ -11,9 +12,10 @@ use crate::store::tests::schema::test_types::{
 };
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_migrations::_helpers::migration::{
-    MIGRATIONS, current_version, migration_plan, schema_digest,
+    MIGRATIONS, current_version, migration_plan, schema_digest, schema_text_digest,
 };
 use crate::store_migrations::_helpers::migration_run::migrate_with;
+use crate::store_migrations::_helpers::recall_schema::recall_schema;
 use crate::store_migrations::main::plan_store_migration::plan_store_migration;
 use crate::store_migrations::models::{StoreMigration, StoreMigrationPlan};
 
@@ -43,13 +45,27 @@ const WIDEN_RUN_STATUS_POSTGRES: &str = "ALTER TABLE sqb_runs DROP CONSTRAINT sq
 fn given_store_at_the_baseline_when_migrating_then_it_matches_a_new_store_and_keeps_its_rows() {
     let test_cases = [
         BaselineUpgradeTestCase {
-            description: "SQLite store",
+            description: "SQLite store from a Linux or macOS release",
             dialect: &SQLITE_STORE,
+            recorded_checksum: "228a951fe04d75eedcefdb44095afe652b178d9b2f32f3a5287c143877d39ce2",
             expected_version: current_version(MIGRATIONS),
         },
         BaselineUpgradeTestCase {
-            description: "PostgreSQL store",
+            description: "SQLite store from a Windows release, built from CRLF SQL",
+            dialect: &SQLITE_STORE,
+            recorded_checksum: "4cb5c0c4f392a2b3f4f2229e2ab8401870cd37b65346ada92cc70aa3ca2e0542",
+            expected_version: current_version(MIGRATIONS),
+        },
+        BaselineUpgradeTestCase {
+            description: "PostgreSQL store from a Linux or macOS release",
             dialect: &POSTGRES_STORE,
+            recorded_checksum: "163045e32da43a8b0ddf17ea22f6dd41d1ff7bffe81836f3cbb35a8754915c3e",
+            expected_version: current_version(MIGRATIONS),
+        },
+        BaselineUpgradeTestCase {
+            description: "PostgreSQL store from a Windows release, built from CRLF SQL",
+            dialect: &POSTGRES_STORE,
+            recorded_checksum: "90758add355967a65ddfcf233b5e66893f92449e17c84e8f9bab42fb703917ab",
             expected_version: current_version(MIGRATIONS),
         },
     ];
@@ -61,7 +77,12 @@ fn given_store_at_the_baseline_when_migrating_then_it_matches_a_new_store_and_ke
             ) else {
                 return;
             };
-            create_unversioned_baseline(&upgraded.store, test_case.dialect).await;
+            create_unversioned_baseline(
+                &upgraded.store,
+                test_case.dialect,
+                test_case.recorded_checksum,
+            )
+            .await;
             let before = table_rows(&upgraded.store, &POPULATED_TABLES).await;
 
             migrate_store(&upgraded.store)
@@ -280,7 +301,12 @@ fn given_a_store_when_planning_its_migration_then_the_plan_is_reported_without_c
             ) else {
                 return;
             };
-            create_unversioned_baseline(&baseline.store, test_case.dialect).await;
+            create_unversioned_baseline(
+                &baseline.store,
+                test_case.dialect,
+                test_case.dialect.baseline_checksum,
+            )
+            .await;
 
             let plans = (
                 plan_store_migration(&empty.store)
@@ -330,11 +356,25 @@ fn given_this_builds_schema_when_checksummed_then_it_matches_the_checksum_pinned
         PinnedChecksumTestCase {
             description: "SQLite store",
             dialect: &SQLITE_STORE,
+            line_ending: "\n",
+            expected_checksums: SQLITE_CHECKSUMS,
+        },
+        PinnedChecksumTestCase {
+            description: "SQLite store built from a CRLF checkout",
+            dialect: &SQLITE_STORE,
+            line_ending: "\r\n",
             expected_checksums: SQLITE_CHECKSUMS,
         },
         PinnedChecksumTestCase {
             description: "PostgreSQL store",
             dialect: &POSTGRES_STORE,
+            line_ending: "\n",
+            expected_checksums: POSTGRES_CHECKSUMS,
+        },
+        PinnedChecksumTestCase {
+            description: "PostgreSQL store built from a CRLF checkout",
+            dialect: &POSTGRES_STORE,
+            line_ending: "\r\n",
             expected_checksums: POSTGRES_CHECKSUMS,
         },
     ];
@@ -344,7 +384,15 @@ fn given_this_builds_schema_when_checksummed_then_it_matches_the_checksum_pinned
                 return;
             };
             let current = current_version(MIGRATIONS);
-            let checksum: String = schema_digest(&fixture.store);
+            let checked_out = |sql: &str| {
+                sql.replace("\r\n", "\n")
+                    .replace('\n', test_case.line_ending)
+            };
+            let checksum: String = schema_text_digest(
+                &recall_schema(&fixture.store).join(";\n"),
+                &checked_out(SCHEMA),
+                &checked_out(INDEXES),
+            );
 
             assert_eq!(
                 Some(checksum.as_str()),
