@@ -173,6 +173,7 @@ class UnlistedMigrationOriginTestCase:
     description: str
     select: tuple[str, ...]
     expected_warnings: tuple[str, ...]
+    expected_missing: tuple[str, ...]
     expected_unlisted_reads: int
 
 
