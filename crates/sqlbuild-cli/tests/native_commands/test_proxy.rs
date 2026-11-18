@@ -192,6 +192,18 @@ fn given_invalid_or_conflicting_server_configuration_when_a_standalone_server_st
             expected_error: "[retention] statistics_days must be between 1 and 65535",
         },
         ServerConfigurationTestCase {
+            description: "an attention snooze that isn't a duration names its key",
+            configuration: "[server]\nattention_snooze = \"a day\"\n",
+            arguments: &[],
+            expected_error: "[server] attention_snooze must be a duration such as \"24h\" or \"1d12h\", or \"0\" for no time limit",
+        },
+        ServerConfigurationTestCase {
+            description: "an attention snooze in months is refused",
+            configuration: "[server]\nattention_snooze = \"1mo\"\n",
+            arguments: &[],
+            expected_error: "[server] attention_snooze can't use years or months",
+        },
+        ServerConfigurationTestCase {
             description: "the replaced trusted-proxy flag points to the file",
             configuration: "",
             arguments: &["--trusted-proxy-config", "proxy.json"],

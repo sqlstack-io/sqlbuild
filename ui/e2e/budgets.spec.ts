@@ -249,6 +249,102 @@ test('Plan: switching sections and showing more on a large changed build', async
 	);
 });
 
+/**
+ * Runs in the page before the app. While `__sqbHoldReads(true)`, the mock client's replies (each a
+ * `readMs` timer) are held, and run when holding stops, so a test can see the page before a read lands.
+ */
+function holdReads(readMs: number) {
+	const realSetTimeout = window.setTimeout.bind(window);
+	let holding = false;
+	let next = 2e9;
+	const held: (() => void)[] = [];
+	window.setTimeout = ((handler: TimerHandler, ms?: number, ...args: unknown[]) => {
+		if (!holding || ms !== readMs || typeof handler !== 'function') return realSetTimeout(handler, ms, ...args);
+		held.push(() => handler(...args));
+		return ++next;
+	}) as typeof window.setTimeout;
+	(window as unknown as { __sqbHoldReads: (on: boolean) => void }).__sqbHoldReads = (on) => {
+		holding = on;
+		if (on) return;
+		for (const run of held.splice(0)) run();
+	};
+}
+
+const holdMockReads = (page: Page, on: boolean) => page.evaluate((o) => (window as unknown as { __sqbHoldReads: (on: boolean) => void }).__sqbHoldReads(o), on);
+
+const FOLDER_ROW = '[data-testid="folder-tree"] tbody tr[data-path], [data-testid="folder-tree"] tbody tr.leaf';
+const ISSUE = 'section.health .issues .issue';
+
+test('Overview and folder view on a 10,000-node project', async ({ page }) => {
+	test.setTimeout(300_000);
+	// The mock client's reply latency (`latencyMs`).
+	await page.addInitScript(holdReads, 120);
+	const cdp = await open(page, '/?mock&huge&still', ISSUE);
+	const quiet = async () => {
+		await page.waitForLoadState('networkidle');
+		await frames(page, 4);
+	};
+	judge(
+		'10K open the folder view',
+		await cost(page, cdp, FOLDER_ROW, async () => {
+			await page.getByTestId('all-folders').click();
+			await page.locator(FOLDER_ROW).nth(19).waitFor();
+		}),
+		BUDGETS['10K open the folder view']
+	);
+	judge(
+		'10K expand all',
+		await cost(page, cdp, FOLDER_ROW, async () => {
+			await page.getByRole('button', { name: 'Expand all' }).click();
+			await page.locator('[data-testid="folder-tree"] tbody tr.leaf, [data-testid="folder-more"]').first().waitFor();
+		}),
+		BUDGETS['10K expand all']
+	);
+	await page.getByRole('button', { name: 'Collapse all' }).click();
+	await quiet();
+	judge(
+		'10K open one folder',
+		await cost(page, cdp, FOLDER_ROW, async () => {
+			await page.getByTestId('folder-toggle').first().click();
+			await page.locator('[data-testid="folder-toggle"][aria-expanded="true"]').first().waitFor();
+		}),
+		BUDGETS['10K open one folder']
+	);
+	await page.getByRole('button', { name: 'Expand all' }).click();
+	await quiet();
+	const tree = (await page.getByTestId('folder-tree').locator('tbody').boundingBox())!;
+	judge(
+		'10K opened tree scroll',
+		await cost(page, cdp, FOLDER_ROW, () => wheel(page, { x: tree.x + tree.width / 2, y: Math.min(tree.y + 200, 800) }, 20, (i) => (i < 10 ? 400 : -400))),
+		BUDGETS['10K opened tree scroll']
+	);
+	judge(
+		'10K back to the Overview',
+		await cost(page, cdp, ISSUE, async () => {
+			await page.locator('nav a', { hasText: 'Overview' }).first().click();
+			await page.locator(ISSUE).first().waitFor();
+		}),
+		BUDGETS['10K back to the Overview']
+	);
+	const stale = page.locator(ISSUE, { hasText: 'out of date' });
+	let listedWhileReading = -1;
+	judge(
+		'10K acknowledge nodes out of date',
+		await cost(page, cdp, ISSUE, async () => {
+			// The Overview's read that follows is held: the item must leave the list without waiting for it.
+			await holdMockReads(page, true);
+			await stale.getByRole('button', { name: 'Acknowledge' }).click();
+			await frames(page, 4);
+			listedWhileReading = await stale.count();
+			await holdMockReads(page, false);
+			await page.waitForFunction(() => ![...document.querySelectorAll('section.health .issues .issue')].some((e) => e.textContent?.includes('out of date')));
+		}),
+		BUDGETS['10K acknowledge nodes out of date']
+	);
+	console.info(`BUDGET 10K acknowledged item still listed while the Overview reads again: ${listedWhileReading}`);
+	expect.soft(listedWhileReading, 'an acknowledged item leaves the list at once, not after the Overview is read again').toBe(0);
+});
+
 // Measured on 10 runs each at 1× and 6× CPU (Chrome throttling), with the breakdown traced from the
 // mutation records (`BUDGET_TRACE=1`). The graph's settle timer is held while a gesture is counted and
 // run once at its end, so DOM changes and reads are the same on every run and get 2 of headroom.
@@ -285,5 +381,27 @@ const BUDGETS: Record<string, Budget> = {
 	'Plan section unchanged': { layouts: 4, styles: 8, mutations: 117, nodes: 2500, drawn: 50, reads: 1 },
 	'Plan section changed': { layouts: 3, styles: 7, mutations: 113, nodes: 2850, drawn: 50, reads: 0 },
 	// Show more reads the next page once and adds its 50 rows. Measured layouts 2, styles 8–9, mutations 54.
-	'Plan show more': { layouts: 4, styles: 12, mutations: 56, nodes: 3400, drawn: 100, reads: 1 }
+	'Plan show more': { layouts: 4, styles: 12, mutations: 56, nodes: 3400, drawn: 100, reads: 1 },
+	// The 10,000-node project (`?huge`), measured the same way: DOM changes, nodes, rows and reads the
+	// same in every run but one (141 against 140 DOM changes going back to the Overview at 6×). The folder
+	// tree windows its rows like any long list; drawing every folder or node instead adds thousands of rows.
+	// Opening the folder view reads the selection vocabulary once and draws 40 rows: 320 cell class writes,
+	// 40 rows' label and wrap classes, the rest the tab switch. Measured layouts 3, styles 12–17.
+	'10K open the folder view': { layouts: 5, styles: 24, mutations: 456, nodes: 7300, drawn: 44, reads: 1 },
+	// Expand all swaps the window's rows for the expanded tree's (316 row insertions and removals) and
+	// rewrites their cells' classes. Measured layouts 1, styles 11–16.
+	'10K expand all': { layouts: 3, styles: 23, mutations: 577, nodes: 5700, drawn: 28, reads: 0 },
+	// Opening one folder inserts its 20 subfolder rows and rewrites the window's cell classes (440).
+	// Measured layouts 1–2, styles 9–15.
+	'10K open one folder': { layouts: 5, styles: 23, mutations: 469, nodes: 7500, drawn: 48, reads: 0 },
+	// 20 wheel steps of 400 px over the expanded tree: like the Checks list, each step swaps rows in and out
+	// of the window (2,142) and rewrites the recycled cells' classes (6,579), one layout per step.
+	// Measured layouts 20, styles 45–53, mutations 8,800.
+	'10K opened tree scroll': { layouts: 22, styles: 63, mutations: 8802, nodes: 5700, drawn: 28, reads: 0 },
+	// Reads the Overview, its timeline and the cost summary once each, and draws the attention card's 9
+	// items and the timeline. Measured layouts 3–4, styles 22–31, mutations 140–141.
+	'10K back to the Overview': { layouts: 7, styles: 42, mutations: 143, nodes: 4600, drawn: 12, reads: 3 },
+	// The acknowledgement and the Overview's read that follows it; the item leaves the list at once (the
+	// test holds that read back to check), so 6 DOM changes. Measured layouts 1, styles 6–7.
+	'10K acknowledge nodes out of date': { layouts: 3, styles: 10, mutations: 8, nodes: 4700, drawn: 11, reads: 2 }
 };

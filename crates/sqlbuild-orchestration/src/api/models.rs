@@ -29,6 +29,8 @@ use crate::api::_helpers::resources::{
     person_operations::recent_runs,
     person_operations::acknowledge,
     person_operations::acknowledgements,
+    person_operations::acknowledge_attention,
+    person_operations::attention_acknowledgements,
     person_reads::run_nodes,
     person_reads::nodes,
     person_reads::node_states,
@@ -617,6 +619,8 @@ pub struct ServerFacts {
     pub state_history: crate::warehouse_metadata::models::StateHistoryRetention,
     /// Each launcher's `pool_caps`; empty where this server runs no launcher.
     pub pool_caps: crate::declarations::models::ServerPoolCaps,
+    /// How long an acknowledged attention condition stays hidden while unchanged.
+    pub attention_snooze: crate::acknowledgements::models::AttentionSnooze,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.

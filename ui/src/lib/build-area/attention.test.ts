@@ -30,6 +30,16 @@ describe('overview alerts', () => {
 		]);
 	});
 
+	it('keeps an overdue schedule as its own alert when its outage is acknowledged, so it isn’t hidden with it', () => {
+		const broken = event('broken', 'location_broken', 'shop');
+		const acknowledged = { ...broken, condition: { key: 'event:location_broken:shop:', shape: {}, acknowledged: { by: 'ada', at: ago(1), until: ago(-600) }, lapsed: null } } as AttentionItem;
+		const views = attentionViews([acknowledged, event('late-shop', 'tick_overdue', 'shop', { message: 'hourly is late' })], now);
+		expect(views.map(({ view }) => [view.key, view.consequences.length])).toEqual([
+			['event:broken', 0],
+			['event:late-shop', 0]
+		]);
+	});
+
 	it('keeps an overdue schedule as its own alert when nothing explains it', () => {
 		const views = attentionViews([event('late', 'tick_overdue', 'shop'), event('broken', 'location_broken', 'marketing')], now);
 		expect(views.map(({ view }) => view.key)).toEqual(['event:late', 'event:broken']);

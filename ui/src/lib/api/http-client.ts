@@ -22,7 +22,7 @@ import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
-import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage } from './types/build';
+import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
@@ -52,6 +52,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRunOutput',
 	'getRunNodeError',
 	'acknowledgeRun',
+	'acknowledgeCondition',
 	'cancelRun',
 	'cancelMatchingRuns',
 	'rerunRun',
@@ -510,6 +511,15 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		},
+		async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: AutomaticWithdrawal): Promise<void> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements', {
+				body: { event_id: automatic?.eventId ?? newRequestId(), key, shape, acknowledged, ...(automatic ? { reason: automatic.reason, withdraws: automatic.withdraws } : {}) },
+				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		},
 		async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 			const source = await requireRun(scope, runId);
 			const body = { run_id: newRequestId(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
@@ -857,7 +867,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				listing ?? listingWithStates(scope),
 				implemented.listSnapshotChanges(scope, { limit: 100 }),
 				implemented.listPlatformEvents(),
-				acknowledgementsOf(scope)
+				acknowledgementsOf(scope),
+				attentionAcknowledgementsOf(scope)
 			]);
 			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
 			const read = await reads.catch((error: unknown) => {
@@ -865,8 +876,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				throw error;
 			});
 			if (!read) return null;
-			const [runs, checks, nodes, changes, events, acknowledgements] = read;
-			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, now: Date.now() });
+			const [runs, checks, nodes, changes, events, acknowledgements, conditions] = read;
+			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
@@ -1141,6 +1152,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return new Map(data.map((a) => [a.run_id, { by: a.acknowledged_by, at: a.acknowledged_at }]));
+	}
+
+	/** Conditions marked handled within two snoozes, lapsed ones included, and the snooze; none from a server or recording without them. */
+	async function attentionAcknowledgementsOf(scope: Scope): Promise<{ snoozeSeconds: number | null | undefined; acknowledgements: AttentionAcknowledgement[] }> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements', {
+			params: { path: { location_id: locationId, target } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (response.status === 404) return { snoozeSeconds: undefined, acknowledgements: [] };
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return {
+			snoozeSeconds: data.snooze_seconds ?? null,
+			acknowledgements: data.acknowledgements.map((a) => ({ eventId: a.event_id, key: a.key, shape: a.shape as ConditionShape, by: a.acknowledged_by, at: a.acknowledged_at, until: a.until ?? null }))
+		};
 	}
 
 	/** Triggers with their latest tick and the newest listed run each started. */

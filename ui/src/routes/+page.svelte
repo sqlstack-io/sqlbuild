@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import { newRequestId } from '$lib/browser/request-id';
 	import { plural, noun } from '$lib/format/plural';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
@@ -22,13 +24,14 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { catalogNodes, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { folderCatalogHref, folderSelections } from '$lib/selection/folders';
-	import { formatAgo } from '$lib/format/time';
+	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
-	import type { AttentionItem } from '$lib/api';
+	import type { AttentionItem, Overview } from '$lib/api';
+	import { CLEARED_REASON, acknowledgementOf, clearedWithdrawalId, judgedRead, snoozeWords, withdrawalsDue, type JudgedRead } from '$lib/build-area/attention-conditions';
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
-	import { quietDeployLine, recentDeployRows, visibleFolders } from '$lib/build-area/overview-panels';
+	import { cappedFolders, quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
 	import { pagesBeyondTarget } from '$lib/nav';
 	import OverviewCost from './overview-cost.svelte';
 
@@ -37,10 +40,25 @@
 	const folderSelection = $derived(folderSelections(catalog.data ?? []));
 	// Reads again when the shared listing changes, which node status changes update; until it is held
 	// the overview waits for it rather than listing every node a second time.
+	// Each read is noted with its scope and whether node state had settled (no sync running, the last one
+	// succeeded) when it began, so cleared acknowledgements are judged only from a read that can show them.
+	let lastRead = $state.raw<JudgedRead<Overview> | null>(null);
 	const overview = createResource((client, scope) => {
 		const nodes = catalog.data;
 		if (!nodes && !catalog.error) return new Promise<never>(() => {});
-		return client.overview(scope, nodes);
+		// The shared listing can still hold the previous target's nodes for a moment after a switch.
+		if (nodes && catalogNodes.view.scopeKey !== scope.locationId) return new Promise<never>(() => {});
+		const nodesSettled = untrack(() => {
+			const sync = app.warehouseSync;
+			return !client.supports('getWarehouseSync') || (sync !== null && !sync.syncing && !sync.lastError);
+		});
+		return client.overview(scope, nodes).then((read) => {
+			if (!read) return read;
+			const readId = newRequestId();
+			const marked = { ...read, readId };
+			lastRead = { overview: marked, readId, scopeKey: scope.locationId, nodesSettled };
+			return marked;
+		});
 	}, ['runs', 'checks', 'snapshot', 'platform_events', 'triggers']);
 	const data = $derived(overview.data ?? null);
 	// Null data means the person may view only part of the target, so the page offers others instead.
@@ -55,27 +73,87 @@
 		info: InfoIcon
 	};
 	const viewed = $derived(attentionViews(data?.attention ?? [], app.now, catalogNodes.view.changedBuild));
-	const acknowledgementOf = (item: AttentionItem) => ('acknowledged' in item ? item.acknowledged : null);
+	// A run is acknowledged for good; an ongoing condition until it changes (see attention-conditions).
+	const conditionFor = (item: AttentionItem) => ('condition' in item ? (item.condition ?? null) : null);
+	// The server's snooze: 24 hours unless it says otherwise; null when acknowledgements have no time limit.
+	const snoozeSeconds = $derived(data?.attentionSnoozeSeconds === undefined ? 86_400 : data.attentionSnoozeSeconds);
+	const ACK_HELP = $derived({
+		run: 'Hide this from the attention list for everyone viewing this target. It stays under Acknowledged, where anyone can undo it.',
+		condition: `Hide this from the attention list for everyone viewing this target, until it changes: it gets worse, or clears and comes back${snoozeSeconds === null ? '' : `, or after ${snoozeWords(snoozeSeconds)}`}. It stays under Acknowledged, where anyone can undo it.`
+	});
+	const handledLabel = (until: string | null | undefined) =>
+		until === undefined ? 'for good' : until === null ? 'hidden until it changes' : `hidden until it changes, or until ${formatStamp(until).slice(5, 16)}`;
+	const canAck = (item: AttentionItem) => ('acknowledged' in item ? canAcknowledge : !!conditionFor(item) && canAcknowledgeConditions);
 	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
-	const issues = $derived(viewed.filter(({ item }) => !acknowledgementOf(item)));
-	const handled = $derived(viewed.filter(({ item }) => acknowledgementOf(item)));
+	// Acknowledged or undone here, and saved, while the Overview reads again: the item moves at once rather
+	// than after the whole Overview is rebuilt, which on a large project takes a while.
+	let settling = $state<ReadonlyMap<string, boolean>>(new Map());
+	const isHandled = (item: AttentionItem, key: string) => settling.get(key) ?? !!acknowledgementOf(item);
+	const issues = $derived(viewed.filter(({ item, view }) => !isHandled(item, view.key)));
+	const handled = $derived(viewed.filter(({ item, view }) => isHandled(item, view.key)));
 	let showHandled = $state(false);
 	let acknowledging = $state<string | null>(null);
 	let acknowledgeError = $state<string | null>(null);
-	async function acknowledge(runId: string, acknowledged: boolean) {
+	/** Acknowledges an item, or undoes that: a run by its ID, a condition as it looks now. */
+	async function acknowledge(item: AttentionItem, key: string, acknowledged: boolean) {
 		const scope = app.scope;
+		const condition = conditionFor(item);
 		if (!scope || acknowledging) return;
-		acknowledging = runId;
+		acknowledging = key;
 		acknowledgeError = null;
 		try {
-			await app.client.acknowledgeRun(scope, runId, acknowledged);
-			await overview.refresh();
+			if ('acknowledged' in item) await app.client.acknowledgeRun(scope, item.run.id, acknowledged);
+			else if (condition) await app.client.acknowledgeCondition(scope, condition.key, condition.shape, acknowledged);
 		} catch (error) {
+			// Only the acknowledgement itself failing is an error; it then stays where it was.
 			acknowledgeError = error instanceof Error ? error.message : String(error);
+			return;
 		} finally {
 			acknowledging = null;
 		}
+		// Saved: it moves now, and stays moved until the Overview has been read again. A failed read is the
+		// Overview's own error, not the acknowledgement's.
+		settling = new Map([...settling, [key, acknowledged]]);
+		overview.refresh();
 	}
+	// An acknowledged condition that has cleared is withdrawn, so if it comes back it shows as new. Only from
+	// a complete read (the overview lists only what it could see in full) and never while node state is
+	// syncing or its last sync failed, when nodes out of date may just not be known yet. Every viewer sends
+	// the same event, which the server applies once; runs are acknowledged for good and never withdrawn.
+	// The first read on opening the page usually begins before the sync status arrives, so it can't be
+	// judged for nodes out of date; once node state is known to have settled, that read is taken again once.
+	const reread = new WeakSet<object>();
+	$effect(() => {
+		const read = lastRead;
+		const sync = app.warehouseSync;
+		if (!read || read.nodesSettled || read.scopeKey !== app.scope?.locationId) return;
+		if (!sync || sync.syncing || sync.lastError || reread.has(read)) return;
+		reread.add(read);
+		untrack(() => overview.refresh());
+	});
+	const withdrawn = new Set<string>();
+	$effect(() => {
+		const scope = app.scope;
+		const read = judgedRead(lastRead, { shown: data, scopeKey: scope?.locationId ?? null, failed: !!overview.error });
+		const due = read ? withdrawalsDue(read.overview.clearedAcknowledgements, { failed: false, syncing: !read.nodesSettled }) : [];
+		if (!scope || !canAcknowledgeConditions || !due.length) return;
+		untrack(() => {
+			for (const ack of due) {
+				const eventId = clearedWithdrawalId(ack);
+				if (withdrawn.has(eventId)) continue;
+				withdrawn.add(eventId);
+				const automatic = { eventId, reason: CLEARED_REASON, withdraws: ack.eventId };
+				void app.client.acknowledgeCondition(scope, ack.key, ack.shape, false, automatic).catch(() => withdrawn.delete(eventId));
+			}
+		});
+	});
+	// A new read of the Overview holds every saved acknowledgement, so nothing is settling any more.
+	$effect(() => {
+		void data;
+		untrack(() => {
+			if (settling.size) settling = new Map();
+		});
+	});
 	const staleListed = $derived(issues.some(({ item }) => item.kind === 'stale_models'));
 	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
 	const loaded = $derived(data !== null);
@@ -89,15 +167,15 @@
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	const costChange = $derived(m?.cost && m.cost.baseline ? Math.round(((m.cost.last24h - m.cost.baseline) / m.cost.baseline) * 100) : null);
 	const groups = $derived(data?.groups ?? []);
-	let showAllFolders = $state(false);
-	const folders = $derived(visibleFolders(groups, showAllFolders));
-	// Whether collapsing hides any folders; folders that need attention always show.
-	const collapsedHidden = $derived(visibleFolders(groups, false).hidden);
+	// At most eight folders, most urgent first; the catalog's folder view lists them all.
+	const folders = $derived(cappedFolders(groups));
+	const ALL_FOLDERS_HREF = '/catalog?view=folders';
 	const deployRows = $derived(recentDeployRows(data?.recentChanges ?? []));
 	// Parts without a server read stay hidden rather than showing zeros, and wait for the read so they don't appear and vanish.
 	const showGroups = $derived(!!data?.groups?.length);
 	const showTimeline = $derived(app.client.supports('timeline'));
 	const canAcknowledge = $derived(app.client.supports('acknowledgeRun'));
+	const canAcknowledgeConditions = $derived(app.client.supports('acknowledgeCondition'));
 	const FAILING_CHECKS_HREF = '/checks?outcome=failing';
 
 </script>
@@ -158,6 +236,10 @@
 								<div class="issue-copy">
 									<a class="issue-title" href={to(view.href)}>{view.title}</a>
 									<p class="issue-detail">{view.detail}</p>
+									{#if conditionFor(item)?.lapsed}
+										{@const lapsed = conditionFor(item)!.lapsed!}
+										<p class="lapsed" data-testid="attention-lapsed">Back on the list: {lapsed.reason} (acknowledged by {lapsed.by} {formatAgo(lapsed.at, app.now)}).</p>
+									{/if}
 									{#if view.consequences.length}
 										<ul class="consequences" aria-label="Caused by this">
 											{#each view.consequences as c, i (i)}<li><a href={to(c.href)}>{c.text}</a></li>{/each}
@@ -166,9 +248,10 @@
 								</div>
 								<small>{view.since}</small>
 								<span class="issue-ack">
-									{#if 'acknowledged' in item && canAcknowledge}
-										<Button variant="ghost" size="sm" title="Mark handled for everyone (audited)" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
-											<BellOffIcon />Acknowledge
+									{#if canAck(item)}
+										<!-- Short text, always visible, stronger while the row is hovered; the tooltip says what it does. -->
+										<Button variant="ghost" size="sm" class="ack" title={'acknowledged' in item ? ACK_HELP.run : ACK_HELP.condition} aria-label="Acknowledge" disabled={acknowledging === view.key} onclick={() => acknowledge(item, view.key, true)} data-testid="attention-ack">
+											<BellOffIcon />Ack
 										</Button>
 									{/if}
 								</span>
@@ -187,21 +270,21 @@
 				{/if}
 				{#if handled.length}
 					<div class="handled">
-						<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[34px] pr-3.5 pl-[17px] text-[12px]">Acknowledged · {handled.length}</DisclosureButton>
+						<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[34px] pr-3.5 pl-[17px] text-[12px]">Acknowledged ({handled.length})</DisclosureButton>
 						{#if showHandled}
 							<div class="handled-rows">
 							{#each handled as { item, view } (view.key)}
-								{@const ack = acknowledgementOf(item)}
+								{@const ack = acknowledgementOf(item) ?? { by: 'you', at: new Date(app.now).toISOString(), until: 'acknowledged' in item ? undefined : snoozeSeconds === null ? null : new Date(app.now + snoozeSeconds * 1000).toISOString() }}
 								<div class="issue muted">
 									<span class="issue-icon info"><BellOffIcon size={13} /></span>
 									<div class="issue-copy">
 										<a class="issue-title" href={to(view.href)}>{view.title}</a>
-										<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)}` : ''}</p>
+										<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)} · ${handledLabel(ack.until)}` : ''}</p>
 									</div>
 									<small>{view.since}</small>
 									<span class="issue-ack">
-										{#if 'acknowledged' in item && canAcknowledge}
-											<Button variant="ghost" size="sm" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, false)}>Undo</Button>
+										{#if canAck(item)}
+											<Button variant="ghost" size="sm" disabled={acknowledging === view.key} onclick={() => acknowledge(item, view.key, false)} data-testid="attention-undo">Undo</Button>
 										{/if}
 									</span>
 									<span class="issue-actions"><a href={to(view.href)}>{view.action} →</a></span>
@@ -272,8 +355,8 @@
 						{:else}
 							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet.{/if}</div>
 						{/each}
-						{#if collapsedHidden}
-							<Button variant="link" size="inline" class="mx-4 mt-1 self-start text-[12px]" aria-expanded={showAllFolders} onclick={() => (showAllFolders = !showAllFolders)}>{showAllFolders ? 'Show fewer' : `Show all ${groups.length} folders`}</Button>
+						{#if folders.total > folders.rows.length}
+							<a class="all-folders" href={to(ALL_FOLDERS_HREF)} data-testid="all-folders">All {folders.total} folders ({folders.attention} need attention) →</a>
 						{/if}
 					</div>
 				</section>{/if}
@@ -344,6 +427,13 @@
 	.issue-actions { justify-content: flex-end; gap: 10px; }
 	.issue-actions a { color: var(--primary); font-weight: 500; white-space: nowrap; }
 	.handled { border-top: 1px solid var(--inner-line); }
+	.all-folders { align-self: flex-start; margin: 6px 16px 4px; color: var(--primary); font-size: 12px; font-weight: 500; }
+	.all-folders:hover { text-decoration: underline; }
+	.lapsed { margin: 4px 0 0; color: var(--sb-warning); font-size: 12px; }
+	/* Ack: muted text with a bell, always visible; on row hover it gains a border and full colour. */
+	.issue :global(.ack) { height: 24px; padding: 0 8px; border: 1px solid transparent; color: var(--muted-foreground); font-size: 12px; font-weight: 500; }
+	.issue:hover :global(.ack), .issue :global(.ack:focus-visible) { border-color: var(--border); background: var(--sb-hover); color: var(--foreground); }
+	.issue :global(.ack:hover) { border-color: var(--muted-foreground); }
 	.issue.muted .issue-title { color: var(--muted-foreground); font-weight: 500; }
 	.ack-error { margin: 0; padding: 8px 17px; border-top: 1px solid var(--inner-line); color: var(--sb-error); font-size: 12px; }
 	.issue-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 2px; }

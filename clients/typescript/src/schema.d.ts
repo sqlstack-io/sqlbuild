@@ -274,6 +274,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAttentionAcknowledgements"];
+        put?: never;
+        post: operations["acknowledgeAttention"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/catalog": {
         parameters: {
             query?: never;
@@ -1597,6 +1613,51 @@ export interface components {
              */
             decision_id?: string | null;
             error: string;
+        };
+        /** @description A condition whose latest acknowledgement event marks it handled. */
+        AttentionAcknowledgement: {
+            /** Format: date-time */
+            acknowledged_at: string;
+            /** @description The person's name, or the audit actor when the person no longer exists. */
+            acknowledged_by: string;
+            /**
+             * Format: uuid
+             * @description The acknowledging audit event, which a withdrawal can name.
+             */
+            event_id: string;
+            key: string;
+            shape: unknown;
+            /**
+             * Format: date-time
+             * @description When the acknowledgement lapses even if the condition never changes; none without a time limit.
+             */
+            until?: string | null;
+        };
+        /** @description Marks an ongoing condition handled as it looks now, or withdraws that; an event ID applies once. */
+        AttentionAcknowledgementRequest: {
+            acknowledged: boolean;
+            /** Format: uuid */
+            event_id: string;
+            /** @description The condition's kind and subject, stable while it lasts, such as `stale_sources`. */
+            key: string;
+            /** @description Why, when it isn't a person's own choice, such as a withdrawal once the condition cleared. */
+            reason?: string | null;
+            /** @description What the condition looks like, as a JSON object of at most 8 KiB that later states are compared with. */
+            shape: unknown;
+            /**
+             * Format: uuid
+             * @description For a withdrawal, the acknowledgement event it withdraws: it applies only while that is still the latest.
+             */
+            withdraws?: string | null;
+        };
+        /** @description A target's condition acknowledgements, and how long one lasts while its condition is unchanged. */
+        AttentionAcknowledgements: {
+            acknowledgements: components["schemas"]["AttentionAcknowledgement"][];
+            /**
+             * Format: int64
+             * @description The server's `attention_snooze` in seconds; none when acknowledgements have no time limit.
+             */
+            snooze_seconds?: number | null;
         };
         AuthenticationDenial: {
             error: string;
@@ -4856,6 +4917,95 @@ export interface operations {
                 };
             };
             /** @description The run is not in this location and target, or the event ID was reused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listAttentionAcknowledgements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conditions marked handled within two snoozes, lapsed ones included, and the snooze */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionAcknowledgements"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    acknowledgeAttention: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttentionAcknowledgementRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether the condition's acknowledgement changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description The key, shape or reason is invalid, or the event ID was reused */
             400: {
                 headers: {
                     [name: string]: unknown;

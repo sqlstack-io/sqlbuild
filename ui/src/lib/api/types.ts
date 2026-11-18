@@ -138,6 +138,13 @@ export type PlatformEvent = {
 	locationId: string | null;
 	subject: string | null;
 	message: string;
+	/** What a grouped event holds, such as the IDs of a location's late schedules; a new one makes it worse. */
+	members?: string[];
+	/**
+	 * Tells one occurrence of an ongoing problem from the next when `id` is fixed per problem, such as a
+	 * stopped scheduler's expired lease or a broken location's last check-in.
+	 */
+	occurrence?: string;
 };
 
 // ---- navigation ----

@@ -427,6 +427,7 @@ describe('overview', () => {
 				if ((path.endsWith('/nodes') || path.endsWith('/node-states')) && nodesStatus !== 200) return Response.json({ error: 'refused' }, { status: nodesStatus });
 				if (path.endsWith('/node-states')) return Response.json({ snapshot_id: null, version: 1, states: {} });
 				if (path.endsWith('/platform/problems')) return Response.json({ scheduler_leader: 'server-1', scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] });
+				if (path.endsWith('/attention-acknowledgements')) return Response.json({ snooze_seconds: 86_400, acknowledgements: [] });
 				return Response.json([]);
 			})
 		);

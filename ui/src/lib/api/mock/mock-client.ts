@@ -5,6 +5,9 @@ import { LocalChangeBus, type ConnectionState } from '../signals';
 import { stateOf } from '../node-states';
 import type {
 	AdhocRunCheck,
+	AttentionAcknowledgement,
+	AutomaticWithdrawal,
+	ConditionShape,
 	SelectionEvaluation,
 	SelectionRequest,
 	SelectionVocabulary,
@@ -316,6 +319,16 @@ export class MockApiClient implements ApiClient {
 	async acknowledgeRun(scope: Scope, runId: string, acknowledged: boolean): Promise<void> {
 		this.#location(scope);
 		this.#operate.acknowledgeRun(runId, acknowledged, 'you');
+	}
+
+	/** The conditions' acknowledgements the mock holds, for wrappers that replace a condition, such as the huge project. */
+	mockConditionAcknowledgements(): AttentionAcknowledgement[] {
+		return this.#operate.conditionAcknowledgements();
+	}
+
+	async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: AutomaticWithdrawal): Promise<void> {
+		this.#location(scope);
+		this.#operate.acknowledgeCondition(key, shape, acknowledged, 'you', automatic?.withdraws);
 	}
 
 	async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {

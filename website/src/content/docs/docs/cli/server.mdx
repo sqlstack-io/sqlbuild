@@ -45,7 +45,7 @@ executable = "/usr/local/bin/sqb"
 
 | Section | Keys |
 | --- | --- |
-| `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`) |
+| `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`), `attention_snooze` (`"24h"`); see [Acknowledge attention items](#acknowledge-attention-items) |
 | `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`; see [Set retention](#set-retention) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
 | `[trusted_proxy]` | `origin`, and optionally `trusted_peers` (`127.0.0.1` and `::1`), `allowed_hosts`, `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
@@ -237,6 +237,33 @@ characters, and `null` when the worker reported none. It can quote warehouse dat
 webhook like other run evidence. `run_failed` events appear only in the webhook, not in the
 server's platform history.
 
+## Acknowledge attention items
+
+Anyone who can see a target's runs can acknowledge an item on its Overview's attention list. That
+hides the item for everyone viewing the target, and records who did it in the audit log:
+
+- A problem run stays acknowledged until someone undoes it.
+- An ongoing condition, such as nodes out of date or a late schedule, stays acknowledged until it
+  gets worse, or until `attention_snooze` has passed:
+
+```toml
+[server]
+attention_snooze = "12h"
+```
+
+`attention_snooze` takes a duration in days, hours, minutes and seconds, such as `"24h"` (the
+default), `"90m"` or `"1d12h"`. `"0"` removes the time limit, so an acknowledged condition stays
+hidden until it gets worse or clears. Years and months aren't accepted.
+
+When the Overview finds that an acknowledged condition has cleared, it withdraws the
+acknowledgement, so the condition shows again if it comes back. The audit log records that
+withdrawal as automatic. Acknowledgements are audit records, so `audit_days` also limits how long
+one without a time limit lasts.
+
+The Overview withdraws an acknowledgement of nodes out of date only once the target's warehouse sync
+has reported and settled. On a target without sync history, or where you may not read its sync
+status, it isn't withdrawn automatically and lapses only after `attention_snooze`.
+
 ## Back up the control database
 
 With no `SQLBUILD_CONTROL_DATABASE_URL`, the server keeps its control database in one SQLite file.
@@ -299,6 +326,18 @@ server can't read what they wrote.
 ```text
 the control server is older than this worker and refused its run report; upgrade the server before its workers
 ```
+
+Some migrations add an index, which the server builds when it migrates. On PostgreSQL that build
+locks its table against writes, so on a large table those writes wait until it is built. Migration
+`0003` indexes acknowledgements in the audit log, so on a large audit log it holds up audit writes,
+including sign-ins. To avoid that, build the index yourself before you upgrade, without blocking
+writes:
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS sqb_security_audit_attention ON sqb_security_audit((scope_json ->> 'location_id'), (scope_json ->> 'target'), (scope_json ->> 'key'), storage_id) WHERE action IN ('attention.acknowledged', 'attention.acknowledgement_withdrawn');
+```
+
+The migration then finds the index already there and skips it.
 
 ## Set retention
 

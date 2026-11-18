@@ -6,11 +6,16 @@ use axum::extract::{Path, Query, State};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
+use crate::acknowledgements::main::acknowledge_person_attention::acknowledge_person_attention;
 use crate::acknowledgements::main::acknowledge_person_run::acknowledge_person_run;
 use crate::acknowledgements::main::list_person_acknowledgements::list_person_acknowledgements;
-use crate::acknowledgements::models::{AcknowledgementRequest, RunAcknowledgement};
+use crate::acknowledgements::main::list_person_attention_acknowledgements::list_person_attention_acknowledgements;
+use crate::acknowledgements::models::{
+    AcknowledgementRequest, AttentionAcknowledgementRequest, AttentionAcknowledgements,
+    RunAcknowledgement,
+};
 use crate::api::errors::ApiError;
-use crate::api::models::{MutationResponse, RunsQuery};
+use crate::api::models::{MutationResponse, RunsQuery, ServerFacts};
 use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
@@ -206,6 +211,56 @@ pub(crate) async fn acknowledgements(
             (&context, principal),
             (location_id, &target),
             default_role,
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(post, path = "/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements", operation_id = "acknowledgeAttention",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("x-sqb-csrf" = String, Header)),
+    request_body = AttentionAcknowledgementRequest,
+    responses((status = 200, body = MutationResponse, description = "Whether the condition's acknowledgement changed"),
+        (status = 400, description = "The key, shape or reason is invalid, or the event ID was reused"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn acknowledge_attention(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Path((location_id, target)), Extension(default_role), Extension(facts)): (
+        Path<(Uuid, String)>,
+        Extension<DefaultRole>,
+        Extension<ServerFacts>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+    Json(request): Json<AttentionAcknowledgementRequest>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: acknowledge_person_attention(
+            &store,
+            (&context, principal),
+            (location_id, &target, &request),
+            (default_role, facts.attention_snooze),
+        )
+        .await?,
+    }))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements", operation_id = "listAttentionAcknowledgements",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = AttentionAcknowledgements, description = "Conditions marked handled within two snoozes, lapsed ones included, and the snooze"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn attention_acknowledgements(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Extension(default_role), Extension(facts)): (Extension<DefaultRole>, Extension<ServerFacts>),
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<AttentionAcknowledgements>, ApiError> {
+    Ok(Json(
+        list_person_attention_acknowledgements(
+            &store,
+            (&context, principal),
+            (location_id, &target),
+            (default_role, facts.attention_snooze),
         )
         .await?,
     ))
