@@ -2,10 +2,14 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::planner_identity::constants::{DBT_REF_RESOURCE, SOURCE_RESOURCE, SQL_TEST_RESOURCE};
+use crate::planner_identity::constants::{
+    DBT_REF_RESOURCE, MODEL_RESOURCE, SEED_RESOURCE, SOURCE_RESOURCE, SQL_TEST_RESOURCE,
+};
 use crate::planner_identity::models::{AvailableUpstreams, GraphKey, MissingUpstream};
 
 /// Missing upstreams, most dependents first, then by `(kind, name)`; dependents sorted by `(kind, name)`.
+///
+/// When deferring, unselected models and seeds are read from the deferred target, so only it counts.
 pub fn missing_upstreams(
     selected_keys: &[GraphKey],
     upstream_deps: &HashMap<GraphKey, Vec<GraphKey>>,
@@ -19,11 +23,14 @@ pub fn missing_upstreams(
                 .contains(&dep_key.kind.as_str())
                 || selected.contains(dep_key)
                 || available.satisfied_keys.contains(dep_key)
-                || available.existing_relations.contains(&dep_key.name)
-                || available
-                    .deferred_relations
-                    .as_ref()
-                    .is_some_and(|deferred| deferred.contains(&dep_key.name))
+                || match &available.deferred_relations {
+                    Some(deferred)
+                        if [MODEL_RESOURCE, SEED_RESOURCE].contains(&dep_key.kind.as_str()) =>
+                    {
+                        deferred.contains(&dep_key.name)
+                    }
+                    _ => available.existing_relations.contains(&dep_key.name),
+                }
             {
                 continue;
             }

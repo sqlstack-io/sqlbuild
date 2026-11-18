@@ -18,6 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clone._test_types import (
     CloneMissingUpstreamE2ETestCase,
     ClonePolicyErrorTestCase,
     ClonePythonFunctionE2ETestCase,
+    DeferToMissingUpstreamE2ETestCase,
     MissingUpstreamFixesE2ETestCase,
     PartialDeferCloneE2ETestCase,
     UnwritableConsumptionDeferCloneE2ETestCase,
@@ -29,6 +30,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clone.helpers import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     REPO_ROOT,
+    execute_duckdb,
     prepare_inline_project,
     query_duckdb,
     run_sqb,
@@ -1147,3 +1149,86 @@ def test_given_unwritable_consumption_table_when_defer_clone_partly_fails_then_c
     output: str = cloned.stdout + cloned.stderr
     assert cloned.returncode == 1, output
     assert all(fragment in output for fragment in test_case.expected_fragments), output
+
+
+_DEFER_DATABASE: str = "warehouse.duckdb"
+_DEFER_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "deferred_reads"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        f'[connection]\ndatabase = "{_DEFER_DATABASE}"\n\n'
+        '[targets.dev]\nschema = "dev"\n\n'
+        '[targets.prod]\nschema = "prod"\n'
+    ),
+    "models/orders.sql": (
+        'MODEL (description "Test model orders.", materialized table);\n\nSELECT 1 AS order_id\n'
+    ),
+    "models/order_report.sql": (
+        'MODEL (description "Test model order_report.", materialized table);\n\n'
+        'SELECT order_id FROM __ref("orders")\n'
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DeferToMissingUpstreamE2ETestCase(
+            description="an upstream built only in the active target is missing from prod",
+            upstream_sql="CREATE TABLE dev.orders AS SELECT 5 AS order_id;",
+            expected_exit_code=1,
+            expected_fragments=(
+                "error[S301]: 1 upstream model this build reads doesn't exist in target 'prod'\n"
+                "  orders\n\n  Build it too:  add + before your selection",
+            ),
+            expected_report_ids=(),
+        ),
+        DeferToMissingUpstreamE2ETestCase(
+            description="an upstream built in prod is read from prod",
+            upstream_sql=(
+                "CREATE TABLE dev.orders AS SELECT 5 AS order_id;"
+                "CREATE TABLE prod.orders AS SELECT 7 AS order_id;"
+            ),
+            expected_exit_code=0,
+            expected_fragments=(),
+            expected_report_ids=(7,),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_defer_to_when_an_upstream_is_missing_from_the_deferred_target_then_s301(
+    test_case: DeferToMissingUpstreamE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="deferred_reads", repo_files=_DEFER_PROJECT_FILES
+    )
+    database: Path = project_dir / _DEFER_DATABASE
+    execute_duckdb(
+        db_path=database, sql="CREATE SCHEMA dev; CREATE SCHEMA prod;" + test_case.upstream_sql
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", "--select", "order_report", "--defer-to", "prod"),
+        project_dir=project_dir,
+    )
+
+    output: str = result.stdout + result.stderr
+    assert result.returncode == test_case.expected_exit_code, output
+    assert all(fragment in output for fragment in test_case.expected_fragments), output
+    assert "sqb clone" not in output, output
+    reports: tuple[int, ...] = (
+        tuple(
+            row[0]
+            for row in query_duckdb(
+                db_path=database,
+                sql=(
+                    "SELECT order_id FROM dev.order_report WHERE EXISTS (SELECT 1 FROM "
+                    "information_schema.tables WHERE table_schema = 'dev' "
+                    "AND table_name = 'order_report')"
+                ),
+            )
+        )
+        if test_case.expected_report_ids
+        else ()
+    )
+    assert reports == test_case.expected_report_ids

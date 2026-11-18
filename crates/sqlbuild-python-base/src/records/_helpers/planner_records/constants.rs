@@ -98,6 +98,7 @@ const R_DEFERRAL_INPUTS: RecordSpec = RecordSpec {
     fields: &[
         FieldSpec::new("deferred_locations", FieldDefault::None),
         FieldSpec::new("deferred_relations", FieldDefault::None),
+        FieldSpec::new("defer_to", FieldDefault::None),
         FieldSpec::new("defer_sources_to", FieldDefault::None),
         FieldSpec::new("source_deferral_enabled", FieldDefault::True),
     ],
