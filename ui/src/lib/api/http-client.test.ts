@@ -435,6 +435,8 @@ describe('overview', () => {
 
 	it('is null for a person who may view only part of the target, with no partial counts', async () => {
 		expect(await server(403).overview(ORDERS)).toBeNull();
+		// The states are read only once the listing is allowed, so the refusal is recorded once.
+		expect(vi.mocked(fetch).mock.calls.filter(([request]) => new URL((request as Request).url).pathname.endsWith('/node-states'))).toHaveLength(0);
 	});
 
 	it('still fails on any other error', async () => {

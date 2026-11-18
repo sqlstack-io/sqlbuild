@@ -967,15 +967,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return started;
 	}
 
-	/** The listing with its node states, for reads not given the catalog feed's nodes; a recording without the states read lists them itself. */
+	/** The listing with its node states, for reads not given the catalog feed's nodes; a recording without the states read lists them itself. The states are read only after the listing is allowed, so a partial viewer is refused once. */
 	async function listingWithStates(scope: Scope): Promise<CatalogNode[]> {
-		const [nodes, states] = await Promise.all([
-			implemented.listCatalogNodes(scope),
-			implemented.listNodeStates(scope).catch((reason: unknown) => {
-				if (isUnsupported(reason)) return null;
-				throw reason;
-			})
-		]);
+		const nodes = await implemented.listCatalogNodes(scope);
+		const states = await implemented.listNodeStates(scope).catch((reason: unknown) => {
+			if (isUnsupported(reason)) return null;
+			throw reason;
+		});
 		return states ? applyNodeStates(nodes, states.states) : nodes;
 	}
 

@@ -70,7 +70,7 @@ pub(crate) fn start_node_states(
     (cache, task)
 }
 
-/// The watched targets a signal names, or every watched target; the unwatched ones it names are dropped once no refresh is pending, since a pending refresh still pushes the old entry's versions.
+/// The watched targets a signal names, or every watched target; the unwatched ones it names are dropped once no refresh is pending or due, since one still pushes the old entry's versions.
 fn watched_targets(
     cache: &NodeStateCache,
     scope: Option<(Uuid, &str)>,
@@ -84,6 +84,7 @@ fn watched_targets(
     targets.retain(|key, entry| {
         !named(key, entry)
             || entry.watchers.load(Ordering::SeqCst) > 0
+            || entry.dirty.load(Ordering::SeqCst)
             || entry.scheduled.load(Ordering::SeqCst)
     });
     targets
