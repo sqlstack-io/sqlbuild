@@ -9,7 +9,8 @@ relations, in planning or in the copy it plans from, shows here first.
 Each case also plans the project live, as `sqb plan` does, against an offline Snowflake warehouse
 holding the same synced catalog, a few sources carrying an undeclared column. It bounds the models
 analysed again against inspected source columns, the warehouse statements sent, cursor batching
-and the live plan's time as a multiple of the warm preview's.
+and the live plan's time as a multiple of the location's publish, which compiles the same
+project on the same machine.
 
 It runs in the 10,000-model cell of the dense compile job, after the compile guards.
 """
@@ -60,7 +61,7 @@ _CURSOR_BATCH_SIZE: int = 50
             expected_max_warm_seconds=10.0,
             expected_max_warm_to_publish=0.45,
             expected_max_check_seconds=0.5,
-            expected_max_live_to_warm=6.0,
+            expected_max_live_to_publish=1.8,
             expected_source_rebinding=(25, 150),
             expected_max_warehouse_statements=1_150,
         ),
@@ -72,7 +73,7 @@ _CURSOR_BATCH_SIZE: int = 50
             expected_max_warm_seconds=10.0,
             expected_max_warm_to_publish=0.45,
             expected_max_check_seconds=0.5,
-            expected_max_live_to_warm=6.0,
+            expected_max_live_to_publish=1.8,
             expected_source_rebinding=(25, 150),
             expected_max_warehouse_statements=1_150,
         ),
@@ -140,7 +141,7 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
         f"publish={served.published_seconds:.2f}s warm_to_publish={warm_to_publish:.2f} "
         f"check_median={check_seconds * 1000:.0f}ms runs={len(reasons)} unbuilt={unbuilt} "
         f"definition_changes={definition_changes} models={len(document['models'])} "
-        f"live={live.seconds:.2f}s live_to_warm={live.seconds / warm:.2f} "
+        f"live={live.seconds:.2f}s live_to_publish={live.seconds / served.published_seconds:.2f} "
         f"live_entries={live.model_entries} rebinding={live.source_rebinding_analyses} "
         f"cursor_relations={live.cursor_relations} cursor_statements={live.cursor_statements} "
         f"warehouse_statements={live.warehouse_statements} "
@@ -174,6 +175,6 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
         "cursor bounds are read in full batches"
     )
     assert live.warehouse_statements <= test_case.expected_max_warehouse_statements
-    assert live.seconds / warm < test_case.expected_max_live_to_warm, (
-        "a live plan grew faster than the warm preview of the same warehouse"
+    assert live.seconds / served.published_seconds < test_case.expected_max_live_to_publish, (
+        "a live plan grew faster than compiling and publishing the same project"
     )
