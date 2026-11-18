@@ -40,15 +40,31 @@ class SchedulerIdentityTestCase:
 
 
 @dataclass(frozen=True)
-class JobLimitDispatchTestCase:
-    """Ready nodes, each node's limiting jobs and their limits, and the dispatch order expected."""
+class JobLimitedBuildTestCase:
+    """A small build graph run through the concurrent dispatch loop with per-job limits."""
 
     description: str
-    ready: tuple[str, ...]
+    # Each node and the nodes it waits for.
+    upstream: dict[str, tuple[str, ...]]
     node_jobs: dict[str, tuple[str, ...]]
     job_limits: dict[str, int]
-    blocked: frozenset[str]
-    # Before each dispatch, the running node that finishes first, or "" for none.
-    finished_before: tuple[str, ...]
-    # Each dispatch's node, or None when no ready node has room.
-    expected_dispatched: tuple[str | None, ...]
+    max_concurrency: int
+    failing: frozenset[str]
+    # The most nodes of each named job, or of the whole build under "*", seen running at once.
+    expected_peaks: dict[str, int]
+    expected_skipped: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SubworkerReservationTestCase:
+    """Running and queued microbatch coordinators, and the sub-worker slots one of them gets."""
+
+    description: str
+    job_limits: dict[str, int]
+    # Nodes of each job already running, the coordinator's included.
+    job_running: dict[str, int]
+    coordinator_jobs: tuple[str, ...]
+    queued_coordinator_jobs: tuple[tuple[str, ...], ...]
+    max_concurrency: int
+    expected_demand: int
+    expected_reservations: tuple[bool, ...]
