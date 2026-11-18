@@ -60,6 +60,16 @@ pub(crate) struct ProxyStartupTestCase {
     pub(crate) expected_warnings: &'static [(&'static str, usize)],
 }
 
+/// A server with the default `trusted_peers`, reached over a non-loopback address of this machine.
+pub(crate) struct ProxyRemotePeerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) configuration: &'static str,
+    /// The username the remote requests carry, which the log must never show.
+    pub(crate) username: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_warnings: usize,
+}
+
 pub(crate) struct ServerConfigurationTestCase {
     pub(crate) description: &'static str,
     pub(crate) configuration: &'static str,
