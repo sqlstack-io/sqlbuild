@@ -250,3 +250,12 @@ class SyncedFallbackTestCase:
     empty_copy: bool
     failing_check: bool
     expected_message: str
+
+
+@dataclass(frozen=True)
+class ExactColumnThresholdTestCase:
+    """A column request of one schema's relations and how many reads of each kind serve it."""
+
+    description: str
+    relation_count: int
+    expected_query_kinds: dict[str, int]
