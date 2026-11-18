@@ -4,6 +4,7 @@
 import type { CatalogNode, GroupStatus } from '$lib/api';
 import { shortName } from '$lib/build-area/labels';
 import { folderOf } from '$lib/lineage/catalog-graph';
+import { canSelectByPath, inexactDirs } from '$lib/selection/folders';
 import { needsAttention } from './overview-panels';
 import { sortFolders } from './overview-panels';
 
@@ -67,8 +68,16 @@ export function folderTree(nodes: readonly CatalogNode[]): FolderNode[] {
 			parent = f;
 		}
 	}
+	// `path:` selects every node under the folder's directory, so it stands for the folder only when that is
+	// exactly what the folder counts: under a root a path selector accepts, and with no source, and no node
+	// of another folder, in it. Otherwise the folder's nodes are selected by name.
+	const dirOfFolder = new Map<string, string>();
+	for (const f of byPath.values()) if (f.root !== null && canSelectByPath(`${f.root}${f.path}`)) dirOfFolder.set(`${f.root}${f.path}`, f.path);
+	const inside = (n: CatalogNode, path: string) => n.kind !== 'source' && (folderOf(n) === path || folderOf(n).startsWith(`${path}/`));
+	const inexact = inexactDirs(nodes, new Set(dirOfFolder.keys()), (n, dir) => inside(n, dirOfFolder.get(dir)!));
 	for (const f of byPath.values()) {
-		f.selection = f.root !== null ? `path:${f.root}${f.path}` : [...new Set(f.keys)].join(' ');
+		const dir = f.root !== null ? `${f.root}${f.path}` : null;
+		f.selection = dir && dirOfFolder.has(dir) && !inexact.has(dir) ? `path:${dir}` : [...new Set(f.keys)].join(' ');
 		delete (f as { root?: unknown }).root;
 		delete (f as { keys?: unknown }).keys;
 	}

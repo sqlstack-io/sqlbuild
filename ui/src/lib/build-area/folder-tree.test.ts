@@ -20,6 +20,31 @@ const rows = (opts: Partial<Parameters<typeof visibleTreeRows>[1]> = {}) =>
 	visibleTreeRows(folderTree(nodes), { expanded: new Set(), sort: 'urgency', reverse: false, attentionOnly: false, listNodes: false, ...opts }).map(label);
 
 describe('the catalog folder tree', () => {
+	it('selects a folder by path only when that selects exactly what it counts, and only under models/ or python/', () => {
+		const tree = folderTree([
+			node('orders', 'models/shop/orders/orders.sql'),
+			// A source declared in the folder: a path would select it, though the folder doesn't count it.
+			node('raw_returns', 'models/shop/returns/sources.yml', { kind: 'source' }),
+			node('returns', 'models/shop/returns/returns.sql'),
+			// A node of a declared group whose file sits in the folder.
+			node('loyalty', 'models/shop/customers/loyalty.sql', { group: 'crm' }),
+			node('customers', 'models/shop/customers/customers.sql'),
+			node('codes', 'seeds/lookups/codes.csv', { kind: 'seed' }),
+			node('score', 'python/ml/score.py', { kind: 'asset' })
+		]);
+		const selection = (path: string) => {
+			const find = (fs: ReturnType<typeof folderTree>): ReturnType<typeof folderTree>[number] | undefined => fs.flatMap((f) => (f.path === path ? [f] : [find(f.children)].filter((x) => !!x)))[0];
+			return find(tree)?.selection;
+		};
+		expect(selection('shop/orders')).toBe('path:models/shop/orders');
+		expect(selection('shop/returns')).toBe('returns');
+		expect(selection('shop/customers')).toBe('customers');
+		expect(selection('shop')).toBe('orders returns customers');
+		// `path:seeds/…` is rejected: path selectors start at models/ or python/.
+		expect([selection('seeds'), selection('seeds/lookups')]).toEqual(['codes', 'codes']);
+		expect(selection('python/ml')).toBe('path:python/ml');
+	});
+
 	it('counts each folder with its subfolders, and selects exactly its nodes', () => {
 		const [payments, orders] = folderTree(nodes);
 		expect([payments.path, payments.total, payments.current, payments.behind, payments.failed]).toEqual(['payments', 5, 3, 1, 1]);

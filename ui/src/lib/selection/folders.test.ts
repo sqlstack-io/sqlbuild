@@ -22,6 +22,11 @@ describe('folder selections', () => {
 		expect(out.get('models')).toBe('top');
 	});
 
+	it('names the nodes of a folder outside models/ and python/, which a path selector rejects', () => {
+		const out = folderSelections([node('seed:codes', 'seeds/lookups/codes.csv', 'seed'), node('seed:regions', 'seeds/lookups/regions.csv', 'seed')]);
+		expect(out.get('seeds')).toBe('codes regions');
+	});
+
 	it('names the nodes when another group shares the folder', () => {
 		const out = folderSelections([node('model:orders', 'models/marts/orders.sql'), node('model:legacy', 'models/marts/legacy.sql', 'table', 'archive')]);
 		expect(out.get('marts')).toBe('orders');

@@ -32,7 +32,7 @@ test('a run is acknowledged for good', async ({ page }) => {
 	await page.goto('/?mock');
 	const row = page.locator('section.health .issues .issue', { hasText: 'core_build partial' });
 	await expect(row).toBeVisible({ timeout: 20_000 });
-	await expect(row.getByRole('button', { name: 'Acknowledge' })).toHaveAttribute('title', /^Hide this from the attention list for everyone\./);
+	await expect(row.getByRole('button', { name: 'Acknowledge' })).toHaveAttribute('title', /^Hide this from the attention list for everyone viewing this target\./);
 	await row.getByRole('button', { name: 'Acknowledge' }).click();
 	const handled = page.locator('section.health .handled');
 	await handled.getByRole('button', { name: /^Acknowledged/ }).click();

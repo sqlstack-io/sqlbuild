@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { plural, noun } from '$lib/format/plural';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
@@ -59,8 +60,8 @@
 	// A run is acknowledged for good; an ongoing condition until it changes (see attention-conditions).
 	const conditionFor = (item: AttentionItem) => ('condition' in item ? (item.condition ?? null) : null);
 	const ACK_HELP = {
-		run: 'Hide this from the attention list for everyone. It stays under Acknowledged, where anyone can undo it.',
-		condition: 'Hide this from the attention list for everyone, until it changes: it gets worse, resolves and comes back, or 24 hours pass. It stays under Acknowledged, where anyone can undo it.'
+		run: 'Hide this from the attention list for everyone viewing this target. It stays under Acknowledged, where anyone can undo it.',
+		condition: 'Hide this from the attention list for everyone viewing this target, until it changes: it gets worse, resolves and comes back, or 24 hours pass. It stays under Acknowledged, where anyone can undo it.'
 	};
 	const canAck = (item: AttentionItem) => ('acknowledged' in item ? canAcknowledge : !!conditionFor(item) && canAcknowledgeConditions);
 	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
@@ -83,18 +84,25 @@
 		try {
 			if ('acknowledged' in item) await app.client.acknowledgeRun(scope, item.run.id, acknowledged);
 			else if (condition) await app.client.acknowledgeCondition(scope, condition.key, condition.shape, acknowledged);
-			settling = new Map([...settling, [key, acknowledged]]);
-			acknowledging = null;
-			await overview.refresh();
 		} catch (error) {
+			// Only the acknowledgement itself failing is an error; it then stays where it was.
 			acknowledgeError = error instanceof Error ? error.message : String(error);
+			return;
 		} finally {
 			acknowledging = null;
-			const rest = new Map(settling);
-			rest.delete(key);
-			settling = rest;
 		}
+		// Saved: it moves now, and stays moved until the Overview has been read again. A failed read is the
+		// Overview's own error, not the acknowledgement's.
+		settling = new Map([...settling, [key, acknowledged]]);
+		overview.refresh();
 	}
+	// A new read of the Overview holds every saved acknowledgement, so nothing is settling any more.
+	$effect(() => {
+		void data;
+		untrack(() => {
+			if (settling.size) settling = new Map();
+		});
+	});
 	const staleListed = $derived(issues.some(({ item }) => item.kind === 'stale_models'));
 	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
 	const loaded = $derived(data !== null);

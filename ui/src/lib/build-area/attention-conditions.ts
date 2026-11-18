@@ -20,11 +20,16 @@ export function conditionOf(item: AttentionItem): { key: string; shape: Conditio
 		case 'stale_sources': {
 			const members = item.sources.map((s) => `${s.key}:${s.status}`).sort();
 			const counts = { warn: item.sources.filter((s) => s.status === 'warn').length, error: item.sources.filter((s) => s.status === 'error').length };
-			return { key: 'stale_sources', noun: 'source', shape: members.length <= MAX_MEMBERS ? { counts, members } : { counts } };
+			return { key: 'stale_sources', noun: 'source', shape: bounded({ counts, members }) };
 		}
 		case 'platform_event': {
 			const e = item.event;
-			return { key: `event:${e.kind}:${e.locationId ?? ''}:${e.subject ?? ''}`, noun: 'event', shape: { severity: SEVERITY[e.severity] ?? 0, occurrence: e.id } };
+			const severity = SEVERITY[e.severity] ?? 0;
+			const key = boundedKey(`event:${e.kind}:${e.locationId ?? ''}:${e.subject ?? ''}`);
+			// A grouped event (late schedules, low calendars) gets worse as it holds more; its ID is fixed.
+			if (e.members) return { key, noun: NOUNS[e.kind] ?? 'event', shape: bounded({ severity, counts: { [e.kind]: e.members.length }, members: e.members }) };
+			// A fixed ID (a stopped scheduler, a broken location) comes with what tells its occurrences apart.
+			return { key, noun: 'event', shape: { severity, ...(e.occurrence ?? e.id ? { occurrence: e.occurrence ?? e.id } : {}) } };
 		}
 		case 'queue_blocked':
 			return { key: `queue:${item.runId}`, noun: 'wait', shape: { members: [...new Set(item.waits.map((w) => w.kind))].sort() } };
@@ -36,7 +41,31 @@ export function conditionOf(item: AttentionItem): { key: string; shape: Conditio
 	}
 }
 
-const COUNT_LABEL: Record<string, string> = { changed: 'changed', behind: 'behind', warn: 'late', error: 'past their error threshold' };
+const COUNT_LABEL: Record<string, string> = { changed: 'changed', behind: 'behind', warn: 'late', error: 'past their error threshold', tick_overdue: 'late', calendar_horizon_low: 'running out of dates' };
+const NOUNS: Record<string, string> = { tick_overdue: 'schedule', calendar_horizon_low: 'calendar' };
+
+/** The server keeps keys to 256 characters; a longer one is cut, with a hash of the whole to keep it distinct. */
+export const MAX_KEY_CHARS = 256;
+export function boundedKey(key: string): string {
+	if (key.length <= MAX_KEY_CHARS) return key;
+	// FNV-1a, 32 bits, twice with different seeds: deterministic and enough to tell keys of one target apart.
+	const fnv = (seed: number) => {
+		let h = seed;
+		for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 0x01000193) >>> 0;
+		return h.toString(16).padStart(8, '0');
+	};
+	return `${key.slice(0, MAX_KEY_CHARS - 18)}#${fnv(0x811c9dc5)}${fnv(0x050c5d1f)}`;
+}
+
+/** The server keeps shapes to 8 KiB; members are left out beyond MAX_MEMBERS or this many bytes, comparing by counts. */
+const MAX_SHAPE_BYTES = 6 * 1024;
+function bounded(shape: ConditionShape): ConditionShape {
+	if (!shape.members) return shape;
+	const fits = shape.members.length <= MAX_MEMBERS && new TextEncoder().encode(JSON.stringify(shape)).length <= MAX_SHAPE_BYTES;
+	if (fits) return shape;
+	const { members: _, ...rest } = shape;
+	return rest;
+}
 
 /** Why an acknowledgement no longer holds at `now`, or null while it does. */
 export function lapseOf(stored: ConditionShape, current: ConditionShape, until: string, now: number, noun: string): string | null {
