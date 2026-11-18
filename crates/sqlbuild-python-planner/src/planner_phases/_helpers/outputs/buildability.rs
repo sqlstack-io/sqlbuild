@@ -97,7 +97,6 @@ pub(crate) fn check_selected_scope_buildability<'py>(
     )
 }
 
-/// The active target, its clone or deferral origins, and the clone `--to` it needs (also when the default target is unknown).
 /// The target this plan reads unselected models and seeds from, when it defers.
 fn deferred_to(
     deferral: &Bound<'_, PyAny>,
@@ -109,6 +108,7 @@ fn deferred_to(
     native_field(deferral, "defer_to")?.extract()
 }
 
+/// The active target, its clone or deferral origins, and the clone `--to` it needs (also when the default target is unknown).
 fn missing_upstream_fixes(
     runtime: &Bound<'_, PyAny>,
     project: &Bound<'_, PyAny>,

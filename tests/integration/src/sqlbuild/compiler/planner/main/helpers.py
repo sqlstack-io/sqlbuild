@@ -645,6 +645,17 @@ _LISTING_GUARDS: MappingProxyType[bool, Callable[[str | None], None]] = MappingP
 )
 
 
+def deferring_unlisted_adapter(
+    *, connection: Any, unlisted_database: str
+) -> UnlistedDatabaseDuckDbAdapter:
+    """An adapter over dev and prod schemas where only dev holds `order_ledger`."""
+
+    connection.execute("CREATE SCHEMA dev")
+    connection.execute("CREATE SCHEMA prod")
+    connection.execute("CREATE TABLE dev.order_ledger AS SELECT 1 AS order_id")
+    return UnlistedDatabaseDuckDbAdapter(connection=connection, unlisted_database=unlisted_database)
+
+
 def plan_deferred_project(
     *,
     project_dir: Path,
@@ -726,12 +737,9 @@ def write_synced_control_store(
     warehouse: RecordingSnowflakeWarehouse,
     schemas: tuple[str, ...],
     observed_at: datetime | None = None,
-    scan_started: datetime | None = None,
+    scan_id: str | None = None,
 ) -> None:
-    """A control store whose location mirrored `schemas` at `observed_at` (default now).
-
-    `scan_started` stamps every row with a later catalog scan that found it unchanged.
-    """
+    """A control store whose location mirrored `schemas` at `observed_at` (default: now)."""
 
     catalog: InspectionCatalog = live_inspection_catalog(warehouse)
     relations: tuple[RelationInfo, ...] = catalog.list_relations(
@@ -742,7 +750,6 @@ def write_synced_control_store(
     )
     location: str = str(uuid4())
     observed: str = (observed_at or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    scan_id: str | None = None if scan_started is None else _uuid7(scan_started)
     (project_dir / ".sqlbuild").mkdir(parents=True)
     with closing(sqlite3.connect(project_dir / ".sqlbuild/control.sqlite3")) as store:
         _ = store.execute(
@@ -773,7 +780,9 @@ def write_synced_control_store(
         store.commit()
 
 
-def _uuid7(started: datetime) -> str:
+def uuid7_at(started: datetime) -> str:
+    """A UUIDv7, as a catalog scan's id, whose timestamp is `started`."""
+
     milliseconds: int = int(started.timestamp() * 1000)
     random: int = uuid4().int
     value: int = (

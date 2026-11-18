@@ -7,9 +7,7 @@ use crate::planner_identity::constants::{
 };
 use crate::planner_identity::models::{AvailableUpstreams, GraphKey, MissingUpstream};
 
-/// Missing upstreams, most dependents first, then by `(kind, name)`; dependents sorted by `(kind, name)`.
-///
-/// When deferring, unselected models and seeds are read from the deferred target, so only it counts.
+/// Missing upstreams, most dependents first; a deferring plan checks unselected models and seeds in the deferred target.
 pub fn missing_upstreams(
     selected_keys: &[GraphKey],
     upstream_deps: &HashMap<GraphKey, Vec<GraphKey>>,

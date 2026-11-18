@@ -133,4 +133,5 @@ class DeferToMissingUpstreamE2ETestCase:
     upstream_sql: str
     expected_exit_code: int
     expected_fragments: tuple[str, ...]
-    expected_report_ids: tuple[int, ...]
+    report_sql: str
+    expected_report_rows: list[tuple[int, ...]]

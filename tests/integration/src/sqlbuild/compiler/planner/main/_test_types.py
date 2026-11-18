@@ -173,7 +173,13 @@ class SourceTableProbeBudgetTestCase:
 class UnlistedMigrationOriginTestCase:
     description: str
     select: tuple[str, ...]
-    expected_warnings: tuple[str, ...]
+    expected_unlisted_reads: int
+
+
+@dataclass(frozen=True)
+class DeferredMissingOriginTestCase:
+    description: str
+    select: tuple[str, ...]
     expected_missing: tuple[str, ...]
     expected_unlisted_reads: int
 

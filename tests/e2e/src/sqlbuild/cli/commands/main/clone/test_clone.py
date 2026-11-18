@@ -45,6 +45,22 @@ _UPSTREAMS: tuple[str, ...] = (
     "returns",
     "shipments",
 )
+_DEFER_DATABASE: str = "warehouse.duckdb"
+_DEFER_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "deferred_reads"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        f'[connection]\ndatabase = "{_DEFER_DATABASE}"\n\n'
+        '[targets.dev]\nschema = "dev"\n\n'
+        '[targets.prod]\nschema = "prod"\n'
+    ),
+    "models/orders.sql": (
+        'MODEL (description "Test model orders.", materialized table);\n\nSELECT 1 AS order_id\n'
+    ),
+    "models/order_report.sql": (
+        'MODEL (description "Test model order_report.", materialized table);\n\n'
+        'SELECT order_id FROM __ref("orders")\n'
+    ),
+}
 
 
 @pytest.mark.parametrize(
@@ -1151,24 +1167,6 @@ def test_given_unwritable_consumption_table_when_defer_clone_partly_fails_then_c
     assert all(fragment in output for fragment in test_case.expected_fragments), output
 
 
-_DEFER_DATABASE: str = "warehouse.duckdb"
-_DEFER_PROJECT_FILES: dict[str, str] = {
-    "sqlbuild_project.toml": (
-        'name = "deferred_reads"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
-        f'[connection]\ndatabase = "{_DEFER_DATABASE}"\n\n'
-        '[targets.dev]\nschema = "dev"\n\n'
-        '[targets.prod]\nschema = "prod"\n'
-    ),
-    "models/orders.sql": (
-        'MODEL (description "Test model orders.", materialized table);\n\nSELECT 1 AS order_id\n'
-    ),
-    "models/order_report.sql": (
-        'MODEL (description "Test model order_report.", materialized table);\n\n'
-        'SELECT order_id FROM __ref("orders")\n'
-    ),
-}
-
-
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -1180,7 +1178,11 @@ _DEFER_PROJECT_FILES: dict[str, str] = {
                 "error[S301]: 1 upstream model this build reads doesn't exist in target 'prod'\n"
                 "  orders\n\n  Build it too:  add + before your selection",
             ),
-            expected_report_ids=(),
+            report_sql=(
+                "SELECT count(*) FROM information_schema.tables "
+                "WHERE table_schema = 'dev' AND table_name = 'order_report'"
+            ),
+            expected_report_rows=[(0,)],
         ),
         DeferToMissingUpstreamE2ETestCase(
             description="an upstream built in prod is read from prod",
@@ -1190,7 +1192,8 @@ _DEFER_PROJECT_FILES: dict[str, str] = {
             ),
             expected_exit_code=0,
             expected_fragments=(),
-            expected_report_ids=(7,),
+            report_sql="SELECT order_id FROM dev.order_report",
+            expected_report_rows=[(7,)],
         ),
     ],
     ids=lambda case: case.description,
@@ -1216,19 +1219,6 @@ def test_given_defer_to_when_an_upstream_is_missing_from_the_deferred_target_the
     assert result.returncode == test_case.expected_exit_code, output
     assert all(fragment in output for fragment in test_case.expected_fragments), output
     assert "sqb clone" not in output, output
-    reports: tuple[int, ...] = (
-        tuple(
-            row[0]
-            for row in query_duckdb(
-                db_path=database,
-                sql=(
-                    "SELECT order_id FROM dev.order_report WHERE EXISTS (SELECT 1 FROM "
-                    "information_schema.tables WHERE table_schema = 'dev' "
-                    "AND table_name = 'order_report')"
-                ),
-            )
-        )
-        if test_case.expected_report_ids
-        else ()
+    assert query_duckdb(db_path=database, sql=test_case.report_sql) == (
+        test_case.expected_report_rows
     )
-    assert reports == test_case.expected_report_ids

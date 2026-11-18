@@ -17,6 +17,7 @@ from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
 from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
     plan_offline_snowflake_project,
     planned_entries,
+    uuid7_at,
     write_synced_control_store,
     write_targeted_snowflake_project,
 )
@@ -168,20 +169,23 @@ def test_given_a_later_scan_found_a_record_unchanged_when_planning_from_synced_s
         project_dir=tmp_path / "orders_platform", target=_TARGET, plan_from="synced_state"
     )
     name: str = project.incremental_model_names[0].upper()
-    replaced: tuple[FakeRelation, ...] = tuple(
-        replace(relation, last_ddl=_SCAN_STARTED + test_case.last_ddl_after_scan_start)
-        if relation.name == name
-        else relation
-        for relation in project.relations
+    original: FakeRelation = next(filter(lambda relation: relation.name == name, project.relations))
+    others: tuple[FakeRelation, ...] = tuple(
+        filter(lambda relation: relation.name != name, project.relations)
     )
-    warehouse: RecordingSnowflakeWarehouse = RecordingSnowflakeWarehouse(relations=replaced)
+    warehouse: RecordingSnowflakeWarehouse = RecordingSnowflakeWarehouse(
+        relations=(
+            *others,
+            replace(original, last_ddl=_SCAN_STARTED + test_case.last_ddl_after_scan_start),
+        )
+    )
     write_synced_control_store(
         project_dir=project.project_dir,
         target=_TARGET,
         warehouse=warehouse,
         schemas=_MODEL_SCHEMAS,
         observed_at=_FIRST_OBSERVED,
-        scan_started=_SCAN_STARTED,
+        scan_id=uuid7_at(_SCAN_STARTED),
     )
     warehouse.queries.clear()
 
