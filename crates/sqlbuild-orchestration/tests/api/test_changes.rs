@@ -263,6 +263,13 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
             .expect("new token");
             let mut live =
                 connect(&client, &first, (location_id, "development", &fresh.bearer)).await;
+            // Each replica announces node states after its own debounce; this one shows when the second has.
+            let mut settled = connect(
+                &client,
+                &second,
+                (location_id, "development", &fresh.bearer),
+            )
+            .await;
             // Long enough to connect on a slow runner before it expires; the wait below runs it out.
             let expiring = issue_token(
                 store,
@@ -289,6 +296,7 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 .await
                 .expect("committed change after expiry");
             expect_topics(&mut live, &snapshot_topics).await;
+            expect_topics(&mut settled, &snapshot_topics).await;
             assert_eq!(
                 next_topic(&mut expires).await,
                 None,
@@ -325,6 +333,7 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 "shutdown drains a live SSE body"
             );
             stop_api(second).await;
+            assert_eq!(next_topic(&mut settled).await, None);
             assert_eq!(next_topic(&mut reconnected).await, None);
             assert_eq!(next_topic(&mut long_stream).await, None);
             close_test_store(fixture).await;
