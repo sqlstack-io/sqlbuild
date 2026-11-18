@@ -34,6 +34,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import (
     OfflineSnowflakeAdapter,
     RecordedQuery,
     RecordingSnowflakeWarehouse,
+    SchemaListingSnowflakeAdapter,
     SyntheticSnowflakeProject,
     write_synthetic_snowflake_project,
 )
@@ -82,7 +83,7 @@ def test_given_large_multi_schema_project_when_planning_then_metadata_reads_stay
     )
 
     result: CompilePipelineResult = plan_offline_snowflake_project(
-        project=project, warehouse=warehouse
+        project=project, warehouse=warehouse, adapter_type=SchemaListingSnowflakeAdapter
     )
 
     metadata: tuple[RecordedQuery, ...] = offline_metadata_queries(warehouse)
@@ -179,9 +180,18 @@ def test_given_planned_project_when_planning_again_then_cursor_bounds_are_read_a
             description="many small schemas read model columns once per schema",
             schema_count=24,
             models_per_schema=2,
+            schema_listing_beyond_32=True,
             expected_per_relation_column_reads=30,
             expected_schema_column_reads=24,
-        )
+        ),
+        SnowflakeManySchemasTestCase(
+            description="many small schemas read each relation's columns once in production",
+            schema_count=24,
+            models_per_schema=2,
+            schema_listing_beyond_32=False,
+            expected_per_relation_column_reads=78,
+            expected_schema_column_reads=0,
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -200,7 +210,11 @@ def test_given_many_small_schemas_when_planning_then_columns_are_read_per_schema
     )
 
     result: CompilePipelineResult = plan_offline_snowflake_project(
-        project=project, warehouse=warehouse
+        project=project,
+        warehouse=warehouse,
+        adapter_type=(OfflineSnowflakeAdapter, SchemaListingSnowflakeAdapter)[
+            test_case.schema_listing_beyond_32
+        ],
     )
 
     assert len(result.plan_output.model_entries) == len(project.model_schemas)

@@ -135,6 +135,7 @@ class SnowflakeManySchemasTestCase:
     description: str
     schema_count: int
     models_per_schema: int
+    schema_listing_beyond_32: bool
     expected_per_relation_column_reads: int
     expected_schema_column_reads: int
 
