@@ -3665,6 +3665,31 @@ class SnowflakeAdapter(
         del connection, destination
         return None
 
+    def maintained_refresh_settings(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> tuple[str, str] | None:
+        """The dynamic table's target lag and warehouse from SHOW DYNAMIC TABLES, or None."""
+
+        stored_name: str = self._information_schema_identifier(name)
+        if schema is None:
+            return None
+        rows: list[dict[str, object]] = self._fetch_schema_show_rows(
+            connection=connection,
+            query=(
+                f"SHOW DYNAMIC TABLES LIKE '{show_like_pattern(stored_name)}' IN SCHEMA "
+                + self._show_schema_scope(connection=connection, database=database, schema=schema)
+            ),
+            show_database=self._show_database(
+                connection=connection, database=database, schema=schema
+            ),
+            schema=schema,
+        )
+        row: dict[str, object]
+        for row in rows:
+            if str(row.get("name")) == stored_name:
+                return (str(row.get("target_lag")), str(row.get("warehouse")))
+        return None
+
     def widen_target_nullability(
         self,
         *,

@@ -250,6 +250,7 @@ fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
         rename_hints,
         config_diff: coloured(model_config_diff(entry, &reason)?),
         query_diff: coloured(model_query_diff(entry, &reason)?),
+        reinitialised_by: optional_text(&native_field(entry, "reinitialised_by")?)?,
         name,
         action,
         reason,

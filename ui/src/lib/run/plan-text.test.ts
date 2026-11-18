@@ -44,6 +44,12 @@ describe('plan text, as sqb plan prints it', () => {
 		expect(section.entries[0].detail).toEqual([]);
 	});
 
+	it('says a kept maintained model recomputes in full when an upstream it reads is rebuilt', () => {
+		const kept = model('daily_totals', { materialization_type: 'maintained', action: 'keep_maintained', reinitialised_by: 'orders' });
+		const [routine] = planSections(plan([kept]));
+		expect(routine.entries).toEqual([{ name: 'daily_totals', value: 'maintained', detail: ['recomputes in full: orders is rebuilt'] }]);
+	});
+
 	it('puts each change in its own section in reason order, then the routine models, and leaves skipped ones out', () => {
 		const sections = planSections(
 			plan([

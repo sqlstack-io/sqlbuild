@@ -438,6 +438,10 @@ impl WarehouseReads for LiveReads {
                 "column_rename_unavailable_reason",
                 vec![("destination", destination)],
             ),
+            AdapterRead::MaintainedRefresh([database, schema, name]) => (
+                "maintained_refresh_settings",
+                vec![("database", database), ("schema", schema), ("name", name)],
+            ),
         };
         self.known_call(py, method, arguments)
     }

@@ -630,6 +630,9 @@ pub(crate) fn routine_model_lines(
             true,
         )];
         lines.extend(cursor_lines(model, true));
+        if let Some(upstream) = &model.reinitialised_by {
+            lines.push(format!("    recomputes in full: {upstream} is rebuilt"));
+        }
         lines
     })
 }

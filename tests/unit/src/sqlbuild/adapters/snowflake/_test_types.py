@@ -453,3 +453,10 @@ class SnowflakeKeyedDeleteInsertFailureTestCase:
 class SnowflakeWarehouseUserTestCase:
     description: str
     expected_expression: str
+
+
+@dataclass(frozen=True)
+class SnowflakeMaintainedRefreshTestCase:
+    description: str
+    rows: tuple[tuple[object, ...], ...]
+    expected_settings: tuple[str, str] | None

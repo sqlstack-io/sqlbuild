@@ -321,6 +321,14 @@ class StrictAdapter(
             help="sqb review needs a warehouse that can drop a schema it created",
         )
 
+    def maintained_refresh_settings(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> tuple[str, str] | None:
+        """Optional: a maintained model's listed target lag and refresh warehouse, or None."""
+
+        del connection, database, schema, name
+        return None
+
     @abstractmethod
     def render_create_table_as(self, *, destination: str, sql: str) -> tuple[str, ...]:
         """Render SQL statements that create or replace a table from a query."""

@@ -189,7 +189,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 		const why = changedRuns(plan);
 		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => {
 			const run = why.get(m.name);
-			return { name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(run ? [run.downstream_of ? `reads ${keyName(run.downstream_of)}` : run.reason] : [])] };
+			return { name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(m.reinitialised_by ? [`recomputes in full: ${m.reinitialised_by} is rebuilt`] : []), ...(run ? [run.downstream_of ? `reads ${keyName(run.downstream_of)}` : run.reason] : [])] };
 		}), false, 'routine_models');
 	}
 	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry), false, 'functions');

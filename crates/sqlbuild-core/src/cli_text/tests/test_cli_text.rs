@@ -244,6 +244,20 @@ fn given_plan_report_when_rendering_then_groups_models_by_reason() {
             expected_completion: "\u{2713} Plan complete  2 selected",
         },
         PlanTextTestCase {
+            description: "a kept maintained model whose upstream is rebuilt says it recomputes in full",
+            report: plan_report(vec![
+                table_model("orders", "query_changed"),
+                ModelPlanText {
+                    action: "keep_maintained".to_owned(),
+                    materialization_label: "maintained".to_owned(),
+                    reinitialised_by: Some("orders".to_owned()),
+                    ..table_model("daily_totals", "no_change")
+                },
+            ]),
+            expected_text: "Plan ready  2 selected\n\nQuery changed (1)\n\u{2514}\u{2500}\u{2500} orders               full rebuild\n    \u{2514}\u{2500}\u{2500} policy  replay_on_change=full\n\nModels (1)\n\u{2514}\u{2500}\u{2500} daily_totals         maintained\n    \u{2514}\u{2500}\u{2500} recomputes in full  orders is rebuilt",
+            expected_completion: "\u{2713} Plan complete  2 selected",
+        },
+        PlanTextTestCase {
             description: "every active model is a full refresh",
             report: plan_report(vec![
                 table_model("orders", "full_refresh"),

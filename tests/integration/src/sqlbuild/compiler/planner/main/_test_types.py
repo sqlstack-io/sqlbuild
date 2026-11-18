@@ -205,3 +205,15 @@ class SyncedScanTestCase:
     last_ddl_after_scan_start: timedelta
     expected_live_describe: bool
     location_clock_ahead: timedelta = timedelta()
+
+
+@dataclass(frozen=True)
+class MaintainedRefreshPlanTestCase:
+    description: str
+    listed_settings: tuple[str, str] | None
+    upstream_query: str
+    expected_upstream_action: PlanAction
+    expected_action: PlanAction
+    expected_reason: PlanReason
+    expected_reinitialised_by: str | None
+    expected_read_names: tuple[str, ...]

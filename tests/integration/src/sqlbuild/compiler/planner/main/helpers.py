@@ -827,3 +827,46 @@ def planned_entries(result: CompilePipelineResult) -> list[tuple[str, str]]:
     """Each planned model's name and reason, in name order."""
 
     return sorted((entry.name, str(entry.reason)) for entry in result.plan_output.model_entries)
+
+
+CLEAN_ORDERS_QUERY: str = "SELECT 1 AS order_id"
+_MAINTAINED: dict[str, object] = {
+    "materialized": "maintained",
+    "refresh": {"lag": "1h"},
+    "refresh_warehouse": "transform_wh",
+}
+
+
+class ListingDuckDbAdapter(DuckDbAdapter):
+    """DuckDB that lists one dynamic table's refresh settings, as Snowflake's SHOW would."""
+
+    def __init__(self, listed: tuple[str, str] | None) -> None:
+        super().__init__()
+        self.listed: tuple[str, str] | None = listed
+        self.read_names: list[str] = []
+
+    def maintained_refresh_settings(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> tuple[str, str] | None:
+        del connection, database, schema
+        self.read_names.append(name)
+        return self.listed
+
+
+def maintained_project_case(upstream_query: str) -> BuildExecutionPlanTestCase:
+    """Clean orders and the daily totals maintained from it, both refreshed within an hour."""
+
+    return BuildExecutionPlanTestCase(
+        description="clean orders and the daily totals maintained from it",
+        setup_sql=(),
+        model_locations={"clean_orders": "staging", "daily_totals": "staging"},
+        model_configs={"clean_orders": _MAINTAINED, "daily_totals": _MAINTAINED},
+        model_queries={
+            "clean_orders": upstream_query,
+            "daily_totals": "SELECT count(*) AS orders FROM staging.clean_orders",
+        },
+        model_deps={"daily_totals": ("clean_orders",)},
+        full_refresh=False,
+        expected_action={},
+        expected_reason={},
+    )
