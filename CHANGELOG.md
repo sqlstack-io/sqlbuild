@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.244.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.243.0...v0.244.0) (2026-11-18)
+
+
+### Features
+
+* **server:** migrate the control store with numbered migrations ([#1563](https://github.com/sqlstack-io/sqlbuild/issues/1563)) ([3f83a7f](https://github.com/sqlstack-io/sqlbuild/commit/3f83a7fa4a1fdec18bb4c4921e4c3146c783c767))
+
 ## [0.243.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.242.0...v0.243.0) (2026-11-17)
 
 
