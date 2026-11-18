@@ -178,6 +178,17 @@ pub(crate) struct ProxyProvisioningTestCase {
     pub(crate) expected_feed_headers: [&'static str; 3],
 }
 
+/// One identity-header request from one socket peer to a server signing people in one way.
+pub(crate) struct ProxyPeerTrustTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) login: crate::api::models::HumanLogin,
+    pub(crate) peer: &'static str,
+    pub(crate) forwarding_headers: &'static [(&'static str, &'static str)],
+    pub(crate) username: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_provisioned: bool,
+}
+
 pub(crate) struct ProxyPeersDefaultTestCase {
     pub(crate) description: &'static str,
     pub(crate) configuration: serde_json::Value,

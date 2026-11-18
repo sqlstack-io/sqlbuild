@@ -35,6 +35,14 @@ pub(crate) fn settings(
     }
 }
 
+/// `[trusted_proxy]` with only its required origin, so `trusted_peers` takes its loopback default.
+pub(crate) fn default_proxy_login() -> HumanLogin {
+    HumanLogin::TrustedProxy(
+        serde_json::from_value(json!({"origin": ORIGIN, "username_header": USER_HEADER}))
+            .expect("proxy settings with the default peers"),
+    )
+}
+
 pub(crate) async fn start(store: &ControlStore, settings: TrustedProxyAuthentication) -> TestApi {
     start_api_with_authentication(
         store,
