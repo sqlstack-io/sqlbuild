@@ -46,6 +46,7 @@ def test_given_regular_primary_work_when_scheduler_submits_then_identity_is_prop
     scheduler._node_jobs = {}
     scheduler._job_limits = {}
     scheduler._job_running = {}
+    scheduler._job_lock = threading.Lock()
     scheduler._max_concurrency = 1
     scheduler._stop = False
     scheduler._microbatch_coordinator_lock = threading.Lock()
@@ -104,6 +105,7 @@ def test_given_microbatch_primary_work_when_scheduler_submits_then_identity_is_p
     scheduler._node_jobs = {}
     scheduler._job_limits = {}
     scheduler._job_running = {}
+    scheduler._job_lock = threading.Lock()
     scheduler._max_concurrency = 2
     scheduler._stop = False
     scheduler._microbatch_coordinator_lock = threading.Lock()

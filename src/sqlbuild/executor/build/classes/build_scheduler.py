@@ -242,9 +242,7 @@ class BuildScheduler:
             callbacks.python_identity_recorder
         )
         self._max_concurrency: int = len(connections)
-        self._job_limits: Mapping[str, int] = runtime.job_limits
-        self._node_jobs: Mapping[CompiledObjectKey, tuple[str, ...]] = runtime.node_jobs
-        self._job_running: dict[str, int] = {}
+        self._init_job_limits(runtime)
         self._blocked_keys: set[CompiledObjectKey] = set()
         self._unbuilt_keys: set[CompiledObjectKey] = set(initial_state.initial_failed_keys)
         self._completed_keys: set[CompiledObjectKey] = set(initial_state.precompleted_keys)
@@ -471,14 +469,7 @@ class BuildScheduler:
                 if self._stop and not self._in_flight:
                     break
 
-                with self._microbatch_coordinator_lock:
-                    queued_coordinators: int = sum(
-                        1 for key in tuple(self._ready) if self._is_concurrent_microbatch(key)
-                    )
-                    self._microbatch_coordinator_demand = min(
-                        self._max_concurrency,
-                        len(self._microbatch_coordinators) + queued_coordinators,
-                    )
+                self._update_microbatch_coordinator_demand()
 
                 while self._ready and len(self._in_flight) < self._max_concurrency:
                     if self._stop:
@@ -549,38 +540,76 @@ class BuildScheduler:
         if escaped is not None:
             raise escaped
 
+    def _update_microbatch_coordinator_demand(self) -> None:
+        """Count the running coordinators and the queued ones whose jobs would let them start."""
+
+        with self._microbatch_coordinator_lock:
+            queued_coordinators: int = sum(
+                1
+                for key in tuple(self._ready)
+                if self._is_concurrent_microbatch(key) and self._has_job_room(key)
+            )
+            self._microbatch_coordinator_demand = min(
+                self._max_concurrency,
+                len(self._microbatch_coordinators) + queued_coordinators,
+            )
+
+    def _init_job_limits(self, runtime: BuildRuntimeParams) -> None:
+        """Job limits, each node's jobs, and a lock over how many of each job's nodes run.
+
+        Coordinators reserve microbatch sub-work from worker threads, so the counts take a lock.
+        """
+
+        self._job_limits: Mapping[str, int] = runtime.job_limits
+        self._node_jobs: Mapping[CompiledObjectKey, tuple[str, ...]] = runtime.node_jobs
+        self._job_running: dict[str, int] = {}
+        self._job_lock: threading.Lock = threading.Lock()
+
     def _take_ready_key(self) -> CompiledObjectKey | None:
         """Remove and return the first ready node whose named jobs all have a free slot."""
 
+        if not self._job_limits or self._has_job_room(self._ready[0]):
+            return self._ready.popleft()
         index: int
         key: CompiledObjectKey
-        for index, key in enumerate(self._ready):
-            if self._has_job_room(key):
-                del self._ready[index]
-                return key
+        with self._job_lock:
+            for index, key in enumerate(self._ready):
+                if key in self._blocked_keys or self._jobs_have_room(self._node_jobs.get(key, ())):
+                    del self._ready[index]
+                    return key
         return None
 
     def _has_job_room(self, key: CompiledObjectKey) -> bool:
         """Whether each job limiting `key` has a free slot; a node to skip never waits."""
 
-        return key in self._blocked_keys or all(
-            self._job_running.get(job, 0) < self._job_limits[job]
-            for job in self._node_jobs.get(key, ())
-        )
+        if key in self._blocked_keys:
+            return True
+        with self._job_lock:
+            return self._jobs_have_room(self._node_jobs.get(key, ()))
+
+    def _jobs_have_room(self, jobs: tuple[str, ...]) -> bool:
+        """Whether each of `jobs` runs fewer nodes than its limit; the caller holds `_job_lock`."""
+
+        return all(self._job_running.get(job, 0) < self._job_limits[job] for job in jobs)
+
+    def _add_job_running(self, jobs: tuple[str, ...], *, change: int) -> None:
+        """Count `change` more running nodes in each of `jobs`; the caller holds `_job_lock`."""
+
+        job: str
+        for job in jobs:
+            self._job_running[job] = self._job_running.get(job, 0) + change
 
     def _start_in_flight(self, key: CompiledObjectKey) -> None:
         self._in_flight.add(key)
-        job: str
-        for job in self._node_jobs.get(key, ()):
-            self._job_running[job] = self._job_running.get(job, 0) + 1
+        with self._job_lock:
+            self._add_job_running(self._node_jobs.get(key, ()), change=1)
 
     def _finish_in_flight(self, key: CompiledObjectKey) -> None:
         if key not in self._in_flight:
             return
         self._in_flight.discard(key)
-        job: str
-        for job in self._node_jobs.get(key, ()):
-            self._job_running[job] -= 1
+        with self._job_lock:
+            self._add_job_running(self._node_jobs.get(key, ()), change=-1)
 
     def _report_scheduler_state(self) -> None:
         callback: Callable[[SchedulerState], None] | None = self._callbacks.on_scheduler_state
@@ -656,6 +685,7 @@ class BuildScheduler:
                     microbatch_batch_runner=lambda batches, concurrency, execute: (
                         self._run_microbatch_subwork(
                             pool=pool,
+                            jobs=self._node_jobs.get(key, ()),
                             coordinator_connection=connection,
                             batches=batches,
                             concurrency=concurrency,
@@ -671,6 +701,7 @@ class BuildScheduler:
         self,
         *,
         pool: ThreadPoolExecutor,
+        jobs: tuple[str, ...],
         coordinator_connection: Any,
         batches: tuple[BatchWindow, ...],
         concurrency: int,
@@ -693,12 +724,13 @@ class BuildScheduler:
                     pool.submit(
                         copy_context().run,
                         self._run_microbatch_batch_worker,
+                        jobs=jobs,
                         batch=batch,
                         execute=execute,
                     ),
                 )
             except BaseException:
-                self._release_microbatch_subworker()
+                self._release_microbatch_subworker(jobs)
                 raise
             return future, batch
 
@@ -707,7 +739,7 @@ class BuildScheduler:
         while (
             len(pending_batches) > 1
             and len(in_flight) < model_subworker_limit
-            and self._reserve_microbatch_subworker()
+            and self._reserve_microbatch_subworker(jobs)
         ):
             submitted_future, submitted_batch = submit_one()
             in_flight[submitted_future] = submitted_batch
@@ -719,7 +751,7 @@ class BuildScheduler:
         failed: bool = coordinator_result.failure is not None
         if failed:
             for future in in_flight:
-                self._cancel_microbatch_subworker(future=future)
+                self._cancel_microbatch_subworker(future=future, jobs=jobs)
         first_exception: BaseException | None = None
         while in_flight:
             completed, _ = wait(tuple(in_flight), return_when=FIRST_COMPLETED)
@@ -734,18 +766,18 @@ class BuildScheduler:
                         first_exception = exc
                     failed = True
                     for sibling in in_flight:
-                        self._cancel_microbatch_subworker(future=sibling)
+                        self._cancel_microbatch_subworker(future=sibling, jobs=jobs)
                     continue
                 results[batch.index] = outcome
                 if outcome.failure is not None:
                     failed = True
                     for sibling in in_flight:
-                        self._cancel_microbatch_subworker(future=sibling)
+                        self._cancel_microbatch_subworker(future=sibling, jobs=jobs)
             while (
                 not failed
                 and pending_batches
                 and len(in_flight) < model_subworker_limit
-                and self._reserve_microbatch_subworker()
+                and self._reserve_microbatch_subworker(jobs)
             ):
                 submitted_future, submitted_batch = submit_one()
                 in_flight[submitted_future] = submitted_batch
@@ -761,6 +793,7 @@ class BuildScheduler:
     def _run_microbatch_batch_worker(
         self,
         *,
+        jobs: tuple[str, ...],
         batch: BatchWindow,
         execute: MicrobatchBatchExecutor,
     ) -> MicrobatchPhaseOutcome:
@@ -771,9 +804,11 @@ class BuildScheduler:
             try:
                 self._connection_pool.put(connection)
             finally:
-                self._release_microbatch_subworker()
+                self._release_microbatch_subworker(jobs)
 
-    def _reserve_microbatch_subworker(self) -> bool:
+    def _reserve_microbatch_subworker(self, jobs: tuple[str, ...]) -> bool:
+        """Take a sub-worker slot, and one in each of its coordinator's jobs, if all are free."""
+
         with self._microbatch_coordinator_lock:
             if (
                 max(
@@ -784,16 +819,24 @@ class BuildScheduler:
                 >= self._max_concurrency
             ):
                 return False
+            with self._job_lock:
+                if not self._jobs_have_room(jobs):
+                    return False
+                self._add_job_running(jobs, change=1)
             self._microbatch_subworkers += 1
             return True
 
-    def _release_microbatch_subworker(self) -> None:
+    def _release_microbatch_subworker(self, jobs: tuple[str, ...]) -> None:
         with self._microbatch_coordinator_lock:
             self._microbatch_subworkers -= 1
+            with self._job_lock:
+                self._add_job_running(jobs, change=-1)
 
-    def _cancel_microbatch_subworker(self, *, future: Future[MicrobatchPhaseOutcome]) -> None:
+    def _cancel_microbatch_subworker(
+        self, *, future: Future[MicrobatchPhaseOutcome], jobs: tuple[str, ...]
+    ) -> None:
         if not future.cancelled() and future.cancel():
-            self._release_microbatch_subworker()
+            self._release_microbatch_subworker(jobs)
 
     def _pre_dispatch(self, key: CompiledObjectKey) -> bool:
         """Run pre-dispatch checks. Returns False if the node should be skipped."""
