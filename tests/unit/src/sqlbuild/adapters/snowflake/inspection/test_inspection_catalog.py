@@ -24,6 +24,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake.inspection._test_types import (
     CappedColumnFallbackTestCase,
     ColumnRequestEquivalenceTestCase,
     DroppedRelationTestCase,
+    ExactColumnThresholdTestCase,
     FreshnessErrorTestCase,
     FreshnessReuseTestCase,
     MissingSchemaTestCase,
@@ -41,6 +42,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import (
     RecordingSnowflakeWarehouse,
     build_inspection_catalog_relations,
     build_offline_snowflake,
+    build_schema_listing_snowflake,
     build_wide_schema_relations,
     build_wide_schemas_relations,
     sorted_relation_reprs,
@@ -152,7 +154,7 @@ def test_given_metadata_request_when_served_by_catalog_then_matches_direct_adapt
 def test_given_relations_when_reading_columns_through_catalog_then_matches_direct_adapter(
     test_case: ColumnRequestEquivalenceTestCase,
 ) -> None:
-    adapter, connection, warehouse = build_offline_snowflake(
+    adapter, connection, warehouse = build_schema_listing_snowflake(
         relations=build_inspection_catalog_relations()
     )
     relations: tuple[RelationInfo, ...] = adapter.list_relations(
@@ -375,7 +377,7 @@ def test_given_unreadable_schema_when_prefetching_best_effort_then_only_real_rea
 def test_given_schema_beyond_show_cap_when_listing_then_matches_direct_adapter(
     test_case: ShowResultCapTestCase,
 ) -> None:
-    adapter, connection, warehouse = build_offline_snowflake(
+    adapter, connection, warehouse = build_schema_listing_snowflake(
         relations=build_wide_schema_relations(
             relation_count=test_case.relation_count,
             columns_per_relation=test_case.columns_per_relation,
@@ -530,7 +532,7 @@ def test_given_dropped_relation_when_reading_exact_columns_then_it_is_missing(
 def test_given_cap_sized_column_listing_when_reading_then_only_needed_relations_are_reread(
     test_case: CappedColumnFallbackTestCase,
 ) -> None:
-    adapter, connection, warehouse = build_offline_snowflake(
+    adapter, connection, warehouse = build_schema_listing_snowflake(
         relations=build_wide_schema_relations(
             relation_count=test_case.relation_count,
             columns_per_relation=test_case.columns_per_relation,
@@ -723,3 +725,45 @@ def test_given_schemas_when_prefetching_listings_then_tables_and_views_run_toget
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ExactColumnThresholdTestCase(
+            description="a few hundred relations are read one by one",
+            relation_count=150,
+            expected_query_kinds={"show_columns": 150},
+        ),
+        ExactColumnThresholdTestCase(
+            description="more relations read the schema's columns in one listing",
+            relation_count=250,
+            expected_query_kinds={"show_schema_columns": 1},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_column_request_size_when_reading_through_catalog_then_picks_cheaper_read(
+    test_case: ExactColumnThresholdTestCase,
+) -> None:
+    adapter, connection, warehouse = build_offline_snowflake(
+        relations=build_wide_schema_relations(
+            relation_count=test_case.relation_count, columns_per_relation=3
+        )
+    )
+    listed: tuple[RelationInfo, ...] = adapter.list_relations(
+        connection=connection, database="analytics", schemas=("inventory",)
+    )
+    direct: dict[tuple[str | None, str | None, str], tuple[ColumnInfo, ...]] = (
+        adapter.get_columns_for_relations(connection=connection, relations=listed)
+    )
+    warehouse.reset()
+
+    served: dict[tuple[str | None, str | None, str], tuple[ColumnInfo, ...]] = InspectionCatalog(
+        adapter=adapter, connection=connection
+    ).get_columns_for_relations(relations=listed)
+
+    assert served == direct
+    assert Counter(query.kind for query in warehouse.queries) == Counter(
+        test_case.expected_query_kinds
+    )

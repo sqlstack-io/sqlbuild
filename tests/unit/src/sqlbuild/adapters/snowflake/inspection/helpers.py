@@ -16,7 +16,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from itertools import chain, compress
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import duckdb
 import pyarrow
@@ -96,6 +96,8 @@ _SHOW_DESCRIPTION: tuple[tuple[str], ...] = (
 _BOUND_MARKERS: tuple[str, str] = ("MIN(", "MAX(")
 _BOUND_VALUE_INDEX: dict[bool, int] = {True: 0, False: 1}
 SHOW_RESULT_CAP: int = 10_000
+# The relation count beyond which schema listing tests read a schema's columns in one listing.
+SCHEMA_LISTING_EXACT_COLUMN_LIMIT: int = 32
 _SHOW_TABLE_FIELDS: tuple[str, ...] = (
     "created_on",
     "name",
@@ -811,6 +813,16 @@ class OfflineSnowflakeAdapter(SnowflakeAdapter):
         return _SnowflakeConnection(self._recording_warehouse.raw_connection())
 
 
+class SchemaListingSnowflakeAdapter(OfflineSnowflakeAdapter):
+    """An offline adapter reading a schema's columns in one listing beyond a few relations.
+
+    Keeps the fixtures of schema listing tests small: production reads up to a few hundred
+    relations one by one.
+    """
+
+    exact_column_inspection_limit: ClassVar[int] = SCHEMA_LISTING_EXACT_COLUMN_LIMIT
+
+
 @dataclass(frozen=True)
 class SyntheticSnowflakeProject:
     """Synthetic multi-schema project files and the warehouse relations they inspect."""
@@ -986,6 +998,16 @@ def build_offline_snowflake(
         relations=relations, statement_latency_seconds=statement_latency_seconds
     )
     adapter: OfflineSnowflakeAdapter = OfflineSnowflakeAdapter(warehouse=warehouse)
+    return adapter, adapter.connect({}), warehouse
+
+
+def build_schema_listing_snowflake(
+    *, relations: tuple[FakeRelation, ...]
+) -> tuple[OfflineSnowflakeAdapter, _SnowflakeConnection, RecordingSnowflakeWarehouse]:
+    """Build an offline adapter that lists a schema's columns beyond a few relations."""
+
+    warehouse: RecordingSnowflakeWarehouse = RecordingSnowflakeWarehouse(relations=relations)
+    adapter: OfflineSnowflakeAdapter = SchemaListingSnowflakeAdapter(warehouse=warehouse)
     return adapter, adapter.connect({}), warehouse
 
 
