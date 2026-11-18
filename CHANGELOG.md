@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.246.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.245.0...v0.246.0) (2026-11-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **plan:** list a run's ignored audit failures and finish the paged plan sections ([#1573](https://github.com/sqlstack-io/sqlbuild/issues/1573))
+
+### Features
+
+* **plan:** list a run's ignored audit failures and finish the paged plan sections ([#1573](https://github.com/sqlstack-io/sqlbuild/issues/1573)) ([49cddc7](https://github.com/sqlstack-io/sqlbuild/commit/49cddc7e559787e06abd2f116537251249e1d68b))
+
 ## [0.245.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.244.0...v0.245.0) (2026-11-18)
 
 
