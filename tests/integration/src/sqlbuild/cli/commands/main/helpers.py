@@ -1435,6 +1435,33 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
         "    managed: true\n    write_strategy: table\n    columns:\n"
         "      - name: event_id\n        type: INTEGER\n"
     ),
+    "models/upper/revenue_upper.sql": (
+        "MODEL (description 'Revenue under an upper-case schema name.', materialized table);\n"
+        "SELECT 20 AS amount\n"
+    ),
+    "models/marts/doubled.sql": (
+        "MODEL (description 'Calls a function in its own schema.', materialized table);\n"
+        'SELECT __udf("udf__doubled")(2) AS amount\n'
+    ),
+    "functions/sql/udf__doubled.sql": (
+        'FUNCTION (\n  description "Twice its argument",\n  arguments (value INTEGER),\n'
+        "  returns INTEGER,\n  schema udfs,\n);\nvalue * 2\n"
+    ),
+    "models/marts/slow_total.sql": (
+        "MODEL (description 'Runs past a one-second deadline.', materialized table);\n"
+        "SELECT COUNT(*) AS total FROM range(100000000000)\n"
+    ),
+    "models/archive/old_orders.sql": (
+        "MODEL (description 'A disabled model in its own schema.', materialized table,\n"
+        "  enabled false, schema archive);\nSELECT 1 AS order_id\n"
+    ),
+    "python/noop.py": (
+        '"""A task that writes no relation."""\n\n'
+        "from sqlbuild.tasks import task\n\n\n"
+        "@task()\n"
+        "def noop(ctx):\n"
+        '    """Do nothing."""\n'
+    ),
     "seeds/regions.csv": "region_id\n1\n",
     "seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
@@ -1442,7 +1469,9 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
     ),
 }
 
-RUN_RECORD_MARTS_SCHEMA: str = '\n[path_defaults.marts]\nschema = "marts"\n'
+RUN_RECORD_MARTS_SCHEMA: str = (
+    '\n[path_defaults.marts]\nschema = "marts"\n\n[path_defaults.upper]\nschema = "MARTS"\n'
+)
 
 
 def write_run_record_project(
@@ -1499,6 +1528,19 @@ def schema_run_ids(*, project_dir: Path, schemas: Iterable[str]) -> set[object]:
     return run_ids
 
 
+def schema_run_statuses(*, project_dir: Path, schemas: Iterable[str]) -> set[object]:
+    """The status of every row in `schemas`' runs tables; `started` rows have none."""
+
+    statuses: set[object] = set()
+    schema: str
+    for schema in schemas:
+        rows: list[tuple[object, ...]] = run_rows(
+            project_dir=project_dir, columns="status", schema=schema
+        )
+        statuses.update(row[0] for row in rows)
+    return statuses
+
+
 def warehouse_schemas(*, project_dir: Path) -> frozenset[str]:
     """The schemas of the project's warehouse."""
 
@@ -1516,7 +1558,7 @@ def runs_tables(*, project_dir: Path) -> frozenset[str]:
         rows: list[tuple[str]] = warehouse.sql(
             "SELECT schema_name FROM duckdb_tables() WHERE table_name = '_sqlbuild_runs'"
         ).fetchall()
-    return frozenset(name for (name,) in rows)
+    return frozenset(name.lower() for (name,) in rows)
 
 
 def built_tables(*, project_dir: Path) -> frozenset[str]:

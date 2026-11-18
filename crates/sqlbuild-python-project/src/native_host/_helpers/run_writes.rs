@@ -1,9 +1,11 @@
-//! Writes of one run's rows to the runs table of every schema it writes, over a few connections.
+//! Writes of one run's rows to the runs table of every schema it writes, over at most a few connections.
 
 use crate::native_host::_helpers::runs_state::CREATE_TABLE_METHOD;
 use crate::native_host::_helpers::runs_state::WAREHOUSE_USER_METHOD;
 use crate::native_host::_helpers::runs_state::row_cells;
+use crate::native_host::constants::RUN_RECORD_SIGNAL_POLL_INTERVAL;
 use crate::native_host::models::{RunIdentity, RunTable};
+use pyo3::PyErr;
 use pyo3::exceptions::{PyException, PyRuntimeError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_core::constants::RUNS_TABLE_NAME;
@@ -34,21 +36,22 @@ pub(crate) struct ShareResult {
     pub(crate) closed: PyResult<()>,
 }
 
-/// Write `row` to each share's tables over one connection per share; the first share on this thread.
+/// Write `row` to each share's tables over one connection per share, each on its own thread.
+///
+/// The writers run outside the calling thread's context, so a build's expired deadline does not
+/// stop its finished row. A signal such as Ctrl+C that arrives meanwhile is returned once every
+/// writer is done.
 pub(crate) fn write_shares<'py>(
     (adapter, connection_config): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (tables, identity): (&[RunTable], &RunIdentity),
     shares: &[Vec<usize>],
     (row, mode): (RunRow<'_>, RowWrite),
-) -> Vec<ShareResult> {
+) -> (Vec<ShareResult>, Option<PyErr>) {
     let py: Python<'py> = adapter.py();
-    let Some((first, rest)) = shares.split_first() else {
-        return Vec::new();
-    };
     let unbound: (Py<PyAny>, Py<PyAny>) =
         (adapter.clone().unbind(), connection_config.clone().unbind());
     std::thread::scope(|scope| {
-        let writers: Vec<_> = rest
+        let writers: Vec<_> = shares
             .iter()
             .map(|share| {
                 let (adapter, connection_config) = (&unbound.0, &unbound.1);
@@ -64,21 +67,24 @@ pub(crate) fn write_shares<'py>(
                 })
             })
             .collect();
-        let mut shared: Vec<ShareResult> = vec![
-            RunWriter {
-                adapter,
-                connection_config,
-                identity,
+        let mut signal: Option<PyErr> = None;
+        while !writers.iter().all(|writer| writer.is_finished()) {
+            if signal.is_none()
+                && let Err(error) = py.check_signals()
+            {
+                signal = Some(error);
             }
-            .write_share(first, tables, (row, mode)),
-        ];
-        for (writer, share) in writers.into_iter().zip(rest) {
-            shared.push(
-                py.detach(|| writer.join())
-                    .unwrap_or_else(|_| panicked_share(share)),
-            );
+            py.detach(|| std::thread::sleep(RUN_RECORD_SIGNAL_POLL_INTERVAL));
         }
-        shared
+        let shared: Vec<ShareResult> = writers
+            .into_iter()
+            .zip(shares)
+            .map(|(writer, share)| {
+                py.detach(|| writer.join())
+                    .unwrap_or_else(|_| panicked_share(share))
+            })
+            .collect();
+        (shared, signal)
     })
 }
 
@@ -90,7 +96,7 @@ pub(crate) fn warn_on_errors(
     shared: Vec<ShareResult>,
 ) -> PyResult<()> {
     let mut written: Vec<(usize, PyResult<()>)> = Vec::with_capacity(tables.len());
-    let mut escaped: Option<pyo3::PyErr> = None;
+    let mut escaped: Option<PyErr> = None;
     for share in shared {
         match share.closed {
             Err(error) if error.is_instance_of::<PyException>(py) => {

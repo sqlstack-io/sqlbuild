@@ -175,7 +175,12 @@ fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) 
             &context.invocation,
             &native_field(&pipeline, "project")?,
         ),
-        || build_write_locations(&native_field(&pipeline, "plan_output")?),
+        || {
+            build_write_locations(
+                &native_field(&pipeline, "plan_output")?,
+                &native_field(&pipeline, "project")?,
+            )
+        },
         context.worker.as_ref().map(|worker| worker.server_run()),
     )?;
     match execute_direct_build(context, &pipeline, providers) {

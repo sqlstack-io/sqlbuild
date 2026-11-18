@@ -29,6 +29,7 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     runs_tables,
     schema_run_ids,
     schema_run_phases,
+    schema_run_statuses,
     warehouse_schemas,
     write_run_record_project,
 )
@@ -305,7 +306,6 @@ def test_given_a_killed_build_when_reading_its_runs_then_only_started_remains(
             "build",
             "--no-tests",
             "--select",
-            "stg_orders",
             "task:crash",
         ],
         capture_output=True,
@@ -368,6 +368,59 @@ def test_given_a_killed_build_when_reading_its_runs_then_only_started_remains(
             expected_warnings=(),
         ),
         RunRecordSchemasTestCase(
+            description="case spellings of one schema record once",
+            command_args=("build", "--no-tests", "--select", "revenue", "revenue_upper"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"marts": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
+            description="a skipped model's schema records nothing",
+            command_args=("build", "--no-tests", "--select", "stg_orders", "old_orders"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"main": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+            expected_finished_status="partial",
+        ),
+        RunRecordSchemasTestCase(
+            description="a function's schema records the run that deploys it",
+            command_args=("build", "--no-tests", "--select", "doubled"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"marts": _PAIR, "udfs": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
+            description="a build that raises finishes failed in each schema",
+            command_args=("build", "--no-tests", "--select", "stg_orders", "slow_total"),
+            settings=RUN_RECORD_MARTS_SCHEMA
+            + '\n[targets.dev.execution_limits]\nmax_duration = "2s"\n',
+            warehouse_setup="",
+            expected_exit_code=1,
+            expected_phases={"main": _PAIR, "marts": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+            expected_finished_status="failed",
+        ),
+        RunRecordSchemasTestCase(
+            description="a task-only run records in the target's default schema",
+            command_args=("build", "--no-tests", "--select", "task:noop"),
+            settings='\n[defaults]\nschema = "analytics"\n' + RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"analytics": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
             description="a seed run records in its seeds' schema and not the target's",
             command_args=("seed",),
             settings='\n[defaults]\nseed_schema = "reference"\n',
@@ -400,6 +453,10 @@ def test_given_a_run_writing_schemas_when_it_runs_then_each_schema_records_it(
         == test_case.expected_phases
     )
     assert len(schema_run_ids(project_dir=tmp_path, schemas=test_case.expected_phases)) == 1
+    assert schema_run_statuses(project_dir=tmp_path, schemas=test_case.expected_phases) == {
+        None,
+        test_case.expected_finished_status,
+    }
     assert not test_case.expected_absent_schemas & warehouse_schemas(project_dir=tmp_path)
     assert captured.count("Warning: could not record that run") == len(
         test_case.expected_warnings

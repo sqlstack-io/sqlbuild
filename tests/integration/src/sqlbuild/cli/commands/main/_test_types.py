@@ -1488,3 +1488,4 @@ class RunRecordSchemasTestCase:
     expected_phases: dict[str, list[str]]
     expected_absent_schemas: frozenset[str]
     expected_warnings: tuple[str, ...]
+    expected_finished_status: str = "succeeded"

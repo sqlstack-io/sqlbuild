@@ -6,6 +6,7 @@ pub(crate) mod native_outcomes;
 pub mod native_revalidation;
 pub mod query_expression_ranges;
 pub mod same_column_type;
+pub mod same_unquoted_name;
 pub mod schema_column;
 pub mod skipped_analysis;
 pub mod unapplied_nullability_rules;
