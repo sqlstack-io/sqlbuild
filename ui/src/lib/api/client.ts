@@ -189,6 +189,11 @@ export class ApiError extends Error {
 	}
 }
 
+/** A server or recording without the read, such as the static demo's without node states. */
+export function isUnsupported(error: unknown): boolean {
+	return error instanceof ApiError && (error.status === 404 || error.status === 405 || error.status === 501);
+}
+
 /** The server refused the read or no longer has what it names, so an earlier answer must not stay on screen. */
 export function isRefusal(error: unknown): boolean {
 	return error instanceof ApiError && (error.status === 403 || error.status === 404);

@@ -1650,7 +1650,7 @@ export interface components {
             run_id?: string | null;
             status: string;
         };
-        /** @description A current snapshot node's declared metadata and latest build, without SQL, source or config. */
+        /** @description A current snapshot node's declared metadata and latest build, which the node listing leaves to node-states. */
         CatalogNodeRecord: {
             /** @description The checks on the node by their newest result. */
             checks: components["schemas"]["CatalogNodeChecks"];
@@ -2275,7 +2275,7 @@ export interface components {
             kind: "sensor_evaluation";
             outcome: components["schemas"]["CustomSensorOutcome"];
         } | {
-            /** @description Model diff text the document left out to stay under its cap; stored apart, never read back here. */
+            /** @description Model diff text, which the document never carries; stored apart, never read back here. */
             diffs?: {
                 [key: string]: components["schemas"]["PlanModelDiff"];
             };
@@ -2739,7 +2739,7 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
-        /** @description A planned model's diff text, from the plan document or, where the document left it out, apart from it. */
+        /** @description A planned model's diff text, stored beside its plan document. */
         PlanDiffRead: components["schemas"]["PlanModelDiff"] & {
             model: string;
         };
@@ -5643,7 +5643,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description An ETag from an earlier response; 304 when the snapshot and state version are unchanged */
+                /** @description An ETag from an earlier response; 304 when the snapshot is unchanged */
                 "If-None-Match"?: string | null;
             };
             path: {
@@ -5654,10 +5654,10 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Every node of the current snapshot; empty before the first publication */
+            /** @description Every node of the current snapshot without its state, which node-states serves; empty before the first publication */
             200: {
                 headers: {
-                    /** @description "<snapshot_id>:<state_version>"; absent before the first publication */
+                    /** @description "<snapshot_id>"; absent before the first publication */
                     ETag?: string;
                     [name: string]: unknown;
                 };

@@ -7,6 +7,7 @@ use uuid::Uuid;
 use sqlbuild_core::fingerprint_identity::main::recorded_model_local_hash::recorded_model_local_hash;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
+use crate::node_states::models::{NodeState, NodeStatesRecord};
 use crate::runs::tests::helpers::{request, request_run, snapshot};
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotInput;
@@ -30,7 +31,7 @@ const LISTING_VIEW_STATEMENTS: usize = 6;
 const WIDE_LISTING_FIXED_STATEMENTS: usize =
     LISTING_AUTHORIZATION_STATEMENTS + LISTING_VIEW_STATEMENTS + 1;
 
-/// A new server's node list, so every listing reads the store.
+/// A new server's node list with each node's state read beside it, as a person sees it, so every listing reads the store.
 async fn list_person_catalog_nodes(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
@@ -48,7 +49,32 @@ async fn list_person_catalog_nodes(
         default_role,
     )
     .await?;
-    Ok(serde_json::from_slice(&listing.body).expect("node list JSON"))
+    let states = crate::node_states::main::read_person_node_states::read_person_node_states(
+        &cache,
+        credentials,
+        scope,
+        default_role,
+    )
+    .await?;
+    let mut states: std::collections::BTreeMap<String, NodeState> =
+        serde_json::from_slice::<NodeStatesRecord>(&states.body)
+            .expect("node states JSON")
+            .states;
+    let records: Vec<CatalogNodeRecord> =
+        serde_json::from_slice(&listing.body).expect("node list JSON");
+    Ok(records
+        .into_iter()
+        .map(|record| {
+            let state: NodeState = states.remove(&record.node_key).unwrap_or_default();
+            CatalogNodeRecord {
+                last_build: state.last_build,
+                last_outcome: state.last_outcome,
+                definition_changed: state.definition_changed,
+                checks: state.checks,
+                ..record
+            }
+        })
+        .collect())
 }
 
 pub(crate) async fn node_status_reads(
@@ -626,10 +652,14 @@ async fn list_wide_target(
         assert_eq!(built, size, "every wide node keeps its own build");
     }
     timings.sort();
+    let (cache, _) = crate::node_states::main::start_node_states::start_node_states(
+        store,
+        &tokio::sync::broadcast::channel(1).0,
+    );
     let statements = STATEMENTS
         .scope(Cell::new(0), async {
-            list_person_catalog_nodes(
-                store,
+            crate::node_states::main::list_person_catalog_nodes::list_person_catalog_nodes(
+                &cache,
                 credentials,
                 (location, "development"),
                 DefaultRole::None,

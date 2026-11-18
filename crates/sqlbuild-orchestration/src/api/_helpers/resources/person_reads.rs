@@ -84,9 +84,9 @@ pub(crate) async fn run_nodes(
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/nodes", operation_id = "listPersonCatalogNodes",
     params(("location_id" = Uuid, Path), ("target" = String, Path),
-        ("If-None-Match" = Option<String>, Header, description = "An ETag from an earlier response; 304 when the snapshot and state version are unchanged")),
-    responses((status = 200, body = Vec<CatalogNodeRecord>, description = "Every node of the current snapshot; empty before the first publication",
-            headers(("ETag" = String, description = "\"<snapshot_id>:<state_version>\"; absent before the first publication"))),
+        ("If-None-Match" = Option<String>, Header, description = "An ETag from an earlier response; 304 when the snapshot is unchanged")),
+    responses((status = 200, body = Vec<CatalogNodeRecord>, description = "Every node of the current snapshot without its state, which node-states serves; empty before the first publication",
+            headers(("ETag" = String, description = "\"<snapshot_id>\"; absent before the first publication"))),
         (status = 304, description = "Unchanged since the If-None-Match ETag", headers(("ETag" = String))),
         (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]

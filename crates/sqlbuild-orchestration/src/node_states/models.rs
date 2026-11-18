@@ -1,7 +1,7 @@
 //! Node states, their versioned in-memory views and the state changes pushed on the change stream.
 
 use std::collections::BTreeMap;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 
 use axum::body::Bytes;
@@ -98,16 +98,29 @@ pub(crate) struct TargetCache {
     pub(crate) scheduled: AtomicBool,
     /// A store signal named this target since its last refresh, so the refresh pushes a notice even when nothing changed.
     pub(crate) announce: AtomicBool,
+    /// Open change streams of this target; a signal refreshes a watched target and drops an unwatched one.
+    pub(crate) watchers: AtomicUsize,
 }
 
-/// One version of a target's states; each response body is serialized at most once.
+/// One change stream's hold on its target, which keeps the target's view refreshed until it drops.
+#[derive(Debug)]
+pub(crate) struct NodeStatesWatch {
+    pub(crate) entry: Arc<TargetCache>,
+}
+
+impl Drop for NodeStatesWatch {
+    fn drop(&mut self) {
+        self.entry.watchers.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// One version of a target's states; its states body is serialized at most once.
 #[derive(Debug)]
 pub(crate) struct TargetView {
     pub(crate) version: u64,
     pub(crate) catalog: Arc<SnapshotCatalog>,
     pub(crate) states: Arc<BTreeMap<String, NodeState>>,
     pub(crate) changed_build: Option<Arc<ChangedBuild>>,
-    pub(crate) nodes_body: tokio::sync::OnceCell<Bytes>,
     pub(crate) states_body: tokio::sync::OnceCell<Bytes>,
 }
 
@@ -117,6 +130,8 @@ pub(crate) struct SnapshotCatalog {
     pub(crate) snapshot_id: Option<Uuid>,
     pub(crate) records: Vec<CatalogNodeRecord>,
     pub(crate) inputs: Vec<(String, SnapshotNode)>,
+    /// The serialized records, which every state version of the snapshot lists.
+    pub(crate) body: tokio::sync::OnceCell<Bytes>,
 }
 
 /// One target's serialized `node_status` event data.

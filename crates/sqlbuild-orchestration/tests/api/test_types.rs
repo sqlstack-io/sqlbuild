@@ -358,6 +358,15 @@ pub(crate) struct ChangedBuildTestCase {
     pub(crate) expected_before_plan: serde_json::Value,
 }
 
+pub(crate) struct HeldTargetTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) watched: bool,
+    /// A refresh is due and one is scheduled, as when signals arrived while the target was watched.
+    pub(crate) pending: (bool, bool),
+    /// Whether the target is still held after the signal, and whether the signal refreshed it.
+    pub(crate) expected_held_and_refreshed: (bool, bool),
+}
+
 pub(crate) struct PushedStatesTestCase {
     pub(crate) description: &'static str,
     pub(crate) built: usize,

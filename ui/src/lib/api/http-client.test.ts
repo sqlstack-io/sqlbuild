@@ -256,6 +256,25 @@ describe('node listing and states', () => {
 		expect(a).toBe(b);
 	});
 
+	it('applies the node states to a read not given the held listing, which carries none', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (path.endsWith('/node-states')) {
+					return Response.json({ snapshot_id: record.snapshot_id, version: 3, states: { 'model:orders': { definition_changed: false, checks: record.checks, last_outcome: { at: '2026-01-02T00:00:00Z', status: 'failed' } } } });
+				}
+				if (path.endsWith('/column-lineage')) {
+					return Response.json({ nodes: [{ node_key: 'model:orders', columns: [] }], edges: [{ source_key: 'model:orders', source_column: 'id', target_key: 'model:orders', target_column: 'order_id', transform: 'direct' }] });
+				}
+				return Response.json([record], { headers: { etag: '"s1"' } });
+			})
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		const lineage = await client.getColumnLineage(ORDERS, 'model:orders');
+		expect(lineage?.models.map((m) => m.status)).toEqual(['fail']);
+	});
+
 	it('reads every node state with its version', async () => {
 		const { client } = server();
 		const states = await client.listNodeStates(ORDERS);
@@ -405,7 +424,8 @@ describe('overview', () => {
 			'fetch',
 			vi.fn(async (request: Request) => {
 				const path = new URL(request.url).pathname;
-				if (path.endsWith('/nodes') && nodesStatus !== 200) return Response.json({ error: 'refused' }, { status: nodesStatus });
+				if ((path.endsWith('/nodes') || path.endsWith('/node-states')) && nodesStatus !== 200) return Response.json({ error: 'refused' }, { status: nodesStatus });
+				if (path.endsWith('/node-states')) return Response.json({ snapshot_id: null, version: 1, states: {} });
 				if (path.endsWith('/platform/problems')) return Response.json({ scheduler_leader: 'server-1', scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] });
 				return Response.json([]);
 			})
@@ -415,6 +435,8 @@ describe('overview', () => {
 
 	it('is null for a person who may view only part of the target, with no partial counts', async () => {
 		expect(await server(403).overview(ORDERS)).toBeNull();
+		// The states are read only once the listing is allowed, so the refusal is recorded once.
+		expect(vi.mocked(fetch).mock.calls.filter(([request]) => new URL((request as Request).url).pathname.endsWith('/node-states'))).toHaveLength(0);
 	});
 
 	it('still fails on any other error', async () => {
@@ -712,6 +734,7 @@ describe('getCatalogNode', () => {
 			['/bootstrap', { login_mode: 'password', access: { name: 'vic', principal_id: 'p', actions: [], locations: [{ location_id: '0191f0aa-orders', name: 'Orders', target: 'development', actions }] } }],
 			['/nodes', [{ node_key: 'model:orders', kind: 'model', name: 'orders', materialization: 'table', tags: [], dependencies: [], snapshot_id: 's' }]],
 			['/checks', []],
+			['/node-states', { snapshot_id: 's', version: 1, states: {} }],
 			['/sql', { node_key: 'model:orders', snapshot_id: 's', raw_sql: 'select 1', compiled_sql: 'select 1' }]
 		];
 		vi.stubGlobal(
@@ -869,6 +892,7 @@ describe('getCatalogNode statistics', () => {
 					return Response.json({ records: page, next_after: page.length === 100 && last ? { observed_at: last.record.observed_at, event_id: last.event_id } : null });
 				}
 				if (url.pathname.endsWith('/node-status')) return Response.json(null);
+				if (url.pathname.endsWith('/node-states')) return Response.json({ snapshot_id: 's', version: 1, states: {} });
 				return Response.json([]);
 			})
 		);

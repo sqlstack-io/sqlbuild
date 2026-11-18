@@ -169,6 +169,22 @@ describe('CatalogFeed', () => {
 		expect(s.reads).toEqual({ listing: 2, states: 2 });
 	});
 
+	it('keeps the held states applied when a reconnect lists the nodes before the states answer', async () => {
+		const s = server();
+		s.set({ states: { 'model:orders': failed('r2') } });
+		const { feed } = feedOver(s.client);
+		feed.ensure(SCOPE);
+		await settle();
+		const open = s.hold();
+		feed.handle(signal('all'));
+		await vi.advanceTimersByTimeAsync(400);
+		expect(s.reads.listing).toBe(2);
+		expect(feed.view.nodes?.find((n) => n.key === 'model:orders')?.lastOutcome).toBe('failed');
+		open();
+		await settle();
+		expect(feed.view.nodes?.find((n) => n.key === 'model:orders')?.lastOutcome).toBe('failed');
+	});
+
 	it('holds changes that arrive while the states are read, and applies the ones after the answer', async () => {
 		const s = server();
 		const open = s.hold();

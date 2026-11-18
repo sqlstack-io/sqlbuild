@@ -11,6 +11,5 @@ pub mod model_execution_annotation;
 pub mod model_materialization_label;
 pub mod model_resource_type;
 pub mod old_name_rows;
-pub mod plan_model_diff;
 pub mod plan_section_page;
 pub mod plan_summary;
