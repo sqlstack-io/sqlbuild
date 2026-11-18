@@ -2,6 +2,7 @@
 
 use crate::live_reads::_helpers::bounded::batch_task;
 use crate::live_reads::_helpers::bounded::run_bounded;
+use crate::live_reads::types::CursorBatchOutcomes;
 use crate::planner_warehouse::models::CursorBatch;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -14,7 +15,7 @@ pub(crate) fn run_cursor_batches<'py>(
     batches: &[CursorBatch],
     reader: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (concurrency, on_complete): (i64, Option<Bound<'py, PyAny>>),
-) -> PyResult<(Vec<(usize, Bound<'py, PyAny>)>, Vec<usize>)> {
+) -> PyResult<CursorBatchOutcomes<'py>> {
     let tasks: Vec<Bound<'py, PyAny>> = batches
         .iter()
         .map(|batch| batch_task(py, batch.sql.clone(), reader))
