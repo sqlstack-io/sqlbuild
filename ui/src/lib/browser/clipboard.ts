@@ -15,7 +15,10 @@ export async function copyText(text: string): Promise<boolean> {
 	area.value = text;
 	area.setAttribute('readonly', '');
 	area.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+	// Selecting the textarea replaces the person's own selection and focus; both are put back afterwards.
 	const focused = document.activeElement as HTMLElement | null;
+	const selection = document.getSelection();
+	const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, i) => selection.getRangeAt(i)) : [];
 	document.body.append(area);
 	area.select();
 	try {
@@ -24,6 +27,10 @@ export async function copyText(text: string): Promise<boolean> {
 		return false;
 	} finally {
 		area.remove();
-		focused?.focus?.();
+		focused?.focus?.({ preventScroll: true });
+		if (selection) {
+			selection.removeAllRanges();
+			for (const range of ranges) selection.addRange(range);
+		}
 	}
 }

@@ -32,3 +32,26 @@ test('copying a selection works without navigator.clipboard', async ({ page }) =
 	await copy.click();
 	await expect.poll(() => page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual([`sqb build -s ${name}`]);
 });
+
+test('copying keeps what the person had selected', async ({ page }) => {
+	await page.goto('/catalog?mock');
+	const name = (await page.locator('table.catalog tbody tr .cell-name a').first().innerText({ timeout: 20_000 })).trim();
+	await page.goto(`/catalog?mock&select=${encodeURIComponent(name)}`);
+	await expect(page.getByText(/^1 of \d+ nodes$/)).toBeVisible({ timeout: 20_000 });
+	await page.locator('h1').first().selectText();
+	const before = await page.evaluate(() => String(getSelection()));
+	expect(before.length).toBeGreaterThan(0);
+	await page.getByRole('button', { name: /^Copy as/ }).click();
+	await expect.poll(() => page.evaluate(() => (window as unknown as { copied: string[] }).copied.length)).toBe(1);
+	expect(await page.evaluate(() => String(getSelection()))).toBe(before);
+});
+
+test('a one-time secret that cannot be copied is selected, with a hint to copy it by hand', async ({ page }) => {
+	await page.addInitScript(() => (document.execCommand = () => false));
+	await page.goto('/locations/0d9c6a52-3f1e-4b7a-9c43-5b8e2f61a7d4?mock');
+	await page.getByRole('button', { name: 'Create token' }).click({ timeout: 20_000 });
+	const issued = page.locator('.issued');
+	await issued.getByRole('button', { name: 'Copy' }).click();
+	await expect(issued.getByRole('alert')).toContainText('copy it with Ctrl+C');
+	expect(await page.evaluate(() => String(getSelection()))).toBe(await issued.locator('code').innerText());
+});
