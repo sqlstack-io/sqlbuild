@@ -488,9 +488,9 @@ pub(crate) fn run_seed<'py>(
         (SEED_COMMAND, env!("CARGO_PKG_VERSION")),
         (request, &invocation, &native_field(&pipeline, "project")?),
         worker.as_ref().map(|worker| worker.server_run()),
-    );
+    )?;
     if let Some(recorder) = &recorder {
-        recorder.started();
+        recorder.started()?;
     }
     let started: Instant = Instant::now();
     let loaded: PyResult<Vec<Bound<'_, PyAny>>> =
@@ -499,7 +499,7 @@ pub(crate) fn run_seed<'py>(
         Ok(results) => results,
         Err(error) => {
             if let Some(recorder) = &recorder {
-                recorder.finished(&RunNodeCounts::default(), raised_ending(py, &error));
+                let _ = recorder.finished(&RunNodeCounts::default(), raised_ending(py, &error));
             }
             return Err(error);
         }
@@ -527,7 +527,7 @@ pub(crate) fn run_seed<'py>(
                 not_started: 0,
             },
             RunEnding::Completed,
-        );
+        )?;
     }
     let stream: Bound<'_, PyAny> = native_field(&invocation, "progress_stream")?;
     let style: CliStyle = CliStyle {

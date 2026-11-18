@@ -11,6 +11,7 @@ use sqlbuild_core::build_command::models::PhaseTimings;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::BuildStatus;
+use sqlbuild_state::runs::models::{RunEnding, RunNodeCounts};
 
 use crate::bindings::_helpers::build_command::execution::Outcome;
 use crate::bindings::_helpers::build_command::execution::Preparation;
@@ -48,6 +49,7 @@ use sqlbuild_python_output::result_output::main::results::format_build_execution
 use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 
 const SUCCESS_STATUS: &str = "success";
+const SKIPPED_STATUS: &str = "skipped";
 const CHECK_KIND: &str = "check";
 const CHECK_WARNED: &str = "check warned";
 const PENDING_MESSAGE: &str = "Build cost collection has not completed.";
@@ -415,6 +417,62 @@ fn check_node_text(check: &CheckResultText) -> PythonNodeText {
             Vec::new()
         },
         error_message: message,
+    }
+}
+
+/// A completed build's footer node counts, and `Raised` when it failed without a failed node.
+pub(crate) fn finished_run(
+    outcome: &Outcome<'_>,
+    check_results: &Bound<'_, PyAny>,
+) -> PyResult<(RunNodeCounts, RunEnding)> {
+    let result = &outcome.result;
+    let mut counts: RunNodeCounts = RunNodeCounts {
+        succeeded: result.success_count,
+        warned: result.warning_count,
+        failed: result.failure_count,
+        skipped: result.skipped_count,
+        not_started: 0,
+    };
+    for node in outcome.python_results.try_iter()? {
+        let node: Bound<'_, PyAny> = node?;
+        let status: String = native_field(&node, "status")?.str()?.extract()?;
+        counts = with_python_node(
+            counts,
+            &status,
+            native_field(&node, "warning_messages")?.len()?,
+        );
+    }
+    for check in check_results.try_iter()? {
+        let check: PythonNodeText = check_node_text(&check_result_text(&check?)?);
+        counts = with_python_node(counts, &check.status, check.warnings.len());
+    }
+    let ending: RunEnding = if result.status != BuildStatus::Success && counts.failed == 0 {
+        RunEnding::Raised
+    } else {
+        RunEnding::Completed
+    };
+    Ok((counts, ending))
+}
+
+fn with_python_node(counts: RunNodeCounts, status: &str, warnings: usize) -> RunNodeCounts {
+    if python_node_failed(status) {
+        RunNodeCounts {
+            failed: counts.failed + 1,
+            ..counts
+        }
+    } else if status == SKIPPED_STATUS {
+        RunNodeCounts {
+            skipped: counts.skipped + 1,
+            ..counts
+        }
+    } else if status == SUCCESS_STATUS {
+        RunNodeCounts {
+            succeeded: counts.succeeded + 1,
+            warned: counts.warned + i64::try_from(warnings).unwrap_or(i64::MAX),
+            ..counts
+        }
+    } else {
+        counts
     }
 }
 

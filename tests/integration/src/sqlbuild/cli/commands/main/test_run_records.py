@@ -10,7 +10,9 @@ from pathlib import Path
 import pytest
 
 from sqlbuild._native import run_cli as main
+from sqlbuild.adapter.contract.classes.runs_table import RunsTableMixin
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
+    InterruptedRunRecordTestCase,
     KilledRunRecordTestCase,
     RunRecordFailureTestCase,
     RunRecordTestCase,
@@ -91,6 +93,23 @@ _SUCCEEDED_TWO: str = '{"succeeded":2,"warned":0,"failed":0,"skipped":0,"not_sta
                     "[]",
                     "partial",
                     '{"succeeded":1,"warned":0,"failed":1,"skipped":0,"not_started":0}',
+                ),
+            ],
+        ),
+        RunRecordTestCase(
+            description="a failing task fails the run even though no model failed",
+            build_args=("--select", "task:fail"),
+            expected_exit_code=1,
+            expected_rows=[
+                ("started", "build", '["task:fail"]', "[]", "[]", None, None),
+                (
+                    "finished",
+                    "build",
+                    '["task:fail"]',
+                    "[]",
+                    "[]",
+                    "failed",
+                    '{"succeeded":0,"warned":0,"failed":1,"skipped":0,"not_started":0}',
                 ),
             ],
         ),
@@ -212,6 +231,44 @@ def test_given_an_unwritable_runs_table_when_building_then_it_warns_and_succeeds
 
     assert exit_code == test_case.expected_exit_code, captured
     assert captured.count(test_case.expected_warning) == 2, captured
+    assert built_tables(project_dir=tmp_path) == test_case.expected_tables
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        InterruptedRunRecordTestCase(
+            description="Ctrl+C while the started row is written stops the build before any node",
+            expected_tables=frozenset(),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_interrupt_while_recording_when_building_then_the_build_stops(
+    test_case: InterruptedRunRecordTestCase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write_run_record_project(project_dir=tmp_path, settings="")
+
+    def interrupt(self: object) -> str | None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(RunsTableMixin, "render_current_warehouse_user", interrupt)
+
+    with pytest.raises(KeyboardInterrupt):
+        main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--no-color",
+                "build",
+                "--no-tests",
+                "-s",
+                "stg_orders",
+            ]
+        )
+
     assert built_tables(project_dir=tmp_path) == test_case.expected_tables
 
 

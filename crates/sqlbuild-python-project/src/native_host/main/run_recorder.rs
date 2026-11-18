@@ -2,6 +2,7 @@
 
 use crate::native_host::_helpers::runs_state::run_identity;
 use crate::native_host::models::{RunCommandScope, RunIdentity, RunRecorder};
+use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_core::constants::RUNS_TABLE_NAME;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
@@ -9,12 +10,12 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_state::runs::models::ServerRun;
 use std::path::PathBuf;
 
-/// One run's recorder, the same for the CLI and a worker (which passes `server`); failures only warn.
+/// One run's recorder for the CLI or a worker (which passes `server`); only an interrupt errors.
 pub fn run_recorder<'py>(
     (command, sqlbuild_version): (&'static str, &'static str),
     (request, invocation, project): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
     server: Option<ServerRun>,
-) -> Option<RunRecorder<'py>> {
+) -> PyResult<Option<RunRecorder<'py>>> {
     let opened = || -> PyResult<Option<RunRecorder<'py>>> {
         let project_dir: PathBuf = native_field(invocation, "effective_project_dir")?.extract()?;
         let settings: Bound<'py, PyAny> = native_field(
@@ -51,12 +52,15 @@ pub fn run_recorder<'py>(
             identity,
         )
     };
-    opened().unwrap_or_else(|error| {
-        let _ = write_console(
-            request.py(),
-            "stderr",
-            &format!("Warning: this run is not recorded in {RUNS_TABLE_NAME}: {error}\n"),
-        );
-        None
-    })
+    match opened() {
+        Err(error) if error.is_instance_of::<PyException>(request.py()) => {
+            let _ = write_console(
+                request.py(),
+                "stderr",
+                &format!("Warning: this run is not recorded in {RUNS_TABLE_NAME}: {error}\n"),
+            );
+            Ok(None)
+        }
+        opened => opened,
+    }
 }
