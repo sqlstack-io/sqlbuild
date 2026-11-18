@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GroupStatus, SnapshotChange } from '$lib/api';
-import { quietDeployLine, recentDeployRows, recentDeploys, sortFolders, visibleFolders } from './overview-panels';
+import { quietDeployLine, recentDeployRows, recentDeploys, sortFolders, cappedFolders } from './overview-panels';
 
 const HOUR = 60 * 60 * 1000;
 const now = Date.parse('2026-11-16T12:00:00Z');
@@ -69,16 +69,14 @@ describe('build status by folder', () => {
 		expect(sorted.map((g) => g.group)).toEqual(['returns', 'billing', 'inventory', 'alpha', 'customers', 'orders']);
 	});
 
-	it('shows eight folders, plus any beyond that need attention, until expanded', () => {
+	it('shows at most eight folders, most urgent first, however many need attention', () => {
 		const calm = Array.from({ length: 12 }, (_, i) => folder(`calm_${String(i).padStart(2, '0')}`, 20 - i));
 		const attention = Array.from({ length: 10 }, (_, i) => folder(`busy_${i}`, 1, 0, 0, 1));
-		expect(visibleFolders(calm, false)).toMatchObject({ hidden: 4 });
-		expect(visibleFolders(calm, false).rows.map((g) => g.group)).toEqual(calm.slice(0, 8).map((g) => g.group));
-		const mixed = visibleFolders([...calm, ...attention], false);
-		expect(mixed.rows).toHaveLength(10);
+		expect(cappedFolders(calm).rows.map((g) => g.group)).toEqual(calm.slice(0, 8).map((g) => g.group));
+		const mixed = cappedFolders([...calm, ...attention]);
+		expect(mixed.rows).toHaveLength(8);
 		expect(mixed.rows.every((g) => g.behind)).toBe(true);
-		expect(mixed.hidden).toBe(12);
-		expect(visibleFolders([...calm, ...attention], true)).toMatchObject({ hidden: 0 });
-		expect(visibleFolders([...calm, ...attention], true).rows).toHaveLength(22);
+		expect([mixed.total, mixed.attention]).toEqual([22, 10]);
+		expect(cappedFolders(calm.slice(0, 3))).toMatchObject({ total: 3, attention: 0 });
 	});
 });

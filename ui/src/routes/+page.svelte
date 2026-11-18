@@ -29,7 +29,7 @@
 	import { acknowledgementOf } from '$lib/build-area/attention-conditions';
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
-	import { quietDeployLine, recentDeployRows, visibleFolders } from '$lib/build-area/overview-panels';
+	import { cappedFolders, quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
 	import { pagesBeyondTarget } from '$lib/nav';
 	import OverviewCost from './overview-cost.svelte';
 
@@ -99,10 +99,9 @@
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	const costChange = $derived(m?.cost && m.cost.baseline ? Math.round(((m.cost.last24h - m.cost.baseline) / m.cost.baseline) * 100) : null);
 	const groups = $derived(data?.groups ?? []);
-	let showAllFolders = $state(false);
-	const folders = $derived(visibleFolders(groups, showAllFolders));
-	// Whether collapsing hides any folders; folders that need attention always show.
-	const collapsedHidden = $derived(visibleFolders(groups, false).hidden);
+	// At most eight folders, most urgent first; the catalog's folder view lists them all.
+	const folders = $derived(cappedFolders(groups));
+	const ALL_FOLDERS_HREF = '/catalog?view=folders';
 	const deployRows = $derived(recentDeployRows(data?.recentChanges ?? []));
 	// Parts without a server read stay hidden rather than showing zeros, and wait for the read so they don't appear and vanish.
 	const showGroups = $derived(!!data?.groups?.length);
@@ -288,8 +287,8 @@
 						{:else}
 							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet.{/if}</div>
 						{/each}
-						{#if collapsedHidden}
-							<Button variant="link" size="inline" class="mx-4 mt-1 self-start text-[12px]" aria-expanded={showAllFolders} onclick={() => (showAllFolders = !showAllFolders)}>{showAllFolders ? 'Show fewer' : `Show all ${groups.length} folders`}</Button>
+						{#if folders.total > folders.rows.length}
+							<a class="all-folders" href={to(ALL_FOLDERS_HREF)} data-testid="all-folders">All {folders.total} folders ({folders.attention} need attention) →</a>
 						{/if}
 					</div>
 				</section>{/if}
@@ -360,6 +359,8 @@
 	.issue-actions { justify-content: flex-end; gap: 10px; }
 	.issue-actions a { color: var(--primary); font-weight: 500; white-space: nowrap; }
 	.handled { border-top: 1px solid var(--inner-line); }
+	.all-folders { align-self: flex-start; margin: 6px 16px 4px; color: var(--primary); font-size: 12px; font-weight: 500; }
+	.all-folders:hover { text-decoration: underline; }
 	.lapsed { margin: 4px 0 0; color: var(--sb-warning); font-size: 12px; }
 	/* Ack: muted text with a bell, always visible; on row hover it gains a border and full colour. */
 	.issue :global(.ack) { height: 24px; padding: 0 8px; border: 1px solid transparent; color: var(--muted-foreground); font-size: 12px; font-weight: 500; }

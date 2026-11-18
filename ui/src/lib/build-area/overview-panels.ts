@@ -6,7 +6,7 @@ import { plural } from '$lib/format/plural';
 
 /** Deploys that changed something the Recent changes panel shows. */
 export const RECENT_DEPLOYS = 4;
-/** Folders the Build status panel shows before "Show all"; folders that need attention always show. */
+/** Folders the Overview's Build status card shows at most; the catalog's folder view lists them all. */
 export const FOLDER_ROWS = 8;
 
 /** Whether a deploy changed any definition: a node, a job or trigger, a role or the environment. */
@@ -74,12 +74,9 @@ export function sortFolders(groups: readonly GroupStatus[]): GroupStatus[] {
 }
 
 /**
- * The folder rows to show, sorted: the first `limit`, plus every folder beyond that needs attention,
- * or all of them when expanded. `hidden` counts the rest, for "Show all N folders".
+ * The Overview card's folders: at most `limit`, most urgent first, however many need attention (the
+ * catalog's folder view lists them all), with how many there are and how many need attention.
  */
-export function visibleFolders(groups: readonly GroupStatus[], expanded: boolean, limit = FOLDER_ROWS): { rows: GroupStatus[]; hidden: number } {
-	const sorted = sortFolders(groups);
-	if (expanded) return { rows: sorted, hidden: 0 };
-	const rows = sorted.filter((g, i) => i < limit || needsAttention(g));
-	return { rows, hidden: sorted.length - rows.length };
+export function cappedFolders(groups: readonly GroupStatus[], limit = FOLDER_ROWS): { rows: GroupStatus[]; total: number; attention: number } {
+	return { rows: sortFolders(groups).slice(0, limit), total: groups.length, attention: groups.filter(needsAttention).length };
 }
