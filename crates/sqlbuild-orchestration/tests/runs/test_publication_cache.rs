@@ -12,7 +12,7 @@ use crate::runs::_helpers::lifecycle::publications::cached;
 use crate::runs::main::requests::check_adhoc_run::check_adhoc_run;
 use crate::runs::models::{AdhocCheckRequest, SnapshotSlots};
 use crate::runs::tests::helpers::{
-    adhoc_fixture, cache_id, cache_lookup, check_projection, snapshot,
+    adhoc_fixture, cache_id, cache_lookup, check_projection, mark, marked, snapshot,
 };
 use crate::runs::tests::test_types::{
     CacheLookupTestCase, ConcurrentLookupTestCase, ExactKeyPlanner, FailedBuildTestCase,
@@ -85,18 +85,18 @@ fn given_concurrent_first_lookups_when_one_is_building_then_the_others_wait_for_
     }];
     for test_case in test_cases {
         run(async {
-            let slots: Mutex<SnapshotSlots<u8>> = Mutex::new(SnapshotSlots::new());
+            let slots: Mutex<SnapshotSlots> = Mutex::new(SnapshotSlots::new());
             let builds = Cell::new(0);
             let (release, released) = oneshot::channel::<()>();
             let key = || ((cache_id(1), "development".to_owned()), cache_id(1));
             let first = cached(&slots, key(), (), |()| async {
                 builds.set(builds.get() + 1);
                 released.await.expect("release the build");
-                Ok(((), test_case.first_value))
+                Ok(((), marked(test_case.first_value)))
             });
             let second = cached(&slots, key(), (), |()| async {
                 builds.set(builds.get() + 1);
-                Ok(((), test_case.second_value))
+                Ok(((), marked(test_case.second_value)))
             });
             let releasing = async {
                 tokio::task::yield_now().await;
@@ -106,7 +106,12 @@ fn given_concurrent_first_lookups_when_one_is_building_then_the_others_wait_for_
             let ((), first) = first.expect("first lookup");
             let ((), second) = second.expect("second lookup");
             assert_eq!(
-                (*first, *second, builds.get(), Arc::ptr_eq(&first, &second)),
+                (
+                    mark(&first),
+                    mark(&second),
+                    builds.get(),
+                    Arc::ptr_eq(&first, &second)
+                ),
                 test_case.expected_outcome,
                 "{}",
                 test_case.description
@@ -128,20 +133,20 @@ fn given_a_failed_build_when_looked_up_again_then_nothing_was_cached() {
     }];
     for test_case in test_cases {
         run(async {
-            let slots: Mutex<SnapshotSlots<u8>> = Mutex::new(SnapshotSlots::new());
+            let slots: Mutex<SnapshotSlots> = Mutex::new(SnapshotSlots::new());
             let key = || ((cache_id(1), "development".to_owned()), cache_id(1));
             let failed = cached(&slots, key(), (), |()| async {
-                Err::<((), u8), _>(ControlError::Invalid(test_case.failure.into()))
+                Err::<((), _), _>(ControlError::Invalid(test_case.failure.into()))
             })
             .await;
             let retried = cached(&slots, key(), (), |()| async {
-                Ok(((), test_case.retried_value))
+                Ok(((), marked(test_case.retried_value)))
             })
             .await;
             assert_eq!(
                 (
                     failed.err().map(|error| error.to_string()),
-                    retried.ok().map(|((), value)| *value)
+                    retried.ok().map(|((), value)| mark(&value))
                 ),
                 (
                     test_case.expected_outcome.0.map(str::to_owned),
