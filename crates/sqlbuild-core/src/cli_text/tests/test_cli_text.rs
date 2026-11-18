@@ -227,6 +227,23 @@ fn given_plan_report_when_rendering_then_groups_models_by_reason() {
             expected_completion: "\u{2713} Plan complete  1 selected",
         },
         PlanTextTestCase {
+            description: "maintained models recompute on a query change and alter refresh settings in place",
+            report: plan_report(vec![
+                ModelPlanText {
+                    action: "create_maintained".to_owned(),
+                    materialization_label: "maintained".to_owned(),
+                    ..table_model("daily_totals", "query_changed")
+                },
+                ModelPlanText {
+                    action: "alter_maintained".to_owned(),
+                    materialization_label: "maintained".to_owned(),
+                    ..table_model("clean_orders", "config_changed")
+                },
+            ]),
+            expected_text: "Plan ready  2 selected\n\nQuery changed (1)\n\u{2514}\u{2500}\u{2500} daily_totals         recreate, full recompute\n\nConfig changed (1)\n\u{2514}\u{2500}\u{2500} clean_orders         change refresh settings in place",
+            expected_completion: "\u{2713} Plan complete  2 selected",
+        },
+        PlanTextTestCase {
             description: "every active model is a full refresh",
             report: plan_report(vec![
                 table_model("orders", "full_refresh"),

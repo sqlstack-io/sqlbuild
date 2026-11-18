@@ -13527,6 +13527,9 @@ class PlanAction(StrEnum):
     LOAD_SEED = "load_seed"
     SKIP = "skip"
     CUSTOM = "custom"
+    CREATE_MAINTAINED = "create_maintained"
+    ALTER_MAINTAINED = "alter_maintained"
+    KEEP_MAINTAINED = "keep_maintained"
 
 class PlanReason(StrEnum):
     FIRST_RUN = "first_run"
@@ -13594,6 +13597,7 @@ class MaterializationType(StrEnum):
     SNAPSHOT = "snapshot"
     SEED = "seed"
     CUSTOM = "custom"
+    MAINTAINED = "maintained"
     @classmethod
     def is_table_backed(cls, *, materialized: object | None) -> bool: ...
 

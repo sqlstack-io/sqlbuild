@@ -11,6 +11,8 @@ pub enum MaterializationType {
     Snapshot,
     Seed,
     Custom,
+    /// A stored result the warehouse keeps fresh between builds.
+    Maintained,
 }
 
 /// What the plan does with a model.
@@ -24,6 +26,12 @@ pub enum PlanAction {
     Snapshot,
     Skip,
     Custom,
+    /// Create or replace the warehouse-maintained object.
+    CreateMaintained,
+    /// Change its refresh settings in place.
+    AlterMaintained,
+    /// Leave the object as it is; builds may still refresh it.
+    KeepMaintained,
 }
 
 /// Why the plan does it.

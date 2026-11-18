@@ -35,6 +35,15 @@ describe('plan text, as sqb plan prints it', () => {
 		expect(actionText(model('a', { reason: 'first_run', backfill: { action: 'full', duration: null } }))).toBe('continue forward');
 	});
 
+	it('words maintained models as the CLI does, with no replay policy', () => {
+		const recreated = model('a', { action: 'create_maintained', reason: 'query_changed', backfill: { action: 'full', duration: null } });
+		expect(actionText(recreated)).toBe('recreate, full recompute');
+		expect(actionText(model('a', { action: 'create_maintained', reason: 'first_run' }))).toBe('create');
+		expect(actionText(model('a', { action: 'alter_maintained', reason: 'config_changed' }))).toBe('change refresh settings in place');
+		const [section] = planSections(plan([recreated]));
+		expect(section.entries[0].detail).toEqual([]);
+	});
+
 	it('puts each change in its own section in reason order, then the routine models, and leaves skipped ones out', () => {
 		const sections = planSections(
 			plan([
