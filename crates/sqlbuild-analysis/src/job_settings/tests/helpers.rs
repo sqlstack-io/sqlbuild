@@ -6,7 +6,9 @@ use crate::assembly::project::types::ObjectKey;
 use crate::graph::main::attach_jobs::attach_jobs;
 use crate::graph::main::build_project_graph::build_project_graph;
 use crate::graph::models::{GraphResource, JobSelection, ProjectGraph};
-use crate::job_settings::models::{DeclaredRun, JobRetry};
+use crate::job_settings::errors::NodeJobSettingsError;
+use crate::job_settings::main::node_job_settings::node_job_settings;
+use crate::job_settings::models::{DeclaredRun, JobRetry, NodeJobSettings};
 
 fn key(kind: &str, name: &str) -> ObjectKey {
     (kind.to_owned(), name.to_owned())
@@ -128,4 +130,16 @@ pub(super) fn graph_with_jobs() -> ProjectGraph {
 
 pub(super) fn strings(values: &[&str]) -> Vec<String> {
     texts(values)
+}
+
+/// What selecting `select` minus `exclude` gives each node of the graph's jobs.
+pub(super) fn resolved_settings(
+    select: &[&str],
+    exclude: &[&str],
+) -> Result<NodeJobSettings, NodeJobSettingsError> {
+    node_job_settings(
+        &graph_with_jobs(),
+        (&texts(select), &texts(exclude)),
+        &declared(),
+    )
 }

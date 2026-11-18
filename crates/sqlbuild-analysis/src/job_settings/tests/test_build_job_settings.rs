@@ -15,7 +15,7 @@ fn given_named_jobs_when_merging_build_settings_then_they_must_agree() {
             description: "a job that leaves vars unset differs from one that sets them",
             select: &["crm_job", "job:orders_job"],
             expected_named: vec!["crm_job", "orders_job"],
-            expected: Err(
+            expected_settings: Err(
                 "jobs crm_job and orders_job set vars differently ({\"region\":\"eu\"} \
                  and not set); a build applies vars to everything it runs",
             ),
@@ -24,13 +24,13 @@ fn given_named_jobs_when_merging_build_settings_then_they_must_agree() {
             description: "a single job's vars",
             select: &["job:crm_job,customers"],
             expected_named: vec!["crm_job"],
-            expected: Ok(BTreeMap::from([("vars", json!({"region": "eu"}))])),
+            expected_settings: Ok(BTreeMap::from([("vars", json!({"region": "eu"}))])),
         },
         BuildJobSettingsTestCase {
             description: "two jobs with different vars",
             select: &["job:crm_job job:crm_us_job"],
             expected_named: vec!["crm_job", "crm_us_job"],
-            expected: Err(
+            expected_settings: Err(
                 "jobs crm_job and crm_us_job set vars differently ({\"region\":\"eu\"} \
                  and {\"region\":\"us\"}); a build applies vars to everything it runs",
             ),
@@ -39,13 +39,13 @@ fn given_named_jobs_when_merging_build_settings_then_they_must_agree() {
             description: "a group's jobs without build-wide settings",
             select: &["job:daily_group"],
             expected_named: vec!["orders_job", "refunds_job"],
-            expected: Ok(BTreeMap::new()),
+            expected_settings: Ok(BTreeMap::new()),
         },
         BuildJobSettingsTestCase {
             description: "tags, paths and node names name no job",
             select: &["tag:daily models/marts orders"],
             expected_named: vec![],
-            expected: Ok(BTreeMap::new()),
+            expected_settings: Ok(BTreeMap::new()),
         },
     ];
     for test_case in test_cases {
@@ -56,7 +56,7 @@ fn given_named_jobs_when_merging_build_settings_then_they_must_agree() {
             .map(|settings| settings.into_iter().collect::<BTreeMap<String, _>>())
             .map_err(|conflict| conflict.message);
         let expected = test_case
-            .expected
+            .expected_settings
             .map(|settings| {
                 settings
                     .into_iter()
@@ -74,7 +74,7 @@ fn given_a_group_when_its_jobs_differ_on_vars_or_changed_then_it_cannot_run_as_o
         GroupMismatchTestCase {
             description: "different vars",
             members: &["crm_job", "crm_us_job"],
-            expected: Some(
+            expected_mismatch: Some(
                 "jobs crm_job and crm_us_job set vars differently; a group runs its \
                  jobs as one build, which has one vars",
             ),
@@ -82,7 +82,7 @@ fn given_a_group_when_its_jobs_differ_on_vars_or_changed_then_it_cannot_run_as_o
         GroupMismatchTestCase {
             description: "vars set by only one job still differ",
             members: &["orders_job", "crm_job"],
-            expected: Some(
+            expected_mismatch: Some(
                 "jobs orders_job and crm_job set vars differently; a group runs its \
                  jobs as one build, which has one vars",
             ),
@@ -90,13 +90,13 @@ fn given_a_group_when_its_jobs_differ_on_vars_or_changed_then_it_cannot_run_as_o
         GroupMismatchTestCase {
             description: "node settings may differ",
             members: &["orders_job", "refunds_job", "quiet_job"],
-            expected: None,
+            expected_mismatch: None,
         },
     ];
     for test_case in test_cases {
         assert_eq!(
             group_setting_mismatch(&strings(test_case.members), &declared()).as_deref(),
-            test_case.expected,
+            test_case.expected_mismatch,
             "{}",
             test_case.description
         );

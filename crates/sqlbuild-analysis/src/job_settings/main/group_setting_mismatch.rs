@@ -7,7 +7,7 @@ use serde_json::Value as Json;
 use crate::job_settings::constants::GROUP_AGREED_SETTINGS;
 use crate::job_settings::models::DeclaredRun;
 
-/// Why `members` cannot run as one build, naming the setting and two members; `None` when they agree.
+/// Why `members` cannot run as one build, naming the setting and two members.
 #[must_use]
 pub fn group_setting_mismatch(
     members: &[String],

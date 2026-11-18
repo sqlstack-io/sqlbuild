@@ -1,5 +1,7 @@
 //! Parse `sqb`'s argv as its `argparse` parser and `parse_cli_invocation` did.
 
+use std::collections::BTreeSet;
+
 use crate::argv::_helpers::parsing::Run;
 use crate::argv::_helpers::table::root_parser;
 use crate::argv::models::{ArgvOutcome, ArgvSettings, Namespace, ParserSpec, Value};
@@ -19,6 +21,7 @@ pub fn parse_cli_arguments(
         writes: Vec::new(),
         command_prog: None,
         usage_failure: None,
+        given: BTreeSet::new(),
     };
     let namespace: Namespace = Namespace {
         entries: defaults,
@@ -32,5 +35,6 @@ pub fn parse_cli_arguments(
         writes: run.writes,
         parsed,
         usage_failure: run.usage_failure,
+        given: run.given,
     }
 }

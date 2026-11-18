@@ -1,12 +1,14 @@
-//! Render one authored setting and check emitted options against the build parser.
+//! Render job settings as options, check them against the build parser and parse without Python.
 
 use std::collections::BTreeMap;
 
 use serde_json::Value as Json;
+use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 
 use crate::argv::_helpers::table::root_parser;
 use crate::argv::constants::CONCURRENCY_DEST;
-use crate::argv::models::{ActionKind, ActionSpec, Default, Nargs, ParserSpec, Value};
+use crate::argv::models::{ActionKind, ActionSpec, Default, Nargs, ParserSpec, TypeFailure, Value};
+use crate::argv::types::ArgvHost;
 
 pub(crate) fn setting_argument(
     parser: &ParserSpec,
@@ -148,4 +150,24 @@ pub(crate) fn validate_mutex(parser: &ParserSpec, arguments: &[String]) -> Resul
         }
     }
     Ok(())
+}
+
+/// Converts `int`-like options so the parse validates them, and keeps every other value as text.
+pub(crate) struct IntegerHost;
+
+impl ArgvHost for IntegerHost {
+    fn convert(&mut self, _converter: &str, text: &str) -> Result<Value, TypeFailure> {
+        Ok(text.trim().parse::<i64>().map_or_else(
+            |_| Value::Str(text.to_owned()),
+            |number| Value::Int(number.to_string()),
+        ))
+    }
+
+    fn repr(&self, text: &str) -> String {
+        python_str_repr(text)
+    }
+
+    fn program_version(&mut self) -> String {
+        String::new()
+    }
 }

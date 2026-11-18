@@ -10,10 +10,10 @@ pub const REPORT_ATTEMPTS: usize = 3;
 pub const STORE_BUSY_STATUS: u16 = 503;
 
 /// Selector kinds that can name a job: `job:<name>` and a bare name.
-pub(crate) const JOB_SELECTOR_KINDS: [&str; 2] = ["job", "name"];
+pub const JOB_SELECTOR_KINDS: [&str; 2] = ["job", "name"];
 
 /// Separates the parts of an intersection selector.
-pub(crate) const SELECTOR_INTERSECTION: char = ',';
+pub const SELECTOR_INTERSECTION: char = ',';
 
 /// The key prefix of a SQL unit test's result, as the snapshot names it.
 pub const SQL_TEST_KEY_PREFIX: &str = "sql_test:";

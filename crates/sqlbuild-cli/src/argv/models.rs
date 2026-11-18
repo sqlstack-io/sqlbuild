@@ -1,6 +1,6 @@
 //! The `sqb` command table, parsed values and the outcome of one argv parse.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use sqlbuild_core::dbt_cli::models::DbtParsedFlags;
 
@@ -174,6 +174,8 @@ pub struct ArgvOutcome {
     pub parsed: Result<Namespace, i64>,
     /// The usage failure that ended the parse, if one did.
     pub usage_failure: Option<UsageFailure>,
+    /// The destination of every option the arguments wrote.
+    pub given: BTreeSet<String>,
 }
 
 /// Why a `sqb dbt` execution parse stopped before producing flags.

@@ -6,8 +6,10 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use serde_json::Value;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::job_settings::constants::CONFLICT_HELP;
 use sqlbuild_analysis::job_settings::errors::{JobSettingConflict, NodeJobSettingsError};
+use sqlbuild_analysis::job_settings::main::build_job_settings::build_job_settings;
 use sqlbuild_analysis::job_settings::main::named_jobs::named_jobs;
 use sqlbuild_analysis::job_settings::main::node_job_settings::node_job_settings;
 use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings};
@@ -35,8 +37,7 @@ fn strings(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     value.try_iter()?.map(|item| item?.extract()).collect()
 }
 
-/// The named jobs' settings for each node `options` selects; `None` without named jobs, with
-/// `--no-job-settings`, or when the selection fails, which planning then reports itself.
+/// The named jobs' settings per selected node; `None` when ignored, unnamed or unselectable.
 pub(crate) fn planned_job_settings(
     project: &Bound<'_, PyAny>,
     options: &Bound<'_, PyAny>,
@@ -46,16 +47,22 @@ pub(crate) fn planned_job_settings(
         return Ok(None);
     }
     let select: Vec<String> = strings(&native_field(options, "select")?)?;
+    let native: Bound<'_, NativeProjectGraph> =
+        native_field(project, "lineage_graph")?.cast_into()?;
+    let native = native.get();
+    if !selectors_need_jobs(native.graph(), &select, &[]) {
+        return Ok(None);
+    }
     let exclude: Vec<String> = strings(&native_field(options, "exclude")?)?;
     let Some(declared): Option<BTreeMap<String, DeclaredRun>> = job_declarations(py)? else {
         return Ok(None);
     };
-    if named_jobs(&select, &declared).is_empty() {
+    let named: Vec<String> = named_jobs(&select, &declared);
+    if named.is_empty() {
         return Ok(None);
     }
-    let native: Bound<'_, NativeProjectGraph> =
-        native_field(project, "lineage_graph")?.cast_into()?;
-    let native = native.get();
+    build_job_settings(&named, &declared)
+        .map_err(|conflict| job_setting_conflict(py, &conflict))?;
     let all: Vec<String> = select.iter().chain(&exclude).cloned().collect();
     let graph = graph_with_jobs(py, native.graph(), &all, &[])?;
     match node_job_settings(&graph, (&select, &exclude), &declared) {
@@ -90,8 +97,7 @@ impl PlannedJobSettings {
         PyFrozenSet::new(py, names)
     }
 
-    /// Each named job's limit and each planned node's limited jobs, a SQL test taking its models'
-    /// jobs; none when `--concurrency` overrides them.
+    /// Each job's limit and each planned node's limited jobs; none under `--concurrency`.
     pub(crate) fn job_limits<'py>(
         &self,
         plan: &Bound<'py, PyAny>,
@@ -141,8 +147,7 @@ impl PlannedJobSettings {
         Ok((limits, node_jobs))
     }
 
-    /// The plan without the SQL tests whose models' jobs set `run_tests = false`, and with each audit
-    /// of a named job's node ignoring failures as that job says, unless the command line decided.
+    /// The plan with its jobs' `run_tests` and, unless the command line decided, audit failures.
     pub(crate) fn apply_to_plan<'py>(
         &self,
         plan: &Bound<'py, PyAny>,
@@ -230,7 +235,8 @@ impl PlannedJobSettings {
                         scope_deps.py(),
                         &JobSettingConflict {
                             message: format!(
-                                "test {} covers nodes of jobs {other} and {job}, which set run_tests differently ({earlier} and {value})",
+                                "test {} covers nodes of jobs {other} and {job}, which set \
+                                 run_tests differently ({earlier} and {value})",
                                 test.1
                             ),
                             help: CONFLICT_HELP,
@@ -244,14 +250,14 @@ impl PlannedJobSettings {
         Ok(seen.is_some_and(|(_, value)| value == &Value::Bool(false)))
     }
 
-    /// The named job's `ignore_audit_failures` for the node an audit is attached to, if it sets one.
+    /// The `ignore_audit_failures` the audited node's job sets, if any.
     fn audit_ignores(&self, entry: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
         let kind: Bound<'_, PyAny> = native_field(entry, "attached_target_kind")?;
         let name: Bound<'_, PyAny> = native_field(entry, "attached_target_name")?;
         if kind.is_none() || name.is_none() {
             return Ok(None);
         }
-        let kind: String = kind.getattr("value")?.extract()?;
+        let kind: String = native_field(&kind, "value")?.extract()?;
         let key: ObjectKey = (kind, name.extract()?);
         Ok(self
             .value(&key, IGNORE_AUDIT_FAILURES)

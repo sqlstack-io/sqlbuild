@@ -1475,3 +1475,26 @@ class SeedRunRecordTestCase:
     description: str
     # Each row as (phase, command, select_json, named_jobs_json, var_keys_json, status, counts).
     expected_rows: list[tuple[str, str, str, str, str, str | None, str | None]]
+
+
+@dataclass(frozen=True)
+class JobSettingsBuildTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    expected_amount: int
+    expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class JobSettingsConflictTestCase:
+    description: str
+    command_args: tuple[str, ...]
+    expected_fragment: str
+    extra_files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class JobFullRefreshTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    expected_counts: tuple[tuple[int, int], ...]
