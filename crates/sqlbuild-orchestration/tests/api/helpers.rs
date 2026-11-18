@@ -14,6 +14,14 @@ pub(crate) async fn start_api_with_authentication(
     store: &ControlStore,
     authentication: ApiAuthentication,
 ) -> TestApi {
+    start_api_with_facts(store, authentication, Default::default()).await
+}
+
+pub(crate) async fn start_api_with_facts(
+    store: &ControlStore,
+    authentication: ApiAuthentication,
+    facts: crate::api::models::ServerFacts,
+) -> TestApi {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("isolated API socket");
@@ -26,7 +34,7 @@ pub(crate) async fn start_api_with_authentication(
         (
             authentication,
             (Vec::new(), std::sync::Arc::new(ExactKeyPlanner)),
-            Default::default(),
+            facts,
         ),
         (|| {}, async {
             let _ = signal.await;

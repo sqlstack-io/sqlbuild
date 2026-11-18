@@ -5,7 +5,7 @@
 
 import { ApiError } from '../client';
 import { groupStatusOf, problemRunsOf } from '../http-overview';
-import { withConditions } from '$lib/build-area/attention-conditions';
+import { clearedAcknowledgements, withConditions } from '$lib/build-area/attention-conditions';
 import { recentDeploys } from '$lib/build-area/overview-panels';
 import type {
 	AttentionItem,
@@ -303,6 +303,9 @@ export class MockBuild {
 				cost: cost === null ? null : { last24h: round(cost), baseline: round(cost * 0.78), baselineDays: 7, unit: 'credits' }
 			},
 			attention: withConditions(attention, this.#ctx.operate.conditionAcknowledgements(), now),
+			attentionSnoozeSeconds: 86_400,
+			// The mock holds every condition, so it sees them all.
+			clearedAcknowledgements: clearedAcknowledgements(attention, this.#ctx.operate.conditionAcknowledgements(), () => true),
 			groups: groupStatusOf(nodes),
 			recentChanges: recentDeploys(this.#changes(scope)),
 			latestRun: latest ? { id: latest.id, status: latest.status, endedAt: latest.endedAt } : null

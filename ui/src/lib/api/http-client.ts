@@ -510,10 +510,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		},
-		async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean): Promise<void> {
+		async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: { eventId: string; reason: string }): Promise<void> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements', {
-				body: { event_id: newRequestId(), key, shape, acknowledged },
+				body: { event_id: automatic?.eventId ?? newRequestId(), key, shape, acknowledged, ...(automatic ? { reason: automatic.reason } : {}) },
 				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
 			});
 			if (response.status === 401) onUnauthorized();
@@ -1147,16 +1147,19 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return new Map(data.map((a) => [a.run_id, { by: a.acknowledged_by, at: a.acknowledged_at }]));
 	}
 
-	/** Conditions marked handled in the last two days, lapsed ones included; none from a server or recording without them. */
-	async function attentionAcknowledgementsOf(scope: Scope): Promise<AttentionAcknowledgement[]> {
+	/** Conditions marked handled within two snoozes, lapsed ones included, and the snooze; none from a server or recording without them. */
+	async function attentionAcknowledgementsOf(scope: Scope): Promise<{ snoozeSeconds: number | null | undefined; acknowledgements: AttentionAcknowledgement[] }> {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements', {
 			params: { path: { location_id: locationId, target } }
 		});
 		if (response.status === 401) onUnauthorized();
-		if (response.status === 404) return [];
+		if (response.status === 404) return { snoozeSeconds: undefined, acknowledgements: [] };
 		if (!data) throw new ApiError(errorText(error, response), response.status);
-		return data.map((a) => ({ key: a.key, shape: a.shape as ConditionShape, by: a.acknowledged_by, at: a.acknowledged_at, until: a.until }));
+		return {
+			snoozeSeconds: data.snooze_seconds ?? null,
+			acknowledgements: data.acknowledgements.map((a) => ({ key: a.key, shape: a.shape as ConditionShape, by: a.acknowledged_by, at: a.acknowledged_at, until: a.until ?? null }))
+		};
 	}
 
 	/** Triggers with their latest tick and the newest listed run each started. */

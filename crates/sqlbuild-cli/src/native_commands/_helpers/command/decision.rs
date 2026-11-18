@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde_json::json;
+use sqlbuild_orchestration::acknowledgements::models::AttentionSnooze;
 use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin, ServerFacts};
 use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
@@ -335,6 +336,15 @@ pub(crate) fn control_api_settings(
             run_logs,
             state_history,
             pool_caps: Default::default(),
+            attention_snooze: match &config.server.attention_snooze {
+                Some(text) => AttentionSnooze::parse(text).map_err(|error| match error {
+                    ControlError::Invalid(message) => {
+                        ControlError::Invalid(format!("[server] {message}"))
+                    }
+                    other => other,
+                })?,
+                None => AttentionSnooze::default(),
+            },
         },
     ))
 }

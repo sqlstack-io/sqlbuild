@@ -1,12 +1,12 @@
 //! What is already stored for a condition when a person acknowledges it or withdraws that.
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::acknowledgements::constants::{ACKNOWLEDGED, ATTENTION_SNOOZE_HOURS, WITHDRAWN};
-use crate::acknowledgements::models::AttentionAcknowledgementRequest;
+use crate::acknowledgements::constants::{ACKNOWLEDGED, WITHDRAWN};
 use crate::acknowledgements::models::PriorAttention;
+use crate::acknowledgements::models::{AttentionAcknowledgementRequest, AttentionSnooze};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -62,12 +62,12 @@ pub(crate) async fn prior_attention(
 pub(crate) fn unchanged(
     (acknowledged, shape, at): (bool, &Value, Option<DateTime<Utc>>),
     request: &AttentionAcknowledgementRequest,
-    now: DateTime<Utc>,
+    (now, snooze): (DateTime<Utc>, AttentionSnooze),
 ) -> bool {
     if !request.acknowledged {
         return !acknowledged;
     }
     acknowledged
         && *shape == request.shape
-        && at.is_some_and(|at| now < at + Duration::hours(ATTENTION_SNOOZE_HOURS))
+        && at.is_some_and(|at| snooze.until(at).is_none_or(|until| now < until))
 }

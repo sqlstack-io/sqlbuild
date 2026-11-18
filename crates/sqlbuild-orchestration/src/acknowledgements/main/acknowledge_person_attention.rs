@@ -4,9 +4,11 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::acknowledgements::_helpers::attention_state::{prior_attention, unchanged};
-use crate::acknowledgements::constants::{ACKNOWLEDGED, MAX_KEY_CHARS, MAX_SHAPE_BYTES, WITHDRAWN};
-use crate::acknowledgements::models::AttentionAcknowledgementRequest;
+use crate::acknowledgements::constants::{
+    ACKNOWLEDGED, MAX_KEY_CHARS, MAX_REASON_CHARS, MAX_SHAPE_BYTES, WITHDRAWN,
+};
 use crate::acknowledgements::models::PriorAttention;
+use crate::acknowledgements::models::{AttentionAcknowledgementRequest, AttentionSnooze};
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, DefaultRole};
@@ -34,6 +36,15 @@ fn validate(request: &AttentionAcknowledgementRequest) -> Result<(), ControlErro
             "attention shape must be at most {MAX_SHAPE_BYTES} bytes"
         )));
     }
+    if request
+        .reason
+        .as_ref()
+        .is_some_and(|reason| reason.trim().is_empty() || reason.chars().count() > MAX_REASON_CHARS)
+    {
+        return Err(ControlError::Invalid(format!(
+            "attention reason must be 1 to {MAX_REASON_CHARS} characters"
+        )));
+    }
     Ok(())
 }
 
@@ -42,7 +53,7 @@ pub async fn acknowledge_person_attention(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
     (location_id, target, request): (Uuid, &str, &AttentionAcknowledgementRequest),
-    default_role: DefaultRole,
+    (default_role, snooze): (DefaultRole, AttentionSnooze),
 ) -> Result<bool, ControlError> {
     let (transaction, context) = authorize_listing(
         begin(store, TransactionMode::Write).await?,
@@ -65,7 +76,11 @@ pub async fn acknowledge_person_attention(
         commit(transaction).await?;
         return Ok(false);
     };
-    if unchanged((acknowledged, &shape, at), request, transaction.now) {
+    if unchanged(
+        (acknowledged, &shape, at),
+        request,
+        (transaction.now, snooze),
+    ) {
         commit(transaction).await?;
         return Ok(false);
     }
@@ -79,7 +94,7 @@ pub async fn acknowledge_person_attention(
         &context,
         (request.event_id, action),
         (
-            json!({"location_id": location_id, "target": target, "key": request.key, "shape": request.shape, "request": body}),
+            json!({"location_id": location_id, "target": target, "key": request.key, "shape": request.shape, "reason": request.reason, "request": body}),
             json!({"acknowledged": acknowledged, "shape": shape}),
             json!({"acknowledged": request.acknowledged, "shape": request.shape}),
         ),

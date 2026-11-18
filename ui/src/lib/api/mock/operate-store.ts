@@ -861,7 +861,7 @@ export class MockOperate {
 		if (!acknowledged) return void this.#conditionAcks.delete(key);
 		const held = this.#conditionAcks.get(key);
 		const now = Date.now();
-		if (held && JSON.stringify(held.shape) === JSON.stringify(shape) && now < Date.parse(held.until)) return;
+		if (held && JSON.stringify(held.shape) === JSON.stringify(shape) && (held.until === null || now < Date.parse(held.until))) return;
 		this.#conditionAcks.set(key, { key, shape, by, at: new Date(now).toISOString(), until: new Date(now + 86_400_000).toISOString() });
 	}
 	acknowledgeRun(runId: string, acknowledged: boolean, by: string): void {

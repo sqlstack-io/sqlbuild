@@ -131,7 +131,7 @@ export interface ApiClient extends PlatformApi {
 	/** Marks a run handled for everyone who can see it, or withdraws the mark; recorded in the audit log. */
 	acknowledgeRun(scope: Scope, runId: string, acknowledged: boolean): Promise<void>;
 	/** Acknowledge an ongoing condition as it looks now (`shape`), until it changes, or withdraw that. */
-	acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean): Promise<void>;
+	acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: { eventId: string; reason: string }): Promise<void>;
 	/** Writes a `cancel_requested` fact; the scheduler then signals the worker. */
 	cancelRun(scope: Scope, runId: string): Promise<Run>;
 	/** `nodes` is required for `selected` and ignored otherwise. */

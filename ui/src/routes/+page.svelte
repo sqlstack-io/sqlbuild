@@ -27,7 +27,7 @@
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
 	import type { AttentionItem } from '$lib/api';
-	import { acknowledgementOf } from '$lib/build-area/attention-conditions';
+	import { CLEARED_REASON, acknowledgementOf, clearedWithdrawalId, snoozeWords, withdrawalsDue } from '$lib/build-area/attention-conditions';
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
 	import { cappedFolders, quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
@@ -59,10 +59,14 @@
 	const viewed = $derived(attentionViews(data?.attention ?? [], app.now, catalogNodes.view.changedBuild));
 	// A run is acknowledged for good; an ongoing condition until it changes (see attention-conditions).
 	const conditionFor = (item: AttentionItem) => ('condition' in item ? (item.condition ?? null) : null);
-	const ACK_HELP = {
+	// The server's snooze: 24 hours unless it says otherwise; null when acknowledgements have no time limit.
+	const snoozeSeconds = $derived(data?.attentionSnoozeSeconds === undefined ? 86_400 : data.attentionSnoozeSeconds);
+	const ACK_HELP = $derived({
 		run: 'Hide this from the attention list for everyone viewing this target. It stays under Acknowledged, where anyone can undo it.',
-		condition: 'Hide this from the attention list for everyone viewing this target, until it changes: it gets worse, resolves and comes back, or 24 hours pass. It stays under Acknowledged, where anyone can undo it.'
-	};
+		condition: `Hide this from the attention list for everyone viewing this target, until it changes: it gets worse, or clears and comes back${snoozeSeconds === null ? '' : `, or ${snoozeWords(snoozeSeconds)} pass`}. It stays under Acknowledged, where anyone can undo it.`
+	});
+	const handledLabel = (until: string | null | undefined) =>
+		until === undefined ? 'for good' : until === null ? 'hidden until it changes' : `hidden until it changes, or until ${formatStamp(until).slice(5, 16)}`;
 	const canAck = (item: AttentionItem) => ('acknowledged' in item ? canAcknowledge : !!conditionFor(item) && canAcknowledgeConditions);
 	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
 	// Acknowledged or undone here, and saved, while the Overview reads again: the item moves at once rather
@@ -96,6 +100,25 @@
 		settling = new Map([...settling, [key, acknowledged]]);
 		overview.refresh();
 	}
+	// An acknowledged condition that has cleared is withdrawn, so if it comes back it shows as new. Only from
+	// a complete read (the overview lists only what it could see in full) and never while node state is
+	// syncing or its last sync failed, when nodes out of date may just not be known yet. Every viewer sends
+	// the same event, which the server applies once; runs are acknowledged for good and never withdrawn.
+	const withdrawn = new Set<string>();
+	$effect(() => {
+		const sync = app.warehouseSync;
+		const due = withdrawalsDue(data?.clearedAcknowledgements, { failed: !!overview.error, syncing: !!sync?.syncing || !!sync?.lastError });
+		const scope = app.scope;
+		if (!scope || !canAcknowledgeConditions || !due.length) return;
+		untrack(() => {
+			for (const ack of due) {
+				const eventId = clearedWithdrawalId(ack);
+				if (withdrawn.has(eventId)) continue;
+				withdrawn.add(eventId);
+				void app.client.acknowledgeCondition(scope, ack.key, ack.shape, false, { eventId, reason: CLEARED_REASON }).catch(() => withdrawn.delete(eventId));
+			}
+		});
+	});
 	// A new read of the Overview holds every saved acknowledgement, so nothing is settling any more.
 	$effect(() => {
 		void data;
@@ -223,12 +246,12 @@
 						{#if showHandled}
 							<div class="handled-rows">
 							{#each handled as { item, view } (view.key)}
-								{@const ack = acknowledgementOf(item) ?? { by: 'you', at: new Date(app.now).toISOString(), until: 'acknowledged' in item ? undefined : new Date(app.now + 86_400_000).toISOString() }}
+								{@const ack = acknowledgementOf(item) ?? { by: 'you', at: new Date(app.now).toISOString(), until: 'acknowledged' in item ? undefined : snoozeSeconds === null ? null : new Date(app.now + snoozeSeconds * 1000).toISOString() }}
 								<div class="issue muted">
 									<span class="issue-icon info"><BellOffIcon size={13} /></span>
 									<div class="issue-copy">
 										<a class="issue-title" href={to(view.href)}>{view.title}</a>
-										<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)} · ${ack.until ? `hidden until it changes, or until ${formatStamp(ack.until).slice(5, 16)}` : 'for good'}` : ''}</p>
+										<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)} · ${handledLabel(ack.until)}` : ''}</p>
 									</div>
 									<small>{view.since}</small>
 									<span class="issue-ack">

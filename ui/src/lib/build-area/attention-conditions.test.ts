@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { AttentionAcknowledgement, AttentionItem, PlatformEvent } from '$lib/api';
-import { acknowledgementOf, conditionOf, withConditions } from './attention-conditions';
+import type { AttentionAcknowledgement, AttentionItem, CatalogNode, PlatformEvent, StaleReason } from '$lib/api';
+import { overviewOf } from '$lib/api/http-overview';
+import { acknowledgementOf, clearedWithdrawalId, conditionOf, snoozeWords, withConditions, withdrawalsDue } from './attention-conditions';
 import { toPlatformEvents } from '$lib/api/http-problems';
 
 const now = Date.parse('2026-11-18T12:00:00Z');
@@ -63,7 +64,7 @@ describe('acknowledging a condition until it changes', () => {
 	it('comes back when it resolved and recurred, or after 24 hours', () => {
 		const before: AttentionItem = { kind: 'platform_event', event: event() };
 		expect(stateOf({ kind: 'platform_event', event: event({ id: 'ev-2' }) }, [acknowledged(before)]).lapsed).toBe('it resolved and came back');
-		expect(stateOf(stale(2, 3), [acknowledged(stale(2, 3), 25)]).lapsed).toBe('its 24-hour acknowledgement ended');
+		expect(stateOf(stale(2, 3), [acknowledged(stale(2, 3), 25)]).lapsed).toBe('the time it was acknowledged for ended');
 	});
 
 	it('keeps large shapes small: many sources compare by their counts', () => {
@@ -119,5 +120,65 @@ describe('the server’s limits', () => {
 		const shape = conditionOf(sources)!.shape;
 		expect(shape).toEqual({ counts: { warn: 50, error: 0 } });
 		expect(JSON.stringify(shape).length).toBeLessThan(8192);
+	});
+});
+
+describe('acknowledgements of conditions that cleared', () => {
+	const ack = (key: string, shape = {}): AttentionAcknowledgement => ({ key, shape, by: 'ada', at: iso(-2), until: iso(22) });
+	const built = (stale: StaleReason[] | null): CatalogNode => ({ key: 'model:orders', kind: 'table', path: 'models/orders.sql', group: null, upstream: [], stale, lastOutcome: 'success', lastBuild: { builtAt: iso(-1) } }) as unknown as CatalogNode;
+	const changed: StaleReason = { reason: 'changed', change: 'definition', detail: '', since: iso(-3) };
+	const read = (nodes: CatalogNode[], acks: AttentionAcknowledgement[]) =>
+		overviewOf({ runs: [], checks: [], nodes, changes: [], events: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now });
+
+	it('lists one whose condition the read can see and no longer finds', () => {
+		const nodesOutOfDate = ack('stale_models', { counts: { changed: 2, behind: 0 } });
+		expect(read([built([])], [nodesOutOfDate]).clearedAcknowledgements).toEqual([nodesOutOfDate]);
+		expect(read([built([changed])], [nodesOutOfDate]).clearedAcknowledgements).toEqual([]);
+	});
+
+	it('never lists one the read cannot see: unknown build state, or late sources, which it does not check', () => {
+		expect(read([built(null)], [ack('stale_models')]).clearedAcknowledgements).toEqual([]);
+		expect(read([built([])], [ack('stale_sources')]).clearedAcknowledgements).toEqual([]);
+		expect(read([built([])], [ack('event:tick_overdue:loc-1:shop · prod')]).clearedAcknowledgements).toEqual([ack('event:tick_overdue:loc-1:shop · prod')]);
+	});
+
+	it('withdraws nothing after a failed read, and nodes out of date only once node state has settled', () => {
+		const cleared = [ack('stale_models'), ack('event:location_broken:loc-1:')];
+		expect(withdrawalsDue(cleared, { failed: true, syncing: false })).toEqual([]);
+		expect(withdrawalsDue(cleared, { failed: false, syncing: true }).map((a) => a.key)).toEqual(['event:location_broken:loc-1:']);
+		expect(withdrawalsDue(cleared, { failed: false, syncing: false })).toEqual(cleared);
+	});
+
+	it('withdraws each acknowledgement with one event ID every viewer agrees on', () => {
+		const id = clearedWithdrawalId(ack('stale_models'));
+		expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+		expect(clearedWithdrawalId(ack('stale_models'))).toBe(id);
+		expect(clearedWithdrawalId({ ...ack('stale_models'), at: iso(-1) })).not.toBe(id);
+		expect(clearedWithdrawalId(ack('stale_sources'))).not.toBe(id);
+	});
+
+	it('shows a condition that comes back after it was withdrawn as new, even with a smaller count', () => {
+		const before = stale(5, 0);
+		const withdrawnThenBack = stale(2, 0);
+		// While acknowledged, a smaller count stays hidden.
+		expect(stateOf(withdrawnThenBack, [acknowledged(before)])).toEqual({ acknowledged: true, lapsed: null });
+		// Once the cleared condition's acknowledgement is withdrawn, the listing no longer holds it.
+		expect(stateOf(withdrawnThenBack, [])).toEqual({ acknowledged: false, lapsed: null });
+	});
+});
+
+describe('the configured snooze', () => {
+	it('never lapses on time without a time limit', () => {
+		const ack = { ...acknowledged(stale(2, 3), 1000), until: null };
+		expect(stateOf(stale(2, 3), [ack])).toEqual({ acknowledged: true, lapsed: null });
+		expect(stateOf(stale(2, 4), [ack]).lapsed).toBe('1 more node behind since it was acknowledged');
+	});
+
+	it('lapses after the configured time', () => {
+		expect(stateOf(stale(2, 3), [{ ...acknowledged(stale(2, 3), 2), until: iso(-1) }]).lapsed).toBe('the time it was acknowledged for ended');
+	});
+
+	it('is worded in plain units', () => {
+		expect([86_400, 5_400, 129_600, 1, 172_800].map(snoozeWords)).toEqual(['1 day', '1 hour and 30 minutes', '1 day and 12 hours', '1 second', '2 days']);
 	});
 });

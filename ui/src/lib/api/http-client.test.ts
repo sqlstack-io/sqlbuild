@@ -407,6 +407,7 @@ describe('overview', () => {
 				const path = new URL(request.url).pathname;
 				if (path.endsWith('/nodes') && nodesStatus !== 200) return Response.json({ error: 'refused' }, { status: nodesStatus });
 				if (path.endsWith('/platform/problems')) return Response.json({ scheduler_leader: 'server-1', scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] });
+				if (path.endsWith('/attention-acknowledgements')) return Response.json({ snooze_seconds: 86_400, acknowledgements: [] });
 				return Response.json([]);
 			})
 		);

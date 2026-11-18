@@ -68,7 +68,7 @@ function bounded(shape: ConditionShape): ConditionShape {
 }
 
 /** Why an acknowledgement no longer holds at `now`, or null while it does. */
-export function lapseOf(stored: ConditionShape, current: ConditionShape, until: string, now: number, noun: string): string | null {
+export function lapseOf(stored: ConditionShape, current: ConditionShape, until: string | null, now: number, noun: string): string | null {
 	if (stored.occurrence !== undefined && current.occurrence !== undefined && stored.occurrence !== current.occurrence) return 'it resolved and came back';
 	if ((current.severity ?? 0) > (stored.severity ?? 0)) return 'it became more severe';
 	for (const [name, count] of Object.entries(current.counts ?? {})) {
@@ -79,8 +79,58 @@ export function lapseOf(stored: ConditionShape, current: ConditionShape, until: 
 		const added = current.members.filter((m) => !stored.members!.includes(m)).length;
 		if (added) return `${plural(added, `new ${noun}`)} since it was acknowledged`;
 	}
-	if (now >= Date.parse(until)) return 'its 24-hour acknowledgement ended';
+	if (until !== null && now >= Date.parse(until)) return 'the time it was acknowledged for ended';
 	return null;
+}
+
+/** A snooze in words, such as `24 hours` or `1 day and 12 hours`. */
+export function snoozeWords(seconds: number): string {
+	const parts = [
+		[Math.floor(seconds / 86_400), 'day'],
+		[Math.floor((seconds % 86_400) / 3_600), 'hour'],
+		[Math.floor((seconds % 3_600) / 60), 'minute'],
+		[seconds % 60, 'second']
+	] as const;
+	const words = parts.filter(([n]) => n > 0).map(([n, unit]) => plural(n, unit));
+	return words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : (words[0] ?? '0 seconds');
+}
+
+/**
+ * Acknowledged conditions that `items` no longer hold, among those this read can `see`; a condition it
+ * can't see is never judged gone. Runs are acknowledged for good and have no condition, so never appear.
+ */
+export function clearedAcknowledgements(items: readonly AttentionItem[], acknowledgements: readonly AttentionAcknowledgement[], see: (key: string) => boolean): AttentionAcknowledgement[] {
+	const present = new Set(items.flatMap((item) => conditionOf(item)?.key ?? []));
+	return acknowledgements.filter((a) => see(a.key) && !present.has(a.key));
+}
+
+/**
+ * The cleared acknowledgements to withdraw now: none after a failed read, and nodes out of date only once
+ * node state has settled (no sync running, the last one succeeded), when their absence can be trusted.
+ */
+export function withdrawalsDue(cleared: readonly AttentionAcknowledgement[] | undefined, read: { failed: boolean; syncing: boolean }): AttentionAcknowledgement[] {
+	if (read.failed) return [];
+	return (cleared ?? []).filter((a) => a.key !== 'stale_models' || !read.syncing);
+}
+
+/** What the audit log says of a withdrawal made because the condition cleared. */
+export const CLEARED_REASON = 'automatic: the condition cleared';
+
+/**
+ * The event ID of withdrawing `ack` because its condition cleared: the same for every viewer, so the
+ * server applies it once however many Overviews notice. A new acknowledgement gets a new one.
+ */
+export function clearedWithdrawalId(ack: Pick<AttentionAcknowledgement, 'key' | 'at'>): string {
+	const text = `${ack.key}\n${ack.at}\ncleared`;
+	// FNV-1a, 32 bits, with four seeds: 128 deterministic bits, shaped as a UUID (version 8, variant 10).
+	const hash = (seed: number) => {
+		let h = seed;
+		for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+		return h.toString(16).padStart(8, '0');
+	};
+	const hex = [0x811c9dc5, 0x050c5d1f, 0x2d358dcc, 0x7a1f3e91].map(hash).join('');
+	const variant = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 /** The items with their conditions, each acknowledged while its acknowledgement holds and otherwise saying why it lapsed. */
@@ -102,7 +152,8 @@ export function withConditions(items: AttentionItem[], acknowledgements: readonl
 }
 
 /** Whether an item is acknowledged now: a run by its own mark, a condition while its acknowledgement holds. */
-export function acknowledgementOf(item: AttentionItem): { by: string; at: string; until?: string } | null {
+/** `until` is absent for a run, acknowledged for good, and null for a condition without a time limit. */
+export function acknowledgementOf(item: AttentionItem): { by: string; at: string; until?: string | null } | null {
 	if ('acknowledged' in item) return item.acknowledged;
 	return ('condition' in item && item.condition?.acknowledged) || null;
 }

@@ -32,7 +32,7 @@ pub(crate) async fn latest_acknowledgements(
         default_role,
     )
     .await?;
-    let since = transaction.now - window;
+    let since = window.map_or(DateTime::UNIX_EPOCH, |window| transaction.now - window);
     let (transaction, rows) = query(
         transaction,
         "SELECT a.action, COALESCE(p.name, a.actor) AS actor, a.occurred_at, a.scope_json \

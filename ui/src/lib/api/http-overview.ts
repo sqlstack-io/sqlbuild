@@ -1,6 +1,6 @@
 import { topFolder } from '$lib/lineage/catalog-graph';
 import { recentDeploys } from '$lib/build-area/overview-panels';
-import { withConditions } from '$lib/build-area/attention-conditions';
+import { clearedAcknowledgements, withConditions } from '$lib/build-area/attention-conditions';
 import { checkCountsOf } from './http-catalog';
 import type { Acknowledgement, AttentionAcknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, GroupStatus, Overview, PlatformEvent, Run, SnapshotChange } from './types';
 
@@ -19,8 +19,8 @@ export type OverviewInputs = {
 	events: PlatformEvent[];
 	/** Problem runs marked handled, by run ID. */
 	acknowledgements: Map<string, Acknowledgement>;
-	/** Conditions' latest acknowledgements. */
-	conditions: AttentionAcknowledgement[];
+	/** Conditions' latest acknowledgements, and the server's snooze (undefined from a server without it). */
+	conditions: { snoozeSeconds: number | null | undefined; acknowledgements: AttentionAcknowledgement[] };
 	now: number;
 };
 
@@ -106,7 +106,10 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 			stale: { nodes: staleNodes, changed: changed.length, behind: behind.length, sources: null },
 			cost: null
 		},
-		attention: withConditions(attention, conditions, now),
+		attention: withConditions(attention, conditions.acknowledgements, now),
+		attentionSnoozeSeconds: conditions.snoozeSeconds,
+		// Nodes out of date are seen only with build state; late sources aren't checked here; events are read in full.
+		clearedAcknowledgements: clearedAcknowledgements(attention, conditions.acknowledgements, (key) => (key === 'stale_models' ? nodes.some((n) => n.stale !== null) : key.startsWith('event:'))),
 		groups: nodes.some((n) => n.stale !== null) ? groupStatusOf(nodes) : null,
 		recentChanges: recentDeploys(changes),
 		latestRun: latest ? { id: latest.id, status: latest.status, endedAt: latest.endedAt } : null

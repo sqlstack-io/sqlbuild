@@ -6,10 +6,13 @@ pub(crate) const MAX_KEY_CHARS: usize = 256;
 pub(crate) const MAX_SHAPE_BYTES: usize = 8 * 1024;
 pub(crate) const ACKNOWLEDGED: &str = "attention.acknowledged";
 pub(crate) const WITHDRAWN: &str = "attention.acknowledgement_withdrawn";
-/// Hours after which an acknowledged condition comes back even if it never changes.
-pub(crate) const ATTENTION_SNOOZE_HOURS: i64 = 24;
-/// Hours of listed condition acknowledgements, so a lapsed one stays readable for a day.
-pub(crate) const ATTENTION_LISTING_HOURS: i64 = 48;
+pub(crate) const MAX_REASON_CHARS: usize = 200;
+/// The `attention_snooze` that removes the time limit.
+pub(crate) const NO_TIME_LIMIT: &str = "0";
+/// Seconds after which an acknowledged condition comes back unchanged, unless `attention_snooze` says otherwise.
+pub(crate) const DEFAULT_ATTENTION_SNOOZE_SECONDS: i64 = 86_400;
+/// Snoozes a listing keeps a condition acknowledgement for, so a lapsed one says why it is back.
+pub(crate) const ATTENTION_LISTING_SNOOZES: i32 = 2;
 /// Days of listed run acknowledgements; the overview lists only a day of problems.
 pub(crate) const RUN_LISTING_DAYS: i64 = 7;
 pub(crate) const RUN_EVENTS: AcknowledgementEvents = AcknowledgementEvents {

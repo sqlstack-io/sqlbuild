@@ -1657,9 +1657,9 @@ export interface components {
             shape: unknown;
             /**
              * Format: date-time
-             * @description When the acknowledgement lapses even if the condition never changes.
+             * @description When the acknowledgement lapses even if the condition never changes; none without a time limit.
              */
-            until: string;
+            until?: string | null;
         };
         /** @description Marks an ongoing condition handled as it looks now, or withdraws that; an event ID applies once. */
         AttentionAcknowledgementRequest: {
@@ -1668,8 +1668,19 @@ export interface components {
             event_id: string;
             /** @description The condition's kind and subject, stable while it lasts, such as `stale_sources`. */
             key: string;
+            /** @description Why, when it isn't a person's own choice, such as a withdrawal once the condition cleared. */
+            reason?: string | null;
             /** @description What the condition looks like, as a JSON object of at most 8 KiB that later states are compared with. */
             shape: unknown;
+        };
+        /** @description A target's condition acknowledgements, and how long one lasts while its condition is unchanged. */
+        AttentionAcknowledgements: {
+            acknowledgements: components["schemas"]["AttentionAcknowledgement"][];
+            /**
+             * Format: int64
+             * @description The server's `attention_snooze` in seconds; none when acknowledgements have no time limit.
+             */
+            snooze_seconds?: number | null;
         };
         AuthenticationDenial: {
             error: string;
@@ -4963,13 +4974,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Conditions marked handled in the last two days, lapsed ones included */
+            /** @description Conditions marked handled within two snoozes, lapsed ones included, and the snooze */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AttentionAcknowledgement"][];
+                    "application/json": components["schemas"]["AttentionAcknowledgements"];
                 };
             };
             /** @description Session rejected */
@@ -5016,7 +5027,7 @@ export interface operations {
                     "application/json": components["schemas"]["MutationResponse"];
                 };
             };
-            /** @description The key or shape is invalid, or the event ID was reused */
+            /** @description The key, shape or reason is invalid, or the event ID was reused */
             400: {
                 headers: {
                     [name: string]: unknown;

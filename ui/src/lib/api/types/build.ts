@@ -385,15 +385,15 @@ export type ConditionShape = {
 	/** Which occurrence it is: a different one means it resolved and came back. */
 	occurrence?: string;
 };
-/** A condition's latest acknowledgement, as the server lists it; `until` is when it lapses even unchanged. */
-export type AttentionAcknowledgement = { key: string; shape: ConditionShape; by: string; at: Iso; until: Iso };
+/** A condition's latest acknowledgement, as the server lists it; `until` is when it lapses even unchanged, null without a time limit. */
+export type AttentionAcknowledgement = { key: string; shape: ConditionShape; by: string; at: Iso; until: Iso | null };
 /** An ongoing condition on the attention list, acknowledged until it changes. */
 export type AttentionCondition = {
 	/** Its kind and subject, stable while it lasts, such as `stale_sources`. */
 	key: string;
 	shape: ConditionShape;
-	/** Holds until the condition gets worse, resolves and comes back, or `until` passes. */
-	acknowledged: (Acknowledgement & { until: Iso }) | null;
+	/** Holds until the condition gets worse, resolves and comes back, or `until` passes (null: no time limit). */
+	acknowledged: (Acknowledgement & { until: Iso | null }) | null;
 	/** Why an acknowledgement no longer holds, while the condition is back on the list. */
 	lapsed: { reason: string; by: string; at: Iso } | null;
 };
@@ -427,4 +427,11 @@ export type Overview = {
 	/** Newest first, up to the fourth deploy that changed something, with the deploys without changes between. */
 	recentChanges: SnapshotChange[];
 	latestRun: (Pick<Run, 'id' | 'endedAt'> & { status: RunStatus }) | null;
+	/** How long an acknowledged condition stays hidden unchanged, in seconds; null without a time limit, absent when unknown. */
+	attentionSnoozeSeconds?: number | null;
+	/**
+	 * Acknowledged conditions this read could see and found gone. Only conditions it reads in full
+	 * are judged, so a condition it can't see (such as late sources, unchecked here) is never listed.
+	 */
+	clearedAcknowledgements?: AttentionAcknowledgement[];
 };

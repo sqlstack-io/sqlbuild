@@ -325,7 +325,7 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.conditionAcknowledgements();
 	}
 
-	async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean): Promise<void> {
+	async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, _automatic?: { eventId: string; reason: string }): Promise<void> {
 		this.#location(scope);
 		this.#operate.acknowledgeCondition(key, shape, acknowledged, 'you');
 	}

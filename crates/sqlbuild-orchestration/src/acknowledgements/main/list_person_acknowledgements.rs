@@ -23,7 +23,7 @@ pub async fn list_person_acknowledgements(
         target,
         default_role,
         events: &RUN_EVENTS,
-        window: Duration::days(RUN_LISTING_DAYS),
+        window: Some(Duration::days(RUN_LISTING_DAYS)),
     };
     latest_acknowledgements(store, person, listing)
         .await?

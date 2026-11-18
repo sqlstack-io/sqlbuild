@@ -353,6 +353,30 @@ pub(crate) struct AttentionAcknowledgementTestCase {
     pub(crate) expected_keys: (&'static [&'static str], &'static [&'static str]),
 }
 
+pub(crate) struct AttentionSnoozeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) snooze: crate::acknowledgements::models::AttentionSnooze,
+    pub(crate) expected_snooze_seconds: serde_json::Value,
+    pub(crate) expected_until_seconds: Option<i64>,
+    pub(crate) expected_same_shape_applies_after_a_wait: bool,
+}
+
+pub(crate) struct SnoozeParseTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) text: &'static str,
+    /// The snooze in seconds (none for no time limit), or part of the error message.
+    pub(crate) expected_seconds: Result<Option<i64>, &'static str>,
+}
+
+pub(crate) struct AutomaticWithdrawalTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Whether the first and the second viewer's identical withdrawal applied.
+    pub(crate) expected_applied: [bool; 2],
+    pub(crate) expected_reason: &'static str,
+    pub(crate) expected_withdrawals: usize,
+}
+
 pub(crate) struct ProvidersTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
