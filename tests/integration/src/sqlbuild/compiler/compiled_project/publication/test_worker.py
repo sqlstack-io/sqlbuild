@@ -857,6 +857,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                     "run_tests = false\n"
                 ),
             },
+            expected_compiles_again=True,
         ),
         WorkerExecutionTestCase(
             "a selected upstream source succeeds once the build returns",

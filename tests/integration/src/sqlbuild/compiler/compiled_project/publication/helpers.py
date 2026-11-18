@@ -1037,6 +1037,17 @@ def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -
         ).fetchall()
         assert contexts, log.read_text()
         assert all(context is not None for (context,) in contexts)
+        printed: str = "".join(
+            str(data)
+            for (data,) in control.execute(
+                "SELECT data FROM recall_output WHERE invocation_id LIKE 'worker/%' "
+                "ORDER BY occurred_at, sequence"
+            ).fetchall()
+        )
+        assert ("Planning from the published compiled project." not in printed) == (
+            test_case.expected_compiles_again
+        ), printed
+        assert ("Compiling project..." in printed) == test_case.expected_compiles_again, printed
         expected_run_ids: set[str] = {
             run_id
             for (run_id,) in control.execute(
