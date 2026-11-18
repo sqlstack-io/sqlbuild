@@ -31,8 +31,6 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 const CONFIGURED_RATE_SOURCE: &str = "configured";
 /// The adapter method that marks the resource costs table as supported.
 pub(crate) const CREATE_TABLE_METHOD: &str = "render_create_resource_costs_table_sql";
-/// Collection budget of each re-read of an older run, which a build waits for.
-pub(crate) const REFRESH_BUDGET_SECONDS: f64 = 20.0;
 
 /// Create-if-missing DDL for the resource costs table, with adapter-rendered column types.
 #[pyfunction]
@@ -210,9 +208,14 @@ pub(crate) fn run_attempt(row: &Bound<'_, PyAny>) -> PyResult<RunCostAttempt> {
     let limitations: Vec<String> = serde_json::from_str(&text(7)?)
         .map_err(|error| PyValueError::new_err(format!("unreadable limitations: {error}")))?;
     let run_started_at: String = utc_text(&cell(9)?)?;
-    let started_epoch: i64 = DateTime::parse_from_rfc3339(&run_started_at)
-        .map_err(|error| PyValueError::new_err(error.to_string()))?
-        .timestamp();
+    let epoch = |text: &str| -> PyResult<i64> {
+        Ok(DateTime::parse_from_rfc3339(text)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?
+            .timestamp())
+    };
+    let started_epoch: i64 = epoch(&run_started_at)?;
+    let run_completed_at: String = utc_text(&cell(10)?)?;
+    let completed_epoch: i64 = epoch(&run_completed_at)?;
     Ok(RunCostAttempt {
         run_id: text(0)?,
         orchestration_run_id: optional_text(&cell(1)?)?,
@@ -226,7 +229,8 @@ pub(crate) fn run_attempt(row: &Bound<'_, PyAny>) -> PyResult<RunCostAttempt> {
         },
         target_name: optional_text(&cell(8)?)?,
         run_started_at,
-        run_completed_at: utc_text(&cell(10)?)?,
+        run_completed_at,
         started_epoch,
+        completed_epoch,
     })
 }

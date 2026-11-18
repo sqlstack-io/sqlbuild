@@ -279,7 +279,7 @@ pub(crate) const EVENT_EXPORT_SEVERITIES: [&str; 4] = ["debug", "info", "warning
 /// `TIME_TRAVEL_RETENTION_MATERIALIZATIONS` in declared order.
 pub(crate) const RETENTION_MATERIALIZATIONS: [&str; 3] = ["table", "incremental", "snapshot"];
 pub(crate) const MATERIALIZATION_DEFAULT_KEYS: [&str; 2] = ["time_travel_retention", "table_type"];
-pub(crate) const WAREHOUSE_GROUPS: [&str; 2] = ["build", "query"];
+pub(crate) const WAREHOUSE_GROUPS: [&str; 3] = ["build", "query", "sync"];
 pub(crate) const SNAPSHOT_FULL_REFRESH_POLICIES: [&str; 3] =
     ["allow", "deny", "require_confirmation"];
 pub(crate) const SNAPSHOT_SCHEMA_CHANGE_POLICIES: [&str; 3] =

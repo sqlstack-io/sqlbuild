@@ -19,7 +19,7 @@ use sqlbuild_python_base::records::types::ErrorId;
 const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
 const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 /// `WarehouseGroup` members in declaration order.
-const WAREHOUSE_GROUPS: [&str; 2] = ["build", "query"];
+const WAREHOUSE_GROUPS: [&str; 3] = ["build", "query", "sync"];
 
 fn project_config_error(py: Python<'_>, message: &str, help: Option<&str>) -> PyErr {
     new_error(py, ErrorId::ProjectConfig, message, (None, help))

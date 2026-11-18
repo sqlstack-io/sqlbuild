@@ -1,6 +1,6 @@
 //! Record a build's run cost in the target's state schema, then re-read older incomplete runs.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -11,13 +11,19 @@ use sqlbuild_state::resource_costs::constants::COLLECTION_FAILED_STATUS;
 use sqlbuild_state::resource_costs::main::refresh_candidates::refresh_candidates;
 use sqlbuild_state::resource_costs::models::RunCostAttempt;
 
-use crate::bindings::_helpers::cost_report::records::summary;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::resource_costs::main::summary::summary;
 use sqlbuild_python_front::resource_costs::models::CostRunIdentity;
 use sqlbuild_python_front::resource_costs::models::ResourceCostStore;
 
 /// The attempt number of a build's own collection; each accepted re-read appends the next.
 const FIRST_ATTEMPT: i64 = 1;
+/// Query-history time a build spends re-reading older runs, across all of them.
+const REFRESH_TOTAL_SECONDS: f64 = 8.0;
+/// Query-history time one older run's re-read may take.
+const REFRESH_RUN_SECONDS: f64 = 5.0;
+/// Remaining time below which no further older run is re-read.
+const REFRESH_MIN_SECONDS: f64 = 1.0;
 
 fn coverage(summary: &CostSummary) -> CostCoverage {
     CostCoverage {
@@ -47,9 +53,14 @@ fn refresh_older(
         .into_iter()
         .filter(|latest| latest.run_id != run_id)
         .collect();
+    let started: Instant = Instant::now();
     for older in refresh_candidates(&latest, unix_now()?) {
+        let remaining: f64 = REFRESH_TOTAL_SECONDS - started.elapsed().as_secs_f64();
+        if remaining < REFRESH_MIN_SECONDS {
+            break;
+        }
         let Ok(refreshed) = store
-            .recollect(&older, rate)
+            .recollect(&older, rate, remaining.min(REFRESH_RUN_SECONDS))
             .and_then(|collected| summary(&collected))
         else {
             continue;

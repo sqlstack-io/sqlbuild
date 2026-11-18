@@ -69,6 +69,7 @@ query = "ADHOC_WH"
 |-------|----------|
 | `build` | `audit`, `build`, `check`, `clone`, `dbt` (SQLBuild's own work), `load`, `plan`, `seed` |
 | `query` | `contract`, `cost`, `debug`, `diff`, `freshness`, `janitor`, `query`, `scenario`, `test` |
+| `sync` | `location`: a code location's warehouse syncs, which read metadata and SQLBuild's small state tables |
 
 Each command uses the first of these that is set:
 
@@ -76,6 +77,20 @@ Each command uses the first of these that is set:
 2. The target's warehouse for the command's group
 3. The connection's `warehouse`
 4. The Snowflake user's default warehouse
+
+A location's syncs use the target's `sync` warehouse, else its `query` warehouse, else the
+connection's `warehouse`, so a sync never wakes the target's `build` warehouse just to read
+metadata. Only when the connection sets no `warehouse` does a sync use the `build` warehouse. Set
+`sync` when the syncs need their own warehouse:
+
+```toml
+[targets.dev.warehouses]
+build = "BUILD_WH"
+query = "ADHOC_WH"
+sync = "TINY_WH"
+```
+
+Runs that a location executes, such as `sqb build`, use their own command's group.
 
 Every connection a command opens uses the same warehouse. Tests and audits that run inside
 `sqb build` use the `build` warehouse. Under `sqb dbt`, dbt's own nodes use the warehouse in their

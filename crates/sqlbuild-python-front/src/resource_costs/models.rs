@@ -4,7 +4,6 @@ use crate::native_host::constants::ROWS_PER_STATEMENT;
 use crate::native_host::main::execute::execute;
 use crate::native_host::models::Location;
 use crate::resource_costs::_helpers::resource_costs_state::CREATE_TABLE_METHOD;
-use crate::resource_costs::_helpers::resource_costs_state::REFRESH_BUDGET_SECONDS;
 use crate::resource_costs::_helpers::resource_costs_state::observation_cells;
 use crate::resource_costs::_helpers::resource_costs_state::run_attempt;
 use crate::resource_costs::_helpers::resource_costs_state::table;
@@ -130,11 +129,12 @@ impl<'py> ResourceCostStore<'py> {
             .collect()
     }
 
-    /// Re-collect one older run through the adapter, priced at `rate`.
+    /// Re-collect one older run through the adapter, priced at `rate`, within `budget_seconds`.
     pub fn recollect(
         &self,
         run: &RunCostAttempt,
         (usd_per_credit, rate_source): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+        budget_seconds: f64,
     ) -> PyResult<Bound<'py, PyAny>> {
         let py: Python<'py> = self.adapter.py();
         let parse = imported(py, "datetime", "datetime")?.getattr("fromisoformat")?;
@@ -165,7 +165,7 @@ impl<'py> ResourceCostStore<'py> {
                 ("rate_source", rate_source.clone()),
                 (
                     "budget_seconds",
-                    PyFloat::new(py, REFRESH_BUDGET_SECONDS).into_any(),
+                    PyFloat::new(py, budget_seconds).into_any(),
                 ),
             ],
         )

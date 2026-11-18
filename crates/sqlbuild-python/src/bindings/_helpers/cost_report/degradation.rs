@@ -14,7 +14,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::cost_report::attribution::report_cost_status;
 use crate::bindings::_helpers::cost_report::publication::publish_resource_costs;
-use crate::bindings::_helpers::cost_report::records::cost_run;
 use crate::bindings::_helpers::cost_report::store;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -22,6 +21,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cost_context::main::cost_aware::cost_aware;
+use sqlbuild_python_front::resource_costs::main::cost_run::cost_run;
 
 const LOGGER_NAME: &str = "sqlbuild.cli.commands._helpers.cost.collection";
 const COLLECTION_LOGGER_NAME: &str = "sqlbuild.cost";
@@ -30,6 +30,8 @@ const CONFIGURED_RATE_SOURCE: &str = "configured";
 const STATEMENT_LEDGER_PATH: [&str; 4] = ["target", "executions", "", "statements.jsonl"];
 const BUILD_BREAKDOWN_LIMIT: usize = 5;
 const FALLBACK_TERMINAL_COLUMNS: usize = 100;
+/// Query-history budget of a command-line build's run-end sweep; what it misses, a later build reads.
+pub(crate) const RUN_END_SWEEP_SECONDS: f64 = 6.0;
 
 /// Log the failure with its traceback, as `_LOGGER.exception` inside the handler did.
 fn log_failure(py: Python<'_>, message: &str, error: &PyErr) -> PyResult<()> {
@@ -271,7 +273,7 @@ fn collection_failure<'py>(
 fn collected_summary<'py>(
     finalization: &Bound<'py, PyAny>,
     adapter: &Bound<'py, PyAny>,
-    (config, rate_source): (&Bound<'py, PyAny>, &str),
+    ((config, rate_source), budget): ((&Bound<'py, PyAny>, &str), Option<f64>),
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = finalization.py();
     let run_id: Bound<'py, PyAny> = native_field(finalization, "run_id")?;
@@ -300,6 +302,10 @@ fn collected_summary<'py>(
             ("statement_ledger_path", ledger),
             ("usd_per_credit", native_field(config, "usd_per_credit")?),
             ("rate_source", PyString::new(py, rate_source).into_any()),
+            (
+                "budget_seconds",
+                pyo3::IntoPyObjectExt::into_bound_py_any(budget, py)?,
+            ),
         ],
     )
 }
@@ -308,6 +314,14 @@ fn collected_summary<'py>(
 #[pyfunction]
 pub(crate) fn finalize_build_cost<'py>(
     finalization: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    finalize_build_cost_within(finalization, None)
+}
+
+/// [`finalize_build_cost`] with the collection's query-history budget, or the adapter's default.
+pub(crate) fn finalize_build_cost_within<'py>(
+    finalization: &Bound<'py, PyAny>,
+    budget: Option<f64>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = finalization.py();
     let adapter: Bound<'py, PyAny> = native_field(finalization, "adapter")?;
@@ -331,7 +345,7 @@ pub(crate) fn finalize_build_cost<'py>(
         return Ok(py.None().into_bound(py));
     }
     let cost: Bound<'py, PyAny> = if native_field(finalization, "collect")?.is_truthy()? {
-        match collected_summary(finalization, &adapter, rate) {
+        match collected_summary(finalization, &adapter, (rate, budget)) {
             Ok(summary) => summary,
             Err(error) => return collection_failure(finalization, rate, "collection", &error),
         }

@@ -97,3 +97,30 @@ pub struct CalendarRequest {
     pub timezone: String,
     pub trigger: TriggerDefinition,
 }
+
+/// A worker build's cost finalization, held until the run has published its outcome.
+#[derive(Debug, Default)]
+pub struct DeferredCost(std::sync::Mutex<Option<Py<PyAny>>>);
+
+impl DeferredCost {
+    const POISONED: &str = "deferred cost lock is poisoned";
+
+    /// Keep `finalization`, replacing any earlier one.
+    pub fn defer(&self, finalization: &Bound<'_, PyAny>) -> PyResult<()> {
+        *self
+            .0
+            .lock()
+            .map_err(|_| pyo3::exceptions::PyRuntimeError::new_err(Self::POISONED))? =
+            Some(finalization.clone().unbind());
+        Ok(())
+    }
+
+    /// The deferred finalization, once.
+    pub fn take(&self) -> PyResult<Option<Py<PyAny>>> {
+        Ok(self
+            .0
+            .lock()
+            .map_err(|_| pyo3::exceptions::PyRuntimeError::new_err(Self::POISONED))?
+            .take())
+    }
+}

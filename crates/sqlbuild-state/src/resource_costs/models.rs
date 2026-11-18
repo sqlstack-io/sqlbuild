@@ -16,6 +16,8 @@ pub struct RunCostAttempt {
     pub run_completed_at: String,
     /// Seconds since the epoch of the run's start.
     pub started_epoch: i64,
+    /// Seconds since the epoch of the run's end.
+    pub completed_epoch: i64,
 }
 
 /// What identifies one observation: the run, the collection attempt, the resource and its warehouse.

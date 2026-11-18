@@ -9,7 +9,7 @@ use sqlbuild_cli::cost_store::main::read_cost_run::read_cost_run;
 use sqlbuild_cli::cost_store::main::write_cost_run::write_cost_run;
 use sqlbuild_core::cost_report::models::CostRun;
 
-use crate::bindings::_helpers::cost_report::records::artifact_error;
+use sqlbuild_python_front::resource_costs::main::artifact_error::artifact_error;
 
 fn failure(py: Python<'_>, error: CostStoreError) -> PyErr {
     match error {

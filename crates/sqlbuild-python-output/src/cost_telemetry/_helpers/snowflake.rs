@@ -12,6 +12,9 @@ use sqlbuild_analysis::snowflake_cost::models::QueryTag;
 use sqlbuild_core::cost_allocation::constants::QUERY_HISTORY_RESULT_LIMIT;
 use sqlbuild_core::cost_allocation::main::query_history_sql::query_history_sql;
 use sqlbuild_core::cost_allocation::models::{QueryHistoryWindow, RunAllocation};
+use sqlbuild_core::cost_command::constants::{
+    INCOMPLETE_HISTORY_LIMITATION, MISSING_METADATA_LIMITATION,
+};
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::cost_telemetry::_helpers::allocation::SummaryState;
@@ -29,6 +32,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cursor::constants::DATETIME_MODULE;
+use sqlbuild_python_front::native_host::main::elapsed_seconds::elapsed_seconds;
+use sqlbuild_python_front::native_host::main::seconds_since::seconds_since;
 
 /// Default budget of one collection, which the at-exit collection keeps short.
 const DEADLINE_SECONDS: f64 = 30.0;
@@ -40,6 +45,8 @@ const STATEMENT_TIMEOUT_CODE: &str = "000630";
 const RUNNING_STATUS: &str = "RUNNING";
 const HOOK_RESOURCE_TYPE: &str = "hook";
 const ROW_WIDTH: usize = 14;
+/// Seconds after which a finished query still without a warehouse size, such as DDL, used none.
+const METADATA_SETTLE_SECONDS: f64 = 120.0;
 const NO_WAREHOUSE_COMPUTE: &str = "no_warehouse_compute";
 const MISSING_WAREHOUSE_METADATA: &str = "missing_warehouse_metadata";
 const INCOMPLETE_HISTORY: &str = "incomplete_history";
@@ -311,7 +318,13 @@ fn row_observation<'py>(
         return Ok(Err(INCOMPLETE_HISTORY));
     }
     if milliseconds.eq(0)? || warehouse_name.is_none() || warehouse_size.is_none() {
-        return Ok(Err(MISSING_WAREHOUSE_METADATA));
+        let settled: bool =
+            !running && elapsed_seconds(&end_time, &observed_at)? >= METADATA_SETTLE_SECONDS;
+        return Ok(Err(if settled {
+            NO_WAREHOUSE_COMPUTE
+        } else {
+            MISSING_WAREHOUSE_METADATA
+        }));
     }
     let tag: Option<QueryTag> = if query_tag.is_instance_of::<PyString>() {
         sqlbuild_query_tag(&query_tag.extract::<String>()?)
@@ -392,7 +405,7 @@ fn open_rows<'py>(
     ))
 }
 
-/// Observations of the run window: one open read, halved windows when saturated or timed out.
+/// Observations of the run window: an open read while it is open, else only the window itself.
 fn query_observations<'py>(
     history: &History<'py>,
     (started_at, completed_at): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -402,7 +415,11 @@ fn query_observations<'py>(
     let skew: Bound<'py, PyAny> = timedelta(py, ("minutes", 10))?;
     let window_start: Bound<'py, PyAny> = started_at.sub(&skew)?;
     let window_end: Bound<'py, PyAny> = completed_at.add(&skew)?;
-    let (rows, saturated) = open_rows(history, (&window_start, &window_end))?;
+    let (rows, saturated) = if seconds_since(&window_end)?.is_sign_positive() {
+        bounded_rows(history, (&window_start, &window_end))?
+    } else {
+        open_rows(history, (&window_start, &window_end))?
+    };
     let observations: Bound<'py, PyList> = PyList::empty(py);
     let mut observed: HashSet<String> = HashSet::new();
     let mut skipped: Vec<(String, &'static str)> = Vec::new();
@@ -531,12 +548,10 @@ fn with_observation_gaps(
     let incomplete: bool = relevant.contains(&INCOMPLETE_HISTORY);
     let mut added: Vec<String> = Vec::new();
     if missing_metadata {
-        added.push(
-            "One or more run statements had missing Snowflake warehouse metadata.".to_owned(),
-        );
+        added.push(MISSING_METADATA_LIMITATION.to_owned());
     }
     if incomplete {
-        added.push("One or more run statements were still incomplete in query history.".to_owned());
+        added.push(INCOMPLETE_HISTORY_LIMITATION.to_owned());
     }
     summary.state.limitations = with_limitations(&summary.state.limitations, added);
     let query_count: usize = summary
@@ -554,6 +569,15 @@ fn with_observation_gaps(
         relevant.len(),
     ];
     summary
+}
+
+/// Whether every expected statement is visible and finished, lacking at most settling metadata.
+fn awaits_only_metadata(expected: &HashSet<String>, observed: &Observed<'_>) -> bool {
+    expected.is_subset(&observed.observed)
+        && !observed
+            .skipped
+            .iter()
+            .any(|(id, reason)| expected.contains(id) && *reason == INCOMPLETE_HISTORY)
 }
 
 fn incomplete_observation(expected: &HashSet<String>, observed: &Observed<'_>) -> bool {
@@ -690,12 +714,12 @@ fn collect<'py>(
             return Ok(with_ledger_failure(complete, failure.as_deref()));
         }
         summary = Some(current);
-        if attempt + 1 < collection.attempts {
-            if history.deadline - monotonic(py)? <= collection.retry_delay_seconds {
-                break;
-            }
-            imported(py, "time", "sleep")?.call1((collection.retry_delay_seconds,))?;
+        let last: bool =
+            attempt + 1 >= collection.attempts || awaits_only_metadata(&expected_ids, &observed);
+        if last || history.deadline - monotonic(py)? <= collection.retry_delay_seconds {
+            break;
         }
+        imported(py, "time", "sleep")?.call1((collection.retry_delay_seconds,))?;
     }
     let mut summary: Summary =
         summary.unwrap_or_else(|| partial("Snowflake query history could not be collected."));
