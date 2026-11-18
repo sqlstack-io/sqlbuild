@@ -4,6 +4,7 @@ use crate::planner_strategy::main::values::input_error::input_error;
 use crate::planner_strategy::main::values::text::text;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyTuple;
@@ -149,16 +150,55 @@ pub(crate) fn outside_target_lineage(
     audit: &Bound<'_, PyAny>,
     graph: &ProjectGraph,
 ) -> PyResult<bool> {
+    let Some(target) = lineage_target(audit)? else {
+        return Ok(false);
+    };
+    let lineage = reachable_graph_keys(&[target], graph, EdgeDirection::Upstream);
+    outside_lineage(audit, &lineage)
+}
+
+/// `outside_target_lineage` of each audit, walking each distinct target's lineage once.
+///
+/// Many audits attach to one model; walking its upstream lineage per audit dominated planning.
+/// One target's lineage is held at a time.
+pub(crate) fn outside_target_lineages(
+    audits: &[Bound<'_, PyAny>],
+    graph: &ProjectGraph,
+) -> PyResult<Vec<bool>> {
+    let mut outside: Vec<bool> = vec![false; audits.len()];
+    let mut by_target: HashMap<(String, String), Vec<usize>> = HashMap::new();
+    for (position, audit) in audits.iter().enumerate() {
+        if let Some(target) = lineage_target(audit)? {
+            by_target.entry(target).or_default().push(position);
+        }
+    }
+    for (target, positions) in by_target {
+        let lineage = reachable_graph_keys(&[target], graph, EdgeDirection::Upstream);
+        for position in positions {
+            outside[position] = outside_lineage(&audits[position], &lineage)?;
+        }
+    }
+    Ok(outside)
+}
+
+/// The key an attached audit's target lineage starts from, or `None` for an unattached audit.
+fn lineage_target(audit: &Bound<'_, PyAny>) -> PyResult<Option<(String, String)>> {
     let py: Python<'_> = audit.py();
     let kind: Bound<'_, PyAny> = attached_target_kind(audit)?;
     let name: Bound<'_, PyAny> = attached_target_name(audit)?;
     if kind.is_none() || name.is_none() {
-        return Ok(false);
+        return Ok(None);
     }
     let kind: String =
         text(&imported(py, COMPILE_TYPES_MODULE, "AttachedAuditTargetKind")?.call1((kind,))?)?;
-    let target = (kind, text(&name)?);
-    let lineage = reachable_graph_keys(&[target], graph, EdgeDirection::Upstream);
+    Ok(Some((kind, text(&name)?)))
+}
+
+/// Whether the audit reads a dependency outside `lineage`.
+fn outside_lineage(
+    audit: &Bound<'_, PyAny>,
+    lineage: &HashSet<(String, String)>,
+) -> PyResult<bool> {
     for dependency in scope_deps(audit)?.try_iter()? {
         if !lineage.contains(&native_key(&dependency?)?) {
             return Ok(true);
