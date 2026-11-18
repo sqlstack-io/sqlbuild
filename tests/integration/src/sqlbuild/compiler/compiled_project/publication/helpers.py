@@ -1556,6 +1556,9 @@ def tagged_model(name: str, tags: str) -> str:
     )
 
 
+# `--changed` compares a relation with each of its executions this close to its newest, so a
+# rebuild sooner than this after a build still reports that build's edits and inputs.
+ORDER_SKEW_SECONDS: float = 5.2
 CHANGED_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/changed_builds")
 CHANGED_JOB: str = (
     'name = "changed_orders_job"\n'
