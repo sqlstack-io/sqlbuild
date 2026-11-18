@@ -30,6 +30,7 @@ pub async fn list_person_attention_acknowledgements(
             .await?
             .into_iter()
             .map(|ack| AttentionAcknowledgement {
+                event_id: ack.event_id,
                 shape: ack.scope["shape"].clone(),
                 key: ack.subject,
                 acknowledged_by: ack.acknowledged_by,

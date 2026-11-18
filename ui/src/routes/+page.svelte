@@ -26,8 +26,8 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
-	import type { AttentionItem } from '$lib/api';
-	import { CLEARED_REASON, acknowledgementOf, clearedWithdrawalId, snoozeWords, withdrawalsDue } from '$lib/build-area/attention-conditions';
+	import type { AttentionItem, Overview } from '$lib/api';
+	import { CLEARED_REASON, acknowledgementOf, clearedWithdrawalId, judgedRead, snoozeWords, withdrawalsDue, type JudgedRead } from '$lib/build-area/attention-conditions';
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
 	import { cappedFolders, quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
@@ -39,10 +39,22 @@
 	const folderSelection = $derived(folderSelections(catalog.data ?? []));
 	// Reads again when the shared listing changes, which node status changes update; until it is held
 	// the overview waits for it rather than listing every node a second time.
+	// Each read is noted with its scope and whether node state had settled (no sync running, the last one
+	// succeeded) when it began, so cleared acknowledgements are judged only from a read that can show them.
+	let lastRead = $state.raw<JudgedRead<Overview> | null>(null);
 	const overview = createResource((client, scope) => {
 		const nodes = catalog.data;
 		if (!nodes && !catalog.error) return new Promise<never>(() => {});
-		return client.overview(scope, nodes);
+		// The shared listing can still hold the previous target's nodes for a moment after a switch.
+		if (nodes && catalogNodes.view.scopeKey !== scope.locationId) return new Promise<never>(() => {});
+		const nodesSettled = untrack(() => {
+			const sync = app.warehouseSync;
+			return !client.supports('getWarehouseSync') || (sync !== null && !sync.syncing && !sync.lastError);
+		});
+		return client.overview(scope, nodes).then((read) => {
+			if (read) lastRead = { overview: read, scopeKey: scope.locationId, nodesSettled };
+			return read;
+		});
 	}, ['runs', 'checks', 'snapshot', 'platform_events', 'triggers']);
 	const data = $derived(overview.data ?? null);
 	// Null data means the person may view only part of the target, so the page offers others instead.
@@ -106,16 +118,17 @@
 	// the same event, which the server applies once; runs are acknowledged for good and never withdrawn.
 	const withdrawn = new Set<string>();
 	$effect(() => {
-		const sync = app.warehouseSync;
-		const due = withdrawalsDue(data?.clearedAcknowledgements, { failed: !!overview.error, syncing: !!sync?.syncing || !!sync?.lastError });
 		const scope = app.scope;
+		const read = judgedRead(lastRead, { shown: data, scopeKey: scope?.locationId ?? null, failed: !!overview.error });
+		const due = read ? withdrawalsDue(read.overview.clearedAcknowledgements, { failed: false, syncing: !read.nodesSettled }) : [];
 		if (!scope || !canAcknowledgeConditions || !due.length) return;
 		untrack(() => {
 			for (const ack of due) {
 				const eventId = clearedWithdrawalId(ack);
 				if (withdrawn.has(eventId)) continue;
 				withdrawn.add(eventId);
-				void app.client.acknowledgeCondition(scope, ack.key, ack.shape, false, { eventId, reason: CLEARED_REASON }).catch(() => withdrawn.delete(eventId));
+				const automatic = { eventId, reason: CLEARED_REASON, withdraws: ack.eventId };
+				void app.client.acknowledgeCondition(scope, ack.key, ack.shape, false, automatic).catch(() => withdrawn.delete(eventId));
 			}
 		});
 	});

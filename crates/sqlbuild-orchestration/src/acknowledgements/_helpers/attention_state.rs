@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use crate::acknowledgements::constants::{ACKNOWLEDGED, WITHDRAWN};
 use crate::acknowledgements::models::PriorAttention;
-use crate::acknowledgements::models::{AttentionAcknowledgementRequest, AttentionSnooze};
+use crate::acknowledgements::models::{
+    AttentionAcknowledgementRequest, AttentionSnooze, StandingAttention,
+};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -34,7 +36,7 @@ pub(crate) async fn prior_attention(
     let (transaction, latest) = query(
         transaction,
         &format!(
-            "SELECT action, occurred_at, scope_json FROM sqb_security_audit \
+            "SELECT event_id, action, occurred_at, scope_json FROM sqb_security_audit \
              WHERE action IN ('{ACKNOWLEDGED}','{WITHDRAWN}') AND scope_json ->> 'location_id'=$1 \
              AND scope_json ->> 'target'=$2 AND scope_json ->> 'key'=$3 ORDER BY storage_id DESC LIMIT 1"
         ),
@@ -50,24 +52,34 @@ pub(crate) async fn prior_attention(
         .map(|row| serde_json::from_value(row["occurred_at"].clone()))
         .transpose()
         .map_err(|error| ControlError::Schema(format!("acknowledgement time: {error}")))?;
-    let standing = PriorAttention::Standing {
+    let event_id: Option<Uuid> = previous
+        .map(|row| serde_json::from_value(row["event_id"].clone()))
+        .transpose()
+        .map_err(|error| ControlError::Schema(format!("acknowledgement event: {error}")))?;
+    let standing = StandingAttention {
+        event_id,
         acknowledged: previous.is_some_and(|row| row["action"].as_str() == Some(ACKNOWLEDGED)),
         shape: previous.map_or(Value::Null, |row| row["scope_json"]["shape"].clone()),
         at,
     };
-    Ok((transaction, standing))
+    Ok((transaction, PriorAttention::Standing(standing)))
 }
 
-/// Whether a request changes nothing: the same shape while it holds, or a withdrawal with none standing.
+/// Whether a request changes nothing: a held shape, or a withdrawal of nothing or of a superseded acknowledgement.
 pub(crate) fn unchanged(
-    (acknowledged, shape, at): (bool, &Value, Option<DateTime<Utc>>),
+    standing: &StandingAttention,
     request: &AttentionAcknowledgementRequest,
     (now, snooze): (DateTime<Utc>, AttentionSnooze),
 ) -> bool {
     if !request.acknowledged {
-        return !acknowledged;
+        return !standing.acknowledged
+            || request
+                .withdraws
+                .is_some_and(|named| standing.event_id != Some(named));
     }
-    acknowledged
-        && *shape == request.shape
-        && at.is_some_and(|at| snooze.until(at).is_none_or(|until| now < until))
+    standing.acknowledged
+        && standing.shape == request.shape
+        && standing
+            .at
+            .is_some_and(|at| snooze.until(at).is_none_or(|until| now < until))
 }

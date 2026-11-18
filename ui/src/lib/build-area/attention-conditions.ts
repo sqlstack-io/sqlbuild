@@ -47,14 +47,16 @@ const NOUNS: Record<string, string> = { tick_overdue: 'schedule', calendar_horiz
 /** The server keeps keys to 256 characters; a longer one is cut, with a hash of the whole to keep it distinct. */
 export const MAX_KEY_CHARS = 256;
 export function boundedKey(key: string): string {
-	if (key.length <= MAX_KEY_CHARS) return key;
+	// The server counts characters (code points), so a key is measured and cut by them, never mid-pair.
+	const points = Array.from(key);
+	if (points.length <= MAX_KEY_CHARS) return key;
 	// FNV-1a, 32 bits, twice with different seeds: deterministic and enough to tell keys of one target apart.
 	const fnv = (seed: number) => {
 		let h = seed;
 		for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 0x01000193) >>> 0;
 		return h.toString(16).padStart(8, '0');
 	};
-	return `${key.slice(0, MAX_KEY_CHARS - 18)}#${fnv(0x811c9dc5)}${fnv(0x050c5d1f)}`;
+	return `${points.slice(0, MAX_KEY_CHARS - 18).join('')}#${fnv(0x811c9dc5)}${fnv(0x050c5d1f)}`;
 }
 
 /** The server keeps shapes to 8 KiB; members are left out beyond MAX_MEMBERS or this many bytes, comparing by counts. */
@@ -113,15 +115,38 @@ export function withdrawalsDue(cleared: readonly AttentionAcknowledgement[] | un
 	return (cleared ?? []).filter((a) => a.key !== 'stale_models' || !read.syncing);
 }
 
+/** An Overview read as the page made it: for which scope, and whether node state had settled when it began. */
+export type JudgedRead<T> = { overview: T; scopeKey: string; nodesSettled: boolean };
+
+/**
+ * The read whose cleared acknowledgements may be withdrawn, or null: only the page's own latest read, while
+ * it is what is shown, for the scope now selected, and not after a failed reload. Shown data that came from
+ * elsewhere (remembered from an earlier visit, or still the previous target's) is never judged.
+ */
+export function judgedRead<T>(read: JudgedRead<T> | null, now: { shown: T | null; scopeKey: string | null; failed: boolean }): JudgedRead<T> | null {
+	if (!read || now.failed || now.shown !== read.overview || now.scopeKey !== read.scopeKey) return null;
+	return read;
+}
+
 /** What the audit log says of a withdrawal made because the condition cleared. */
 export const CLEARED_REASON = 'automatic: the condition cleared';
+
+/**
+ * Whether an event's condition is one every viewer of `scopeKey` (a `<location>:<target>` key) sees in full:
+ * the server-wide scheduler, which everyone sees, or this target's own problems. Others' problems are
+ * listed only to people who may view their target, so their absence here says nothing.
+ */
+export function visibleEventKey(key: string, scopeKey: string): boolean {
+	if (key === boundedKey('event:scheduler_no_leader::')) return true;
+	return ['location_broken', 'tick_overdue', 'calendar_horizon_low'].some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
+}
 
 /**
  * The event ID of withdrawing `ack` because its condition cleared: the same for every viewer, so the
  * server applies it once however many Overviews notice. A new acknowledgement gets a new one.
  */
-export function clearedWithdrawalId(ack: Pick<AttentionAcknowledgement, 'key' | 'at'>): string {
-	const text = `${ack.key}\n${ack.at}\ncleared`;
+export function clearedWithdrawalId(ack: Pick<AttentionAcknowledgement, 'eventId'>): string {
+	const text = `${ack.eventId}\ncleared`;
 	// FNV-1a, 32 bits, with four seeds: 128 deterministic bits, shaped as a UUID (version 8, variant 10).
 	const hash = (seed: number) => {
 		let h = seed;

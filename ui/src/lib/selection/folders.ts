@@ -64,11 +64,13 @@ export function folderSelections(nodes: readonly CatalogNode[]): Map<string, str
 		groupAt.set(dir, g);
 	}
 	// A folder is exact only when no other group's node sits anywhere under it.
-	const inexact = inexactDirs(nodes, new Set(groupAt.keys()), (n, dir) => groupAt.get(dir) === topFolder(n));
+	// Sources are left out of the folders' counts, so one under a folder makes a path select more than counted.
+	const inexact = inexactDirs(nodes, new Set(groupAt.keys()), (n, dir) => n.kind !== 'source' && groupAt.get(dir) === topFolder(n));
 	const out = new Map<string, string>();
 	for (const [g, list] of groups) {
 		const dir = folderOf.get(g);
-		out.set(g, dir && !inexact.has(dir) ? `path:${dir}` : [...new Set(list.map((n) => shortName(n.key)))].join(' '));
+		const counted = list.filter((n) => n.kind !== 'source');
+		out.set(g, dir && !inexact.has(dir) ? `path:${dir}` : [...new Set((counted.length ? counted : list).map((n) => shortName(n.key)))].join(' '));
 	}
 	return out;
 }

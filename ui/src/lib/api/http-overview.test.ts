@@ -52,7 +52,7 @@ describe('overview from live reads', () => {
 		changes: [change(1, [['added', 'model:orders'], ['added', 'seed:regions'], ['removed', 'model:old']]), change(24 * 8, [['added', 'model:totals']])],
 		events: [event('scheduler', true), event('cleared', false)],
 		acknowledgements: new Map([['orders-new', { by: 'ada', at: hoursAgo(1) }]]),
-		conditions: { snoozeSeconds: 86_400, acknowledgements: [] },
+		conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev',
 		now
 	});
 
@@ -103,7 +103,7 @@ describe('overview from live reads', () => {
 
 	it('leaves parts without a server read empty instead of zero', () => {
 		expect(overview.metrics.cost).toBeNull();
-		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, now });
+		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
 		expect(unknown.groups).toBeNull();
 	});
 });

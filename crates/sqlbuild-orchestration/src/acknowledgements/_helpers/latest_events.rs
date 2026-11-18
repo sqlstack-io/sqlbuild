@@ -35,14 +35,15 @@ pub(crate) async fn latest_acknowledgements(
     let since = window.map_or(DateTime::UNIX_EPOCH, |window| transaction.now - window);
     let (transaction, rows) = query(
         transaction,
-        "SELECT a.action, COALESCE(p.name, a.actor) AS actor, a.occurred_at, a.scope_json \
-         FROM sqb_security_audit a LEFT JOIN sqb_principals p ON 'principal:' || CAST(p.principal_id AS TEXT)=a.actor \
-         WHERE a.occurred_at >= $1 AND a.action IN ($2, $3) \
-         AND a.scope_json ->> 'location_id'=$4 AND a.scope_json ->> 'target'=$5 ORDER BY a.storage_id",
+        &format!(
+            "SELECT a.event_id, a.action, COALESCE(p.name, a.actor) AS actor, a.occurred_at, a.scope_json \
+             FROM sqb_security_audit a LEFT JOIN sqb_principals p ON 'principal:' || CAST(p.principal_id AS TEXT)=a.actor \
+             WHERE a.action IN ('{}', '{}') AND a.occurred_at >= $1 \
+             AND a.scope_json ->> 'location_id'=$2 AND a.scope_json ->> 'target'=$3 ORDER BY a.storage_id",
+            events.acknowledged, events.withdrawn
+        ),
         vec![
             Parameter::Time(since),
-            Parameter::Text(events.acknowledged.into()),
-            Parameter::Text(events.withdrawn.into()),
             Parameter::Text(location_id.to_string()),
             Parameter::Text(target.into()),
         ],
@@ -60,8 +61,11 @@ pub(crate) async fn latest_acknowledgements(
             .to_owned();
         let acknowledged_at: DateTime<Utc> = serde_json::from_value(row["occurred_at"].clone())
             .map_err(|error| ControlError::Schema(format!("acknowledgement time: {error}")))?;
+        let event_id: Uuid = serde_json::from_value(row["event_id"].clone())
+            .map_err(|error| ControlError::Schema(format!("acknowledgement event: {error}")))?;
         let marked =
             (row["action"].as_str() == Some(events.acknowledged)).then(|| LatestAcknowledgement {
+                event_id,
                 subject: subject.clone(),
                 acknowledged_by: row["actor"].as_str().unwrap_or_default().into(),
                 acknowledged_at,

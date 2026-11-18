@@ -1653,6 +1653,11 @@ export interface components {
             acknowledged_at: string;
             /** @description The person's name, or the audit actor when the person no longer exists. */
             acknowledged_by: string;
+            /**
+             * Format: uuid
+             * @description The acknowledging audit event, which a withdrawal can name.
+             */
+            event_id: string;
             key: string;
             shape: unknown;
             /**
@@ -1672,6 +1677,11 @@ export interface components {
             reason?: string | null;
             /** @description What the condition looks like, as a JSON object of at most 8 KiB that later states are compared with. */
             shape: unknown;
+            /**
+             * Format: uuid
+             * @description For a withdrawal, the acknowledgement event it withdraws: it applies only while that is still the latest.
+             */
+            withdraws?: string | null;
         };
         /** @description A target's condition acknowledgements, and how long one lasts while its condition is unchanged. */
         AttentionAcknowledgements: {

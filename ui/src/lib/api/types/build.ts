@@ -386,7 +386,9 @@ export type ConditionShape = {
 	occurrence?: string;
 };
 /** A condition's latest acknowledgement, as the server lists it; `until` is when it lapses even unchanged, null without a time limit. */
-export type AttentionAcknowledgement = { key: string; shape: ConditionShape; by: string; at: Iso; until: Iso | null };
+export type AttentionAcknowledgement = { eventId: string; key: string; shape: ConditionShape; by: string; at: Iso; until: Iso | null };
+/** A withdrawal the Overview makes itself: its event ID, why, and the acknowledgement event it withdraws. */
+export type AutomaticWithdrawal = { eventId: string; reason: string; withdraws: string };
 /** An ongoing condition on the attention list, acknowledged until it changes. */
 export type AttentionCondition = {
 	/** Its kind and subject, stable while it lasts, such as `stale_sources`. */

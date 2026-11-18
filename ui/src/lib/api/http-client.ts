@@ -21,7 +21,7 @@ import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
-import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape } from './types/build';
+import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
@@ -510,10 +510,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		},
-		async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: { eventId: string; reason: string }): Promise<void> {
+		async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: AutomaticWithdrawal): Promise<void> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements', {
-				body: { event_id: automatic?.eventId ?? newRequestId(), key, shape, acknowledged, ...(automatic ? { reason: automatic.reason } : {}) },
+				body: { event_id: automatic?.eventId ?? newRequestId(), key, shape, acknowledged, ...(automatic ? { reason: automatic.reason, withdraws: automatic.withdraws } : {}) },
 				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
 			});
 			if (response.status === 401) onUnauthorized();
@@ -880,7 +880,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			});
 			if (!read) return null;
 			const [runs, checks, nodes, changes, events, acknowledgements, conditions] = read;
-			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now() });
+			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
@@ -1158,7 +1158,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return {
 			snoozeSeconds: data.snooze_seconds ?? null,
-			acknowledgements: data.acknowledgements.map((a) => ({ key: a.key, shape: a.shape as ConditionShape, by: a.acknowledged_by, at: a.acknowledged_at, until: a.until ?? null }))
+			acknowledgements: data.acknowledgements.map((a) => ({ eventId: a.event_id, key: a.key, shape: a.shape as ConditionShape, by: a.acknowledged_by, at: a.acknowledged_at, until: a.until ?? null }))
 		};
 	}
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AttentionAcknowledgement, AttentionItem, CatalogNode, PlatformEvent, StaleReason } from '$lib/api';
 import { overviewOf } from '$lib/api/http-overview';
-import { acknowledgementOf, clearedWithdrawalId, conditionOf, snoozeWords, withConditions, withdrawalsDue } from './attention-conditions';
+import { acknowledgementOf, clearedWithdrawalId, conditionOf, judgedRead, snoozeWords, withConditions, withdrawalsDue } from './attention-conditions';
 import { toPlatformEvents } from '$lib/api/http-problems';
 
 const now = Date.parse('2026-11-18T12:00:00Z');
@@ -26,7 +26,7 @@ const source = (key: string, status: 'warn' | 'error') => ({ key, status, loaded
 /** The acknowledgement of `item` as it looks now, made `hoursAgo` ago. */
 const acknowledged = (item: AttentionItem, hoursAgo = 1): AttentionAcknowledgement => {
 	const { key, shape } = conditionOf(item)!;
-	return { key, shape, by: 'ada', at: iso(-hoursAgo), until: iso(24 - hoursAgo) };
+	return { eventId: `ack-${key}-${hoursAgo}`, key, shape, by: 'ada', at: iso(-hoursAgo), until: iso(24 - hoursAgo) };
 };
 const stateOf = (item: AttentionItem, acks: AttentionAcknowledgement[], at = now) => {
 	const [shown] = withConditions([item], acks, at);
@@ -108,6 +108,12 @@ describe('server problems, whose event IDs are fixed per problem', () => {
 });
 
 describe('the server’s limits', () => {
+	it('cuts a long key between characters, never inside one', () => {
+		const key = conditionOf({ kind: 'platform_event', event: event({ subject: '🦆'.repeat(300) }) })!.key;
+		expect(Array.from(key).length).toBeLessThanOrEqual(256);
+		expect(key).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+	});
+
 	it('keeps keys to 256 characters, distinct for distinct long subjects', () => {
 		const long = (name: string) => conditionOf({ kind: 'platform_event', event: event({ subject: `${name.repeat(300)} · prod` }) })!.key;
 		expect(long('a').length).toBeLessThanOrEqual(256);
@@ -124,11 +130,11 @@ describe('the server’s limits', () => {
 });
 
 describe('acknowledgements of conditions that cleared', () => {
-	const ack = (key: string, shape = {}): AttentionAcknowledgement => ({ key, shape, by: 'ada', at: iso(-2), until: iso(22) });
+	const ack = (key: string, shape = {}): AttentionAcknowledgement => ({ eventId: `ack-${key}`, key, shape, by: 'ada', at: iso(-2), until: iso(22) });
 	const built = (stale: StaleReason[] | null): CatalogNode => ({ key: 'model:orders', kind: 'table', path: 'models/orders.sql', group: null, upstream: [], stale, lastOutcome: 'success', lastBuild: { builtAt: iso(-1) } }) as unknown as CatalogNode;
 	const changed: StaleReason = { reason: 'changed', change: 'definition', detail: '', since: iso(-3) };
 	const read = (nodes: CatalogNode[], acks: AttentionAcknowledgement[]) =>
-		overviewOf({ runs: [], checks: [], nodes, changes: [], events: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now });
+		overviewOf({ runs: [], checks: [], nodes, changes: [], events: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now, scopeKey: 'loc-1:dev' });
 
 	it('lists one whose condition the read can see and no longer finds', () => {
 		const nodesOutOfDate = ack('stale_models', { counts: { changed: 2, behind: 0 } });
@@ -139,7 +145,38 @@ describe('acknowledgements of conditions that cleared', () => {
 	it('never lists one the read cannot see: unknown build state, or late sources, which it does not check', () => {
 		expect(read([built(null)], [ack('stale_models')]).clearedAcknowledgements).toEqual([]);
 		expect(read([built([])], [ack('stale_sources')]).clearedAcknowledgements).toEqual([]);
-		expect(read([built([])], [ack('event:tick_overdue:loc-1:shop · prod')]).clearedAcknowledgements).toEqual([ack('event:tick_overdue:loc-1:shop · prod')]);
+		expect(read([built([])], [ack('event:tick_overdue:loc-1:dev:shop · dev')]).clearedAcknowledgements).toEqual([ack('event:tick_overdue:loc-1:dev:shop · dev')]);
+	});
+
+	it('judges another target’s problems never, as a viewer may not be allowed to see them; the scheduler always', () => {
+		// The server lists a broken location, late schedules and low calendars only to people who may view
+		// that target, so their absence from this read says nothing about them.
+		const elsewhere = [ack('event:location_broken:loc-2:prod:billing · prod'), ack('event:tick_overdue:loc-1:prod:shop · prod'), ack('event:calendar_horizon_low:loc-2:dev:billing · dev')];
+		expect(read([built([])], elsewhere).clearedAcknowledgements).toEqual([]);
+		expect(read([built([])], [ack('event:scheduler_no_leader::')]).clearedAcknowledgements).toEqual([ack('event:scheduler_no_leader::')]);
+		expect(read([built([])], [ack('event:location_broken:loc-1:dev:shop · dev')]).clearedAcknowledgements).toHaveLength(1);
+	});
+
+	it('judges only the page’s own latest read, for the target now selected, shown and not failed', () => {
+		const a = read([built([])], [ack('stale_models')]);
+		const b = read([built([])], []);
+		const readA = { overview: a, scopeKey: 'loc-1:dev', nodesSettled: true };
+		expect(judgedRead(readA, { shown: a, scopeKey: 'loc-1:dev', failed: false })).toBe(readA);
+		// Switched to target B: A's data is still shown until B's read lands, and A's withdrawal waits on it.
+		expect(judgedRead(readA, { shown: a, scopeKey: 'loc-2:dev', failed: false })).toBeNull();
+		// Back on A, its remembered data shows before a fresh read: never judged.
+		expect(judgedRead({ overview: b, scopeKey: 'loc-2:dev', nodesSettled: true }, { shown: a, scopeKey: 'loc-1:dev', failed: false })).toBeNull();
+		expect(judgedRead(readA, { shown: a, scopeKey: 'loc-1:dev', failed: true })).toBeNull();
+		expect(judgedRead(null, { shown: a, scopeKey: 'loc-1:dev', failed: false })).toBeNull();
+	});
+
+	it('judges nodes out of date only from a read that began after node state settled', () => {
+		const a = read([built([])], [ack('stale_models'), ack('event:scheduler_no_leader::')]);
+		// Read during a sync: even once the sync has finished, that read's nodes are not judged; a new read is needed.
+		const duringSync = judgedRead({ overview: a, scopeKey: 'loc-1:dev', nodesSettled: false }, { shown: a, scopeKey: 'loc-1:dev', failed: false })!;
+		expect(withdrawalsDue(duringSync.overview.clearedAcknowledgements, { failed: false, syncing: !duringSync.nodesSettled }).map((x) => x.key)).toEqual(['event:scheduler_no_leader::']);
+		const afterSync = judgedRead({ overview: a, scopeKey: 'loc-1:dev', nodesSettled: true }, { shown: a, scopeKey: 'loc-1:dev', failed: false })!;
+		expect(withdrawalsDue(afterSync.overview.clearedAcknowledgements, { failed: false, syncing: !afterSync.nodesSettled }).map((x) => x.key)).toEqual(['stale_models', 'event:scheduler_no_leader::']);
 	});
 
 	it('withdraws nothing after a failed read, and nodes out of date only once node state has settled', () => {
@@ -149,12 +186,11 @@ describe('acknowledgements of conditions that cleared', () => {
 		expect(withdrawalsDue(cleared, { failed: false, syncing: false })).toEqual(cleared);
 	});
 
-	it('withdraws each acknowledgement with one event ID every viewer agrees on', () => {
+	it('withdraws each acknowledgement with one event ID every viewer agrees on, derived from that acknowledgement', () => {
 		const id = clearedWithdrawalId(ack('stale_models'));
 		expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 		expect(clearedWithdrawalId(ack('stale_models'))).toBe(id);
-		expect(clearedWithdrawalId({ ...ack('stale_models'), at: iso(-1) })).not.toBe(id);
-		expect(clearedWithdrawalId(ack('stale_sources'))).not.toBe(id);
+		expect(clearedWithdrawalId({ ...ack('stale_models'), eventId: 'a-later-acknowledgement' })).not.toBe(id);
 	});
 
 	it('shows a condition that comes back after it was withdrawn as new, even with a smaller count', () => {

@@ -6,6 +6,7 @@ import { stateOf } from '../node-states';
 import type {
 	AdhocRunCheck,
 	AttentionAcknowledgement,
+	AutomaticWithdrawal,
 	ConditionShape,
 	SelectionEvaluation,
 	SelectionRequest,
@@ -325,9 +326,9 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.conditionAcknowledgements();
 	}
 
-	async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, _automatic?: { eventId: string; reason: string }): Promise<void> {
+	async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: AutomaticWithdrawal): Promise<void> {
 		this.#location(scope);
-		this.#operate.acknowledgeCondition(key, shape, acknowledged, 'you');
+		this.#operate.acknowledgeCondition(key, shape, acknowledged, 'you', automatic?.withdraws);
 	}
 
 	async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {

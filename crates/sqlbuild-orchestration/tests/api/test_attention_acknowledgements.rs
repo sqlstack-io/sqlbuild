@@ -10,7 +10,7 @@ use crate::api::tests::denials_helpers::person_send;
 use crate::api::tests::helpers::{start_api_with_authentication, start_api_with_facts, stop_api};
 use crate::api::tests::test_types::{
     AttentionAcknowledgementTestCase, AttentionSnoozeTestCase, AutomaticWithdrawalTestCase,
-    SnoozeParseTestCase,
+    NamedWithdrawalTestCase, SnoozeParseTestCase,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::role_helpers::role_fixture;
@@ -337,6 +337,16 @@ fn given_a_snooze_setting_when_it_is_parsed_then_durations_and_zero_are_accepted
             expected_seconds: Err("attention_snooze must be a duration"),
         },
         SnoozeParseTestCase {
+            description: "a year",
+            text: "365d",
+            expected_seconds: Ok(Some(31_536_000)),
+        },
+        SnoozeParseTestCase {
+            description: "longer than a year",
+            text: "366d",
+            expected_seconds: Err("attention_snooze can be at most 365 days"),
+        },
+        SnoozeParseTestCase {
             description: "months",
             text: "1mo",
             expected_seconds: Err("can't use years or months"),
@@ -463,6 +473,106 @@ fn given_a_cleared_condition_when_viewers_withdraw_it_automatically_then_it_is_w
                 ),
                 "{}",
                 test_case.description
+            );
+            stop_api(api).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_withdrawal_naming_an_acknowledgement_when_a_newer_one_stands_then_it_changes_nothing() {
+    let test_cases = [
+        NamedWithdrawalTestCase {
+            description: "SQLite",
+            backend: Backend::Sqlite,
+            expected_statuses: [200, 200, 200, 400, 200],
+            expected_applied: [false, true],
+            expected_standing_after_stale: "re-acknowledged",
+        },
+        NamedWithdrawalTestCase {
+            description: "PostgreSQL",
+            backend: Backend::Postgres,
+            expected_statuses: [200, 200, 200, 400, 200],
+            expected_applied: [false, true],
+            expected_standing_after_stale: "re-acknowledged",
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let inventory = create_location(store, "inventory", "orders-admin")
+                .await
+                .expect("location");
+            let api = start_api_with_authentication(
+                store,
+                ApiAuthentication {
+                    login: HumanLogin::Password("https://control.example.com".into()),
+                    ..ApiAuthentication::default()
+                },
+            )
+            .await;
+            let client = reqwest::Client::new();
+            let url = format!(
+                "{}/api/control/locations/{inventory}/targets/development/attention-acknowledgements",
+                api.url
+            );
+            let administrator = (
+                url.as_str(),
+                roles.administrator.bearer.as_str(),
+                roles.administrator.csrf.as_str(),
+            );
+            let send = |body: Value| {
+                let client = client.clone();
+                async move {
+                    let response = person_send(&client, administrator, Some(body)).await;
+                    let status = response.status().as_u16();
+                    (
+                        status,
+                        response.json::<Value>().await.unwrap_or(Value::Null),
+                    )
+                }
+            };
+            let first = Uuid::now_v7();
+            let again = Uuid::now_v7();
+            let acknowledged = send(json!({"event_id": first, "key": "stale_models", "shape": {"counts": {"changed": 2}}, "acknowledged": true})).await;
+            let reacknowledged = send(json!({"event_id": again, "key": "stale_models", "shape": {"counts": {"changed": 3}}, "acknowledged": true, "reason": "re-acknowledged"})).await;
+            let stale = send(json!({"event_id": Uuid::now_v7(), "key": "stale_models", "shape": {}, "acknowledged": false, "reason": "automatic: the condition cleared", "withdraws": first})).await;
+            let named_acknowledgement = send(json!({"event_id": Uuid::now_v7(), "key": "stale_models", "shape": {}, "acknowledged": true, "withdraws": first})).await;
+            let listed: Value = person_send(&client, administrator, None)
+                .await
+                .json()
+                .await
+                .expect("listing");
+            let current = send(json!({"event_id": Uuid::now_v7(), "key": "stale_models", "shape": {}, "acknowledged": false, "reason": "automatic: the condition cleared", "withdraws": again})).await;
+            assert_eq!(
+                (
+                    [
+                        acknowledged.0,
+                        reacknowledged.0,
+                        stale.0,
+                        named_acknowledgement.0,
+                        current.0
+                    ],
+                    [&stale.1["applied"], &current.1["applied"]],
+                    (
+                        &listed["acknowledgements"][0]["event_id"],
+                        &listed["acknowledgements"][0]["shape"]["counts"]["changed"]
+                    ),
+                ),
+                (
+                    test_case.expected_statuses,
+                    test_case.expected_applied.map(Value::Bool).each_ref(),
+                    (&json!(again), &json!(3)),
+                ),
+                "{}: {}",
+                test_case.description,
+                test_case.expected_standing_after_stale
             );
             stop_api(api).await;
             close_test_store(fixture).await;

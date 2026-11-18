@@ -12,7 +12,8 @@ describe('folder selections', () => {
 			node('model:stg_a', 'models/staging/shop/stg_a.sql'),
 			node('model:stg_b', 'models/staging/crm/stg_b.sql')
 		]);
-		expect(out.get('marts')).toBe('path:models/marts');
+		// A source in the folder isn't counted, so its path would select more: the nodes are named instead.
+		expect(out.get('marts')).toBe('orders');
 		expect(out.get('staging')).toBe('path:models/staging');
 	});
 

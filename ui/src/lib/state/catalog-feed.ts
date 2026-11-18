@@ -6,7 +6,8 @@ import { applyNodeStates, deltaAction } from '$lib/api/node-states';
 const SIGNAL_PAUSE_MS = 300;
 
 /** `changedBuild` comes with the node states; null until they are read, or when the server has none. */
-export type CatalogView = { nodes: CatalogNode[] | undefined; error: string | null; loading: boolean; changedBuild: ChangedBuild | null };
+/** `scopeKey` is the location key the view holds nodes for, so a reader can tell them from another target's. */
+export type CatalogView = { nodes: CatalogNode[] | undefined; error: string | null; loading: boolean; changedBuild: ChangedBuild | null; scopeKey?: string | null };
 
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason));
 
@@ -98,7 +99,7 @@ export class CatalogFeed {
 	}
 
 	#set(view: Partial<CatalogView>) {
-		this.#view = { ...this.#view, ...view };
+		this.#view = { ...this.#view, ...view, scopeKey: this.#scope?.locationId ?? null };
 		this.publish(this.#view);
 	}
 

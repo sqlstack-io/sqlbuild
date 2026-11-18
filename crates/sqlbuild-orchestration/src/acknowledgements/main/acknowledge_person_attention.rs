@@ -36,6 +36,11 @@ fn validate(request: &AttentionAcknowledgementRequest) -> Result<(), ControlErro
             "attention shape must be at most {MAX_SHAPE_BYTES} bytes"
         )));
     }
+    if request.acknowledged && request.withdraws.is_some() {
+        return Err(ControlError::Invalid(
+            "only a withdrawal can name the acknowledgement it withdraws".into(),
+        ));
+    }
     if request
         .reason
         .as_ref()
@@ -67,20 +72,11 @@ pub async fn acknowledge_person_attention(
         serde_json::to_value(request).map_err(|error| ControlError::Invalid(error.to_string()))?;
     let (transaction, prior) =
         prior_attention(transaction, (location_id, target), (request, &body)).await?;
-    let PriorAttention::Standing {
-        acknowledged,
-        shape,
-        at,
-    } = prior
-    else {
+    let PriorAttention::Standing(standing) = prior else {
         commit(transaction).await?;
         return Ok(false);
     };
-    if unchanged(
-        (acknowledged, &shape, at),
-        request,
-        (transaction.now, snooze),
-    ) {
+    if unchanged(&standing, request, (transaction.now, snooze)) {
         commit(transaction).await?;
         return Ok(false);
     }
@@ -95,7 +91,7 @@ pub async fn acknowledge_person_attention(
         (request.event_id, action),
         (
             json!({"location_id": location_id, "target": target, "key": request.key, "shape": request.shape, "reason": request.reason, "request": body}),
-            json!({"acknowledged": acknowledged, "shape": shape}),
+            json!({"acknowledged": standing.acknowledged, "shape": standing.shape}),
             json!({"acknowledged": request.acknowledged, "shape": request.shape}),
         ),
     )

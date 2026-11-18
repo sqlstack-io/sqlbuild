@@ -1,6 +1,6 @@
 import { topFolder } from '$lib/lineage/catalog-graph';
 import { recentDeploys } from '$lib/build-area/overview-panels';
-import { clearedAcknowledgements, withConditions } from '$lib/build-area/attention-conditions';
+import { clearedAcknowledgements, visibleEventKey, withConditions } from '$lib/build-area/attention-conditions';
 import { checkCountsOf } from './http-catalog';
 import type { Acknowledgement, AttentionAcknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, GroupStatus, Overview, PlatformEvent, Run, SnapshotChange } from './types';
 
@@ -19,6 +19,8 @@ export type OverviewInputs = {
 	events: PlatformEvent[];
 	/** Problem runs marked handled, by run ID. */
 	acknowledgements: Map<string, Acknowledgement>;
+	/** The location key (`<location>:<target>`) the read was for. */
+	scopeKey: string;
 	/** Conditions' latest acknowledgements, and the server's snooze (undefined from a server without it). */
 	conditions: { snoozeSeconds: number | null | undefined; acknowledgements: AttentionAcknowledgement[] };
 	now: number;
@@ -68,7 +70,7 @@ export function groupStatusOf(nodes: CatalogNode[]): GroupStatus[] {
  * does not check source freshness, so late sources stay unknown. Groups are top-level folders, and
  * group status is null when the server reports no build state. There is no cost read, so the page hides cost.
  */
-export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now }: OverviewInputs): Overview {
+export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now, scopeKey }: OverviewInputs): Overview {
 	const acknowledged = (r: Run) => acknowledgements.get(r.id) ?? null;
 	const topLevel = runs.filter((r) => !r.parentRunId);
 	const recent = topLevel.filter((r) => Date.parse(r.queuedAt) >= now - DAY);
@@ -108,8 +110,11 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 		},
 		attention: withConditions(attention, conditions.acknowledgements, now),
 		attentionSnoozeSeconds: conditions.snoozeSeconds,
-		// Nodes out of date are seen only with build state; late sources aren't checked here; events are read in full.
-		clearedAcknowledgements: clearedAcknowledgements(attention, conditions.acknowledgements, (key) => (key === 'stale_models' ? nodes.some((n) => n.stale !== null) : key.startsWith('event:'))),
+		// Nodes out of date are seen only with build state; late sources aren't checked here. Every viewer
+		// sees the scheduler, but other problems only for targets they may view, so only this target's count.
+		clearedAcknowledgements: clearedAcknowledgements(attention, conditions.acknowledgements, (key) =>
+			key === 'stale_models' ? nodes.some((n) => n.stale !== null) : visibleEventKey(key, scopeKey)
+		),
 		groups: nodes.some((n) => n.stale !== null) ? groupStatusOf(nodes) : null,
 		recentChanges: recentDeploys(changes),
 		latestRun: latest ? { id: latest.id, status: latest.status, endedAt: latest.endedAt } : null

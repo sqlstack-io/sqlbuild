@@ -377,6 +377,16 @@ pub(crate) struct AutomaticWithdrawalTestCase {
     pub(crate) expected_withdrawals: usize,
 }
 
+pub(crate) struct NamedWithdrawalTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Statuses of: acknowledge, re-acknowledge, stale withdrawal, acknowledge naming one, current withdrawal.
+    pub(crate) expected_statuses: [u16; 5],
+    /// Whether the withdrawal naming the first and then the second acknowledgement applied.
+    pub(crate) expected_applied: [bool; 2],
+    pub(crate) expected_standing_after_stale: &'static str,
+}
+
 pub(crate) struct ProvidersTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

@@ -6,7 +6,8 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::acknowledgements::constants::{
-    ATTENTION_LISTING_SNOOZES, DEFAULT_ATTENTION_SNOOZE_SECONDS, NO_TIME_LIMIT,
+    ATTENTION_LISTING_SNOOZES, DEFAULT_ATTENTION_SNOOZE_SECONDS, MAX_ATTENTION_SNOOZE_DAYS,
+    NO_TIME_LIMIT,
 };
 use crate::credentials::models::DefaultRole;
 use crate::store::errors::ControlError;
@@ -42,11 +43,16 @@ pub struct AttentionAcknowledgementRequest {
     /// Why, when it isn't a person's own choice, such as a withdrawal once the condition cleared.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// For a withdrawal, the acknowledgement event it withdraws: it applies only while that is still the latest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withdraws: Option<Uuid>,
 }
 
 /// A condition whose latest acknowledgement event marks it handled.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AttentionAcknowledgement {
+    /// The acknowledging audit event, which a withdrawal can name.
+    pub event_id: Uuid,
     pub key: String,
     pub shape: serde_json::Value,
     /// The person's name, or the audit actor when the person no longer exists.
@@ -100,6 +106,11 @@ impl AttentionSnooze {
                 .and_then(|part| total.checked_add(part))
                 .ok_or_else(invalid)
         })?;
+        if seconds > MAX_ATTENTION_SNOOZE_DAYS * 86_400 {
+            return Err(ControlError::Invalid(format!(
+                "attention_snooze can be at most {MAX_ATTENTION_SNOOZE_DAYS} days, or \"0\" for no time limit: {text:?}"
+            )));
+        }
         Duration::try_seconds(seconds)
             .map(|snooze| Self(Some(snooze)))
             .ok_or_else(invalid)
@@ -149,6 +160,7 @@ pub(crate) struct AcknowledgementListing<'a> {
 /// A subject's standing acknowledgement: who made it, when, and the event's scope.
 #[derive(Debug)]
 pub(crate) struct LatestAcknowledgement {
+    pub(crate) event_id: Uuid,
     pub(crate) subject: String,
     pub(crate) acknowledged_by: String,
     pub(crate) acknowledged_at: DateTime<Utc>,
@@ -159,9 +171,14 @@ pub(crate) struct LatestAcknowledgement {
 #[derive(Debug)]
 pub(crate) enum PriorAttention {
     Retried,
-    Standing {
-        acknowledged: bool,
-        shape: Value,
-        at: Option<DateTime<Utc>>,
-    },
+    Standing(StandingAttention),
+}
+
+/// A condition's latest acknowledgement event, if any: whether it acknowledges, with which shape, when.
+#[derive(Debug)]
+pub(crate) struct StandingAttention {
+    pub(crate) event_id: Option<Uuid>,
+    pub(crate) acknowledged: bool,
+    pub(crate) shape: Value,
+    pub(crate) at: Option<DateTime<Utc>>,
 }
