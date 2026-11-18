@@ -62,3 +62,13 @@ class HookReadsTestCase:
     reads: object
     expected_reads: tuple[str, ...] = ()
     expected_error: str = ""
+
+
+@dataclass(frozen=True)
+class NodeSetDependencyTestCase:
+    """A task's dependency on a job or tag, as stored and as it renders."""
+
+    description: str
+    dependency: object
+    expected_dependency: object
+    expected_text: str

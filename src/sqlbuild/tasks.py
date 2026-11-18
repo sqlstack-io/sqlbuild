@@ -8,7 +8,7 @@ from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.executor.python_nodes.models import TaskContext
 from sqlbuild.python_nodes.main.apply_task import apply_task
 from sqlbuild.python_nodes.main.read_task_definition import read_task_definition
-from sqlbuild.python_nodes.models import RetryPolicy, SqlResourceRef, TaskDefinition
+from sqlbuild.python_nodes.models import NodeSetRef, RetryPolicy, SqlResourceRef, TaskDefinition
 
 __all__ = ("SkipMode", "TaskContext", "get_task_definition", "task")
 
@@ -19,8 +19,9 @@ def task(
     name: str | None = None,
     depends_on: Callable[..., object]
     | SqlResourceRef
-    | tuple[Callable[..., object] | SqlResourceRef, ...]
-    | list[Callable[..., object] | SqlResourceRef] = (),
+    | NodeSetRef
+    | tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...]
+    | list[Callable[..., object] | SqlResourceRef | NodeSetRef] = (),
     tags: Sequence[str] = (),
     group: str | None = None,
     description: str | None = None,

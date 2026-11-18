@@ -37,6 +37,7 @@ use sqlbuild_analysis::graph::models::BuildResources;
 use sqlbuild_analysis::graph::models::EdgeDirection;
 use sqlbuild_analysis::graph::models::GraphIndexes;
 use sqlbuild_analysis::graph::models::ProjectGraph;
+use sqlbuild_analysis::node_set_dependencies::models::ResolvedNode;
 use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_nodes::resolve_python_sql_nodes;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection as run_selection;
@@ -48,6 +49,7 @@ use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::discovery::main::records::stored_node_sets::stored_node_sets;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -398,6 +400,8 @@ pub struct ProjectSelection {
     pub(crate) sources: Vec<(String, Option<String>)>,
     allow_warehouse_round_trips: bool,
     pub nodes: PythonSelectionGraph,
+    /// Each Python node's resolved `job(...)` and `tag(...)` dependencies.
+    pub sets: Vec<ResolvedNode>,
 }
 
 impl ProjectSelection {
@@ -406,6 +410,10 @@ impl ProjectSelection {
             sources: project_sources(project)?,
             allow_warehouse_round_trips: allows_round_trips(project)?,
             nodes: selection_graph(&python_node_graph(discovered_inputs)?)?,
+            sets: match stored_node_sets(discovered_inputs)? {
+                Some(Ok(sets)) => sets,
+                _ => Vec::new(),
+            },
         })
     }
 

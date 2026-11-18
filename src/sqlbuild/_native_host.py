@@ -283,6 +283,7 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "AuditCase": ("sqlbuild.python_nodes.models", "AuditCase"),
     "RELATION_RENDERER": ("sqlbuild.python_nodes.models", "RELATION_RENDERER"),
     "SqlResourceRef": ("sqlbuild.python_nodes.models", "SqlResourceRef"),
+    "NodeSetRef": ("sqlbuild.python_nodes.models", "NodeSetRef"),
     "PythonCheckSeverity": ("sqlbuild.python_nodes.types", "PythonCheckSeverity"),
     "SqlResourceRefKind": ("sqlbuild.python_nodes.types", "SqlResourceRefKind"),
     "load_custom_rules": (

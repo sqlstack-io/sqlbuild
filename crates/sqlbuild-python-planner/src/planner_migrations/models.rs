@@ -1,8 +1,8 @@
 //! Public records of planner migrations.
 
 use crate::planner_migrations::_helpers::discovery::state_inspection::RelationKey;
-use crate::planner_migrations::_helpers::discovery::state_inspection::lowered;
 use crate::planner_migrations::_helpers::discovery::state_inspection::fingerprint_key;
+use crate::planner_migrations::_helpers::discovery::state_inspection::lowered;
 use crate::planner_migrations::_helpers::discovery::state_inspection::pending;
 use crate::planner_migrations::_helpers::discovery::state_inspection::relation_key;
 use crate::planner_migrations::_helpers::discovery::state_inspection::schema_or_empty;
@@ -31,7 +31,6 @@ use sqlbuild_core::constants::COLUMN_MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
-use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
@@ -40,6 +39,7 @@ use sqlbuild_python_front::state_rows::constants::MODEL_KIND;
 use sqlbuild_python_front::state_rows::constants::OLD_NAME_KIND;
 use sqlbuild_python_front::state_rows::main::migrations::layout::layout;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_views::old_name_views;
+use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
 use sqlbuild_state::events::models::{EventRelation, FingerprintKey};
 use std::collections::HashMap;
 use std::collections::HashSet;

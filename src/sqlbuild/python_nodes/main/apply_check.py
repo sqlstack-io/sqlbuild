@@ -10,7 +10,7 @@ from sqlbuild.python_nodes._helpers.dependency_normalization import (
     normalize_python_node_dependencies,
 )
 from sqlbuild.python_nodes._helpers.description_resolution import resolve_description
-from sqlbuild.python_nodes.models import CheckDefinition, SqlResourceRef
+from sqlbuild.python_nodes.models import CheckDefinition, NodeSetRef, SqlResourceRef
 from sqlbuild.python_nodes.types import PythonCheckSeverity
 
 
@@ -18,8 +18,9 @@ def apply_check(
     *,
     depends_on: Callable[..., object]
     | SqlResourceRef
-    | tuple[Callable[..., object] | SqlResourceRef, ...]
-    | list[Callable[..., object] | SqlResourceRef],
+    | NodeSetRef
+    | tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...]
+    | list[Callable[..., object] | SqlResourceRef | NodeSetRef],
     name: str | None = None,
     severity: str | PythonCheckSeverity = PythonCheckSeverity.ERROR,
     tags: Sequence[str] = (),
@@ -29,7 +30,7 @@ def apply_check(
 ) -> Callable[[Callable[..., object]], Callable[..., object]]:
     """Apply SQLBuild check metadata to a Python function."""
 
-    normalized_deps: tuple[Callable[..., object] | SqlResourceRef, ...] = (
+    normalized_deps: tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...] = (
         normalize_python_node_dependencies(depends_on)
     )
 

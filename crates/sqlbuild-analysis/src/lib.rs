@@ -23,6 +23,7 @@ pub mod lineage;
 pub mod lineage_command;
 pub mod lineage_graph;
 pub mod manifest;
+pub mod node_set_dependencies;
 pub mod nullability_rules;
 pub mod planner_changes;
 pub mod planner_fixtures;

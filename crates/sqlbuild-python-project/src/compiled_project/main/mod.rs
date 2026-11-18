@@ -1,4 +1,5 @@
 pub mod config_values;
+pub mod declared_jobs;
 pub mod declarations;
 pub mod entry_schema_fact;
 pub mod family_fact;
