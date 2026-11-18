@@ -8,11 +8,11 @@ use crate::credentials::main::sessions::set_password::set_password;
 use crate::credentials::models::{
     AuditContext, BuiltinRole, PasswordAuthority, RoleAssignmentRequest,
 };
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkPoll, PlanRequest,
 };
-use crate::runs::main::request_person_run::request_person_run;
+use crate::runs::main::requests::request_person_run::request_person_run;
 use crate::runs::models::PersonRunRequest;
 use crate::runs::tests::test_types::ExactKeyPlanner;
 use crate::store::errors::ControlError;

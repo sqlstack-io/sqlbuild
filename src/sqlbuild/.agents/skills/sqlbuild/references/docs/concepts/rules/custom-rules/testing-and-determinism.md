@@ -60,9 +60,9 @@ passes, the case fails with `custom rule <code> is not deterministic`. The usual
 module-level state, such as a set of already-seen models, that carries over from one subject to
 the next. Compute findings from the subject and `ctx` alone.
 
-Keep Rule tests under the project's `tests/` directory, outside `tests/python/` and
-`tests/providers/`, such as in `tests/rules/`. `sqb test` runs only those two folders, so run Rule
-tests with pytest.
+Keep Rule tests under the project's `tests/` directory, outside `tests/python/`, `tests/providers/`
+and `tests/orchestration/`, such as in `tests/rules/`. `sqb test` runs only those three folders, so
+run Rule tests with pytest.
 
 ## Parallel evaluation
 

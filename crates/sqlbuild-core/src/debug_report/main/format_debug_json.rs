@@ -48,6 +48,10 @@ pub fn format_debug_json(report: &DebugReport) -> String {
         ),
         ("connection".to_owned(), lines_value(&report.connection)),
         (
+            "history_reads_wake_compute".to_owned(),
+            JsonValue::Bool(report.history_reads_wake_compute),
+        ),
+        (
             "local_files".to_owned(),
             JsonValue::Array(
                 report

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import PageTabs from '$lib/components/platform/page-tabs.svelte';
+	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -54,7 +57,7 @@
 	]);
 
 	// Only a problem gets a word; the dot and its title cover the usual states, as the top bar already says Live.
-	const freshnessText = { reconnecting: 'Reconnecting', stale: 'Stale' } as const;
+	const freshnessText = { reconnecting: 'Reconnecting', stale: 'Paused · refresh' } as const;
 	const freshnessTitle = {
 		connecting: 'Connecting for live updates…',
 		live: 'Updates arrive as runs change',
@@ -64,13 +67,12 @@
 </script>
 
 <div class="tabs-bar">
-	<div class="tabs" role="tablist">
-		{#each tabs as t (t.value)}
-			<button role="tab" aria-selected={p.tab === t.value} class:on={p.tab === t.value} title={t.title} onclick={() => list.update({ tab: t.value })}>
-				{t.label}{#if t.count !== undefined}<span class="count" class:na={t.count === 'unavailable'} title={t.count === 'unavailable' ? "Couldn't load the count" : undefined}>{t.count}</span>{/if}
-			</button>
-		{/each}
-	</div>
+	<PageTabs
+		flush
+		value={p.tab}
+		tabs={tabs.map((t) => ({ value: t.value, label: t.label, title: t.count === 'unavailable' ? `${t.title ?? t.label}. Couldn't load the count.` : t.title, count: t.count === 'unavailable' ? '?' : t.count }))}
+		onselect={(tab) => list.update({ tab })}
+	/>
 	<div class="right">
 		{#if views.length > 1}
 			<SegmentedFilter bind:value={() => p.view, (v: RunsView) => list.update({ view: v })} options={views} loading={queued === undefined} />
@@ -79,7 +81,7 @@
 		<span class="fresh {list.freshness}" title={freshnessTitle[list.freshness]}>
 			<span class="ago" class:waiting={!list.updatedAt}>{list.updatedAt ? `updated ${formatAgo(new Date(list.updatedAt).toISOString(), app.now)}` : 'updated just now'}</span>
 			<i></i>{#if list.freshness === 'reconnecting' || list.freshness === 'stale'}{freshnessText[list.freshness]}{/if}
-			<button class="refresh" onclick={() => list.refresh()} aria-label="Refresh now" title="Refresh now"><RefreshCwIcon size={12} /></button>
+			<Button size="icon-sm" class="text-muted-foreground hover:text-foreground" onclick={() => list.refresh()} aria-label="Refresh now" title="Refresh now"><RefreshCwIcon /></Button>
 		</span>
 	</div>
 </div>
@@ -89,10 +91,10 @@
 		<label class="search">
 			<SearchIcon size={14} />
 			<input value={draft} oninput={(e) => onInput(e.currentTarget.value)} placeholder="Search, or filter with job:… status:… node:…" aria-label="Search and filter runs" />
-			{#if draft}<button onclick={() => (onInput(''), list.update({ q: '' }))} aria-label="Clear search"><XIcon size={13} /></button>{/if}
+			{#if draft}<Button variant="ghost" size="icon-xs" onclick={() => (onInput(''), list.update({ q: '' }))} aria-label="Clear search"><XIcon /></Button>{/if}
 		</label>
 		<div class="help-wrap">
-			<button class="help-btn" onclick={() => (showHelp = !showHelp)} aria-expanded={showHelp}>Filters?</button>
+			<Button variant="ghost" aria-expanded={showHelp} onclick={() => (showHelp = !showHelp)}><CircleHelpIcon />Filters</Button>
 			{#if showHelp}
 				<div class="help" role="dialog" aria-label="Filter tokens">
 					<p>Type tokens, or click a job, schedule, sensor, person or kind in a row.</p>
@@ -129,10 +131,10 @@
 			{#each tokens as t (`${t.key}:${t.value}`)}
 				<span class="token" class:bad={invalid.has(`${t.key}:${t.value}`)} title={invalid.has(`${t.key}:${t.value}`) ? `Not a known value; ${TOKEN_HELP[t.key]}` : undefined}>
 					<b>{t.key}</b>{t.value}
-					<button onclick={() => list.update({ q: removeToken(p.q, t.key, t.value) })} aria-label="Remove filter {t.key}:{t.value}"><XIcon size={11} /></button>
+					<Button variant="ghost" size="icon-xs" onclick={() => list.update({ q: removeToken(p.q, t.key, t.value) })} aria-label="Remove filter {t.key}:{t.value}"><XIcon /></Button>
 				</span>
 			{/each}
-			<button class="clear" onclick={() => list.update({ q: parseTokens(p.q).text })}>Clear filters</button>
+			<Button variant="ghost" size="sm" onclick={() => list.update({ q: parseTokens(p.q).text })}>Clear filters</Button>
 		</div>
 	{/if}
 {/if}
@@ -145,38 +147,6 @@
 		gap: 12px;
 		padding: 0 20px;
 		border-bottom: 1px solid var(--border);
-	}
-	.tabs {
-		display: flex;
-		gap: 2px;
-	}
-	.tabs button {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		padding: 12px 10px 10px;
-		border-bottom: 2px solid transparent;
-		color: var(--muted-foreground);
-		font-size: 13px;
-		font-weight: 500;
-	}
-	.tabs button:hover {
-		color: var(--foreground);
-	}
-	.tabs button.on {
-		border-color: var(--primary);
-		color: var(--foreground);
-	}
-	.count {
-		padding: 0 6px;
-		border-radius: 999px;
-		background: var(--sb-hover);
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-		font-variant-numeric: tabular-nums;
-	}
-	.count.na {
-		font-style: italic;
 	}
 	.right {
 		display: flex;
@@ -216,17 +186,6 @@
 	.fresh.stale i {
 		background: var(--sb-error);
 	}
-	.refresh {
-		display: grid;
-		width: 24px;
-		height: 24px;
-		place-items: center;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-	}
-	.refresh:hover {
-		background: var(--sb-hover);
-	}
 	.filter-bar {
 		display: flex;
 		flex: 0 0 auto;
@@ -262,11 +221,6 @@
 	}
 	.help-wrap {
 		position: relative;
-	}
-	.help-btn {
-		color: var(--muted-foreground);
-		font-size: 12px;
-		text-decoration: underline dotted;
 	}
 	.help {
 		position: absolute;
@@ -346,18 +300,5 @@
 	.token.bad {
 		border-color: var(--sb-warning);
 		text-decoration: line-through;
-	}
-	.token button {
-		display: grid;
-		place-items: center;
-		color: var(--sb-text-faint);
-	}
-	.clear {
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.clear:hover,
-	.token button:hover {
-		color: var(--foreground);
 	}
 </style>

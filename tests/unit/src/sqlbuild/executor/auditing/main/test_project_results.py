@@ -26,7 +26,10 @@ from sqlbuild.runtime.observability.exceptions import ObservabilityValidationErr
 from sqlbuild.runtime.observability.main.dispatcher_scope import dispatcher_scope
 from sqlbuild.runtime.observability.main.identity_scope import identity_scope
 from sqlbuild.runtime.observability.models import ExecutionIdentity, LifecycleEvent
-from tests.unit.src.sqlbuild.executor.auditing.main._test_types import AuditExecutionCase
+from tests.unit.src.sqlbuild.executor.auditing.main._test_types import (
+    AuditExecutionCase,
+    IgnoredFailureProjectionCase,
+)
 from tests.unit.src.sqlbuild.executor.auditing.main.helpers import (
     build_projection_entry,
     build_projection_result,
@@ -91,6 +94,73 @@ def test_given_executed_measurement_when_projected_then_builds_record_and_lifecy
     assert events[0].payload["result_id"] == records[0].result_id
     assert events[0].payload["audit_definition_name"] == "dq_column_rate"
     assert events[0].payload["audit_description"] == "Valid row percentage"
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        IgnoredFailureProjectionCase(
+            description="an ignored failure is recorded as a failure marked ignored",
+            ignored=True,
+            expected_metadata_json='{"ignored": true}',
+            expected_payload_ignored=True,
+        ),
+        IgnoredFailureProjectionCase(
+            description="a failure that blocked carries no ignored mark",
+            ignored=False,
+            expected_metadata_json=None,
+            expected_payload_ignored=None,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_failed_audit_when_projected_then_history_and_event_say_whether_it_was_ignored(
+    test_case: IgnoredFailureProjectionCase,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records: list[AuditResultRecord] = []
+
+    def write_records(**kwargs: object) -> None:
+        records.extend(cast(tuple[AuditResultRecord, ...], kwargs["records"]))
+
+    monkeypatch.setattr(projection_module, "write_audit_result_records", write_records)
+    dispatcher: EventDispatcher = EventDispatcher()
+    events: list[LifecycleEvent] = []
+    dispatcher.subscribe_lifecycle(subscriber=events.append, accepts_opaque=False)
+    plan: PlanOutput = PlanOutput(
+        audit_entries=(build_projection_entry(),),
+        model_locations={
+            "orders": CompiledRelationLocation(
+                database="warehouse", schema="analytics", name="orders", qualified_name=None
+            )
+        },
+    )
+    # Writer is replaced, so only method attributes passed into it are required.
+    adapter: Any = writer_adapter()
+
+    with (
+        identity_scope(ExecutionIdentity(invocation_id="invocation", run_id="run")),
+        dispatcher_scope(dispatcher),
+    ):
+        _ = project_audit_result_batch(
+            plan=plan,
+            results=(
+                replace(
+                    build_projection_result(),
+                    outcome=AuditOutcome.ERROR,
+                    ignored=test_case.ignored,
+                ),
+            ),
+            adapter=adapter,
+            connection=object(),
+        )
+
+    assert [(record.outcome, record.metadata_json) for record in records] == [
+        (AuditOutcome.ERROR.value, test_case.expected_metadata_json)
+    ]
+    assert [event.payload.get("ignored") for event in events] == [
+        test_case.expected_payload_ignored
+    ]
 
 
 @pytest.mark.parametrize(

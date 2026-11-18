@@ -45,6 +45,18 @@ pub(crate) fn frozen_window<'de, D: Deserializer<'de>>(
         .map_err(serde::de::Error::custom)
 }
 
+/// The member attempt of a stored frozen request, or of an already projected record.
+pub(crate) fn frozen_member_attempt<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u8>, D::Error> {
+    let value: Value = frozen(deserializer)?;
+    let attempt: &Value = value.get("member_attempt").unwrap_or(&value);
+    attempt
+        .as_u64()
+        .map(|attempt| u8::try_from(attempt).map_err(serde::de::Error::custom))
+        .transpose()
+}
+
 /// A JSON column, which SQLite returns as text and PostgreSQL as JSON.
 fn frozen<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Value, D::Error> {
     let value: Value = Option::<Value>::deserialize(deserializer)?.unwrap_or(Value::Null);

@@ -6,9 +6,13 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from itertools import chain
 from typing import Any
 
 import pytest
+
+from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapter.contract.models import RelationRowCountEstimate
 
 
 class FetchedRows:
@@ -347,3 +351,18 @@ def expire_after_start(*, deadline: Any, raw: CancellableRawConnection) -> threa
     thread: threading.Thread = threading.Thread(target=watchdog)
     thread.start()
     return thread
+
+
+def estimate_pages(
+    *, adapter: BaseAdapter, connection: MetadataConnection, pages: tuple[tuple[str, ...], ...]
+) -> tuple[RelationRowCountEstimate, ...]:
+    """Estimate each page of names in schema ``analytics.dev``, as a statistics sync does."""
+
+    return tuple(
+        chain.from_iterable(
+            adapter.estimate_relation_row_counts(
+                connection=connection, database="analytics", schema="dev", names=page
+            )
+            for page in pages
+        )
+    )

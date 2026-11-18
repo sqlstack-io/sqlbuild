@@ -2,10 +2,12 @@ use std::io;
 
 use crate::argv::models::Stream;
 use crate::launcher::constants::{PROGRAM_NAME, PROGRAM_VERSION};
-use crate::native_commands::_helpers::terminal::lost_stdout;
+use crate::native_commands::_helpers::command::terminal::{line_reset, lost_stdout};
 use crate::native_commands::models::LostStdout;
 use crate::native_commands::tests::helpers::parse;
-use crate::native_commands::tests::test_types::{LostStdoutTestCase, ParseTestCase};
+use crate::native_commands::tests::test_types::{
+    LineResetTestCase, LostStdoutTestCase, ParseTestCase,
+};
 
 /// Thresholds recorded from CPython 3.12 writing to a pipe without a reader.
 #[test]
@@ -68,6 +70,38 @@ fn given_version_among_options_when_parsing_natively_then_the_lone_version_line_
                 Err(0),
                 test_case.expected_needs_python,
             ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_child_spinner_on_the_terminal_when_writing_then_its_line_is_erased_first() {
+    let test_cases = [
+        LineResetTestCase {
+            description: "a terminal shared with a location interpreter",
+            shared: true,
+            terminal: true,
+            expected_reset: b"\r\x1b[K",
+        },
+        LineResetTestCase {
+            description: "a log file shared with the interpreter keeps its bytes",
+            shared: true,
+            terminal: false,
+            expected_reset: b"",
+        },
+        LineResetTestCase {
+            description: "a terminal no child draws on",
+            shared: false,
+            terminal: true,
+            expected_reset: b"",
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            line_reset(test_case.shared, test_case.terminal),
+            test_case.expected_reset,
             "{}",
             test_case.description
         );

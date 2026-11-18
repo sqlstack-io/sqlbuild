@@ -3,6 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::native_host::models::Dialect;
 
 use sqlbuild_python_compile::compile_driver::main::stages::build_deferred_locations::build_deferred_locations;
 use sqlbuild_python_compile::compile_driver::main::stages::resolve_deferred_target_config::resolve_deferred_target_config;
@@ -149,7 +150,7 @@ pub(crate) fn compile_static_command_context<'py>(
             py,
             &[
                 ("project", project.clone()),
-                ("adapter", adapter),
+                ("dialect", Dialect::of(&adapter)?.into_any()),
                 ("scope", scope.clone()),
                 (
                     "deferral",

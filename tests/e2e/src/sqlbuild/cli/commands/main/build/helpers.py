@@ -25,6 +25,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     execute_duckdb,
     prepare_inline_project,
     query_duckdb,
+    row_count,
     run_sqb,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
@@ -1492,49 +1493,6 @@ def changed_build_steps(warehouse: ChangedWarehouse) -> tuple[ChangedBuildStep, 
     )
 
 
-def node_result_source_yml(location: str) -> str:
-    """A managed `raw_orders` source at `location`, for node result location tests."""
-
-    return (
-        "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
-        f"    managed: true\n{location}    write_strategy: table\n"
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
-    )
-
-
-def node_result_project(*, tmp_path: Path, target_lines: str, files: dict[str, str]) -> Path:
-    """A DuckDB orders project whose `dev` target has `target_lines`, plus `files`."""
-
-    return prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="orders",
-        repo_files={
-            "sqlbuild_project.toml": (
-                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
-                '[connection]\ndatabase = "dev.duckdb"\n\n'
-                f'[defaults]\ndatabase = "dev"\nschema = "mart"\n\n[targets.dev]\n{target_lines}'
-            ),
-            "models/orders.sql": (
-                "MODEL (description 'Orders.', materialized table);\n\n"
-                'SELECT order_id FROM __source("raw_orders")\n'
-            ),
-        }
-        | files,
-    )
-
-
-def node_results_in(*, db_path: Path, schema: str, node_type: str) -> list[tuple[str, str, str]]:
-    """`(node_name, run_id, payload_json_b64)` of one node type's results in `schema`."""
-
-    return query_duckdb(
-        db_path=db_path,
-        sql=(
-            f"SELECT node_name, run_id, payload_json_b64 FROM {schema}._sqlbuild_node_results "
-            f"WHERE node_type = '{node_type}' ORDER BY node_name"
-        ),
-    )
-
-
 ALLOW_ROUND_TRIPS: str = "\n[settings]\nallow_warehouse_round_trips = true\n"
 SCORING_TASK: str = (
     '    relation = ctx.relation(model("orders"))\n'
@@ -1647,3 +1605,145 @@ def build_round_trip_project(
     assert positions == sorted(positions), output
     assert all(fragment in output for fragment in test_case.expected_output_fragments), output
     return project_dir / "scoring.duckdb", output
+
+
+# ---- builds that ignore audit failures ----
+
+IGNORED_AUDITS_DATABASE: str = "shop.duckdb"
+_IGNORED_AUDITS_PROJECT_TOML: str = (
+    'name = "ignored_audits"\nadapter = "duckdb"\n\n'
+    f'[connection]\ndatabase = "{IGNORED_AUDITS_DATABASE}"\n'
+)
+_EXPRESSION_AUDIT: str = "AUDIT ();\n\nSELECT * FROM @relation WHERE NOT (@expression)\n"
+_RAW_ORDERS_SQL: str = (
+    "CREATE TABLE main.raw_orders AS SELECT * FROM (VALUES (1, 100), (2, 200)) t(id, amount_cents)"
+)
+# A table whose final audit fails, and a model that reads it.
+STAGED_AUDIT_FILES: dict[str, str] = {
+    "audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
+    "models/daily.sql": (
+        "MODEL (description 'Daily totals.', materialized table, audits [expression_is_true "
+        '(name "total_is_negative", expression "total_cents < 0", severity error)]);\n\n'
+        "SELECT 1 AS day, 300 AS total_cents\n"
+    ),
+    "models/daily_summary.sql": (
+        "MODEL (description 'Reads daily.', materialized table);\n\n"
+        'SELECT day FROM __ref("daily")\n'
+    ),
+}
+# An incremental model whose delta audit fails, over one row it already holds.
+INCREMENTAL_AUDIT_FILES: dict[str, str] = {
+    "audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
+    "sources/raw.yml": (
+        "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+        "    schema: main\n    table: raw_orders\n"
+    ),
+    "models/orders.sql": (
+        "MODEL (description 'Orders.', materialized incremental, incremental_strategy merge, "
+        'unique_key [id], audits [expression_is_true (name "amount_is_negative", '
+        'expression "amount_cents < 0", severity error, run_scope delta_and_final)]);\n\n'
+        'SELECT id, amount_cents FROM __source("raw_orders")\n'
+    ),
+}
+INCREMENTAL_AUDIT_SEED_SQL: str = (
+    f"{_RAW_ORDERS_SQL}; CREATE TABLE main.orders AS SELECT 0 AS id, 50 AS amount_cents"
+)
+# A source whose audit fails, and a model that reads it.
+SOURCE_AUDIT_FILES: dict[str, str] = {
+    "audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
+    "sources/raw.yml": (
+        "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+        "    schema: main\n    table: raw_orders\n    audits:\n"
+        "      - expression_is_true:\n          name: raw_amount_is_negative\n"
+        '          expression: "amount_cents < 0"\n          severity: error\n'
+    ),
+    "models/order_count.sql": (
+        "MODEL (description 'Reads raw orders.', materialized table);\n\n"
+        'SELECT count(*) AS order_count FROM __source("raw_orders")\n'
+    ),
+}
+SOURCE_AUDIT_SEED_SQL: str = _RAW_ORDERS_SQL
+
+
+def ignored_audits_project(
+    tmp_path: Path, files: dict[str, str], seed_sql: str, settings_toml: str
+) -> Path:
+    """A DuckDB project of `files`, `settings_toml` after its connection, its warehouse seeded."""
+
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="ignored_audits",
+        repo_files={"sqlbuild_project.toml": _IGNORED_AUDITS_PROJECT_TOML + settings_toml, **files},
+    )
+    execute_duckdb(db_path=project_dir / IGNORED_AUDITS_DATABASE, sql=seed_sql)
+    return project_dir
+
+
+def warehouse_table_rows(db_path: Path) -> dict[str, int]:
+    """Each project table in `main` with its row count, leaving out SQLBuild's own state tables."""
+
+    names: list[tuple[Any, ...]] = query_duckdb(
+        db_path=db_path,
+        sql=(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' "
+            "AND table_name NOT LIKE '\\_sqlbuild%' ESCAPE '\\' ORDER BY table_name"
+        ),
+    )
+    return {str(name): row_count(db_path=db_path, table_name=str(name)) for (name,) in names}
+
+
+def recorded_audit_outcomes(db_path: Path) -> tuple[tuple[str, str, bool], ...]:
+    """Each stored audit result's name, outcome and whether its build ignored it, by name."""
+
+    rows: list[tuple[Any, ...]] = query_duckdb(
+        db_path=db_path,
+        sql=(
+            "SELECT audit_name, outcome, "
+            "coalesce(json_extract(metadata_json, '$.ignored')::BOOLEAN, false) "
+            "FROM main._sqlbuild_audit_results ORDER BY audit_name, run_scope_phase"
+        ),
+    )
+    return tuple((str(name), str(outcome), bool(ignored)) for name, outcome, ignored in rows)
+
+
+def node_result_source_yml(location: str) -> str:
+    """A managed `raw_orders` source at `location`, for node result location tests."""
+
+    return (
+        "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+        f"    managed: true\n{location}    write_strategy: table\n"
+        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+    )
+
+
+def node_result_project(*, tmp_path: Path, target_lines: str, files: dict[str, str]) -> Path:
+    """A DuckDB orders project whose `dev` target has `target_lines`, plus `files`."""
+
+    return prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="orders",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                f'[defaults]\ndatabase = "dev"\nschema = "mart"\n\n[targets.dev]\n{target_lines}'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n\n"
+                'SELECT order_id FROM __source("raw_orders")\n'
+            ),
+        }
+        | files,
+    )
+
+
+def node_results_in(*, db_path: Path, schema: str, node_type: str) -> list[tuple[str, str, str]]:
+    """`(node_name, run_id, payload_json_b64)` of one node type's results in `schema`."""
+
+    return query_duckdb(
+        db_path=db_path,
+        sql=(
+            f"SELECT node_name, run_id, payload_json_b64 FROM {schema}._sqlbuild_node_results "
+            f"WHERE node_type = '{node_type}' ORDER BY node_name"
+        ),
+    )

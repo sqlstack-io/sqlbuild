@@ -2,10 +2,12 @@
 
 use crate::planner_migrations::_helpers::column::column_objects::config;
 use crate::planner_migrations::_helpers::column::column_objects::native;
-use crate::planner_migrations::_helpers::discovery::discovery_events::{
-    identity, key, newest, relation,
-};
-use crate::planner_migrations::models::{ModelMigrationDeclaration, ModelMigrationRequest};
+use crate::planner_migrations::_helpers::discovery::discovery_events::identity;
+use crate::planner_migrations::_helpers::discovery::discovery_events::key;
+use crate::planner_migrations::_helpers::discovery::discovery_events::newest;
+use crate::planner_migrations::_helpers::discovery::discovery_events::relation;
+use crate::planner_migrations::models::ModelMigrationDeclaration;
+use crate::planner_migrations::models::ModelMigrationRequest;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{
     PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PySet, PySetMethods, PyString, PyTuple,

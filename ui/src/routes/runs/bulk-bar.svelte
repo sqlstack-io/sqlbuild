@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import type { RunsState } from './state.svelte';
@@ -23,7 +24,7 @@
 	}
 
 	function label(action: BulkAction, count: number): string {
-		if (list.armed === action) return `Confirm: ${bulkLabel[action].toLowerCase()} ${count} run${count === 1 ? '' : 's'}`;
+		if (list.armed === action) return `Confirm: ${bulkLabel[action].toLowerCase()} ${plural(count, 'run')}`;
 		return `${bulkLabel[action]} ${count} of ${total}`;
 	}
 </script>
@@ -36,7 +37,7 @@
 				{@const count = list.eligibleFor[action].length}
 				<span title={title(action, count)}>
 					<Button
-						size="sm"
+						size="bar"
 						variant={list.armed === action ? (action === 'cancel' ? 'destructive' : 'default') : 'outline'}
 						disabled={!count || list.busy !== null}
 						aria-busy={list.busy === action}
@@ -44,12 +45,12 @@
 					>
 				</span>
 			{/each}
-			<button class="clear" onclick={() => list.clearSelection()}>Clear selection</button>
+			<Button variant="ghost" onclick={() => list.clearSelection()}>Clear selection</Button>
 		{/if}
 		{#if scopedTab && matchingActive && app.client.supports('cancelMatchingRuns')}
 			<span class="all" title={app.can('run.cancel') ? 'Cancels every active run matching the current tab and filters, not only the loaded ones' : "You don't have permission (run.cancel)"}>
 				<Button
-					size="sm"
+					size="bar"
 					variant={list.armed === 'cancel_all' ? 'destructive' : 'outline'}
 					disabled={!app.can('run.cancel') || list.busy !== null}
 					aria-busy={list.busy === 'cancel_all'}
@@ -65,7 +66,7 @@
 {#if list.result}
 	<div class="result" class:failed={list.result.failed} role="status">
 		{list.result.text}
-		<button onclick={() => list.dismissResult()}>Dismiss</button>
+		<Button variant="ghost" size="sm" onclick={() => list.dismissResult()}>Dismiss</Button>
 	</div>
 {/if}
 
@@ -88,15 +89,6 @@
 	}
 	.all {
 		margin-left: auto;
-	}
-	.clear,
-	.result button {
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.clear:hover,
-	.result button:hover {
-		color: var(--foreground);
 	}
 	.hint {
 		color: var(--sb-text-faint);

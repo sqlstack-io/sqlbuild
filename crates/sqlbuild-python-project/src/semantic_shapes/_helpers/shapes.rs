@@ -8,7 +8,8 @@ use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::analysis::constants::CASE_SENSITIVE_BINDING_DIALECTS;
 use crate::analysis::main::normalize_analysis_sql::normalize_analysis_sql;
-use crate::analysis::models::{BindingCatalog, CatalogKey};
+use crate::analysis::models::BindingCatalog;
+use crate::analysis::models::CatalogKey;
 use crate::analysis_session::main::infer_native_expression_source_shapes::infer_native_expression_source_shapes;
 use crate::compiled_project::models::ReferenceTuple;
 use crate::compiled_views::main::compiled_models::declared_rows::declared_rows;

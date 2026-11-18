@@ -6,12 +6,19 @@ import { parseCommand } from '$lib/run/command';
 import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
 import type { LocalChangeBus } from '../signals';
+import { memberLinks, pairKey } from '$lib/lineage/member-graph';
 import type {
 	Acknowledgement,
+	CatalogNode,
+	WaitReason,
 	AdhocPermission,
 	AdhocRunCheck,
+	SelectionEvaluation,
+	SelectionRequest,
+	SelectionVocabulary,
 	PlanChanged,
 	PlanResult,
+	PlanTimings,
 	AdhocRunRequest,
 	BuiltInRole,
 	BulkRunResult,
@@ -51,12 +58,16 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import {
-	CONCURRENCY_LIMITS,
+	serverLimitOf,
 	IMAGE_ID,
 	JOB_DEFS,
+	DECLARED_WAITS,
 	SNAPSHOT_GENERATION,
 	TRIGGER_DEFS,
-	concurrencyGroupsOf,
+	poolHoldersOf,
+	poolUsesOf,
+	resolvedConcurrencyOf,
+	runConcurrencyOf,
 	createOperateFixtures,
 	jobDef,
 	jobNodes,
@@ -69,7 +80,7 @@ import {
 	type TriggerDef
 } from './operate';
 import { SCHEDULER } from './principals';
-import { ancestors, isWritable, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
+import { ancestors, evaluateMockSelection, isWritable, mockVocabulary, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
 import {
 	commandOf,
 	computeNodes,
@@ -121,6 +132,26 @@ export type OperateContext = {
 	/** Name of the location's one target. */
 	target: (scope: Scope) => string;
 	reply: <T>(value: T) => Promise<T>;
+};
+
+/** The end-to-end tests' stand-in for a plan recorded without timings: `window.__sqbPlanWithoutTimings`. */
+const withoutTimings = () => typeof window !== 'undefined' && !!(window as unknown as { __sqbPlanWithoutTimings?: boolean }).__sqbPlanWithoutTimings;
+
+/** A location preview's planning steps, as the plan summary reports them. */
+const MOCK_PLAN_TIMINGS: PlanTimings = {
+	total_seconds: 10.6,
+	steps: [
+		{ name: 'Reading warehouse state', seconds: 3.3 },
+		{ name: 'Detecting changes', seconds: 2.4 },
+		{ name: 'Checking source freshness', seconds: 0.2 },
+		{ name: 'Building plan entries', seconds: 2.9 },
+		{ name: 'Preparing test fixtures', seconds: 0.1 },
+		{ name: 'Assembling the plan', seconds: 0.6 },
+		{ name: 'Reading build history', seconds: 0.3 },
+		{ name: 'Writing the plan', seconds: 0.4 },
+		{ name: 'Other', seconds: 0.4 }
+	],
+	planned_from: 'synced_state'
 };
 
 export class MockOperate {
@@ -518,6 +549,21 @@ export class MockOperate {
 		return this.#ctx.reply(structuredClone(SNAPSHOT_NODES));
 	}
 
+	evaluateSelection(scope: Scope, request: SelectionRequest): Promise<SelectionEvaluation> {
+		void scope;
+		const { keys, error } = evaluateMockSelection(request.select, request.exclude);
+		const offset = request.offset ?? 0;
+		const limit = Math.min(Math.max(request.limit ?? 1000, 1), 10_000);
+		const page = keys.slice(offset, offset + limit);
+		return this.#ctx.reply({ snapshotId: 'mock-snapshot', count: keys.length, keys: page, nextOffset: offset + limit < keys.length ? offset + limit : null, error });
+	}
+
+	selectionVocabulary(scope: Scope): Promise<SelectionVocabulary> {
+		void scope;
+		const jobs = JOB_DEFS.map((j) => ({ value: j.key, count: jobNodes(j.key).length })).sort((a, b) => a.value.localeCompare(b.value));
+		return this.#ctx.reply({ snapshotId: 'mock-snapshot', jobs, ...mockVocabulary() });
+	}
+
 	// ---- actions: runs ----
 
 	cancelRun(scope: Scope, runId: string): Promise<Run> {
@@ -681,10 +727,10 @@ export class MockOperate {
 		const synced_copy = {
 			synced_at: new Date(Date.now() - 300_000).toISOString(),
 			cursor_window_starts: Object.fromEntries(models.filter((m) => m.materialization_type === 'incremental' && reason !== 'full_refresh').map((m) => [m.name, windowStart])),
-			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas']
+			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas', 'recorded migrations']
 		};
 		return this.#ctx.reply({
-			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision },
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision, ...(withoutTimings() ? {} : { timings: MOCK_PLAN_TIMINGS }), ...(command.includes('--ignore-audit-failures') ? { ignore_audit_failures: true } : {}) },
 			error: null
 		});
 	}
@@ -975,20 +1021,19 @@ export class MockOperate {
 				if (overlap.length)
 					waits.push({ kind: 'write_claim', runId: h.run.id, nodeKey: overlap[0], otherNodes: overlap.length - 1 });
 			}
-			const fullGroups: string[] = [];
-			for (const group of rec.script.concurrencyGroups) {
-				const inGroup = holders.filter((h) => h.script.concurrencyGroups.includes(group)).map((h) => h.run.id);
-				const limit = CONCURRENCY_LIMITS[group] ?? 1;
-				if (inGroup.length >= limit) {
-					waits.push({ kind: 'concurrency_limit', limit: group, holders: inGroup, elsewhere: 0 });
-					fullGroups.push(group);
+			const fullPools: string[] = [];
+			for (const [pool, amount] of Object.entries(rec.script.pools)) {
+				const inPool = holders.filter((h) => pool in h.script.pools);
+				const limit = serverLimitOf(pool);
+				const held = inPool.reduce((sum, h) => sum + h.script.pools[pool], 0);
+				if (held + Math.min(amount, limit) > limit) {
+					waits.push({ kind: 'pool_full', pool, holders: inPool.map((h) => h.run.id) });
+					fullPools.push(pool);
 				}
 			}
-			if (fullGroups.length) {
-				for (const group of fullGroups) {
-					const first = ahead.find((a) => a.script.concurrencyGroups.includes(group));
-					if (first) waits.push({ kind: 'earlier_run', runId: first.run.id, limit: group });
-				}
+			for (const pool of fullPools) {
+				const first = ahead.find((a) => pool in a.script.pools);
+				if (first) waits.push({ kind: 'earlier_run', runId: first.run.id, pool });
 			}
 			if (rec.run.parentRunId) {
 				const parent = this.#byId(rec.run.parentRunId);
@@ -998,7 +1043,7 @@ export class MockOperate {
 					const me = members.find((m) => m.jobKey === rec.run.jobKey);
 					for (const up of me?.upstream ?? []) {
 						const sibling = this.#children(parent).find((c) => c.run.jobKey === up.jobKey);
-						if (sibling && isActive(sibling.run.status)) waits.push({ kind: 'upstream_job', runId: sibling.run.id, jobKey: up.jobKey });
+						if (sibling && isActive(sibling.run.status)) waits.push({ kind: 'upstream_job', runId: sibling.run.id, jobKey: up.jobKey, attempt: sibling.run.memberAttempt });
 					}
 				}
 				if (parent && parent.run.status === 'queued') waits.push({ kind: 'group_parent', runId: parent.run.id });
@@ -1050,6 +1095,7 @@ export class MockOperate {
 				tickScheduledFor: null,
 				runKey: null,
 				rerunOfRunId: spec.rerunOf ?? null,
+				memberAttempt: null,
 				narrowing: spec.narrowing ?? null,
 				window: null,
 				requestedBy: spec.by,
@@ -1064,7 +1110,8 @@ export class MockOperate {
 				startedAt: null,
 				endedAt: null,
 				nodeCounts: { success: 0, warn: 0, failed: 0, skipped: 0, running: 0, pending: 0 },
-				cost: null
+				cost: null,
+				ignoredAuditFailures: 0
 			},
 			script: {
 				verb: spec.verb ?? 'build',
@@ -1082,7 +1129,7 @@ export class MockOperate {
 				lastHeartbeatAt: null,
 				imageId: IMAGE_ID,
 				snapshotGeneration: SNAPSHOT_GENERATION,
-				concurrencyGroups: job?.concurrencyGroups ?? []
+				pools: job?.pools ?? {}
 			}
 		};
 		this.#records.unshift(rec);
@@ -1164,7 +1211,8 @@ export class MockOperate {
 		if (!job || job.kind !== 'group') return [];
 		const nodesOf = new Map(job.members.map((m) => [m, new Set(jobNodes(m))]));
 		const upstream = new Map<string, JobGroupMember['upstream']>();
-		for (const b of job.members) {
+		const declared = DECLARED_WAITS[key];
+		for (const b of declared ? [] : job.members) {
 			const ups: JobGroupMember['upstream'] = [];
 			const needs = new Set([...nodesOf.get(b)!].flatMap((n) => [...ancestors(n)]));
 			for (const a of job.members) {
@@ -1173,6 +1221,7 @@ export class MockOperate {
 			}
 			upstream.set(b, ups);
 		}
+		for (const [b, ups] of declared ?? []) upstream.set(b, ups.map((a) => ({ jobKey: a, source: 'lineage' as const })));
 		const stage = new Map<string, number>();
 		const stageOf = (m: string): number => {
 			if (stage.has(m)) return stage.get(m)!;
@@ -1180,7 +1229,16 @@ export class MockOperate {
 			stage.set(m, s);
 			return s;
 		};
-		return job.members.map((m) => ({ jobKey: m, upstream: upstream.get(m) ?? [], stage: stageOf(m) }));
+		const members = job.members.map((m) => ({ jobKey: m, upstream: upstream.get(m) ?? [], stage: stageOf(m), reasons: [] as WaitReason[] }));
+		// Published as the server publishes them: node by node, from the snapshot's lineage.
+		const info = new Map(job.members.map((m) => [m, { nodeCount: null, lastRun: null, nodes: jobNodes(m) }]));
+		const links = memberLinks(members, info, SNAPSHOT_NODES as unknown as CatalogNode[]);
+		for (const m of members) {
+			for (const { jobKey: up } of m.upstream) {
+				for (const link of links.get(pairKey(up, m.jobKey)) ?? []) m.reasons.push({ upstreamJob: up, fromNode: link.from, toNode: link.to });
+			}
+		}
+		return members;
 	}
 
 	#jobView(key: string, scope: Scope): JobDetail {
@@ -1194,10 +1252,15 @@ export class MockOperate {
 		return structuredClone({
 			...job,
 			nodeCount: resolved.filter((n) => snapshotNode(n)?.kind !== 'source').length,
+			nodes: resolved,
 			resolvedNodes: resolved,
 			lastRun: view ? { id: view.id, status: view.status, startedAt: view.startedAt, endedAt: view.endedAt } : null,
 			triggerIds: TRIGGER_DEFS.filter((t) => t.jobKey === key).map((t) => triggerId(t.name)),
-			concurrency: concurrencyGroupsOf(job).map((g) => ({ ...g, holders: holders.filter((h) => h.script.concurrencyGroups.includes(g.key)).map((h) => h.run.id) })),
+			pools: poolUsesOf(job),
+			concurrency: runConcurrencyOf(job),
+			ignoreAuditFailures: job.ignoreAuditFailures ?? null,
+			resolvedConcurrency: resolvedConcurrencyOf(job),
+			poolHolders: poolHoldersOf(job).map((g) => ({ ...g, holders: holders.filter((h) => g.pool in h.script.pools).map((h) => h.run.id) })),
 			memberOf: JOB_DEFS.filter((g) => g.members.includes(key)).map((g) => g.key),
 			cursorType: resolved.map((n) => snapshotNode(n)?.cursor).find((c) => c) ?? null,
 			groupMembers: this.#groupMembers(key),

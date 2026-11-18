@@ -5,26 +5,29 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::authorization::models::CurrentSnapshotId;
 use crate::platform::constants::LOCATION_RETENTION_DAYS;
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::decompress::decompress;
 use crate::store::main::query::query;
-use crate::store::models::{ControlTransaction, Parameter};
+use crate::store::models::{Connection, ControlTransaction, Parameter};
 use crate::store::types::Row;
 use crate::warehouse_metadata::constants::PREVIEW_REQUIRED_TABLES;
 use crate::warehouse_metadata::models::{
-    CleanSync, PreviewLatestRun, WarehouseCatalogRecord, WarehouseConsumptionRecord,
-    WarehouseFingerprintRecord, WarehouseObservationRecord,
+    CleanSync, PreviewLatestRun, WarehouseCatalogColumn, WarehouseCatalogRecord,
+    WarehouseConsumptionRecord, WarehouseFingerprintRecord, WarehouseObservationRecord,
 };
+use sqlbuild_state::warehouse_state::models::{StateColumn, StateLocation, StateRelation};
 
 const RELATIONS_SQL: &str = "SELECT record_json FROM sqb_warehouse_catalog \
     WHERE location_id=$1 AND target=$2 ORDER BY state_database, state_schema, event_id";
-const FINGERPRINTS_SQL: &str = "SELECT f.record_json, t.body FROM (SELECT record_json, definition_text_hash, \
+/// `{body}` is the definition body as hexadecimal text in the transaction's dialect.
+const FINGERPRINTS_SQL: &str = "SELECT f.record_json, {body} AS body FROM (SELECT record_json, definition_text_hash, \
     ROW_NUMBER() OVER (PARTITION BY state_database, state_schema, node_type, node_name, target_database, \
     target_schema, target_name ORDER BY observed_at DESC, event_id DESC) AS newest \
     FROM sqb_warehouse_fingerprints WHERE location_id=$1 AND target=$2) f \
@@ -43,6 +46,21 @@ const OBSERVATIONS_SQL: &str = "SELECT record_json FROM (SELECT record_json, kin
     (PARTITION BY state_database, state_schema, kind, node ORDER BY observed_at DESC, event_id DESC) AS newest \
     FROM sqb_warehouse_observations WHERE location_id=$1 AND target=$2) observations WHERE newest=1 \
     ORDER BY kind, node";
+
+/// The mirrored tables a preview copy reads; any write to them changes the mirror version.
+const MIRROR_TABLES: [&str; 4] = [
+    "sqb_warehouse_catalog",
+    "sqb_warehouse_fingerprints",
+    "sqb_warehouse_consumption",
+    "sqb_warehouse_observations",
+];
+const CURRENT_SNAPSHOT_SQL: &str =
+    "SELECT snapshot_id FROM sqb_current_snapshots WHERE location_id=$1 AND target=$2";
+/// The newest clean sync of today's location invocation, which moves the copy's `synced_at`.
+const NEWEST_CLEAN_SYNC_SQL: &str = "SELECT MAX(occurred_at) AS synced_at FROM recall_events \
+    WHERE invocation_id=$1 AND event_type='location_health' AND payload->'report'->>'target'=$2 \
+    AND payload->'report'->'health'->>'kind'='warehouse_sync' \
+    AND payload->'report'->'health'->>'failure' IS NULL";
 
 /// Adds scope, cursor and page size to the parameters, with the SQL after the caller's conditions.
 pub(crate) fn page_tail(
@@ -72,6 +90,36 @@ pub(crate) fn page_tail(
         parameters.len()
     );
     (parameters, tail)
+}
+
+/// The definition body as hexadecimal text, which a store returns far faster than bytes.
+fn body_hex(transaction: &ControlTransaction) -> String {
+    if matches!(transaction.connection, Some(Connection::Postgres(_))) {
+        "encode(t.body, 'hex')".to_owned()
+    } else {
+        "hex(t.body)".to_owned()
+    }
+}
+
+pub(crate) fn location(database: Option<String>, schema: String) -> StateLocation {
+    StateLocation { database, schema }
+}
+
+fn column(column: WarehouseCatalogColumn) -> StateColumn {
+    StateColumn {
+        name: column.name,
+        data_type: column.data_type,
+    }
+}
+
+pub(crate) fn relation(record: WarehouseCatalogRecord) -> StateRelation {
+    StateRelation {
+        database: record.state_database,
+        schema: record.state_schema,
+        name: record.name,
+        relation_type: record.relation_type,
+        columns: record.columns.into_iter().map(column).collect(),
+    }
 }
 
 fn scope_parameters((location_id, target): (Uuid, &str)) -> Vec<Parameter> {
@@ -109,7 +157,8 @@ pub(crate) async fn preview_fingerprints(
     transaction: ControlTransaction,
     scope: (Uuid, &str),
 ) -> Result<(ControlTransaction, Vec<WarehouseFingerprintRecord>), ControlError> {
-    let (transaction, rows) = query(transaction, FINGERPRINTS_SQL, scope_parameters(scope)).await?;
+    let sql: String = FINGERPRINTS_SQL.replace("{body}", &body_hex(&transaction));
+    let (transaction, rows) = query(transaction, &sql, scope_parameters(scope)).await?;
     let mut fingerprints: Vec<WarehouseFingerprintRecord> = Vec::with_capacity(rows.len());
     for mut row in rows {
         let body: Vec<u8> = decompress(&row.remove("body").unwrap_or(Value::Null))?;
@@ -124,6 +173,52 @@ pub(crate) async fn preview_fingerprints(
         })?);
     }
     Ok((transaction, fingerprints))
+}
+
+/// The mirror version: a digest of the mirrored tables' row counts and newest receipts, the snapshot and today's newest clean sync.
+pub(crate) async fn preview_version(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, String), ControlError> {
+    let tables: Vec<String> = MIRROR_TABLES
+        .iter()
+        .map(|table| {
+            format!(
+                "SELECT '{table}' AS mirror, COUNT(*) AS records, MAX(received_at) AS received_at \
+                 FROM {table} WHERE location_id=$1 AND target=$2"
+            )
+        })
+        .collect();
+    let (transaction, mirrored) = query(
+        transaction,
+        &tables.join(" UNION ALL "),
+        scope_parameters((location_id, target)),
+    )
+    .await?;
+    let (transaction, snapshot) = query(
+        transaction,
+        CURRENT_SNAPSHOT_SQL,
+        scope_parameters((location_id, target)),
+    )
+    .await?;
+    let today = transaction.now.date_naive();
+    let (transaction, synced) = query(
+        transaction,
+        NEWEST_CLEAN_SYNC_SQL,
+        vec![
+            Parameter::Text(format!("location/{location_id}/{today}")),
+            Parameter::Text(target.into()),
+        ],
+    )
+    .await?;
+    let mut mirrored: Vec<Row> = mirrored;
+    mirrored.sort_by(|left, right| {
+        left.get("mirror")
+            .map(Value::to_string)
+            .cmp(&right.get("mirror").map(Value::to_string))
+    });
+    let identity: Value = serde_json::json!([mirrored, snapshot, synced]);
+    Ok((transaction, sha256_hex(identity.to_string().as_bytes())))
 }
 
 /// Each node's newest succeeded build that names its node and run.

@@ -2,7 +2,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde_json::json;
+use uuid::Uuid;
+
+use crate::declarations::main::group_dependencies::group_dependencies;
+use crate::declarations::models::JobDefinition;
 use crate::declarations::tests::test_types::Pairs;
+use crate::snapshots::models::{SnapshotInput, SnapshotNode};
+use crate::store::errors::ControlError;
 
 pub(crate) fn map(pairs: Pairs) -> BTreeMap<String, BTreeSet<String>> {
     pairs
@@ -44,4 +51,60 @@ pub(crate) fn chained_group(
     }
     deps.insert("model:tail".to_owned(), BTreeSet::from([node(last)]));
     (selections, deps)
+}
+
+/// A snapshot whose models read the nodes `lineage` lists.
+pub(crate) fn input(lineage: &[(&str, Vec<&str>)]) -> SnapshotInput {
+    SnapshotInput {
+        location_id: Uuid::nil(),
+        target: "development".into(),
+        generation: 1,
+        git_revision: None,
+        git_dirty: false,
+        git_author: None,
+        image_id: None,
+        environment_hash: "orders-environment".into(),
+        sqb_version: "1.0.0".into(),
+        nodes: lineage
+            .iter()
+            .map(|(key, deps)| {
+                (
+                    (*key).to_owned(),
+                    SnapshotNode {
+                        kind: "model".into(),
+                        definition: json!({"deps": deps}),
+                        raw_sql: None,
+                        compiled_sql: None,
+                        python_source: None,
+                    },
+                )
+            })
+            .collect(),
+        documents: BTreeMap::new(),
+    }
+}
+
+/// Member jobs selecting the nodes `selections` lists.
+pub(crate) fn jobs(selections: &[(&str, Vec<&str>)]) -> BTreeMap<String, JobDefinition> {
+    selections
+        .iter()
+        .map(|(name, selection)| {
+            let definition =
+                json!({"description": format!("Build {name}"), "selection": selection});
+            (
+                (*name).to_owned(),
+                serde_json::from_value(definition).expect("job definition"),
+            )
+        })
+        .collect()
+}
+
+/// The group waits of members `selections` over `lineage`.
+pub(crate) fn waits(
+    lineage: &[(&str, Vec<&str>)],
+    selections: &[(&str, Vec<&str>)],
+) -> Result<BTreeMap<String, BTreeSet<String>>, ControlError> {
+    let jobs = jobs(selections);
+    let members: BTreeSet<String> = jobs.keys().cloned().collect();
+    group_dependencies(("orders_job_group", &input(lineage)), &jobs, &members)
 }

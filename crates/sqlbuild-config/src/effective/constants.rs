@@ -224,4 +224,11 @@ pub(crate) const TARGET_FIELDS: &[TargetField] = &[
             decided_by: &["catalog_connection"],
         },
     },
+    TargetField {
+        group: None,
+        name: "ignore_audit_failures",
+        rule: MergeRule::Overlay {
+            decided_by: &["ignore_audit_failures"],
+        },
+    },
 ];

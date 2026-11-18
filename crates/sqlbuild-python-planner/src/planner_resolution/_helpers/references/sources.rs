@@ -1,8 +1,9 @@
 //! Source contract validation and adapter-controlled projection rendering.
 
-use crate::planner_resolution::_helpers::references::values::{
-    cursor_wrap, filtering_of, method, string,
-};
+use crate::planner_resolution::_helpers::references::values::cursor_wrap;
+use crate::planner_resolution::_helpers::references::values::filtering_of;
+use crate::planner_resolution::_helpers::references::values::method;
+use crate::planner_resolution::_helpers::references::values::string;
 use crate::planner_resolution::models::CursorFiltering;
 use crate::planner_strategy::main::values::input_error::input_error;
 use pyo3::IntoPyObject;
@@ -10,6 +11,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyTuple};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -40,7 +43,7 @@ fn rows(value: &Bound<'_, PyAny>) -> PyResult<Vec<(String, Option<String>)>> {
 fn check_columns(
     entry: &Bound<'_, PyAny>,
     columns: &Bound<'_, PyAny>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     relation: &str,
 ) -> PyResult<()> {
     let py = entry.py();
@@ -82,11 +85,8 @@ fn check_columns(
         if actual.is_empty() {
             continue;
         }
-        let equal: bool = types_equal(
-            &native_field(adapter, "sql_analysis_dialect_name")?,
-            actual,
-            &kind,
-        )?;
+        let equal: bool =
+            types_equal(&dialect.syntax("sql_analysis_dialect_name")?, actual, &kind)?;
         if !equal {
             return Err(source_error(
                 py,
@@ -101,24 +101,24 @@ fn check_columns(
 }
 
 fn cast_projection<'py>(
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     name: &str,
     declared: &str,
     kind: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let py = adapter.py();
+    let py = dialect.py();
     method(
-        adapter,
+        dialect,
         "render_source_expression_cast",
         &[
             (
                 "expression",
-                adapter.call_method1("render_identifier", (name,))?,
+                dialect.syntax("render_identifier")?.call1((name,))?,
             ),
             ("target_type", string(py, kind)),
             (
                 "alias",
-                adapter.call_method1("render_identifier", (declared,))?,
+                dialect.syntax("render_identifier")?.call1((declared,))?,
             ),
         ],
     )
@@ -127,7 +127,7 @@ fn cast_projection<'py>(
 fn cast_source(
     entry: &Bound<'_, PyAny>,
     columns: &Bound<'_, PyAny>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     relation: String,
 ) -> PyResult<String> {
     let declared = rows(&native_field(entry, "columns")?)?;
@@ -182,13 +182,15 @@ fn cast_source(
         let mut projections: Vec<Bound<'_, PyAny>> = Vec::new();
         for projection in &plan.projections {
             projections.push(if let Some((declared, kind)) = &projection.cast {
-                cast_projection(adapter, &projection.name, declared, kind)?
+                cast_projection(dialect, &projection.name, declared, kind)?
             } else {
-                adapter.call_method1("render_identifier", (&projection.name,))?
+                dialect
+                    .syntax("render_identifier")?
+                    .call1((&projection.name,))?
             });
         }
         return method(
-            adapter,
+            dialect,
             "render_source_expression_cast_subquery",
             &[
                 ("source_relation", string(py, &relation)),
@@ -203,11 +205,11 @@ fn cast_source(
     let mut projections: Vec<Bound<'_, PyAny>> = Vec::new();
     for projection in &plan.projections {
         if let Some((name, kind)) = &projection.cast {
-            projections.push(cast_projection(adapter, &projection.name, name, kind)?);
+            projections.push(cast_projection(dialect, &projection.name, name, kind)?);
         }
     }
     method(
-        adapter,
+        dialect,
         "_render_source_relation_cast_subquery_with_columns",
         &[
             ("source_relation", string(py, &relation)),
@@ -240,17 +242,17 @@ fn cast_source(
 }
 
 #[pyfunction]
-#[pyo3(signature = (*, adapter, source_entry))]
+#[pyo3(signature = (*, dialect, source_entry))]
 pub(crate) fn render_source_read_relation(
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     source_entry: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
-    render_source_read(source_entry, adapter)
+    render_source_read(source_entry, dialect)
 }
 
 fn resolve_one(
     (source_map, warehouse_columns): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     filtering: &CursorFiltering<'_>,
     (name, original): (&str, &str),
 ) -> PyResult<String> {
@@ -258,8 +260,8 @@ fn resolve_one(
     if entry.is_none() {
         return Ok(original.to_owned());
     }
-    let adapter = adapter.clone();
-    let mut relation = render_source_read_relation(&adapter, &entry)?;
+    let dialect = dialect.clone();
+    let mut relation = render_source_read_relation(&dialect, &entry)?;
     let columns = mapping_get(warehouse_columns, name)?;
     let expression = !native_field(&entry, "expression")?.is_none();
     if columns.is_truthy()?
@@ -274,12 +276,12 @@ fn resolve_one(
         } else {
             relation.clone()
         };
-        check_columns(&entry, &columns, &adapter, &label)?;
+        check_columns(&entry, &columns, &dialect, &label)?;
     }
     if native_field(&entry, "type_enforcement")?.is_truthy()? {
-        relation = cast_source(&entry, &columns, &adapter, relation)?;
+        relation = cast_source(&entry, &columns, &dialect, relation)?;
     }
-    cursor_wrap(&adapter, filtering, relation, (name, false))
+    cursor_wrap(&dialect, filtering, relation, (name, false))
 }
 
 #[pyfunction]
@@ -300,7 +302,7 @@ pub(crate) fn resolve_source_references(
                 "star_exclude_keyword",
                 "cursor_bounds",
                 "cursor_filter_inputs",
-                "adapter",
+                "dialect",
                 "cursor_type",
                 "lower_bound_inclusive",
             ],
@@ -313,7 +315,7 @@ pub(crate) fn resolve_source_references(
             &args.value("source_map")?,
             &args.value("source_warehouse_columns")?,
         ),
-        &args.value("adapter")?,
+        &Dialect::passed(args.value("dialect")?)?,
         &filtering_of(&args)?,
     )
 }
@@ -322,18 +324,19 @@ pub(crate) fn resolve_source_references(
 pub(crate) fn resolve_sources(
     sql: &str,
     lookups: (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     filtering: &CursorFiltering<'_>,
 ) -> PyResult<String> {
-    let aliases = adapter
-        .call_method0("requires_derived_table_aliases")?
+    let aliases = dialect
+        .syntax("requires_derived_table_aliases")?
+        .call0()?
         .is_truthy()?;
     let mut output = String::new();
     let mut last = 0;
     for span in reference_spans(sql, "source") {
         let mut relation = resolve_one(
             lookups,
-            adapter,
+            dialect,
             filtering,
             (&span.name, &sql[span.start..span.end]),
         )?;

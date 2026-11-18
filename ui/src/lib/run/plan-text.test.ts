@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { actionText, changedSections, cloneCommands, jobRefreshText, looseWarnings, planSections, warningText } from './plan-text';
+import { actionText, changedSections, cloneCommands, jobRefreshText, loadedRows, looseWarnings, planSections, sectionSize, warningText } from './plan-text';
 
 const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	name,
@@ -173,17 +173,33 @@ describe('plan under --changed', () => {
 		expect(jobRefreshText('nightly', [trigger('nightly', 'running', '2026-01-01T02:00:00Z'), trigger('nightly', 'running', '2026-01-01T05:00:00Z')], now)).toBe('job nightly · next run in 2h');
 		// While no server runs the scheduler, neither a schedule nor a sensor starts the job, so it shows no countdown.
 		const stopped = true;
-		expect(jobRefreshText('nightly', [trigger('nightly', 'running', '2026-01-01T02:00:00Z')], now, stopped)).toBe('job nightly · can’t start until the scheduler is running again');
-		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'running', null, 'sensor')], now, stopped)).toBe('job finance_daily · can’t start until the scheduler is running again');
+		expect(jobRefreshText('nightly', [trigger('nightly', 'running', '2026-01-01T02:00:00Z')], now, stopped)).toBe('job nightly · scheduler stopped');
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'running', null, 'sensor')], now, stopped)).toBe('job finance_daily · scheduler stopped');
 		// A paused job stays paused whether or not the scheduler runs.
 		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', '2026-01-01T05:00:00Z')], now, stopped)).toBe('job finance_daily is paused');
-		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', null), trigger('finance_daily', 'running', null, 'sensor')], now)).toBe('job finance_daily · when its sensor fires');
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', null), trigger('finance_daily', 'running', null, 'sensor')], now)).toBe('job finance_daily · on sensor');
 		// A running schedule with no next run, such as a finished calendar, is not a sensor.
 		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'running', null)], now)).toBe('job finance_daily');
 		expect(jobRefreshText('crm', [trigger('finance_daily', 'running', '2026-01-01T05:00:00Z')], now)).toBe('job crm');
 	});
 });
 
+
+describe('plan from a server summary', () => {
+	const summary = plan([model('orders', { reason: 'query_changed' }), model('customers')], {
+		pages: { routine_models: 3, unchanged: 120 },
+		loaded: { routine_models: 1, unchanged: 1 },
+		changed: { counts: ['definition'], reach: 'all', runs: [{ node: 'model:orders', reason: 'definition changed', downstream_of: null }, { node: 'model:customers', reason: 'upstream changed', downstream_of: 'model:orders' }], held_back: [], unchanged: ['model:events'] }
+	});
+	it.each([
+		{ description: 'routine models count the whole section and page from what is loaded', title: 'Models', expected: { size: 3, loaded: 1, page: 'routine_models' } },
+		{ description: 'unchanged nodes count the whole section', title: 'Unchanged', expected: { size: 120, loaded: 1, page: 'unchanged' } }
+	])('$description', ({ title, expected }) => {
+		const section = [...planSections(summary), ...changedSections(summary.changed!, (job) => job, summary.pages)].find((s) => s.title === title)!;
+		expect({ size: sectionSize(section), loaded: section.entries.length, page: section.page }).toEqual(expected);
+		expect(loadedRows(summary, section.page!)).toBe(expected.loaded);
+	});
+});
 
 describe('cloneCommands', () => {
 	it('returns each origin\'s clone command with every missing name, and nothing for other errors', () => {

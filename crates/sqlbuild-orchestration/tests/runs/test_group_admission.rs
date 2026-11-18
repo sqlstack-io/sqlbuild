@@ -5,19 +5,19 @@ use std::num::NonZeroU32;
 
 use crate::credentials::models::AuditContext;
 use crate::runs::main::{
-    advance_groups::advance_groups, claim_next_run::claim_next_run, list_runs::list_runs,
-    request_job_run::request_job_run,
+    execution::advance_groups::advance_groups, execution::claim_next_run::claim_next_run,
+    listings::list_runs::list_runs, requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{JobRunRequest, RunDispatch, RunStatus};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::claim_helpers::{slot_counts, succeed};
-use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::runs::tests::helpers::{one_slot_each, pool_slots, queue, request, snapshot};
 use crate::runs::tests::test_types::{
     AdmissionParent, GroupAdmissionTestCase, GroupChildLimitTestCase, GroupQueueTestCase,
     MixedAdmissionTestCase, RunLifecycleTestCase,
@@ -71,7 +71,7 @@ fn given_mixed_physical_and_parent_waiters_when_admitting_then_priority_and_queu
                     "jobs".into(),
                     json!({"stage": {"description": "Build orders", "selection": ["orders"]}}),
                 );
-                input.documents.insert("groups".into(), json!({"daily": {"description": "Group orders", "selection": ["orders"], "concurrency_groups": ["warehouse"], "jobs": {"stage": []}}}));
+                input.documents.insert("groups".into(), json!({"daily": {"description": "Group orders", "selection": ["orders"], "pools": {"warehouse": {"amount": 1, "limit": 100}}, "jobs": {"stage": []}}}));
                 let published = publish_snapshot(store, &input).await.expect("publish");
                 let mut physical = request(
                     (location, published.snapshot_id),
@@ -79,7 +79,9 @@ fn given_mixed_physical_and_parent_waiters_when_admitting_then_priority_and_queu
                     test_case.physical_priority,
                     &["inventory"],
                 );
-                physical.concurrency_groups.insert("warehouse".into());
+                physical
+                    .pools
+                    .insert("warehouse".into(), pool_slots(1, 100));
                 queue(store, &physical).await;
                 request_job_run(
                     store,
@@ -284,7 +286,7 @@ fn given_an_unserved_queued_group_when_dispatching_an_eligible_scope_then_unknow
                 .expect("served location");
             for location in [unserved, served] {
                 let mut input = snapshot(location);
-                input.documents.insert("jobs".into(), json!({"stage": {"description": "Build orders", "selection": ["orders"], "concurrency_groups": if location == unserved {vec!["inventory_limit"]} else {vec![]}}}));
+                input.documents.insert("jobs".into(), json!({"stage": {"description": "Build orders", "selection": ["orders"], "pools": if location == unserved {one_slot_each(&["inventory_limit"])} else {json!({})}}}));
                 input.documents.insert("groups".into(), json!({"daily": {"description": "Group orders", "selection": ["orders"], "jobs": {"stage": []}}}));
                 publish_snapshot(store, &input).await.expect("publish");
                 request_job_run(
@@ -502,13 +504,13 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                         input.nodes.get_mut(node).expect("stage node").definition["deps"] =
                             json!(earlier_nodes);
                         earlier_nodes.push(node);
-                        jobs.insert(name.clone(), json!({"description": "Build a synthetic stage", "selection": [node], "concurrency_groups": needs}));
+                        jobs.insert(name.clone(), json!({"description": "Build a synthetic stage", "selection": [node], "pools": one_slot_each(needs)}));
                         let after: Vec<String> = (0..stage)
                             .map(|earlier| format!("orders_job_{index}_{earlier}"))
                             .collect();
                         members.insert(name, json!(after));
                     }
-                    groups.insert(format!("orders_group_{index}"), json!({"description": "Complete a synthetic group", "selection": selection, "concurrency_groups": parent.holds, "jobs": members}));
+                    groups.insert(format!("orders_group_{index}"), json!({"description": "Complete a synthetic group", "selection": selection, "pools": one_slot_each(parent.holds), "jobs": members}));
                 }
                 input.documents.insert("jobs".into(), json!(jobs));
                 input.documents.insert("groups".into(), json!(groups));
@@ -659,7 +661,7 @@ fn given_an_older_blocked_allow_group_when_an_independent_generation_is_queued_t
                 "jobs".into(),
                 json!({"stage": {"description": "Build a pinned stage", "selection": ["orders"]}}),
             );
-            input.documents.insert("groups".into(), json!({"daily": {"description": "Allow independent generations", "selection": ["orders"], "concurrency_groups": ["orders_limit"], "jobs": {"stage": []}}}));
+            input.documents.insert("groups".into(), json!({"daily": {"description": "Allow independent generations", "selection": ["orders"], "pools": {"orders_limit": {"amount": 1, "limit": 100}}, "jobs": {"stage": []}}}));
             let first = publish_snapshot(store, &input)
                 .await
                 .expect("first snapshot");
@@ -683,8 +685,8 @@ fn given_an_older_blocked_allow_group_when_an_independent_generation_is_queued_t
                 json!(["inventory"]);
             input.documents.get_mut("groups").expect("groups")["daily"]["selection"] =
                 json!(["inventory"]);
-            input.documents.get_mut("groups").expect("groups")["daily"]["concurrency_groups"] =
-                json!(["inventory_limit"]);
+            input.documents.get_mut("groups").expect("groups")["daily"]["pools"] =
+                one_slot_each(&["inventory_limit"]);
             publish_snapshot(store, &input)
                 .await
                 .expect("second snapshot");
@@ -697,7 +699,9 @@ fn given_an_older_blocked_allow_group_when_an_independent_generation_is_queued_t
                 .await
                 .expect("newer request");
             let mut physical = request((location, first.snapshot_id), 3000, 10, &["products"]);
-            physical.concurrency_groups.insert("orders_limit".into());
+            physical
+                .pools
+                .insert("orders_limit".into(), pool_slots(1, 100));
             queue(store, &physical).await;
             let lease = acquire_lease(store, Uuid::now_v7())
                 .await
@@ -812,7 +816,7 @@ fn given_a_large_healthy_project_with_blocked_groups_when_claiming_then_unrelate
                     json!(format!("Orders {index} {}", "details ".repeat(128)));
                 input.nodes.insert(format!("orders_{index}"), node);
             }
-            let jobs = (0..test_case.group_count).map(|index| (format!("job_{index}"), json!({"description": "Build orders", "selection": ["orders"], "concurrency_groups": ["warehouse"]}))).collect::<serde_json::Map<_, _>>();
+            let jobs = (0..test_case.group_count).map(|index| (format!("job_{index}"), json!({"description": "Build orders", "selection": ["orders"], "pools": {"warehouse": {"amount": 1, "limit": 100}}}))).collect::<serde_json::Map<_, _>>();
             let groups = (0..test_case.group_count).map(|index| (format!("group_{index}"), json!({"description": "Independent order group", "selection": ["orders"], "jobs": {format!("job_{index}"): []}}))).collect::<serde_json::Map<_, _>>();
             input.documents.insert("jobs".into(), json!(jobs));
             input.documents.insert("groups".into(), json!(groups));
@@ -831,7 +835,9 @@ fn given_a_large_healthy_project_with_blocked_groups_when_claiming_then_unrelate
             let limits = BTreeMap::from([("warehouse".into(), NonZeroU32::new(1).expect("one"))]);
             let scope = (location, "development");
             let mut physical = request((location, published.snapshot_id), 1, 10, &["products"]);
-            physical.concurrency_groups.insert("warehouse".into());
+            physical
+                .pools
+                .insert("warehouse".into(), pool_slots(1, 100));
             queue(store, &physical).await;
             let blocker = claim_next_run(store, &lease, &limits, Some(scope))
                 .await

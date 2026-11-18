@@ -1,9 +1,10 @@
 //! Preserve adapter overrides when describing migration execution.
 
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::planner_migrations::_helpers::column::column_objects::replace;
-use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyBool;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -25,15 +26,16 @@ fn migration_promotion<'py>(
     runtime: &Bound<'py, PyAny>,
     decision: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
+    let dialect = runtime_dialect(runtime)?;
     let promotion = record_class(runtime.py(), RecordId::MigrationPromotion)?;
-    if adapter
-        .call_method0("supports_transactional_ddl")?
+    if dialect
+        .syntax("supports_transactional_ddl")?
+        .call0()?
         .is_truthy()?
     {
         return native_field(&promotion, "TRANSACTIONAL_RENAME");
     }
-    if !decision.eq("migrate")? && native_field(&adapter, "adapter_name")?.eq("snowflake")? {
+    if !decision.eq("migrate")? && dialect.syntax("adapter_name")?.eq("snowflake")? {
         return native_field(&promotion, "SWAP");
     }
     native_field(&promotion, "RENAME")
@@ -46,8 +48,8 @@ pub(crate) fn migration_with_execution<'py>(
     entry: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = runtime.py();
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
-    let transient = if native_field(&adapter, "adapter_name")?.eq("snowflake")? {
+    let dialect = runtime_dialect(runtime)?;
+    let transient = if dialect.syntax("adapter_name")?.eq("snowflake")? {
         PyBool::new(
             py,
             native_field(
@@ -62,7 +64,7 @@ pub(crate) fn migration_with_execution<'py>(
         py.None().into_bound(py)
     };
     let stage = call_with(
-        &native_field(&adapter, "render_migration_stage")?,
+        &dialect.syntax("render_migration_stage")?,
         &[
             ("origin", label(&native_field(entry, "origin")?)?),
             ("stage", label(&native_field(entry, "destination")?)?),

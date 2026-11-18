@@ -4,40 +4,65 @@ use crate::lifecycle_events::models::EventDefinition;
 
 /// The lifecycle event schema version SQLBuild produces.
 pub const CURRENT_LIFECYCLE_EVENT_SCHEMA_VERSION: i64 = 2;
+
 /// Every lifecycle event schema version with a catalogue, oldest first.
 pub const LIFECYCLE_EVENT_SCHEMA_VERSIONS: [i64; 2] = [1, 2];
+
 /// The only lifecycle event schema version without invocation metadata.
 pub(crate) const UNSEQUENCED_SCHEMA_VERSION: i128 = 1;
+
 /// The diagnostic log schema version SQLBuild produces and reads.
 pub const CURRENT_DIAGNOSTIC_LOG_SCHEMA_VERSION: i64 = 1;
+
 /// Every diagnostic log severity.
 pub const DIAGNOSTIC_SEVERITIES: [&str; 6] =
     ["critical", "debug", "error", "info", "trace", "warning"];
+
 /// The producer whose version SQLBuild supplies itself.
 pub const DEFAULT_PRODUCER: &str = "sqlbuild";
+
 /// The message for an invalid invocation sequence.
 pub const INVOCATION_SEQUENCE_PROBLEM: &str =
     "invocation_sequence must be a non-negative integer excluding bool";
+
 pub(crate) const MAX_METADATA_BYTES: usize = 4096;
+
 /// The smallest duration a payload may carry.
 pub(crate) const MINIMUM_DURATION_MS: f64 = 0.0;
+
 /// The most characters a hook name may hold after its first.
 pub(crate) const HOOK_NAME_MAX_TAIL: usize = 127;
+
 pub(crate) const DURATION_MS_FIELD: &str = "duration_ms";
+
 pub(crate) const EXIT_CODE_FIELD: &str = "exit_code";
+
 pub(crate) const METADATA_FIELD: &str = "metadata";
+
 pub(crate) const CONFIGURED_CONCURRENCY_FIELD: &str = "configured_concurrency";
+
 pub(crate) const RUN_STARTED_EVENT: &str = "run_started";
+
 pub(crate) const STATEMENT_EVENT_PREFIX: &str = "statement_";
+
 pub(crate) const OPERATION_EVENT_PREFIX: &str = "operation_";
+
 pub(crate) const MICROBATCH_EVENT_PREFIX: &str = "microbatch_";
+
 pub(crate) const RESOURCE_ATTEMPT_SKIPPED_EVENT: &str = "resource_attempt_skipped";
+
 pub(crate) const RETRY_SCHEDULED_EVENT: &str = "retry_scheduled";
+
 pub(crate) const RUN_TERMINALS: [&str; 2] = ["run_completed", "run_failed"];
+
 pub(crate) const AUDIT_RUN_COUNT_FIELDS: [&str; 3] = ["fail_count", "pass_count", "warn_count"];
+
 pub(crate) const MICROBATCH_STRATEGIES: [&str; 2] = ["rolling_window", "watermark"];
+
 pub(crate) const MICROBATCH_RUN_TYPES: [&str; 3] = ["backfill", "normal", "replay_on_change"];
+
 pub(crate) const MICROBATCH_KINDS: [&str; 2] = ["ordinary", "recovery"];
+
 pub const OPERATION_TARGET_KINDS: [&str; 7] = [
     "audit",
     "namespace",
@@ -47,6 +72,7 @@ pub const OPERATION_TARGET_KINDS: [&str; 7] = [
     "staging_relation",
     "state_batch",
 ];
+
 pub const OPERATION_SCOPES: [&str; 7] = [
     "delta",
     "end",
@@ -56,6 +82,7 @@ pub const OPERATION_SCOPES: [&str; 7] = [
     "source",
     "standalone",
 ];
+
 pub const OPERATION_PHASES: [&str; 11] = [
     "apply",
     "assert",
@@ -69,6 +96,7 @@ pub const OPERATION_PHASES: [&str; 11] = [
     "reconcile",
     "setup",
 ];
+
 pub(crate) const FORBIDDEN_STATEMENT_PAYLOAD_FIELDS: [&str; 8] = [
     "bindings",
     "full_sql",
@@ -79,6 +107,7 @@ pub(crate) const FORBIDDEN_STATEMENT_PAYLOAD_FIELDS: [&str; 8] = [
     "sql",
     "statement_sql",
 ];
+
 pub(crate) const STRING_PAYLOAD_FIELDS: [&str; 56] = [
     "adapter",
     "attached_column_name",
@@ -137,6 +166,7 @@ pub(crate) const STRING_PAYLOAD_FIELDS: [&str; 56] = [
     "target_name",
     "target_schema",
 ];
+
 pub(crate) const NONNEGATIVE_INTEGER_PAYLOAD_FIELDS: [&str; 26] = [
     "affected_rows",
     "attempt_number",
@@ -165,13 +195,21 @@ pub(crate) const NONNEGATIVE_INTEGER_PAYLOAD_FIELDS: [&str; 26] = [
     "warn_count",
     "worker_count",
 ];
+
 pub(crate) const FINITE_NUMBER_PAYLOAD_FIELDS: [&str; 1] = ["measured_value"];
+
 pub(crate) const BOOLEAN_PAYLOAD_FIELDS: [&str; 2] = ["evidence_truncated", "reused"];
+
 pub(crate) const JSON_PAYLOAD_FIELDS: [&str; 3] = ["audit_meta", "evidence", "thresholds"];
+
 pub const RESOURCE_SKIP_CODES: [&str; 4] = ["dependency", "explicit", "fan_in", "scheduler"];
+
 pub const RESOURCE_SKIP_MODES: [&str; 2] = ["hard", "soft"];
+
 pub const HOOK_PHASES: [&str; 2] = ["post_hooks", "pre_hooks"];
+
 pub const HOOK_TYPES: [&str; 2] = ["python", "sql"];
+
 pub const OPERATION_KINDS: [&str; 10] = [
     "clone",
     "freshness",
@@ -184,6 +222,7 @@ pub const OPERATION_KINDS: [&str; 10] = [
     "subprocess",
     "warehouse",
 ];
+
 /// Includes retired names, such as the removed dlt and ingestr loads, so stored history still decodes.
 pub const OPERATION_NAMES: [&str; 57] = [
     "adbc_driver_install",
@@ -244,6 +283,7 @@ pub const OPERATION_NAMES: [&str; 57] = [
     "table_type_conversion",
     "table_type_inspection",
 ];
+
 pub const OPERATION_METADATA_FIELDS: [&str; 9] = [
     "added_count",
     "altered_count",
@@ -255,6 +295,7 @@ pub const OPERATION_METADATA_FIELDS: [&str; 9] = [
     "row_count",
     "unknown_count",
 ];
+
 pub const OPERATION_STRATEGIES: [&str; 10] = [
     "adapter",
     "append_new_columns",
@@ -267,6 +308,7 @@ pub const OPERATION_STRATEGIES: [&str; 10] = [
     "sql",
     "sync_all_columns",
 ];
+
 pub const OPERATION_ADAPTERS: [&str; 10] = [
     "bigquery",
     "clickhouse",
@@ -528,6 +570,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V1: [EventDefinition; 20] = [
             "executed_sql",
             "execution_error",
             "execution_fingerprint",
+            "ignored",
             "measured_value",
             "measurement_sql",
             "minimum_samples",
@@ -642,6 +685,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V1: [EventDefinition; 20] = [
         terminal: true,
     },
 ];
+
 /// The schema version 2 catalogue in declaration order.
 pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 23] = [
     EventDefinition {
@@ -904,6 +948,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 23] = [
             "executed_sql",
             "execution_error",
             "execution_fingerprint",
+            "ignored",
             "measured_value",
             "measurement_sql",
             "minimum_samples",

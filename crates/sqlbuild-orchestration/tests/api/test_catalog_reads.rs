@@ -15,10 +15,10 @@ use crate::credentials::models::{
     AuditContext, BuiltinRole, DefaultRole, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};

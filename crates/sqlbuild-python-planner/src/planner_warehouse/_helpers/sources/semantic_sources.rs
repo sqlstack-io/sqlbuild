@@ -1,15 +1,14 @@
 //! Complete missing source metadata in bounded, database-grouped batches.
 
-use crate::planner_warehouse::_helpers::inspection::snapshot::{columns_for, list_relations};
-use crate::planner_warehouse::constants::ACTIVE_CATALOG;
+use crate::planner_warehouse::_helpers::inspection::snapshot::columns_for;
+use crate::planner_warehouse::_helpers::inspection::snapshot::list_relations;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_model_config::config_values::models::ConfigNode;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
@@ -58,30 +57,20 @@ fn sorted_texts<'py>(py: Python<'py>, values: BTreeSet<String>) -> PyResult<Boun
 }
 
 fn source_candidates<'py>(
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    reads: &Bound<'py, PlannerReads>,
     database: &Bound<'py, PyAny>,
     entries: &[Bound<'py, PyAny>],
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let py = adapter.py();
+    let py = reads.py();
     let mut pending: Vec<Bound<'py, PyAny>> = entries.to_vec();
     let mut relations: Vec<Bound<'py, PyAny>> = Vec::new();
-    let catalog = call_with(
-        &host_entry(py, ACTIVE_CATALOG)?,
-        &[
-            ("adapter", adapter.clone()),
-            ("connection", connection.clone()),
-        ],
-    )?;
     let mut scoped: Vec<_> = Vec::new();
     for entry in entries {
         if !native_field(entry, "schema")?.is_none() {
             scoped.push(entry.clone());
         }
     }
-    if !catalog.is_none()
-        && native_field(&catalog, "schema_scoped")?.is_truthy()?
-        && !scoped.is_empty()
-    {
+    if !scoped.is_empty() && reads.get().reads().lists_by_schema(py)? {
         let mut schemas: BTreeSet<_> = BTreeSet::new();
         let mut names: BTreeSet<_> = BTreeSet::new();
         for entry in &scoped {
@@ -93,7 +82,7 @@ fn source_candidates<'py>(
             names.insert(wanted_name(entry)?.extract::<String>()?);
         }
         let listed = list_relations(
-            (adapter, connection),
+            reads,
             database,
             sorted_texts(py, schemas)?,
             sorted_texts(py, names)?,
@@ -122,7 +111,7 @@ fn source_candidates<'py>(
             names.insert(wanted_name(entry)?.extract::<String>()?);
         }
         let listed = list_relations(
-            (adapter, connection),
+            reads,
             database,
             py.None().into_bound(py),
             sorted_texts(py, names)?,
@@ -143,18 +132,14 @@ fn source_candidates<'py>(
 
 /// Source relation candidates by name; schema listings first answer schema-scoped catalogs.
 #[pyfunction]
-#[pyo3(signature = (*, adapter, connection, database, entries))]
+#[pyo3(signature = (*, reads, database, entries))]
 pub(crate) fn list_source_candidates<'py>(
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
+    reads: &Bound<'py, PlannerReads>,
     database: &Bound<'py, PyAny>,
     entries: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let entries: Vec<Bound<'py, PyAny>> = entries.try_iter()?.collect::<PyResult<_>>()?;
-    tuple(
-        adapter.py(),
-        source_candidates((adapter, connection), database, &entries)?,
-    )
+    tuple(reads.py(), source_candidates(reads, database, &entries)?)
 }
 
 /// Reuse collected columns and inspect only selected, unresolved table sources.
@@ -172,8 +157,7 @@ pub(crate) fn semantic_source_columns<'py>(
         (
             &[
                 "project",
-                "adapter",
-                "connection",
+                "reads",
                 "source_read_map",
                 "columns",
                 "selected_keys",
@@ -182,8 +166,7 @@ pub(crate) fn semantic_source_columns<'py>(
         ),
     )?;
     let project = &args.value("project")?;
-    let adapter = &args.value("adapter")?;
-    let connection = &args.value("connection")?;
+    let reads = args.value("reads")?;
     let source_read_map = &args.value("source_read_map")?;
     let columns = args.value("columns")?.downcast_into::<PyDict>()?;
     let columns = &columns;
@@ -191,10 +174,11 @@ pub(crate) fn semantic_source_columns<'py>(
 
     let py = project.py();
     if !native_field(&native_field(project, "settings")?, "sql_analysis")?.is_truthy()?
-        || connection.is_none()
+        || reads.is_none()
     {
         return Ok(columns.clone());
     }
+    let reads = &PlannerReads::passed(reads)?;
     let mut required: BTreeSet<String> = BTreeSet::new();
     for model in compiled_models(project)?.try_iter()? {
         let model = model?;
@@ -239,7 +223,7 @@ pub(crate) fn semantic_source_columns<'py>(
     }
     let result = columns.copy()?;
     for (database, entries) in groups {
-        let relations = source_candidates((adapter, connection), &database, &entries)?;
+        let relations = source_candidates(reads, &database, &entries)?;
         let mut chosen: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)> = Vec::new();
         for entry in &entries {
             let mut candidates: Vec<_> = Vec::new();
@@ -266,10 +250,7 @@ pub(crate) fn semantic_source_columns<'py>(
             for (_, relation) in &chosen {
                 unique.set_item(relation, py.None())?;
             }
-            columns_for(
-                (adapter, connection),
-                PyTuple::new(py, unique.keys())?.into_any(),
-            )?
+            columns_for(reads, PyTuple::new(py, unique.keys())?.into_any())?
         };
         for (name, relation) in chosen {
             let lower = |value: Bound<'py, PyAny>| -> PyResult<Bound<'py, PyAny>> {

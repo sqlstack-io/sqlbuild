@@ -24,16 +24,3 @@ pub(crate) fn sanitize(value: &str) -> String {
 pub(crate) fn display_value(value: Option<&str>) -> String {
     value.map_or_else(|| NOT_SET.to_owned(), sanitize)
 }
-
-/// A count with `,` thousands separators.
-pub(crate) fn grouped(value: usize) -> String {
-    let digits: String = value.to_string();
-    let mut text: String = String::with_capacity(digits.len() + digits.len() / 3);
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            text.push(',');
-        }
-        text.push(digit);
-    }
-    text
-}

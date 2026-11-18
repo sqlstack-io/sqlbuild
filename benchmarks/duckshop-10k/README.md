@@ -7,7 +7,7 @@ marketplace partners, carriers, warehouses, retail stores, suppliers, payment ga
 networks, messaging, affiliates, support tools, ledgers, wholesale desks, returns portals and a
 product catalogue. Every name and value is invented.
 
-Only the generator, its tests and `checksum.txt` are committed. The generated project is written
+Only the generators, their tests and `checksum.txt` are committed. The generated project is written
 to a directory you choose.
 
 ## Usage
@@ -64,3 +64,26 @@ because their results depend on the engine or the session.
 
 CI runs both in the 10,000-model cell of the dense compile job, under its 4 GiB memory limit, after
 the dense guards have finished, so the DuckShop compile never shares the limit with them.
+
+## Synced warehouse state
+
+`synced_state.py` writes the warehouse state a location syncs after building the project: about 13K
+relations, a fingerprint and two `--changed` executions per built model, an execution per seed and
+cursor observations, as the metadata pages a location sends the server. No warehouse runs the
+project, so the hashes come from the planner itself: a `SQLBUILD_PLANNER_CAPTURE_DIR` capture of
+one plan of the published project gives each model's identity metadata and query, and an unedited
+model then plans as unchanged. `--changed-share` of the built models record a definition one line
+older, and the models outside `--built-share` were never built.
+
+```bash
+python benchmarks/duckshop-10k/synced_state.py control.sqlite3 001-plan_output.json state.json \
+  --built-share 0.95
+```
+
+`tests/e2e/.../plan/test_duckshop_10k_preview_performance.py` serves the project on a location,
+mirrors that state into the server, and times a warm `--changed` plan preview of every node, with
+every model built and with one in twenty unbuilt. It fails when the warm preview takes more than 0.45
+of the same location's publish, a linear 10K compile on the same machine, so a lookup over every
+model or relation shows however fast the runner is; it also checks that only the edited and unbuilt
+models report their own change, and times the ad-hoc command check. It runs in the 10,000-model
+cell after the DuckShop compile guard.

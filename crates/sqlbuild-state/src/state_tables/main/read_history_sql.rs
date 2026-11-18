@@ -1,5 +1,6 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
+use crate::state_tables::_helpers::history_sql::{after_filter, binary, versioned_source};
 use crate::state_tables::constants::{EVENT_ID_COLUMN, MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
 use crate::state_tables::models::HistoryRead;
 
@@ -17,6 +18,7 @@ pub fn read_history_sql(
         adapter,
         has_event_id,
         limit,
+        newest,
     } = read;
     let mut projection = columns.join(", ");
     if !columns.contains(&EVENT_ID_COLUMN) {
@@ -44,43 +46,18 @@ pub fn read_history_sql(
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let mut greater: Vec<String> = Vec::new();
-    let mut equal: Vec<String> = Vec::new();
-    if let Some(after) = after {
-        for ((column, ordered), value) in columns.iter().zip(&ordered).zip(after) {
-            let literal = value
-                .as_ref()
-                .map(|value| {
-                    if *column == timestamp_column {
-                        Ok(value.clone())
-                    } else {
-                        binary(value, adapter)
-                    }
-                })
-                .transpose()?;
-            let comparison = literal.as_ref().map_or_else(
-                || format!("{column} IS NOT NULL"),
-                |literal| format!("{ordered} > {literal}"),
-            );
-            let prefix = if equal.is_empty() {
-                String::new()
-            } else {
-                format!("{} AND ", equal.join(" AND "))
-            };
-            greater.push(format!("({prefix}{comparison})"));
-            equal.push(literal.as_ref().map_or_else(
-                || format!("{column} IS NULL"),
-                |literal| format!("{ordered} = {literal}"),
-            ));
-        }
-    }
     let mut filters: Vec<String> = Vec::new();
-    if !greater.is_empty() {
-        filters.push(format!("({})", greater.join(" OR ")));
-    }
+    filters.extend(
+        after
+            .map(|after| after_filter((&columns, &ordered), after, (timestamp_column, adapter)))
+            .transpose()?
+            .flatten(),
+    );
     if let Some(since) = observed_since {
         filters.push(format!("{timestamp_column} >= {since}"));
     }
+    let (source, versions) = versioned_source(qualified_name, timestamp_column, newest);
+    filters.extend(versions);
     let filter = if filters.is_empty() {
         String::new()
     } else {
@@ -104,26 +81,7 @@ pub fn read_history_sql(
         format!(" LIMIT {limit}")
     };
     Ok(format!(
-        "SELECT {head}{projection} FROM {qualified_name}{filter} ORDER BY {}{tail}",
+        "SELECT {head}{projection} FROM {source}{filter} ORDER BY {}{tail}",
         order.join(", ")
     ))
-}
-
-/// Session and column collations must not merge case, accents or trailing spaces at page boundaries.
-fn binary(value: &str, adapter: &str) -> Result<String, String> {
-    Ok(match adapter {
-        "duckdb" | "motherduck" => format!("encode({value})"),
-        "sqlite" => format!("CAST({value} AS BLOB)"),
-        "postgres" => format!("convert_to({value}, 'UTF8')"),
-        "snowflake" => format!("TO_BINARY({value}, 'UTF-8')"),
-        "bigquery" => format!("CAST({value} AS BYTES)"),
-        "databricks" => format!("CAST({value} AS BINARY)"),
-        "sqlserver" => format!("CONVERT(VARBINARY(MAX), CONVERT(NVARCHAR(MAX), {value}))"),
-        "clickhouse" => value.to_owned(),
-        _ => {
-            return Err(format!(
-                "warehouse history does not support adapter '{adapter}'"
-            ));
-        }
-    })
 }

@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use uuid::Uuid;
 
-use crate::runs::_helpers::groups::admission::{earlier_waiters, limit_waiters};
+use crate::runs::_helpers::groups::admission::{earlier_waiters, limit_waiters, slot_pool};
 use crate::runs::_helpers::groups::selection::child_waits;
 use crate::runs::models::{
     LimitWaiter, QueueCandidate, QueueHolder, QueueWait, RunQueueState, RunRecord, RunningJob,
@@ -77,7 +77,7 @@ pub(crate) async fn queue_states(
             .find(|waiter| waiter.run_id == request.run_id)
             .map(|waiter| waiter.limits.clone())
             .unwrap_or_default();
-        waits.extend(held_limits(&slots, &shown, (request.run_id, &limits)));
+        waits.extend(held_limits(&slots, (request.run_id, &limits)));
         waits.extend(earlier_runs(&waiters, (candidate, &limits), &candidates));
         run.queue = Some(RunQueueState { position, waits });
     }
@@ -111,27 +111,25 @@ fn write_claims(
         .collect()
 }
 
-/// Each limit this run takes that running runs hold, naming holders in this scope and counting the rest.
+/// Each group this run takes whose slots running runs hold; slots belong to one location and target.
 fn held_limits(
     slots: &[QueueHolder],
-    shown: &impl Fn(&QueueHolder) -> Option<Uuid>,
     (run_id, limits): (Uuid, &BTreeSet<String>),
 ) -> Vec<QueueWait> {
     let mut waits: Vec<QueueWait> = Vec::new();
     for limit in limits {
-        let held: Vec<&QueueHolder> = slots
-            .iter()
-            .filter(|slot| &slot.held == limit && slot.run_id != run_id)
-            .collect();
-        if held.is_empty() {
-            continue;
+        let mut holders: Vec<Uuid> = Vec::new();
+        for slot in slots {
+            if &slot.held == limit && slot.run_id != run_id && !holders.contains(&slot.run_id) {
+                holders.push(slot.run_id);
+            }
         }
-        let holders: Vec<Uuid> = held.iter().filter_map(|slot| shown(slot)).collect();
-        waits.push(QueueWait::ConcurrencyLimit {
-            limit: limit.clone(),
-            elsewhere: count(held.len() - holders.len()),
-            holders,
-        });
+        if !holders.is_empty() {
+            waits.push(QueueWait::PoolFull {
+                pool: slot_pool(limit).to_owned(),
+                holders,
+            });
+        }
     }
     waits
 }
@@ -148,7 +146,7 @@ fn earlier_runs(
         if ahead.insert(limit) {
             waits.push(QueueWait::EarlierRun {
                 run_id: here.contains_key(&waiter.run_id).then_some(waiter.run_id),
-                limit: limit.clone(),
+                pool: slot_pool(limit).to_owned(),
             });
         }
     }

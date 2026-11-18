@@ -1,4 +1,4 @@
-//! Reserve write claims and concurrency slots inside the candidate's rollback savepoint.
+//! Reserve write claims and pool slots inside the candidate's rollback savepoint, all or none.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
@@ -6,17 +6,20 @@ use std::num::NonZeroU32;
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::declarations::models::PoolSlots;
+use crate::runs::_helpers::groups::admission::slot_key;
 use crate::runs::_helpers::lifecycle::events::append_run_event;
 use crate::runs::models::{RunClaim, RunRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
+use crate::store::types::Row;
 
 /// Occupied slots above a lowered limit still count; group children use a parent's slot one at a time.
 pub(crate) async fn reserve_claims(
     mut transaction: ControlTransaction,
     request: &RunRequest,
-    limits: &BTreeMap<String, NonZeroU32>,
+    caps: &BTreeMap<String, NonZeroU32>,
 ) -> Result<(ControlTransaction, bool), ControlError> {
     if let Some(job_key) = &request.job_key {
         let rows;
@@ -48,7 +51,7 @@ pub(crate) async fn reserve_claims(
         for row in rows {
             let sibling: RunRequest = serde_json::from_value(row["request_json"].clone())
                 .map_err(|error| ControlError::Invalid(error.to_string()))?;
-            siblings_hold.extend(sibling.concurrency_groups);
+            siblings_hold.extend(sibling.pools.into_keys());
         }
     }
     for node in &request.write_set {
@@ -68,64 +71,74 @@ pub(crate) async fn reserve_claims(
             return Ok((transaction, false));
         }
     }
-    for group in &request.concurrency_groups {
+    for (pool, slots) in &request.pools {
+        let key = slot_key(request, pool);
         if let Some(parent_id) = request.parent_run_id {
             let inherited;
             (transaction, inherited) = query(
                 transaction,
                 "SELECT slot FROM sqb_concurrency_slots WHERE group_key=$1 AND run_id=$2",
-                vec![Parameter::Text(group.clone()), Parameter::Id(parent_id)],
+                vec![Parameter::Text(key.clone()), Parameter::Id(parent_id)],
             )
             .await?;
             if !inherited.is_empty() {
-                if siblings_hold.contains(group) {
+                if siblings_hold.contains(pool) {
                     return Ok((transaction, false));
                 }
                 continue;
             }
         }
-        let limit = limits
-            .get(group)
-            .ok_or_else(|| {
-                ControlError::Invalid(format!("concurrency group {group} has no configured limit"))
-            })?
-            .get();
-        let slots;
-        (transaction, slots) = query(
+        let occupied;
+        (transaction, occupied) = query(
             transaction,
             "SELECT slot FROM sqb_concurrency_slots WHERE group_key=$1 ORDER BY slot",
-            vec![Parameter::Text(group.clone())],
+            vec![Parameter::Text(key.clone())],
         )
         .await?;
-        let occupied: BTreeSet<i64> = slots
-            .iter()
-            .filter_map(|row| row.get("slot").and_then(serde_json::Value::as_i64))
-            .collect();
-        if occupied.len() >= limit as usize {
+        let Some(free) = free_slots(&occupied, effective_slots(*slots, caps.get(pool))) else {
             return Ok((transaction, false));
-        }
-        let slot = (1..=i64::from(limit))
-            .find(|slot| !occupied.contains(slot))
-            .ok_or_else(|| {
-                ControlError::Invalid("concurrency slot accounting is inconsistent".into())
-            })?;
-        let inserted;
-        (transaction, inserted) = query(
-            transaction,
-            "INSERT INTO sqb_concurrency_slots (group_key, slot, run_id) VALUES ($1,$2,$3) \
-             ON CONFLICT (group_key, slot) DO NOTHING RETURNING slot",
-            vec![
-                Parameter::Text(group.clone()),
-                Parameter::Integer(slot),
-                Parameter::Id(request.run_id),
-            ],
-        )
-        .await?;
-        if inserted.is_empty() {
-            return Ok((transaction, false));
+        };
+        for slot in free {
+            let inserted;
+            (transaction, inserted) = query(
+                transaction,
+                "INSERT INTO sqb_concurrency_slots (group_key, slot, run_id) VALUES ($1,$2,$3) \
+                 ON CONFLICT (group_key, slot) DO NOTHING RETURNING slot",
+                vec![
+                    Parameter::Text(key.clone()),
+                    Parameter::Integer(slot),
+                    Parameter::Id(request.run_id),
+                ],
+            )
+            .await?;
+            if inserted.is_empty() {
+                return Ok((transaction, false));
+            }
         }
     }
     Ok((transaction, true))
+}
+
+/// The run's amount and the pool's limit, lowered to the server's cap; above the cap a run takes the whole pool.
+fn effective_slots(slots: PoolSlots, cap: Option<&NonZeroU32>) -> (u32, u32) {
+    let limit = cap.map_or(slots.limit, |cap| slots.limit.min(*cap)).get();
+    (slots.amount.get().min(limit), limit)
+}
+
+/// `amount` slot numbers free below `limit`, or `None` when the pool lacks room; slots above a lowered limit still count.
+fn free_slots(occupied: &[Row], (amount, limit): (u32, u32)) -> Option<Vec<i64>> {
+    let taken: BTreeSet<i64> = occupied
+        .iter()
+        .filter_map(|row| row.get("slot").and_then(serde_json::Value::as_i64))
+        .collect();
+    if taken.len() + amount as usize > limit as usize {
+        return None;
+    }
+    let free: Vec<i64> = (1..=i64::from(limit))
+        .filter(|slot| !taken.contains(slot))
+        .take(amount as usize)
+        .collect();
+    (free.len() == amount as usize).then_some(free)
 }
 
 /// Publish ownership only after every physical claim has been reserved in this transaction.

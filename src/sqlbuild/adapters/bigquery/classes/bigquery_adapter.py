@@ -55,6 +55,7 @@ from sqlbuild.adapter.contract.exceptions import (
 from sqlbuild.adapter.contract.main.complete_table_freshness_results import (
     complete_table_freshness_results,
 )
+from sqlbuild.adapter.contract.main.estimates_one_at_a_time import estimates_one_at_a_time
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
 from sqlbuild.adapter.contract.models import (
@@ -2644,6 +2645,18 @@ class BigQueryAdapter(
             else None,
             byte_count=byte_count if isinstance(byte_count, int) else None,
             byte_count_basis="tables_api_num_bytes" if isinstance(byte_count, int) else None,
+        )
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Metadata-only estimates of `names` in one dataset, one table at a time."""
+
+        return estimates_one_at_a_time(
+            estimate=self.estimate_relation_row_count,
+            connection=connection,
+            location=(database, schema),
+            names=names,
         )
 
     def inspect_row_diff_coverage(

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import TYPE_PROOF_FILES
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import PUBLISHABLE_FILES
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentTerminalTestCase,
 )
@@ -67,10 +67,10 @@ def test_given_an_interactive_adapter_when_developing_then_sign_in_happens_once_
     connects: Path = tmp_path / "connects.txt"
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
             "sqlbuild_project.toml": 'default_target = "development"\n'
-            + TYPE_PROOF_FILES["sqlbuild_project.toml"].replace(
+            + PUBLISHABLE_FILES["sqlbuild_project.toml"].replace(
                 'adapter = "duckdb"', 'adapter = "duckdb_sign_in"'
             )
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'

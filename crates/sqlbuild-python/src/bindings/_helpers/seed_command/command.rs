@@ -1,5 +1,6 @@
 //! `sqb seed`: compile the selected seeds, load them, and report.
 
+use sqlbuild_python_planner::live_reads::models::LiveReads;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -269,12 +270,12 @@ fn compile_seeds<'py>(
         )?;
         let connection: Bound<'py, PyAny> =
             connection_with_hooks(&adapter, &connection_config, &hooks)?;
-        let read: PyResult<Bound<'py, PyAny>> = read_selected_seed_fingerprints(
-            &adapter,
-            &connection,
-            &PyTuple::new(py, &selected)?.into_any(),
-        )
-        .map(Bound::into_any);
+        let read: PyResult<Bound<'py, PyAny>> = LiveReads::new(&adapter, &connection, None)
+            .handle(adapter.py())
+            .and_then(|reads| {
+                read_selected_seed_fingerprints(&reads, &PyTuple::new(py, &selected)?.into_any())
+            })
+            .map(Bound::into_any);
         let closed: PyResult<Bound<'py, PyAny>> = adapter.call_method1("close", (connection,));
         let read: Bound<'py, PyAny> = read?;
         closed?;

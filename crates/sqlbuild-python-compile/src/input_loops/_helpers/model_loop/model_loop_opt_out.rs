@@ -23,9 +23,9 @@ use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_core::constants::PANIC_MESSAGE;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 
-use crate::input_loops::_helpers::model_loop::model_loop_prepass::spawned;
 use sqlbuild_python_base::cache::main::parse_key::parse_key;
 use sqlbuild_python_base::cache::models::NativeParseStore;
+use sqlbuild_python_base::native_threads::main::spawned::spawned;
 use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
 
 use crate::input_loops::_helpers::model::model_loop::LoopContext;

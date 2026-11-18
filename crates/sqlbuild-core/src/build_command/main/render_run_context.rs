@@ -1,9 +1,10 @@
 //! The verbose build execution context.
 
-use crate::build_command::_helpers::text::{display_value, grouped, sanitize};
+use crate::build_command::_helpers::text::{display_value, sanitize};
 use crate::build_command::constants::{CONTEXT_LABEL_WIDTH, NOT_SET};
 use crate::build_command::models::RunContextFacts;
 use crate::cli_text::models::{CliDocument, CliStyle};
+use crate::number_text::main::format_thousands::format_thousands;
 
 fn date_vars(facts: &RunContextFacts) -> String {
     match &facts.date_vars {
@@ -45,8 +46,8 @@ pub fn render_run_context(facts: &RunContextFacts, style: CliStyle) -> String {
             "selected",
             format!(
                 "{} of {} build resources",
-                grouped(facts.selected_count),
-                grouped(facts.total_count)
+                format_thousands(facts.selected_count as i128),
+                format_thousands(facts.total_count as i128)
             ),
         ),
         ("date vars", date_vars(facts)),
@@ -72,7 +73,7 @@ pub fn render_run_context(facts: &RunContextFacts, style: CliStyle) -> String {
                     format!(
                         "{} ({} {noun})",
                         sanitize(&file.path),
-                        grouped(file.selector_count)
+                        format_thousands(file.selector_count as i128)
                     ),
                 )],
                 Some(CONTEXT_LABEL_WIDTH),

@@ -1,12 +1,13 @@
-//! Read group membership and failure policy from the parent's immutable publication.
+//! Group membership and failure policy from the parent's publication; a retried member counts once.
 
 use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
 use crate::declarations::main::frozen_definitions::frozen_definitions;
+use crate::runs::constants::SUPERSEDED_CHILD;
 use crate::runs::models::{GroupContext, GroupRun};
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
 use crate::store::models::{ControlTransaction, Parameter};
@@ -16,7 +17,7 @@ pub(crate) async fn load_group(
     parent_id: Uuid,
 ) -> Result<(ControlTransaction, GroupContext), ControlError> {
     let (transaction, rows) = query(transaction,
-        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r \
+        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.ignored_audit_failures, r.worker_instance FROM sqb_runs r \
          WHERE r.run_id=$1 AND r.kind='group'",
         vec![Parameter::Id(parent_id)]).await?;
     let parent: GroupRun = decode_row(
@@ -25,16 +26,16 @@ pub(crate) async fn load_group(
             .ok_or_else(|| ControlError::Invalid("group run is missing".into()))?,
     )?;
     let (transaction, rows) = query(transaction,
-        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r \
-         WHERE r.parent_run_id=$1 ORDER BY r.run_id",
+        &format!("SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.ignored_audit_failures, r.worker_instance FROM sqb_runs r \
+         WHERE r.parent_run_id=$1 AND NOT {SUPERSEDED_CHILD} ORDER BY r.run_id"),
         vec![Parameter::Id(parent_id)]).await?;
     let children = rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;
     let (transaction, definitions) =
         frozen_definitions(transaction, parent.request_json.snapshot_id).await?;
     let (transaction, failures) = query(
         transaction,
-        "SELECT n.node_key FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
-         WHERE r.parent_run_id=$1 AND n.kind='node' AND n.status='failed'",
+        &format!("SELECT n.node_key FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
+         WHERE r.parent_run_id=$1 AND n.kind='node' AND n.status='failed' AND NOT {SUPERSEDED_CHILD}"),
         vec![Parameter::Id(parent_id)],
     )
     .await?;

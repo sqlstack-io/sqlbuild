@@ -12,7 +12,11 @@ use sqlbuild_core::constants::{
 };
 
 use crate::store::errors::ControlError;
-use crate::warehouse_metadata::constants::DEFAULT_STATISTICS_RETENTION_DAYS;
+use crate::store::models::ControlStore;
+use crate::warehouse_metadata::constants::{
+    DEFAULT_POSTGRES_STATE_HISTORY_VERSIONS, DEFAULT_SQLITE_STATE_HISTORY_VERSIONS,
+    DEFAULT_STATISTICS_RETENTION_DAYS,
+};
 
 /// Preserve observations, not an inferred latest version, age status or run outcome.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -482,6 +486,12 @@ pub struct PreviewCopyRead {
     /// Whether the copy carries consumption history; sent only when set, as older servers reject it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub consumption: bool,
+    /// Whether the location holds copies by mirror version; sent only when set, as older servers reject it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub versioned: bool,
+    /// The mirror version of the copy the location holds; an unchanged mirror returns no records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub known_version: Option<String>,
 }
 
 /// The newest successful build of a node, which a `cursor_max` observation must come from.
@@ -516,6 +526,12 @@ pub struct PreviewCopy {
     /// Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub consumption: Vec<WarehouseConsumptionRecord>,
+    /// The mirror version these records were read at; sent only to a versioned read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Set when the mirror is still at the read's known version: the records are left out.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unchanged: bool,
 }
 
 /// Private interpreter input; cursor values are data and receive adapter literal rendering.
@@ -597,6 +613,9 @@ pub struct FingerprintRead {
     /// The table's change token after the last complete read; an equal token skips this read.
     #[serde(default)]
     pub unchanged_token: Option<String>,
+    /// A full read delivers only each node's newest builds; incremental reads ignore it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub newest_versions: Option<u16>,
 }
 
 /// Node results carry no event identity, so the cursor holds the row's identity columns.
@@ -636,6 +655,9 @@ pub struct StateEventsRead {
     /// The table's change token after the last complete read; an equal token skips this read.
     #[serde(default)]
     pub unchanged_token: Option<String>,
+    /// A full read of check results delivers only each check's newest; other tables ignore it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub newest_versions: Option<u16>,
 }
 
 /// The private interpreter accepts only known state tables, never arbitrary SQL.
@@ -919,6 +941,41 @@ impl Default for StatisticsRetention {
             days: DEFAULT_STATISTICS_RETENTION_DAYS,
         }
     }
+}
+
+/// Builds and check results the store mirrors per node or check; unset follows the store's default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StateHistoryRetention {
+    versions: Option<u16>,
+}
+
+impl StateHistoryRetention {
+    pub fn versions(versions: u16) -> Result<Self, ControlError> {
+        if versions == 0 {
+            return Err(ControlError::Invalid(
+                "state history retention must keep at least one version".into(),
+            ));
+        }
+        Ok(Self {
+            versions: Some(versions),
+        })
+    }
+
+    /// The configured limit, or the store's default; never zero, so a node's latest version stays.
+    #[must_use]
+    pub fn kept_versions(self, store: &ControlStore) -> u16 {
+        self.versions.unwrap_or(match store {
+            ControlStore::Sqlite(_) => DEFAULT_SQLITE_STATE_HISTORY_VERSIONS,
+            ControlStore::Postgres(_) => DEFAULT_POSTGRES_STATE_HISTORY_VERSIONS,
+        })
+    }
+}
+
+/// The newest versions per node or check a full read of state history needs to deliver.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseRetention {
+    pub state_history_versions: u16,
 }
 
 /// A current snapshot node's declared metadata and latest build, without SQL, source or config.

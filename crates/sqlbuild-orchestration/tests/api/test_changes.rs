@@ -18,12 +18,12 @@ use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::{change_trigger::change_trigger, list_triggers::list_triggers};
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
-use crate::runs::main::request_job_run::request_job_run;
+use crate::runs::main::requests::request_job_run::request_job_run;
 use crate::runs::models::JobRunRequest;
 use crate::runs::tests::helpers::snapshot;
 use crate::scheduler::models::TickDecision;
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, evaluate_trigger};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::ControlStore;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -263,11 +263,19 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
             .expect("new token");
             let mut live =
                 connect(&client, &first, (location_id, "development", &fresh.bearer)).await;
+            // Each replica announces node states after its own debounce; this one shows when the second has.
+            let mut settled = connect(
+                &client,
+                &second,
+                (location_id, "development", &fresh.bearer),
+            )
+            .await;
+            // Long enough to connect on a slow runner before it expires; the wait below runs it out.
             let expiring = issue_token(
                 store,
                 &audit,
                 CredentialScope::Location { location_id },
-                Utc::now() + chrono::Duration::seconds(1),
+                Utc::now() + chrono::Duration::seconds(5),
             )
             .await
             .expect("expiring token");
@@ -288,6 +296,7 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 .await
                 .expect("committed change after expiry");
             expect_topics(&mut live, &snapshot_topics).await;
+            expect_topics(&mut settled, &snapshot_topics).await;
             assert_eq!(
                 next_topic(&mut expires).await,
                 None,
@@ -324,6 +333,7 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 "shutdown drains a live SSE body"
             );
             stop_api(second).await;
+            assert_eq!(next_topic(&mut settled).await, None);
             assert_eq!(next_topic(&mut reconnected).await, None);
             assert_eq!(next_topic(&mut long_stream).await, None);
             close_test_store(fixture).await;

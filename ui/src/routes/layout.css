@@ -11,6 +11,8 @@
 
 /* Refined SQLBuild light theme: crisp white chrome over a restrained cool-grey canvas. */
 :root {
+	/* Zoomed-out graph pills' names, at weight 500: one line to change the font. */
+	--font-node-compact: var(--font-mono);
 	/* experiment: panels are outlined in light mode, filled (borderless) in dark mode */
 	/* light: the card edge is the strongest line on the page; lines inside cards stay quieter */
 	--panel-border: rgba(28, 32, 38, 0.2);
@@ -57,6 +59,8 @@
 	--sb-error: #c74757;
 	--sb-running: #2677d9;
 	--sb-stale: #7756b9;
+	/* Needs building: changed nodes use --sb-stale; nodes only behind an upstream rebuild use this lighter purple. */
+	--sb-behind: #a089d3;
 	--sb-secondary: #16826f;
 	--sb-text-faint: #98a0ad;
 	--sb-surface-low: #f7f8fa;
@@ -132,6 +136,7 @@
 	--sb-error: #f47089;
 	--sb-running: #69aaf6;
 	--sb-stale: #a78bfa;
+	--sb-behind: #8a77c4;
 	--sb-secondary: #4dd6c4;
 	--sb-text-faint: #626975;
 	--sb-surface-low: #080a0d;
@@ -219,6 +224,34 @@
 	html {
 		@apply font-sans;
 	}
+	/* One thin, themed scrollbar for every scroll area, so no page shows the browser's default. */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--border-strong) transparent;
+	}
+	*::-webkit-scrollbar {
+		width: 9px;
+		height: 9px;
+	}
+	*::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	*::-webkit-scrollbar-thumb {
+		background: var(--border-strong);
+		border-radius: 2px;
+		border: 2px solid transparent;
+		background-clip: content-box;
+	}
+	*::-webkit-scrollbar-thumb:hover {
+		background: var(--muted-foreground);
+		background-clip: content-box;
+	}
+}
+
+/* The lighter bracketed part of a button label, e.g. the "(+65)" of "Build 30 changed (+65)". */
+.label-extra {
+	opacity: 0.72;
+	font-weight: 400;
 }
 
 /* Shared list-table treatment (Catalog/Runs/Jobs/Triggers/Checks/Providers).
@@ -269,6 +302,19 @@
 .sb-list tbody tr:hover {
 	background: var(--sb-hover);
 }
+/* A list whose rows open nothing. */
+.sb-list.static tbody tr {
+	cursor: default;
+}
+/* A short list inside a page section, such as a plan's nodes: tighter rows. */
+.sb-list.compact tbody td {
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+/* A list inside a panel, under the panel's own heading. */
+.sb-list.framed {
+	border-top: 1px solid var(--border);
+}
 .sb-list .code,
 .sb-list code {
 	font-family: var(--font-mono);
@@ -300,7 +346,10 @@
 .sb-list .cell-name a:hover {
 	color: var(--primary);
 }
+/* Descriptions don't wrap; the width limit stops one long description widening its column and
+   pushing the rest of the table off-screen. */
 .sb-list .cell-desc {
+	max-width: 480px;
 	margin-top: 1px;
 	overflow: hidden;
 	color: var(--muted-foreground);
@@ -341,6 +390,11 @@
 }
 .sb-tag .sb-tag-ico {
 	color: var(--sb-text-faint);
+}
+/* A tag that flags something to look at, e.g. "warnings". */
+.sb-tag.warn {
+	background: color-mix(in srgb, var(--sb-warning) 14%, transparent);
+	color: var(--sb-warning);
 }
 /* status label: coloured dot + plain label (no tinted pill) */
 .sb-status {

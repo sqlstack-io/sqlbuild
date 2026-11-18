@@ -1,7 +1,9 @@
 //! Public records of freshness.
 
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::Bound;
 use pyo3::prelude::PyAny;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 /// Previous state records by identity; absent means no comparison.
 #[derive(Debug)]
@@ -9,11 +11,11 @@ pub struct PreviousState<'py> {
     pub by_identity: Option<Bound<'py, PyAny>>,
 }
 
-/// The adapter, connection and observation time every source is observed with.
+/// The SQL dialect, warehouse reads and observation time every source is observed with.
 #[derive(Debug)]
 pub struct Observer<'py> {
-    pub adapter: Bound<'py, PyAny>,
-    pub connection: Bound<'py, PyAny>,
+    pub dialect: Bound<'py, Dialect>,
+    pub reads: Bound<'py, PlannerReads>,
     pub observed_at: Bound<'py, PyAny>,
 }
 

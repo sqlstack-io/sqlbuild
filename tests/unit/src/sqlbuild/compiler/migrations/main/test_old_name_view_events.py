@@ -13,6 +13,7 @@ from sqlbuild._native import (
     OldNameViewEvent,
     OldNameViewEventType,
     OldNameViewHistory,
+    live_reads,
     project_old_name_views,
     read_migration_state_events,
     stored_old_name_view_columns,
@@ -234,7 +235,7 @@ def test_given_state_table_without_optional_columns_when_planning_then_absent_co
     for column in test_case.absent_columns:
         _ = connection.execute(f"ALTER TABLE main._sqlbuild_old_name_views DROP COLUMN {column}")
     inspection: MigrationStateInspection = MigrationStateInspection(
-        adapter=adapter, connection=connection, database=None
+        reads=live_reads(adapter=adapter, connection=connection), database=None
     )
 
     inspection.inspect_old_name_views(schemas={"main"})

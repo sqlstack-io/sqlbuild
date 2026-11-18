@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use crate::runs::main::claim_next_run::claim_next_run;
-use crate::runs::main::list_run_claims::list_run_claims;
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
+use crate::runs::main::listings::list_run_claims::list_run_claims;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::RunStatus;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;
 use uuid::Uuid;
@@ -15,7 +15,7 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::_helpers::lifecycle::reads::list_runs_in;
 use crate::runs::models::{QueueWait, RunQueueState};
 use crate::runs::tests::claim_helpers::succeed;
-use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::runs::tests::helpers::{pool_slots, queue, request, snapshot};
 use crate::runs::tests::terminal_helpers::finish;
 use crate::runs::tests::test_types::{
     BacklogClaimTestCase, GroupLimitTestCase, PriorityClaimsTestCase, QueueStateTestCase,
@@ -325,15 +325,9 @@ fn given_named_group_limits_when_capacity_is_lowered_then_active_high_slots_stil
             for id in 1..=3 {
                 let mut input = request((location, published.snapshot_id), id, 0, &["orders"]);
                 input.write_set.clear();
-                input.concurrency_groups.insert("warehouse".into());
+                input.pools.insert("warehouse".into(), pool_slots(1, 100));
                 queue(store, &input).await;
             }
-            assert!(
-                claim_next_run(store, &lease, &BTreeMap::new(), None)
-                    .await
-                    .is_err(),
-                "unknown groups cannot silently become unlimited"
-            );
             let first = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("first slot")
@@ -483,7 +477,10 @@ fn given_a_blocked_multi_limit_waiter_when_younger_work_arrives_then_shared_limi
                 (4, 0, &["products"][..], &[][..]),
             ] {
                 let mut input = request(scope, id, priority, nodes);
-                input.concurrency_groups = groups.iter().map(|key| (*key).into()).collect();
+                input.pools = groups
+                    .iter()
+                    .map(|key| ((*key).into(), pool_slots(1, 100)))
+                    .collect();
                 queue(store, &input).await;
             }
             let lease = acquire_lease(store, Uuid::now_v7())
@@ -575,9 +572,11 @@ fn given_claimed_work_here_and_elsewhere_when_listing_the_queue_then_each_run_sh
                 .expect("elect")
                 .expect("leader");
             let mut running = request((location, here.snapshot_id), 1, 0, &["orders"]);
-            running.concurrency_groups.insert("warehouse".into());
+            running.pools.insert("warehouse".into(), pool_slots(2, 100));
             let mut elsewhere = request((other, there.snapshot_id), 2, 0, &["products"]);
-            elsewhere.concurrency_groups.insert("warehouse".into());
+            elsewhere
+                .pools
+                .insert("warehouse".into(), pool_slots(1, 100));
             for input in [&running, &elsewhere] {
                 queue(store, input).await;
                 claim_next_run(store, &lease, &limits, None)
@@ -586,9 +585,9 @@ fn given_claimed_work_here_and_elsewhere_when_listing_the_queue_then_each_run_sh
                     .expect("claimable");
             }
             let mut blocked = request((location, here.snapshot_id), 3, 0, &["customers", "orders"]);
-            blocked.concurrency_groups.insert("warehouse".into());
+            blocked.pools.insert("warehouse".into(), pool_slots(1, 100));
             let mut urgent = request((location, here.snapshot_id), 4, 5, &["inventory"]);
-            urgent.concurrency_groups.insert("warehouse".into());
+            urgent.pools.insert("warehouse".into(), pool_slots(1, 100));
             let free = request((location, here.snapshot_id), 5, 0, &["products"]);
             for input in [&blocked, &urgent, &free] {
                 queue(store, input).await;
@@ -602,10 +601,9 @@ fn given_claimed_work_here_and_elsewhere_when_listing_the_queue_then_each_run_sh
             .await
             .expect("queue");
             commit(transaction).await.expect("commit");
-            let slot = QueueWait::ConcurrencyLimit {
-                limit: "warehouse".into(),
+            let slot = QueueWait::PoolFull {
+                pool: "warehouse".into(),
                 holders: vec![running.run_id],
-                elsewhere: 1,
             };
             let expected = [
                 (
@@ -628,7 +626,7 @@ fn given_claimed_work_here_and_elsewhere_when_listing_the_queue_then_each_run_sh
                             slot,
                             QueueWait::EarlierRun {
                                 run_id: Some(urgent.run_id),
-                                limit: "warehouse".into(),
+                                pool: "warehouse".into(),
                             },
                         ],
                     },

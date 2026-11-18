@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import type { Run } from '$lib/api';
 	import CopyButton from '$lib/components/copy-button.svelte';
@@ -8,6 +10,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import type { RunDetailState } from './state.svelte';
+	import { attemptLabel } from './utils';
 
 	let { view }: { view: RunDetailState } = $props();
 
@@ -22,6 +25,14 @@
 			...d.children.map((run) => ({ role: 'Job run', run }))
 		];
 	});
+	const invocationColumns: TableColumn[] = [
+		{ id: 'invocation', label: 'sqb invocation', minWidth: 200 },
+		{ id: 'run', label: 'Run', width: '110px' },
+		{ id: 'attempt', label: 'Attempt', width: '80px' },
+		{ id: 'started', label: 'Started', width: '170px' },
+		{ id: 'ended', label: 'Ended', width: '170px' },
+		{ id: 'exit', label: 'Exit code', width: '90px' }
+	];
 </script>
 
 {#if d}
@@ -36,6 +47,10 @@
 							<i style:background={runStatusTone[r.run.status]}></i>
 							<span class="mono">{shortRunId(r.run.id)}</span>
 							{#if r.role === 'Job run' && r.run.jobKey}<span>{r.run.jobKey}</span>{/if}
+							{#if r.role === 'Job run'}
+								{@const attempt = attemptLabel(r.run, d.children)}
+								{#if attempt}<span class="faint" data-testid="member-attempt">{attempt}</span>{/if}
+							{/if}
 							<span class="faint">{runStatusLabel[r.run.status].toLowerCase()}</span>
 						</a>
 					</li>
@@ -57,7 +72,7 @@
 		<div class="details">
 			<dl>
 				{#if p}
-				<div><dt>Project version</dt><dd>Version {p.snapshotGeneration}{#if p.gitRevision} · commit <code>{p.gitRevision}</code>{/if}{p.gitDirty ? ' (with uncommitted changes)' : ''} <span class="faint">· snapshot <code>{p.snapshotId}</code></span></dd></div>
+				<div><dt>Project version</dt><dd>Version {p.snapshotGeneration}{#if p.gitRevision} · commit <code>{p.gitRevision}</code>{/if}{#if p.gitDirty}<span title="Published with uncommitted changes"> · dirty</span>{/if} <span class="faint">· snapshot <code>{p.snapshotId}</code></span></dd></div>
 				{#if p.command}<div><dt>Command</dt><dd><code>{p.command}</code> <CopyButton value={p.command} label="Copy command" /></dd></div>{/if}
 				{#if p.selection.length || p.exclude.length}
 					<div><dt>Selection</dt><dd>{@render selection(p.selection)}{#if p.exclude.length} excluding <code>{p.exclude.join(' ')}</code>{/if}</dd></div>
@@ -66,7 +81,7 @@
 				{:else if d.selection.length}
 				<div><dt>Selection</dt><dd>{@render selection(d.selection)}</dd></div>
 				{/if}
-				<div><dt>Rebuilds history</dt><dd>{d.run.rewriteHistory ? 'Yes: a full refresh or a set time window, so it needs extra permission to rerun' : 'No'}</dd></div>
+				<div><dt>Rebuilds history</dt><dd title={d.run.rewriteHistory ? 'Full refresh or set window; rerun needs run.rewrite_history' : undefined}>{d.run.rewriteHistory ? 'Yes' : 'No'}</dd></div>
 				<div><dt>Priority</dt><dd>{d.run.priority}</dd></div>
 				<div><dt>Run ID</dt><dd><code>{d.run.id}</code> <CopyButton value={d.run.id} label="Copy run ID" /></dd></div>
 				{#if d.run.runKey}<div><dt>Sensor run key</dt><dd><code>{d.run.runKey}</code></dd></div>{/if}
@@ -83,10 +98,8 @@
 				{/if}
 			</dl>
 			{#if d.invocations.length}
-				<table>
-					<thead><tr><th>sqb invocation</th><th>Run</th><th>Attempt</th><th>Started</th><th>Ended</th><th>Exit code</th></tr></thead>
-					<tbody>
-						{#each d.invocations as inv (inv.invocationId)}
+				<DataTable class="static compact" embedded columns={invocationColumns} rows={d.invocations} key={(inv) => inv.invocationId} empty="No sqb invocations.">
+					{#snippet row(inv)}
 							<tr>
 								<td class="mono">{inv.invocationId}</td>
 								<td class="mono"><a href={to(`/runs/${inv.runId}`)}>{shortRunId(inv.runId)}</a></td>
@@ -95,9 +108,8 @@
 								<td>{inv.endedAt ? formatStamp(inv.endedAt) : '—'}</td>
 								<td>{inv.exitCode ?? '—'}</td>
 							</tr>
-						{/each}
-					</tbody>
-				</table>
+					{/snippet}
+				</DataTable>
 			{/if}
 		</div>
 	{/if}
@@ -170,20 +182,6 @@
 		width: fit-content;
 		color: var(--primary);
 		cursor: pointer;
-	}
-	table {
-		margin-top: 10px;
-		border-collapse: collapse;
-		font-size: 12px;
-	}
-	th {
-		padding: 4px 16px 4px 0;
-		color: var(--sb-text-faint);
-		font-weight: 500;
-		text-align: left;
-	}
-	td {
-		padding: 3px 16px 3px 0;
 	}
 	a:hover {
 		color: var(--primary);

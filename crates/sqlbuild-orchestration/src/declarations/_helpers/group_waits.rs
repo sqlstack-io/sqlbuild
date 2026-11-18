@@ -2,10 +2,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::declarations::constants::SEED_KEY_PREFIX;
+use crate::declarations::constants::{
+    LOADER_KIND, SEED_KEY_PREFIX, SOURCE_KIND, SOURCE_LOADER_POINTER,
+};
 use crate::declarations::models::GroupCycle;
+use crate::snapshots::models::SnapshotInput;
 
-/// Each member `name` waits for, with the first lineage edge that makes it wait: the node and the upstream it reads.
+/// The members building the first nodes `name` reaches upstream, each with the edge that makes it wait.
 pub(crate) fn member_waits(
     (name, selection): (&str, &BTreeSet<String>),
     deps: &BTreeMap<String, BTreeSet<String>>,
@@ -19,15 +22,15 @@ pub(crate) fn member_waits(
             continue;
         }
         for upstream in deps.get(key).into_iter().flatten() {
-            let builders: Option<&BTreeSet<&str>> = owners.get(upstream.as_str());
-            for owner in builders
-                .filter(|builders| !builders.contains(name))
-                .into_iter()
-                .flatten()
+            if let Some(builders) = owners.get(upstream.as_str())
+                && !builders.contains(name)
             {
-                waits
-                    .entry((*owner).to_owned())
-                    .or_insert_with(|| (key.to_owned(), upstream.clone()));
+                for owner in builders {
+                    waits
+                        .entry((*owner).to_owned())
+                        .or_insert_with(|| (key.to_owned(), upstream.clone()));
+                }
+                continue;
             }
             if !seen.contains(upstream.as_str()) {
                 pending.push(upstream);
@@ -118,4 +121,54 @@ pub(crate) fn named_cycle(
         description: waits.join("; "),
         shared_read,
     }
+}
+
+/// A node's published `deps`, and for a source its loader, whose upstream Python it waits for too.
+pub(crate) fn upstream_keys<'a>(input: &'a SnapshotInput, key: &str) -> Vec<&'a str> {
+    let Some(node) = input.nodes.get(key) else {
+        return Vec::new();
+    };
+    let mut upstream: Vec<&'a str> = node
+        .definition
+        .get("deps")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
+        .collect();
+    if node.kind == SOURCE_KIND
+        && let Some(loader) = node
+            .definition
+            .pointer(SOURCE_LOADER_POINTER)
+            .and_then(serde_json::Value::as_str)
+        && let Some((loader_key, _)) = input
+            .nodes
+            .get_key_value(&format!("{LOADER_KIND}:{loader}"))
+        && !upstream.contains(&loader_key.as_str())
+    {
+        upstream.push(loader_key);
+    }
+    upstream
+}
+
+/// The selected nodes upstream of `start`, a node no member selects, through other such nodes.
+pub(crate) fn selected_upstream(
+    input: &SnapshotInput,
+    selected: &BTreeSet<&str>,
+    start: &str,
+) -> BTreeSet<String> {
+    let mut found: BTreeSet<String> = BTreeSet::new();
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
+    let mut pending: Vec<&str> = upstream_keys(input, start);
+    while let Some(key) = pending.pop() {
+        if !seen.insert(key) {
+            continue;
+        }
+        if selected.contains(key) {
+            found.insert(key.to_owned());
+        } else {
+            pending.extend(upstream_keys(input, key));
+        }
+    }
+    found
 }

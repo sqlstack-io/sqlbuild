@@ -1,10 +1,12 @@
 <script lang="ts">
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { runStatusTone } from '$lib/status';
 	import { shortRunId } from '$lib/operate/labels';
 	import FailuresPanel from './failures-panel.svelte';
+	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
 	import LiveStatements from './live-statements.svelte';
 	import NodePanel from './node-panel.svelte';
 	import RelatedRuns from './related-runs.svelte';
@@ -70,6 +72,7 @@
 	{#if detail}
 		<RunBanners banners={view.banners} />
 		<FailuresPanel {view} />
+		<IgnoredAuditsPanel {view} />
 		<RelatedRuns {view} />
 
 		<div bind:this={splitEl} class="flex min-h-0 flex-1 flex-col" class:select-none={dragging}>
@@ -78,16 +81,13 @@
 					<span class="label">Nodes over time</span>
 					{#if detail.children.length}<span class="faint">{detail.children.length} job runs · nodes from all of them</span>{/if}
 					{#if hasGraph}
-					<div class="seg" role="tablist">
-						<button role="tab" aria-selected={topView === 'timeline'} class:on={topView === 'timeline'} onclick={() => (topView = 'timeline')}>Timeline</button>
-						<button role="tab" aria-selected={topView === 'graph'} class:on={topView === 'graph'} onclick={() => (topView = 'graph')}>Graph</button>
-					</div>
+					<div class="seg"><SegmentedFilter label="View" bind:value={topView} options={[{ value: 'timeline', label: 'Timeline' }, { value: 'graph', label: 'Graph' }]} /></div>
 					{/if}
 				</div>
 				<div class="flex min-h-0 flex-1">
 					<div class="relative flex min-h-0 flex-1 flex-col">
 						{#if !nodes.length}
-							<div class="empty">{detail.children.length ? 'The job runs in this group have no nodes yet.' : 'No nodes yet: the run hasn’t started.'}</div>
+							<div class="empty">{detail.children.length ? 'No nodes yet.' : 'Not started.'}</div>
 						{:else if topView === 'timeline' || !hasGraph}
 							<RunGantt {nodes} {origin} now={app.now} selected={view.selected} {groups} onselect={(key, add) => view.selectNode(key, add)} />
 						{:else}
@@ -128,7 +128,7 @@
 	{:else if view.detailRes.error}
 		<div class="empty">Couldn't load this run: {view.detailRes.error}</div>
 	{:else}
-		<div class="empty">Run not found. This page shows only the newest 1,000 runs of a location, so an older run can be missing here.</div>
+		<div class="empty" title="Only the newest 1,000 runs per location are kept here">Run not found.</div>
 	{/if}
 </div>
 
@@ -150,21 +150,7 @@
 		color: var(--sb-text-faint);
 	}
 	.seg {
-		display: flex;
-		overflow: hidden;
 		margin-left: auto;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-	}
-	.seg button {
-		padding: 3px 12px;
-		color: var(--muted-foreground);
-		font-size: 11px;
-		font-weight: 500;
-	}
-	.seg button.on {
-		background: var(--sidebar-accent);
-		color: var(--foreground);
 	}
 	.splitter {
 		position: relative;

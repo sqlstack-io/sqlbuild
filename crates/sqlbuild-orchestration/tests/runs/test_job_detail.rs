@@ -1,6 +1,7 @@
 //! One job's declaration reads like the job list; a full-refresh launch needs run.rewrite_history down to group children and records it.
 
 use std::collections::BTreeMap;
+use std::num::NonZeroU32;
 
 use serde_json::json;
 use uuid::Uuid;
@@ -12,15 +13,17 @@ use crate::credentials::tests::role_helpers::{
 };
 use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::read_person_job::read_person_job;
+use crate::declarations::models::ServerPoolCaps;
 use crate::runs::_helpers::requests::job::frozen_group_children;
 use crate::runs::main::{
-    advance_groups::advance_groups, list_runs::list_runs, request_person_run::request_person_run,
+    execution::advance_groups::advance_groups, listings::list_runs::list_runs,
+    requests::request_person_run::request_person_run,
 };
 use crate::runs::models::{JobRunRequest, PersonRunRequest, RunRecord, RunRequest, RunWindow};
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
 use crate::runs::tests::test_types::{ExactKeyPlanner, JobDetailTestCase};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::{begin::begin, commit::commit};
@@ -68,6 +71,8 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     "select": "orders", "targets": ["development"],
                     "declared_at": {"path": "orchestration/jobs.py", "line": 7},
                     "owner": "Orders team", "overlap": "skip",
+                    "pools": {"warehouse": {"amount": 3, "limit": 4}},
+                    "resolved_concurrency": {"limit": 4, "source": "job"},
                     "on_failure": {"retries": 2, "retry_delay_seconds": 300}},
                 "customers": {"description": "Build customers", "selection": ["customers"]},
             }));
@@ -75,7 +80,10 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 "groups".into(),
                 json!({"orders_group": {
                 "description": "Orders, then customers", "selection": ["customers", "orders"],
-                "jobs": {"customers": ["daily_orders"], "daily_orders": []}}}),
+                "pools": {"warehouse": {"amount": 1, "limit": 4}},
+                "jobs": {"customers": ["daily_orders"], "daily_orders": []},
+                "wait_reasons": {"customers": [
+                    {"upstream_job": "daily_orders", "from_node": "orders", "to_node": "customers"}]}}}),
             );
             input
                 .nodes
@@ -91,12 +99,18 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
             publish_snapshot(store, &input).await.expect("publish jobs");
             let administrator = (&roles.context, credentials(&roles.administrator));
             let location = roles.location_id;
+            let caps = ServerPoolCaps {
+                launchers: BTreeMap::from([(
+                    (location, "development".to_owned()),
+                    BTreeMap::from([("warehouse".to_owned(), NonZeroU32::new(2).expect("cap"))]),
+                )]),
+            };
             let read = |who, job: &'static str| {
                 read_person_job(
                     store,
                     who,
                     (location, "development", job),
-                    DefaultRole::None,
+                    (DefaultRole::None, &caps),
                 )
             };
 
@@ -144,7 +158,7 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 store,
                 administrator,
                 (location, "development"),
-                DefaultRole::None,
+                (DefaultRole::None, &caps),
             )
             .await
             .expect("administrator lists jobs");
@@ -201,6 +215,31 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     (test_case.expected_order[1], json!(["daily_orders"]))
                 ],
                 "{}: members in run order, not name order, with their waits",
+                test_case.description
+            );
+            assert_eq!(
+                (
+                    json!(group.members[1].reasons),
+                    json!(job.pools),
+                    (job.concurrency, json!(job.resolved_concurrency)),
+                    json!(listed[1].pools),
+                    (listed[1].concurrency, json!(listed[1].resolved_concurrency)),
+                    json!(group.pools),
+                    json!(group.resolved_concurrency)
+                ),
+                (
+                    json!([{"upstream_job": "daily_orders", "from_node": "orders", "to_node": "customers"}]),
+                    json!([{"pool": "warehouse", "amount": 3, "limit": 4, "cap": 2, "server_limit": 2,
+                        "clamped": true, "shared_with": ["orders_group"]}]),
+                    (Some(4), json!({"limit": 4, "source": "job"})),
+                    json!([{"pool": "warehouse", "amount": 3, "limit": 4, "cap": 2, "server_limit": 2,
+                        "clamped": true, "shared_with": ["orders_group"]}]),
+                    (Some(4), json!({"limit": 4, "source": "job"})),
+                    json!([{"pool": "warehouse", "amount": 1, "limit": 4, "cap": 2, "server_limit": 2,
+                        "clamped": false, "shared_with": ["daily_orders"]}]),
+                    json!(null)
+                ),
+                "{}: a member's node-level reasons, each pool against this server's cap with what shares it, and the run's concurrency",
                 test_case.description
             );
             assert!(

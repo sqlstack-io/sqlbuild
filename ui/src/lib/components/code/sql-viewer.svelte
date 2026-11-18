@@ -1,4 +1,8 @@
 <script lang="ts">
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
+	import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right';
+	import UnfoldVerticalIcon from '@lucide/svelte/icons/unfold-vertical';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -125,17 +129,15 @@
 	<header>
 		<span class="file">{name}.sql</span>
 		<span class="meta">{raw.split('\n').length} lines</span>
-		<div class="modes">
-			{#each [['raw', 'Raw'], ['compiled', 'Compiled'], ['diff', 'Side by side'], ...(versions.length ? [['drift', 'Drift']] : [])] as [m, label] (m)}
-				<button class:on={mode === m} onclick={() => (mode = m as Mode)}>{label}</button>
-			{/each}
+		<div class="ml-auto">
+			<SegmentedFilter label="View" bind:value={mode} options={[{ value: 'raw' as Mode, label: 'Raw' }, { value: 'compiled' as Mode, label: 'Compiled' }, { value: 'diff' as Mode, label: 'Side by side' }, ...(versions.length ? [{ value: 'drift' as Mode, label: 'Drift' }] : [])]} />
 		</div>
-		<button class="icon" class:on={wrap} onclick={() => (wrap = !wrap)} title="Wrap long lines" aria-label="Wrap long lines"><WrapTextIcon size={15} /></button>
-		<button class="icon" onclick={copy} title="Copy SQL" aria-label="Copy SQL">
-			{#if copied}<CheckIcon size={15} />{:else}<CopyIcon size={15} />{/if}
-		</button>
+		<Button variant="ghost" size="icon-bar" aria-pressed={wrap} onclick={() => (wrap = !wrap)} title="Wrap long lines" aria-label="Wrap long lines"><WrapTextIcon /></Button>
+		<Button variant="ghost" size="icon-bar" onclick={copy} title="Copy SQL" aria-label="Copy SQL">
+			{#if copied}<CheckIcon />{:else}<CopyIcon />{/if}
+		</Button>
 		{#if onClose}
-			<button class="icon" onclick={() => onClose?.()} title="Close (Esc)" aria-label="Close SQL"><XIcon size={16} /></button>
+			<Button variant="ghost" size="icon-bar" onclick={() => onClose?.()} title="Close (Esc)" aria-label="Close SQL"><XIcon /></Button>
 		{/if}
 	</header>
 
@@ -146,18 +148,10 @@
 					{#each versions as v (v.id)}<option value={v.id}>{v.label} · {v.detail}</option>{/each}
 				</select>
 			</label>
-			<div class="mini-seg">
-				{#each [['compiled', 'Compiled'], ['raw', 'Raw']] as [v, l] (v)}
-					<button class:on={driftSide === v} onclick={() => (driftSide = v as 'compiled' | 'raw')}>{l}</button>
-				{/each}
-			</div>
-			<div class="mini-seg">
-				{#each [['unified', 'Unified'], ['split', 'Split']] as [v, l] (v)}
-					<button class:on={layout === v} onclick={() => chooseLayout(v as 'unified' | 'split')}>{l}</button>
-				{/each}
-			</div>
+			<SegmentedFilter label="SQL compared" bind:value={driftSide} options={[{ value: 'compiled', label: 'Compiled' }, { value: 'raw', label: 'Raw' }]} />
+			<SegmentedFilter label="Layout" value={layout} options={[{ value: 'unified', label: 'Unified' }, { value: 'split', label: 'Split' }]} onselect={chooseLayout} />
 			<span class="stats"><b class="add">+{stats.added}</b><b class="del">−{stats.removed}</b></span>
-			<button class="text-btn" onclick={() => (showAll = !showAll)}>{showAll ? 'Fold unchanged' : 'Show all lines'}</button>
+			<Button variant="link" size="inline" onclick={() => (showAll = !showAll)}>{showAll ? 'Fold unchanged' : 'Show all lines'}</Button>
 		</div>
 		<div class="drift-note {explanation.tone}"><i></i>{explanation.text}</div>
 	{/if}
@@ -178,8 +172,9 @@
 					<h4>References</h4>
 					{#each outline.refs as r (r.label)}
 						<div class="item-row">
+							<!-- raw-button: an entry in the outline list; it scrolls the SQL to that line -->
 							<button class="item" onclick={() => jump(r.line)}>{r.label}</button>
-							<button class="go" onclick={() => onRef?.(r.label)} title="Select in graph">↗</button>
+							<Button variant="ghost" size="icon-sm" class="text-primary" onclick={() => onRef?.(r.label)} title="Select in graph" aria-label="Select {r.label} in graph"><ArrowUpRightIcon /></Button>
 						</div>
 					{/each}
 				</div>
@@ -188,9 +183,11 @@
 				<div class="group">
 					<h4>Steps</h4>
 					{#each outline.steps as s (s.label)}
+						<!-- raw-button: an entry in the outline list; it scrolls the SQL to that line -->
 						<button class="item" onclick={() => jump(s.line)}>{s.label}<span>L{s.line}</span></button>
 					{/each}
 					{#if outline.finalSelect}
+						<!-- raw-button: an entry in the outline list; it scrolls the SQL to that line -->
 						<button class="item final" onclick={() => jump(outline.finalSelect!)}>Final select<span>L{outline.finalSelect}</span></button>
 					{/if}
 				</div>
@@ -213,7 +210,8 @@
 					<div class="pane">
 						{#each driftRows as r (r.op === 'fold' ? r.key : `${r.op}${r.a ?? ''}-${r.b ?? ''}`)}
 							{#if r.op === 'fold'}
-								<button class="fold" onclick={() => (showAll = true)}>⋯ {r.count} unchanged lines</button>
+								<!-- raw-button: a folded run of unchanged lines inside the diff; it unfolds them -->
+								<button class="fold" onclick={() => (showAll = true)}><UnfoldVerticalIcon size={13} />{r.count} unchanged lines</button>
 							{:else}
 								<div class="dline {r.op}">
 									<span class="ln">{r.a ?? ''}</span><span class="ln">{r.b ?? ''}</span>
@@ -227,7 +225,8 @@
 					<div class="pane split">
 						{#each splitRows as r (r.key)}
 							{#if r.fold}
-								<button class="fold" onclick={() => (showAll = true)}>⋯ {r.fold} unchanged lines</button>
+								<!-- raw-button: a folded run of unchanged lines inside the diff; it unfolds them -->
+								<button class="fold" onclick={() => (showAll = true)}><UnfoldVerticalIcon size={13} />{r.fold} unchanged lines</button>
 							{:else}
 								<div class="split-row">
 									<div class="dline {r.left ? (r.left.op === 'same' ? 'same' : 'del') : 'empty'}">
@@ -287,43 +286,6 @@
 	.meta {
 		color: var(--muted-foreground);
 		font-size: 12px;
-	}
-	.modes {
-		display: flex;
-		gap: 2px;
-		margin-left: auto;
-		padding: 2px;
-		border-radius: 2px;
-		background: var(--sb-hover);
-	}
-	.modes button {
-		height: 26px;
-		padding: 0 10px;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
-	.modes button.on {
-		background: var(--card);
-		color: var(--foreground);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-	}
-	.icon {
-		display: grid;
-		width: 30px;
-		height: 30px;
-		place-items: center;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-	}
-	.icon:hover,
-	.icon.on {
-		background: var(--sb-hover);
-		color: var(--foreground);
 	}
 	.body {
 		display: grid;
@@ -390,12 +352,6 @@
 	}
 	.item.final {
 		font-family: var(--font-sans);
-	}
-	.go {
-		border: 0;
-		background: transparent;
-		color: var(--primary);
-		font-size: 12px;
 	}
 	.col {
 		padding: 2px 6px;
@@ -505,27 +461,6 @@
 		color: var(--foreground);
 		font-size: 12.5px;
 	}
-	.mini-seg {
-		display: flex;
-		gap: 2px;
-		padding: 2px;
-		border-radius: 2px;
-		background: var(--sb-hover);
-	}
-	.mini-seg button {
-		height: 24px;
-		padding: 0 9px;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.mini-seg button.on {
-		background: var(--card);
-		color: var(--foreground);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-	}
 	.stats {
 		display: flex;
 		gap: 8px;
@@ -537,12 +472,6 @@
 	}
 	.stats .del {
 		color: var(--sb-error);
-	}
-	.text-btn {
-		border: 0;
-		background: transparent;
-		color: var(--primary);
-		font-size: 12.5px;
 	}
 	.drift-note {
 		display: flex;
@@ -621,7 +550,9 @@
 		color: var(--sb-error);
 	}
 	.fold {
-		display: block;
+		display: flex;
+		align-items: center;
+		gap: 6px;
 		width: 100%;
 		padding: 4px 0 4px 98px;
 		border: 0;

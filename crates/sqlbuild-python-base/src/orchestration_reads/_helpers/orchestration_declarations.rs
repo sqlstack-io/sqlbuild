@@ -1,27 +1,27 @@
 //! The public authoring records enter native compilation here, never scheduler execution.
 
-use crate::orchestration_reads::models::ImportedDeclarations;
-use crate::orchestration_reads::models::RunControls;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyModuleMethods;
-use pyo3::wrap_pyfunction;
-use std::collections::{BTreeMap, HashSet};
-use std::path::{Component, Path};
-
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::pyfunction;
-use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
-use serde_json::Value;
-use sqlbuild_discovery::orchestration_files::models::{self as files, RunFile};
-use sqlbuild_host::entries::models::UserCodeHost;
-use sqlbuild_orchestration::declarations::models::{DeclaredAt, OnFailure, Overlap, RunResources};
-
 use crate::native_host::constants::AUTHORING_MODULE;
 use crate::native_host::constants::CALENDAR_CLASS;
 use crate::native_host::constants::CONSTRUCTING_MODULES;
 use crate::native_host::constants::SENSOR_CLASS;
 use crate::native_host::main::host_entry::host_entry as entry;
+use crate::orchestration_reads::models::ImportedDeclarations;
+use crate::orchestration_reads::models::RunControls;
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::PyModule;
+use pyo3::prelude::PyModuleMethods;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
+use pyo3::wrap_pyfunction;
+use serde_json::Value;
+use sqlbuild_discovery::orchestration_files::models::{self as files, RunFile};
+use sqlbuild_host::entries::models::UserCodeHost;
+use sqlbuild_orchestration::declarations::models::DependencyFailure;
+use sqlbuild_orchestration::declarations::models::{DeclaredAt, OnFailure, Overlap, RunResources};
+use std::collections::BTreeSet;
+use std::collections::{BTreeMap, HashSet};
+use std::path::{Component, Path};
 
 /// The file and line of the author's code constructing a declaration; `None` for code without a source file.
 #[pyfunction]
@@ -92,9 +92,9 @@ pub(crate) fn run_controls(run: &RunFile) -> RunControls {
             files::Overlap::Queue => Overlap::Queue,
             files::Overlap::Skip => Overlap::Skip,
         },
-        on_failure: run.on_failure.map(|policy| OnFailure {
-            retries: policy.retries,
-            retry_delay_seconds: policy.retry_delay_seconds,
+        on_failure: run.retry.map(|policy| OnFailure {
+            retries: policy.attempts.saturating_sub(1),
+            retry_delay_seconds: policy.delay_seconds,
         }),
     }
 }
@@ -189,4 +189,27 @@ pub(crate) fn module_declarations<'py>(
 /// Register `declaration_site` on the native module.
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(declaration_site, module)?)
+}
+
+/// Each published member whose `[dependencies] on_failure`, its override or else the group's, is not `partial`.
+pub(crate) fn dependency_failures(
+    dependencies: &files::GroupDependencies,
+    members: &BTreeSet<String>,
+) -> BTreeMap<String, DependencyFailure> {
+    members
+        .iter()
+        .filter_map(|member| {
+            let written = dependencies
+                .members
+                .get(member)
+                .and_then(|settings| settings.on_failure)
+                .or(dependencies.defaults.on_failure)?;
+            let policy = match written {
+                files::DependencyFailure::Partial => return None,
+                files::DependencyFailure::Skip => DependencyFailure::Skip,
+                files::DependencyFailure::Run => DependencyFailure::Run,
+            };
+            Some((member.clone(), policy))
+        })
+        .collect()
 }

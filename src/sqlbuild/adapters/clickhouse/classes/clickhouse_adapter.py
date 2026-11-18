@@ -39,6 +39,7 @@ from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecord
 from sqlbuild.adapter.contract.classes.unkeyed_diff import UnkeyedDiffMixin
 from sqlbuild.adapter.contract.constants import DIFF_LEFT_SIDE, DIFF_RIGHT_SIDE
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
+from sqlbuild.adapter.contract.main.estimates_by_name import estimates_by_name
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
@@ -175,6 +176,7 @@ class ClickHouseAdapter(
     max_identifier_length: ClassVar[int] = MAX_IDENTIFIER_LENGTH
     relation_grants_supported: ClassVar[bool] = False
     state_timestamp_type: ClassVar[str | None] = STATE_TIMESTAMP_TYPE
+    history_reads_wake_compute: ClassVar[bool] = True
     _snapshot_sql_dialect: ClassVar[SnapshotSqlDialect] = SnapshotSqlDialect(
         timestamp_type="Nullable(DateTime64(6, 'UTC'))",
         distinct_condition=render_is_distinct_from,
@@ -494,14 +496,25 @@ class ClickHouseAdapter(
             + _database_filter(schema)
             + f" AND name = {quote_string(name)}",
         ).fetchone()
-        if row is None:
-            return RelationRowCountEstimate(row_count=None, detail="relation not found")
-        byte_count: int | None = int(row[2]) if metadata_only and row[2] is not None else None
-        return RelationRowCountEstimate(
-            row_count=int(row[1]) if row[1] is not None else None,
-            detail=f"engine {row[0]} does not report row counts" if row[1] is None else None,
-            byte_count=byte_count,
-            byte_count_basis="system_tables_total_bytes" if byte_count is not None else None,
+        return _row_count_estimate(row=row, metadata_only=metadata_only)
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Read every named table's rows and bytes from ``system.tables`` in one query."""
+
+        del database
+        if not names:
+            return ()
+        return estimates_by_name(
+            rows=self.execute(
+                connection=connection,
+                sql="SELECT name, engine, total_rows, total_bytes FROM system.tables WHERE "
+                + _database_filter(schema)
+                + f" AND name IN ({', '.join(quote_string(name) for name in names)})",
+            ).fetchall(),
+            names=names,
+            estimate=lambda row: _row_count_estimate(row=row, metadata_only=True),
         )
 
     def read_view_definition(
@@ -2823,4 +2836,18 @@ def _prune_history_sql(
         f"SELECT {identity} FROM (SELECT {identity}, row_number() OVER ("
         f"PARTITION BY {partition} ORDER BY {order}) AS __sqlbuild_history_rank FROM {table}) "
         f"WHERE __sqlbuild_history_rank > {retain_versions}) SETTINGS transform_null_in = 1"
+    )
+
+
+def _row_count_estimate(*, row: Any, metadata_only: bool) -> RelationRowCountEstimate:
+    """The estimate of one ``(engine, total_rows[, total_bytes])`` row, or of no row."""
+
+    if row is None:
+        return RelationRowCountEstimate(row_count=None, detail="relation not found")
+    byte_count: int | None = int(row[2]) if metadata_only and row[2] is not None else None
+    return RelationRowCountEstimate(
+        row_count=int(row[1]) if row[1] is not None else None,
+        detail=f"engine {row[0]} does not report row counts" if row[1] is None else None,
+        byte_count=byte_count,
+        byte_count_basis="system_tables_total_bytes" if byte_count is not None else None,
     )

@@ -2,6 +2,7 @@
 
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::GraphIndexes;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 use crate::planner_strategy::_helpers::audits::{
     attachment, outside_target_lineage, resolve_effective_run_scope,
@@ -39,9 +40,10 @@ use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::planner_strategy::constants::{
-    AUDIT_TYPES_MODULE, COMPILE_TYPES_MODULE, MODEL_ATTACHMENT, SOURCE_ATTACHMENT,
-};
+use sqlbuild_python_project::planner_strategy::constants::AUDIT_TYPES_MODULE;
+use sqlbuild_python_project::planner_strategy::constants::COMPILE_TYPES_MODULE;
+use sqlbuild_python_project::planner_strategy::constants::MODEL_ATTACHMENT;
+use sqlbuild_python_project::planner_strategy::constants::SOURCE_ATTACHMENT;
 use sqlbuild_python_project::planner_strategy::models::AuditPlanning;
 
 /// One attribute read of a compiled audit.
@@ -63,7 +65,7 @@ fn render_query<'py>(
                 ("model_locations", request.model_locations.clone()),
                 ("seed_locations", request.seed_locations.clone()),
                 ("source_map", request.source_map.clone()),
-                ("adapter", request.adapter.clone()),
+                ("adapter", request.dialect.clone().into_any()),
             ],
         )?))?,
     )?;
@@ -101,7 +103,7 @@ pub(crate) fn plan_audit_of<'py>(
             model_locations: request.get("model_locations")?,
             seed_locations: request.get("seed_locations")?,
             source_map: request.get("source_map")?,
-            adapter: request.get("adapter")?,
+            dialect: Dialect::passed(request.get("dialect")?)?,
             model_materializations: request.get("model_materializations")?,
             lineage: Py::new(
                 request.py(),

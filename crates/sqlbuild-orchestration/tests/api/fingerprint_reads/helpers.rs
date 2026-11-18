@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import '@xyflow/svelte/dist/style.css';
-	import { Background, Controls, SvelteFlow, type Edge, type Node } from '@xyflow/svelte';
+	import type { Edge, Node } from '@xyflow/svelte';
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
 	import { untrack } from 'svelte';
 	import type { RunEdge, RunNode } from '$lib/api';
 	import { layoutGraph } from '$lib/lineage/layout';
@@ -54,10 +54,7 @@
 </script>
 
 <div class="sb-flow relative flex-1" style="background: var(--sb-inset)">
-	<SvelteFlow bind:nodes={flowNodes} bind:edges={flowEdges} {nodeTypes} fitView nodesDraggable proOptions={{ hideAttribution: true }}>
-		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-		<Controls />
-	</SvelteFlow>
+	<GraphCanvas bind:nodes={flowNodes} bind:edges={flowEdges} {nodeTypes} fitOnInit nodesDraggable />
 </div>
 
 <style>

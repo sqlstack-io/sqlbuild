@@ -51,6 +51,7 @@ from sqlbuild.adapter.contract.constants import (
 )
 from sqlbuild.adapter.contract.exceptions import AdapterUserError, ViewRenameRefusedError
 from sqlbuild.adapter.contract.main.column_name_key import column_name_key
+from sqlbuild.adapter.contract.main.estimates_one_at_a_time import estimates_one_at_a_time
 from sqlbuild.adapter.contract.main.is_quoted_identifier import is_quoted_identifier
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
@@ -2319,6 +2320,18 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
                 row_count=None, detail="no table size metadata (view or missing table)"
             )
         return RelationRowCountEstimate(row_count=int(row[0]))
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Metadata-only estimates of `names` in one schema, one relation at a time."""
+
+        return estimates_one_at_a_time(
+            estimate=self.estimate_relation_row_count,
+            connection=connection,
+            location=(database, schema),
+            names=names,
+        )
 
     def diff_schema(
         self,

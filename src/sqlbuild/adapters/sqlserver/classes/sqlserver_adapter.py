@@ -54,6 +54,7 @@ from sqlbuild.adapter.contract.exceptions import (
     AdapterUserError,
     UnsupportedTypedSqlRenderingError,
 )
+from sqlbuild.adapter.contract.main.estimates_by_name import estimates_by_name
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
@@ -1404,11 +1405,30 @@ class SqlServerAdapter(
                 "GROUP BY objects.type"
             ),
         ).fetchone()
-        if row is None:
-            return RelationRowCountEstimate(row_count=None, detail="relation not found")
-        if str(row[0]).strip().upper() != USER_TABLE_OBJECT_TYPE or row[1] is None:
-            return RelationRowCountEstimate(row_count=None, detail="no row count (view)")
-        return RelationRowCountEstimate(row_count=int(row[1]))
+        return _row_count_estimate(row)
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Sum every named table's partition rows with one catalog query."""
+
+        if not names:
+            return ()
+        catalog: str = "" if database is None else f"{self.render_identifier(database)}."
+        listed: str = ", ".join(f"N{_quote_sql_string(name)}" for name in names)
+        rows: list[tuple[Any, ...]] = self.execute(
+            connection=connection,
+            sql=(
+                "SELECT objects.name, objects.type, SUM(partitions.rows) "
+                f"FROM {catalog}sys.objects AS objects "
+                f"JOIN {catalog}sys.schemas AS schemas ON schemas.schema_id = objects.schema_id "
+                f"LEFT JOIN {catalog}sys.partitions AS partitions "
+                "ON partitions.object_id = objects.object_id AND partitions.index_id IN (0, 1) "
+                f"WHERE schemas.name = N{_quote_sql_string(schema)} AND objects.name IN ({listed}) "
+                "GROUP BY objects.name, objects.type"
+            ),
+        ).fetchall()
+        return estimates_by_name(rows=rows, names=names, estimate=_row_count_estimate)
 
     def inspect_row_diff_coverage(
         self,
@@ -3108,3 +3128,13 @@ class SqlServerAdapter(
             cursor.executemany(insert_sql, rows)
         finally:
             cursor.close()
+
+
+def _row_count_estimate(row: tuple[Any, ...] | None) -> RelationRowCountEstimate:
+    """The estimate of one ``(object type, partition rows)`` catalog row, or of no row."""
+
+    if row is None:
+        return RelationRowCountEstimate(row_count=None, detail="relation not found")
+    if str(row[0]).strip().upper() != USER_TABLE_OBJECT_TYPE or row[1] is None:
+        return RelationRowCountEstimate(row_count=None, detail="no row count (view)")
+    return RelationRowCountEstimate(row_count=int(row[1]))

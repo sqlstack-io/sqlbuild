@@ -1,10 +1,12 @@
-//! Failed nodes block only their lineage dependents inside a group.
+//! Failed nodes block only their lineage dependents inside a group, unless the member's policy says otherwise.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::declarations::models::DependencyFailure;
 use crate::runs::_helpers::groups::context::load_group;
-use crate::runs::models::{QueueWait, RunRequest, RunStatus};
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::runs::constants::SUPERSEDED_CHILD;
+use crate::runs::models::{GroupContext, GroupRun, QueueWait, RunRequest, RunStatus};
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -36,10 +38,13 @@ pub(crate) async fn child_waits(
         .job_key
         .as_ref()
         .ok_or_else(|| ControlError::Invalid("group has no declaration".into()))?;
-    let dependencies = upstream_jobs(&group.definitions.groups[parent_name].jobs, name);
+    let declaration = &group.definitions.groups[parent_name];
+    let dependencies = upstream_jobs(&declaration.jobs, name);
     if group.parent.state.status != RunStatus::Running
         || group.parent.state.cancel_requested_at.is_some()
         || group.stopped()
+        || (declaration.member_dependency_failure(name) == DependencyFailure::Skip
+            && failed_upstream(&group, &dependencies).is_some())
     {
         return Ok((
             transaction,
@@ -55,6 +60,7 @@ pub(crate) async fn child_waits(
                 || QueueWait::UpstreamJob {
                     run_id: child.request_json.run_id,
                     job_key: job_key.clone(),
+                    attempt: child.request_json.member_attempt,
                 },
             )
         })
@@ -62,6 +68,46 @@ pub(crate) async fn child_waits(
     Ok((transaction, waits))
 }
 
+/// The upstream member, of `dependencies`, that ended without success; none while any still runs.
+pub(crate) fn failed_upstream<'a>(
+    group: &'a GroupContext,
+    dependencies: &BTreeSet<&str>,
+) -> Option<&'a GroupRun> {
+    let upstream: Vec<&GroupRun> = group
+        .children
+        .iter()
+        .filter(|child| {
+            child
+                .request_json
+                .job_key
+                .as_deref()
+                .is_some_and(|job_key| dependencies.contains(job_key))
+        })
+        .collect();
+    if upstream
+        .iter()
+        .any(|child| !child.state.status.is_terminal())
+    {
+        return None;
+    }
+    upstream
+        .into_iter()
+        .find(|child| !matches!(child.state.status, RunStatus::Success | RunStatus::Warn))
+}
+
+/// The members `name` waits for, through the group's ordering.
+pub(crate) fn member_dependencies<'a>(group: &'a GroupContext, name: &str) -> BTreeSet<&'a str> {
+    group
+        .parent
+        .request_json
+        .job_key
+        .as_ref()
+        .and_then(|parent| group.definitions.groups.get(parent))
+        .map(|declaration| upstream_jobs(&declaration.jobs, name))
+        .unwrap_or_default()
+}
+
+/// Nodes the worker skips because a sibling member failed; none for a member whose policy is `run`.
 pub(crate) async fn skipped_nodes(
     transaction: ControlTransaction,
     request: &RunRequest,
@@ -69,9 +115,24 @@ pub(crate) async fn skipped_nodes(
     let Some(parent_id) = request.parent_run_id else {
         return Ok((transaction, BTreeMap::new()));
     };
+    let (transaction, group) = load_group(transaction, parent_id).await?;
+    let runs_regardless = group
+        .parent
+        .request_json
+        .job_key
+        .as_ref()
+        .and_then(|parent| group.definitions.groups.get(parent))
+        .zip(request.job_key.as_deref())
+        .is_some_and(|(declaration, name)| {
+            declaration.member_dependency_failure(name) == DependencyFailure::Run
+        });
+    if runs_regardless {
+        return Ok((transaction, BTreeMap::new()));
+    }
     let (transaction, rows) = query(transaction,
-        "SELECT n.node_key, n.status, n.skipped_because_of FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
-         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.kind='node' AND n.status IN ('failed','skipped','cancelled')",
+        &format!("SELECT n.node_key, n.status, n.skipped_because_of FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
+         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.kind='node' AND n.status IN ('failed','skipped','cancelled') \
+         AND NOT {SUPERSEDED_CHILD}"),
         vec![Parameter::Id(parent_id), Parameter::Id(request.run_id)]).await?;
     let failures: BTreeMap<String, String> = rows
         .into_iter()

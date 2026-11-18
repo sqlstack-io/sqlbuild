@@ -8,8 +8,8 @@ use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::credentials::models::AuditContext;
 use crate::credentials::models::AuthenticatedPerson;
-use crate::platform::main::read_person_connection_test::read_person_connection_test;
-use crate::platform::main::request_location_work::request_location_work;
+use crate::platform::main::health::read_person_connection_test::read_person_connection_test;
+use crate::platform::main::work::request_location_work::request_location_work;
 use crate::platform::models::{
     LocationWork, LocationWorkRecord, LocationWorkRequest, PersonWorkRequest,
 };

@@ -3,6 +3,8 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_planner::live_reads::models::LiveReads;
 
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
@@ -158,8 +160,17 @@ pub(crate) fn timed_clone_pipeline<'py>(
                 ("project", destination_project.clone()),
                 ("select", native_field(&pipeline.options, "select")?),
                 ("exclude", native_field(&pipeline.options, "exclude")?),
-                ("adapter", pipeline.adapter.clone()),
-                ("connection", native_field(&pipeline.connection, "handle")?),
+                ("dialect", Dialect::of(&pipeline.adapter)?.into_any()),
+                (
+                    "reads",
+                    LiveReads::new(
+                        &pipeline.adapter,
+                        &native_field(&pipeline.connection, "handle")?,
+                        None,
+                    )
+                    .handle(pipeline.adapter.py())?
+                    .into_any(),
+                ),
                 ("origin_project", origin_project.clone()),
                 ("origin_source_project", origin_source_project),
                 ("destination_source_project", destination_source_project),

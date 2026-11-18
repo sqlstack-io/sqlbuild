@@ -1,5 +1,7 @@
 #[path = "tests/test_argv_host.rs"]
 mod argv_host;
+#[path = "tests/test_changed_build.rs"]
+mod changed_build;
 #[path = "tests/test_decision.rs"]
 mod decision;
 #[path = "tests/helpers.rs"]
@@ -16,6 +18,8 @@ mod paths;
 mod project_facts;
 #[path = "tests/test_rules.rs"]
 mod rules;
+#[path = "tests/test_sync_schedule.rs"]
+mod sync_schedule;
 #[path = "tests/test_terminal.rs"]
 mod terminal;
 #[path = "tests/test_types.rs"]

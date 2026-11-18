@@ -11,6 +11,7 @@ import pytest
 
 from sqlbuild._native import (
     CompileModelConfig,
+    Dialect,
     DiscoveredSeedFile,
     Fingerprint,
     PlannerRelationsContext,
@@ -23,6 +24,7 @@ from sqlbuild._native import (
     build_seed_command_plan,
     build_test_command_plan,
     compiled_model_record,
+    live_reads,
     project_with,
     read_selected_seed_fingerprints,
     resolve_static_command_scope,
@@ -76,12 +78,12 @@ def test_given_incremental_attached_audit_when_planning_then_no_warehouse_method
     )
     relations: PlannerRelationsContext = resolve_static_relation_context(
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         scope=scope,
     )
     plan: PlanOutput = build_audit_command_plan(
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         scope=scope,
         relations=relations,
     )
@@ -110,13 +112,13 @@ def test_given_sql_test_with_function_dependency_when_planning_then_required_fun
     )
     relations: PlannerRelationsContext = resolve_static_relation_context(
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         scope=scope,
     )
 
     plan: PlanOutput = build_test_command_plan(
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         scope=scope,
         relations=relations,
     )
@@ -156,7 +158,7 @@ def test_given_selected_seed_when_planning_then_identity_and_reason_are_preserve
     )
     relations: PlannerRelationsContext = resolve_static_relation_context(
         project=project,
-        adapter=adapter,
+        dialect=Dialect(adapter),
         scope=scope,
     )
 
@@ -223,8 +225,7 @@ def test_given_selected_seed_without_state_table_when_reading_reason_then_only_s
     connection: object = object()
 
     fingerprints: dict[str, Fingerprint] = read_selected_seed_fingerprints(
-        adapter=adapter,
-        connection=connection,
+        reads=live_reads(adapter=adapter, connection=connection),
         seeds=(seed,),
     )
 

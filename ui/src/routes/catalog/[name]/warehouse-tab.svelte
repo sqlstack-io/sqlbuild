@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import type { MicrobatchCoverage, WarehouseObject } from '$lib/api';
 	import KeyValues from '$lib/components/platform/key-values.svelte';
@@ -30,6 +33,12 @@
 	const batchLabel = { complete: 'complete', gap: 'gap', replay_required: 'replay required' } as const;
 	/** Timestamp bounds as local stamps; integer bounds as written. */
 	const bound = (text: string | null) => (microbatch?.cursorType === 'timestamp' ? formatStamp(text) : (text ?? '—'));
+	const columnColumns = $derived<TableColumn[]>([
+		{ id: 'column', label: 'Column', minWidth: 200 },
+		...(compared ? [{ id: 'declared', label: 'Declared', width: '22%' }] : []),
+		{ id: 'actual', label: 'In the warehouse', width: '22%' },
+		...(compared ? [{ id: 'state', label: 'State', width: '160px' }] : [])
+	]);
 </script>
 
 <div class="wrap">
@@ -47,7 +56,7 @@
 			/>
 		</Panel>
 		{#if warehouse.stats.length}
-			<Panel title="Rows over time" note="{formatNumber(warehouse.stats.length)} {warehouse.stats.length === 1 ? 'sample' : 'samples'}">
+			<Panel title="Rows over time" note={plural(warehouse.stats.length, 'sample')}>
 				<svg viewBox="0 0 {W} {H}" class="spark" preserveAspectRatio="none" aria-label="Row count over time">
 					<path d={path} fill="none" stroke="var(--primary)" stroke-width="1.6" vector-effect="non-scaling-stroke" />
 				</svg>
@@ -59,24 +68,21 @@
 		{/if}
 	</div>
 
-	<Panel title="Columns" note={!compared ? `${warehouse.columns.length} in the warehouse` : mismatched ? `${mismatched} differ from the code` : 'All match the code'}>
-		<table class="sb-list">
-			<thead><tr><th>Column</th>{#if compared}<th>Declared</th>{/if}<th>In the warehouse</th>{#if compared}<th>State</th>{/if}</tr></thead>
-			<tbody>
-				{#each warehouse.columns as c (c.name)}
+	<Panel title="Columns" note={!compared ? `${warehouse.columns.length} columns` : mismatched ? `${mismatched} differ` : 'All match'}>
+		<DataTable class="static" embedded columns={columnColumns} rows={warehouse.columns} key={(c) => c.name} empty="No columns reported.">
+			{#snippet row(c)}
 					<tr>
 						<td><code>{c.name}</code></td>
 						{#if compared}<td><code class="muted">{c.declaredType ?? '—'}</code></td>{/if}
 						<td><code class="muted">{c.actualType ?? '—'}</code></td>
 						{#if compared}<td>{#if c.state}<StatusLabel tone={warehouseColumnTone[c.state]} label={warehouseColumnLabel[c.state]} muted={c.state === 'match'} />{/if}</td>{/if}
 					</tr>
-				{/each}
-			</tbody>
-		</table>
+			{/snippet}
+		</DataTable>
 	</Panel>
 
 	{#if microbatch}
-		<Panel title="Microbatch coverage" note="Tracked only for concurrent microbatch models · {microbatch.cursorColumn} · {microbatch.batchSize} batches · complete up to {bound(microbatch.contiguousFrontier)}">
+		<Panel title="Microbatch coverage" help="Tracked only for concurrent microbatch models" note="{microbatch.cursorColumn} · {microbatch.batchSize} batches · complete to {bound(microbatch.contiguousFrontier)}">
 			<div class="batches">
 				{#each microbatch.batches as b (b.start)}
 					<a class="batch" href={b.runId ? to(`/runs/${b.runId}`) : undefined} style:background={batchTone[b.state]} title="{bound(b.start)} – {bound(b.end)} · {batchLabel[b.state]}{b.runId ? ` · ${b.runId}` : ''}"><span class="sr-only">{batchLabel[b.state]}</span></a>
@@ -84,9 +90,9 @@
 			</div>
 			<div class="legend">
 				<span><i style:background={batchTone.complete}></i>complete</span>
-				<span title="Holes between completed partitions"><i style:background={batchTone.gap}></i>{microbatch.knownGaps} known {microbatch.knownGaps === 1 ? 'gap' : 'gaps'}</span>
+				<span title="Holes between completed partitions"><i style:background={batchTone.gap}></i>{plural(microbatch.knownGaps, 'known gap')}</span>
 				<span><i style:background={batchTone.replay_required}></i>replay required</span>
-				<span class="muted">{microbatch.batchesTruncated ? 'Newest batches shown · ' : ''}tracked since {bound(microbatch.earliest)}</span>
+				<span class="muted">{microbatch.batchesTruncated ? 'Newest only · ' : ''}since {bound(microbatch.earliest)}</span>
 			</div>
 		</Panel>
 	{/if}

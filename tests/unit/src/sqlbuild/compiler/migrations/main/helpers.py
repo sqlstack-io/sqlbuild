@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from sqlbuild._native import (
     ColumnMigrationDecision,
     ColumnMigrationEvent,
+    Fingerprint,
     MigrationDecision,
     MigrationDiscovery,
     MigrationEvent,
@@ -102,4 +103,23 @@ def old_name_fact(
         expires_at=expires_at,
         archive_name=archive_name,
         grants_copied=grants_copied,
+    )
+
+
+def built_fingerprint(node_type: str, node_name: str, schema: str, day: int) -> Fingerprint:
+    """Return a fingerprint of `node_name` built into `schema` at noon on January `day`, 2026."""
+
+    return Fingerprint(
+        node_type=node_type,
+        node_name=node_name,
+        target_database=None,
+        target_schema=schema,
+        target_name=node_name,
+        run_id=f"run_{day:03d}",
+        definition_hash="definition_hash",
+        version_hash="version_hash",
+        schema_fingerprint="schema_hash",
+        definition="SELECT 1",
+        metadata_json="{}",
+        ts=datetime(2026, 1, day, 12, 0, 0),
     )

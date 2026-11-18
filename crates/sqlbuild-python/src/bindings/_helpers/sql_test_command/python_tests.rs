@@ -32,7 +32,7 @@ const TEST_MODULE_PREFIX: &str = "test_";
 const PYTEST_MODULE: &str = "pytest";
 /// The diagnostic code of a Python test run that cannot start.
 pub(crate) const PYTHON_TESTS_INPUT_CODE: &str = "S000";
-/// The project folder whose `python/` and `providers/` folders mirror the project's.
+/// The project folder whose `python/`, `providers/` and `orchestration/` folders mirror the project's.
 const TESTS_FOLDER: &str = "tests";
 /// The discovered Python node collections whose folders a selection's tests mirror.
 const NODE_COLLECTIONS: [&str; 4] = [
@@ -54,7 +54,7 @@ pub(crate) fn selective(request: &Bound<'_, PyAny>) -> PyResult<bool> {
         || native_field(request, "exclude")?.is_truthy()?)
 }
 
-/// Every `test_*.py` module under the project's `tests/python/` and `tests/providers/`.
+/// Every `test_*.py` module under the project's `tests/python/`, `tests/providers/` and `tests/orchestration/`.
 pub(crate) fn python_test_modules(invocation: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     let project_dir: PathBuf = native_field(invocation, "effective_project_dir")?.extract()?;
     Ok(python_test_paths(&project_dir)
@@ -118,7 +118,7 @@ pub(crate) fn selected_python_tests(
             (
                 Some(PYTHON_TESTS_INPUT_CODE),
                 Some(
-                    "add test_*.py modules under tests/python/ or tests/providers/, mirroring the code they test",
+                    "add test_*.py modules under tests/python/, tests/providers/ or tests/orchestration/, mirroring the code they test",
                 ),
             ),
         ));

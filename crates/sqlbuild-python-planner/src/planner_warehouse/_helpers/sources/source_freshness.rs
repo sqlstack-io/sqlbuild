@@ -2,8 +2,10 @@
 
 use crate::freshness::main::build_direct_source_freshness_planning_result_function::build_direct_source_freshness_planning_result_function;
 use crate::freshness::main::build_direct_source_freshness_propagation_result_function::build_direct_source_freshness_propagation_result_function;
-use crate::planner_warehouse::_helpers::inspection::snapshot::{destination_nodes, lower};
+use crate::planner_warehouse::_helpers::inspection::snapshot::destination_nodes;
+use crate::planner_warehouse::_helpers::inspection::snapshot::lower;
 use crate::planner_warehouse::constants::RUN_SCOPE;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
@@ -14,8 +16,9 @@ use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_project::planner_phases::main::replace::replace;
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
@@ -72,13 +75,16 @@ pub(crate) fn build_planner_source_freshness_result_of<'py>(
         "build_planner_source_freshness_result",
         options,
         (
-            &["project", "adapter", "connection", "scope", "relations"],
+            &["project", "dialect", "reads", "scope", "relations"],
             &["freshness_state_schemas"],
         ),
     )?;
     build_planner_source_freshness_result(
         (&args.value("project")?, &args.value("scope")?),
-        (&args.value("adapter")?, &args.value("connection")?),
+        (
+            &Dialect::passed(args.value("dialect")?)?,
+            &PlannerReads::passed(args.value("reads")?)?,
+        ),
         &args.value("relations")?,
         &args.value("freshness_state_schemas")?,
     )
@@ -87,7 +93,7 @@ pub(crate) fn build_planner_source_freshness_result_of<'py>(
 /// The source freshness evaluation of one inspection scope against the warehouse.
 pub(crate) fn build_planner_source_freshness_result<'py>(
     (project, scope): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (dialect, reads): (&Bound<'py, Dialect>, &Bound<'py, PlannerReads>),
     relations: &Bound<'py, PyAny>,
     freshness_state_schemas: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -100,15 +106,11 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
             lowered_state.insert(schema?.extract()?);
         }
     }
-    let synced_copy = adapter.is_instance_of::<SyncedCopyAdapter>();
     let exists = PyDict::new(py);
     for schema in &schemas {
         exists.set_item(
             schema,
-            PyBool::new(
-                py,
-                !synced_copy && lowered_state.contains(&lower(&text(py, schema))?),
-            ),
+            PyBool::new(py, lowered_state.contains(&lower(&text(py, schema))?)),
         )?;
     }
     let sources = tuple(
@@ -126,8 +128,8 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
             call_with(
                 build_direct_source_freshness_planning_result_function(py)?.as_any(),
                 &[
-                    ("adapter", adapter.clone()),
-                    ("connection", connection.clone()),
+                    ("dialect", dialect.clone().into_any()),
+                    ("reads", reads.clone().into_any()),
                     ("sources", sources),
                     ("state_database", state_database(project)?),
                     (
@@ -138,7 +140,7 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
                     ("run_id", text(py, "planning")),
                     (
                         "render_qualified_name",
-                        native_field(adapter, "render_qualified_name")?,
+                        dialect.syntax("render_qualified_name")?,
                     ),
                     ("state_table_exists_by_schema", exists.into_any()),
                     (

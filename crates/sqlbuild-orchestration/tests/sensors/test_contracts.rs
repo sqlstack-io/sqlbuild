@@ -8,6 +8,8 @@ mod test_custom;
 mod test_delivery;
 #[path = "test_execution_bounds.rs"]
 mod test_execution_bounds;
+#[path = "test_group_members.rs"]
+mod test_group_members;
 #[path = "test_nodes.rs"]
 mod test_nodes;
 #[path = "test_person_state.rs"]

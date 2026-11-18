@@ -492,6 +492,8 @@ pub struct AuditExecutionResult<V> {
     pub execution_error: Option<String>,
     pub audit_meta: Option<Vec<(String, V)>>,
     pub skip_reason: Option<String>,
+    /// An error-severity failure the build let through.
+    pub ignored: bool,
 }
 
 /// One executed model. Mirrors `sqlbuild.executor.run.models.ModelExecutionResult`; `V` is a host value.
@@ -679,6 +681,7 @@ pub struct BuildExecutionResult<V> {
     pub skipped_count: i64,
     pub warning_count: i64,
     pub insufficient_count: i64,
+    pub ignored_audit_failure_count: i64,
     pub audit_result_projection_attempted_count: i64,
     pub audit_result_projection_written_count: i64,
     pub audit_result_projection_failed_count: i64,

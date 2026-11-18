@@ -10,7 +10,9 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::build_command::defer_clone::run_defer_clone_boundary_prephase;
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
-use crate::bindings::_helpers::build_command::policies::{enforce_plan_policies, model_limit};
+use crate::bindings::_helpers::build_command::policies::enforce_plan_policies;
+use crate::bindings::_helpers::build_command::policies::model_limit;
+use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -77,6 +79,17 @@ fn request_options<'py>(context: &BuildContext<'py>) -> PyResult<Bound<'py, PyAn
             ("concurrency", field("concurrency")?),
             ("selection_diagnostics", field("selection_diagnostics")?),
             ("plan_sql_tests", field("run_tests")?),
+            (
+                "ignore_audit_failures",
+                boolean(
+                    py,
+                    resolve_ignore_audit_failures(
+                        request,
+                        &context.get("discovered_inputs")?,
+                        &field("selected_target")?,
+                    )?,
+                ),
+            ),
             ("accepts_unit_test_selectors", boolean(py, true)),
         ],
     )

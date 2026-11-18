@@ -14,12 +14,16 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseHistoryRead,
 };
 
-use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
+use crate::bindings::_helpers::location_command::command::location_arguments;
+use crate::bindings::_helpers::location_command::command::publish_location;
 use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
+use crate::bindings::_helpers::location_command::constants::PLAN_REQUEST;
+use crate::bindings::_helpers::location_command::runtime_plan::runtime_plan;
+use crate::bindings::_helpers::location_command::types::HeldProject;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
-use crate::bindings::_helpers::native_host::warehouse_metadata::{
-    close_history_session, open_history_session, read_history,
-};
+use crate::bindings::_helpers::native_host::warehouse_metadata::close_history_session;
+use crate::bindings::_helpers::native_host::warehouse_metadata::open_history_session;
+use crate::bindings::_helpers::native_host::warehouse_metadata::read_history;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
@@ -30,6 +34,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
     within(&redirect, |_| {
         let mut session = None;
         let mut stream = None;
+        let mut held: Option<HeldProject<'_>> = None;
         let mut reported_busy = false;
         let mut serve = || -> PyResult<i32> {
             loop {
@@ -48,8 +53,13 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                 let output = if let Some(generation) = request.as_i64() {
                     options.set_item("generation", generation)?;
                     let arguments = location_arguments(py, Some(options.clone()))?;
-                    let record = match publish_location(py, &arguments) {
-                        Ok(record) => Some(record),
+                    held = None;
+                    let (published, rules) = match publish_location(py, &arguments) {
+                        Ok(Ok((published, project))) => {
+                            held = Some(project);
+                            (Some(published), None)
+                        }
+                        Ok(Err(rules)) => (None, Some(rules)),
                         Err(error) => {
                             write_stderr(
                                 py,
@@ -57,10 +67,15 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             )?;
                             let failed = generation_failed(generation, error.to_string());
                             py.detach(|| emit_dev_event(&failed))?;
-                            None
+                            (None, None)
                         }
                     };
-                    serde_json::to_string(&record)
+                    serde_json::to_string(&serde_json::json!({
+                        "published": published,
+                        "rules": rules,
+                    }))
+                } else if let Some(plan) = request.get(PLAN_REQUEST) {
+                    serde_json::to_string(&runtime_plan(py, held.as_ref(), plan)?)
                 } else if let Some(kind) = WarehouseHistoryKind::ALL
                     .iter()
                     .find(|kind| request.get(kind.as_str()).is_some())

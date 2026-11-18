@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use chrono::{Duration, Utc};
 use sqlbuild_orchestration::api::errors::ClientError;
-use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
+use sqlbuild_orchestration::snapshots::main::publication::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 use uuid::Uuid;
 

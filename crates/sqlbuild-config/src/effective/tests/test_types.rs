@@ -58,3 +58,11 @@ pub(super) struct ConcurrencyTestCase {
     pub(super) expected_limit: i64,
     pub(super) expected_source: &'static str,
 }
+
+pub(super) struct AuditFailureTestCase {
+    pub(super) description: &'static str,
+    pub(super) requested: Option<bool>,
+    pub(super) target: Option<bool>,
+    pub(super) settings: bool,
+    pub(super) expected_ignored: bool,
+}

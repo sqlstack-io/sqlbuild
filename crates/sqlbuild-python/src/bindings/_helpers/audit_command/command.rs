@@ -1,5 +1,6 @@
 //! `sqb audit`: compile the selected audits, run them with nested progress, and report.
 
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -182,7 +183,7 @@ fn compile_audits<'py>(
     )?))?;
     let plan_output: Bound<'py, PyAny> = build_audit_command_plan(
         &native_field(&context, "project")?,
-        &adapter,
+        &Dialect::of(&adapter)?,
         &native_field(&context, "scope")?,
         &native_field(&context, "relations")?,
     )?;

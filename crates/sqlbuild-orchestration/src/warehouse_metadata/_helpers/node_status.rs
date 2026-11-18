@@ -30,7 +30,7 @@ pub(crate) fn destination(node: &SnapshotNode) -> Option<FingerprintQuery> {
 }
 
 /// A node's newest build: its record, recorded metadata JSON and recorded definition text hash.
-type RecordedBuild = (FingerprintObservation, String, String);
+pub(crate) type RecordedBuild = (FingerprintObservation, String, String);
 
 /// Each node's definition evidence, reading the recorded texts its comparison re-fingerprints.
 pub(crate) async fn definition_evidences(

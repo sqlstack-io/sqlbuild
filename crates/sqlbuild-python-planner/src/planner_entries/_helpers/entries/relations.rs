@@ -1,7 +1,8 @@
 //! Relation locations and source metadata for plan entry construction.
 
 use crate::planner_entries::_helpers::entries::values::planner_model;
-use crate::planner_entries::models::{PlannerRelationsContext, RelationsRequest};
+use crate::planner_entries::models::PlannerRelationsContext;
+use crate::planner_entries::models::RelationsRequest;
 use crate::planner_resolution::main::references::apply_deferred_locations::apply_deferred_locations;
 use crate::planner_resolution::main::references::build_function_locations::build_function_locations;
 use crate::planner_resolution::main::references::build_model_locations::build_model_locations;
@@ -11,12 +12,19 @@ use crate::planner_warehouse::main::sources::build_source_read_map::build_source
 use crate::planner_warehouse::main::sources::gather_source_inspection::gather_source_inspection;
 use crate::planner_warehouse::main::sources::semantic_source_columns::semantic_source_columns;
 use crate::planner_warehouse::main::sources::with_declared_source_reads::with_declared_source_reads;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use crate::planner_warehouse::models::PlannerReads;
+use pyo3::prelude::Bound;
+use pyo3::prelude::PyAny;
+use pyo3::prelude::PyAnyMethods;
+use pyo3::prelude::PyResult;
+use pyo3::prelude::Python;
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::types::RecordId;
@@ -51,7 +59,7 @@ fn selected_audit_relation_keys(
 
 /// Reuse already-gathered source columns for the read map, or gather them once.
 fn source_warehouse_columns<'py>(
-    (project, adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (project, reads): (&Bound<'py, PyAny>, Option<&Bound<'py, PlannerReads>>),
     source_read_map: &Bound<'py, PyAny>,
     known_source_columns: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
@@ -67,6 +75,12 @@ fn source_warehouse_columns<'py>(
         let names = PyFrozenSet::new(py, known.keys())?.into_any();
         return Ok((known.into_any(), names));
     }
+    let Some(reads) = reads else {
+        return Ok((
+            PyDict::new(py).into_any(),
+            PyFrozenSet::empty(py)?.into_any(),
+        ));
+    };
     let entries = PyTuple::new(
         py,
         mapping_values(source_read_map)?
@@ -75,8 +89,7 @@ fn source_warehouse_columns<'py>(
     )?;
     let gathered = gather_source_inspection(
         project,
-        adapter,
-        connection,
+        reads,
         entries.into_any().extract::<Option<Bound<PyAny>>>()?,
     )?;
     Ok((gathered.get_item(0)?, gathered.get_item(1)?))
@@ -88,8 +101,8 @@ pub(crate) fn planner_relations_context<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let RelationsRequest {
         project,
-        adapter,
-        connection,
+        dialect,
+        reads,
         scope,
         deferral,
         project_config,
@@ -178,7 +191,7 @@ pub(crate) fn planner_relations_context<'py>(
     .into_any();
     let python_source_read_map = read_map(&python_source_map, Some(python_names))?;
     let (columns, listed_source_names) = source_warehouse_columns(
-        (&project, &adapter, &connection),
+        (&project, reads.as_ref()),
         &source_read_map,
         &known_source_columns,
     )?;
@@ -188,8 +201,10 @@ pub(crate) fn planner_relations_context<'py>(
             py,
             &[
                 ("project", project.clone()),
-                ("adapter", adapter.clone()),
-                ("connection", connection),
+                (
+                    "reads",
+                    reads.map_or_else(|| py.None().into_bound(py), Bound::into_any),
+                ),
                 ("source_read_map", source_read_map.clone()),
                 ("selected_keys", selected_keys),
                 ("columns", columns),
@@ -207,7 +222,7 @@ pub(crate) fn planner_relations_context<'py>(
             source_read_map: source_read_map.unbind(),
             python_source_read_map: python_source_read_map.unbind(),
             source_warehouse_columns: semantic_columns.unbind(),
-            star_exclude_keyword: adapter.call_method0("star_exclude_keyword")?.unbind(),
+            star_exclude_keyword: dialect.syntax("star_exclude_keyword")?.call0()?.unbind(),
             listed_source_names: listed_source_names.unbind(),
         },
     )?
@@ -226,7 +241,7 @@ pub(crate) fn build_planner_relations_context<'py>(
         "build_planner_relations_context",
         kwargs,
         (
-            &["project", "adapter", "connection", "scope"],
+            &["project", "dialect", "reads", "scope"],
             &[
                 "deferral",
                 "project_config",
@@ -238,8 +253,8 @@ pub(crate) fn build_planner_relations_context<'py>(
     )?;
     planner_relations_context(RelationsRequest {
         project: args.value("project")?,
-        adapter: args.value("adapter")?,
-        connection: args.value("connection")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
+        reads: Some(PlannerReads::passed(args.value("reads")?)?),
         scope: args.value("scope")?,
         deferral: args.value("deferral")?,
         project_config: args.value("project_config")?,

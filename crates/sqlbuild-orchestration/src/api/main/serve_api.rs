@@ -1,17 +1,15 @@
 //! One native server owns migrations and all storage writes; locations and workers speak HTTP.
 
+use axum::Json;
 use axum::routing::get;
-use axum::{Extension, Json, Router, middleware};
-use tower_http::compression::CompressionLayer;
 
-use crate::api::_helpers::authentication::{bearer::local_request, configure::configure};
-use crate::api::_helpers::resources::compression::compress_reads_only;
-use crate::api::_helpers::resources::server_errors::generic_server_errors;
-use crate::api::_helpers::resources::ui_assets::{UI_ASSETS, serve_ui};
-use crate::api::_helpers::resources::{changes, router::router};
+use crate::api::_helpers::authentication::configure::configure;
+use crate::api::_helpers::resources::application::{application_router, development_application};
+use crate::api::_helpers::resources::changes;
 use crate::api::main::openapi_document::openapi_document;
-use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, GroupRole, ServerFacts};
+use crate::api::models::{ApiAuthentication, GroupRole, ServerFacts};
 use crate::authorization::main::publish_group_roles::publish_group_roles;
+use crate::node_states::main::start_node_states::start_node_states;
 use crate::runs::types::RunHandoff;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -33,21 +31,17 @@ pub async fn serve_api(
     prepare_store(&store, &group_roles).await?;
     let (sender, listener_changes) = subscribe_changes(&store).await?;
     let (stop, stopped) = tokio::sync::watch::channel(false);
-    let feed = ChangeFeed {
-        sender: sender.clone(),
-        stopped,
-    };
-    let application = router(&store, feed.clone())
-        .merge(authentication_routes.layer(Extension(feed)))
-        .layer(Extension(std::sync::Arc::new(images)))
-        .layer(Extension(planner))
-        .layer(Extension(facts.statistics))
-        .layer(Extension(facts))
-        .route(
-            "/api/openapi.json",
-            get(|| async { Json(openapi_document()) }),
-        )
-        .with_state(store.clone());
+    let (node_states, refresh_node_states) = start_node_states(&store, &sender);
+    let application = application_router(
+        &store,
+        (sender.clone(), stopped),
+        authentication_routes,
+        (node_states, (images, planner), facts),
+    )
+    .route(
+        "/api/openapi.json",
+        get(|| async { Json(openapi_document()) }),
+    );
     let application = development_application(application, development_scope, address);
     let server = axum::serve(
         listener,
@@ -61,6 +55,7 @@ pub async fn serve_api(
     tokio::select! {
         result = async { server.await } => { result?; Ok(()) },
         result = changes::relay(store.clone(), listener_changes, sender) => result,
+        () = refresh_node_states => Ok(()),
     }
 }
 
@@ -70,22 +65,4 @@ async fn prepare_store(
 ) -> Result<(), ControlError> {
     migrate_store(store).await?;
     publish_group_roles(store, group_roles).await
-}
-
-fn development_application(
-    application: Router,
-    scope: Option<DevelopmentScope>,
-    address: std::net::SocketAddr,
-) -> Router {
-    let application = serve_ui(application, UI_ASSETS);
-    let application = match scope {
-        Some(scope) => application
-            .layer(Extension(scope))
-            .layer(middleware::from_fn_with_state(address, local_request)),
-        None => application,
-    };
-    application
-        .layer(middleware::map_response(generic_server_errors))
-        .layer(CompressionLayer::new())
-        .layer(middleware::from_fn(compress_reads_only))
 }

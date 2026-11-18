@@ -13,7 +13,9 @@ use sqlbuild_cursor::algebra::main::parse_duration::parse_duration;
 use sqlbuild_cursor::algebra::models::DurationDigits;
 use sqlbuild_model_config::model_validation::main::parse_iso_timestamp::parse_iso_timestamp;
 
-use crate::native_commands::_helpers::terminal::{stdout_supports_color, terminal_columns};
+use crate::native_commands::_helpers::command::terminal::{
+    stdout_supports_color, terminal_columns,
+};
 use crate::native_commands::constants::COST_ISO_PYTHON_MINOR;
 use crate::native_commands::models::CostOptions;
 

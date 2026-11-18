@@ -1,5 +1,5 @@
 use crate::argv::models::Namespace;
-use crate::native_commands::_helpers::decision::native_invocation;
+use crate::native_commands::_helpers::command::decision::native_invocation;
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{NativeCommand, RulesAction, RulesOptions, SkillsOptions};
 use crate::native_commands::tests::helpers::parse;

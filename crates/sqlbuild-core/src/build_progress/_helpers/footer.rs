@@ -17,6 +17,8 @@ pub(crate) struct FooterCounts {
     pub(crate) fail: i64,
     pub(crate) timeout: i64,
     pub(crate) skip: i64,
+    /// Error-severity audit failures the build let through; not counted as failures.
+    pub(crate) ignored: i64,
 }
 
 impl FooterCounts {
@@ -53,6 +55,7 @@ pub(crate) fn count_results(result: &BuildResultText, python: &[PythonNodeText])
         match audit.outcome.as_str() {
             PASS => counts.pass += 1,
             WARN => counts.warn += 1,
+            ERROR if audit.ignored => counts.ignored += 1,
             ERROR => counts.fail += 1,
             SKIPPED => counts.skip += 1,
             _ => {}
@@ -210,6 +213,43 @@ fn message_error(message: Option<&String>) -> ErrorText {
     ErrorText {
         message: message.cloned(),
         ..ErrorText::default()
+    }
+}
+
+/// Each ignored audit failure under the model, source or check it audits, marked ignored.
+pub(crate) fn ignored_failure_details(result: &BuildResultText, style: CliStyle) -> Vec<String> {
+    let mut section: Section = Section::new(style.warning_strong("Ignored audit failures:"));
+    for model in &result.models {
+        let ignored: Vec<String> = model
+            .audits
+            .iter()
+            .filter(|audit| audit.ignored)
+            .map(ignored_audit)
+            .collect();
+        if !ignored.is_empty() {
+            section.entry(format!("  {}", model.name), ignored);
+        }
+    }
+    for audit in result
+        .source_audits
+        .iter()
+        .chain(result.end_audits.iter())
+        .filter(|audit| audit.ignored)
+    {
+        let target: &str = audit
+            .attached_target_name
+            .as_deref()
+            .unwrap_or(&audit.audit_name);
+        section.entry(format!("  {target}"), [ignored_audit(audit)]);
+    }
+    section.finish()
+}
+
+/// An ignored audit failure: what it found, or the error that failed it, then that it was ignored.
+fn ignored_audit(audit: &AuditResultText) -> String {
+    match &audit.execution_error {
+        Some(error) => format!("    audit {} failed: {error} (ignored)", audit.audit_name),
+        None => format!("{} (ignored)", audit_warning(audit)),
     }
 }
 

@@ -27,3 +27,9 @@ pub(crate) struct EventKeyTestCase {
     pub(crate) timestamp_column: &'static str,
     pub(crate) expected_ordering_keys: &'static [&'static str],
 }
+
+pub(crate) struct NewestVersionsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) versions: u16,
+    pub(crate) expected_sql: &'static str,
+}

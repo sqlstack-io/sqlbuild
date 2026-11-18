@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionTestOf, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { connectionDetailsOf, connectionTestOf, firstSyncPending, healthOf, instancesOf, poolCapWarningsOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -12,6 +12,18 @@ const seen = (secondsAgo: number, health: Health, session = 's-1') => ({
 describe('location health', () => {
 	it('is broken without a check-in in the last 90 seconds, whatever was reported before', () => {
 		expect(healthOf([seen(91, { kind: 'heartbeat' })], now)).toEqual({ health: 'broken', liveInstances: 0, lastSeenAt: at(91) });
+	});
+
+	it("reads the server's newest pool-cap warning, job by job", () => {
+		const job = { job_key: 'close_of_business', kind: 'group' as const, pool: 'warehouse_heavy', amount: 3, cap: 1, message: 'group close_of_business takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool' };
+		const capped = seen(5, { kind: 'pool_capped', generation: 2, jobs: [job] }, '00000000-0000-0000-0000-000000000000');
+		expect(poolCapWarningsOf([capped, seen(10, { kind: 'heartbeat' })])).toEqual([{ jobKey: 'close_of_business', kind: 'group', pool: 'warehouse_heavy', amount: 3, cap: 1, message: job.message }]);
+		expect(poolCapWarningsOf([seen(10, { kind: 'heartbeat' })])).toEqual([]);
+	});
+
+	it("doesn't count the server's pool-cap warning as a location check-in", () => {
+		const capped = seen(5, { kind: 'pool_capped', generation: 2, jobs: [] }, '00000000-0000-0000-0000-000000000000');
+		expect(healthOf([capped, seen(91, { kind: 'heartbeat' })], now)).toEqual({ health: 'broken', liveInstances: 0, lastSeenAt: at(91) });
 	});
 
 	it('counts each live instance once', () => {
@@ -37,6 +49,16 @@ describe('location health', () => {
 		expect(healthOf(observations, now).health).toBe('degraded');
 		expect(connectionTestOf(observations)).toMatchObject({ outcome: 'failed', at: at(5) });
 	});
+
+	it('records the startup check with its duration, and an older location\'s check as after publishing', () => {
+		expect(connectionTestOf([seen(5, { kind: 'connection', generation: 1, healthy: true, trigger: 'startup', elapsed_millis: 410 })])).toMatchObject({
+			outcome: 'ok',
+			trigger: 'startup',
+			durationMs: 410,
+			message: 'Connected on startup'
+		});
+		expect(connectionTestOf([seen(5, { kind: 'connection', generation: 2, healthy: false })])).toMatchObject({ trigger: 'publish', durationMs: 0, message: 'Could not connect after publishing' });
+	});
 });
 
 describe('location processes', () => {
@@ -46,6 +68,8 @@ describe('location processes', () => {
 			['s-1', at(5), 'live'],
 			['old', at(95), 'stale']
 		]);
+		const capped = seen(1, { kind: 'pool_capped', generation: 2, jobs: [] }, '00000000-0000-0000-0000-000000000000');
+		expect(instancesOf([capped, ...observations], now).map((i) => i.id)).toEqual(['s-1', 'old']);
 	});
 });
 
@@ -55,6 +79,12 @@ describe('toLocationDetail', () => {
 	it('shows a failed reload as its health, without inventing a failed deploy or error text', () => {
 		const detail = toLocationDetail(location, [seen(5, { kind: 'heartbeat' }), seen(20, { kind: 'compile_failed', generation: 3 }), seen(40, { kind: 'connection', generation: 2, healthy: true })], null, now);
 		expect([detail.health, detail.failedDeploy, detail.lastLoadError, detail.snapshot]).toEqual(['falling_back', null, null, null]);
+	});
+
+	it('lists the rule findings that failed the load, as sqb compile prints them', () => {
+		const rules = { finding_count: 3, findings: [{ code: 'SQBRMODEL102', message: 'SELECT * is allowed only inside dependency import CTEs', path: 'models/orders.sql', line: 2 }] };
+		const detail = toLocationDetail(location, [seen(20, { kind: 'compile_failed', generation: 3, rules })], null, now);
+		expect(detail.lastLoadError).toBe('Compile failed: 3 rule findings\nmodels/orders.sql:2 [SQBRMODEL102] SELECT * is allowed only inside dependency import CTEs\n… and 2 more');
 	});
 
 	it('is healthy again once a newer generation connects', () => {
@@ -80,7 +110,7 @@ describe('warehouseSyncOf', () => {
 			sync('2026-11-08T12:01:00Z', 'catalog', null),
 			sync('2026-11-08T12:00:00Z', 'statistics', 'delivery')
 		]);
-		expect(result).toEqual({ lastSyncedAt: '2026-11-08T12:02:00Z', lastError: 'catalog: failed while reading the warehouse', lastReportedAt: '2026-11-08T12:03:00Z' });
+		expect(result).toEqual({ lastSyncedAt: '2026-11-08T12:02:00Z', lastError: 'catalog: failed while reading the warehouse', lastReportedAt: '2026-11-08T12:03:00Z', syncing: null, completed: null });
 	});
 
 	it("gives each table its newest sync, the time it last synced cleanly, and where the state tables are read from", () => {
@@ -98,11 +128,91 @@ describe('warehouseSyncOf', () => {
 		]);
 	});
 
+	it('counts the records mirrored of each table, and names the next sync from the report that completed one', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const completed = sync('2026-11-08T12:03:00Z', 'statistics', null);
+		const observations = [{ ...completed, report: { ...completed.report, health: { ...completed.report.health, next_sync_at: '2026-11-08T12:33:00Z' } } }, sync('2026-11-08T12:02:00Z', 'catalog', null)];
+		const connection = toWarehouseConnection(location, observations, null, [
+			{ table: 'catalog', records: 120 },
+			{ table: 'statistics', records: 4_800 }
+		]);
+		expect(connection.tables.map((t) => [t.table, t.mirroredTotal])).toEqual([
+			['catalog', 120],
+			['statistics', 4_800]
+		]);
+		expect(connection.nextSyncAt).toBe('2026-11-08T12:33:00Z');
+		const running = toWarehouseConnection(location, [sync('2026-11-08T12:40:00Z', 'catalog', null), ...observations]);
+		expect([running.nextSyncAt, running.tables[0].mirroredTotal]).toEqual([null, null]);
+	});
+
+	it('marks a sync that failed reads stopped, from the newest report only', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const failed = sync('2026-11-08T12:03:00Z', 'catalog', 'read', 'permission denied for table _sqlbuild_catalog');
+		const progress = { position: 2, kinds: 14, rows: 40, elapsed_millis: 900, completed: false, halted: true };
+		const stopped = { ...failed, report: { ...failed.report, health: { ...failed.report.health, progress } } };
+		const halted = toWarehouseConnection(location, [stopped, sync('2026-11-08T12:02:00Z', 'statistics', null)]);
+		expect([halted.halted, halted.nextSyncAt, halted.tables.find((t) => t.table === 'catalog')?.error]).toEqual([true, null, 'permission denied for table _sqlbuild_catalog']);
+		const resumed = toWarehouseConnection(location, [sync('2026-11-08T12:10:00Z', 'catalog', null), stopped]);
+		expect(resumed.halted).toBe(false);
+		expect(warehouseSyncOf([stopped])?.syncing).toBeNull();
+		expect(warehouseSyncOf([{ ...stopped, report: { ...stopped.report, health: { ...stopped.report.health, progress: { ...progress, halted: false } } } }])?.syncing).toMatchObject({ position: 2, kinds: 14 });
+	});
+
+	it('shows the connection settings published with the newest snapshot, and none before it publishes them', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const published = {
+			snapshot_id: 'snap-1',
+			generation: 3,
+			git_dirty: false,
+			environment_hash: 'env',
+			sqb_version: '1.0.0',
+			published_at: '2026-11-08T12:00:00Z',
+			changes: [],
+			connection: { adapter: 'snowflake', account: 'orders-account', user: 'orders_loader', role: 'LOADER', warehouse: 'ORDERS_WH', database: 'ORDERS', auth_method: 'key_pair' }
+		};
+		expect(toWarehouseConnection(location, [], published).details).toEqual({
+			adapter: 'snowflake',
+			account: 'orders-account',
+			host: null,
+			user: 'orders_loader',
+			role: 'LOADER',
+			warehouse: 'ORDERS_WH',
+			database: 'ORDERS',
+			authMethod: 'key_pair'
+		});
+		expect(connectionDetailsOf({ ...published, connection: null })).toBeNull();
+		expect(toWarehouseConnection(location, []).details).toBeNull();
+	});
+
 	it('shows a build holding the warehouse file as a wait, not a failure', () => {
 		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
 		const observations = [sync('2026-11-08T12:03:00Z', 'catalog', 'busy'), sync('2026-11-08T12:01:00Z', 'catalog', null)];
 		expect(toWarehouseConnection(location, observations).tables.map((t) => [t.failure, t.waiting, t.lastSyncedAt])).toEqual([['Waiting for a build that holds the warehouse file', true, '2026-11-08T12:01:00Z']]);
-		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z' });
+		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z', syncing: null, completed: null });
+	});
+
+	it('says why a read failed and on what page size, without the warehouse message', () => {
+		const timedOut = sync('2026-11-08T12:03:00Z', 'statistics', 'read');
+		const health = { ...timedOut.report.health, read_failure: { kind: 'timed_out' as const, seconds: 130 }, page_limit: 100 };
+		expect(warehouseSyncOf([{ ...timedOut, report: { ...timedOut.report, health } }])?.lastError).toBe('statistics: failed while reading the warehouse: no reply within 130 s, on a page of 100 relations');
+		const erroring = sync('2026-11-08T12:04:00Z', 'catalog', 'read');
+		const error = { ...erroring.report.health, read_failure: { kind: 'read_error' as const }, page_limit: 2000 };
+		expect(warehouseSyncOf([{ ...erroring, report: { ...erroring.report, health: error } }])?.lastError).toBe('catalog: failed while reading the warehouse: the warehouse returned an error; the location’s log has it, on a page of 2,000 rows');
+	});
+
+	it('shows a running sync and the newest completed one, and a first sync as pending until it completes', () => {
+		const at = (time: string, table: 'catalog' | 'statistics', position: number, rows: number, completed: boolean) => {
+			const report = sync(time, table, null);
+			return { ...report, report: { ...report.report, health: { ...report.report.health, progress: { position, kinds: 14, rows, elapsed_millis: 12_800, completed } } } };
+		};
+		const now = Date.parse('2026-11-08T12:10:30Z');
+		const first = warehouseSyncOf([at('2026-11-08T12:10:00Z', 'catalog', 13, 1640, false)]);
+		expect(first?.syncing).toEqual({ position: 13, kinds: 14, table: 'catalog', rows: 1640 });
+		expect(firstSyncPending(first, now)).toBe(true);
+		expect(firstSyncPending(first, now + 60 * 60_000)).toBe(false);
+		const later = warehouseSyncOf([at('2026-11-08T12:10:00Z', 'catalog', 13, 10, false), at('2026-11-08T12:00:00Z', 'statistics', 14, 31_204, true)]);
+		expect(later?.completed).toEqual({ at: '2026-11-08T12:00:00Z', kinds: 14, rows: 31_204, elapsedMs: 12_800 });
+		expect(firstSyncPending(later, now)).toBe(false);
 	});
 
 	it("shows a failed read's warehouse error after its stage", () => {

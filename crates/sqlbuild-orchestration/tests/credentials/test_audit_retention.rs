@@ -9,10 +9,10 @@ use crate::credentials::models::{AuditContext, AuditRetention};
 use crate::credentials::tests::helpers::{acknowledge_audit, age_audit, audit_rows};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::test_types::AuditRetentionTestCase;
-use crate::runs::main::request_job_run::request_job_run;
+use crate::runs::main::requests::request_job_run::request_job_run;
 use crate::runs::models::JobRunRequest;
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
 use crate::store::models::TransactionMode;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -52,8 +52,7 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_rows_survive_and_retrie
             input.documents.insert(
                 "jobs".into(),
                 json!({"daily_orders": {
-                    "description": "Build orders", "selection": ["orders"], "settings": {},
-                    "concurrency_groups": []
+                    "description": "Build orders", "selection": ["orders"], "settings": {}
                 }}),
             );
             publish_snapshot(store, &input).await.expect("publish job");

@@ -18,11 +18,11 @@ use crate::api::tests::warehouse_history_helpers::{
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
-use crate::platform::main::connect_location_work::connect_location_work;
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
+use crate::platform::main::work::connect_location_work::connect_location_work;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -31,6 +31,7 @@ use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
 
 #[test]
@@ -199,7 +200,7 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             let mut invalid_id = batch.clone();
             invalid_id["records"][0]["event_id"] = json!(" ");
             let mut oversized = batch.clone();
-            oversized["records"] = json!(vec![record.clone(); 101]);
+            oversized["records"] = json!(vec![record.clone(); MAX_HISTORY_PAGE_RECORDS + 1]);
             let mut unknown = batch.clone();
             unknown["records"][0]["status"] = json!("success");
             let foreign = url.replace(&location.to_string(), &other.to_string());

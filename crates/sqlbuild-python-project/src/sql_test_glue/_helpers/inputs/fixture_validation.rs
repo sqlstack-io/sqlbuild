@@ -1,5 +1,6 @@
 //! Static SQL-test fixture shape validation over native fixture completion.
 
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::BTreeSet;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -31,7 +32,8 @@ pub(crate) fn validated_fixtures<'py>(
 ) -> PyResult<Result<[Bound<'py, PyDict>; 4], Vec<String>>> {
     let py = test.py();
     let (chain, [refs, sources, seeds, expected]) = request;
-    let adapter = inputs.1;
+    let dialect = Dialect::of(inputs.1)?;
+    let dialect = &dialect;
     let resource_types = record_class(py, RecordId::CompiledResourceType)?;
     let model = native_field(&resource_types, "MODEL")?;
     let kinds = [
@@ -48,7 +50,7 @@ pub(crate) fn validated_fixtures<'py>(
         ],
     )?;
     let chain: Vec<String> = chain.extract()?;
-    let completion = complete_fixtures(context, adapter, (&chain, groups.as_any()))?;
+    let completion = complete_fixtures(context, dialect, (&chain, groups.as_any()))?;
     let mut errors: BTreeSet<String> = BTreeSet::new();
     for diagnostic in &completion.diagnostics {
         let key = native_field(diagnostic, "key")?;
@@ -81,7 +83,7 @@ pub(crate) fn validated_fixtures<'py>(
                 let (completed_sql, empty_error) = complete_empty_fixture_sql(
                     &sql.extract::<String>()?,
                     context.relations.get(&model_key),
-                    adapter,
+                    dialect,
                 )?;
                 if let Some(error) = empty_error {
                     errors.insert(format!("{}: expected output '{name}' {error}", location()?));
@@ -91,7 +93,7 @@ pub(crate) fn validated_fixtures<'py>(
                 kwargs.set_item("query_sql", &completed_sql)?;
                 kwargs.set_item(
                     "inference_profile",
-                    adapter.call_method0("expression_inference_profile")?,
+                    dialect.call_method0("expression_inference_profile")?,
                 )?;
                 let inference =
                     context
@@ -107,7 +109,7 @@ pub(crate) fn validated_fixtures<'py>(
                         .unwrap_or_default();
                     completed_expected.set_item(
                         &name,
-                        complete_typed_null_columns(&completed_sql, &inference, types, adapter)?,
+                        complete_typed_null_columns(&completed_sql, &inference, types, dialect)?,
                     )?;
                     Some(native_field(&inference, "columns")?)
                 }

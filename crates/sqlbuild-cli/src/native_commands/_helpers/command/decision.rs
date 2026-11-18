@@ -1,0 +1,514 @@
+//! Resolve native invocations and control-service settings from parsed arguments.
+
+use std::net::{IpAddr, SocketAddr};
+use std::path::PathBuf;
+
+use chrono::{DateTime, Utc};
+use serde_json::json;
+use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin, ServerFacts};
+use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
+use sqlbuild_orchestration::declarations::models::TriggerChange;
+use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
+use sqlbuild_orchestration::runs::models::RunLogRetention;
+use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
+use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
+use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    StateHistoryRetention, StatisticsRetention,
+};
+use uuid::Uuid;
+
+use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
+use crate::argv::models::{ArgvOutcome, Namespace, Value};
+use crate::dispatch::main::invocation_policy::invocation_policy;
+use crate::dispatch::models::{CommandFacts, InvocationPolicy};
+use crate::native_commands::_helpers::command::terminal::read_password;
+use crate::native_commands::constants::{
+    CLEAN_COMMAND, INIT_COMMAND, RULES_COMMAND, RULES_LIST_ACTION, RULES_SHOW_ACTION,
+    SKILLS_COMMAND,
+};
+use crate::native_commands::errors::PythonNeeded;
+use crate::native_commands::models::{
+    ControlAdmin, CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions,
+    SkillsOptions,
+};
+use crate::server_config::models::{ServerConfig, ServerSection};
+use sqlbuild_core::cost_command::constants::DESCENDING_ORDER;
+
+/// Whether `sqb review --json` failed to parse, which Python reports as a JSON document.
+pub(crate) fn review_json_failure(arguments: &[String], outcome: &ArgvOutcome) -> bool {
+    arguments.iter().any(|argument| argument == JSON_OPTION)
+        && outcome
+            .usage_failure
+            .as_ref()
+            .is_some_and(|failure| failure.prog == REVIEW_PROG)
+}
+
+pub(crate) fn text(namespace: &Namespace, name: &str) -> Option<String> {
+    match namespace.get(name) {
+        Some(Value::Str(text) | Value::Path(text)) => Some(text.clone()),
+        _ => None,
+    }
+}
+
+pub(crate) fn flag(namespace: &Namespace, name: &str) -> bool {
+    namespace.get(name) == Some(&Value::Bool(true))
+}
+
+pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, ControlError> {
+    let value = text(namespace, "admin_subject").unwrap_or_default();
+    let action = text(namespace, "admin_command");
+    if action.as_deref() == Some("create-user") {
+        if value.trim().is_empty() {
+            return Err(ControlError::Invalid("user name is required".into()));
+        }
+        return Ok(ControlAdmin::BootstrapUser(value));
+    }
+    if action.as_deref() == Some("create-location") {
+        if value.trim().is_empty() {
+            return Err(ControlError::Invalid("location name is required".into()));
+        }
+        return Ok(ControlAdmin::CreateLocation(value));
+    }
+    if action.as_deref() == Some("create-principal") {
+        if value.trim().is_empty() {
+            return Err(ControlError::Invalid("principal name is required".into()));
+        }
+        return Ok(ControlAdmin::CreatePrincipal(value));
+    }
+    let id = Uuid::parse_str(&value)
+        .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
+    match action.as_deref() {
+        Some("location-work") => Ok(ControlAdmin::LocationWork(id)),
+        Some("check-location") => {
+            let request_id =
+                Uuid::parse_str(&text(namespace, "admin_event_id").unwrap_or_default())
+                    .map_err(|_| ControlError::Invalid("--request-id must be a UUID".into()))?;
+            let target = text(namespace, "admin_target").unwrap_or_default();
+            let reason = text(namespace, "admin_reason").unwrap_or_default();
+            if target.trim().is_empty() || reason.trim().is_empty() {
+                return Err(ControlError::Invalid(
+                    "target and reason must not be blank".into(),
+                ));
+            }
+            Ok(ControlAdmin::RequestLocationWork(LocationWorkRequest {
+                request_id,
+                location_id: id,
+                target,
+                reason,
+                work: LocationWork::CheckConnection {},
+            }))
+        }
+        Some("change-trigger" | "cancel-run" | "request-run" | "rerun-run") => {
+            let identity_option = if matches!(action.as_deref(), Some("request-run" | "rerun-run"))
+            {
+                "--run-id"
+            } else {
+                "--event-id"
+            };
+            let event_id = Uuid::parse_str(&text(namespace, "admin_event_id").unwrap_or_default())
+                .map_err(|_| ControlError::Invalid(format!("{identity_option} must be a UUID")))?;
+            let reason = text(namespace, "admin_reason").unwrap_or_default();
+            if reason.trim().is_empty() {
+                return Err(ControlError::Invalid("--reason must not be blank".into()));
+            }
+            if matches!(action.as_deref(), Some("request-run" | "rerun-run")) {
+                let priority = match namespace.get("admin_priority") {
+                    Some(Value::Int(value)) => value.parse::<i64>().map_err(|_| {
+                        ControlError::Invalid("--priority must fit a signed 64-bit integer".into())
+                    })?,
+                    _ => 0,
+                };
+                if action.as_deref() == Some("rerun-run") {
+                    return Ok(ControlAdmin::Rerun(RerunRequest {
+                        run_id: event_id,
+                        source_run_id: id,
+                        from_failure: flag(namespace, "admin_from_failure"),
+                        reason,
+                        priority,
+                        nodes: Vec::new(),
+                    }));
+                }
+                let target = text(namespace, "admin_target").unwrap_or_default();
+                let job_key = text(namespace, "admin_job").unwrap_or_default();
+                if target.trim().is_empty() || job_key.trim().is_empty() {
+                    return Err(ControlError::Invalid(
+                        "target and job must not be blank".into(),
+                    ));
+                }
+                let window = match (
+                    text(namespace, "admin_start_cursor_ts"),
+                    text(namespace, "admin_end_cursor_ts"),
+                    text(namespace, "admin_start_cursor_int"),
+                    text(namespace, "admin_end_cursor_int"),
+                ) {
+                    (None, None, None, None) => None,
+                    (Some(start), Some(end), None, None) => Some(RunWindow::Timestamp {
+                        start: DateTime::parse_from_rfc3339(&start)
+                            .map_err(|_| {
+                                ControlError::Invalid(
+                                    "backfill start must be an RFC3339 timestamp with timezone"
+                                        .into(),
+                                )
+                            })?
+                            .with_timezone(&Utc),
+                        end: DateTime::parse_from_rfc3339(&end)
+                            .map_err(|_| {
+                                ControlError::Invalid(
+                                    "backfill end must be an RFC3339 timestamp with timezone"
+                                        .into(),
+                                )
+                            })?
+                            .with_timezone(&Utc),
+                    }),
+                    (None, None, Some(start), Some(end)) => Some(RunWindow::Integer {
+                        start: start.parse().map_err(|_| {
+                            ControlError::Invalid(
+                                "backfill start must be a signed 64-bit integer".into(),
+                            )
+                        })?,
+                        end: end.parse().map_err(|_| {
+                            ControlError::Invalid(
+                                "backfill end must be a signed 64-bit integer".into(),
+                            )
+                        })?,
+                    }),
+                    _ => {
+                        return Err(ControlError::Invalid(
+                            "backfill requires both start and end of exactly one cursor type"
+                                .into(),
+                        ));
+                    }
+                };
+                return Ok(ControlAdmin::RequestJobRun(JobRunRequest {
+                    run_id: event_id,
+                    location_id: id,
+                    target,
+                    job_key,
+                    reason,
+                    priority,
+                    window,
+                    full_refresh: false,
+                    select: texts(namespace, "admin_select").unwrap_or_default(),
+                    exclude: texts(namespace, "admin_exclude").unwrap_or_default(),
+                }));
+            }
+            if action.as_deref() == Some("cancel-run") {
+                return Ok(ControlAdmin::CancelRun {
+                    event_id,
+                    run_id: id,
+                    reason,
+                });
+            }
+            let mut change = json!({
+                "kind": text(namespace, "admin_trigger_change").unwrap_or_default().replace('-', "_"),
+            });
+            let cursor = text(namespace, "admin_cursor");
+            if let Some(cursor) = &cursor {
+                change["time"] = json!(cursor);
+            }
+            let change: TriggerChange = serde_json::from_value(change)
+                .map_err(|error| ControlError::Invalid(format!("trigger change: {error}")))?;
+            if cursor.is_some() && !matches!(change, TriggerChange::SetCursor { .. }) {
+                return Err(ControlError::Invalid(
+                    "--cursor is only valid for set-cursor".into(),
+                ));
+            }
+            Ok(ControlAdmin::ChangeTrigger {
+                event_id,
+                trigger_id: id,
+                change,
+                reason,
+            })
+        }
+        Some("issue-location-token") => {
+            let expiry = DateTime::parse_from_rfc3339(
+                &text(namespace, "admin_expires_at").unwrap_or_default(),
+            )
+            .map_err(|_| ControlError::Invalid("--expires-at must be an RFC3339 timestamp".into()))?
+            .with_timezone(&Utc);
+            if expiry <= Utc::now() {
+                return Err(ControlError::Invalid(
+                    "token expiry must be in the future".into(),
+                ));
+            }
+            Ok(ControlAdmin::IssueToken(
+                CredentialScope::Location { location_id: id },
+                expiry,
+            ))
+        }
+        Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
+        Some("rotate-token") => Ok(ControlAdmin::RotateToken(id)),
+        Some("set-password") => Ok(ControlAdmin::SetPassword(id, read_password()?)),
+        Some("grant-admin") => Ok(ControlAdmin::GrantAdmin(id)),
+        _ => Err(ControlError::Invalid(
+            "an administration command is required".into(),
+        )),
+    }
+}
+
+pub(crate) fn control_address(
+    namespace: &Namespace,
+    standalone: bool,
+    server: &ServerSection,
+) -> Result<Option<SocketAddr>, ControlError> {
+    if standalone {
+        return Ok(None);
+    }
+    let host = match text(namespace, "control_host") {
+        Some(host) => host
+            .parse()
+            .map_err(|_| ControlError::Invalid("--host must be an IP address".into()))?,
+        None => server.host.unwrap_or(IpAddr::from([127, 0, 0, 1])),
+    };
+    let port = match namespace.get("control_port") {
+        Some(Value::Int(value)) => value
+            .parse::<u16>()
+            .map_err(|_| ControlError::Invalid("--port must be between 0 and 65535".into()))?,
+        _ => server.port.unwrap_or(8000),
+    };
+    Ok(Some(SocketAddr::new(host, port)))
+}
+
+/// API settings are validated together before any store is opened; `standalone` always runs the scheduler.
+pub(crate) fn control_api_settings(
+    namespace: &Namespace,
+    standalone: bool,
+    config: &ServerConfig,
+) -> Result<(ApiAuthentication, ServerFacts), ControlError> {
+    let retention = &config.retention;
+    let statistics = match retention_setting(
+        namespace,
+        "statistics-retention-days",
+        ("statistics_days", retention.statistics_days),
+    )? {
+        Some(days) => StatisticsRetention::days(days)?,
+        None => StatisticsRetention::default(),
+    };
+    let audit = match retention_setting(
+        namespace,
+        "audit-retention-days",
+        ("audit_days", retention.audit_days),
+    )? {
+        Some(days) => AuditRetention::days(days)?,
+        None => AuditRetention::default(),
+    };
+    let snapshots = match retention_setting(
+        namespace,
+        "snapshot-retention-count",
+        ("snapshot_count", retention.snapshot_count),
+    )? {
+        Some(count) => SnapshotRetention::count(count)?,
+        None => SnapshotRetention::default(),
+    };
+    let state_history = match retention_setting(
+        namespace,
+        "state-history-retention-versions",
+        ("state_history_versions", retention.state_history_versions),
+    )? {
+        Some(versions) => StateHistoryRetention::versions(versions)?,
+        None => StateHistoryRetention::default(),
+    };
+    let defaults = RunLogRetention::default();
+    let run_logs = RunLogRetention::new(
+        retention_setting(
+            namespace,
+            "run-log-retention-days",
+            ("run_log_days", retention.run_log_days),
+        )?
+        .unwrap_or(defaults.days()),
+        retention_setting(
+            namespace,
+            "run-log-retention-count",
+            ("run_log_count", retention.run_log_count),
+        )?
+        .unwrap_or(defaults.count()),
+    )?;
+    Ok((
+        control_authentication(namespace, config)?,
+        ServerFacts {
+            version: env!("CARGO_PKG_VERSION").into(),
+            scheduler: scheduler_enabled(namespace, standalone, &config.server),
+            audit,
+            statistics,
+            snapshots,
+            run_logs,
+            state_history,
+            pool_caps: Default::default(),
+        },
+    ))
+}
+
+/// `--no-scheduler` wins over `[server] scheduler`; the standalone scheduler always schedules.
+pub(crate) fn scheduler_enabled(
+    namespace: &Namespace,
+    standalone: bool,
+    server: &ServerSection,
+) -> bool {
+    standalone || !flag(namespace, "control_no_scheduler") && server.scheduler.unwrap_or(true)
+}
+
+/// Zero and out-of-range values name the flag, or the `[retention]` key, before any type-specific check runs.
+fn retention_setting(
+    namespace: &Namespace,
+    flag: &str,
+    (key, file): (&str, Option<u16>),
+) -> Result<Option<u16>, ControlError> {
+    match namespace.get(&format!("control_{}", flag.replace('-', "_"))) {
+        Some(Value::Int(value)) => match value.parse::<u16>() {
+            Ok(setting) if setting > 0 => Ok(Some(setting)),
+            _ => Err(ControlError::Invalid(format!(
+                "--{flag} must be between 1 and 65535"
+            ))),
+        },
+        _ => match file {
+            Some(0) => Err(ControlError::Invalid(format!(
+                "[retention] {key} must be between 1 and 65535"
+            ))),
+            setting => Ok(setting),
+        },
+    }
+}
+
+fn control_authentication(
+    namespace: &Namespace,
+    config: &ServerConfig,
+) -> Result<ApiAuthentication, ControlError> {
+    let password = text(namespace, "control_password_origin")
+        .or_else(|| config.server.password_origin.clone());
+    let login = match (password, config.trusted_proxy.clone(), config.oidc.clone()) {
+        (None, None, None) => HumanLogin::None,
+        (Some(origin), None, None) => HumanLogin::Password(origin),
+        (None, Some(settings), None) => HumanLogin::TrustedProxy(settings),
+        (None, None, Some(settings)) => HumanLogin::Oidc(settings),
+        (_, Some(_), _) => {
+            return Err(ControlError::Invalid(
+                "trusted-proxy authentication cannot be combined with other human authentication modes".into(),
+            ));
+        }
+        _ => {
+            return Err(ControlError::Invalid(
+                "OIDC authentication cannot be combined with other human authentication modes"
+                    .into(),
+            ));
+        }
+    };
+    Ok(ApiAuthentication {
+        login,
+        default_role: serde_json::from_value(json!(
+            text(namespace, "control_default_role")
+                .or_else(|| config.server.default_role.clone())
+                .unwrap_or_else(|| "none".into())
+        ))
+        .map_err(|_| ControlError::Invalid("default role must be none or viewer".into()))?,
+    })
+}
+
+/// The variable naming the control database: `--database-env`, then `[server] database_env`.
+pub(crate) fn control_database_variable(namespace: &Namespace, server: &ServerSection) -> String {
+    text(namespace, "control_database_env")
+        .or_else(|| server.database_env.clone())
+        .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into())
+}
+
+pub(crate) fn control_database(
+    namespace: &Namespace,
+    variable: &str,
+) -> Result<String, ControlError> {
+    match std::env::var(variable) {
+        Ok(value) => Ok(value),
+        Err(std::env::VarError::NotPresent) => Ok(PathBuf::from(
+            text(namespace, "project_dir").unwrap_or_else(|| ".".into()),
+        )
+        .join(".sqlbuild/control.sqlite3")
+        .to_string_lossy()
+        .into_owned()),
+        Err(std::env::VarError::NotUnicode(_)) => Err(ControlError::Invalid(
+            "control database variable must be UTF-8".into(),
+        )),
+    }
+}
+
+/// The strings of a list attribute, or `None` when it holds anything else.
+fn texts(namespace: &Namespace, name: &str) -> Option<Vec<String>> {
+    match namespace.get(name) {
+        None | Some(Value::None) => Some(Vec::new()),
+        Some(Value::List(items)) => items
+            .iter()
+            .map(|item| match item {
+                Value::Str(text) => Some(text.clone()),
+                _ => None,
+            })
+            .collect(),
+        Some(_) => None,
+    }
+}
+
+fn rules_command(namespace: &Namespace) -> Result<NativeCommand, PythonNeeded> {
+    let action: RulesAction = match text(namespace, "rules_command").as_deref() {
+        None | Some(RULES_LIST_ACTION) => RulesAction::List,
+        Some(RULES_SHOW_ACTION) => RulesAction::Show,
+        Some(_) => return Err(PythonNeeded::Command),
+    };
+    Ok(NativeCommand::Rules(RulesOptions {
+        action,
+        selector: text(namespace, "rules_rule_selector"),
+        json: flag(namespace, "json"),
+    }))
+}
+
+fn native_command(
+    command: Option<&str>,
+    namespace: &Namespace,
+) -> Result<NativeCommand, PythonNeeded> {
+    match command {
+        None | Some(CLEAN_COMMAND) => Ok(NativeCommand::Nothing),
+        Some(INIT_COMMAND) => Ok(NativeCommand::Init),
+        Some(SKILLS_COMMAND) => Ok(NativeCommand::Skills(SkillsOptions {
+            global_install: flag(namespace, "skills_global"),
+            targets: texts(namespace, "skills_target").ok_or(PythonNeeded::Arguments)?,
+            force: flag(namespace, "skills_force"),
+        })),
+        Some(RULES_COMMAND) => rules_command(namespace),
+        Some("cost") => Ok(NativeCommand::Cost(CostOptions {
+            selector: text(namespace, "cost_selector").unwrap_or_else(|| "latest".to_owned()),
+            limit: match namespace.get("cost_limit") {
+                None | Some(Value::None) => None,
+                Some(Value::Int(value)) => {
+                    Some(value.parse().map_err(|_| PythonNeeded::Arguments)?)
+                }
+                _ => return Err(PythonNeeded::Arguments),
+            },
+            no_limit: flag(namespace, "cost_no_limit"),
+            sort: text(namespace, "cost_sort"),
+            descending: text(namespace, "cost_order").is_none_or(|order| order == DESCENDING_ORDER),
+            since: text(namespace, "cost_since"),
+            until: text(namespace, "cost_until"),
+            json: flag(namespace, "json"),
+            json_path: text(namespace, "json_output").map(PathBuf::from),
+            no_color: flag(namespace, "no_color"),
+        })),
+        Some(_) => Err(PythonNeeded::Command),
+    }
+}
+
+/// The command `namespace` runs, when it runs without Python; `--debug` always uses Python.
+pub(crate) fn native_invocation(namespace: &Namespace) -> Result<NativeInvocation, PythonNeeded> {
+    if flag(namespace, "debug") {
+        return Err(PythonNeeded::Command);
+    }
+    let command_name: Option<String> = text(namespace, "command");
+    let command: NativeCommand = native_command(command_name.as_deref(), namespace)?;
+    let policy: InvocationPolicy = invocation_policy(&CommandFacts {
+        command: command_name.clone(),
+        ..CommandFacts::default()
+    });
+    Ok(NativeInvocation {
+        command,
+        command_name,
+        project_dir: text(namespace, "project_dir").map(PathBuf::from),
+        target: text(namespace, "target"),
+        creates_project: policy.creates_project,
+        maintains_skills: policy.maintains_skills,
+    })
+}

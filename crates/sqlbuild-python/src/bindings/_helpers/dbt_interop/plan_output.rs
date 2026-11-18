@@ -4,10 +4,11 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_planner::live_reads::models::LiveReads;
 
-use crate::bindings::_helpers::command_runtime::connection::{
-    anchor_local_database_path, with_dbt_profile,
-};
+use crate::bindings::_helpers::command_runtime::connection::anchor_local_database_path;
+use crate::bindings::_helpers::command_runtime::connection::with_dbt_profile;
 use crate::bindings::_helpers::command_runtime::warehouses::apply_command_warehouse;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -204,14 +205,20 @@ pub(crate) fn build_sqlbuild_plan_output<'py>(
             ],
         )?;
         let discovered = native_field(&environment, "discovered_inputs")?;
+        let adapter = native_field(&environment, "adapter")?;
         let result = build_execution_plan(
             py,
             Some(keywords(
                 py,
                 &[
                     ("project", native_field(&environment, "project")?),
-                    ("adapter", native_field(&environment, "adapter")?),
-                    ("connection", connection.clone()),
+                    ("dialect", Dialect::of(&adapter)?.into_any()),
+                    (
+                        "reads",
+                        LiveReads::new(&adapter, &connection, None)
+                            .handle(adapter.py())?
+                            .into_any(),
+                    ),
                     ("selection", selection),
                     ("overrides", overrides),
                     ("deferral", deferral),

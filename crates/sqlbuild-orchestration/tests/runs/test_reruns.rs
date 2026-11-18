@@ -4,15 +4,16 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::credentials::models::AuditContext;
 use crate::runs::main::{
-    advance_groups::advance_groups, change_run::change_run, claim_next_run::claim_next_run,
-    list_runs::list_runs, request_job_run::request_job_run, request_rerun::request_rerun,
+    execution::advance_groups::advance_groups, execution::change_run::change_run,
+    execution::claim_next_run::claim_next_run, listings::list_runs::list_runs,
+    requests::request_job_run::request_job_run, requests::request_rerun::request_rerun,
 };
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RerunRequest, RunAuthority, RunChange, RunChangeRequest, RunOrigin,
     RunOutcome, RunStatus, RunWindow,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use serde_json::json;
 use uuid::Uuid;
@@ -79,13 +80,13 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 .expect("inventory model")
                 .definition["deps"] = json!(["products"]);
             input.documents.insert("jobs".into(), json!({
-                "staging": {"description": "Stage orders", "selection": ["orders", "customers"], "concurrency_groups": ["warehouse"], "settings": {"vars": {"batch": 23}}},
-                "marts": {"description": "Build inventory", "selection": ["inventory"], "concurrency_groups": ["inventory_limit"]},
+                "staging": {"description": "Stage orders", "selection": ["orders", "customers"], "pools": {"warehouse": {"amount": 1, "limit": 100}}, "settings": {"vars": {"batch": 23}}},
+                "marts": {"description": "Build inventory", "selection": ["inventory"], "pools": {"inventory_limit": {"amount": 1, "limit": 100}}},
                 "completed": {"description": "Build products and shipments", "selection": ["products", "shipments"]}
             }));
             input.documents.insert("groups".into(), json!({"daily_orders": {
                 "description": "Build daily orders", "selection": ["customers", "orders", "inventory", "products", "shipments"],
-                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["completed"], "completed": ["staging"]}
+                "pools": {"warehouse": {"amount": 1, "limit": 100}}, "jobs": {"staging": [], "marts": ["completed"], "completed": ["staging"]}
             }}));
             let published = publish_snapshot(store, &input).await.expect("publish");
             let source_id = Uuid::now_v7();

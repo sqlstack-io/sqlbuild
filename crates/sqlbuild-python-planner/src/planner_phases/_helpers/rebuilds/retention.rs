@@ -1,14 +1,22 @@
 //! Warehouse-aware time-travel retention and Snowflake table-type planning.
 
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::rebuilds::effective_target_config::effective_target_config;
 use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
-use crate::planner_phases::constants::{
-    BIGQUERY_ADAPTER, DECREASE_WARNING, DOWNGRADE_HISTORY_DAYS, PERMANENT_TABLE_TYPE,
-    RETENTION_DECREASE, RETENTION_INCREASE, RETENTION_MATCH, SNOWFLAKE_ADAPTER,
-    TRANSIENT_TABLE_TYPE,
-};
+use crate::planner_phases::constants::BIGQUERY_ADAPTER;
+use crate::planner_phases::constants::DECREASE_WARNING;
+use crate::planner_phases::constants::DOWNGRADE_HISTORY_DAYS;
+use crate::planner_phases::constants::PERMANENT_TABLE_TYPE;
+use crate::planner_phases::constants::RETENTION_DECREASE;
+use crate::planner_phases::constants::RETENTION_INCREASE;
+use crate::planner_phases::constants::RETENTION_MATCH;
+use crate::planner_phases::constants::SNOWFLAKE_ADAPTER;
+use crate::planner_phases::constants::TRANSIENT_TABLE_TYPE;
+use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
+use crate::planner_warehouse::models::Read;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -21,9 +29,9 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::typed_values::typed_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
@@ -70,7 +78,7 @@ fn selected_models<'py>(
 }
 
 fn adapter_is(runtime: &Bound<'_, PyAny>, name: &str) -> PyResult<bool> {
-    native_field(&native_field(runtime, "adapter")?, "adapter_name")?.eq(name)
+    runtime_dialect(runtime)?.syntax("adapter_name")?.eq(name)
 }
 
 /// Entries for selected Snowflake table-type drift.
@@ -113,11 +121,10 @@ pub(crate) fn plan_table_types<'py>(
     if !snowflake {
         return tuple(py, Vec::new());
     }
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
-    if let Ok(facade) = adapter.downcast::<SyncedCopyAdapter>() {
-        facade.get().mark_unknown("table types".to_owned());
+    if let Read::Unknown(_) = runtime_reads(runtime)?.get().reads().table_types() {
         return tuple(py, Vec::new());
     }
+    let dialect = runtime_dialect(runtime)?;
     let target = effective_target_config(runtime)?;
     let relations = native_field(&native_field(warehouse, "snapshot")?, "existing_relations")?;
     let materialization = record_class(py, RecordId::MaterializationType)?;
@@ -150,9 +157,10 @@ pub(crate) fn plan_table_types<'py>(
             continue;
         }
         let downgrade = actual == Some(false) && desired_transient;
-        let destination = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
-        let limit: i64 = adapter
-            .call_method0("maximum_identifier_length")?
+        let destination = destination(&model)?;
+        let limit: i64 = dialect
+            .syntax("maximum_identifier_length")?
+            .call0()?
             .extract()?;
         let target_name: String = native_field(&destination, "name")?.extract()?;
         entries.push(planner_model(
@@ -269,31 +277,16 @@ fn render_changes<'py>(
         fields.push(("state", state.clone()));
     }
     call_with(
-        &native_field(
-            &native_field(runtime, "adapter")?,
-            "render_retention_changes",
-        )?,
+        &runtime_dialect(runtime)?.syntax("render_retention_changes")?,
         &fields,
     )
 }
 
 fn inspect<'py>(
-    runtime: &Bound<'py, PyAny>,
+    inspect_retention: &Bound<'py, PyAny>,
     request: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    call_with(
-        &native_field(
-            &runtime_field(runtime, |runtime| &runtime.adapter)?,
-            "inspect_retention",
-        )?,
-        &[
-            (
-                "connection",
-                runtime_field(runtime, |runtime| &runtime.connection)?,
-            ),
-            ("request", request.clone()),
-        ],
-    )
+    call_with(inspect_retention, &[("request", request.clone())])
 }
 
 fn state_direction(state: &Bound<'_, PyAny>, desired_days: i64) -> PyResult<&'static str> {
@@ -319,7 +312,7 @@ fn transient_error(py: Python<'_>, name: &str, desired_days: i64, convert: &str)
 }
 
 fn relation_retention<'py>(
-    runtime: &Bound<'py, PyAny>,
+    (runtime, inspect_retention): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     warehouse: &Bound<'py, PyAny>,
     model: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -397,17 +390,14 @@ fn relation_retention<'py>(
     let mut listed = py.None().into_bound(py);
     if native_field(&relation, "identity")?.eq(&lookup)? {
         listed = call_with(
-            &native_field(
-                &native_field(runtime, "adapter")?,
-                "retention_state_from_relation",
-            )?,
+            &runtime_dialect(runtime)?.syntax("retention_state_from_relation")?,
             &[("request", request.clone()), ("relation", relation.clone())],
         )?;
     }
     let state = if listed.is_truthy()? {
         listed
     } else {
-        inspect(runtime, &request)?
+        inspect(inspect_retention, &request)?
     };
     if native_field(&state, "is_transient")?.is_truthy()?
         && desired_days > 1
@@ -456,7 +446,7 @@ fn relation_retention<'py>(
 }
 
 fn bigquery_retention<'py>(
-    runtime: &Bound<'py, PyAny>,
+    (runtime, inspect_retention): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     models: &[Bound<'py, PyAny>],
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let py = runtime.py();
@@ -555,7 +545,7 @@ fn bigquery_retention<'py>(
                 ("desired_days", desired_days.into_pyobject(py)?.into_any()),
             ],
         )?;
-        let state = inspect(runtime, &request)?;
+        let state = inspect(inspect_retention, &request)?;
         let base = RetentionEntry {
             request: request.clone(),
             model_names: sorted_names(py, names)?,
@@ -612,17 +602,23 @@ pub(crate) fn plan_retention<'py>(
             models.push(model);
         }
     }
-    if models.is_empty()
-        || runtime_field(runtime, |runtime| &runtime.adapter)?.is_instance_of::<SyncedCopyAdapter>()
-    {
+    if models.is_empty() {
         return tuple(py, Vec::new());
     }
+    let Read::Known(inspect_retention) = runtime_reads(runtime)?.get().reads().retention(py)?
+    else {
+        return tuple(py, Vec::new());
+    };
     let entries = if adapter_is(runtime, BIGQUERY_ADAPTER)? {
-        bigquery_retention(runtime, &models)?
+        bigquery_retention((runtime, &inspect_retention), &models)?
     } else {
         let mut entries: Vec<_> = Vec::new();
         for model in &models {
-            entries.extend(relation_retention(runtime, warehouse, model)?);
+            entries.extend(relation_retention(
+                (runtime, &inspect_retention),
+                warehouse,
+                model,
+            )?);
         }
         entries
     };

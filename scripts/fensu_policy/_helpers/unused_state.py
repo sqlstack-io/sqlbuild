@@ -20,6 +20,8 @@ from scripts.fensu_policy.constants import (
     OBSERVATION_STATE_PATTERN,
     PARENTHESIS_CLOSE,
     PARENTHESIS_OPEN,
+    PLANNER_WAREHOUSE_IDENTIFIER_PATTERN,
+    PLANNER_WAREHOUSE_LITERAL_PATTERN,
     POLICY_CONFIG_FILE,
     REASON_SEPARATOR,
     REMOVED_CODE,
@@ -75,6 +77,8 @@ from scripts.fensu_policy.models import EnumVariant, StateDefinition, StateReads
 
 _OBSERVATION_STATE: re.Pattern[str] = re.compile(OBSERVATION_STATE_PATTERN)
 _SYNCED_COPY: re.Pattern[str] = re.compile(SYNCED_COPY_PATTERN)
+_PLANNER_WAREHOUSE_IDENTIFIER: re.Pattern[str] = re.compile(PLANNER_WAREHOUSE_IDENTIFIER_PATTERN)
+_PLANNER_WAREHOUSE_LITERAL: re.Pattern[str] = re.compile(PLANNER_WAREHOUSE_LITERAL_PATTERN)
 _LEXEMES: re.Pattern[str] = re.compile(RUST_LITERAL_PATTERN, re.DOTALL)
 _CONTINUATION: re.Pattern[str] = re.compile(RUST_LINE_CONTINUATION)
 _TEST_MODULE: re.Pattern[str] = re.compile(RUST_TEST_MODULE_PATTERN)
@@ -612,6 +616,25 @@ def synced_copy_reference_lines(*, source: str) -> list[int]:
     return _reference_lines(source=source, pattern=_SYNCED_COPY)
 
 
+def warehouse_access_lines(*, source: str) -> list[int]:
+    """One-based code lines naming the adapter, a connection or a warehouse operation."""
+
+    lines: list[int] = []
+    number: int
+    code: str
+    raw: str
+    for number, (code, raw) in enumerate(
+        zip(code_view(source=source).splitlines(), source.splitlines(), strict=True), start=1
+    ):
+        if REMOVED_CODE in code:
+            continue
+        if _PLANNER_WAREHOUSE_IDENTIFIER.search(code) or _PLANNER_WAREHOUSE_LITERAL.search(
+            raw.partition(RUST_LINE_COMMENT)[0]
+        ):
+            lines.append(number)
+    return lines
+
+
 def _reference_lines(*, source: str, pattern: re.Pattern[str]) -> list[int]:
     lines: list[int] = []
     number: int
@@ -631,33 +654,49 @@ def confined_references(
 ) -> list[Fault]:
     """Faults for each reference outside the allowed paths, and for stale allowed paths."""
 
+    return path_entry_faults(
+        ctx=ctx,
+        entries=(option, "allowed_paths", False),
+        lines=references,
+        stale=lambda prefix: f"allowed path {prefix} no longer names {subject}; remove the entry",
+    )
+
+
+def path_entry_faults(
+    *,
+    ctx: RuleContext,
+    entries: tuple[RuleOption[tuple[str, ...]], str, bool],
+    lines: Callable[..., list[int]],
+    stale: Callable[[str], str],
+) -> list[Fault]:
+    """Faults for `lines` on the guarded side of `entries` (option, name, guarded); bad entries."""
+
+    option: RuleOption[tuple[str, ...]]
+    name: str
+    inside: bool
+    option, name, inside = entries
     reasons: dict[str, str]
     malformed: list[str]
     reasons, malformed = reasoned_entries(entries=ctx.option(option))
     prefixes: list[str] = list(reasons)
-    used: set[str] = set()
+    matched: set[str] = set()
     faults: list[Fault] = []
     for facts in ctx.rust.files:
         path: str = facts.file.path.value
         if facts.test or is_rust_test_path(path=path):
             continue
-        lines: list[int] = references(source=facts.source)
-        if not lines:
-            continue
         prefix: str | None = allowed_prefix(path=path, prefixes=prefixes)
-        if prefix is not None:
-            used.add(prefix)
+        if prefix is None and inside:
             continue
-        faults.extend(
-            ctx.fault_for(path=ctx.repo_root / path, line=line, column=0) for line in lines
-        )
-    problems: list[str] = [
-        f"allowed_paths entry {entry!r} needs `path=reason`" for entry in malformed
-    ] + [
-        f"allowed path {prefix} no longer names {subject}; remove the entry"
-        for prefix in prefixes
-        if prefix not in used
-    ]
+        found: list[int] = lines(source=facts.source)
+        if prefix is not None and (inside or found):
+            matched.add(prefix)
+        if (prefix is not None) == inside:
+            faults.extend(
+                ctx.fault_for(path=ctx.repo_root / path, line=line, column=0) for line in found
+            )
+    problems: list[str] = [f"{name} entry {entry!r} needs `path=reason`" for entry in malformed]
+    problems += [stale(prefix) for prefix in prefixes if prefix not in matched]
     return [
         ctx.fault_for(path=ctx.repo_root / POLICY_CONFIG_FILE, line=1, column=0, message=problem)
         for problem in problems

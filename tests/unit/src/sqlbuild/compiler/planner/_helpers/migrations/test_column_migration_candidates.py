@@ -16,6 +16,7 @@ from sqlbuild._native import (
     CompiledResourceType,
     CompileModelConfig,
     DeferralInputs,
+    Dialect,
     Fingerprint,
     PlannerInputError,
     PlannerOverrides,
@@ -23,6 +24,7 @@ from sqlbuild._native import (
     PlannerScope,
     WarehouseFingerprints,
     WarehouseSnapshot,
+    live_reads,
     plan_column_migrations,
 )
 from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
@@ -69,8 +71,8 @@ def test_given_untokenizable_tracked_model_when_planning_column_migrations_then_
             effective_vars={},
             models=(model,),
         ),
-        adapter=adapter,
-        connection=object(),
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=object()),
     )
     scope: PlannerScope = PlannerScope(
         upstream_deps={model.key: ()},

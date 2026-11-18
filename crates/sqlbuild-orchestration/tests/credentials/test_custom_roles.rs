@@ -8,7 +8,7 @@ use crate::credentials::tests::role_helpers::{
 };
 use crate::credentials::tests::test_types::CustomRoleTestCase;
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;

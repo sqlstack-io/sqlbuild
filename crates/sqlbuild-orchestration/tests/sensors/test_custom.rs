@@ -11,13 +11,13 @@ use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
-use crate::platform::main::connect_location_work::connect_location_work;
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
+use crate::platform::main::work::connect_location_work::connect_location_work;
 use crate::platform::models::{
     LocationHealth, LocationHealthReport, LocationWork, LocationWorkOutcome, LocationWorkPoll,
     LocationWorkResult,
 };
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::RunOrigin;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
@@ -25,7 +25,7 @@ use crate::sensors::main::complete_custom_sensor::complete_custom_sensor;
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationOutcome};
 use crate::sensors::tests::helpers::{evaluations, snapshot};
 use crate::sensors::tests::test_types::{CustomSensorResultCase, SensorTestCase};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};

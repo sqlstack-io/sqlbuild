@@ -78,7 +78,8 @@ sqb build --select +kind:asset
 ```
 
 The kinds are `model`, `source`, `seed`, `udf`, `table_fn`, `task`, `asset`, `loader` and
-`check`, as the server's catalog names them. Kind selectors compose with `+`, `,` and `--exclude`
+`check`, as the server's catalog names them, and `function`, which selects both `udf` and
+`table_fn`. Kind selectors compose with `+`, `,` and `--exclude`
 like tag selectors. An unknown kind is an error that names the closest kinds, and a kind your
 project has no nodes of is an error, as an unused tag is.
 

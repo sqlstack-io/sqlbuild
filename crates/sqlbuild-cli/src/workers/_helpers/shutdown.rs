@@ -3,7 +3,7 @@
 use std::io::Write;
 use std::time::{Duration, Instant};
 
-use sqlbuild_orchestration::runs::main::observe_run::observe_run;
+use sqlbuild_orchestration::runs::main::execution::observe_run::observe_run;
 use sqlbuild_orchestration::runs::models::{RunChange, RunOutcome};
 use sqlbuild_orchestration::scheduler::constants::RENEW_INTERVAL_SECONDS;
 use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;

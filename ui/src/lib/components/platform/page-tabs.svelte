@@ -1,16 +1,23 @@
 <script lang="ts" generics="T extends string">
+	// The UI's one row of tabs under a page or panel header.
 	let {
 		value = $bindable(),
-		tabs
+		tabs,
+		flush = false,
+		onselect
 	}: {
 		value: T;
-		tabs: { value: T; label: string; count?: number }[];
+		tabs: { value: T; label: string; count?: number | string; title?: string }[];
+		/** Inside a header that already has the padding and bottom border. */
+		flush?: boolean;
+		/** Called with the tab picked, e.g. to keep it in the URL. */
+		onselect?: (value: T) => void;
 	} = $props();
 </script>
 
-<div class="page-tabs" role="tablist">
+<div class="page-tabs" class:flush role="tablist">
 	{#each tabs as t (t.value)}
-		<button role="tab" aria-selected={value === t.value} class:on={value === t.value} onclick={() => (value = t.value)}>
+		<button role="tab" aria-selected={value === t.value} class:on={value === t.value} title={t.title} onclick={() => ((value = t.value), onselect?.(t.value))}>
 			{t.label}{#if t.count != null}<span>{t.count}</span>{/if}
 		</button>
 	{/each}
@@ -25,8 +32,13 @@
 		padding: 0 16px;
 		border-bottom: 1px solid var(--border);
 	}
+	.page-tabs.flush {
+		padding: 0;
+		border-bottom: 0;
+	}
 	button {
 		display: inline-flex;
+		margin-bottom: -1px;
 		align-items: center;
 		gap: 6px;
 		padding: 10px 8px;

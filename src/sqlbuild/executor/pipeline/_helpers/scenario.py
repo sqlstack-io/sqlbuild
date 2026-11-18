@@ -20,6 +20,7 @@ from typing import Any, ClassVar, Protocol
 from sqlbuild._native import (
     CompiledSqlScenario,
     CompilePipelineResult,
+    Dialect,
     NativeProgressProjector,
     ScenarioExecutionPlan,
     SqlLexicalSyntax,
@@ -701,7 +702,7 @@ def _run_scenario[ResultT: _ScenarioPipelineResult](
             scenario_plan = build_scenario_plan(
                 scenario=scenario,
                 pipeline_result=pipeline_result,
-                adapter=adapter,
+                dialect=Dialect(adapter),
                 project_name=project_name,
                 source_lexical_syntax=source_lexical_syntax,
             )
@@ -753,7 +754,7 @@ def select_scenario_snapshot_capture_candidates(
             scenario_plan: ScenarioExecutionPlan = build_scenario_plan(
                 scenario=scenario,
                 pipeline_result=pipeline_result,
-                adapter=adapter,
+                dialect=Dialect(adapter),
                 project_name=project_name,
                 source_lexical_syntax=source_lexical_syntax,
             )

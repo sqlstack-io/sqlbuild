@@ -7,7 +7,7 @@ use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest, TriggerStatus};
 use crate::scheduler::main::_acquire_lease::acquire_lease;
 use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
@@ -248,7 +248,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
 #[test]
 fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_survive_and_only_future_times_are_replaced()
  {
-    use crate::runs::main::list_runs::list_runs;
+    use crate::runs::main::listings::list_runs::list_runs;
     use crate::scheduler::main::list_ticks::list_ticks;
     use serde_json::json;
 

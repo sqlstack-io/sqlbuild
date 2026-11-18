@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
+	import PageBody from '$lib/components/page-body.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -16,7 +18,7 @@
 	import ProblemList from '$lib/components/platform/problem-list.svelte';
 	import type { LocationInstance } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { healthLabel, healthTone, shortImage, targetWords } from '$lib/platform/labels';
+	import { brokenDeployPolicyHelp, brokenDeployPolicyLabel, healthHelp, healthLabel, healthTone, shortImage, targetWords } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { openRecord } from '../utils';
@@ -49,7 +51,7 @@
 </script>
 
 <AppTopbar title="Locations">
-	<Button variant="outline" size="sm" onclick={() => (location.refresh(), problems.refresh())}>↻ Refresh</Button>
+	<RefreshButton onclick={() => (location.refresh(), problems.refresh())} />
 </AppTopbar>
 
 <div class="flex min-h-0 flex-1 flex-col">
@@ -66,8 +68,8 @@
 				<span class="font-display text-[17px] font-semibold">{detail.name}</span>
 				<span class="muted">· {targetWords(detail.target)}</span>
 				<span class="right">
-					<StatusLabel tone={healthTone[detail.health]} label={healthLabel[detail.health]} />
-					{#if openProblems}<a class="warn" href="#problems">· {openProblems} open problem{openProblems === 1 ? '' : 's'}</a>{/if}
+					<span title={healthHelp[detail.health]}><StatusLabel tone={healthTone[detail.health]} label={healthLabel[detail.health]} /></span>
+					{#if openProblems}<a class="warn" href="#problems">· {plural(openProblems, 'open problem')}</a>{/if}
 				</span>
 			</div>
 
@@ -89,9 +91,10 @@
 						{#if running.imageId}image <code title={running.imageId}>{shortImage(running.imageId)}</code> ·{:else if detail.imageId === null}<span title="Runs start as local processes, not containers">local process</span> ·{/if}
 						<span title={formatStamp(running.lastSeenAt)}>last check-in {formatAgo(running.lastSeenAt, app.now)}</span>
 					{:else if processes.live.length > 1}
-						<b class="fg">{processes.live.length} processes running</b> · usually a deploy in progress: the new one takes over once it loads
+						<b class="fg" title="Usually a deploy in progress; the new one takes over once it loads">{processes.live.length} processes running</b>
 					{:else}
-						<b class="err">Not running</b> · no process of this location is checking in, so no runs can start
+						<!-- copy-allow: consequence warning -->
+						<b class="err">Not running</b> · no runs can start
 					{/if}
 				</span>
 				<span class="right">
@@ -119,13 +122,13 @@
 						<TriangleAlertIcon size={14} />
 						<span class="summary-text">
 							<b>Deploy failed {formatAgo(detail.failedDeploy.attemptedAt, app.now)}</b>
-							— {detail.brokenDeployPolicy === 'fallback' ? `still running ${detail.snapshot ? `version ${detail.snapshot.generation}` : 'the previous version'}` : 'scheduled runs wait until a deploy works'}
+							· {detail.brokenDeployPolicy === 'fallback' ? `on version ${detail.snapshot ? detail.snapshot.generation : 'before'}` : 'runs held'}
 							· <code>{firstLine(detail.failedDeploy.error)}</code>
 						</span>
 						<span class="more">details</span>
 					</summary>
 					<div class="alert-body">
-						<p>Commit <code>{detail.failedDeploy.gitRevision}</code> (image <code>{shortImage(detail.failedDeploy.imageId)}</code>) didn't load. Fix the error and deploy again; a deploy only takes over once it loads without errors.</p>
+						<p title="A deploy takes over only once it loads cleanly">Commit <code>{detail.failedDeploy.gitRevision}</code> (image <code>{shortImage(detail.failedDeploy.imageId)}</code>) didn't load.</p>
 						<pre>{detail.failedDeploy.error}</pre>
 					</div>
 				</details>
@@ -142,8 +145,21 @@
 				<div class="alert note">
 					<TriangleAlertIcon size={14} />
 					<span class="summary-text">
-						<b>The last reload failed</b> — still running {detail.snapshot ? `version ${detail.snapshot.generation}` : 'the last version that loaded'}. The location keeps the error: see its output, or run
-						<code>sqb compile</code> in its project.
+						<b title="The location keeps the error: see its output, or run sqb compile in its project">Reload failed</b> · on version {detail.snapshot ? detail.snapshot.generation : 'before'}
+					</span>
+				</div>
+			{/if}
+			{#if detail.poolCapWarnings.length}
+				<!-- The server's own warning, from its pool caps: it doesn't touch the location's health or last check-in. -->
+				<div class="alert note pool-caps">
+					<TriangleAlertIcon size={14} />
+					<span class="summary-text">
+						<b title="This server's pool_caps lower a pool's limit below what these jobs ask for; each takes the whole pool, so it runs alone in it">Pool caps on this server</b>
+						{#each detail.poolCapWarnings as w (`${w.jobKey}:${w.pool}`)}
+							<span class="cap" title={w.message}>
+								· {w.kind} <a href={to(`/jobs/${w.jobKey}`)}>{w.jobKey}</a> takes {w.amount} of pool {w.pool}; capped at {w.cap}, so it runs alone in that pool
+							</span>
+						{/each}
 					</span>
 				</div>
 			{/if}
@@ -159,7 +175,8 @@
 							detail.warehouseConnection && { label: 'Warehouse connection', value: detail.warehouseConnection, mono: true },
 							detail.brokenDeployPolicy && {
 								label: 'If a deploy fails',
-								value: detail.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : 'Hold scheduled runs until a deploy works'
+								value: brokenDeployPolicyLabel[detail.brokenDeployPolicy === 'fallback' ? 'fallback' : 'hold'],
+								help: brokenDeployPolicyHelp[detail.brokenDeployPolicy === 'fallback' ? 'fallback' : 'hold']
 							}
 						].filter((row) => !!row)}
 					/>
@@ -167,11 +184,11 @@
 			</details>
 		</header>
 
-		<div class="min-h-0 flex-1 overflow-auto p-6">
+		<PageBody padding="24px">
 			<div id="problems">
 				<Panel
 					title="Problems"
-					note={history ? 'Overdue schedules, failed deploys, runs that couldn’t start, connection tests and warehouse syncs that failed' : 'Late schedules, and the location no longer checking in'}
+					help={history ? 'Overdue schedules, failed deploys, runs that couldn’t start, connection tests and warehouse syncs that failed.' : 'Late schedules, and the location no longer checking in.'}
 				>
 					{#snippet actions()}
 						{#if history}<SegmentedFilter
@@ -182,16 +199,16 @@
 							]}
 						/>{/if}
 					{/snippet}
-					<ProblemList events={problemRows} resource={problems} currentLocationId={id} empty={problemView === 'open' ? 'No open problems. Everything is running normally.' : 'No problems recorded for this location.'} />
+					<ProblemList events={problemRows} resource={problems} currentLocationId={id} empty={problemView === 'open' ? 'No open problems.' : 'No problems recorded for this location.'} />
 				</Panel>
 			</div>
 
 			{#if app.can('location.manage') && app.client.supports('listLocationTokens')}
-				<Panel title="Access tokens" note="Lets this location's processes connect to the server. Can't do anything else.">
+				<Panel title="Access tokens" help="Lets this location's processes connect to the server. Can't do anything else.">
 					<LocationTokens locationId={detail.id} />
 				</Panel>
 			{/if}
-		</div>
+		</PageBody>
 	{/if}
 </div>
 

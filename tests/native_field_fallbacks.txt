@@ -56,12 +56,14 @@ crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.format
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.format_fix
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.format_fixtures_only
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.from_target
+crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.ignore_audit_failures
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.json
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.left_query
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.left_query_file
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.project_dir
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.right_query
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.right_query_file
+crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.run_audits
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.scenario_command
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.scenario_local
 crates/sqlbuild-python/src/bindings/_helpers/cli/dispatch.rs	CliNamespace.scenario_refresh

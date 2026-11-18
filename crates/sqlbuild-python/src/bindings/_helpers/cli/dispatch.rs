@@ -35,9 +35,8 @@ use crate::bindings::_helpers::scenario_command::test_command::run_scenario_test
 use crate::bindings::_helpers::scopes::scope_command::run_scope_command;
 use crate::bindings::_helpers::seed_command::command::run_seed_command;
 use crate::bindings::_helpers::sql_test_command::test_command::run_test_command;
-use crate::bindings::_helpers::workspace_commands::commands::{
-    run_playground_command, run_skills_command,
-};
+use crate::bindings::_helpers::workspace_commands::commands::run_playground_command;
+use crate::bindings::_helpers::workspace_commands::commands::run_skills_command;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyAttributeError, PyOSError, PyTypeError, PyUnicodeError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -334,27 +333,27 @@ fn selector_file_error(py: Python<'_>, path: &Bound<'_, PyAny>, error: &PyErr) -
     ))
 }
 
-/// Call the route's command implementation, or the handler a test injected for its slot.
-fn call_route<'py>(
+/// The positional and keyword arguments a route passes its implementation, or the handler a test injected.
+type RouteArguments<'py> = (Vec<Bound<'py, PyAny>>, Bound<'py, PyDict>);
+
+fn route_arguments<'py>(
     invocation: &Invocation<'py>,
     route: &Route,
-    handler: Option<Bound<'py, PyAny>>,
-    recall: &InvocationRecall,
-) -> PyResult<Bound<'py, PyAny>> {
+    injected: bool,
+) -> PyResult<RouteArguments<'py>> {
     let py: Python<'py> = invocation.py();
     let mut positional: Vec<Bound<'py, PyAny>> = Vec::new();
     let keywords: Bound<'py, PyDict> = PyDict::new(py);
-    let positional_count: usize = match &handler {
-        Some(_) => route.shape.slot_positional,
-        None => {
-            if let Some(extra) = route.implementation_extra {
-                keywords.set_item(extra.name, invocation.value(extra.source)?)?;
-            }
-            if route.shape.implementation_keywords {
-                0
-            } else {
-                route.shape.slot_positional
-            }
+    let positional_count: usize = if injected {
+        route.shape.slot_positional
+    } else {
+        if let Some(extra) = route.implementation_extra {
+            keywords.set_item(extra.name, invocation.value(extra.source)?)?;
+        }
+        if route.shape.implementation_keywords {
+            0
+        } else {
+            route.shape.slot_positional
         }
     };
     for (index, field) in route.arguments.iter().enumerate() {
@@ -365,6 +364,18 @@ fn call_route<'py>(
             keywords.set_item(field.name, value)?;
         }
     }
+    Ok((positional, keywords))
+}
+
+/// Call the route's command implementation, or the handler a test injected for its slot.
+fn call_route<'py>(
+    invocation: &Invocation<'py>,
+    route: &Route,
+    handler: Option<Bound<'py, PyAny>>,
+    recall: &InvocationRecall,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = invocation.py();
+    let (positional, keywords) = route_arguments(invocation, route, handler.is_some())?;
     match handler {
         Some(handler) => handler.call(PyTuple::new(py, positional)?, Some(&keywords)),
         None => run_implementation(route.implementation, (positional, keywords), recall),
@@ -442,6 +453,42 @@ fn run_implementation<'py>(
         }
     };
     code.into_bound_py_any(py)
+}
+
+/// Run `body` with the request record a parsed command's route passes, in the scopes `sqb` runs it in.
+pub(crate) fn with_routed_request<'py, T>(
+    args: &Bound<'py, PyAny>,
+    body: impl FnOnce(&Bound<'py, PyAny>) -> PyResult<T>,
+) -> PyResult<T> {
+    let py: Python<'py> = args.py();
+    within(&warehouse_scope(args)?, |_| {
+        let invocation = Invocation::new(args)?;
+        let _secrets = MissingSecretsScope::enter(
+            args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
+                .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
+        );
+        let route = match command_dispatch(&command_facts(args)?) {
+            Dispatch::Run(route, None) => route,
+            Dispatch::Run(_, Some(failure)) | Dispatch::Fail(failure) => {
+                return Err(user_error(py, failure));
+            }
+            Dispatch::Nothing => {
+                return Err(PyTypeError::new_err("the command line names no command"));
+            }
+        };
+        let project_dir: PathBuf = invocation.value(Source::EffectiveProjectDir)?.extract()?;
+        let selected_target: Option<String> = match invocation.value(Source::Attr("target")) {
+            Ok(target) => optional_text(&target)?,
+            Err(_) => None,
+        };
+        with_job_scope((project_dir, selected_target), || {
+            let arguments = route_arguments(&invocation, route, false)?;
+            let request = argument(&arguments, "request")?.ok_or_else(|| {
+                PyTypeError::new_err(format!("{}() takes no request", route.implementation))
+            })?;
+            body(&request)
+        })
+    })
 }
 
 fn routed_command<'py>(
@@ -555,5 +602,7 @@ pub(crate) fn command_facts(args: &Bound<'_, PyAny>) -> PyResult<CommandFacts> {
         scenario_retain: flag("scenario_retain")?,
         scenario_snapshot_sync: flag("scenario_sync_snapshots")? || flag("scenario_refresh")?,
         raw_query_diff,
+        ignores_failures_of_no_audits: attr("ignore_audit_failures")?.is_truthy()?
+            && !flag("run_audits")?,
     })
 }

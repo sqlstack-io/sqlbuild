@@ -1,10 +1,16 @@
 //! Convert public migration models at the Python boundary for native presentation.
 
 use crate::plan_output::_helpers::plan_text::display_limit;
-use crate::plan_output::_helpers::values::{iso, optional_text, relation_name, texts};
+use crate::plan_output::_helpers::values::iso;
+use crate::plan_output::_helpers::values::optional_text;
+use crate::plan_output::_helpers::values::relation_name;
+use crate::plan_output::_helpers::values::texts;
 use crate::plan_output::main::items::items;
 use crate::plan_output::main::text::text;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::prelude::Bound;
+use pyo3::prelude::PyAny;
+use pyo3::prelude::PyAnyMethods;
+use pyo3::prelude::PyResult;
 use pyo3::pyfunction;
 use sqlbuild_core::cli_text::models::{
     CliStyle, ColumnMigrationText, MigrationDecisionText, MigrationText, MigrationTextReport,

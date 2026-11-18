@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 
+use crate::orchestration_files::_helpers::dependencies::group_dependencies;
 use crate::orchestration_files::_helpers::raw::{RawGroup, RawRun};
 use crate::orchestration_files::_helpers::reading::{
     check_keys, error_at, nonblank, run_file, toml_error,
@@ -35,8 +36,10 @@ pub(crate) fn read_group_file(text: &str) -> Result<GroupFile, FileError> {
         }
         jobs.push(job);
     }
+    let members: BTreeSet<String> = seen;
     Ok(GroupFile {
         run: run_file(text, run)?,
         jobs,
+        dependencies: group_dependencies(text, &members)?,
     })
 }

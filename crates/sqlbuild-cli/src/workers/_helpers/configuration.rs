@@ -3,11 +3,12 @@
 use std::collections::BTreeSet;
 
 use sqlbuild_orchestration::credentials::main::locations::location_named::location_named;
+use sqlbuild_orchestration::declarations::models::ServerPoolCaps;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
-use crate::workers::models::{Launcher, LauncherScope, Launchers};
+use crate::workers::models::{Launcher, LauncherScope, Launchers, Workers};
 
 impl<'a> Launcher<'a> {
     pub(in crate::workers) fn scope(self) -> LauncherScope<'a> {
@@ -17,13 +18,34 @@ impl<'a> Launcher<'a> {
                 target: &location.target,
                 server_url: &location.server_url,
                 max_workers: location.max_workers,
+                pool_caps: &location.pool_caps,
             },
             Self::Docker(location) => LauncherScope {
                 location_id: location.location_id,
                 target: &location.target,
                 server_url: &location.server_url,
                 max_workers: location.max_workers,
+                pool_caps: &location.pool_caps,
             },
+        }
+    }
+}
+
+impl Workers {
+    /// Each launcher's `pool_caps`, by its resolved location and target.
+    pub(crate) fn pool_caps(&self) -> ServerPoolCaps {
+        ServerPoolCaps {
+            launchers: self
+                .configuration
+                .locations()
+                .map(|launcher| {
+                    let scope = launcher.scope();
+                    (
+                        (scope.location_id, scope.target.to_owned()),
+                        scope.pool_caps.clone(),
+                    )
+                })
+                .collect(),
         }
     }
 }

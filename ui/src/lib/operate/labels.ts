@@ -7,6 +7,8 @@ import type {
 	NodeCounts,
 	OnFailure,
 	OverlapPolicy,
+	ResolvedConcurrency,
+	PoolUse,
 	QueueWait,
 	RunCost,
 	RunEvent,
@@ -70,8 +72,8 @@ export const overlapHelp: Record<OverlapPolicy, string> = {
 
 /** Short plain wording of an overlap policy; the policy name goes in a tooltip. */
 export const overlapPlain: Record<OverlapPolicy, string> = {
-	queue: 'Queue another run',
-	skip: 'Skip if running'
+	queue: 'Queue',
+	skip: 'Skip'
 };
 
 /** A whole delay in its largest exact unit, e.g. 300 → `5 min`, 5400 → `90 min`, 7200 → `2 h`. */
@@ -81,17 +83,14 @@ function delayText(seconds: number): string {
 	return `${seconds} s`;
 }
 
-/** An `on_failure` policy in words, e.g. "Retry twice, 5 min apart" or "Retry once after 15 min". */
+/** A `[retry]` policy as a fact beside the "Retries" key, e.g. "2 × 5 min", "1 × 15 min" or "3 × immediate". */
 export function onFailureText(policy: OnFailure): string {
-	const times = policy.retries === 1 ? 'once' : policy.retries === 2 ? 'twice' : `${policy.retries} times`;
-	if (!policy.retryDelaySeconds) return `Retry ${times} at once`;
-	const delay = delayText(policy.retryDelaySeconds);
-	return policy.retries === 1 ? `Retry once after ${delay}` : `Retry ${times}, ${delay} apart`;
+	return `${policy.retries} × ${policy.retryDelaySeconds ? delayText(policy.retryDelaySeconds) : 'immediate'}`;
 }
 
 /** A job's overlap, retries and priority for a list cell; empty when it uses the defaults. */
 export function jobPolicyText(job: { overlap: OverlapPolicy | null; onFailure: OnFailure | null; priority: number | null }): string {
-	return [job.overlap === 'skip' ? overlapPlain.skip : null, job.onFailure ? onFailureText(job.onFailure) : null, job.priority ? `priority ${job.priority}` : null].filter(Boolean).join(' · ');
+	return [job.overlap === 'skip' ? 'Skip if running' : null, job.onFailure ? `Retry ${onFailureText(job.onFailure)}` : null, job.priority ? `priority ${job.priority}` : null].filter(Boolean).join(' · ');
 }
 
 export type WaitPart = { text: string; href?: string; code?: boolean };
@@ -107,41 +106,81 @@ export function shortRunId(id: string): string {
 	return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(short) ? short.slice(0, 8) : short;
 }
 
-/** A concurrency group's slots in words, e.g. `warehouse_heavy` → `warehouse heavy`, `target:prod` → `prod target`. */
-export function slotLabel(group: string): string {
-	if (group.startsWith('target:')) return `${group.slice('target:'.length)} target`;
-	return group.replace(/[_-]+/g, ' ');
+/** How many of the jobs sharing a pool are named before "+N more". */
+export const SHARED_SHOWN = 3;
+
+/** The docs page the Concurrency panel links to. */
+export const CONCURRENCY_DOCS = 'https://sqlbuild.com/docs/concepts/concurrency/';
+
+/** Which layer set a run's concurrency, as the panel names it; a target by its name when known. */
+export function concurrencySource(source: ResolvedConcurrency['source'], target: string | null): string {
+	switch (source) {
+		case 'job':
+			return 'job setting';
+		case 'target':
+			return target ? `target ${target}` : 'target setting';
+		case 'local':
+			return 'local setting';
+		case 'project':
+			return 'project setting';
+		case 'default':
+			return 'SQLBuild default';
+	}
+}
+
+/** What a job does when triggered while a run of it is active, finishing "If triggered while running: …". */
+export const overlapWhileRunning: Record<OverlapPolicy, string> = { queue: 'waits', skip: 'is skipped' };
+
+/**
+ * A pool the job takes, in plain words. Normally "supplier_api: takes 1 of 2", against the limit on
+ * this server, with the cap as a quiet detail when the server lowered the project's limit. When the
+ * job asks for more than this server allows, it takes the whole pool, and `clamped` says so: "Takes
+ * the whole warehouse_heavy pool on this server (capped at 1; the project asks for 3)". The other
+ * jobs and groups sharing it follow: the first `SHARED_SHOWN`, then `more`.
+ */
+export function poolText(use: PoolUse): { text: string; detail: string | null; clamped: boolean; shared: string[]; more: number } {
+	const shared = use.sharedWith.slice(0, SHARED_SHOWN);
+	const more = use.sharedWith.length - shared.length;
+	if (use.clamped) {
+		// copy-allow: the Concurrency panel's wording, agreed with the product owner
+		return { text: `Takes the whole ${use.pool} pool on this server`, detail: `capped at ${use.serverLimit}; the project asks for ${use.amount}`, clamped: true, shared, more };
+	}
+	const capped = use.serverLimit < use.limit;
+	// copy-allow: the Concurrency panel's wording, agreed with the product owner
+	return { text: `${use.pool}: takes ${use.amount} of ${use.serverLimit}`, detail: capped ? `capped on this server; the project allows ${use.limit}` : null, clamped: false, shared, more };
 }
 
 const runLink = (id: string): WaitPart => ({ text: `run ${shortRunId(id)}`, href: `/runs/${id}` });
 
-/** A queue wait as a plain sentence of linkable parts, e.g. "Waiting: run 7f3a is updating orders". */
+/**
+ * A queue wait as short linkable facts, e.g. "Writing orders · run 7f3a"; `waitTechnical` gives the
+ * scheduler's own wording for the tooltip.
+ */
 export function describeWait(wait: QueueWait): WaitPart[] {
 	switch (wait.kind) {
 		case 'write_claim':
 			return [
-				{ text: 'Waiting: ' },
-				wait.runId ? runLink(wait.runId) : { text: 'a run in another location' },
-				{ text: ' is updating ' },
+				{ text: 'Writing ' },
 				{ text: wait.nodeKey, href: `/catalog/${wait.nodeKey}` },
-				...(wait.otherNodes ? [{ text: ` and ${wait.otherNodes} more` }] : [])
+				...(wait.otherNodes ? [{ text: ` +${wait.otherNodes}` }] : []),
+				{ text: ' · ' },
+				wait.runId ? runLink(wait.runId) : { text: 'another location' }
 			];
-		case 'concurrency_limit':
+		case 'pool_full':
 			return [
-				{ text: `Waiting: the ${slotLabel(wait.limit)} limit is in use by ` },
-				...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)]),
-				...(wait.elsewhere ? [{ text: `${wait.holders.length ? ' and ' : ''}${wait.elsewhere} run${wait.elsewhere === 1 ? '' : 's'} elsewhere` }] : [])
+				{ text: `${wait.pool} pool full · ` },
+				...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)])
 			];
 		case 'earlier_run':
-			return [{ text: 'Waiting: ' }, wait.runId ? runLink(wait.runId) : { text: 'an earlier run elsewhere' }, { text: ` goes first on the ${slotLabel(wait.limit)} limit` }];
+			return [{ text: 'Behind ' }, wait.runId ? runLink(wait.runId) : { text: 'a run elsewhere' }, { text: ` · ${wait.pool} pool` }];
 		case 'job_running':
-			return [{ text: 'Waiting: ' }, runLink(wait.runId), { text: ' of the same job is running' }];
+			return [{ text: 'Job running · ' }, runLink(wait.runId)];
 		case 'upstream_job':
-			return [{ text: 'Waiting for ' }, { text: wait.jobKey || shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' to finish first' }];
+			return [{ text: 'After ' }, { text: wait.jobKey || shortRunId(wait.runId), href: `/runs/${wait.runId}` }, ...(wait.attempt ? [{ text: ' · retrying' }] : [])];
 		case 'group_parent':
-			return [{ text: 'Waiting for its group run ' }, { text: shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' to start' }];
+			return [{ text: 'Group run ' }, { text: shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' not started' }];
 		case 'retry_delay':
-			return [{ text: `Waiting: retry ${wait.attempt} is due at ${formatStamp(wait.dueAt)}` }];
+			return [{ text: `Retry ${wait.attempt} at ${formatStamp(wait.dueAt)}` }];
 	}
 }
 
@@ -157,18 +196,18 @@ export function waitTechnical(wait: QueueWait): string {
 	switch (wait.kind) {
 		case 'write_claim':
 			return `write claim held by ${wait.runId ?? 'another location or target'} on ${wait.nodeKey}${wait.otherNodes ? ` (+${wait.otherNodes})` : ''}`;
-		case 'concurrency_limit':
-			return `concurrency limit ${wait.limit} held by ${[...wait.holders, ...(wait.elsewhere ? [`${wait.elsewhere} elsewhere`] : [])].join(', ')}`;
+		case 'pool_full':
+			return `pool ${wait.pool} full, slots held by ${wait.holders.join(', ')}`;
 		case 'earlier_run':
-			return `${wait.runId ?? 'a run elsewhere'} is ahead on ${wait.limit} (priority, then queue order)`;
+			return `${wait.runId ?? 'a run elsewhere'} is ahead on pool ${wait.pool} (priority, then queue order)`;
 		case 'job_running':
 			return `job already running in ${wait.runId}`;
 		case 'upstream_job':
-			return `upstream job ${wait.jobKey} (${wait.runId}) still active`;
+			return `upstream job ${wait.jobKey} (${wait.runId}) still active${wait.attempt ? `, attempt ${wait.attempt}` : ''}`;
 		case 'group_parent':
 			return `group run ${wait.runId} not running yet`;
 		case 'retry_delay':
-			return `on_failure retry ${wait.attempt}, not before ${wait.dueAt}`;
+			return `retry ${wait.attempt}, not before ${wait.dueAt}`;
 	}
 }
 
@@ -180,10 +219,10 @@ export const tickOutcomeTone: Record<TickOutcome, string> = {
 };
 
 export const tickOutcomeText: Record<TickOutcome, string> = {
-	requested: 'started a run',
-	skipped: 'skipped',
-	covered: 'merged',
-	failed: 'failed'
+	requested: 'Run started',
+	skipped: 'Skipped',
+	covered: 'Merged',
+	failed: 'Failed'
 };
 
 /** What each tick outcome means, with the scheduler's own name for debugging. */
@@ -205,9 +244,9 @@ export const evaluationTone: Record<SensorEvaluationOutcome, string> = {
 export const triggerKindLabel: Record<TriggerKind, string> = {
 	cron_schedule: 'Schedule',
 	calendar_schedule: 'Calendar schedule',
-	job_sensor: 'When a job finishes',
-	node_sensor: 'When data changes',
-	platform_sensor: 'When a problem happens',
+	job_sensor: 'Job sensor',
+	node_sensor: 'Data sensor',
+	platform_sensor: 'Problem sensor',
 	custom_sensor: 'Custom sensor'
 };
 
@@ -223,7 +262,7 @@ export const triggerKindHelp: Record<TriggerKind, string> = {
 export const stateEventLabel: Record<TriggerStateEventKind, string> = {
 	enabled: 'Turned on',
 	paused: 'Paused',
-	reset_to_default: 'Set back to what the code says',
+	reset_to_default: 'Reset to code',
 	cursor_set: 'Position set',
 	cursor_reset: 'Started over'
 };

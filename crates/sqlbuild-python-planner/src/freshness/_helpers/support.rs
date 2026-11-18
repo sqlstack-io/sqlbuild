@@ -5,9 +5,8 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::PyString;
 
-use crate::freshness::_helpers::exception_types::{
-    SourceFreshnessInputError, SourceFreshnessObservationError,
-};
+use crate::freshness::_helpers::exception_types::SourceFreshnessInputError;
+use crate::freshness::_helpers::exception_types::SourceFreshnessObservationError;
 use sqlbuild_python_front::state_rows::main::event_rows::date_time_typed::date_time_typed;
 
 pub(crate) const OBSERVATION_ERROR: fn(String) -> PyErr = SourceFreshnessObservationError::new_err;

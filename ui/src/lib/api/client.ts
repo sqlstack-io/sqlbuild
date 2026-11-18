@@ -1,6 +1,9 @@
 import type {
 	AdhocRunCheck,
 	PlanResult,
+	PlanPage,
+	PlanDiff,
+	PlanPageSection,
 	AdhocRunRequest,
 	Bootstrap,
 	BulkRunResult,
@@ -31,10 +34,14 @@ import type {
 	RunCostRow,
 	CostSummary,
 	NodeBuildCost,
+	NodeStates,
 	Snapshot,
 	RunTabCounts,
 	Scope,
 	SnapshotChange,
+	SelectionEvaluation,
+	SelectionRequest,
+	SelectionVocabulary,
 	SnapshotNode,
 	StatementSql,
 	Timeline,
@@ -66,13 +73,18 @@ export interface ApiClient extends PlatformApi {
 	 * Health, attention items, metrics, build status by group and recent changes; null when the
 	 * person may view only part of the target, because its listings need view on every node.
 	 */
-	overview(scope: Scope): Promise<Overview | null>;
-	/** Every node in the current snapshot with its build state; also the lineage graph. */
+	overview(scope: Scope, listing?: CatalogNode[]): Promise<Overview | null>;
+	/**
+	 * Every node in the current snapshot with its build state; also the lineage graph. Pages read it
+	 * through the shared catalog store (`$lib/state/catalog.svelte`), which reads it once per snapshot.
+	 */
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
+	/** Every node's build state at the current status version, for applying `node_status` changes to a listing. */
+	listNodeStates(scope: Scope): Promise<NodeStates>;
 	/** `listing` is a current `listCatalogNodes` result the caller already holds, so it isn't read again. */
 	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null>;
-	/** The snapshot's column lineage around one node. */
-	getColumnLineage(scope: Scope, key: string): Promise<ColumnLineage | null>;
+	/** The snapshot's column lineage around one node; `listing` as for `getCatalogNode`. */
+	getColumnLineage(scope: Scope, key: string, listing?: CatalogNode[]): Promise<ColumnLineage | null>;
 	/** Every audit and check with its latest result. */
 	listChecks(scope: Scope): Promise<Check[]>;
 	getCheck(scope: Scope, id: string): Promise<CheckDetail | null>;
@@ -122,11 +134,20 @@ export interface ApiClient extends PlatformApi {
 	rerunSelectedNodes(scope: Scope, runId: string, nodes: string[]): Promise<Run>;
 
 	listSnapshotNodes(scope: Scope): Promise<SnapshotNode[]>;
+	/** Resolves a selection exactly as `sqb build` would; a refused selection is a result with its error, not a throw. */
+	evaluateSelection(scope: Scope, request: SelectionRequest): Promise<SelectionEvaluation>;
+	/** Tags, folders, jobs, sources, seeds and kinds of the current publication, with node counts. */
+	selectionVocabulary(scope: Scope): Promise<SelectionVocabulary>;
 	/** The server's pre-launch check: resolution, write set and authorization. */
 	checkAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<AdhocRunCheck>;
 	launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run>;
 	/** Asks the location to run `sqb plan` on a build command against the warehouse, and waits for it. */
 	planBuild(scope: Scope, command: string[]): Promise<PlanResult>;
+	/** One page of a large section of the plan `requestId` names, which its summary only counts. */
+	/** One page of a plan section; `name` finds rows whose name contains it, ignoring case. */
+	planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number, name?: string): Promise<PlanPage>;
+	/** One planned model's diff text, read on demand; null without one. */
+	planDiff(scope: Scope, requestId: string, model: string): Promise<PlanDiff | null>;
 
 	listJobs(scope: Scope): Promise<Job[]>;
 	getJob(scope: Scope, key: string): Promise<JobDetail | null>;
@@ -151,7 +172,7 @@ export interface ApiClient extends PlatformApi {
 	/** Asks the location to read SQLBuild's state back from the warehouse now. `connection.test` */
 	requestWarehouseSync(scope: Scope): Promise<void>;
 
-	/** Live "changed" signals (SSE in the server client); consumers refetch. */
+	/** Live "changed" signals (SSE in the server client); consumers refetch or apply their payload. */
 	changes: ChangeSubscription;
 }
 

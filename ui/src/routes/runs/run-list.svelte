@@ -1,17 +1,20 @@
 <script lang="ts">
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { openRow, to } from '$lib/paths';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import RadarIcon from '@lucide/svelte/icons/radar';
 	import UserIcon from '@lucide/svelte/icons/user';
-	import { onMount } from 'svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import type { RunRow } from '$lib/api';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import RunStatusPill from '$lib/components/operate/run-status-pill.svelte';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
 	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
-	import { runKindLabel, runStatusTone } from '$lib/status';
+	import { ignoresAuditFailures, runKindLabel, runStatusTone } from '$lib/status';
 	import type { RunsState } from './state.svelte';
 	import type { TokenKey } from './types';
 	import { statusLine } from './utils';
@@ -20,23 +23,17 @@
 
 	const ROW_H = 52;
 	const OVERSCAN = 8;
-	let scroller = $state<HTMLDivElement>();
-	let scrollTop = $state(0);
-	let viewH = $state(600);
-
-	onMount(() => {
-		const el = scroller;
-		if (!el) return;
-		const ro = new ResizeObserver(() => (viewH = el.clientHeight));
-		ro.observe(el);
-		viewH = el.clientHeight;
-		return () => ro.disconnect();
-	});
-
 	const rows = $derived(list.display);
-	const first = $derived(Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN));
-	const last = $derived(Math.min(rows.length, Math.ceil((scrollTop + viewH) / ROW_H) + OVERSCAN));
-	const visible = $derived(rows.slice(first, last));
+	let last = $state(0);
+	const runColumns: TableColumn[] = [
+		{ id: 'sel', label: '', width: '40px', class: 'sel' },
+		{ id: 'run', label: 'Run', width: '140px' },
+		{ id: 'what', label: 'What', minWidth: 200 },
+		{ id: 'by', label: 'Started by', width: '180px' },
+		{ id: 'status', label: 'Status', width: '280px' },
+		{ id: 'started', label: 'Started', width: '150px' },
+		{ id: 'took', label: 'Took', width: '90px', align: 'right' }
+	];
 
 	// Fetch the next cursor page when the window nears the end.
 	$effect(() => {
@@ -48,41 +45,22 @@
 </script>
 
 {#snippet chip(key: TokenKey, value: string, label: string, title: string)}
+	<!-- raw-button: a value chip in a run row; clicking it filters the list by that value -->
 	<button type="button" class="chip" onclick={() => onfilter(key, value)} {title}>{label}</button>
 {/snippet}
 
-<div bind:this={scroller} class="sb-list-wrap scroller" onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)}>
-	<table class="sb-list runs">
-		<colgroup>
-			<col style:width="40px" />
-			<col style:width="140px" />
-			<col />
-			<col style:width="180px" />
-			<col style:width="220px" />
-			<col style:width="150px" />
-			<col style:width="90px" />
-		</colgroup>
-		<thead>
-			<tr>
-				<th class="sel">
-					<input type="checkbox" class="sb-check" checked={list.allVisibleSelected} indeterminate={list.selected.size > 0 && !list.allVisibleSelected} onchange={() => list.toggleAll()} aria-label="Select all loaded runs" />
-				</th>
-				<th>Run</th>
-				<th>What</th>
-				<th>Started by</th>
-				<th>Status</th>
-				<th>Started</th>
-				<th class="num">Took</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#if first > 0}<tr class="spacer" style:height="{first * ROW_H}px"><td colspan="7"></td></tr>{/if}
-			{#each visible as d (d.key)}
+<DataTable class="runs" columns={runColumns} rows={rows} key={(d) => d.key} rowHeight={ROW_H} windowAbove={0} onwindow={(r) => (last = r.last)} empty={emptyText}>
+	{#snippet head(c)}
+		{#if c.id === 'sel'}
+			<input type="checkbox" class="sb-check" checked={list.allVisibleSelected} indeterminate={list.selected.size > 0 && !list.allVisibleSelected} onchange={() => list.toggleAll()} aria-label="Select all loaded runs" />
+		{/if}
+	{/snippet}
+	{#snippet row(d)}
 				{@const r = d.row.run}
 				{@const line = statusLine(d.row, app.now)}
-				<tr class:child={d.child} class:checked={list.selected.has(r.id)} style:height="{ROW_H}px" onclick={(e) => openRow(e, `/runs/${r.id}`)} onauxclick={(e) => e.button === 1 && openRow(e, `/runs/${r.id}`)}>
+				<tr class:child={d.child} class:checked={list.selected.has(r.id)} onclick={(e) => openRow(e, `/runs/${r.id}`)} onauxclick={(e) => e.button === 1 && openRow(e, `/runs/${r.id}`)}>
 					<td class="sel">
-						<i class="stripe" style:background={runStatusTone[r.status]}></i>
+						<i class="stripe" style:background={ignoresAuditFailures(r.status, r.ignoredAuditFailures) ? 'var(--sb-warning)' : runStatusTone[r.status]}></i>
 						<input type="checkbox" class="sb-check" checked={list.selected.has(r.id)} onchange={() => list.toggleSelected(r.id)} aria-label="Select run {shortRunId(r.id)}" />
 					</td>
 					<td>
@@ -90,9 +68,7 @@
 							<a class="mono" href={to(`/runs/${r.id}`)} title={r.id}>{shortRunId(r.id)}</a>
 							<CopyButton value={r.id} label="Copy run ID" />
 							{#if r.childRunCount && !d.child && !list.params.children}
-								<button type="button" class="expand" onclick={() => list.toggleExpanded(r.id)} aria-expanded={list.expanded.has(r.id)} title="{list.expanded.has(r.id) ? 'Hide' : 'Show'} the {r.childRunCount} job runs in this group">
-									{list.expanded.has(r.id) ? '▾' : '▸'} {r.childRunCount}
-								</button>
+								<DisclosureButton open={list.expanded.has(r.id)} onclick={() => list.toggleExpanded(r.id)} title="{list.expanded.has(r.id) ? 'Hide' : 'Show'} the {r.childRunCount} job runs in this group" class="ml-0.5 gap-0.5 text-[11.5px]">{r.childRunCount}</DisclosureButton>
 							{/if}
 						</div>
 						{#if d.child || (list.params.children && r.parentRunId)}
@@ -134,7 +110,7 @@
 						{/if}
 					</td>
 					<td>
-						<RunStatusPill status={r.status} />
+						<RunStatusPill status={r.status} ignored={r.ignoredAuditFailures} />
 						<div class="status-line" style:color={toneColor[line.tone]} title={line.title ?? line.text}>{line.text}</div>
 					</td>
 					<td>
@@ -148,61 +124,34 @@
 						<span class:live={!r.endedAt && !!r.startedAt} class="muted took">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</span>
 					</td>
 				</tr>
-			{/each}
-			{#if last < rows.length}<tr class="spacer" style:height="{(rows.length - last) * ROW_H}px"><td colspan="7"></td></tr>{/if}
-			{#if !rows.length}
-				<tr class="load-row">
-					<td colspan="7" class="empty">
-						{#if list.error}
-							<span class="err">Couldn't load runs: {list.error}</span> <button class="retry" onclick={() => list.refresh()}>Retry</button>
-						{:else if list.resetting}
-							<Loading lines={4} />
-						{:else}
-							{emptyText}
-						{/if}
-					</td>
-				</tr>
-			{:else if list.loadingMore || list.hasMore}
-				<tr class="load-row"><td colspan="7" class="empty">Loading more…</td></tr>
-			{:else if rows.length > 20}
-				<tr class="load-row"><td colspan="7" class="empty">That's all {rows.length} runs.</td></tr>
-			{/if}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+	{#snippet emptyRow()}
+		<tr class="load-row">
+			<td colspan={runColumns.length} class="empty">
+				{#if list.error}
+					<span class="err">Couldn't load runs: {list.error}</span> <Button variant="link" size="inline" onclick={() => list.refresh()}>Retry</Button>
+				{:else if list.resetting}
+					<Loading lines={4} />
+				{:else}
+					{emptyText}
+				{/if}
+			</td>
+		</tr>
+	{/snippet}
+	{#snippet after()}
+		{#if list.loadingMore || list.hasMore}
+			<tr class="load-row"><td colspan={runColumns.length} class="empty">Loading more…</td></tr>
+		{:else if rows.length > 20}
+			<tr class="load-row"><td colspan={runColumns.length} class="empty">That's all {rows.length} runs.</td></tr>
+		{/if}
+	{/snippet}
+</DataTable>
 
 <style>
-	.scroller {
-		min-height: 0;
-		flex: 1;
-		overflow: auto;
-	}
-	.runs {
-		min-width: 1000px;
-		table-layout: fixed;
-	}
-	.runs thead th {
-		position: sticky;
-		top: 0;
-		z-index: 2;
-		background: var(--background);
-	}
-	.runs td {
-		overflow: hidden;
-		padding-top: 4px;
-		padding-bottom: 4px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.spacer td,
-	.spacer {
-		padding: 0 !important;
-		border: 0 !important;
-	}
 	tr.checked td {
 		background: color-mix(in srgb, var(--primary) 7%, transparent);
 	}
-	.sel {
+	:global(.runs .sel) {
 		position: relative;
 		padding-right: 4px !important;
 		padding-left: 14px !important;
@@ -230,18 +179,6 @@
 	.cell-desc a:hover {
 		color: var(--primary);
 		text-decoration: underline;
-	}
-	.expand {
-		margin-left: 2px;
-		padding: 0 6px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-		line-height: 18px;
-	}
-	.expand:hover {
-		color: var(--foreground);
 	}
 	tr.child td:nth-child(2) {
 		padding-left: 28px;
@@ -316,8 +253,5 @@
 	}
 	.err {
 		color: var(--sb-error);
-	}
-	.retry {
-		color: var(--primary);
 	}
 </style>

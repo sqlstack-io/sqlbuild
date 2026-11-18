@@ -15,6 +15,7 @@ import type {
 	AuditQuery,
 	BuiltInRole,
 	Capability,
+	ConnectionDetails,
 	ConnectionTest,
 	EffectiveAccess,
 	IssuedToken,
@@ -59,6 +60,25 @@ type MockWarehouse = {
 	values: Record<string, string | number | boolean>;
 	lastTest: ConnectionTest | null;
 };
+
+/** The non-secret settings a mock connection would publish: values as set, defaults otherwise, and the sign-in method by name. */
+function mockConnectionDetails(c: MockWarehouse): ConnectionDetails {
+	const value = (key: string): string | null => {
+		const v = c.values[key] ?? c.settings.find((f) => f.key === key)?.default;
+		return v === undefined ? null : String(v);
+	};
+	const secret = c.settings.find((f) => f.type === 'secret')?.key;
+	return {
+		adapter: c.adapter,
+		account: value('account'),
+		host: value('host') ?? value('path'),
+		user: value('user'),
+		role: value('role'),
+		warehouse: value('warehouse'),
+		database: value('database') ?? value('dbname'),
+		authMethod: secret === 'private_key' ? 'key_pair' : secret === 'password' ? 'password' : 'none'
+	};
+}
 import {
 	ADMIN_ONLY,
 	baseGrantsOf,
@@ -73,7 +93,7 @@ import {
 	type AccessData
 } from './access';
 import { LOCATION_MARKETING, LOCATION_SHOP, LOCATION_SHOP_DEV, LOCATION_SHOP_STAGING, ROLE_CAPABILITIES, SHOP_LOCATIONS } from './fixtures';
-import { triggerId } from './operate';
+import { poolCapWarnings, triggerId } from './operate';
 import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM } from './principals';
 
 const MIN = 60_000;
@@ -250,7 +270,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 	});
 	const loadError =
 		"ImportError: cannot import name 'campaign_touches' from 'models.attribution' (orchestration/jobs.py, line 12)";
-	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest'>;
+	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest' | 'poolCapWarnings'>;
 	const locationExtras: Record<string, LocationExtras> = {
 		[LOCATION_SHOP]: {
 			createdAt: ago(days(210)),
@@ -259,6 +279,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			lastLoadError: null,
 			imageId: 'sha256:4be1c07d9a52',
 			warehouseConnection: 'prod',
+			// This mock server caps a pool below what a group asks for.
+			poolCapWarnings: poolCapWarnings(),
 			connectionTest: publishTest(190, 820, 'Connected as TRANSFORMER to WAFFLE_SHOP; warehouse TRANSFORMING_WH available'),
 			instances: [
 				{ id: 'location-waffle-shop-7c2d', imageId: 'sha256:4be1c07d9a52', gitRevision: '7d2e41a', startedAt: ago(192), lastSeenAt: ago(0.2), state: 'live' },
@@ -273,6 +295,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			lastLoadError: null,
 			imageId: 'sha256:9f02b6e4c1a8',
 			warehouseConnection: 'staging',
+			poolCapWarnings: [],
 			connectionTest: publishTest(35, 760, 'Connected as TRANSFORMER to WAFFLE_SHOP_STAGING'),
 			instances: [
 				{ id: 'location-waffle-shop-staging-c7e3', imageId: 'sha256:61d0a4f7b2e9', gitRevision: 'e09a6c3', startedAt: ago(1), lastSeenAt: ago(0.1), state: 'live' },
@@ -286,6 +309,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			lastLoadError: null,
 			imageId: null,
 			warehouseConnection: 'dev',
+			poolCapWarnings: [],
 			connectionTest: publishTest(2, 12, 'Opened warehouse.duckdb'),
 			instances: [{ id: 'location-waffle-shop-dev-local', imageId: 'local', gitRevision: 'b81c09e', startedAt: ago(30), lastSeenAt: ago(0.3), state: 'live' }]
 		},
@@ -296,6 +320,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			lastLoadError: loadError,
 			imageId: 'sha256:3e5f7aa20c19',
 			warehouseConnection: 'prod',
+			poolCapWarnings: [],
 			connectionTest: publishTest(1440, 140, 'Connected to analytics as sqb_builder'),
 			instances: [
 				{ id: 'location-marketing-analytics-03f6', imageId: 'sha256:3e5f7aa20c19', gitRevision: '3e5f7aa', startedAt: ago(days(1) + 30), lastSeenAt: ago(0.5), state: 'live' },
@@ -392,7 +417,9 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				setting('api_key', 'SecretStr', 'ORDERS_API_KEY', 'API key', { required: true })
 			],
 			usedBy: [{ kind: 'loader', name: 'raw__orders' }],
-			jobs: ['load_sources', 'nightly_all']
+			nodes: ['raw__orders'],
+			jobs: ['load_sources', 'nightly_all'],
+			jobNodes: { load_sources: ['raw__orders'], nightly_all: ['raw__orders'] }
 		},
 		{
 			name: 'export_bucket',
@@ -410,7 +437,9 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				{ kind: 'task', name: 'export_revenue_csv' },
 				{ kind: 'sink', name: 'run_log_archive' }
 			],
-			jobs: ['revenue_refresh', 'reporting_exports']
+			nodes: ['export_revenue_csv'],
+			jobs: ['revenue_refresh', 'reporting_exports'],
+			jobNodes: { revenue_refresh: ['export_revenue_csv'], reporting_exports: ['export_revenue_csv'] }
 		},
 		{
 			name: 'support_desk',
@@ -423,7 +452,9 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				setting('token', 'SecretStr', 'SUPPORT_DESK_TOKEN', 'Access token', { required: true })
 			],
 			usedBy: [{ kind: 'loader', name: 'raw__support_tickets' }],
-			jobs: ['load_sources']
+			nodes: ['raw__support_tickets'],
+			jobs: ['load_sources'],
+			jobNodes: { load_sources: ['raw__support_tickets'] }
 		},
 		{
 			name: 'chat_webhook',
@@ -435,7 +466,9 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				setting('timeout_seconds', 'int', 'CHAT_WEBHOOK_TIMEOUT_SECONDS', 'Request timeout')
 			],
 			usedBy: [],
-			jobs: []
+			nodes: [],
+			jobs: [],
+			jobNodes: {}
 		}
 	];
 
@@ -714,9 +747,13 @@ export class MockPlatformApi implements PlatformApi {
 					id: l.id,
 					location: l.name,
 					target: c.target,
+					// Shows the page as it will look once locations publish their settings and the sync schedule.
+					details: mockConnectionDetails(c),
 					stateLocation: { database: typeof c.values.database === 'string' ? c.values.database : null, schema: 'sqlbuild' },
 					lastTest: this.#connectionTests.get(`${l.id}/${c.name}`) ?? c.lastTest,
-					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, error: null, waiting: false, lastSyncedAt: synced }))
+					nextSyncAt: new Date(Date.now() + 26 * 60_000).toISOString(),
+					halted: false,
+					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, error: null, waiting: false, lastSyncedAt: synced, mirroredTotal: 4_800 * (i + 1) }))
 				}))
 		);
 		return this.#ctx.reply(structuredClone(connections));

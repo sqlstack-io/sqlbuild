@@ -19,6 +19,8 @@ use crate::warehouse_metadata::models::WarehouseAuditRecord;
 pub(crate) struct AuditRow {
     pub(crate) event_id: Uuid,
     pub(crate) record: WarehouseAuditRecord,
+    /// An error-severity failure its build let through.
+    pub(crate) ignored: bool,
 }
 
 /// The newest result of every check in the target.
@@ -27,7 +29,7 @@ pub(crate) async fn latest_results(
     (location_id, target): (Uuid, &str),
 ) -> Result<(ControlTransaction, Vec<AuditRow>), ControlError> {
     query_records(transaction,
-        "SELECT a.event_id,a.record_json AS record FROM sqb_warehouse_audit_results a \
+        "SELECT a.event_id,a.record_json AS record,a.ignored FROM sqb_warehouse_audit_results a \
          WHERE a.location_id=$1 AND a.target=$2 AND NOT EXISTS (SELECT 1 FROM sqb_warehouse_audit_results b \
            WHERE b.location_id=a.location_id AND b.target=a.target AND b.binding_key=a.binding_key \
            AND (b.observed_at,b.event_id)>(a.observed_at,a.event_id)) \
@@ -43,7 +45,7 @@ pub(crate) async fn check_result(
 ) -> Result<(ControlTransaction, Option<AuditRow>), ControlError> {
     let (transaction, mut rows) = query_records(
         transaction,
-        "SELECT event_id,record_json AS record FROM sqb_warehouse_audit_results \
+        "SELECT event_id,record_json AS record,ignored FROM sqb_warehouse_audit_results \
          WHERE location_id=$1 AND target=$2 AND binding_key=$3 AND event_id=$4",
         vec![
             Parameter::Id(location_id),
@@ -98,7 +100,7 @@ pub(crate) async fn check_results(
     limit: u32,
 ) -> Result<(ControlTransaction, Vec<AuditRow>), ControlError> {
     query_records(transaction,
-        "SELECT event_id,record_json AS record FROM sqb_warehouse_audit_results \
+        "SELECT event_id,record_json AS record,ignored FROM sqb_warehouse_audit_results \
          WHERE location_id=$1 AND target=$2 AND binding_key=$3 ORDER BY observed_at DESC,event_id DESC LIMIT $4",
         vec![Parameter::Id(location_id), Parameter::Text(target.into()), Parameter::Text(binding_key.into()),
             Parameter::Integer(i64::from(limit.clamp(1, 1000)))]).await

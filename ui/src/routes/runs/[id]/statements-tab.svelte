@@ -1,4 +1,8 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import CircleXIcon from '@lucide/svelte/icons/circle-x';
 	import CircleSlashIcon from '@lucide/svelte/icons/circle-slash';
@@ -56,28 +60,24 @@
 
 	const elapsed = (st: RunStatement) => ((st.endedAt ? Date.parse(st.endedAt) : app.now) - Date.parse(st.startedAt)) / 1000;
 	const outcome = { completed: 'Finished', failed: 'Failed', running: 'Running', cancelled: 'Cancelled' } as const;
+	const statementColumns = $derived<TableColumn[]>([
+		{ id: 'caret', label: '', width: '40px' },
+		{ id: 'seq', label: '#', width: '50px', align: 'right' },
+		{ id: 'time', label: 'Time', width: '100px' },
+		...(grouped ? [{ id: 'run', label: 'Job run', width: '100px' }] : []),
+		{ id: 'node', label: 'Node', minWidth: 200 },
+		{ id: 'kind', label: 'Statement', width: '120px' },
+		{ id: 'outcome', label: 'Outcome', width: '110px' },
+		{ id: 'rows', label: 'Rows', width: '110px', align: 'right' },
+		{ id: 'took', label: 'Took', width: '80px', align: 'right' },
+		{ id: 'qid', label: 'Query ID', width: '170px' }
+	]);
 </script>
 
-{#if statements.length}
-	<table class="st">
-		<thead>
-			<tr>
-				<th class="caret-col"></th>
-				<th class="num">#</th>
-				<th>Time</th>
-				{#if grouped}<th>Job run</th>{/if}
-				<th>Node</th>
-				<th>Statement</th>
-				<th>Outcome</th>
-				<th class="num">Rows</th>
-				<th class="num">Took</th>
-				<th>Query ID</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each statements as st (st.id)}
+<DataTable class="compact statements" embedded columns={statementColumns} rows={statements} key={(st) => st.id} empty={total ? 'No queries match the filter.' : 'No queries yet.'}>
+	{#snippet row(st)}
 				<tr class="row" class:open={open.has(st.id)} onclick={() => toggle(st)}>
-					<td class="caret-col"><button class="caret" aria-expanded={open.has(st.id)} aria-label="{open.has(st.id) ? 'Hide' : 'Show'} statement {st.sequence}">{open.has(st.id) ? '▾' : '▸'}</button></td>
+					<td class="caret-col"><DisclosureButton open={open.has(st.id)}><span class="sr-only">{open.has(st.id) ? 'Hide' : 'Show'} statement {st.sequence}</span></DisclosureButton></td>
 					<td class="num faint">{st.sequence}</td>
 					<td class="faint nowrap" title={formatStamp(st.startedAt)}>{clockTime(st.startedAt)}</td>
 					{#if grouped}<td class="mono faint">{shortRunId(st.runId)}</td>{/if}
@@ -103,6 +103,7 @@
 				{#if st.error}
 					<tr class="err-row">
 						<td colspan={grouped ? 10 : 9}>
+							<!-- raw-button: a failed statement's error text, clickable to show it in full -->
 							<button class="err" class:clamp={!fullError.has(st.id)} onclick={() => toggleError(st.id)} title={fullError.has(st.id) ? 'Show less' : 'Show the full error'}>{st.error}</button>
 						</td>
 					</tr>
@@ -118,38 +119,17 @@
 							{:else if loaded?.state === 'ok' && loaded.sql !== null}
 								<SqlBlock sql={loaded.sql} caption="statement {st.sequence} · {st.nodeKey}" />
 							{:else if loaded?.state === 'error'}
-								<p class="note err-text">Couldn't load the SQL: {loaded.message} <button class="retry" onclick={() => retry(st)}>Retry</button></p>
+								<p class="note err-text">Couldn't load the SQL: {loaded.message} <Button variant="link" size="inline" onclick={() => retry(st)}>Retry</Button></p>
 							{:else}
 								<p class="note">Loading SQL…</p>
 							{/if}
 						</td>
 					</tr>
 				{/if}
-			{/each}
-		</tbody>
-	</table>
-{:else}
-	<div class="empty">{total ? 'No queries match the filter.' : 'No queries yet. They appear here as the run sends them to the warehouse.'}</div>
-{/if}
+	{/snippet}
+</DataTable>
 
 <style>
-	.st {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12px;
-	}
-	th {
-		position: sticky;
-		top: 0;
-		z-index: 1;
-		padding: 7px 12px;
-		border-bottom: 1px solid var(--border);
-		background: var(--background);
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		font-weight: 500;
-		text-align: left;
-	}
 	td {
 		padding: 6px 12px;
 		border-bottom: 1px solid var(--border-subtle);
@@ -163,16 +143,8 @@
 		background: var(--sb-hover);
 	}
 	.caret-col {
-		width: 28px;
 		padding-right: 0;
 		padding-left: 14px;
-	}
-	.caret {
-		color: var(--sb-text-faint);
-	}
-	.num {
-		text-align: right;
-		font-variant-numeric: tabular-nums;
 	}
 	.mono {
 		font-family: var(--font-mono);
@@ -241,9 +213,6 @@
 	}
 	.err-text {
 		color: var(--sb-error);
-	}
-	.retry {
-		color: var(--primary);
 	}
 	.empty {
 		padding: 32px;

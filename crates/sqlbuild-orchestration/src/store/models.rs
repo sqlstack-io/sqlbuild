@@ -81,6 +81,8 @@ pub(crate) struct ControlTransaction {
     pub(crate) now: DateTime<Utc>,
     pub(crate) changes: BTreeSet<Change>,
     pub(crate) notifications: Option<broadcast::Sender<ChangeMessage>>,
+    /// This process's turn to write a SQLite store, held until the transaction ends.
+    pub(crate) _writer: Option<tokio::sync::OwnedMutexGuard<()>>,
 }
 
 #[derive(Debug)]

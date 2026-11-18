@@ -1,8 +1,8 @@
 //! `sqb control sync` asks the location to read the warehouse; the location runs the sync itself.
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::text;
-use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::_helpers::command::decision::text;
+use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::person_login::main::request_warehouse_sync::request_warehouse_sync;
 
 pub(super) fn run_warehouse_sync(namespace: &Namespace) -> i32 {

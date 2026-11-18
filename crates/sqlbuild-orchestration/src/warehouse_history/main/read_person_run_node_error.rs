@@ -7,7 +7,7 @@ use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::models::{RunChange, RunChangeRequest, RunNodeFailure};
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter};

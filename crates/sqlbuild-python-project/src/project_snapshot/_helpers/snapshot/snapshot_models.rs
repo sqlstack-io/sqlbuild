@@ -17,9 +17,9 @@ use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::models::NativeCompiledModel;
 use crate::compiled_views::models::NativeProjectView;
 use crate::compiled_views::types::ModelInputRecord;
-use crate::project_snapshot::_helpers::snapshot::snapshot_project::{
-    dependency_keys, destination, insert_node,
-};
+use crate::project_snapshot::_helpers::snapshot::snapshot_project::dependency_keys;
+use crate::project_snapshot::_helpers::snapshot::snapshot_project::destination;
+use crate::project_snapshot::_helpers::snapshot::snapshot_project::insert_node;
 use sqlbuild_python_front::attachments::main::analysis_cursor_splices::analysis_cursor_splices;
 
 /// Each model's snapshot node, and the `columns` document of ranges kept out of node identity.

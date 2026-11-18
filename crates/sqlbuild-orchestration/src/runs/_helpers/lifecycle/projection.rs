@@ -63,6 +63,17 @@ pub(crate) async fn project_run_state(
         RunChange::NodeStarted { .. } | RunChange::NodeFinished { .. } => {
             return project_node(transaction, request, &state.node_counts_json).await;
         }
+        RunChange::AuditFailuresIgnored { count } => {
+            (transaction, _) = query(
+                transaction,
+                "UPDATE sqb_runs SET ignored_audit_failures=$1 WHERE run_id=$2",
+                vec![
+                    Parameter::Integer(i64::from(*count)),
+                    Parameter::Id(request.run_id),
+                ],
+            )
+            .await?;
+        }
         RunChange::Launched { .. } => {
             (transaction, _) = query(transaction,
                 "UPDATE sqb_runs SET status=CASE WHEN status='queued' THEN 'launched' ELSE status END, launched_at=COALESCE(launched_at,$1) WHERE run_id=$2",

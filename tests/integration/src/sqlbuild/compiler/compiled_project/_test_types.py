@@ -289,6 +289,17 @@ class PythonCheckJobRejectionTestCase:
 
 
 @dataclass(frozen=True)
+class SnapshotConcurrencyTestCase:
+    description: str
+    project_tables: str
+    local_files: dict[str, str]
+    job_settings: str
+    selected_target: str | None
+    expected_job: dict[str, object]
+    expected_group: dict[str, object]
+
+
+@dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
     schedule: str
@@ -309,6 +320,14 @@ class SnapshotDeclarationRejectionTestCase:
     fields: dict[str, str] = field(default_factory=dict)
     tables: str = ""
     copies: int = 1
+
+
+@dataclass(frozen=True)
+class SnapshotRetryTestCase:
+    description: str
+    tables: str
+    expected_on_failure: dict[str, int]
+    expected_warnings: tuple[str, ...]
 
 
 @dataclass(frozen=True)

@@ -6,14 +6,17 @@
 	import { app } from '$lib/state/app.svelte';
 	import GatedButton from './gated-button.svelte';
 
-	/** `compact` shows one line, e.g. "Warehouse ● connected 54s ago", with the message in the tooltip. */
-	type Props = { scope: Scope; connection: string; last: ConnectionTest | null; compact?: boolean; ontested?: () => void };
-	let { scope, connection, last, compact = false, ontested }: Props = $props();
+	/**
+	 * `compact` shows one line, e.g. "Warehouse ● connected 54s ago", with the message in the tooltip.
+	 * `showLast` false shows only a test run here, for a page that shows the last recorded check itself.
+	 */
+	type Props = { scope: Scope; connection: string; last: ConnectionTest | null; compact?: boolean; showLast?: boolean; ontested?: () => void };
+	let { scope, connection, last, compact = false, showLast = true, ontested }: Props = $props();
 
 	let testing = $state(false);
 	let result = $state<ConnectionTest | null>(null);
 	let failure = $state<string | null>(null);
-	const shown = $derived(result ?? last);
+	const shown = $derived(result ?? (showLast ? last : null));
 
 	async function test() {
 		testing = true;
@@ -29,7 +32,7 @@
 	}
 
 	function origin(t: ConnectionTest): string {
-		return t.trigger === 'publish' ? 'after the last deploy' : t.by ? `by ${t.by.name}` : 'manually';
+		return t.trigger === 'publish' ? 'on deploy' : t.trigger === 'startup' ? 'on startup' : t.by ? `by ${t.by.name}` : 'manual';
 	}
 </script>
 
@@ -54,7 +57,7 @@
 				<StatusLabel tone={testTone[shown.outcome]} label="{testLabel[shown.outcome]} {formatAgo(shown.at, app.now)} {origin(shown)}" />
 			</span>
 			<div class="message">{shown.message}</div>
-		{:else}
+		{:else if showLast}
 			<StatusLabel tone="var(--sb-text-faint)" label="Not tested yet" muted />
 		{/if}
 		{#if failure}<div class="message err">{failure}</div>{/if}

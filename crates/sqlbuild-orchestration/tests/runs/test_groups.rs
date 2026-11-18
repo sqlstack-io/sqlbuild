@@ -5,23 +5,26 @@ use std::num::NonZeroU32;
 
 use crate::credentials::models::AuditContext;
 use crate::runs::main::{
-    advance_groups::advance_groups, change_run::change_run, claim_next_run::claim_next_run,
-    list_runs::list_runs, request_job_run::request_job_run, run_execution::run_execution,
+    execution::advance_groups::advance_groups, execution::change_run::change_run,
+    execution::claim_next_run::claim_next_run, execution::run_execution::run_execution,
+    listings::list_runs::list_runs, requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
-use crate::runs::tests::claim_helpers::{slot_counts, succeed};
+use crate::runs::tests::claim_helpers::{slot_counts, succeed, succeed_ignoring_audit_failures};
 use crate::runs::tests::helpers::snapshot;
-use crate::runs::tests::test_types::{RunLifecycleTestCase, TransactionFault};
+use crate::runs::tests::test_types::{
+    GroupMemberSettingsTestCase, RunLifecycleTestCase, TransactionFault,
+};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -61,12 +64,12 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
             input.nodes.get_mut("orders").expect("orders").definition["deps"] =
                 json!(["customers"]);
             input.documents.insert("jobs".into(), json!({
-                "staging": {"description": "Stage customers", "selection": ["customers"], "concurrency_groups": ["warehouse"]},
-                "marts": {"description": "Build orders", "selection": ["orders"], "concurrency_groups": ["warehouse"]}
+                "staging": {"description": "Stage customers", "selection": ["customers"], "pools": {"warehouse": {"amount": 1, "limit": 100}}},
+                "marts": {"description": "Build orders", "selection": ["orders"], "pools": {"warehouse": {"amount": 1, "limit": 100}}}
             }));
             input.documents.insert("groups".into(), json!({"daily_orders": {
                 "description": "Stage then build orders", "selection": ["customers", "orders"],
-                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["staging"]}
+                "pools": {"warehouse": {"amount": 1, "limit": 100}}, "jobs": {"staging": [], "marts": ["staging"]}
             }}));
             let published = publish_snapshot(store, &input)
                 .await
@@ -340,12 +343,12 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
             };
             let mut input = snapshot(location);
             input.documents.insert("jobs".into(), json!({
-                "orders_job": {"description": "Build orders", "selection": ["orders"], "concurrency_groups": ["inventory_limit"]},
-                "inventory_job": {"description": "Build inventory", "selection": ["customers"], "concurrency_groups": ["orders_limit"]}
+                "orders_job": {"description": "Build orders", "selection": ["orders"], "pools": {"inventory_limit": {"amount": 1, "limit": 100}}},
+                "inventory_job": {"description": "Build inventory", "selection": ["customers"], "pools": {"orders_limit": {"amount": 1, "limit": 100}}}
             }));
             input.documents.insert("groups".into(), json!({
-                "orders_group": {"description": "Orders group", "selection": ["orders"], "concurrency_groups": ["orders_limit"], "jobs": {"orders_job": []}},
-                "inventory_group": {"description": "Inventory group", "selection": ["customers"], "concurrency_groups": ["inventory_limit"], "jobs": {"inventory_job": []}}
+                "orders_group": {"description": "Orders group", "selection": ["orders"], "pools": {"orders_limit": {"amount": 1, "limit": 100}}, "jobs": {"orders_job": []}},
+                "inventory_group": {"description": "Inventory group", "selection": ["customers"], "pools": {"inventory_limit": {"amount": 1, "limit": 100}}, "jobs": {"inventory_job": []}}
             }));
             publish_snapshot(store, &input)
                 .await
@@ -433,4 +436,154 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
         });
     }
     assert_eq!(completed.len(), 2, "both backends must run");
+}
+
+#[test]
+fn given_group_members_with_different_audit_settings_when_run_then_each_keeps_its_own_and_the_group_sums_ignored_failures()
+ {
+    let test_cases = [
+        GroupMemberSettingsTestCase {
+            description: "SQLite members keep their own settings",
+            backend: Backend::Sqlite,
+            members: [("staging", true, 2), ("marts", false, 0)],
+            expected_group_status: RunStatus::Success,
+            expected_group_ignored: 2,
+        },
+        GroupMemberSettingsTestCase {
+            description: "PostgreSQL members keep their own settings",
+            backend: Backend::Postgres,
+            members: [("staging", false, 0), ("marts", true, 3)],
+            expected_group_status: RunStatus::Success,
+            expected_group_ignored: 3,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let context = AuditContext {
+                actor: "test-operator".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let [
+                (first_job, first_ignores, _),
+                (second_job, second_ignores, _),
+            ] = test_case.members;
+            let mut input = snapshot(location);
+            input.documents.insert(
+                "jobs".into(),
+                json!({
+                    first_job: {"description": "Stage customers", "selection": ["customers"],
+                        "settings": {"ignore_audit_failures": first_ignores, "concurrency": 2}},
+                    second_job: {"description": "Build orders", "selection": ["orders"],
+                        "settings": {"ignore_audit_failures": second_ignores}}
+                }),
+            );
+            input.documents.insert(
+                "groups".into(),
+                json!({"daily_orders": {
+                    "description": "Both members at once", "selection": ["customers", "orders"],
+                    "jobs": {first_job: [], second_job: []}
+                }}),
+            );
+            publish_snapshot(store, &input)
+                .await
+                .expect("publish group");
+            let request = JobRunRequest {
+                run_id: Uuid::now_v7(),
+                location_id: location,
+                target: "development".into(),
+                job_key: "daily_orders".into(),
+                reason: "Build the group".into(),
+                priority: 1,
+                window: None,
+                full_refresh: true,
+                select: Vec::new(),
+                exclude: Vec::new(),
+            };
+            request_job_run(store, (&context, None), &request)
+                .await
+                .expect("request group");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::new();
+            let scope = (location, "development");
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("start virtual parent");
+            let mut settings = BTreeMap::new();
+            for _ in test_case.members {
+                let claim = claim_next_run(store, &lease, &limits, Some(scope))
+                    .await
+                    .expect("claim member")
+                    .expect("member ready");
+                let job = claim.request.job_key.clone().expect("member job");
+                let (_, _, ignored) = test_case
+                    .members
+                    .into_iter()
+                    .find(|(name, _, _)| *name == job)
+                    .expect("declared member");
+                settings.insert(job, claim.request.settings.clone());
+                succeed_ignoring_audit_failures(store, &claim, ignored).await;
+            }
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("finish parent");
+
+            assert_eq!(
+                settings,
+                BTreeMap::from([
+                    (
+                        first_job.to_owned(),
+                        BTreeMap::from([
+                            ("concurrency".to_owned(), json!(2)),
+                            ("full_refresh".to_owned(), json!(true)),
+                            ("ignore_audit_failures".to_owned(), json!(first_ignores)),
+                        ]),
+                    ),
+                    (
+                        second_job.to_owned(),
+                        BTreeMap::from([
+                            ("full_refresh".to_owned(), json!(true)),
+                            ("ignore_audit_failures".to_owned(), json!(second_ignores)),
+                        ]),
+                    ),
+                ]),
+                "{}: each member runs with its own settings and the group's full refresh",
+                test_case.description
+            );
+            let runs = list_runs(store, scope, 100).await.expect("runs");
+            let parent = runs
+                .iter()
+                .find(|run| run.run_id == request.run_id)
+                .expect("parent");
+            assert_eq!(
+                (
+                    parent.status,
+                    parent.ignored_audit_failures,
+                    parent
+                        .node_counts_json
+                        .contains_key("audit_failures_ignored"),
+                ),
+                (
+                    test_case.expected_group_status,
+                    test_case.expected_group_ignored,
+                    false,
+                ),
+                "{}: the group succeeds with its members' ignored failures summed",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
 }

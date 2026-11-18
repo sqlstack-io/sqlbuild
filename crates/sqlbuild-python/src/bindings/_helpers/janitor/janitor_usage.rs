@@ -11,7 +11,10 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_model_config::model_validation::main::fixed_duration_seconds::fixed_duration_seconds;
 
 use crate::bindings::_helpers::diff_report::support::cli_error;
-use crate::bindings::_helpers::janitor::janitor_keys::{Folded, Key, record, tuple};
+use crate::bindings::_helpers::janitor::janitor_keys::Folded;
+use crate::bindings::_helpers::janitor::janitor_keys::Key;
+use crate::bindings::_helpers::janitor::janitor_keys::record;
+use crate::bindings::_helpers::janitor::janitor_keys::tuple;
 use crate::bindings::_helpers::janitor::janitor_planning::completed;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;

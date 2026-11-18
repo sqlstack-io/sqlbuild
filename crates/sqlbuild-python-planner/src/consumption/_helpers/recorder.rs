@@ -3,6 +3,7 @@
 use crate::consumption::models::ChangedDecision;
 use crate::consumption::models::ConsumptionRecorder;
 use crate::consumption::models::Prepared;
+use sqlbuild_python_front::native_host::types::ConsumptionReads;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -165,9 +166,9 @@ pub(crate) fn prepare<'py>(
 }
 
 /// Recent executions the build reads, with older ones read back when deciding needs them.
-pub(crate) fn read_history(
+pub(crate) fn read_history<R: ConsumptionReads + ?Sized>(
     py: Python<'_>,
-    connection: &ConsumptionConnection,
+    connection: &R,
     (facts, policy): (&BuildFacts, Option<&ChangedPolicy>),
 ) -> (ConsumptionHistory, Vec<String>) {
     let mut warnings: Vec<String> = Vec::new();
@@ -225,9 +226,9 @@ fn needs_read_back(policy: &ChangedPolicy) -> bool {
 }
 
 /// `history` plus every older upstream execution its builds read, followed back until none is left.
-fn with_read_back(
+fn with_read_back<R: ConsumptionReads + ?Sized>(
     py: Python<'_>,
-    connection: &ConsumptionConnection,
+    connection: &R,
     history: ConsumptionHistory,
     nodes: &[NodeFacts],
 ) -> (ConsumptionHistory, Vec<String>) {
@@ -241,9 +242,9 @@ fn with_read_back(
 }
 
 /// The rows of these executions; a schema that cannot be read leaves its rebuilds counted.
-fn read_references(
+fn read_references<R: ConsumptionReads + ?Sized>(
     py: Python<'_>,
-    connection: &ConsumptionConnection,
+    connection: &R,
     references: &[(RelationKey, String)],
 ) -> (Vec<ConsumptionRow>, Vec<String>) {
     let mut by_location: BTreeMap<Location, Vec<&str>> = BTreeMap::new();

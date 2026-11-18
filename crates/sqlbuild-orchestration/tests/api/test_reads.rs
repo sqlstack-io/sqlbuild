@@ -5,7 +5,7 @@ use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
 use crate::scheduler::tests::contracts::ticks::helpers::{calendar_text, calendar_time};
-use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
+use crate::snapshots::main::reads::list_person_snapshots::list_person_snapshots;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Parameter, TransactionMode};
@@ -24,12 +24,12 @@ use crate::credentials::models::{
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
-use crate::runs::main::change_run::change_run;
-use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunOutcome};
 use crate::runs::tests::helpers::request_run;
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, evaluate_trigger};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::publish_recall;
 use crate::worker::main::connect_worker::connect_worker;
@@ -382,6 +382,12 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 json!({"order_support": {"description": "Answer order questions", "grants": [{"nodes": ["tag:orders"],
                     "permissions": ["view"], "resolved_nodes": {"tag:orders": ["orders"]}}]}}),
             );
+            let connection = json!({"adapter": "postgres", "account": null, "host": "db.example.com",
+                "user": "orders", "role": null, "warehouse": null, "database": "orders",
+                "auth_method": "password"});
+            extra
+                .documents
+                .insert("connection".into(), connection.clone());
             publish_snapshot(store, &extra)
                 .await
                 .expect("second publication");
@@ -404,6 +410,11 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 json!([{"change_kind": "removed", "subject_key": "products"},
                     {"change_kind": "added", "subject_key": "role:order_support"}]),
                 "only the subjects that changed; a role assigner sees the role's name"
+            );
+            assert_eq!(
+                [json!(history[0].connection), json!(history[1].connection)],
+                [connection.clone(), json!(null)],
+                "each publication carries the connection settings it was published with"
             );
             let viewer = create_principal(store, &audit, "orders-viewer")
                 .await
@@ -436,6 +447,21 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 json!([{"change_kind": "removed", "subject_key": "products"},
                     {"change_kind": "added", "subject_key": "role:"}]),
                 "a viewer sees that a role changed, not which"
+            );
+            assert_eq!(
+                json!(
+                    list_person_snapshots(
+                        store,
+                        (&audit, viewer),
+                        ((location_id, "development"), 1),
+                        DefaultRole::None,
+                    )
+                    .await
+                    .expect("viewer snapshots")[0]
+                        .connection
+                ),
+                connection,
+                "everyone who can view the location sees its connection settings"
             );
             let run = (location_id, "development", claim.request.run_id);
             let execution = format!("worker/{}/execution", claim.claim_id);

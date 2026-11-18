@@ -148,6 +148,7 @@ const R_TARGET_CONFIG: RecordSpec = RecordSpec {
         ),
         FieldSpec::new("concurrency", FieldDefault::None),
         FieldSpec::new("catalog_connection", FieldDefault::None),
+        FieldSpec::new("ignore_audit_failures", FieldDefault::None),
     ],
 };
 const R_TARGET_SETTINGS: RecordSpec = RecordSpec {
@@ -205,6 +206,7 @@ const R_LOCAL_TARGET_CONFIG: RecordSpec = RecordSpec {
         ),
         FieldSpec::new("concurrency", FieldDefault::None),
         FieldSpec::new("catalog_connection", FieldDefault::None),
+        FieldSpec::new("ignore_audit_failures", FieldDefault::None),
     ],
 };
 const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {
@@ -233,6 +235,7 @@ const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("delta_compile", FieldDefault::True),
         FieldSpec::new("allow_missing_secrets", FieldDefault::False),
         FieldSpec::new("allow_warehouse_round_trips", FieldDefault::False),
+        FieldSpec::new("ignore_audit_failures", FieldDefault::False),
     ],
 };
 const R_SCOPES_CONFIG: RecordSpec = RecordSpec {

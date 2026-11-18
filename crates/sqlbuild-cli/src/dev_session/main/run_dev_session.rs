@@ -3,7 +3,7 @@
 use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
-use sqlbuild_orchestration::runs::main::list_runs::list_runs;
+use sqlbuild_orchestration::runs::main::listings::list_runs::list_runs;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
 use tokio::io::{AsyncBufReadExt, BufReader};

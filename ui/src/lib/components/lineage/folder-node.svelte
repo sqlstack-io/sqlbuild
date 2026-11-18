@@ -1,33 +1,39 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import type { GroupCard } from '$lib/lineage/catalog-graph';
+	import CompactFace from '$lib/components/graph/compact-face.svelte';
 
-	let { data }: NodeProps = $props();
+	let { id, data }: NodeProps = $props();
 	const d = $derived(data as GroupCard);
+	// Zoomed out, the folder's colour is its worst state: any failure, then any stale node, then ok.
+	const tone = $derived(d.failed ? 'var(--sb-error)' : d.stale ? 'var(--sb-stale)' : d.ok ? 'var(--sb-success)' : 'var(--sb-text-faint)');
 </script>
 
-<!-- A collapsed folder; clicking it opens the folder into its nodes. -->
-<div class="group" class:dimmed={d.dimmed} title="Show the {d.count} nodes in {d.group}">
+<!-- A closed folder; clicking it opens the folder into a box around its folders and nodes. -->
+<div class="group" class:dimmed={d.dimmed} title="Open {d.group}: {plural(d.count, d.noun ?? 'node')}">
 	<Handle type="target" position={Position.Left} class="node-handle" />
 	<div class="head">
 		<FolderIcon size={14} strokeWidth={1.75} class="glyph" />
-		<span class="name">{d.group}</span>
+		<span class="name">{d.label ?? d.group}</span>
 		<span class="count">{d.count}</span>
-		<ChevronRightIcon size={13} class="glyph" />
+		<span class="hit" aria-hidden="true"><ChevronRightIcon size={13} class="glyph" /></span>
 	</div>
 	<div class="status">
 		{#if d.ok}<span><i style:background="var(--sb-success)"></i>{d.ok} ok</span>{/if}
 		{#if d.stale}<span><i style:background="var(--sb-stale)"></i>{d.stale} stale</span>{/if}
 		{#if d.failed}<span><i style:background="var(--sb-error)"></i>{d.failed} failed</span>{/if}
-		{#if !d.ok && !d.stale && !d.failed}<span class="faint">No builds</span>{/if}
+		{#if !d.ok && !d.stale && !d.failed}<span class="faint">{d.empty ?? 'No builds'}</span>{/if}
 	</div>
+	<CompactFace {id} title={d.label ?? d.group} {tone} kind="group" badge={d.count} />
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
 
 <style>
 	.group {
+		position: relative;
 		width: 236px;
 		border: 1px solid var(--node-border);
 		border-radius: 2px;
@@ -67,6 +73,22 @@
 	.count {
 		color: var(--sb-text-faint);
 		font-size: 11px;
+	}
+	/* The chevron's target: at least 28 px square on screen, however far the graph is zoomed out
+	   (--sb-unzoom, set by the graph). The whole card opens the folder too. */
+	.hit {
+		display: inline-grid;
+		width: 28px;
+		height: 28px;
+		flex: 0 0 28px;
+		margin-right: -8px;
+		place-items: center;
+		border-radius: 3px;
+		transform: scale(var(--sb-unzoom, 1));
+		transform-origin: center right;
+	}
+	.group:hover .hit {
+		background: var(--sb-hover);
 	}
 	.status {
 		display: flex;

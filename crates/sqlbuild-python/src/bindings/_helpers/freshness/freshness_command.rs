@@ -1,6 +1,8 @@
 //! `sqb freshness`: observe selected source freshness without writing state.
 
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
+use sqlbuild_python_planner::live_reads::models::LiveReads;
 use std::collections::BTreeSet;
 
 use pyo3::exceptions::PyValueError;
@@ -233,8 +235,8 @@ fn observe(
         let observed_at: Bound<'_, PyAny> = imported(py, "datetime", "datetime")?
             .call_method1("now", (imported(py, "datetime", "UTC")?,))?;
         let observer: Observer<'_> = Observer {
-            adapter: adapter.clone(),
-            connection: connection.clone(),
+            dialect: Dialect::of(adapter)?,
+            reads: LiveReads::new(adapter, &connection, None).handle(adapter.py())?,
             observed_at,
         };
         let state: PreviousState<'_> = PreviousState { by_identity };

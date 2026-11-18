@@ -23,6 +23,7 @@ Online: https://sqlbuild.com/docs/concepts/project-configuration/
 - Scenario
 - Git
 - Review
+- Pools
 - dbt
 - Skills
 - Project Python
@@ -186,6 +187,7 @@ A target is a named build context - the database and schema you build into, plus
 | `missing_migration_origin` | What a build does when a declared `migrate_from` origin does not exist in this target: `allow` (default), `require_confirmation`, or `deny`. See [Missing migration origins](models/migrations.md#missing-migration-origins) |
 | `warehouses` | Snowflake warehouse per command group, `build` and `query`. See [Command-group warehouses](adapters/snowflake.md#command-group-warehouses) |
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
+| `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
 
 ```toml
 [connections.warehouse]
@@ -256,7 +258,7 @@ still takes precedence for that invocation.
 
 Targets often run on very different warehouses. A target can set its own worker limit, so local
 and CI runs use many workers while production stays within what its warehouse runs without
-queuing:
+queuing. To limit runs rather than models, see [Concurrency](concurrency.md):
 
 ```toml
 [settings]
@@ -518,6 +520,7 @@ delta_compile = true
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](../cli/compile.md#compiling-after-an-edit). |
 | `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](python-nodes/providers.md#secrets). |
 | `allow_warehouse_round_trips` | `false` | Allow a loader to depend on a task or asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](python-nodes/overview.md#warehouse-round-trips). |
+| `ignore_audit_failures` | `false` | Let builds go on past failing audits: they still run and record `fail`, but promote, apply and build downstream as if they passed. A target, a job and `--ignore-audit-failures` / `--no-ignore-audit-failures` override it. See [Ignoring audit failures](audits.md#ignoring-audit-failures). |
 
 ### Unit test and scenario limits
 
@@ -640,7 +643,7 @@ keep_in_use = false
 | `archive_retention_days` | `14` | How many days an archive is kept before it is deleted. `0` deletes it in the same run. |
 | `delete_tracked_only` | `true` | Only clean relations that appear in fingerprint tracking |
 | `exclude_patterns` | `[]` | Glob patterns for relations to skip |
-| `direct_state_history_versions` | `20` | How many state-history rows to keep per identity in `_sqlbuild_fingerprints` and `_sqlbuild_source_freshness`, and how many builds of each model and seed to keep in `_sqlbuild_consumption` |
+| `direct_state_history_versions` | `20` | How many state-history rows to keep per identity in `_sqlbuild_fingerprints` and `_sqlbuild_source_freshness`, how many builds of each model and seed to keep in `_sqlbuild_consumption`, and how many results of each check to keep in `_sqlbuild_audit_results` |
 | `in_use_window` | `"7d"` | How far back the janitor looks for reads of each relation it would archive. A fixed duration such as `"7d"` or `"36h"`. See [Relations in use](../cli/janitor.md#relations-in-use) |
 | `keep_in_use` | `false` | Keep relations read within `in_use_window` instead of archiving them. `--keep-in-use` turns it on for one run. Stops with `C503` when usage can't be read in full |
 
@@ -724,6 +727,27 @@ critical_tags = ["critical"]
 | `schema_prefix` | `"review"` | Prefix of the schema each review creates and drops; the schema name is lowercase |
 | `critical_tags` | `["critical"]` | Model tags that make a model critical, in addition to `critical true` in its `MODEL` header |
 
+## Pools
+
+`[pools]` declares each pool with its limit, and `[targets.<name>.pools]` changes a limit for one
+target. Jobs and job groups take slots of a pool with `pools = { supplier_api = 1 }`.
+
+```toml
+[pools]
+supplier_api = 2
+
+[targets.dev.pools]
+supplier_api = 1
+```
+
+| Field | Value |
+|-------|-------|
+| `[pools]` | Each pool's limit, a whole number of slots from `1` to `10000` |
+| `[targets.<name>.pools]` | The target's limit for pools `[pools]` declares |
+
+When to use a pool, and how amounts, targets and server caps work, is on
+[Concurrency](concurrency.md#jobs-sharing-something-else-pools).
+
 ## dbt
 
 `[dbt]` points SQLBuild at an existing dbt project. See
@@ -772,7 +796,7 @@ Compilation rejects Python anywhere else with `D016`, so indirectly importable m
 an unofficial project structure.
 
 The project's `tests/` directory holds SQL tests and scenarios, and pytest tests of project Python
-under `tests/python/` and `tests/providers/`, which `sqb test` runs; see
+under `tests/python/`, `tests/providers/` and `tests/orchestration/`, which `sqb test` runs; see
 [Python tests](../cli/test.md#python-tests). Orchestrator code such as Dagster or Rivers definitions
 lives outside the SQLBuild project directory and points at it; see
 [Dagster](../integrations/dagster.md) and [Rivers](../integrations/rivers.md).

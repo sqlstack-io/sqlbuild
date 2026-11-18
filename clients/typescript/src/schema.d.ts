@@ -530,6 +530,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/mirrored-totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonMirroredTotals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/node-states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonNodeStates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/node-status": {
         parameters: {
             query?: never;
@@ -634,6 +666,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["readPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlanDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlanRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlanSummary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -778,6 +858,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["readPersonRunStatementSql"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["evaluateSelection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/selection/vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readSelectionVocabulary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1042,6 +1154,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/changed-build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_changed_build"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/changes": {
         parameters: {
             query?: never;
@@ -1084,6 +1212,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["preview_copy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/metadata/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How much state history a full read delivers; older servers answer 404 and the location reads it all. */
+        get: operations["read_metadata_retention"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1563,7 +1708,53 @@ export interface components {
         };
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
         ChangeNotice: {
+            /** @description `node_status` only: too many nodes changed, or the snapshot or changed build is new; refetch node states. */
+            full?: boolean | null;
+            /**
+             * Format: int64
+             * @description `node_status` only: the version this change applies to; refetch node states when it is not yours.
+             */
+            previous_version?: number | null;
+            /** @description `node_status` only: the nodes whose state changed, absent when `full` is set. */
+            states?: {
+                [key: string]: components["schemas"]["NodeState"];
+            } | null;
             topic: string;
+            /**
+             * Format: int64
+             * @description `node_status` only: the state version after this change.
+             */
+            version?: number | null;
+        };
+        /** @description The nodes the default `sqb build --changed` runs, as the location last planned it from the synced copy. */
+        ChangedBuild: {
+            /** @description Nodes that run for a change of their own, as `kind:name`. */
+            changed: string[];
+            /** @description Nodes that run only because an upstream they read runs. */
+            downstream: string[];
+            /** @description Why the location's plan failed, with both lists empty; absent when it planned. */
+            failing?: string | null;
+            /**
+             * Format: int64
+             * @description The publication generation it was planned for.
+             */
+            generation: number;
+            /**
+             * Format: date-time
+             * @description When the server received it.
+             */
+            reported_at: string;
+        };
+        /** @description A location's plan of the default `sqb build --changed`, fenced to its reader session and generation. */
+        ChangedBuildReport: {
+            changed: string[];
+            downstream: string[];
+            /** @description Why the plan failed, sent with empty lists; only newer servers accept it. */
+            failing?: string | null;
+            /** Format: int64 */
+            generation: number;
+            /** Format: uuid */
+            session_id: string;
         };
         /** @description One result's stored evidence rows; `view.evidence` reads them, audited. */
         CheckEvidence: {
@@ -1593,6 +1784,8 @@ export interface components {
             /** Format: int64 */
             evidence_count?: number | null;
             evidence_truncated?: string | null;
+            /** @description An error-severity failure its build let through instead of holding anything back. */
+            ignored?: boolean;
             invocation_id: string;
             measured_value?: string | null;
             /** Format: int64 */
@@ -1653,12 +1846,37 @@ export interface components {
             /** Format: uuid */
             snapshot_id?: string | null;
         };
+        /**
+         * @description The layer that set a run's concurrency.
+         * @enum {string}
+         */
+        ConcurrencySource: "job" | "target" | "local" | "project" | "default";
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
             record_key: string;
             rejected_sha256: string;
             table: components["schemas"]["Table"];
+        };
+        /**
+         * @description When a location checks its warehouse connection on its own.
+         * @enum {string}
+         */
+        ConnectionCheckTrigger: "startup" | "publish";
+        /** @description A target's connection settings as its location publishes them: names only, never a secret. */
+        ConnectionDetails: {
+            account?: string | null;
+            /** @description The adapter, such as `snowflake`, `postgres` or `duckdb`. */
+            adapter: string;
+            /** @description How the location signs in, by name only, such as `key_pair`, `password` or `oauth`. */
+            auth_method?: string | null;
+            /** @description The database the connection opens by default. */
+            database?: string | null;
+            /** @description The server host, or for a file database its path. */
+            host?: string | null;
+            role?: string | null;
+            user?: string | null;
+            warehouse?: string | null;
         };
         /** @description What the UI needs first: how people sign in, and what this person may see and do. */
         ControlBootstrap: {
@@ -1824,7 +2042,11 @@ export interface components {
         };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
-            concurrency_groups: string[];
+            /**
+             * Format: int64
+             * @description The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
+             */
+            concurrency?: number | null;
             /** @description Selected nodes whose failure stops a group. */
             critical_nodes: string[];
             /** @description The cursor type every selected cursor node shares; absent when none has a cursor or types differ. */
@@ -1832,6 +2054,8 @@ export interface components {
             declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
             exclude?: string | null;
+            /** @description The job's own `ignore_audit_failures` setting; absent uses the target's, then the project's. */
+            ignore_audit_failures?: boolean | null;
             job_key: string;
             kind: components["schemas"]["RunKind"];
             /** @description The groups this job belongs to. */
@@ -1841,6 +2065,9 @@ export interface components {
             on_failure?: null | components["schemas"]["OnFailure"];
             overlap: components["schemas"]["Overlap"];
             owner?: string | null;
+            /** @description Each pool the job takes, by pool name. */
+            pools: components["schemas"]["PoolUse"][];
+            resolved_concurrency?: null | components["schemas"]["ResolvedConcurrency"];
             select?: string | null;
             selection: string[];
             /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
@@ -1854,20 +2081,31 @@ export interface components {
         };
         JobMember: {
             job_key: string;
+            /** @description Node by node, why it waits for each of `waits_for`; a wait with none follows lineage through another member. */
+            reasons: components["schemas"]["WaitReason"][];
             /** @description Members this one waits for, from the lineage between their nodes. */
             waits_for: string[];
         };
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
-            concurrency_groups: string[];
+            /**
+             * Format: int64
+             * @description The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
+             */
+            concurrency?: number | null;
             declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
+            /** @description The job's own `ignore_audit_failures` setting; absent uses the target's, then the project's. */
+            ignore_audit_failures?: boolean | null;
             job_key: string;
             /** @description `job` or `group`; a group's selection is the union of its member jobs' selections. */
             kind: components["schemas"]["RunKind"];
             on_failure?: null | components["schemas"]["OnFailure"];
             overlap: components["schemas"]["Overlap"];
             owner?: string | null;
+            /** @description Each pool the job takes, by pool name. */
+            pools: components["schemas"]["PoolUse"][];
+            resolved_concurrency?: null | components["schemas"]["ResolvedConcurrency"];
             /** @description A job's selectors as written; absent for a group and for snapshots published before they were recorded. */
             select?: string | null;
             selection: string[];
@@ -1923,12 +2161,19 @@ export interface components {
             generation: number;
             /** @enum {string} */
             kind: "compile_failed";
+            rules?: null | components["schemas"]["LocationRuleFailure"];
         } | {
+            /**
+             * Format: int64
+             * @description How long the check took; absent from older locations.
+             */
+            elapsed_millis?: number | null;
             /** Format: int64 */
             generation: number;
             healthy: boolean;
             /** @enum {string} */
             kind: "connection";
+            trigger?: null | components["schemas"]["ConnectionCheckTrigger"];
         } | {
             /** Format: int64 */
             generation: number;
@@ -1936,6 +2181,12 @@ export interface components {
             kind: "provider_secrets";
             /** Format: int64 */
             missing: number;
+        } | {
+            /** Format: int64 */
+            generation: number;
+            jobs: components["schemas"]["PoolCapWarning"][];
+            /** @enum {string} */
+            kind: "pool_capped";
         } | {
             /** Format: int64 */
             elapsed_millis: number;
@@ -1947,6 +2198,18 @@ export interface components {
             /** @enum {string} */
             kind: "warehouse_sync";
             location: components["schemas"]["WarehouseStateLocation"];
+            /**
+             * Format: date-time
+             * @description On the report that completes or stops a sync, when the next safety sync is due unless a run ends first; absent otherwise, where no timed sync follows, and from older locations.
+             */
+            next_sync_at?: string | null;
+            /**
+             * Format: int64
+             * @description Rows, or statistics relations, the failed read asked for.
+             */
+            page_limit?: number | null;
+            progress?: null | components["schemas"]["WarehouseSyncProgress"];
+            read_failure?: null | components["schemas"]["WarehouseReadFailure"];
             /** Format: int64 */
             records_sent: number;
             table: components["schemas"]["WarehouseHistoryKind"];
@@ -1964,6 +2227,21 @@ export interface components {
             /** Format: uuid */
             session_id: string;
             target: string;
+        };
+        /** @description Configured rules that failed a location's load: how many findings, and the first of them. */
+        LocationRuleFailure: {
+            /** Format: int64 */
+            finding_count: number;
+            /** @description At most `MAX_REPORTED_RULE_FINDINGS`, in the rules' order. */
+            findings: components["schemas"]["LocationRuleFinding"][];
+        };
+        /** @description One rule finding as `sqb compile` prints it. */
+        LocationRuleFinding: {
+            code: string;
+            /** Format: int64 */
+            line?: number | null;
+            message: string;
+            path?: string | null;
         };
         /** @description Only named location operations cross this boundary, never arbitrary SQL or Python. */
         LocationWork: {
@@ -2003,6 +2281,10 @@ export interface components {
             kind: "sensor_evaluation";
             outcome: components["schemas"]["CustomSensorOutcome"];
         } | {
+            /** @description Model diff text the document left out to stay under its cap; stored apart, never read back here. */
+            diffs?: {
+                [key: string]: components["schemas"]["PlanModelDiff"];
+            };
             document: Record<string, never>;
             /** @enum {string} */
             kind: "plan";
@@ -2148,6 +2430,12 @@ export interface components {
             physical_generation_id: string;
             target_name: string;
         };
+        /** @description How many records the server holds for one mirrored state table of a target. */
+        MirroredTotal: {
+            /** Format: int64 */
+            records: number;
+            table: components["schemas"]["WarehouseHistoryKind"];
+        };
         MutationResponse: {
             applied: boolean;
         };
@@ -2200,6 +2488,24 @@ export interface components {
             raw_sql?: string | null;
             /** Format: uuid */
             snapshot_id: string;
+        };
+        /** @description The state fields of a `CatalogNodeRecord`, with the same meaning. */
+        NodeState: {
+            checks: components["schemas"]["CatalogNodeChecks"];
+            definition_changed: boolean;
+            last_build?: null | components["schemas"]["CatalogNodeBuild"];
+            last_outcome?: null | components["schemas"]["CatalogNodeOutcome"];
+        };
+        /** @description Every current node's state at one version; `snapshot_id` is null before the first publication. */
+        NodeStatesRecord: {
+            changed_build?: null | components["schemas"]["ChangedBuild"];
+            /** Format: uuid */
+            snapshot_id?: string | null;
+            states: {
+                [key: string]: components["schemas"]["NodeState"];
+            };
+            /** Format: int64 */
+            version: number;
         };
         NodeStatus: {
             build?: null | components["schemas"]["FingerprintObservation"];
@@ -2443,11 +2749,55 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description A planned model's diff text, from the plan document or, where the document left it out, apart from it. */
+        PlanDiffRead: components["schemas"]["PlanModelDiff"] & {
+            model: string;
+        };
+        /** @description One planned model's diff text, as `sqb plan` prints it. */
+        PlanModelDiff: {
+            config_diff?: string[] | null;
+            query_diff?: string[] | null;
+        };
         /** @description A person's build command to plan on the location; the server freezes it like an ad-hoc run. */
         PlanRequest: {
             command: string[];
             /** Format: uuid */
             request_id: string;
+        };
+        /** @description A page of a plan section with the `--changed` runs, warnings and cursor window starts of its models. */
+        PlanRows: {
+            cursor_window_starts: {
+                [key: string]: string;
+            };
+            /** @description Model rows carry `diff_stats` in place of their diff text, which `plans/{request_id}/diff` serves. */
+            rows: Record<string, never>[];
+            runs: Record<string, never>[];
+            /** @description Rows in the section, filter or not. */
+            section_total: number;
+            /** @description Rows matching the name filter; the section's size without one. */
+            total: number;
+            warnings: Record<string, never>[];
+        };
+        /** @description A plan request's state with its summary: changed models in full, large sections as counts to page. */
+        PlanSummaryRead: {
+            /** Format: date-time */
+            expires_at: string;
+            outcome?: null | components["schemas"]["LocationWorkOutcome"];
+            timings?: null | components["schemas"]["PlanTimings"];
+        };
+        /** @description One planning step and its wall time. */
+        PlanTimingStep: {
+            name: string;
+            /** Format: double */
+            seconds: number;
+        };
+        /** @description How long one plan took: its steps in pipeline order with `Other` last, and what it read. */
+        PlanTimings: {
+            /** @description `synced_state` for a preview over the synced warehouse state; `live` when it read the warehouse. */
+            planned_from: string;
+            steps: components["schemas"]["PlanTimingStep"][];
+            /** Format: double */
+            total_seconds: number;
         };
         PlatformEvent: {
             /** @enum {string} */
@@ -2525,6 +2875,52 @@ export interface components {
              */
             scheduler_lease_expires_at?: string | null;
         };
+        /** @description A job or group asking for more of a pool than this server's cap, so it runs alone in that pool. */
+        PoolCapWarning: {
+            /** Format: int32 */
+            amount: number;
+            /** Format: int32 */
+            cap: number;
+            job_key: string;
+            kind: components["schemas"]["RunKind"];
+            /** @description Such as "job X takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs alone in that pool". */
+            message: string;
+            pool: string;
+        };
+        /** @description How many slots of a pool a job takes, and the pool's limit on the job's target. */
+        PoolSlots: {
+            /** Format: int32 */
+            amount: number;
+            /** Format: int32 */
+            limit: number;
+        };
+        /** @description A pool a job takes: its slots, the pool's limit, and the other jobs and groups taking it. */
+        PoolUse: {
+            /**
+             * Format: int32
+             * @description The slots the job asks for.
+             */
+            amount: number;
+            /**
+             * Format: int32
+             * @description This server's `pool_caps` entry for the location and target; absent when it sets none.
+             */
+            cap?: number | null;
+            /** @description The job asks for more slots than `server_limit`, so on this server it takes the whole pool. */
+            clamped: boolean;
+            /**
+             * Format: int32
+             * @description The project's limit on the target.
+             */
+            limit: number;
+            pool: string;
+            /**
+             * Format: int32
+             * @description The limit on this server: the project's limit, lowered to the cap.
+             */
+            server_limit: number;
+            shared_with: string[];
+        };
         /** @description What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly. */
         PreviewCopy: {
             /** @description Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it. */
@@ -2535,6 +2931,10 @@ export interface components {
             relations: components["schemas"]["WarehouseCatalogRecord"][];
             /** Format: date-time */
             synced_at?: string | null;
+            /** @description Set when the mirror is still at the read's known version: the records are left out. */
+            unchanged?: boolean;
+            /** @description The mirror version these records were read at; sent only to a versioned read. */
+            version?: string | null;
         };
         /** @description A location asks for the mirrored copy a plan preview plans from, as its fenced reader. */
         PreviewCopyRead: {
@@ -2542,8 +2942,12 @@ export interface components {
             consumption?: boolean;
             /** Format: int64 */
             generation: number;
+            /** @description The mirror version of the copy the location holds; an unchanged mirror returns no records. */
+            known_version?: string | null;
             /** Format: uuid */
             session_id: string;
+            /** @description Whether the location holds copies by mirror version; sent only when set, as older servers reject it. */
+            versioned?: boolean;
         };
         /** @description The newest successful build of a node, which a `cursor_max` observation must come from. */
         PreviewLatestRun: {
@@ -2564,6 +2968,10 @@ export interface components {
             class: string;
             /** @description The class docstring. */
             description: string;
+            /** @description Each of those jobs with the provider's nodes it selects, in node order. */
+            job_nodes?: {
+                [key: string]: string[];
+            };
             /** @description Jobs whose selection includes one of those nodes. */
             jobs?: string[];
             name: string;
@@ -2604,6 +3012,7 @@ export interface components {
         PublishedSnapshot: {
             /** @description Added, changed and removed nodes and roles, in publication order. */
             changes: components["schemas"]["PublishedChange"][];
+            connection?: null | components["schemas"]["ConnectionDetails"];
             /** @description Digest of the lock file, Python and `sqb` versions; a change means dependencies changed. */
             environment_hash: string;
             /** Format: int64 */
@@ -2624,6 +3033,11 @@ export interface components {
             /** Format: uuid */
             run_id: string;
         } | {
+            /**
+             * Format: int32
+             * @description The upstream job's attempt when the group is retrying it; absent for its first attempt.
+             */
+            attempt?: number | null;
             job_key: string;
             /** @enum {string} */
             kind: "upstream_job";
@@ -2643,16 +3057,14 @@ export interface components {
             /** Format: uuid */
             run_id?: string | null;
         } | {
-            /** Format: int32 */
-            elsewhere: number;
             holders: string[];
             /** @enum {string} */
-            kind: "concurrency_limit";
-            limit: string;
+            kind: "pool_full";
+            pool: string;
         } | {
             /** @enum {string} */
             kind: "earlier_run";
-            limit: string;
+            pool: string;
             /** Format: uuid */
             run_id?: string | null;
         } | {
@@ -2712,6 +3124,12 @@ export interface components {
             run_id: string;
             /** Format: uuid */
             source_run_id: string;
+        };
+        /** @description The models a run builds at once on its target, and the layer that set it. */
+        ResolvedConcurrency: {
+            /** Format: int64 */
+            limit: number;
+            source: components["schemas"]["ConcurrencySource"];
         };
         RoleAssignmentRequest: {
             /** Format: uuid */
@@ -2820,6 +3238,11 @@ export interface components {
             kind: "finished";
             outcome: components["schemas"]["RunOutcome"];
             reason: string;
+        } | {
+            /** Format: int32 */
+            count: number;
+            /** @enum {string} */
+            kind: "audit_failures_ignored";
         };
         RunChangeRequest: {
             change: components["schemas"]["RunChange"];
@@ -2848,7 +3271,7 @@ export interface components {
             occurred_at?: string | null;
         };
         /** @enum {string} */
-        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text. */
         RunEventRecord: {
             /** Format: int64 */
@@ -2860,6 +3283,8 @@ export interface components {
             event_id: string;
             event_type: string;
             invocation_id: string;
+            /** @description A summary the scheduler writes for a group run's member events, such as a member retry; never error or SQL text. */
+            message?: string | null;
             occurred_at: string;
             outcome?: string | null;
             producer?: string | null;
@@ -2921,7 +3346,7 @@ export interface components {
          * @description Terminal outcomes cannot be confused with a request to change an active status.
          * @enum {string}
          */
-        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Captured output and error text of a run's invocations; both can quote warehouse data. */
         RunOutput: {
             /** @description Invocation failures and error diagnostics, oldest first. */
@@ -2954,6 +3379,11 @@ export interface components {
             ended_at?: string | null;
             git_dirty?: boolean | null;
             git_revision?: string | null;
+            /**
+             * Format: int32
+             * @description Error-severity audit failures the run let through; a group sums its members'.
+             */
+            ignored_audit_failures?: number;
             /** @description The deployment image the run is pinned to, when its location publishes one. */
             image_id?: string | null;
             job_key?: string | null;
@@ -2964,6 +3394,11 @@ export interface components {
             launched_at?: string | null;
             /** Format: uuid */
             location_id: string;
+            /**
+             * Format: int32
+             * @description Which attempt of its member job a group child is, once the group retried it; absent for a first attempt and for every other run.
+             */
+            member_attempt?: number | null;
             narrowing?: null | components["schemas"]["RunNarrowing"];
             node_counts_json: {
                 [key: string]: number;
@@ -3012,16 +3447,24 @@ export interface components {
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {
             command?: components["schemas"]["RunCommand"];
-            concurrency_groups: string[];
             image_id?: string | null;
             job_key?: string | null;
             kind: components["schemas"]["RunKind"];
             /** Format: uuid */
             location_id: string;
+            /**
+             * Format: int32
+             * @description Which attempt of its member job a group child is, from the second on; the first leaves it unset.
+             */
+            member_attempt?: number | null;
             narrowing?: null | components["schemas"]["RunNarrowing"];
             origin: components["schemas"]["RunOrigin"];
             /** Format: uuid */
             parent_run_id?: string | null;
+            /** @description Each pool the run takes, its amount and the pool's limit frozen with it; the server's cap may lower the limit. */
+            pools?: {
+                [key: string]: components["schemas"]["PoolSlots"];
+            };
             /** Format: int64 */
             priority: number;
             requested_by: string;
@@ -3046,7 +3489,7 @@ export interface components {
             window?: null | components["schemas"]["RunWindow"];
             write_set: string[];
         };
-        /** @description Which retry of the job's `on_failure` policy a run is, and when it may start. */
+        /** @description Which retry of the job's `[retry]` policy a run is, and when it may start. */
         RunRetry: {
             /** Format: int32 */
             attempt: number;
@@ -3084,7 +3527,7 @@ export interface components {
             statement_id: string;
         };
         /** @enum {string} */
-        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Inclusive typed CLI cursor bounds; the native planner derives exclusive execution ends. */
         RunWindow: {
             /** Format: date-time */
@@ -3132,6 +3575,87 @@ export interface components {
             scope_json: unknown;
             /** Format: int64 */
             storage_id: number;
+        };
+        /** @description The nodes `sqb build --select … --exclude …` selects in the current publication, or why it refuses the selectors. */
+        SelectionEvaluation: {
+            /**
+             * Format: int64
+             * @description Every selected node, across all pages.
+             */
+            count: number;
+            error?: null | components["schemas"]["SelectionProblem"];
+            /** @description One page of the selected `kind:name` keys, sorted. */
+            keys: string[];
+            /**
+             * Format: int32
+             * @description The offset of the next page, when there is one.
+             */
+            next_offset?: number | null;
+            /**
+             * Format: uuid
+             * @description The publication evaluated; `None` before the first one.
+             */
+            snapshot_id?: string | null;
+        };
+        /** @enum {string} */
+        SelectionField: "select" | "exclude";
+        /** @description One selector token in the request's `select` or `exclude` text. */
+        SelectionLocation: {
+            /** Format: int32 */
+            end: number;
+            field: components["schemas"]["SelectionField"];
+            /**
+             * Format: int32
+             * @description Where the token starts and ends in its field, in UTF-16 code units, as JavaScript indexes strings.
+             */
+            start: number;
+            token: string;
+        };
+        /** @description Why `sqb` refuses a selection, where, and what might have been meant. */
+        SelectionProblem: {
+            /** @description The selector error code, such as `S007`; `None` when the selection as a whole is refused. */
+            code?: string | null;
+            /** @description `sqb`'s own help line, such as "did you mean 'orders'?". */
+            help?: string | null;
+            location?: null | components["schemas"]["SelectionLocation"];
+            message: string;
+            refused?: null | components["schemas"]["SelectionRefusal"];
+            /** @description Replacements for that whole token, closest first. */
+            suggestions: string[];
+        };
+        /** @description One refused comma part: its exact text and position in the token, its selector type and value. */
+        SelectionRefusal: {
+            /**
+             * Format: int32
+             * @description Which comma part of the token it is, from 0.
+             */
+            index: number;
+            /** @description The part as typed, such as `+tag:finanse`. */
+            part: string;
+            /** @description `tag`, `path`, `job`, `source`, `seed`, `kind`, `test`, `name`, `glob`, or a Python node type such as `task`. */
+            type: string;
+            /** @description The value the part names, without its type prefix or `+` markers, such as `finanse`. */
+            value: string;
+        };
+        /** @description The values each selector type takes in the current publication, with how many nodes each one selects. */
+        SelectionVocabulary: {
+            /** @description `job:` names: the nodes each job or job group selects. */
+            jobs: components["schemas"]["VocabularyEntry"][];
+            /** @description `kind:` values: the nodes of each kind. */
+            kinds: components["schemas"]["VocabularyEntry"][];
+            /** @description `path:` folders such as `models/staging`: the nodes below each, at any depth. */
+            paths: components["schemas"]["VocabularyEntry"][];
+            /** @description `seed:` names, one node each. */
+            seeds: components["schemas"]["VocabularyEntry"][];
+            /**
+             * Format: uuid
+             * @description The publication described; `None` before the first one.
+             */
+            snapshot_id?: string | null;
+            /** @description `source:` names, one node each. */
+            sources: components["schemas"]["VocabularyEntry"][];
+            /** @description `tag:` values: the SQL resources and Python nodes with each tag. */
+            tags: components["schemas"]["VocabularyEntry"][];
         };
         SensorCondition: {
             /** @enum {string} */
@@ -3202,6 +3726,11 @@ export interface components {
              * @description Publications kept per location target.
              */
             snapshots_kept: number;
+            /**
+             * Format: int64
+             * @description Builds of each node, and results of each check, the store mirrors from the warehouse.
+             */
+            state_history_versions: number;
             /** Format: int64 */
             statistics_days: number;
         };
@@ -3400,6 +3929,18 @@ export interface components {
         };
         /** @enum {string} */
         TriggerStatus: "running" | "paused";
+        /** @description One selector value and the number of nodes it selects. */
+        VocabularyEntry: {
+            /** Format: int64 */
+            count: number;
+            value: string;
+        };
+        /** @description One reason a member waits: `from_node` of `upstream_job` feeds its `to_node`, directly or through nodes no member selects. */
+        WaitReason: {
+            from_node: string;
+            to_node: string;
+            upstream_job: string;
+        };
         WarehouseCatalogColumn: {
             data_type: string;
             name: string;
@@ -3518,6 +4059,19 @@ export interface components {
             state_schema: string;
             value: string;
         };
+        /** @description What went wrong reading one page, without the warehouse's message, which may name hosts or users. */
+        WarehouseReadFailure: {
+            /** @enum {string} */
+            kind: "reader_start";
+        } | {
+            /** @enum {string} */
+            kind: "read_error";
+        } | {
+            /** @enum {string} */
+            kind: "timed_out";
+            /** Format: int64 */
+            seconds: number;
+        };
         /** @description One estimated query cost observation of a run, resource and warehouse; refreshes append. */
         WarehouseResourceCostRecord: {
             /** Format: int64 */
@@ -3554,6 +4108,11 @@ export interface components {
             warehouse_name: string;
             warehouse_size: string;
             warehouse_type?: string | null;
+        };
+        /** @description The newest versions per node or check a full read of state history needs to deliver. */
+        WarehouseRetention: {
+            /** Format: int32 */
+            state_history_versions: number;
         };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
@@ -3593,6 +4152,33 @@ export interface components {
          * @enum {string}
          */
         WarehouseSyncFailure: "watermark" | "read" | "delivery" | "busy";
+        /** @description How far one synchronization has got, so people see it running and when it completed. */
+        WarehouseSyncProgress: {
+            /** @description This report's page was the synchronization's last, so it has completed. */
+            completed: boolean;
+            /**
+             * Format: int64
+             * @description Milliseconds since the synchronization began.
+             */
+            elapsed_millis: number;
+            /** @description Failed reads in a row stopped the sync until a run, a request, a publication or `next_sync_at`. */
+            halted?: boolean;
+            /**
+             * Format: int64
+             * @description Kinds the synchronization reads: 14 for each state schema.
+             */
+            kinds: number;
+            /**
+             * Format: int64
+             * @description The reported kind's position in the synchronization, from 1.
+             */
+            position: number;
+            /**
+             * Format: int64
+             * @description Rows the synchronization has delivered, this report's included.
+             */
+            rows: number;
+        };
         WarehouseSyncResponse: {
             applied: boolean;
         };
@@ -4349,7 +4935,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description changed events: all, runs, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. */
+            /** @description changed events: all, runs, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. node_status carries version, previous_version and the changed states (empty when none changed), or full: refetch node states when full is set or previous_version is not the version held. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4959,6 +5545,82 @@ export interface operations {
             };
         };
     };
+    readPersonMirroredTotals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records the server mirrors of each state table of this target, in sync order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MirroredTotal"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonNodeStates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every current node's state at the state version node_status events continue from */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeStatesRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     readPersonNodeStatus: {
         parameters: {
             query: {
@@ -5009,7 +5671,10 @@ export interface operations {
     listPersonCatalogNodes: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description An ETag from an earlier response; 304 when the snapshot and state version are unchanged */
+                "If-None-Match"?: string | null;
+            };
             path: {
                 location_id: string;
                 target: string;
@@ -5021,11 +5686,21 @@ export interface operations {
             /** @description Every node of the current snapshot; empty before the first publication */
             200: {
                 headers: {
+                    /** @description "<snapshot_id>:<state_version>"; absent before the first publication */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogNodeRecord"][];
                 };
+            };
+            /** @description Unchanged since the If-None-Match ETag */
+            304: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session rejected */
             401: {
@@ -5238,6 +5913,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["LocationWorkRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPlanDiff: {
+        parameters: {
+            query: {
+                /** @description The planned model whose diff to read */
+                model: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDiffRead"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description No diff of that model, or no view.sql on every current node */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPlanRows: {
+        parameters: {
+            query: {
+                /** @description The section to page */
+                section: "full_refresh" | "query_changed" | "function_changed" | "config_changed" | "schema_changed" | "first_run" | "renamed" | "routine_models" | "migrations" | "column_migrations" | "table_type_conversions" | "retention" | "loader_reloads" | "loader_loads" | "source_reloads" | "source_loads" | "changed_functions" | "functions" | "seeds" | "python_nodes" | "held_back" | "unchanged" | "warnings";
+                /** @description Rows to skip; 0 by default */
+                offset?: number;
+                /** @description At most this many rows, capped at 1000 */
+                limit?: number;
+                /** @description Only rows whose name contains this, ignoring case */
+                name?: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["PlanRows"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPlanSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["PlanSummaryRead"];
                 };
             };
             /** @description Session rejected */
@@ -5678,6 +6486,98 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    evaluateSelection: {
+        parameters: {
+            query?: {
+                /** @description Space-separated selectors, as `sqb build -s` takes them; empty selects every node */
+                select?: string;
+                /** @description Space-separated selectors, as `--exclude` takes them */
+                exclude?: string;
+                /** @description Sorted keys to skip */
+                offset?: number;
+                /** @description Page size; defaults to 1,000, clamped to 1..10,000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The selected keys, or why `sqb` refuses the selectors */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SelectionEvaluation"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readSelectionVocabulary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SelectionVocabulary"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };
@@ -6409,6 +7309,62 @@ export interface operations {
             };
         };
     };
+    report_changed_build: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangedBuildReport"];
+            };
+        };
+        responses: {
+            /** @description Stored; it replaces the target's previous report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     subscribe: {
         parameters: {
             query?: never;
@@ -6421,7 +7377,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description changed events: all, runs, run:<id>, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. */
+            /** @description changed events: all, runs, run:<id>, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. node_status carries version, previous_version and the changed states (empty when none changed), or full: refetch node states when full is set or previous_version is not the version held. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6549,6 +7505,42 @@ export interface operations {
             };
             /** @description Reader generation fenced */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_metadata_retention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseRetention"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import { untrack } from 'svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -54,11 +57,10 @@
 
 {#if failed.length}
 	<section class="failures" aria-label="Failures">
-		<button class="head" onclick={() => (collapsed = !collapsed)} aria-expanded={!collapsed}>
-			<span class="caret">{collapsed ? '▸' : '▾'}</span>
-			<b>{failed.length} node{failed.length === 1 ? '' : 's'} failed</b>
+		<DisclosureButton tone="default" open={!collapsed} onclick={() => (collapsed = !collapsed)} class="w-full px-6 pt-2 pb-1">
+			<b>{plural(failed.length, 'node')} failed</b>
 			{#if skipped}<span class="faint">· {skipped} skipped because of {failed.length === 1 ? 'it' : 'them'}</span>{/if}
-		</button>
+		</DisclosureButton>
 		{#if !collapsed}
 			<ul>
 				{#each failed as n (`${n.runId}/${n.nodeKey}`)}
@@ -68,7 +70,7 @@
 					{@const detail = n.errorDetail ?? loaded?.message ?? null}
 					<li>
 						<div class="row">
-							{#if app.client.supports('listRunStatements')}<button class="node mono" onclick={() => view.focusNode(n.nodeKey, 'statements')} title="Show this node's queries below">{n.nodeKey}</button>{:else}<span class="node mono">{n.nodeKey}</span>{/if}
+							{#if app.client.supports('listRunStatements')}<Button variant="link" size="inline" class="font-mono font-medium text-(--sb-error)" onclick={() => view.focusNode(n.nodeKey, 'statements')} title="Show this node's queries below">{n.nodeKey}</Button>{:else}<span class="node mono">{n.nodeKey}</span>{/if}
 							{#if n.runId !== view.run?.id}<a class="faint" href={to(`/runs/${n.runId}`)}>in {n.jobKey ?? shortRunId(n.runId)}</a>{/if}
 							<span class="msg">{n.errorMessage ?? loaded?.message?.split('\n')[0] ?? (n.errorCode ? `Failed with ${n.errorCode}` : 'Failed')}</span>
 							{#if where}
@@ -76,7 +78,7 @@
 								<CopyButton value={where} label="Copy file" />
 							{/if}
 							{#if n.errorDetail || readable}
-								<button class="more" onclick={() => toggle(n)} aria-expanded={open.has(key)}>{open.has(key) ? 'Hide details' : 'Details'}</button>
+								<Button variant="link" size="inline" class="text-[12px]" onclick={() => toggle(n)} aria-expanded={open.has(key)}>{open.has(key) ? 'Hide details' : 'Details'}</Button>
 							{/if}
 						</div>
 						{#if open.has(key)}
@@ -106,21 +108,9 @@
 		background: color-mix(in srgb, var(--sb-error) 4%, var(--background));
 		font-size: 12.5px;
 	}
-	.head {
-		display: flex;
-		width: 100%;
-		align-items: center;
-		gap: 6px;
-		padding: 8px 24px 4px;
-		text-align: left;
-	}
-	.head b {
+	.failures :global(.disclosure b) {
 		color: var(--sb-error);
 		font-weight: 600;
-	}
-	.caret {
-		width: 12px;
-		color: var(--sb-text-faint);
 	}
 	ul {
 		display: flex;
@@ -147,9 +137,6 @@
 		color: var(--sb-error);
 		font-weight: 500;
 	}
-	.node:hover {
-		text-decoration: underline;
-	}
 	.msg {
 		overflow: hidden;
 		min-width: 0;
@@ -159,10 +146,6 @@
 	}
 	.loc {
 		color: var(--muted-foreground);
-	}
-	.more {
-		color: var(--primary);
-		font-size: 12px;
 	}
 	.faint {
 		color: var(--muted-foreground);

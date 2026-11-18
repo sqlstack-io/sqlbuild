@@ -3,8 +3,9 @@
 // nodes. The server resolves selectors and refuses flags; nothing here decides
 // whether a command may run. Pure: no side effects.
 
-import type { CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
+import type { ChangedBuild, CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
 import { flagSpec, VERBS, type FlagSpec } from './command-table';
+import { plural } from '$lib/format/plural';
 
 /** The command line read for the panel's own controls: verb tabs, flag hints and verb switching. */
 export type CommandParts = {
@@ -104,6 +105,37 @@ export function planHref(selection: string[] = [], verb: LaunchVerb = 'build', n
 
 /** The plan of `sqb build --changed`: what changed, what runs downstream of it, and what waits for its job. */
 export const CHANGED_PLAN_HREF = planHref([], 'build', { flags: { '--changed': true } });
+
+/**
+ * The counts the "Build N changed" button shows: the location's plan of `CHANGED_PLAN_HREF` when it
+ * names a change, else the nodes whose definitions changed, with the downstream count unknown, and
+ * why that plan is failing, if it is.
+ */
+export function changedBuildCounts(definitionChanged: number, build: ChangedBuild | null): { changed: number; downstream: number | null; failing: string | null } {
+	const failing = build?.failing ?? null;
+	return build?.changed.length && !failing ? { changed: build.changed.length, downstream: build.downstream.length, failing } : { changed: definitionChanged, downstream: null, failing };
+}
+
+/** The "Build N changed" button's main label, its lighter bracketed part (null without one), and its tooltip. */
+export type ChangedBuildLabel = { label: string; extra: string | null; tooltip: string };
+
+/**
+ * The label of the button that opens `CHANGED_PLAN_HREF`: `Build 30 changed (+65)` in a top bar,
+ * `Build 30 changed (+65 downstream)` in the overview banner. `downstream` is how many more nodes the
+ * plan runs beyond the changed ones; the brackets are left out at 0 and when it is unknown (null).
+ * While the location's plan is failing, the tooltip gives its reason instead.
+ */
+export function changedBuildLabel(changed: number, downstream: number | null, place: 'bar' | 'banner', failing: string | null = null): ChangedBuildLabel {
+	if (failing) return { label: `Build ${changed} changed`, extra: null, tooltip: `Plan failing: ${failing}` };
+	const nodes = changed === 1 ? '1 changed node' : `${changed} changed nodes`;
+	const reaches = changed === 1 ? 'it reaches' : 'they reach';
+	const reach = downstream === null ? ` and the downstream nodes ${reaches}` : downstream === 0 ? '' : ` and the ${plural(downstream, 'downstream node')} ${reaches}`;
+	return {
+		label: `Build ${changed} changed`,
+		extra: downstream ? (place === 'bar' ? ` (+${downstream})` : ` (+${downstream} downstream)`) : null,
+		tooltip: `Plan a build of the ${nodes}${reach}. You review the plan before anything runs.`
+	};
+}
 
 /** The review page for rerunning runs, opened before anything reruns; `nodes` only for one run's selected nodes. */
 export function rerunHref(runIds: string[], mode: RerunMode, nodes: string[] = []): string {

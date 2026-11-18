@@ -10,7 +10,7 @@ use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
 use crate::scheduler::tests::contracts::ticks::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;

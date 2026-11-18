@@ -1,15 +1,15 @@
 use crate::api::errors::ClientError;
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
-use crate::platform::main::connect_location_work::connect_location_work;
-use crate::platform::main::location_work::location_work;
-use crate::platform::main::report_location_health::report_location_health;
-use crate::platform::main::request_location_work::request_location_work;
+use crate::platform::main::health::report_location_health::report_location_health;
+use crate::platform::main::work::connect_location_work::connect_location_work;
+use crate::platform::main::work::location_work::location_work;
+use crate::platform::main::work::request_location_work::request_location_work;
 use crate::platform::models::{
     LocationHealth, LocationHealthReport, LocationWork, LocationWorkOutcome, LocationWorkPoll,
     LocationWorkRecord, LocationWorkRequest, LocationWorkResult,
 };
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use chrono::{Duration, Utc};
 use reqwest::StatusCode;

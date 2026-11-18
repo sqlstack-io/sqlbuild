@@ -10,24 +10,32 @@ use sqlbuild_orchestration::platform::models::{
     LocationWork, LocationWorkClient, LocationWorkOutcome, LocationWorkPoll, LocationWorkResult,
 };
 use sqlbuild_orchestration::store::errors::ControlError;
+use tokio::sync::mpsc;
 use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::argv::models::Stream;
-use crate::native_commands::_helpers::execution::check_location_connection;
-use crate::native_commands::_helpers::paths::location_files;
-use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::_helpers::command::paths::location_files;
+use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::check_location_connection;
+use crate::native_commands::_helpers::location::work::work_error;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
-use crate::native_commands::models::{LocationServe, LocationWatch};
+use crate::native_commands::models::{
+    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn,
+};
 
-/// Retry the exact completed result without rerunning it; `true` asks the metadata loop to sync.
+/// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
-    (options, script, connected): (&LocationServe, &Path, bool),
+    (options, script, (runtime, connected)): (
+        &LocationServe,
+        &Path,
+        (&mpsc::Sender<LocationRuntimeRequest>, bool),
+    ),
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(Vec<PathBuf>, bool)>, ControlError> {
+) -> Result<Option<LocationWorkTurn>, ControlError> {
     tokio::pin!(stopped);
     let claim = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
@@ -35,12 +43,12 @@ pub(super) async fn run_location_work(
             Ok(claim) => claim,
             Err(error) => {
                 work_error(&error)?;
-                return Ok(Some((Vec::new(), false)));
+                return Ok(Some(LocationWorkTurn::default()));
             },
         },
     };
     let Some(claim) = claim else {
-        return Ok(Some((Vec::new(), false)));
+        return Ok(Some(LocationWorkTurn::default()));
     };
     let deadline = Instant::now()
         + (claim.lease_expires_at - Utc::now())
@@ -60,7 +68,7 @@ pub(super) async fn run_location_work(
         };
         let copy = (client, poll.session_id, claim.generation);
         let checked = perform_work(
-            (options, script, connected),
+            (options, script, (runtime, connected)),
             claim.request.work,
             copy,
             expires,
@@ -71,7 +79,11 @@ pub(super) async fn run_location_work(
                 Stream::Stderr,
                 "Location work stopped before completion; no result reported.\n",
             )]));
-            return Ok((!shutting_down).then_some((files, false)));
+            return Ok((!shutting_down).then_some(LocationWorkTurn {
+                files,
+                sync: false,
+                claimed: true,
+            }));
         };
         files = local_files;
         let mut expected = watch.observed.clone();
@@ -106,7 +118,11 @@ pub(super) async fn run_location_work(
                     Stream::Stderr,
                     "Location work completed.\n",
                 )]));
-                return Ok(Some((files, sync)));
+                return Ok(Some(LocationWorkTurn {
+                    files,
+                    sync,
+                    claimed: true,
+                }));
             }
             Err(error) => {
                 work_error(&error)?;
@@ -124,12 +140,20 @@ pub(super) async fn run_location_work(
         Stream::Stderr,
         "Location work acknowledgement expired; check the server result before retrying.\n",
     )]));
-    Ok(Some((files, sync)))
+    Ok(Some(LocationWorkTurn {
+        files,
+        sync,
+        claimed: true,
+    }))
 }
 
 /// One named operation; `None` means it stopped at shutdown or its lease ended; `sqb dev` never signs in here.
 async fn perform_work(
-    (options, script, connected): (&LocationServe, &Path, bool),
+    (options, script, (runtime, connected)): (
+        &LocationServe,
+        &Path,
+        (&mpsc::Sender<LocationRuntimeRequest>, bool),
+    ),
     work: LocationWork,
     copy: (&LocationWorkClient, Uuid, i64),
     expires: impl Future<Output = Result<(), ControlError>>,
@@ -162,21 +186,8 @@ async fn perform_work(
             selection,
             settings,
             ..
-        } => plan_location((options, script), (&selection, &settings), copy, expires)
+        } => plan_location((options, runtime), (&selection, &settings), copy, expires)
             .await?
-            .map(|document| (LocationWorkOutcome::Plan { document }, Vec::new())),
+            .map(|(document, diffs)| (LocationWorkOutcome::Plan { document, diffs }, Vec::new())),
     })
-}
-
-fn work_error(error: &ClientError) -> Result<(), ControlError> {
-    if matches!(error, ClientError::Configuration(_))
-        || matches!(error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
-    {
-        return Err(ControlError::Invalid(error.to_string()));
-    }
-    drop(write_output(&[(
-        Stream::Stderr,
-        &format!("Location work request failed: {error}\n"),
-    )]));
-    Ok(())
 }

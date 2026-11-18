@@ -1,11 +1,11 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import SunIcon from '@lucide/svelte/icons/sun';
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import type { Snippet } from 'svelte';
 	import type { ConnectionState, PlatformEvent } from '$lib/api';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 	import { formatAgo } from '$lib/format/time';
-	import { targetWords } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import PlatformEventBanner from './shell/platform-event-banner.svelte';
 	import WarehouseSyncStatus from './shell/warehouse-sync-status.svelte';
@@ -34,7 +34,7 @@
 	};
 
 	const snapshot = $derived(app.snapshot);
-	const where = $derived(app.location ? `${app.location.name} · ${targetWords(app.location.target)}` : '—');
+	const where = $derived(app.location ? `${app.location.name} · ${app.location.target.name}` : '—');
 </script>
 
 <div class="app-topbar flex h-[52px] shrink-0 items-center gap-3 border-b border-border px-5">
@@ -53,7 +53,7 @@
 			<span class="connection"><span class="h-[7px] w-[7px] rounded-full" style:background={connectionTone[app.connection]}></span>{connectionLabel[app.connection]}</span>
 			{#if snapshot !== undefined}
 				<span class="text-[var(--sb-text-faint)]">·</span>
-				<span class="whitespace-nowrap">{snapshot ? `Version ${snapshot.generation}, deployed ${formatAgo(snapshot.publishedAt, app.now)}` : 'nothing deployed yet'}</span>
+				<span class="whitespace-nowrap">{snapshot ? `v${snapshot.generation} · ${formatAgo(snapshot.publishedAt, app.now)}` : 'Not deployed'}</span>
 			{/if}
 		</span>
 		{#if app.client.supports('getWarehouseSync')}
@@ -61,17 +61,9 @@
 			<WarehouseSyncStatus />
 		{/if}
 		{#if children}<span class="ml-1 flex items-center gap-2.5">{@render children()}</span>{/if}
-		<button
-			class="bg-card text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] grid h-8 w-8 place-items-center rounded-md border border-border"
-			aria-label="Toggle theme"
-			onclick={toggleTheme}
-		>
-			{#if theme.value === 'dark'}
-				<SunIcon size={14} />
-			{:else}
-				<MoonIcon size={14} />
-			{/if}
-		</button>
+		<Button size="icon-bar" class="text-muted-foreground hover:text-foreground" aria-label="Toggle theme" title="Toggle theme" onclick={toggleTheme}>
+			{#if theme.value === 'dark'}<SunIcon />{:else}<MoonIcon />{/if}
+		</Button>
 	</div>
 </div>
 <PlatformEventBanner only={events} />

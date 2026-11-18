@@ -17,9 +17,10 @@ use crate::credentials::models::{
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
-    advance_groups::advance_groups, change_run::change_run, list_person_runs::list_person_runs,
-    list_runs::list_runs, request_job_run::request_job_run, request_person_run::request_person_run,
-    request_rerun::request_rerun,
+    execution::advance_groups::advance_groups, execution::change_run::change_run,
+    listings::list_person_runs::list_person_runs, listings::list_runs::list_runs,
+    requests::request_job_run::request_job_run, requests::request_person_run::request_person_run,
+    requests::request_rerun::request_rerun,
 };
 use crate::runs::models::{
     CancelRunRequest, JobRunRequest, PersonRunRequest, RerunRequest, RunAuthority, RunChange,
@@ -29,7 +30,7 @@ use crate::runs::tests::helpers::{request_run, snapshot};
 use crate::runs::tests::test_types::{ExactKeyPlanner, PersonRunPermissionTestCase};
 use crate::runs::types::RunsListing;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};

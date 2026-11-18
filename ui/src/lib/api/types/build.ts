@@ -79,6 +79,34 @@ export type CatalogNode = {
 	checks: CheckCounts | null;
 };
 
+// ---- node states ----
+
+/** A node's build state, the part of a catalog node that changes between publications. */
+export type NodeState = {
+	lastBuild: NodeBuild | null;
+	lastOutcome: NodeOutcome | null;
+	/** The definition differs from the one the last build recorded. */
+	definitionChanged: boolean;
+	checks: CheckCounts | null;
+};
+
+/** Every node's state at one status version of a snapshot. */
+/**
+ * What `sqb build --changed` with default options runs, as the location planned it from the synced copy
+ * after its last publication or sync: nodes changed themselves, and nodes downstream of them, as keys.
+ * `failing` is why that plan failed, with both lists empty; a failed plan is never shown as a count.
+ */
+export type ChangedBuild = { generation: number; changed: string[]; downstream: string[]; failing: string | null };
+
+/** `changedBuild` is null until the location plans the current snapshot, and from an older server. */
+export type NodeStates = { snapshotId: string | null; version: number; states: Record<string, NodeState>; changedBuild: ChangedBuild | null };
+
+/**
+ * A `node_status` change: the states that changed between two versions, or `full` when too many
+ * changed to list, so the whole map is read again.
+ */
+export type NodeStatusDelta = { version: number; previousVersion: number; states: Record<string, NodeState>; full?: false } | { version: number; previousVersion: number; full: true };
+
 // ---- node detail ----
 
 export type ColumnDef = {
@@ -229,6 +257,8 @@ export type CheckEvaluation = {
 	measuredValue: number | null;
 	evidenceCount: number | null;
 	evidenceTruncated: boolean;
+	/** An error-severity failure its build let through (`ignore_audit_failures`) instead of stopping. */
+	ignored: boolean;
 };
 
 /** One audit or check with its latest result. */
@@ -369,6 +399,7 @@ export type Overview = {
 	attention: AttentionItem[];
 	/** Null when the server reports no per-group build state. */
 	groups: GroupStatus[] | null;
+	/** Newest first, up to the fourth deploy that changed something, with the deploys without changes between. */
 	recentChanges: SnapshotChange[];
 	latestRun: (Pick<Run, 'id' | 'endedAt'> & { status: RunStatus }) | null;
 };

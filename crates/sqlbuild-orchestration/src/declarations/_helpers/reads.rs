@@ -4,8 +4,12 @@ use uuid::Uuid;
 
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 
+use crate::declarations::_helpers::job_detail::{
+    Caps, DeclaredPools, ignores_audit_failures, pool_uses, run_concurrency,
+};
 use crate::declarations::models::{
-    JobRecord, PersonTriggerChange, StoredJob, TriggerChangeRequest, TriggerRecord,
+    JobRecord, PersonTriggerChange, PoolUse, ProviderRecord, StoredJob, TriggerChangeRequest,
+    TriggerRecord,
 };
 use crate::scheduler::models::TickRecord;
 use crate::store::errors::ControlError;
@@ -66,9 +70,11 @@ pub(crate) async fn trigger_changes_in(
     Ok((transaction, changes))
 }
 
+/// The target's current jobs and groups, each pool against this server's `caps`.
 pub(crate) async fn jobs_in(
     transaction: ControlTransaction,
     (location_id, target): (Uuid, &str),
+    caps: &Caps,
 ) -> Result<(ControlTransaction, Vec<JobRecord>), ControlError> {
     let (transaction, stored): (_, Vec<StoredJob>) = query_records(
         transaction,
@@ -77,14 +83,26 @@ pub(crate) async fn jobs_in(
         vec![Parameter::Id(location_id), Parameter::Text(target.into())],
     )
     .await?;
+    let declared: Vec<DeclaredPools<'_>> = stored
+        .iter()
+        .map(|job| (job.job_key.as_str(), &job.definition_json.pools))
+        .collect();
+    let pools: Vec<Vec<PoolUse>> = stored
+        .iter()
+        .map(|job| pool_uses((&job.job_key, &job.definition_json), &declared, caps))
+        .collect();
     let jobs: Vec<JobRecord> = stored
         .into_iter()
-        .map(|job| JobRecord {
+        .zip(pools)
+        .map(|(job, pools)| JobRecord {
+            concurrency: run_concurrency(&job.definition_json),
+            ignore_audit_failures: ignores_audit_failures(&job.definition_json),
+            resolved_concurrency: job.definition_json.resolved_concurrency,
             job_key: job.job_key,
             kind: job.kind,
             description: job.definition_json.description,
             selection: job.definition_json.selection,
-            concurrency_groups: job.definition_json.concurrency_groups,
+            pools,
             snapshot_id: job.snapshot_id,
             select: job.definition_json.select,
             declared_at: job.definition_json.declared_at,
@@ -107,4 +125,27 @@ pub(crate) async fn latest_ticks_in(
          ORDER BY x.scheduled_for DESC LIMIT 1) \
          WHERE t.location_id=$1 AND t.target=$2 AND t.removed_in_snapshot_id IS NULL",
         vec![Parameter::Id(location_id), Parameter::Text(target.into())]).await
+}
+
+/// `provider` with the current jobs that select any of its nodes, and the nodes each selects.
+pub(crate) fn with_provider_jobs(
+    mut provider: ProviderRecord,
+    jobs: &[JobRecord],
+) -> ProviderRecord {
+    provider.jobs.clear();
+    provider.job_nodes.clear();
+    for job in jobs {
+        let selected: std::collections::BTreeSet<&String> = job.selection.iter().collect();
+        let matched: Vec<String> = provider
+            .nodes
+            .iter()
+            .filter(|key| selected.contains(key))
+            .cloned()
+            .collect();
+        if !matched.is_empty() {
+            provider.jobs.push(job.job_key.clone());
+            provider.job_nodes.insert(job.job_key.clone(), matched);
+        }
+    }
+    provider
 }

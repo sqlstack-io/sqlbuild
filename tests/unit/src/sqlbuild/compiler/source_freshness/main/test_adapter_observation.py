@@ -7,11 +7,13 @@ import pytest
 
 from sqlbuild._native import (
     AdapterSourceFreshnessBatch,
+    Dialect,
     DirectSourceFreshnessPlanningResult,
     SourceFreshnessConfig,
     SourceFreshnessStrategy,
     SourceFreshnessUnknownReason,
     build_direct_source_freshness_planning_result,
+    live_reads,
     observe_adapter_sources_freshness,
 )
 from sqlbuild.adapter.contract.models import TableFreshnessMetadata
@@ -85,8 +87,8 @@ def test_given_batch_with_unobservable_table_when_observing_then_isolates_each_s
 
     with invocation_scope("freshness-invocation"), dispatcher_scope(dispatcher):
         batch: AdapterSourceFreshnessBatch = observe_adapter_sources_freshness(
-            adapter=adapter,
-            connection=object(),
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=object()),
             sources=physical_table_sources(
                 freshness=SourceFreshnessConfig(strategy=SourceFreshnessStrategy.ADAPTER)
             ),
@@ -132,8 +134,8 @@ def test_given_batch_with_absent_table_metadata_when_planning_then_records_other
     connection: Any = adapter.connect({"database": ":memory:"})
     try:
         result: DirectSourceFreshnessPlanningResult = build_direct_source_freshness_planning_result(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             sources=physical_table_sources(freshness=None),
             state_database=None,
             state_schemas=("state_schema",),

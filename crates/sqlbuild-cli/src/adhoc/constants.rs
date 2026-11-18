@@ -56,12 +56,13 @@ pub(crate) const INCLUDE_PYTHON_DEST: &str = "include_python";
 pub(crate) const SELECTOR_DESTS: [&str; 3] = ["select", "exclude", "positional_select"];
 
 /// Destinations an ad-hoc run may set; the control plane gates history rewrites and warehouses.
-pub(crate) const ALLOWED_DESTS: [&str; 31] = [
+pub(crate) const ALLOWED_DESTS: [&str; 32] = [
     "max_microbatches",
     "changed",
     "reach",
     "run_tests",
     "run_audits",
+    "ignore_audit_failures",
     "include_python",
     "fail_fast",
     "concurrency",
@@ -174,3 +175,19 @@ pub(crate) const REFUSED_DESTS: [(&str, &str, &str); 23] = [
     ("since", "--since", "it needs the worker's Git checkout"),
     ("explain", "--explain", "it needs the worker's Git checkout"),
 ];
+
+/// Replacements suggested for a selector value nothing matches: at most this many, at least this similar.
+pub(crate) const SUGGESTION_LIMIT: usize = 3;
+pub(crate) const SUGGESTION_CUTOFF: f64 = 0.6;
+
+/// The folder of a node at the project root, which no `path:` selector names.
+pub(crate) const PROJECT_FOLDER: &str = ".";
+
+/// `kind:function` selects both function kinds; the vocabulary lists it with their combined count.
+pub(crate) const FUNCTION_KIND_ALIAS: &str = "function";
+pub(crate) const FUNCTION_KINDS: [&str; 2] = ["udf", "table_fn"];
+
+/// The selector type of a bare name, and of a bare name with glob characters, as a refusal reports them.
+pub(crate) const NAME_SELECTOR: &str = "name";
+pub(crate) const GLOB_SELECTOR: &str = "glob";
+pub(crate) const GLOB_CHARACTERS: [char; 3] = ['*', '?', '['];

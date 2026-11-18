@@ -11,6 +11,8 @@ use sqlbuild_analysis::planner_fixtures::models::{
 };
 use sqlbuild_analysis::required_columns::models::ColumnRead;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use std::collections::{HashMap, HashSet};
 
 use crate::compiled_views::main::compiled_models::dep_rows::dep_rows;
@@ -32,9 +34,9 @@ pub(crate) fn required_fixture_columns(
     context: &RelationFixturePlanningContext,
     ordered_model_names: &[String],
     fixture_keys: &HashSet<FixtureKey>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<FixtureReadRequirements> {
-    let py = adapter.py();
+    let py = dialect.py();
     let mut schema: Vec<FixtureStarRelation> = Vec::new();
     let mut authoritative: HashMap<FixtureKey, HashSet<String>> = HashMap::new();
     for key in fixture_keys {
@@ -50,8 +52,9 @@ pub(crate) fn required_fixture_columns(
             authoritative.insert(key.clone(), names.iter().cloned().collect());
         }
     }
-    let dialect = adapter
-        .call_method0("expression_inference_profile")?
+    let analysis_dialect = dialect
+        .syntax("expression_inference_profile")?
+        .call0()?
         .getattr("sql_analysis_dialect")?
         .extract::<Option<String>>()?;
     let mut models: Vec<FixtureReadModel> = Vec::new();
@@ -81,10 +84,10 @@ pub(crate) fn required_fixture_columns(
             key: FixtureReadKey {
                 sql: query_sql(&model)?.extract()?,
                 references,
-                dialect: dialect.clone(),
+                dialect: analysis_dialect.clone(),
             },
             high_confidence: facts.reads.clone(),
-            stars: model_stars(&model, &schema, adapter)?,
+            stars: model_stars(&model, &schema, dialect)?,
         });
     }
     let owner = work_counts(py)?;
@@ -131,7 +134,7 @@ pub(crate) fn lineage_reads(model: &Bound<'_, PyAny>) -> PyResult<Vec<ColumnRead
 fn model_stars(
     model: &Bound<'_, PyAny>,
     schema: &[FixtureStarRelation],
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<Vec<(String, String)>> {
     if !star_flags(model)?.0 {
         return Ok(Vec::new());
@@ -157,8 +160,9 @@ fn model_stars(
     let inputs: Option<Vec<String>> = proven_inputs(model)?;
     let dialect: Option<String> =
         if inputs.is_none() && selected.iter().any(|relation| !relation.columns.is_empty()) {
-            adapter
-                .call_method0("expression_inference_profile")?
+            dialect
+                .syntax("expression_inference_profile")?
+                .call0()?
                 .getattr("sql_analysis_dialect")?
                 .extract()?
         } else {

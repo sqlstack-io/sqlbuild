@@ -165,15 +165,92 @@ pub(crate) struct AdhocCommandTestCase {
 /// The CLI's planner reduced to exact node keys, `--full-refresh`, `--no-load-sources` and `--warehouse NAME`.
 pub(crate) struct ExactKeyPlanner;
 
+/// Every test's publications share one cache; snapshot IDs and scopes are unique per test.
+static EXACT_KEY_PUBLICATIONS: crate::runs::models::PublicationCache =
+    crate::runs::models::PublicationCache::new();
+
 impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
-    fn plan(
+    fn prepare(
         &self,
-        command: &[String],
-        (resources, jobs): (
-            &[crate::runs::models::PlannerResource],
-            &crate::runs::types::PublishedJobs,
-        ),
-    ) -> Result<crate::runs::models::CommandPlan, String> {
+        resources: Vec<crate::runs::models::PlannerResource>,
+        jobs: crate::runs::types::PublishedJobs,
+    ) -> std::sync::Arc<dyn crate::runs::types::PreparedPublication> {
+        std::sync::Arc::new(ExactKeyPublication { resources, jobs })
+    }
+
+    fn publications(&self) -> &crate::runs::models::PublicationCache {
+        &EXACT_KEY_PUBLICATIONS
+    }
+}
+
+/// One publication as [`ExactKeyPlanner`] prepared it.
+#[derive(Debug)]
+pub(crate) struct ExactKeyPublication {
+    resources: Vec<crate::runs::models::PlannerResource>,
+    jobs: crate::runs::types::PublishedJobs,
+}
+
+impl crate::runs::types::PreparedPublication for ExactKeyPublication {
+    /// Exact keys only: each token names one published key, and an unknown one is refused with its position.
+    fn evaluate(
+        &self,
+        select: &str,
+        exclude: &str,
+    ) -> Result<Vec<String>, Box<crate::runs::models::SelectionProblem>> {
+        let known = |field: crate::runs::models::SelectionField, text: &str| {
+            let mut keys: std::collections::BTreeSet<String> = Default::default();
+            for token in text.split(' ').filter(|token| !token.is_empty()) {
+                if !self.resources.iter().any(|resource| resource.key == token) {
+                    let start = text.find(token).unwrap_or_default();
+                    return Err(Box::new(crate::runs::models::SelectionProblem {
+                        code: Some("S007".into()),
+                        message: format!("unknown selector name '{token}'"),
+                        help: None,
+                        location: Some(crate::runs::models::SelectionLocation {
+                            field,
+                            token: token.to_owned(),
+                            start: u32::try_from(start).unwrap_or_default(),
+                            end: u32::try_from(start + token.len()).unwrap_or_default(),
+                        }),
+                        suggestions: Vec::new(),
+                        refused: None,
+                    }));
+                }
+                keys.insert(token.to_owned());
+            }
+            Ok(keys)
+        };
+        let selected = known(crate::runs::models::SelectionField::Select, select)?;
+        let excluded = known(crate::runs::models::SelectionField::Exclude, exclude)?;
+        let selected = if select.trim().is_empty() {
+            self.resources
+                .iter()
+                .map(|resource| resource.key.clone())
+                .collect()
+        } else {
+            selected
+        };
+        Ok(selected.difference(&excluded).cloned().collect())
+    }
+
+    /// One entry per published kind.
+    fn vocabulary(&self) -> crate::runs::models::SelectionVocabulary {
+        let mut kinds: std::collections::BTreeMap<String, u64> = Default::default();
+        for resource in &self.resources {
+            let kind = resource.key.split_once(':').map_or("", |(kind, _)| kind);
+            *kinds.entry(kind.to_owned()).or_default() += 1;
+        }
+        crate::runs::models::SelectionVocabulary {
+            kinds: kinds
+                .into_iter()
+                .map(|(value, count)| crate::runs::models::VocabularyEntry { value, count })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn plan(&self, command: &[String]) -> Result<crate::runs::models::CommandPlan, String> {
+        let (resources, jobs) = (&self.resources, &self.jobs);
         let mut plan = crate::runs::models::CommandPlan {
             verb: command.first().cloned().unwrap_or_default(),
             selection: Default::default(),
@@ -307,4 +384,136 @@ pub(crate) struct RunLogRetentionTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_artifacts: i64,
     pub(crate) expected_runs: i64,
+}
+
+/// What a member of a group does once the job it depends on has failed.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum MemberReaction {
+    /// It runs, and the worker skips these nodes, each because of the failed node named.
+    Runs(Vec<(&'static str, &'static str)>),
+    /// The group ends it without running: its nodes are skipped because of the failed node.
+    Skipped,
+}
+
+pub(crate) struct GroupDependencyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The group's `dependency_failure` document: each member whose policy is not `partial`.
+    pub(crate) dependency_failure: serde_json::Value,
+    pub(crate) expected_marts: MemberReaction,
+    pub(crate) expected_inventory: MemberReaction,
+}
+
+pub(crate) struct GroupMemberRetryTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The failing member's `retry_delay_seconds`.
+    pub(crate) delay_seconds: u32,
+    /// The member events the group run's timeline shows, in order.
+    pub(crate) expected_messages: &'static [&'static str],
+}
+
+pub(crate) struct RoundTripGroupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each member's jobs it waits for, as publication freezes them.
+    pub(crate) expected_waits: serde_json::Value,
+    /// The order the group launches its members in.
+    pub(crate) expected_order: &'static [&'static str],
+}
+
+pub(crate) struct ProjectLimitTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) project_limit: u32,
+    pub(crate) server_cap: Option<u32>,
+    pub(crate) expected_running_per_location: usize,
+}
+
+pub(crate) struct WaitReasonTestCase {
+    pub(crate) description: &'static str,
+    /// Each node's upstream nodes.
+    pub(crate) deps: &'static [(&'static str, &'static [&'static str])],
+    pub(crate) jobs: serde_json::Value,
+    pub(crate) waits: serde_json::Value,
+    pub(crate) expected_reasons: serde_json::Value,
+}
+
+pub(crate) struct DeclarationCheckTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) jobs: serde_json::Value,
+    pub(crate) groups: serde_json::Value,
+    pub(crate) expected_error: &'static str,
+}
+
+/// Lookups of `(location and target, snapshot)` by small numbers, and which ones built their value.
+pub(crate) struct CacheLookupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) lookups: &'static [(u8, u8)],
+    pub(crate) expected_built: &'static [bool],
+}
+
+/// Two first lookups of one snapshot, the first still building when the second arrives.
+pub(crate) struct ConcurrentLookupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) first_value: u8,
+    pub(crate) second_value: u8,
+    /// The value each lookup got, how many builds ran and whether both share one value.
+    pub(crate) expected_outcome: (u8, u8, usize, bool),
+}
+
+/// A lookup whose build fails, then another of the same snapshot.
+pub(crate) struct FailedBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) failure: &'static str,
+    pub(crate) retried_value: u8,
+    /// The failed lookup's error and the retried lookup's value.
+    pub(crate) expected_outcome: (Option<&'static str>, Option<u8>),
+}
+
+/// A command checked before and after a publication adds the node it names.
+pub(crate) struct NewerPublicationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) command: &'static [&'static str],
+    pub(crate) added_node: &'static str,
+    pub(crate) expected_before_error: &'static str,
+    pub(crate) expected_after_selection: &'static [&'static str],
+}
+
+/// A selection's count, page of keys, next offset and refusal message.
+pub(crate) type ExpectedSelection = (
+    u64,
+    &'static [&'static str],
+    Option<u32>,
+    Option<&'static str>,
+);
+
+/// One person's selection request: the count, page, next offset and refusal message it returns, or the HTTP status refusing it.
+pub(crate) struct SelectionRequestTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) person: AdhocPerson,
+    pub(crate) select: &'static str,
+    pub(crate) exclude: &'static str,
+    pub(crate) limit: Option<u32>,
+    pub(crate) expected_outcome: Result<ExpectedSelection, u16>,
+}
+
+/// A queued run: its ID, priority and each pool it takes as `(pool, amount, limit)`.
+pub(crate) type PooledRun = (u128, i64, &'static [(&'static str, u32, u32)]);
+
+pub(crate) struct PoolAmountTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) runs: &'static [PooledRun],
+    pub(crate) caps: &'static [(&'static str, u32)],
+    pub(crate) expected_claimed: &'static [u128],
+    pub(crate) expected_slots: &'static [(&'static str, i64)],
+}
+
+pub(crate) struct GroupMemberSettingsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each member job's `ignore_audit_failures` setting and the audit failures its run ignores.
+    pub(crate) members: [(&'static str, bool, u32); 2],
+    pub(crate) expected_group_status: RunStatus,
+    pub(crate) expected_group_ignored: u32,
 }

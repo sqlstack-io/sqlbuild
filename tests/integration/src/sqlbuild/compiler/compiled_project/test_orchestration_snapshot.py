@@ -29,6 +29,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     PythonJobGroupTestCase,
     PythonJobSelectionTestCase,
     SnapshotCatalogTestCase,
+    SnapshotConcurrencyTestCase,
     SnapshotDeclarationRejectionTestCase,
     SnapshotDiscoveryRejectionTestCase,
     SnapshotDiscoveryTestCase,
@@ -39,6 +40,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotProcessReuseTestCase,
     SnapshotProvidersTestCase,
     SnapshotRejectionTestCase,
+    SnapshotRetryTestCase,
     SnapshotScheduleTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
@@ -886,6 +888,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         write_files(
             project_dir=tmp_path,
             files={
+                "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+                + "\n[pools]\norder_reporting = 3\n"
+                + "\n[targets.development.pools]\norder_reporting = 2\n",
                 "orchestration/jobs/nightly_orders_job.toml": (
                     'name = "nightly_orders_job"\n'
                     'description = "Refresh order reporting."\n'
@@ -894,7 +899,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                     'targets = ["development"]\n'
                     'owner = "Orders team"\n'
                     'overlap = "skip"\n'
-                    'concurrency_groups = ["order_reporting"]\n'
+                    "pools = { order_reporting = 2 }\n"
                     f"schedule = {schedule}\n"
                     "\n[on_failure]\nretries = 2\nretry_delay_seconds = 600\n"
                     '\n[settings]\nrun_tests = false\nvars = { batch = 3 }\nwarehouse = "reporting"\n'
@@ -929,7 +934,8 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                 "vars": {"batch": 3},
                 "warehouse": "reporting",
             },
-            "concurrency_groups": ["order_reporting"],
+            "pools": {"order_reporting": {"amount": 2, "limit": 2}},
+            "resolved_concurrency": {"limit": 4, "source": "job"},
             "select": "+orders",
             "exclude": "stg_orders",
             "targets": ["development"],
@@ -954,6 +960,160 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         "30 3 * * *"
     )
     assert second["nodes"] == first["nodes"]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotConcurrencyTestCase(
+            description="nothing set uses SQLBuild's default",
+            project_tables="",
+            local_files={},
+            job_settings="",
+            selected_target=None,
+            expected_job={"limit": 1, "source": "default"},
+            expected_group={"limit": 1, "source": "default"},
+        ),
+        SnapshotConcurrencyTestCase(
+            description="the project's setting",
+            project_tables="\n[settings]\nconcurrency = 3\n",
+            local_files={},
+            job_settings="",
+            selected_target=None,
+            expected_job={"limit": 3, "source": "project"},
+            expected_group={"limit": 3, "source": "project"},
+        ),
+        SnapshotConcurrencyTestCase(
+            description="the location's local setting over the project's",
+            project_tables="\n[settings]\nconcurrency = 3\n",
+            local_files={"sqlbuild_local.toml": "[settings]\nconcurrency = 5\n"},
+            job_settings="",
+            selected_target=None,
+            expected_job={"limit": 5, "source": "local"},
+            expected_group={"limit": 5, "source": "local"},
+        ),
+        SnapshotConcurrencyTestCase(
+            description="the target's concurrency over the settings",
+            project_tables='\n[settings]\nconcurrency = 3\n\n[targets.development]\nschema = "main"\nconcurrency = 6\n',
+            local_files={},
+            job_settings="",
+            selected_target="development",
+            expected_job={"limit": 6, "source": "target"},
+            expected_group={"limit": 6, "source": "target"},
+        ),
+        SnapshotConcurrencyTestCase(
+            description="the job's own setting over the target's; its group keeps the target's",
+            project_tables='\n[targets.development]\nschema = "main"\nconcurrency = 6\n',
+            local_files={},
+            job_settings="\n[settings]\nconcurrency = 2\n",
+            selected_target="development",
+            expected_job={"limit": 2, "source": "job"},
+            expected_group={"limit": 6, "source": "target"},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_concurrency_layers_when_publishing_then_each_job_and_group_carries_its_resolved_concurrency(
+    tmp_path: Path, test_case: SnapshotConcurrencyTestCase
+) -> None:
+    write_files(
+        project_dir=tmp_path,
+        files=TYPE_PROOF_FILES
+        | test_case.local_files
+        | {
+            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            + test_case.project_tables,
+            "orchestration/jobs/nightly_orders_job.toml": (
+                'name = "nightly_orders_job"\n'
+                'description = "Refresh order reporting."\n'
+                'select = "+orders"\n' + test_case.job_settings
+            ),
+            "orchestration/job_groups/nightly_job_group.toml": (
+                'name = "nightly_job_group"\n'
+                'description = "Everything nightly."\n'
+                'jobs = ["nightly_orders_job"]\n'
+            ),
+        },
+    )
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discovered,
+        adapter=DuckDbAdapter(),
+        selected_target=test_case.selected_target,
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+
+    documents: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=project,
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            discovered_inputs=discovered,
+        ).to_json()
+    )["documents"]
+
+    assert (
+        documents["jobs"]["nightly_orders_job"]["resolved_concurrency"],
+        documents["groups"]["nightly_job_group"]["resolved_concurrency"],
+    ) == (test_case.expected_job, test_case.expected_group)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotRetryTestCase(
+            description="current retry names",
+            tables="[retry]\nattempts = 3\ndelay_seconds = 900\n",
+            expected_on_failure={"retries": 2, "retry_delay_seconds": 900},
+            expected_warnings=(),
+        ),
+        SnapshotRetryTestCase(
+            description="deprecated on_failure names",
+            tables="[on_failure]\nretries = 2\nretry_delay_seconds = 600\n",
+            expected_on_failure={"retries": 2, "retry_delay_seconds": 600},
+            expected_warnings=(
+                "Warning: orchestration/jobs/daily_build_job.toml:6:1: "
+                "`[on_failure]` is deprecated; rename it to `[retry]`",
+                "Warning: orchestration/jobs/daily_build_job.toml:7:11: "
+                "`retries` is deprecated; rename it to `attempts`",
+                "Warning: orchestration/jobs/daily_build_job.toml:8:23: "
+                "`retry_delay_seconds` is deprecated; rename it to `delay_seconds`",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_job_retry_table_when_compiling_then_both_names_publish_one_policy_and_old_ones_warn(
+    tmp_path: Path, capfd: pytest.CaptureFixture[str], test_case: SnapshotRetryTestCase
+) -> None:
+    text: str = "".join(f"{key} = {value}\n" for key, value in _DAILY_BUILD.items())
+    write_files(
+        project_dir=tmp_path,
+        files=TYPE_PROOF_FILES
+        | {"orchestration/jobs/daily_build_job.toml": text + "\n" + test_case.tables},
+    )
+    capfd.readouterr()
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    warnings: list[str] = list(
+        filter(lambda line: line.startswith("Warning: "), capfd.readouterr().err.splitlines())
+    )
+    snapshot: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=build_compiled_project(
+                discovered_inputs=discovered,
+                adapter=DuckDbAdapter(),
+                resolved_connection={"database": "warehouse", "schema": "main"},
+            ),
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            discovered_inputs=discovered,
+        ).to_json()
+    )
+
+    assert snapshot["documents"]["jobs"]["daily_build_job"]["on_failure"] == (
+        test_case.expected_on_failure
+    )
+    assert tuple(warnings) == test_case.expected_warnings
 
 
 @pytest.mark.parametrize(
@@ -1172,6 +1332,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                 "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
                     "MODEL (", "MODEL (tags ['edge_case'],", 1
                 ),
+                "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+                + "\n[pools]\nedge_inventory_limit = 1\nedge_products_limit = 1\n",
             },
             expected_jobs=(
                 "edge_snapshot_inventory_job",
@@ -1286,6 +1448,46 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "job_key": "source_job_group",
                         "kinds": ["completed"],
                         "executed_successfully": ["model:orders"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 2},
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
+            description="a run_event on a group member can watch for the group skipping it",
+            files={
+                "orchestration/jobs/source_orders_job.toml": (
+                    'name = "source_orders_job"\ndescription = "Orders."\nselect = "orders"\n'
+                ),
+                "orchestration/jobs/inventory_job.toml": (
+                    'name = "inventory_job"\ndescription = "Inventory."\nselect = "stg_orders"\n'
+                ),
+                "orchestration/job_groups/source_job_group.toml": (
+                    'name = "source_job_group"\ndescription = "Source orders."\n'
+                    'jobs = ["source_orders_job"]\n'
+                ),
+                "orchestration/sensors/on_orders_sensor.py": (
+                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
+                    "on_orders = sensor(\n"
+                    "    'on_orders_sensor',\n"
+                    "    description='Build inventory when the group skips orders.',\n"
+                    "    when=run_event(job='source_orders_job', kinds=[RunEventKind.SKIPPED]),\n"
+                    "    run='inventory_job',\n"
+                    ")\n"
+                ),
+            },
+            expected_jobs=("inventory_job", "source_orders_job"),
+            expected_groups={"source_job_group": {"source_orders_job": []}},
+            expected_sensors={
+                "on_orders_sensor": {
+                    "description": "Build inventory when the group skips orders.",
+                    "job_key": "inventory_job",
+                    "when": {
+                        "kind": "run_event",
+                        "job_key": "source_orders_job",
+                        "kinds": ["skipped"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
@@ -1896,6 +2098,41 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             },
             expected_error=ValueError,
             expected_message="unknown variant",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a job using a pool the project does not declare",
+            files={
+                "orchestration/jobs/nightly_orders_job.toml": (
+                    'name = "nightly_orders_job"\n'
+                    'description = "Refresh order reporting."\n'
+                    'select = "orders"\n'
+                    "pools = { nightly_window = 1 }\n"
+                )
+            },
+            expected_error=ValueError,
+            expected_message=(
+                r"job 'nightly_orders_job' uses pool 'nightly_window', which "
+                r"\[pools\] in sqlbuild_project.toml does not declare"
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a job taking more of a pool than its limit on a target",
+            files={
+                "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+                + "\n[pools]\nsupplier_api = 3\n"
+                + "\n[targets.production.pools]\nsupplier_api = 1\n",
+                "orchestration/jobs/nightly_orders_job.toml": (
+                    'name = "nightly_orders_job"\n'
+                    'description = "Refresh order reporting."\n'
+                    'select = "orders"\n'
+                    "pools = { supplier_api = 2 }\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message=(
+                r"job 'nightly_orders_job' takes 2 slots of pool 'supplier_api', more than its "
+                r"limit of 1 on target 'production'"
+            ),
         ),
     ],
     ids=lambda case: case.description,

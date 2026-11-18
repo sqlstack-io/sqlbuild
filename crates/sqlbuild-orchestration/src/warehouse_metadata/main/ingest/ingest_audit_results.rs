@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::store::errors::ControlError;
 use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::events::ingest_events;
-use crate::warehouse_metadata::_helpers::ingestion::batch_records;
+use crate::warehouse_metadata::_helpers::ingestion::{batch_records, ignored_failure};
 use crate::warehouse_metadata::models::{
     MetadataBatch, StateEventImport, WarehouseAuditRecord, WarehouseStateLocation,
     WarehouseSyncResponse,
@@ -36,6 +36,10 @@ pub async fn ingest_audit_results(
                         ("audit_name", Parameter::Text(record.audit_name.clone())),
                         ("outcome", Parameter::Text(record.outcome.clone())),
                         ("binding_key", Parameter::Text(record.binding_key.clone())),
+                        (
+                            "ignored",
+                            Parameter::Boolean(ignored_failure(record.metadata_json.as_deref())),
+                        ),
                     ],
                     record_json: json!(record),
                 })

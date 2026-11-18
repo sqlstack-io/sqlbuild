@@ -13,6 +13,8 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -37,7 +39,7 @@ pub(crate) fn build_cli_scenario_plan<'py>(
             &[
                 "scenario",
                 "pipeline_result",
-                "adapter",
+                "dialect",
                 "project_name",
                 "source_lexical_syntax",
             ],
@@ -46,7 +48,7 @@ pub(crate) fn build_cli_scenario_plan<'py>(
     )?;
     let scenario = args.value("scenario")?;
     let project = native_field(&args.value("pipeline_result")?, "project")?;
-    let adapter = args.value("adapter")?;
+    let dialect = Dialect::passed(args.value("dialect")?)?;
     let (graph, warnings) = plan_scenario_graph(&scenario, &project, true, None)?;
     raise_for_warnings(warnings.as_any())?;
     let hashes = object(
@@ -101,7 +103,7 @@ pub(crate) fn build_cli_scenario_plan<'py>(
                 ("artifacts", PyTuple::new(py, identities)?.into_any()),
                 (
                     "identifier_limit",
-                    adapter.call_method0("maximum_identifier_length")?,
+                    dialect.syntax("maximum_identifier_length")?.call0()?,
                 ),
             ],
         )?),
@@ -111,7 +113,7 @@ pub(crate) fn build_cli_scenario_plan<'py>(
         project: project.clone(),
         graph_plan: graph.clone(),
         relation_map: map,
-        render_qualified_name: native_field(&adapter, "render_qualified_name")?,
+        render_qualified_name: dialect.syntax("render_qualified_name")?,
         database,
         schema,
     })?;
@@ -122,7 +124,7 @@ pub(crate) fn build_cli_scenario_plan<'py>(
             &[
                 ("scenario", scenario),
                 ("project", project),
-                ("adapter", adapter),
+                ("dialect", dialect.into_any()),
                 ("graph_plan", graph),
                 ("relation_plan", relations),
                 (

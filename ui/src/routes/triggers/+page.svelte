@@ -1,23 +1,30 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { openRow, to } from '$lib/paths';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import CalendarIcon from '@lucide/svelte/icons/calendar-days';
 	import RadioIcon from '@lucide/svelte/icons/radio';
 	import CodeIcon from '@lucide/svelte/icons/code';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import PinIcon from '@lucide/svelte/icons/pin';
 	import type { Trigger, TriggerKind, TriggerState } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import { app } from '$lib/state/app.svelte';
+	import { countBy } from '$lib/list/count-by';
+	import { matchesAny, toggleValue } from '$lib/list/choice';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
+	import SetInUiPin from './set-in-ui-pin.svelte';
+	import { setInUi, setInUiCount } from './utils';
 	import { shortRunId, tickOutcomeHelp, tickOutcomeText, tickOutcomeTone, triggerKindHelp, triggerKindLabel } from '$lib/operate/labels';
 
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks', 'runs']);
@@ -27,14 +34,19 @@
 
 	let query = $state('');
 	let type = $state<'all' | 'schedule' | 'sensor'>('all');
-	let kind = $state<TriggerKind | ''>('');
-	let stateFilter = $state<TriggerState | 'overridden' | ''>('');
+	let kind = $state<TriggerKind[]>([]);
+	let stateFilter = $state<(TriggerState | 'set_in_ui')[]>([]);
 	const all = $derived(triggers.data ?? []);
+	const byType = $derived(countBy(all, (t) => t.type));
+	const kindSet = $derived(new Set(kind));
+	const byKind = $derived(countBy(all, (t) => t.kind));
+	/** Any of the chosen states; "set in UI" matches a trigger whose state differs from its code. */
+	const matchesState = (t: Trigger) => !stateFilter.length || stateFilter.some((f) => (f === 'set_in_ui' ? setInUi(t) : t.state === f));
 	const filtered = $derived(
 		all.filter((t) => {
 			if (type !== 'all' && t.type !== type) return false;
-			if (kind && t.kind !== kind) return false;
-			if (stateFilter === 'overridden' ? t.state === t.defaultState : stateFilter && t.state !== stateFilter) return false;
+			if (!matchesAny(kindSet, t.kind)) return false;
+			if (!matchesState(t)) return false;
 			const q = query.trim().toLowerCase();
 			return !q || `${t.name} ${t.jobKey ?? ''} ${t.cadence} ${t.description}`.toLowerCase().includes(q);
 		})
@@ -83,19 +95,29 @@
 	}
 
 	const runningCount = $derived(all.filter((t) => t.state === 'running').length);
-	const overriddenCount = $derived(all.filter((t) => t.state !== t.defaultState).length);
+	const setInUiTotal = $derived(setInUiCount(all));
 
 	function nextDue(t: Trigger): string {
-		if (t.type === 'sensor') return t.state === 'paused' ? 'Paused' : 'When its condition is met';
-		if (t.state === 'paused') return 'Paused';
+		if (t.state === 'paused') return '—';
+		if (t.type === 'sensor') return 'On condition';
 		if (!t.nextDueAt) return '—';
 		if (Date.parse(t.nextDueAt) < app.now) return `Late: was due ${formatAgo(t.nextDueAt, app.now)}`;
 		return formatIn(t.nextDueAt, app.now);
 	}
+	const tableColumns = $derived<TableColumn[]>([
+		{ id: 'sel', label: '', width: '44px', title: canToggle ? undefined : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)" },
+		{ id: 'name', label: 'Name', minWidth: 220, truncate: false },
+		{ id: 'kind', label: 'Kind', width: '150px' },
+		{ id: 'runs', label: 'Runs', width: '18%' },
+		{ id: 'status', label: 'Status', width: '130px' },
+		{ id: 'next', label: 'Next run', width: '190px' },
+		{ id: 'tick', label: 'Last tick', width: '170px', title: 'What happened the last time it was due (its last tick)' },
+		{ id: 'last', label: 'Last run', width: '170px' }
+	]);
 </script>
 
 <AppTopbar title="Triggers">
-	<Button variant="outline" size="sm" onclick={() => triggers.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => triggers.refresh()} />
 </AppTopbar>
 
 <ListToolbar
@@ -104,9 +126,16 @@
 	placeholder="Search schedules, sensors and jobs"
 	total="{filtered.length} of {all.length} schedules and sensors"
 	counts={[
-		{ tone: 'var(--sb-success)', count: runningCount, label: 'on' },
-		{ tone: 'var(--sb-text-faint)', count: all.length - runningCount, label: 'paused' },
-		{ tone: 'var(--sb-warning)', count: overriddenCount, label: 'switched from what the code says' }
+		{ tone: 'var(--sb-success)', count: runningCount, label: 'on', reserve: true },
+		{ tone: 'var(--sb-text-faint)', count: all.length - runningCount, label: 'paused', reserve: true },
+		{
+			count: setInUiTotal,
+			label: 'set in UI',
+			reserve: true,
+			icon: PinIcon,
+			pressed: stateFilter.includes('set_in_ui'),
+			onclick: () => (stateFilter = toggleValue(stateFilter, 'set_in_ui'))
+		}
 	]}
 >
 	{#snippet filters()}
@@ -114,18 +143,19 @@
 			bind:value={type}
 			options={[
 				{ value: 'all', label: 'All' },
-				{ value: 'schedule', label: 'Schedules', count: all.filter((t) => t.type === 'schedule').length },
-				{ value: 'sensor', label: 'Sensors', count: all.filter((t) => t.type === 'sensor').length }
+				{ value: 'schedule', label: 'Schedules', count: byType.get('schedule') ?? 0 },
+				{ value: 'sensor', label: 'Sensors', count: byType.get('sensor') ?? 0 }
 			]}
 		/>
-		<ChoiceFilter label="Kind" bind:value={kind} options={(Object.keys(triggerKindLabel) as TriggerKind[]).map((k) => ({ value: k, label: triggerKindLabel[k], count: all.filter((t) => t.kind === k).length }))} />
+		<ChoiceFilter multiple label="Kind" bind:values={kind} options={(Object.keys(triggerKindLabel) as TriggerKind[]).map((k) => ({ value: k, label: triggerKindLabel[k], count: byKind.get(k) ?? 0 }))} />
 		<ChoiceFilter
+			multiple
 			label="Status"
-			bind:value={stateFilter}
+			bind:values={stateFilter}
 			options={[
 				{ value: 'running', label: 'On' },
 				{ value: 'paused', label: 'Paused' },
-				{ value: 'overridden', label: 'Switched from what the code says' }
+				{ value: 'set_in_ui', label: 'Set in UI' }
 			]}
 		/>
 	{/snippet}
@@ -133,32 +163,19 @@
 		{#if selected.size}
 			<span class="bulk">{selected.size} selected</span>
 			<input class="reason" bind:value={reason} placeholder="Why? (saved in the history)" aria-label="Reason" />
-			<button class="bulk-btn" disabled={!canToggle || busy} onclick={() => bulk('running')}>Turn on</button>
-			<button class="bulk-btn" disabled={!canToggle || busy} onclick={() => bulk('paused')}>Pause</button>
+			<Button disabled={!canToggle || busy} onclick={() => bulk('running')}>Turn on</Button>
+			<Button disabled={!canToggle || busy} onclick={() => bulk('paused')}>Pause</Button>
 		{/if}
 		{#if actionError}<span class="bulk error">{actionError}</span>{/if}
 	{/snippet}
 </ListToolbar>
 
-<div class="sb-list-wrap">
-	<table class="sb-list">
-		<thead>
-			<tr>
-				<th class="check-col" title={canToggle ? undefined : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
-					<input type="checkbox" checked={allSelected} onchange={toggleAll} class="sb-check" aria-label="Select all" disabled={!canToggle} />
-				</th>
-				<th>Name</th>
-				<th>Kind</th>
-				<th>Runs</th>
-				<th>Status</th>
-				<th>Next run</th>
-				<th title="What happened the last time it was due (its last tick)">Last time due</th>
-				<th>Last run</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each filtered as t (t.id)}
-				<tr class:sb-row-off={t.state === 'paused'} onclick={(e) => openRow(e, `/triggers/${t.id}`)}>
+<DataTable columns={tableColumns} rows={filtered} key={(t) => t.id} resource={triggers} empty={all.length ? 'Nothing matches the filter.' : 'No schedules or sensors yet.'}>
+	{#snippet head(c)}
+		{#if c.id === 'sel'}<input type="checkbox" checked={allSelected} onchange={toggleAll} class="sb-check" aria-label="Select all" disabled={!canToggle} />{/if}
+	{/snippet}
+	{#snippet row(t)}
+				<tr onclick={(e) => openRow(e, `/triggers/${t.id}`)}>
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<td class="check-col" onclick={(e) => e.stopPropagation()} title={canToggle ? undefined : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
@@ -192,31 +209,22 @@
 						</span>
 					</td>
 					<td>
-						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Runs its own code</span>{/if}
+						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Own code</span>{/if}
 					</td>
-					<td>
-						<span class:muted={t.state === 'paused'}>{t.state === 'running' ? 'On' : 'Paused'}</span>
-						{#if t.state !== t.defaultState}
-							<div class="cell-desc override" title="Someone switched it here; the code says {t.defaultState}">
-								code says {t.defaultState === 'running' ? 'on' : 'paused'} ·
-								{#if canToggle}
-									<button class="reset" onclick={(e) => (e.stopPropagation(), resetDefault(t))}>reset</button>
-								{:else}
-									<span title="You don't have permission to pause or turn on schedules and sensors (trigger.toggle)">reset</span>
-								{/if}
-							</div>
-						{:else}
-							<div class="cell-desc">as in the code</div>
-						{/if}
+					<td class="status-col">
+						<span class="status-cell">
+							<StatusLabel tone={t.state === 'running' ? 'var(--sb-success)' : 'var(--sb-text-faint)'} label={t.state === 'running' ? 'On' : 'Paused'} />
+							{#if setInUi(t)}<SetInUiPin trigger={t} canReset={canToggle} onreset={() => resetDefault(t)} />{/if}
+						</span>
 					</td>
-					<td class="muted" title={t.nextDueAt ? formatStamp(t.nextDueAt) : undefined}>{nextDue(t)}</td>
+					<td class="muted next-col" title={t.state === 'running' && t.nextDueAt ? formatStamp(t.nextDueAt) : undefined}>{nextDue(t)}</td>
 					<td class="muted" title={t.lastTick ? `${tickOutcomeHelp[t.lastTick.outcome]}${t.lastTick.reason ? `\n${t.lastTick.reason}` : ''}` : undefined}>
 						{#if t.lastTick}
-							<span class="tick" style:--c={tickOutcomeTone[t.lastTick.outcome]}>{tickOutcomeText[t.lastTick.outcome]}</span>
+							<StatusLabel muted tone={tickOutcomeTone[t.lastTick.outcome]} label={tickOutcomeText[t.lastTick.outcome]} />
 							{#if t.lastTick.coveredByRunId}into run <a class="link code" href={to(`/runs/${t.lastTick.coveredByRunId}`)}>{shortRunId(t.lastTick.coveredByRunId)}</a>{/if}
 							<div class="cell-desc">{formatAgo(t.lastTick.scheduledFor, app.now)}</div>
 						{:else}
-							{t.type === 'sensor' ? 'See its checks' : 'Not due yet'}
+							{t.type === 'sensor' ? '—' : 'Not due yet'}
 						{/if}
 					</td>
 					<td>
@@ -230,16 +238,23 @@
 						{/if}
 					</td>
 				</tr>
-			{:else}
-				<LoadRow colspan={8} resource={triggers} empty={all.length ? 'Nothing matches the filter.' : 'No schedules or sensors yet. Declare them in the project code and deploy.'} />
-			{/each}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+</DataTable>
 
 <style>
-	.check-col {
-		width: 44px;
+	/* Switching a trigger changes what these two cells say. Their widths fit every variant and they never
+	   wrap, so a switch can't resize the columns or change the row's height and move the page. */
+	.status-col {
+		white-space: nowrap;
+	}
+	/* A fixed height, so the pin coming and going never changes the row's height. */
+	.status-cell {
+		display: inline-flex;
+		height: 20px;
+		align-items: center;
+	}
+	.next-col {
+		white-space: nowrap;
 	}
 	.type-cell {
 		display: inline-flex;
@@ -253,30 +268,8 @@
 		align-items: center;
 		gap: 10px;
 	}
-	.override {
-		color: var(--sb-warning) !important;
-	}
-	.reset {
-		color: var(--primary);
-	}
-	.reset:hover {
-		text-decoration: underline;
-	}
 	.warn-icon {
 		color: var(--sb-warning);
-	}
-	.tick {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-	}
-	/* Only the dot carries the outcome's colour; a column of the usual outcome stays calm. */
-	.tick::before {
-		content: '';
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--c);
 	}
 	.bulk {
 		margin-left: 8px;
@@ -294,19 +287,5 @@
 		border-radius: 2px;
 		background: var(--background);
 		font-size: 12.5px;
-	}
-	.bulk-btn {
-		height: 28px;
-		padding: 0 10px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: transparent;
-		font-size: 12.5px;
-	}
-	.bulk-btn:hover:not(:disabled) {
-		background: var(--sb-hover);
-	}
-	.bulk-btn:disabled {
-		opacity: 0.5;
 	}
 </style>

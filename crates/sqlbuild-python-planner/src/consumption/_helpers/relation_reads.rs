@@ -4,12 +4,15 @@ use std::collections::{BTreeSet, HashMap};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_reference_calls;
+use sqlbuild_analysis::relation_names::main::extract_relation_names::extract_relation_names;
 use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 
+use sqlbuild_python_base::native_threads::main::pooled::pooled;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_front::native_host::main::optional_text::optional_text;
 use sqlbuild_python_project::analysis::main::extract_sql_relation_names::extract_sql_relation_names;
+use sqlbuild_python_project::analysis::main::prefetch_sql_relation_names::prefetch_sql_relation_names;
 use sqlbuild_python_project::analysis::types::RelationRow;
 
 /// Function calls, `__udf("name")(...)`, parsed as plain calls; their reads are declared inputs.
@@ -115,6 +118,30 @@ fn names((name, schema, database): &RelationRow, location: &RelationKey) -> bool
         })
 }
 
+/// `sql` with function calls as plain calls, as the read check parses it.
+fn plain_calls(sql: String) -> String {
+    FUNCTION_CALLS.iter().fold(sql, |sql, function| {
+        replace_reference_calls(&sql, function, |_| {
+            Ok::<_, std::convert::Infallible>(Some((*function).to_owned()))
+        })
+        .unwrap_or_else(|never| match never {})
+    })
+}
+
+/// Parse the relations each of `sqls` reads, in parallel, ahead of their read checks.
+pub(crate) fn prefetch_reads(
+    py: Python<'_>,
+    sqls: Vec<String>,
+    dialect: Option<&str>,
+) -> PyResult<()> {
+    prefetch_sql_relation_names(
+        py,
+        sqls.into_iter().map(plain_calls).collect(),
+        dialect,
+        |missing: &[String]| pooled(missing, |sql: &String| extract_relation_names(sql, dialect)),
+    )
+}
+
 /// True when `sql` cannot be parsed or names an ambiguous relation or one no input writes.
 pub(crate) fn sql_reads_undeclared(
     py: Python<'_>,
@@ -122,12 +149,7 @@ pub(crate) fn sql_reads_undeclared(
     (inputs, own): (&[InputFact], Option<&RelationKey>),
     (locations, dialect): (&Locations, Option<&str>),
 ) -> PyResult<bool> {
-    let sql: String = FUNCTION_CALLS.iter().fold(sql, |sql, function| {
-        replace_reference_calls(&sql, function, |_| {
-            Ok::<_, std::convert::Infallible>(Some((*function).to_owned()))
-        })
-        .unwrap_or_else(|never| match never {})
-    });
+    let sql: String = plain_calls(sql);
     let Some((relations, temporary)) = extract_sql_relation_names(py, &sql, dialect)? else {
         return Ok(true);
     };

@@ -8,7 +8,7 @@ use crate::platform::constants::RUN_FAILURE_NODE_LIMIT;
 use crate::platform::models::PlatformEvent;
 use crate::runs::_helpers::lifecycle::error_text::finished_error_message;
 use crate::runs::models::{RunChangeRequest, RunNodeFailure, RunOutcome};
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::query::query;

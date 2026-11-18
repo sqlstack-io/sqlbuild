@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -27,21 +28,14 @@
 
 <AppTopbar title="Check access" />
 
-<div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-8">
-	{#if !canCheckOthers}<p class="lede">You can check your own access; checking others needs “Give roles” or “See the audit log”.</p>{/if}
-	<div class="max-w-[1100px]">
+<PageBody padding="20px 24px 32px">
+	<div class="max-w-[1100px]" title={canCheckOthers ? undefined : 'Checking others needs “Give roles” or “See the audit log”'}>
 		<AccessChecker principals={canCheckOthers ? (accounts.data ?? []) : []} {initial} />
 	</div>
 	<p class="back"><a href={to(`/admin/people`)}>← People</a></p>
-</div>
+</PageBody>
 
 <style>
-	.lede {
-		max-width: 860px;
-		margin-bottom: 18px;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
 	.back {
 		margin-top: 24px;
 		font-size: 12.5px;

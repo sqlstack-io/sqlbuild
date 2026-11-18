@@ -2,8 +2,8 @@
 
 use std::collections::BTreeMap;
 
-use crate::runs::main::change_run::change_run;
-use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunClaim, RunRequest};
 use crate::scheduler::models::SchedulerLease;
 use crate::store::models::ControlStore;

@@ -10,7 +10,9 @@ use sqlbuild_analysis::planner_fixtures::main::{
 };
 
 use crate::planner_strategy::_helpers::fixtures::fixture_preparation::PreparedFixtures;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::{columns, diagnostic, label};
+use crate::planner_strategy::_helpers::fixtures::fixture_values::columns;
+use crate::planner_strategy::_helpers::fixtures::fixture_values::diagnostic;
+use crate::planner_strategy::_helpers::fixtures::fixture_values::label;
 use crate::planner_strategy::models::RelationFixturePlanningContext;
 use crate::planner_strategy::types::FixtureKey;
 

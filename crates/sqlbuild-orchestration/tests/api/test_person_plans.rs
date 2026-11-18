@@ -1,22 +1,31 @@
 //! A person's plan is frozen like an ad-hoc build, queued as location work and read only by them.
 
+use std::collections::BTreeMap;
+
 use serde_json::json;
+use sqlbuild_core::plan_display::main::detach_model_diffs::detach_model_diffs;
 use uuid::Uuid;
 
 use crate::api::tests::plans_helpers::{ask, person, plan_request, register_instance, run_rows};
-use crate::api::tests::test_types::PlanTestCase;
+use crate::api::tests::test_types::{PlanDiffTestCase, PlanTestCase};
+use crate::api::tests::work_helpers::execute;
 use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, BuiltinRole};
 use crate::credentials::tests::location_helpers::create_location;
-use crate::platform::main::claim_location_work::claim_location_work;
-use crate::platform::main::complete_location_work::complete_location_work;
-use crate::platform::main::read_person_plan::read_person_plan;
-use crate::platform::main::request_location_work::request_location_work;
+use crate::platform::_helpers::maintenance::retention::retain;
+use crate::platform::main::person_reads::read_person_plan::read_person_plan;
+use crate::platform::main::person_reads::read_person_plan_diff::read_person_plan_diff;
+use crate::platform::main::person_reads::read_person_plan_rows::read_person_plan_rows;
+use crate::platform::main::person_reads::read_person_plan_summary::read_person_plan_summary;
+use crate::platform::main::work::claim_location_work::claim_location_work;
+use crate::platform::main::work::complete_location_work::complete_location_work;
+use crate::platform::main::work::request_location_work::request_location_work;
 use crate::platform::models::{
-    LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult, PlanRequest,
+    LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult, PlanModelDiff,
+    PlanRequest, PlanRowSection, PlanRowsQuery, PlanTimingStep, PlanTimings,
 };
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -310,7 +319,10 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             let complete = |document: serde_json::Value| LocationWorkResult {
                 claim_id: claimed.claim_id,
                 session_id: poll.session_id,
-                outcome: LocationWorkOutcome::Plan { document },
+                outcome: LocationWorkOutcome::Plan {
+                    document,
+                    diffs: BTreeMap::new(),
+                },
             };
             for invalid in [
                 json!(["models"]),
@@ -326,9 +338,11 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 );
             }
             let document = json!({
-                "models": [{"name": "orders", "action": "create_table", "reason": "first_run", "query_diff": ["-SELECT 1", "+SELECT 2"], "config_diff": ["-a", "+b"]}],
+                "models": [{"name": "orders", "action": "create_table", "reason": "first_run", "query_diff": ["-SELECT 1", "+SELECT 2"], "config_diff": ["-a", "+b"]},
+                    {"name": "customers", "action": "create_view", "reason": "no_change", "config_diff": ["-a", "+b"]}],
                 "warnings": [{"severity": "warning", "message": "connect failed: db_password=orders-pass"}],
                 "python_nodes": [{"name": "orders_export", "identity_diff": {"source_diff": ["-a", "+b"]}}],
+                "timings": {"total_seconds": 1.5, "steps": [{"name": "Reading warehouse state", "seconds": 1.0}, {"name": "Other", "seconds": 0.5}], "planned_from": "synced_state"},
             });
             assert!(
                 complete_location_work(
@@ -357,7 +371,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 )
             };
             let record = read(viewer).await.expect("read").expect("own plan");
-            let Some(LocationWorkOutcome::Plan { document }) =
+            let Some(LocationWorkOutcome::Plan { document, .. }) =
                 record.result_json.map(|result| result.outcome)
             else {
                 panic!(
@@ -384,8 +398,97 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 "{description}: viewers lack view.sql",
                 description = test_case.description
             );
+            let plan = (location, "development", first.request_id);
+            let summary = read_person_plan_summary(store, (&context, viewer), plan)
+                .await
+                .expect("summary")
+                .expect("own plan");
+            assert_eq!(
+                summary.timings,
+                Some(PlanTimings {
+                    total_seconds: 1.5,
+                    steps: vec![
+                        PlanTimingStep {
+                            name: "Reading warehouse state".to_owned(),
+                            seconds: 1.0,
+                        },
+                        PlanTimingStep {
+                            name: "Other".to_owned(),
+                            seconds: 0.5,
+                        },
+                    ],
+                    planned_from: "synced_state".to_owned(),
+                }),
+                "{description}: typed plan timings",
+                description = test_case.description
+            );
+            let Some(LocationWorkOutcome::Plan {
+                document: summary, ..
+            }) = summary.outcome
+            else {
+                panic!(
+                    "{description}: plan summary",
+                    description = test_case.description
+                )
+            };
+            let rows = |reader: Uuid, offset: usize| {
+                read_person_plan_rows(
+                    store,
+                    (&context, reader),
+                    plan,
+                    PlanRowsQuery {
+                        section: PlanRowSection::RoutineModels,
+                        offset: Some(offset),
+                        limit: Some(1),
+                        name: None,
+                    },
+                )
+            };
+            let page = rows(viewer, 0).await.expect("rows").expect("planned");
+            assert_eq!(
+                (
+                    summary["models"].as_array().map(Vec::len),
+                    summary["models"][0].get("query_diff").is_none(),
+                    summary["built_model_names"].clone(),
+                    summary["pages"].clone(),
+                    page.total,
+                    page.rows.first().map(|row| row["name"].clone()),
+                    page.rows
+                        .first()
+                        .map(|row| row.get("config_diff").is_none()),
+                    rows(viewer, 1)
+                        .await
+                        .expect("rows")
+                        .map(|page| page.rows.len()),
+                ),
+                (
+                    Some(0),
+                    true,
+                    serde_json::Value::Null,
+                    json!({"first_run": 1, "routine_models": 1, "python_nodes": 1, "warnings": 1}),
+                    1,
+                    Some(json!("customers")),
+                    Some(true),
+                    Some(0),
+                ),
+                "{description}: the summary counts each section and carries no rows; pages leave diffs out",
+                description = test_case.description
+            );
             assert!(
-                read(developer).await.expect("read").is_none(),
+                read_person_plan_diff(store, (&context, viewer), (plan, "orders"))
+                    .await
+                    .expect("diff")
+                    .is_none(),
+                "{description}: no diff without view.sql",
+                description = test_case.description
+            );
+            assert!(
+                read(developer).await.expect("read").is_none()
+                    && read_person_plan_summary(store, (&context, developer), plan)
+                        .await
+                        .expect("summary")
+                        .is_none()
+                    && rows(developer, 0).await.expect("rows").is_none(),
                 "{description}: only the requester reads a plan",
                 description = test_case.description
             );
@@ -393,6 +496,208 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 matches!(read(outsider).await, Err(ControlError::Denied { .. })),
                 "{description}: view is required to read",
                 description = test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_and_each_diff_is_served_on_demand()
+ {
+    let test_cases = [
+        PlanDiffTestCase {
+            description: "SQLite",
+            backend: Backend::Sqlite,
+            expected_detached_diff: &["-select  id", "+select id"],
+        },
+        PlanDiffTestCase {
+            description: "PostgreSQL",
+            backend: Backend::Postgres,
+            expected_detached_diff: &["-select  id", "+select id"],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let context = AuditContext {
+                actor: "control-store-owner".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let admin = bootstrap_user(store, &context, "orders-admin")
+                .await
+                .expect("bootstrap");
+            let location = create_location(store, "orders", "test-owner")
+                .await
+                .expect("location");
+            publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("publish");
+            let poll = register_instance(store, location).await;
+            let request = plan_request(&["build", "orders", "customers"]);
+            ask(store, (&context, admin), location, &request)
+                .await
+                .expect("plan");
+            let claimed = claim_location_work(store, location, &poll)
+                .await
+                .expect("claim")
+                .expect("plan work");
+            let models: Vec<serde_json::Value> = (0..450)
+                .map(|index| {
+                    json!({"name": format!("orders_{index:03}"), "action": "create_table",
+                    "reason": "query_changed", "query_diff": ["-select  id", "+select id"]})
+                })
+                .chain([
+                    json!({"name": "customers", "action": "create_view", "reason": "config_changed",
+                    "config_diff": ["-a", "+b"]}),
+                ])
+                .collect();
+            let (detached_plan, detached) =
+                detach_model_diffs(json!({"models": models[..450].to_vec(), "warnings": []}));
+            let document = json!({
+                "models": detached_plan["models"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .chain([&models[450]])
+                    .collect::<Vec<_>>(),
+                "warnings": [],
+            });
+            let diffs: BTreeMap<String, PlanModelDiff> = detached
+                .into_iter()
+                .map(|(model, diff)| {
+                    (
+                        model,
+                        PlanModelDiff {
+                            query_diff: diff.query_diff,
+                            config_diff: diff.config_diff,
+                        },
+                    )
+                })
+                .collect();
+            let result = LocationWorkResult {
+                claim_id: claimed.claim_id,
+                session_id: poll.session_id,
+                outcome: LocationWorkOutcome::Plan { document, diffs },
+            };
+            assert!(
+                complete_location_work(store, (location, request.request_id), &result)
+                    .await
+                    .expect("complete"),
+                "{}: the plan and its detached diffs are stored",
+                test_case.description
+            );
+            assert!(
+                !complete_location_work(store, (location, request.request_id), &result)
+                    .await
+                    .expect("retry"),
+                "{}: a retried completion stores nothing twice",
+                test_case.description
+            );
+            let plan = (location, "development", request.request_id);
+            let reader = (&context, admin);
+            let page = |section: PlanRowSection, name: Option<&str>| {
+                read_person_plan_rows(
+                    store,
+                    reader,
+                    plan,
+                    PlanRowsQuery {
+                        section,
+                        offset: Some(0),
+                        limit: Some(50),
+                        name: name.map(str::to_owned),
+                    },
+                )
+            };
+
+            let changed = page(PlanRowSection::QueryChanged, None)
+                .await
+                .expect("rows")
+                .expect("planned");
+            let found = page(PlanRowSection::QueryChanged, Some("ORDERS_44"))
+                .await
+                .expect("rows")
+                .expect("planned");
+            let detached_diff = read_person_plan_diff(store, reader, (plan, "orders_123"))
+                .await
+                .expect("diff");
+            let inline_diff = read_person_plan_diff(store, reader, (plan, "customers"))
+                .await
+                .expect("diff");
+            let missing = read_person_plan_diff(store, reader, (plan, "nowhere"))
+                .await
+                .expect("diff");
+            let stored = read_person_plan(store, reader, plan)
+                .await
+                .expect("plan")
+                .expect("own plan");
+
+            assert_eq!(
+                (
+                    (
+                        changed.total,
+                        changed.rows.len(),
+                        changed.rows[0]["diff_stats"].clone()
+                    ),
+                    (found.total, found.section_total),
+                    detached_diff.map(|read| read.diff.query_diff),
+                    inline_diff.map(|read| read.diff.config_diff),
+                    missing,
+                    stored.result_json.map(|result| matches!(
+                        result.outcome,
+                        LocationWorkOutcome::Plan { diffs, .. } if diffs.is_empty()
+                    )),
+                ),
+                (
+                    (
+                        450,
+                        50,
+                        json!({"query": {"added": 1, "removed": 1, "whitespace_only": true}})
+                    ),
+                    (10, 450),
+                    Some(Some(
+                        test_case
+                            .expected_detached_diff
+                            .iter()
+                            .map(|line| (*line).to_owned())
+                            .collect()
+                    )),
+                    Some(Some(vec!["-a".to_owned(), "+b".to_owned()])),
+                    None,
+                    Some(true),
+                ),
+                "{}: pages count the left-out diffs, each diff reads from the document or apart from it, \
+                 and the stored plan never carries them",
+                test_case.description
+            );
+            execute(
+                store,
+                "UPDATE sqb_location_work SET expires_at='2000-01-01T00:00:00Z'",
+            )
+            .await;
+            retain(store, Default::default(), &[])
+                .await
+                .expect("retention pass");
+            assert_eq!(
+                (
+                    read_person_plan(store, reader, plan)
+                        .await
+                        .expect("plan")
+                        .is_none(),
+                    read_person_plan_diff(store, reader, (plan, "orders_123"))
+                        .await
+                        .expect("diff")
+                        .is_none(),
+                ),
+                (true, true),
+                "{}: an expired plan goes with the diffs it stored apart",
+                test_case.description
             );
             close_test_store(fixture).await;
         });

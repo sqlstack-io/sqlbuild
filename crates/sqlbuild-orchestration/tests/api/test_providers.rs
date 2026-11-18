@@ -10,7 +10,7 @@ use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::read_person_providers::read_person_providers;
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -123,6 +123,10 @@ fn given_published_providers_when_people_read_them_then_jobs_using_their_nodes_a
                     ],
                     "nodes": ["check:stock_levels", "model:orders"],
                     "jobs": test_case.expected_jobs,
+                    "job_nodes": {
+                        "order_exports": ["model:orders"],
+                        "stock_alerts": ["check:stock_levels"],
+                    },
                 }]),
                 "{}: jobs selecting a node that runs the provider, including a model through its hook, and none the document names",
                 test_case.description

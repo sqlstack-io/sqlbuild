@@ -3,16 +3,16 @@ use crate::authorization::main::{
 };
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, BuiltinRole, DefaultRole, RoleAssignmentRequest};
-use crate::platform::_helpers::observations::observe;
-use crate::platform::main::list_person_platform_events::list_person_platform_events;
-use crate::platform::main::read_person_problems::read_person_problems;
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::_helpers::health::observations::observe;
+use crate::platform::main::health::report_location_health::report_location_health;
+use crate::platform::main::person_reads::list_person_platform_events::list_person_platform_events;
+use crate::platform::main::person_reads::read_person_problems::read_person_problems;
 use crate::platform::models::{
     LocationHealth, LocationHealthReport, PersonPlatformEvent, PersonPlatformEventPage,
     PlatformEvent, PlatformEventKind,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::migrate_store::migrate_store;

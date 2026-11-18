@@ -9,6 +9,7 @@ use sqlbuild_analysis::planner_fixtures::main::{
 use sqlbuild_analysis::planner_fixtures::models::{
     FixtureColumn, FixtureSqlInput, SuppliedProjection,
 };
+use sqlbuild_python_base::native_host::models::Dialect;
 
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -27,7 +28,7 @@ pub(crate) struct CompletionSql<'py, 'a> {
 
 pub(crate) fn render_completed(
     input: CompletionSql<'_, '_>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<String> {
     let mut supplied: Vec<SuppliedProjection> = Vec::new();
     if !input.typed_nulls.is_empty() {
@@ -54,7 +55,7 @@ pub(crate) fn render_completed(
             completed: &input.completed,
         },
         |name, exact| {
-            adapter
+            dialect
                 .call_method1(
                     if exact {
                         "render_exact_identifier"

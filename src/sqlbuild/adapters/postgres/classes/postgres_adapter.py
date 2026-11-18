@@ -51,6 +51,7 @@ from sqlbuild.adapter.contract.constants import (
     QUALIFIED_NAME_SEPARATOR,
 )
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
+from sqlbuild.adapter.contract.main.estimates_by_name import estimates_by_name
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
@@ -2434,6 +2435,38 @@ class PostgresAdapter(
                 f"WHERE {schema_filter} AND relation.relname = {_quote_sql_string(name)}"
             ),
         ).fetchone()
+        return self._row_count_estimate(row=row, metadata_only=metadata_only)
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Read every named relation's ``reltuples`` and size with one catalog query."""
+
+        del database
+        if not names:
+            return ()
+        listed: str = ", ".join(_quote_sql_string(name) for name in names)
+        return estimates_by_name(
+            rows=self.execute(
+                connection=connection,
+                sql=(
+                    "SELECT relation.relname, relation.relkind, relation.reltuples, "
+                    "pg_relation_size(relation.oid) FROM pg_class AS relation "
+                    "JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace "
+                    f"WHERE namespace.nspname = {_quote_sql_string(schema)} "
+                    f"AND relation.relname IN ({listed})"
+                ),
+            ).fetchall(),
+            names=names,
+            estimate=lambda row: self._row_count_estimate(row=row, metadata_only=True),
+        )
+
+    @staticmethod
+    def _row_count_estimate(
+        *, row: tuple[Any, ...] | None, metadata_only: bool
+    ) -> RelationRowCountEstimate:
+        """The estimate of one ``(relkind, reltuples, size)`` catalog row, or of no row."""
+
         if row is None:
             return RelationRowCountEstimate(row_count=None, detail="relation not found")
         if str(row[0]) not in ROW_COUNT_RELATION_KINDS:

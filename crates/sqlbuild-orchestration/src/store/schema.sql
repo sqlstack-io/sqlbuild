@@ -56,7 +56,7 @@ CREATE TABLE sqb_snapshot_sources (
 );
 CREATE TABLE sqb_snapshot_documents (
     snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
-    kind TEXT NOT NULL CHECK (kind IN ('jobs', 'groups', 'triggers', 'roles', 'lineage', 'columns', 'providers')),
+    kind TEXT NOT NULL CHECK (kind IN ('jobs', 'groups', 'triggers', 'roles', 'lineage', 'columns', 'providers', 'connection')),
     document_hash TEXT NOT NULL REFERENCES sqb_documents(document_hash),
     PRIMARY KEY (snapshot_id, kind)
 );
@@ -67,6 +67,14 @@ CREATE TABLE sqb_current_snapshots (
     PRIMARY KEY (location_id, target),
     FOREIGN KEY (location_id, target, snapshot_id)
         REFERENCES sqb_snapshots(location_id, target, snapshot_id)
+);
+CREATE TABLE sqb_changed_builds (
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    generation BIGINT NOT NULL,
+    reported_at {time} NOT NULL,
+    report_json {json} NOT NULL,
+    PRIMARY KEY (location_id, target)
 );
 CREATE TABLE sqb_snapshot_changes (
     snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
@@ -148,7 +156,7 @@ CREATE TABLE sqb_runs (
     authored_json {json},
     write_set_digest TEXT NOT NULL,
     rewrite_history BOOLEAN NOT NULL DEFAULT FALSE,
-    status TEXT NOT NULL CHECK (status IN ('queued', 'launched', 'running', 'unresponsive', 'success', 'warn', 'partial', 'failed', 'cancelled')),
+    status TEXT NOT NULL CHECK (status IN ('queued', 'launched', 'running', 'unresponsive', 'success', 'warn', 'partial', 'failed', 'cancelled', 'skipped')),
     status_reason TEXT,
     queued_at {time} NOT NULL,
     launched_at {time},
@@ -156,6 +164,7 @@ CREATE TABLE sqb_runs (
     ended_at {time},
     cancel_requested_at {time},
     node_counts_json {json} NOT NULL,
+    ignored_audit_failures BIGINT NOT NULL DEFAULT 0,
     last_event_storage_id BIGINT NOT NULL,
     worker_instance {uuid},
     container_id TEXT,
@@ -196,8 +205,7 @@ CREATE TABLE sqb_concurrency_slots (
     group_key TEXT NOT NULL,
     slot BIGINT NOT NULL CHECK (slot > 0),
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
-    PRIMARY KEY (group_key, slot),
-    UNIQUE (group_key, run_id)
+    PRIMARY KEY (group_key, slot)
 );
 CREATE INDEX sqb_concurrency_slots_run ON sqb_concurrency_slots(run_id);
 CREATE TABLE sqb_principals (
@@ -263,6 +271,12 @@ CREATE TABLE sqb_location_work (
     completed_at {time}
 );
 CREATE INDEX sqb_location_work_pending ON sqb_location_work(location_id, target, requested_at);
+CREATE TABLE sqb_plan_diffs (
+    request_id {uuid} NOT NULL REFERENCES sqb_location_work(request_id),
+    model TEXT NOT NULL,
+    diff_json {json} NOT NULL,
+    PRIMARY KEY (request_id, model)
+);
 CREATE TABLE sqb_platform_sink_deliveries (
     sink_id TEXT NOT NULL,
     storage_id BIGINT NOT NULL,
@@ -289,7 +303,7 @@ CREATE TABLE sqb_run_requests (
     PRIMARY KEY (trigger_id, run_key)
 );
 CREATE INDEX sqb_runs_terminal_cursor ON sqb_runs(location_id, target, job_key, last_event_storage_id)
-WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled');
+WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled', 'skipped');
 CREATE INDEX sqb_runs_parent ON sqb_runs(parent_run_id) WHERE parent_run_id IS NOT NULL;
 CREATE TABLE sqb_warehouse_freshness (
     event_id {uuid} PRIMARY KEY,
@@ -399,7 +413,8 @@ CREATE TABLE sqb_warehouse_audit_results (
     record_json {json} NOT NULL,
     received_at {time} NOT NULL,
     scan_id {uuid},
-    binding_key TEXT
+    binding_key TEXT,
+    ignored BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX sqb_audit_results_namespace ON sqb_warehouse_audit_results (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE INDEX sqb_audit_results_binding ON sqb_warehouse_audit_results (location_id,target,binding_key,observed_at,event_id);

@@ -11,8 +11,10 @@ use sqlbuild_core::text::main::python_casefold::python_casefold;
 
 use crate::compiled_views::main::compiled_models::lineage_facts::lineage_facts;
 use crate::compiled_views::models::LineageFactRow;
-use crate::planner_strategy::constants::{DIRECT_TRANSFORM, MODEL_REFERENCE_KIND};
-use crate::planner_strategy::models::{ExpectedTypes, RelationFixturePlanningContext};
+use crate::planner_strategy::constants::DIRECT_TRANSFORM;
+use crate::planner_strategy::constants::MODEL_REFERENCE_KIND;
+use crate::planner_strategy::models::ExpectedTypes;
+use crate::planner_strategy::models::RelationFixturePlanningContext;
 use crate::planner_strategy::types::FixtureKey;
 
 /// Each chain model's known column types with direct lineage types propagated from its inputs.

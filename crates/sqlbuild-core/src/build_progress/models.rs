@@ -40,6 +40,8 @@ pub struct AuditResultText {
     pub execution_error: Option<String>,
     /// Why the audit did not run, when its outcome is `skipped`.
     pub skip_reason: Option<String>,
+    /// An error-severity failure the build let through.
+    pub ignored: bool,
 }
 
 /// One pre- or post-hook result.

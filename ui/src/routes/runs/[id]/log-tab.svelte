@@ -1,6 +1,11 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
+	import { plural } from '$lib/format/plural';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import type { RunEventLevel } from '$lib/api';
@@ -56,11 +61,10 @@
 	const byCategory = $derived(entries.filter(kindShown));
 	const byLevel = $derived(entries.filter((e) => levelShown(e) && e.category !== 'output'));
 	const shown = $derived(entries.filter((e) => levelShown(e) && kindShown(e) && matches(e)));
-	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: byCategory.filter((e) => l.value === 'all' || e.level === l.value).length })));
-	const kindOptions = $derived([
-		{ value: 'all' as const, label: 'All kinds', count: byLevel.length },
-		...present.map((c) => ({ value: c.value, label: c.label, count: byLevel.filter((e) => e.category === c.value).length }))
-	]);
+	const levelCounts = $derived(countBy(byCategory, (e) => e.level));
+	const categoryCounts = $derived(countBy(byLevel, (e) => e.category));
+	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? byCategory.length : (levelCounts.get(l.value) ?? 0) })));
+	const kindOptions = $derived([{ value: 'all' as const, label: 'All kinds', count: byLevel.length }, ...present.map((c) => ({ value: c.value, label: c.label, count: categoryCounts.get(c.value) ?? 0 }))]);
 
 	function toggle<T>(set: Set<T>, value: T): Set<T> {
 		const next = new Set(set);
@@ -79,6 +83,12 @@
 		a.click();
 		URL.revokeObjectURL(url);
 	}
+	const logColumns = $derived<TableColumn[]>([
+		{ id: 'time', label: 'Time', width: '110px' },
+		...(grouped ? [{ id: 'run', label: 'Job run', width: '100px' }] : []),
+		{ id: 'node', label: 'Node', width: '220px' },
+		{ id: 'what', label: 'What happened', minWidth: 300, truncate: false }
+	]);
 </script>
 
 <div class="filters">
@@ -93,26 +103,11 @@
 		<SearchIcon size={13} />
 		<input bind:value={query} placeholder="Search the log" aria-label="Search the log" />
 	</label>
-	<button class="dl" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon size={13} /> Download</button>
+	<Button size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
 </div>
 
-<table class="log">
-	<colgroup>
-		<col style:width="110px" />
-		{#if grouped}<col style:width="100px" />{/if}
-		<col style:width="220px" />
-		<col />
-	</colgroup>
-	<thead>
-		<tr>
-			<th>Time</th>
-			{#if grouped}<th>Job run</th>{/if}
-			<th>Node</th>
-			<th>What happened</th>
-		</tr>
-	</thead>
-	<tbody>
-		{#each shown as e (e.id)}
+<DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
+	{#snippet row(e)}
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'}>
 				<td class="faint nowrap" title={formatStamp(e.at)}>{clockTime(e.at)}</td>
 				{#if grouped}<td class="mono faint"><a href={to(`/runs/${e.runId}`)}>{shortRunId(e.runId)}</a></td>{/if}
@@ -121,17 +116,15 @@
 					{#if e.stream}
 						{@const lines = e.text.split('\n')}
 						<span title={e.title}>{open.has(e.id) || lines.length <= FOLD ? e.text : lines.slice(0, FOLD).join('\n')}</span>
-						{#if lines.length > FOLD}<button class="more" onclick={() => (open = toggle(open, e.id))}>{open.has(e.id) ? 'Show less' : `Show all ${lines.length} lines`}</button>{/if}
+						{#if lines.length > FOLD}<Button variant="link" size="inline" class="mt-0.5 flex font-sans text-[11.5px]" onclick={() => (open = toggle(open, e.id))}>{open.has(e.id) ? 'Show less' : `Show all ${lines.length} lines`}</Button>{/if}
 					{:else}
 						<span class="dot" style:background={e.tone}></span><span title={e.title}>{e.text}</span>
 						{#if e.queries.length}
-							<button class="fold" class:open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} aria-expanded={expanded.has(e.id)}>
-								<ChevronRightIcon size={12} />{e.queries.length} {e.queries.length === 1 ? 'query' : 'queries'}
-							</button>
+							<DisclosureButton open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} class="ml-2 gap-0.5 text-[11.5px]">{plural(e.queries.length, 'query', 'queries')}</DisclosureButton>
 						{/if}
 					{/if}
 					{#if e.statementId && e.nodeKey && onstatement && e.category === 'queries'}
-						<button class="sql" onclick={() => onstatement(e.nodeKey!)} title="Show this node's queries and their SQL">SQL</button>
+						<Button variant="link" size="inline" class="ml-2 font-mono text-[11px]" onclick={() => onstatement(e.nodeKey!)} title="Show this node's queries and their SQL">SQL</Button>
 					{/if}
 				</td>
 			</tr>
@@ -144,17 +137,14 @@
 						<td>
 							<span class="dot" style:background={x.tone}></span><span title={x.title}>{x.text}</span>
 							{#if x.statementId && x.nodeKey && onstatement}
-								<button class="sql" onclick={() => onstatement(x.nodeKey!)} title="Show this node's queries and their SQL">SQL</button>
+								<Button variant="link" size="inline" class="ml-2 font-mono text-[11px]" onclick={() => onstatement(x.nodeKey!)} title="Show this node's queries and their SQL">SQL</Button>
 							{/if}
 						</td>
 					</tr>
 				{/each}
 			{/if}
-		{:else}
-			<tr><td colspan={grouped ? 4 : 3} class="empty">{entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}</td></tr>
-		{/each}
-	</tbody>
-</table>
+	{/snippet}
+</DataTable>
 
 <style>
 	.filters {
@@ -179,23 +169,6 @@
 	}
 	.switch span {
 		color: var(--sb-text-faint);
-	}
-	.fold {
-		display: inline-flex;
-		align-items: center;
-		gap: 2px;
-		margin-left: 8px;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.fold:hover {
-		color: var(--primary);
-	}
-	.fold :global(svg) {
-		transition: transform 0.12s;
-	}
-	.fold.open :global(svg) {
-		transform: rotate(90deg);
 	}
 	tr.query td {
 		padding-top: 3px;
@@ -222,32 +195,6 @@
 		color: var(--foreground);
 		font-size: 12px;
 	}
-	.dl {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		padding: 3px 8px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.dl:disabled {
-		opacity: 0.5;
-	}
-	.log {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12px;
-	}
-	th {
-		padding: 6px 16px;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		font-weight: 500;
-		text-align: left;
-	}
 	td {
 		padding: 5px 16px;
 		border-bottom: 1px solid var(--border-subtle);
@@ -272,13 +219,6 @@
 	td.out {
 		color: var(--muted-foreground);
 	}
-	.more {
-		display: block;
-		margin-top: 2px;
-		color: var(--primary);
-		font-family: var(--font-sans);
-		font-size: 11.5px;
-	}
 	.dot {
 		display: inline-block;
 		width: 6px;
@@ -286,18 +226,6 @@
 		margin-right: 8px;
 		border-radius: 50%;
 		vertical-align: middle;
-	}
-	.sql {
-		margin-left: 8px;
-		padding: 0 5px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-family: var(--font-mono);
-		font-size: 10.5px;
-	}
-	.sql:hover {
-		color: var(--primary);
 	}
 	.mono {
 		font-family: var(--font-mono);
@@ -308,11 +236,6 @@
 	}
 	.nowrap {
 		white-space: nowrap;
-	}
-	.empty {
-		padding: 32px;
-		color: var(--sb-text-faint);
-		text-align: center;
 	}
 	a:hover {
 		color: var(--primary);

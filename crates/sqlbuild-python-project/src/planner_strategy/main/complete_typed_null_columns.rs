@@ -4,6 +4,7 @@ use crate::planner_strategy::_helpers::fixtures::fixture_sql::CompletionSql;
 use crate::planner_strategy::_helpers::fixtures::fixture_sql::render_completed;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Fixture SQL with its untyped null columns cast to the expected types.
@@ -11,7 +12,7 @@ pub fn complete_typed_null_columns(
     sql: &str,
     inference: &Bound<'_, PyAny>,
     expected_types: &[(String, String)],
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<String> {
     let py = inference.py();
     let typed_nulls = PyDict::new(py);
@@ -33,6 +34,6 @@ pub fn complete_typed_null_columns(
             quoted_names: native_field(inference, "quoted_names")?,
             completed: Vec::new(),
         },
-        adapter,
+        dialect,
     )
 }

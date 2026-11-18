@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
-    administrators, audit, changes, location_health, location_work, person_bootstrap,
-    person_checks, person_location_work, person_maintenance, person_node_sql, person_operations,
-    person_plans, person_reads, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
+    administrators, audit, changed_builds, changes, location_health, location_work,
+    person_bootstrap, person_checks, person_location_work, person_maintenance, person_node_sql,
+    person_operations, person_plans, person_reads, person_selection, run_reads, runs, snapshots,
+    trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -30,6 +31,7 @@ use crate::api::_helpers::resources::{
     person_operations::acknowledgements,
     person_reads::run_nodes,
     person_reads::nodes,
+    person_reads::node_states,
     person_reads::node_runs,
     person_reads::run_events,
     person_reads::run_statements,
@@ -48,6 +50,7 @@ use crate::api::_helpers::resources::{
     person_reads::sensor_state,
     person_reads::snapshots,
     person_reads::health,
+    person_reads::mirrored_totals,
     person_reads::problems,
     person_reads::platform_events,
     person_operations::catalog,
@@ -67,6 +70,11 @@ use crate::api::_helpers::resources::{
     person_location_work::result,
     person_plans::request,
     person_plans::read,
+    person_plans::summary,
+    person_plans::rows,
+    person_plans::diff,
+    person_selection::evaluate,
+    person_selection::vocabulary,
     person_node_sql::read,
     password_sessions::login,
     password_sessions::current,
@@ -101,7 +109,9 @@ use crate::api::_helpers::resources::{
     trigger_reads::ticks,
     warehouse_metadata::report,
     warehouse_metadata::preview_copy,
+    changed_builds::report,
     warehouse_metadata::statistics_due,
+    warehouse_metadata::retention,
     warehouse_metadata::sync_due,
     warehouse_metadata::watermark
 ))]
@@ -238,6 +248,18 @@ pub struct ControlBootstrap {
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ChangeNotice {
     pub topic: String,
+    /// `node_status` only: the state version after this change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<u64>,
+    /// `node_status` only: the version this change applies to; refetch node states when it is not yours.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_version: Option<u64>,
+    /// `node_status` only: the nodes whose state changed, absent when `full` is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub states: Option<std::collections::BTreeMap<String, crate::node_states::models::NodeState>>,
+    /// `node_status` only: too many nodes changed, or the snapshot or changed build is new; refetch node states.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full: Option<bool>,
 }
 
 /// Explicit local development scope; never enabled by ordinary server startup.
@@ -496,6 +518,8 @@ pub(crate) struct ChangeStream {
     pub(crate) target: String,
     pub(crate) target_hash: String,
     pub(crate) receiver: tokio::sync::broadcast::Receiver<crate::store::models::ChangeMessage>,
+    pub(crate) updates:
+        tokio::sync::broadcast::Receiver<crate::node_states::models::NodeStatusUpdate>,
     pub(crate) stopped: tokio::sync::watch::Receiver<bool>,
     pub(crate) keepalive: tokio::time::Interval,
     pub(crate) initial: bool,
@@ -533,6 +557,9 @@ pub struct ServerFacts {
     pub statistics: crate::warehouse_metadata::models::StatisticsRetention,
     pub snapshots: crate::snapshots::models::SnapshotRetention,
     pub run_logs: crate::runs::models::RunLogRetention,
+    pub state_history: crate::warehouse_metadata::models::StateHistoryRetention,
+    /// Each launcher's `pool_caps`; empty where this server runs no launcher.
+    pub pool_caps: crate::declarations::models::ServerPoolCaps,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.
@@ -557,6 +584,8 @@ pub struct ServerRetention {
     pub run_log_days: i64,
     /// Finished runs per location target that keep their logs.
     pub run_logs_kept: i64,
+    /// Builds of each node, and results of each check, the store mirrors from the warehouse.
+    pub state_history_versions: i64,
     pub platform_alert_days: i64,
     pub heartbeat_days: i64,
     pub location_health_days: i64,

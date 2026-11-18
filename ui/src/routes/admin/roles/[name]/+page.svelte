@@ -1,10 +1,13 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import NoAccess from '$lib/components/platform/no-access.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
@@ -35,10 +38,15 @@
 	function addedOn(action: Capability): string[] {
 		return additions.filter((a) => a.action === action).map((a) => (a.selector === '*' ? 'every node' : a.selector));
 	}
+	const additionColumns: TableColumn[] = [
+		{ id: 'action', label: 'Action', minWidth: 220, truncate: false },
+		{ id: 'on', label: 'On', width: '30%' },
+		{ id: 'matches', label: 'Matches today', width: '200px' }
+	];
 </script>
 
 <AppTopbar title="Roles">
-	<Button variant="outline" size="sm" onclick={() => role.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => role.refresh()} />
 </AppTopbar>
 
 {#if !app.can('role.assign')}
@@ -57,13 +65,13 @@
 		{#if role.data === null && !role.loading}
 			<p class="muted px-6 py-4">No role named <code>{name}</code> in {app.location?.name}. Project roles only exist in the locations deployed from that project.</p>
 		{:else if r}
-			<div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-10">
+			<PageBody padding="20px 24px 40px">
 				<div class="columns">
 					<div class="min-w-0">
 						<p class="desc">{r.description}</p>
 
 						{#if r.source === 'built_in'}
-							<Panel title="What it allows" note="On every node, in the locations it's given">
+							<Panel title="Permissions" help="On every node, in the locations it's given.">
 								<ul class="actions">
 									{#each ownActions as a (a)}<li><PermissionName action={a} risk /></li>{/each}
 								</ul>
@@ -82,6 +90,7 @@
 									<p class="muted">No built-in base.</p>
 								{/if}
 								{#if compare}
+									<!-- raw-table: a two-column comparison of a role with its base role, not a list -->
 									<table class="compare">
 										<thead>
 											<tr><th>Action</th><th>{r.extends ? builtInLabel(r.extends) : 'Base'}</th><th>{r.name}</th></tr>
@@ -103,17 +112,9 @@
 								{/if}
 							</Panel>
 
-							<Panel title="Additions" note="Approved actions on top of the base role">
-								<table class="sb-list static framed">
-									<thead>
-										<tr>
-											<th>Action</th>
-											<th>On</th>
-											<th>Matches today</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each additions as a (a.action + a.selector)}
+							<Panel title="Additions" help="Approved actions on top of the base role.">
+								<DataTable class="static framed" embedded columns={additionColumns} rows={additions} key={(a) => a.action + a.selector} empty="No additions.">
+									{#snippet row(a)}
 											{@const m = matchOf(a.selector)}
 											<tr class:risky={PERMISSIONS[a.action].risk === 'changes_data' || PERMISSIONS[a.action].risk === 'administer'}>
 												<td>
@@ -129,23 +130,19 @@
 													{/if}
 												</td>
 											</tr>
-										{:else}
-											<tr><td colspan="3" class="empty">No additions.</td></tr>
-										{/each}
-									</tbody>
-								</table>
+									{/snippet}
+								</DataTable>
 							</Panel>
 
 							{#if r.selectors.length}
-								<Panel title="What the selectors match today" note="Selectors can match more nodes as the project grows, so watch the growth">
+								<Panel title="Matched nodes" help="Selectors can match more nodes as the project grows, so watch the growth.">
 									<ul class="selectors">
 										{#each r.selectors as s (s.selector)}
 											<li>
-												<button class="sel" onclick={() => (open = { ...open, [s.selector]: !open[s.selector] })} aria-expanded={!!open[s.selector]}>
-													<ChevronRightIcon size={13} class={open[s.selector] ? 'rotate-90' : ''} />
+												<DisclosureButton tone="default" open={!!open[s.selector]} onclick={() => (open = { ...open, [s.selector]: !open[s.selector] })}>
 													<code>{s.selector}</code> → {plural(s.nodes.length, 'node')}
 													{#if s.newSinceLastWeek.length}<span class="growth">+{s.newSinceLastWeek.length} since last week</span>{/if}
-												</button>
+												</DisclosureButton>
 												{#if open[s.selector]}
 													<div class="nodes">
 														{#each s.nodes as n (n)}
@@ -163,14 +160,14 @@
 						{/if}
 
 						{#if r.definition}
-							<Panel title="Definition" note="As the location published it; change it in the project's roles file">
+							<Panel title="Definition" help="As the location published it; change it in the project's roles file.">
 								<CodePreview file={r.definedIn ?? 'published roles document'} code={r.definition} language="text" maxLines={24} />
 							</Panel>
 						{/if}
 					</div>
 
 					<div class="min-w-0">
-						<Panel title="Who has it" note={plural(r.holders, 'account')}>
+						<Panel title="Holders" note={plural(r.holders, 'account')}>
 							<ul class="holders">
 								{#each r.assignments as a (a.id)}
 									<li class:stale={a.stale}>
@@ -185,7 +182,7 @@
 						</Panel>
 					</div>
 				</div>
-			</div>
+			</PageBody>
 		{:else if role.error}
 			<p class="err px-6 py-4">Couldn't load: {role.error}</p>
 		{:else}
@@ -257,12 +254,6 @@
 	.compare tr.diff td:last-child {
 		color: var(--sb-success);
 	}
-	.framed {
-		border-top: 1px solid var(--border);
-	}
-	:global(.sb-list.static tbody tr) {
-		cursor: default;
-	}
 	tr.risky td:first-child {
 		box-shadow: inset 2px 0 0 var(--sb-warning);
 	}
@@ -273,15 +264,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-	}
-	.sel {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-	}
-	.sel :global(svg) {
-		color: var(--sb-text-faint);
-		transition: transform 0.1s;
 	}
 	.nodes {
 		display: flex;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { groupRunNodes, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, mergePlanPage, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -125,7 +125,7 @@ describe('run queue', () => {
 	it('keeps claim order, drops runs that started meanwhile and never names a run elsewhere', () => {
 		const entries = queueEntriesOf(
 			[
-				wire('urgent', { status: 'queued', queue: { position: 1, waits: [{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'], elsewhere: 2 }] } }),
+				wire('urgent', { status: 'queued', queue: { position: 1, waits: [{ kind: 'pool_full', pool: 'warehouse', holders: ['held'] }] } }),
 				wire('started', { status: 'queued' }),
 				wire('blocked', {
 					status: 'queued',
@@ -133,8 +133,9 @@ describe('run queue', () => {
 						position: 2,
 						waits: [
 							{ kind: 'write_claim', run_id: null, node_key: 'model.orders', other_nodes: 3 },
-							{ kind: 'earlier_run', run_id: 'urgent', limit: 'warehouse' },
+							{ kind: 'earlier_run', run_id: 'urgent', pool: 'warehouse' },
 							{ kind: 'upstream_job', run_id: 'stage', job_key: 'staging' },
+							{ kind: 'upstream_job', run_id: 'retry', job_key: 'partner_export', attempt: 2 },
 							{ kind: 'job_running', run_id: 'same' },
 							{ kind: 'write_claim', run_id: 'same', node_key: 'model.customers', other_nodes: 0 }
 						]
@@ -147,11 +148,12 @@ describe('run queue', () => {
 			['urgent', 1],
 			['blocked', 2]
 		]);
-		expect(entries[0].waits).toEqual([{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'], elsewhere: 2 }]);
+		expect(entries[0].waits).toEqual([{ kind: 'pool_full', pool: 'warehouse', holders: ['held'] }]);
 		expect(entries[1].waits).toEqual([
 			{ kind: 'write_claim', runId: null, nodeKey: 'model.orders', otherNodes: 3 },
-			{ kind: 'earlier_run', runId: 'urgent', limit: 'warehouse' },
-			{ kind: 'upstream_job', runId: 'stage', jobKey: 'staging' },
+			{ kind: 'earlier_run', runId: 'urgent', pool: 'warehouse' },
+			{ kind: 'upstream_job', runId: 'stage', jobKey: 'staging', attempt: null },
+			{ kind: 'upstream_job', runId: 'retry', jobKey: 'partner_export', attempt: 2 },
 			{ kind: 'job_running', runId: 'same' }
 		]);
 	});
@@ -236,12 +238,16 @@ describe('run Recall reads', () => {
 			event('statement_completed', { duration_ms: 1500, affected_rows: 1, resource_id: `["${inv}","model:orders"]`, statement_id: 's1' }),
 			event('resource_attempt_failed', { severity: 'error', error_type: 'ExecutionFailed', error_code: 'R002', resource_id: `["${inv}","model:orders"]` }),
 			event('operation_started'),
-			event('location_health', { invocation_id: 'scheduler/r1' })
+			event('location_health', { invocation_id: 'scheduler/r1' }),
+			event('run_member_retrying', { invocation_id: 'scheduler/r1', message: 'partner_export_job failed, retrying in 15 min (attempt 2 of 3)' }),
+			event('run_member_recovered', { invocation_id: 'scheduler/r1', message: 'partner_export_job succeeded on attempt 2' })
 		].flatMap((e) => toRunEvent(e, 'r1') ?? []);
 		expect(mapped.map((e) => [e.type, e.producer, e.level, e.nodeKey, e.statementId, e.message])).toEqual([
 			['claimed', 'scheduler', 'info', null, null, ''],
 			['statement_completed', 'sqb', 'info', 'model:orders', 's1', '1.5 s · 1 row'],
-			['resource_attempt_failed', 'sqb', 'error', 'model:orders', null, 'ExecutionFailed: R002']
+			['resource_attempt_failed', 'sqb', 'error', 'model:orders', null, 'ExecutionFailed: R002'],
+			['member_retrying', 'scheduler', 'info', null, null, 'partner_export_job failed, retrying in 15 min (attempt 2 of 3)'],
+			['member_recovered', 'scheduler', 'info', null, null, 'partner_export_job succeeded on attempt 2']
 		]);
 	});
 
@@ -303,5 +309,47 @@ describe('planResultOf', () => {
 		expect(result.error).toBe(expected.error);
 		expect(result.plan?.models[0]?.name ?? null).toBe(expected.plan);
 		if (result.plan) expect(result.plan.warnings).toEqual([]);
+	});
+});
+
+describe('mergePlanPage', () => {
+	const summary = planResultOf({
+		kind: 'plan',
+		document: {
+			models: [{ name: 'orders', action: 'create_table', reason: 'query_changed' }],
+			pages: { routine_models: 2, unchanged: 3 },
+			changed: { counts: ['definition'], reach: 'all', runs: [{ node: 'model:orders', reason: 'definition changed', downstream_of: null }], held_back: [], unchanged: [] }
+		}
+	} as never).plan!;
+	it.each([
+		{
+			description: 'a routine page adds its models and their runs after the changed ones',
+			section: 'routine_models' as const,
+			page: { total: 2, rows: [{ name: 'customers', reason: 'no_change' }], runs: [{ node: 'model:customers', reason: 'upstream changed', downstream_of: 'model:orders' }] },
+			expected: { models: ['orders', 'customers'], runs: ['model:orders', 'model:customers'], unchanged: [], pages: { routine_models: 2, unchanged: 3 } }
+		},
+		{
+			description: 'an unchanged page adds its nodes and keeps the models',
+			section: 'unchanged' as const,
+			page: { total: 3, rows: ['model:payments'], runs: [] },
+			expected: { models: ['orders'], runs: ['model:orders'], unchanged: ['model:payments'], pages: { routine_models: 2, unchanged: 3 } }
+		},
+		{
+			description: 'a first-run page adds its models, counts what it loaded and keeps the section total, not the filter matches',
+			section: 'first_run' as const,
+			page: { total: 1, section_total: 672, rows: [{ name: 'daily_orders', reason: 'first_run' }], runs: [], warnings: [], cursor_window_starts: {} },
+			expected: { models: ['orders', 'daily_orders'], runs: ['model:orders'], unchanged: [], pages: { routine_models: 2, unchanged: 3, first_run: 672 } }
+		}
+	])('$description', ({ section, page, expected }) => {
+		const merged = mergePlanPage(summary, section, page as never);
+		expect({ models: merged.models.map((m) => m.name), runs: merged.changed?.runs.map((r) => r.node), unchanged: merged.changed?.unchanged, pages: merged.pages }).toEqual(expected);
+		expect(merged.loaded?.[section]).toBe(page.rows.length);
+	});
+	it("keeps a warning once when a model's page and the warnings section both bring it, and adds the page's window starts", () => {
+		const warning = { severity: 'warning', message: 'orders: already-built dates keep their old results' };
+		const withCopy = { ...summary, synced_copy: { synced_at: null, cursor_window_starts: {}, unknown_until_run: [] } };
+		const page = { total: 1, section_total: 1, rows: [{ name: 'orders', reason: 'query_changed' }], runs: [], warnings: [warning], cursor_window_starts: { orders: '2026-11-01' } };
+		const once = mergePlanPage(mergePlanPage(withCopy, 'query_changed', page as never), 'warnings', { ...page, rows: [warning], warnings: [], cursor_window_starts: {} } as never);
+		expect({ warnings: once.warnings, starts: once.synced_copy?.cursor_window_starts }).toEqual({ warnings: [warning], starts: { orders: '2026-11-01' } });
 	});
 });

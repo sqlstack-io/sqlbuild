@@ -231,7 +231,8 @@ record!(SqlTestExecutionResult<V> {
 record!(BuildExecutionResult<V> {
     status, model_results, seed_results, function_results, load_results, test_results,
     source_audit_results, end_audit_results, success_count, failure_count, timeout_count,
-    skipped_count, warning_count, insufficient_count, audit_result_projection_attempted_count,
+    skipped_count, warning_count, insufficient_count, ignored_audit_failure_count,
+    audit_result_projection_attempted_count,
     audit_result_projection_written_count, audit_result_projection_failed_count, timings,
 });
 
@@ -336,6 +337,7 @@ impl<'py> ReadResult<'py> for AuditExecutionResult<Bound<'py, PyAny>> {
                 Some(mapping(&meta)?)
             },
             skip_reason: ReadResult::read(&field(value, "skip_reason")?)?,
+            ignored: ReadResult::read(&field(value, "ignored")?)?,
         })
     }
 }

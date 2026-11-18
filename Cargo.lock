@@ -4474,6 +4474,7 @@ dependencies = [
  "chrono",
  "mimalloc",
  "pyo3",
+ "rayon",
  "rusqlite",
  "rustc-hash",
  "serde",
@@ -4575,6 +4576,7 @@ dependencies = [
 name = "sqlbuild-python-planner"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "pyo3",
  "serde_json",
  "sqlbuild-analysis",
@@ -4726,6 +4728,8 @@ dependencies = [
 name = "sqlbuild-state"
 version = "0.0.0"
 dependencies = [
+ "chrono",
+ "serde",
  "serde_json",
  "sha2 0.10.9",
  "sqlbuild-core",

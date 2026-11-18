@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::declarations::_helpers::documents::decode_definitions;
 use crate::declarations::models::Definitions;
-use crate::snapshots::main::read_snapshot_documents::read_snapshot_documents;
+use crate::snapshots::main::reads::read_snapshot_documents::read_snapshot_documents;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 

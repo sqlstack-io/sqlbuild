@@ -2,7 +2,8 @@
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::planner_migrations::_helpers::column::column_objects::{native, text};
+use crate::planner_migrations::_helpers::column::column_objects::native;
+use crate::planner_migrations::_helpers::column::column_objects::text;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyStringMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::call_with::call_with;

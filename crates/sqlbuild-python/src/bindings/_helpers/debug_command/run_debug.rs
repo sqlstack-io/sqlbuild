@@ -22,17 +22,20 @@ use sqlbuild_core::debug_report::models::{
     DebugReport, DebugRuntime, WarehouseCheck,
 };
 
-use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
-use crate::bindings::_helpers::command_runtime::connection::{
-    local_database_files, project_connection_config,
-};
-use crate::bindings::_helpers::command_runtime::runtime_errors::{
-    expected_resolution_error, resolution_message,
-};
+use crate::bindings::_helpers::cli::failure_cause::FailureCause;
+use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
+use crate::bindings::_helpers::command_runtime::connection::local_database_files;
+use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
+use crate::bindings::_helpers::command_runtime::runtime_errors::expected_resolution_error;
+use crate::bindings::_helpers::command_runtime::runtime_errors::resolution_message;
 use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
-use crate::bindings::_helpers::command_runtime::warehouses::{
-    CommandScope, WarehouseInputs, apply_warehouse, command_scope, find_authored, resolve_warehouse,
-};
+use crate::bindings::_helpers::command_runtime::warehouses::CommandScope;
+use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
+use crate::bindings::_helpers::command_runtime::warehouses::apply_warehouse;
+use crate::bindings::_helpers::command_runtime::warehouses::command_scope;
+use crate::bindings::_helpers::command_runtime::warehouses::find_authored;
+use crate::bindings::_helpers::command_runtime::warehouses::resolve_warehouse;
+use crate::bindings::_helpers::native_host::warehouse_metadata::history_reads_wake_compute;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -306,13 +309,10 @@ fn build_report(
     })?;
     let connection_config: Bound<'_, PyDict> =
         effective_connection(&context, (&adapter_name, &base_connection))?.cast_into()?;
+    let adapter_text: String = adapter_name.str()?.extract()?;
     let namespace: Bound<'_, PyTuple> = effective_target_namespace(
         (&context.discovered_inputs, &context.selected_target),
-        (
-            &adapter_name.str()?.extract::<String>()?,
-            connection_config.as_any(),
-            &context.adapter,
-        ),
+        (&adapter_text, connection_config.as_any(), &context.adapter),
     )?;
     let target_config: Bound<'_, PyAny> = namespace.get_item(1)?;
     let connection_name: Option<String> = if target_config.is_none() {
@@ -331,7 +331,7 @@ fn build_report(
             .getattr("name")?
             .str()?
             .extract()?,
-        adapter_name: adapter_name.str()?.extract()?,
+        adapter_name: adapter_text,
         target_name: optional_string(&namespace.get_item(0)?)?.filter(|name| !name.is_empty()),
         connection_name,
         database: target_value(&namespace.get_item(2)?)?,
@@ -347,6 +347,7 @@ fn build_report(
     };
     Ok(DebugReport {
         local_files: local_database_files(&facts.adapter_name, &connection_config)?,
+        history_reads_wake_compute: history_reads_wake_compute(&context.adapter)?,
         runtime: debug_runtime_lines(&runtime(py)?),
         configuration: debug_configuration_lines(&facts, &warehouses),
         missing_secrets: providers

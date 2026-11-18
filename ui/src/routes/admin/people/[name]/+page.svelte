@@ -1,11 +1,14 @@
 <script lang="ts">
+	import LockIcon from '@lucide/svelte/icons/lock';
+	import HelpTip from '$lib/components/help-tip.svelte';
+	import PageBody from '$lib/components/page-body.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import GatedButton from '$lib/components/platform/gated-button.svelte';
 	import NoAccess from '$lib/components/platform/no-access.svelte';
@@ -67,7 +70,7 @@
 </script>
 
 <AppTopbar title="People">
-	<Button variant="outline" size="sm" onclick={changed}>↻ Refresh</Button>
+	<RefreshButton onclick={changed} />
 </AppTopbar>
 
 {#if !canSee}
@@ -83,7 +86,7 @@
 				<StatusLabel tone={account.disabled ? 'var(--sb-text-faint)' : 'var(--sb-success)'} label={account.disabled ? 'Disabled' : 'Active'} muted={account.disabled} />
 				<div class="ml-auto flex items-center gap-2">
 					{#if account.name === app.user?.name}
-						<span class="muted">This is you</span>
+						<span class="muted">You</span>
 					{:else}
 						<GatedButton requires="user.manage" size="sm" variant={account.disabled ? 'outline' : 'destructive'} {busy} onclick={() => toggle(account)}>{account.disabled ? 'Enable' : 'Disable'}</GatedButton>
 					{/if}
@@ -93,20 +96,20 @@
 		{#if error}<p class="err px-6 pt-3">{error}</p>{/if}
 
 		{#if d.accounts.data && !account}
-			<p class="muted px-6 py-4">No person named <code>{name}</code>. They appear here after they first sign in.</p>
+			<p class="muted px-6 py-4">No person named <code>{name}</code>.<HelpTip text="People appear after their first sign-in" /></p>
 		{:else if account}
-			<div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-10">
+			<PageBody padding="20px 24px 40px">
 				<div class="columns">
 					<div class="min-w-0">
-						<Panel title="Roles" note="What they've been given; SSO, policy-file and built-in roles are locked here">
+						<Panel title="Roles" help="What they've been given; SSO, policy-file and built-in roles are locked here.">
 							{#if app.can('role.assign')}
 								<AssignmentList principal={account} assignments={d.assignments.data ?? []} rolesByLocation={d.rolesByLocation} onchange={changed} />
 							{:else}
-								<p class="muted">Seeing roles requires “Give roles and approve role changes” (role.assign).</p>
+								<p class="muted" title="Seeing roles requires “Give roles and approve role changes”"><LockIcon size={12} class="inline" /> No access (role.assign)</p>
 							{/if}
 						</Panel>
 
-						{#if showsAccess}<Panel title="Effective access" note="Every action in every location, after adding up all their roles">
+						{#if showsAccess}<Panel title="Effective access" help="Every action in every location, after adding up all their roles.">
 							{#if !canExplain}
 								<p class="muted">Requires “Give roles” (role.assign) or “See the audit log” (audit.view).</p>
 							{:else if access.data}
@@ -120,7 +123,7 @@
 
 						{#if canExplain && showsChecker}
 							<div bind:this={checkerEl}>
-								<Panel title="Why?" note="Pick a mark above, or check any action">
+								<Panel title="Why?" help="Pick a mark above, or check any action.">
 									<AccessChecker principals={[account]} initial={why ?? { principal: account.name }} lockPrincipal />
 								</Panel>
 							</div>
@@ -145,7 +148,7 @@
 						</Panel>
 					</div>
 				</div>
-			</div>
+			</PageBody>
 		{:else}
 			<div class="px-6 py-4"><Loading /></div>
 		{/if}

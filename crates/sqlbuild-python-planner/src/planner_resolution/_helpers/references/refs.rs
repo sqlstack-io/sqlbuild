@@ -1,10 +1,13 @@
 //! Reference lookup and adapter callbacks for planner SQL.
 
 use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::models::Dialect;
 
-use crate::planner_resolution::_helpers::references::values::{
-    cursor_wrap, filtering_of, method, string,
-};
+use crate::planner_resolution::_helpers::references::values::cursor_wrap;
+use crate::planner_resolution::_helpers::references::values::filtering_of;
+use crate::planner_resolution::_helpers::references::values::method;
+use crate::planner_resolution::_helpers::references::values::string;
 use crate::planner_resolution::models::CursorFiltering;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -12,7 +15,6 @@ use pyo3::pyfunction;
 use pyo3::types::PyDict;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::SqlCodeScanner;
@@ -35,7 +37,7 @@ pub(crate) fn resolve_ref_references(
                 "seed_locations",
                 "cursor_bounds",
                 "cursor_filter_inputs",
-                "adapter",
+                "dialect",
                 "cursor_type",
                 "lower_bound_inclusive",
             ],
@@ -48,7 +50,7 @@ pub(crate) fn resolve_ref_references(
             &args.value("model_locations")?,
             &args.value("seed_locations")?,
         ),
-        &args.value("adapter")?,
+        &Dialect::passed(args.value("dialect")?)?,
         &filtering_of(&args)?,
     )
 }
@@ -57,10 +59,10 @@ pub(crate) fn resolve_ref_references(
 pub(crate) fn resolve_refs(
     original: &str,
     (model_locations, seed_locations): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     filtering: &CursorFiltering<'_>,
 ) -> PyResult<String> {
-    let py = adapter.py();
+    let py = dialect.py();
     let mut sql = original.to_owned();
     for (kind, locations) in [("ref", model_locations), ("seed", seed_locations)] {
         let mut output = String::new();
@@ -73,7 +75,10 @@ pub(crate) fn resolve_refs(
             } else {
                 let relation: String = call_with(
                     &host_entry(py, AdapterHost::ResolveRelationLocationQualifiedName)?,
-                    &[("adapter", adapter.clone()), ("location", target)],
+                    &[
+                        ("adapter", dialect.clone().into_any()),
+                        ("location", target),
+                    ],
                 )?
                 .extract()?;
                 let char_end = sql[..span.end].chars().count();
@@ -82,7 +87,7 @@ pub(crate) fn resolve_refs(
                     .nth(char_end)
                     .map_or(original.len(), |(offset, _)| offset);
                 output.push_str(&cursor_wrap(
-                    adapter,
+                    dialect,
                     filtering,
                     relation,
                     (&span.name, !ref_alias(original, original_end)),
@@ -134,10 +139,10 @@ pub(crate) fn resolve_dbt_ref_references(
 fn resolve_function_calls(
     query_sql: &str,
     locations: &Bound<'_, PyAny>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
     table: bool,
 ) -> PyResult<String> {
-    let py = adapter.py();
+    let py = dialect.py();
     let kind = if table { "table_fn" } else { "udf" };
     let spans = reference_spans(query_sql, kind);
     if spans.is_empty() {
@@ -190,7 +195,7 @@ fn resolve_function_calls(
             "render_udf_call"
         };
         let rendered: String = method(
-            adapter,
+            dialect,
             hook,
             &[
                 ("target", qualified),
@@ -213,21 +218,21 @@ fn resolve_function_calls(
 }
 
 #[pyfunction]
-#[pyo3(signature = (*, query_sql, function_locations, adapter))]
+#[pyo3(signature = (*, query_sql, function_locations, dialect))]
 pub(crate) fn resolve_udf_references(
     query_sql: &str,
     function_locations: &Bound<'_, PyAny>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<String> {
-    resolve_function_calls(query_sql, function_locations, adapter, false)
+    resolve_function_calls(query_sql, function_locations, dialect, false)
 }
 
 #[pyfunction]
-#[pyo3(signature = (*, query_sql, function_locations, adapter))]
+#[pyo3(signature = (*, query_sql, function_locations, dialect))]
 pub(crate) fn resolve_table_function_references(
     query_sql: &str,
     function_locations: &Bound<'_, PyAny>,
-    adapter: &Bound<'_, PyAny>,
+    dialect: &Bound<'_, Dialect>,
 ) -> PyResult<String> {
-    resolve_function_calls(query_sql, function_locations, adapter, true)
+    resolve_function_calls(query_sql, function_locations, dialect, true)
 }

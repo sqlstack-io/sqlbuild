@@ -25,6 +25,13 @@ pub(crate) const HEARTBEAT_PAGE: usize = 1000;
 
 /// A plan document larger than this is refused by the server and replaced by an error on the location.
 pub const PLAN_DOCUMENT_BYTES: usize = 8 * 1024 * 1024;
+/// The most diff text a plan may store apart from its document, as JSON.
+pub const PLAN_DIFF_BYTES: usize = 56 * 1024 * 1024;
+/// Plan diffs stored per insert statement.
+pub(crate) const PLAN_DIFF_INSERT_ROWS: usize = 200;
+
+/// The plan document's field holding how long each planning step took.
+pub(crate) const PLAN_TIMINGS_KEY: &str = "timings";
 
 /// How long a location may hold a plan before another instance may claim it.
 pub(crate) const PLAN_LEASE_SECONDS: i64 = 300;
@@ -40,3 +47,9 @@ pub(crate) const LOCATION_SILENCE_SECONDS: i64 = 90;
 
 /// A SQLite WAL reset waits this long for readers while holding the write lock, then retries later.
 pub(crate) const CHECKPOINT_READER_WAIT_MS: u64 = 200;
+/// How many rule findings a location's health report lists; the count covers the rest.
+pub const MAX_REPORTED_RULE_FINDINGS: usize = 50;
+/// The longest code, message or path of a reported rule finding, in characters.
+pub const MAX_RULE_FINDING_CHARS: usize = 500;
+/// The most rows one page of a plan section returns.
+pub const PLAN_ROWS_LIMIT: usize = 1000;

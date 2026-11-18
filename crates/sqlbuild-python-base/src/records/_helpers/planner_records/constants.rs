@@ -110,6 +110,7 @@ const R_PLANNER_POLICIES: RecordSpec = RecordSpec {
         FieldSpec::new("selection_diagnostics", FieldDefault::False),
         FieldSpec::new("plan_sql_tests", FieldDefault::True),
         FieldSpec::new("record_migration_fingerprints", FieldDefault::True),
+        FieldSpec::new("ignore_audit_failures", FieldDefault::False),
     ],
 };
 const R_DIRECT_SOURCE_FRESHNESS_PLANNING_RESULT: RecordSpec = RecordSpec {
@@ -782,6 +783,7 @@ const R_AUDIT_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("description", FieldDefault::None),
         FieldSpec::new("reads_outside_target_lineage", FieldDefault::False),
         FieldSpec::new("meta", FieldDefault::None),
+        FieldSpec::new("ignore_failure", FieldDefault::False),
     ],
 };
 const R_CHAIN_STEP: RecordSpec = RecordSpec {
@@ -932,6 +934,7 @@ const R_PLAN_OUTPUT: RecordSpec = RecordSpec {
         FieldSpec::new("cursor_overrides", FieldDefault::None),
         FieldSpec::new("existing_model_names", FieldDefault::EmptyFrozenset),
         FieldSpec::new("end_audit_source_keys", FieldDefault::EmptyFrozenset),
+        FieldSpec::new("ignore_audit_failures", FieldDefault::False),
     ],
 };
 
@@ -1086,6 +1089,7 @@ const R_WAREHOUSE_SNAPSHOT: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::WarehouseFingerprints),
         ),
         FieldSpec::new("cursor_snapshots", FieldDefault::EmptyDict),
+        FieldSpec::new("cursor_inputs_at_run", FieldDefault::False),
         FieldSpec::new(
             "source_freshness_state_schemas",
             FieldDefault::EmptyFrozenset,

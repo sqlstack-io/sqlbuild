@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import RunStatusPill from '$lib/components/operate/run-status-pill.svelte';
@@ -7,7 +8,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { runKindLabel, runOriginLabel, runStatusTone } from '$lib/status';
 	import RerunButton from './rerun-button.svelte';
-	import { costSummary } from './utils';
+	import { costSummary, retriedMembers } from './utils';
 	import type { RunDetailState } from './state.svelte';
 
 	let { view, runId }: { view: RunDetailState; runId: string } = $props();
@@ -16,6 +17,7 @@
 	const pct = $derived(view.progress.total ? (view.progress.done / view.progress.total) * 100 : 0);
 	const what = $derived(run?.jobKey ?? (view.detail?.selection.join(' ') || 'whole project'));
 	const cancelRequested = $derived(!!view.detail?.cancel && !view.detail.cancel.terminatedAt);
+	const retried = $derived(retriedMembers(view.detail?.children ?? []));
 </script>
 
 <div class="head">
@@ -32,7 +34,8 @@
 				<h2>
 					{#if run.jobKey}<a href={to(`/jobs/${run.jobKey}`)}>{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
 				</h2>
-				<RunStatusPill status={run.status} size="md" />
+				<RunStatusPill status={run.status} size="md" ignored={run.ignoredAuditFailures} />
+				{#if retried}<span class="chip" title="Member jobs the group retried inside this run" data-testid="run-retried">· {retried} retried</span>{/if}
 				<!-- The kind is a fact about this run; the origin opens what started it, when that has a page. -->
 				<span class="chip" title="{runKindLabel[run.kind]} run">{runKindLabel[run.kind].toLowerCase()}</span>
 				{#if run.narrowing}
@@ -57,7 +60,7 @@
 					{#if view.cost && view.cost.status !== 'none'}
 						{@const summary = costSummary(view.cost)}
 						<span>·</span>
-						<button class="cost-link" onclick={() => (view.tab = 'cost')} title="Estimated query cost{summary.note ? `. ${summary.note}` : ''}" data-testid="run-cost-chip">{summary.text.startsWith('Cost') ? summary.text.toLowerCase() : `est. ${summary.text}`}</button>
+						<Button variant="link" size="inline" onclick={() => (view.tab = 'cost')} title="Estimated query cost{summary.note ? `. ${summary.note}` : ''}" data-testid="run-cost-chip">{summary.text.startsWith('Cost') ? summary.text.toLowerCase() : `est. ${summary.text}`}</Button>
 					{/if}
 				{:else}
 					<span title={formatStamp(run.queuedAt)}>Queued {formatAgo(run.queuedAt, app.now)}</span>
@@ -75,7 +78,7 @@
 					<span>·</span>
 					<a href={to(`/changes`)} title="Project version {p.snapshotGeneration}{p.gitRevision ? `, commit ${p.gitRevision}` : ''}{p.gitDirty ? ' with uncommitted changes' : ''}">version {p.snapshotGeneration}</a>
 				{/if}
-				<button class="details-btn" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Version, command, image, worker and other technical details">{view.showDetails ? 'Hide details' : 'Details'}</button>
+				<Button variant="link" size="inline" class="ml-2.5" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Version, command, image, worker and other technical details">{view.showDetails ? 'Hide details' : 'Details'}</Button>
 			</div>
 			{#if view.detail?.provenance?.command}
 				{@const command = view.detail.provenance.command}
@@ -91,16 +94,15 @@
 		<div class="actions">
 			{#if view.active}
 				<span title={!app.can('run.cancel') ? "You don't have permission to cancel (run.cancel)" : cancelRequested ? 'Cancel already requested; see the progress below' : 'Stops the run: running queries are cancelled, then the run is stopped'}>
-					<button
-						class="cancel"
-						class:armed={view.cancelArmed}
+					<Button
+						variant={view.cancelArmed ? 'destructive' : 'outline'}
 						disabled={!app.can('run.cancel') || cancelRequested || view.busy !== null}
 						aria-busy={view.busy === 'cancel'}
 						onclick={() => view.cancel()}
 						onblur={() => view.disarmCancel()}
 					>
 						{cancelRequested ? 'Cancelling…' : view.cancelArmed ? 'Confirm cancel' : 'Cancel run'}
-					</button>
+					</Button>
 				</span>
 			{/if}
 			<RerunButton {view} />
@@ -110,11 +112,6 @@
 {#if view.actionError}<div class="action-error" role="alert">{view.actionError}</div>{/if}
 
 <style>
-	.cost-link {
-		color: inherit;
-		text-decoration: underline dotted;
-		text-underline-offset: 2px;
-	}
 	.command {
 		display: flex;
 		align-items: center;
@@ -229,36 +226,11 @@
 		height: 100%;
 		transition: width 0.4s ease;
 	}
-	.details-btn {
-		margin-left: 10px;
-		color: var(--primary);
-		font-size: 12.5px;
-	}
 	.actions {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		padding-top: 18px;
-	}
-	.cancel {
-		height: 32px;
-		padding: 0 12px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: var(--background);
-		font-size: 13px;
-		font-weight: 500;
-	}
-	.cancel:hover:not(:disabled) {
-		background: var(--sb-hover);
-	}
-	.cancel.armed {
-		border-color: var(--sb-error);
-		background: color-mix(in srgb, var(--sb-error) 14%, var(--background));
-		color: var(--sb-error);
-	}
-	.cancel:disabled {
-		opacity: 0.55;
 	}
 	.err,
 	.action-error {

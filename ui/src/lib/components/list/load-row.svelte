@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import type { Resource } from '$lib/state/resource.svelte';
 
 	let { colspan, resource, empty }: { colspan: number; resource: Resource<unknown>; empty: string } = $props();
@@ -9,7 +10,7 @@
 	<tr class="load-row">
 		<td {colspan} class="empty error">
 			Couldn't load: {resource.error}
-			<button onclick={() => resource.refresh()}>Retry</button>
+			<Button variant="link" size="inline" class="ml-2" onclick={() => resource.refresh()}>Retry</Button>
 		</td>
 	</tr>
 {:else if resource.loading && resource.data === undefined}
@@ -38,9 +39,5 @@
 	}
 	.error {
 		color: var(--sb-error);
-	}
-	button {
-		margin-left: 8px;
-		color: var(--primary);
 	}
 </style>

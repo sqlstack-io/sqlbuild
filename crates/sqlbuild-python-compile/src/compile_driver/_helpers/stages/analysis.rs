@@ -1,15 +1,7 @@
 //! The compile analysis sequence: discovery, graph, lineage, contracts, selection and rules.
 
-use crate::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
-use std::time::Instant;
-
-use pyo3::IntoPyObject;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple, PyTupleMethods};
-use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
-
 use crate::compile_driver::_helpers::setup::project::build_project_graph_with_analysis_selection;
+use crate::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use crate::lineage::main::build_project_column_lineage::build_project_column_lineage;
 use crate::rules::constants::RULE_FIX_AVAILABLE_NOTE;
 use crate::rules::main::checking::rules_progress::rules_progress;
@@ -18,8 +10,12 @@ use crate::rules::main::rule::evaluate_rules::evaluate_rules;
 use crate::rules::models::EarlyRulesScope;
 use crate::rules::models::EarlyRulesSettings;
 use crate::rules::models::EarlySqlLint;
+use pyo3::IntoPyObject;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple, PyTupleMethods};
 use sqlbuild_analysis::graph::constants::PLANNER_DEFAULT_CODE;
 use sqlbuild_analysis::graph::errors::SelectorError;
+use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -43,13 +39,19 @@ use sqlbuild_python_project::planner_identity::main::execution_cycle::execution_
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 use sqlbuild_python_project::project_snapshot::main::job_group_cycles::job_group_cycles;
+use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
+use std::time::Instant;
 
 const RICH_LINEAGE: &str = "rich";
+
 const FAST_LINEAGE: &str = "fast";
+
 const RICH_COLUMN_LINEAGE: &str = "RICH";
+
 const FAST_COLUMN_LINEAGE: &str = "FAST";
 
 const GENERIC_DIALECT: &str = "generic";
+
 const TARGET_DIRECTORY: &str = "target";
 
 /// `ColumnLineageMode.<member>`.
@@ -570,6 +572,50 @@ impl<'py> Driver<'_, 'py> {
     }
 }
 
+/// The core diagnostics followed by one rule-phase error per rule finding; lint-unavailable ones only warn.
+fn with_rule_diagnostics<'py>(
+    py: Python<'py>,
+    core: &Bound<'py, PyTuple>,
+    rules_result: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let phase: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticPhase, "RULE")?;
+    let severity: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticSeverity, "ERROR")?;
+    let unavailable: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticSeverity, "WARNING")?;
+    let fix_note: Bound<'py, PyAny> = PyString::new(py, RULE_FIX_AVAILABLE_NOTE).into_any();
+    let mut diagnostics: Vec<Bound<'py, PyAny>> = core.iter().collect();
+    for fault in native_field(rules_result, "findings")?.try_iter()? {
+        let fault: Bound<'py, PyAny> = fault?;
+        let notes: Bound<'py, PyTuple> = if native_field(&fault, "fixable")?.is_truthy()? {
+            PyTuple::new(py, [fix_note.clone()])?
+        } else {
+            PyTuple::empty(py)
+        };
+        diagnostics.push(new_record_with(
+            py,
+            RecordId::CompilerDiagnostic,
+            &[
+                ("phase", phase.clone()),
+                (
+                    "severity",
+                    match counts_toward_exit(&native_field(&fault, "code")?.extract::<String>()?) {
+                        true => severity.clone(),
+                        false => unavailable.clone(),
+                    },
+                ),
+                ("code", native_field(&fault, "code")?),
+                ("message", native_field(&fault, "message")?),
+                ("path", native_field(&fault, "path")?),
+                ("line", native_field(&fault, "line")?),
+                ("column", native_field(&fault, "column")?),
+                ("help", native_field(&fault, "remediation")?),
+                ("notes", notes.into_any()),
+                ("affected_rules", native_field(&fault, "affected_rules")?),
+            ],
+        )?);
+    }
+    PyTuple::new(py, diagnostics)
+}
+
 /// Compile errors for what every plan refuses: an execution-order cycle and the first SQL/Python boundary error.
 fn boundary_diagnostics<'py>(
     graph: &Bound<'py, PyAny>,
@@ -613,48 +659,4 @@ fn boundary_diagnostics<'py>(
             )
         })
         .collect()
-}
-
-/// The core diagnostics followed by one rule-phase error per rule finding; lint-unavailable ones only warn.
-fn with_rule_diagnostics<'py>(
-    py: Python<'py>,
-    core: &Bound<'py, PyTuple>,
-    rules_result: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let phase: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticPhase, "RULE")?;
-    let severity: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticSeverity, "ERROR")?;
-    let unavailable: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticSeverity, "WARNING")?;
-    let fix_note: Bound<'py, PyAny> = PyString::new(py, RULE_FIX_AVAILABLE_NOTE).into_any();
-    let mut diagnostics: Vec<Bound<'py, PyAny>> = core.iter().collect();
-    for fault in native_field(rules_result, "findings")?.try_iter()? {
-        let fault: Bound<'py, PyAny> = fault?;
-        let notes: Bound<'py, PyTuple> = if native_field(&fault, "fixable")?.is_truthy()? {
-            PyTuple::new(py, [fix_note.clone()])?
-        } else {
-            PyTuple::empty(py)
-        };
-        diagnostics.push(new_record_with(
-            py,
-            RecordId::CompilerDiagnostic,
-            &[
-                ("phase", phase.clone()),
-                (
-                    "severity",
-                    match counts_toward_exit(&native_field(&fault, "code")?.extract::<String>()?) {
-                        true => severity.clone(),
-                        false => unavailable.clone(),
-                    },
-                ),
-                ("code", native_field(&fault, "code")?),
-                ("message", native_field(&fault, "message")?),
-                ("path", native_field(&fault, "path")?),
-                ("line", native_field(&fault, "line")?),
-                ("column", native_field(&fault, "column")?),
-                ("help", native_field(&fault, "remediation")?),
-                ("notes", notes.into_any()),
-                ("affected_rules", native_field(&fault, "affected_rules")?),
-            ],
-        )?);
-    }
-    PyTuple::new(py, diagnostics)
 }

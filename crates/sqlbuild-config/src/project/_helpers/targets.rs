@@ -15,8 +15,9 @@ use crate::project::_helpers::keys::{
 use crate::project::_helpers::sections::{fixed_duration_seconds, item_timeout};
 use crate::project::_helpers::values::{int_below, is_int};
 use crate::project::constants::{
-    CLONE_KEYS, CONCURRENCY_KEY, CONFIRMATION_POLICIES, EXECUTION_LIMIT_KEYS, MAX_FULL_ROWS_KEY,
-    RETENTION_MATERIALIZATIONS, TARGET_KEYS, UNLIMITED_DIFF_FULL_ROWS, WAREHOUSE_GROUPS,
+    CLONE_KEYS, CONCURRENCY_KEY, CONFIRMATION_POLICIES, EXECUTION_LIMIT_KEYS,
+    IGNORE_AUDIT_FAILURES_KEY, MAX_FULL_ROWS_KEY, POOLS_KEY, RETENTION_MATERIALIZATIONS,
+    TARGET_KEYS, UNLIMITED_DIFF_FULL_ROWS, WAREHOUSE_GROUPS,
 };
 use crate::project::errors::ConfigFailure;
 use crate::project::models::{Built, ConfigFile};
@@ -314,6 +315,14 @@ fn validate_target_keys(mapping: &Entries, target: TargetPlace<'_>) -> Result<()
     };
     reject_removed_virtual_keys(mapping, &["state", "changes_only"], place)?;
     validate_allowed_keys(mapping, &TARGET_KEYS, place)?;
+    if matches!(target.file, ConfigFile::Local | ConfigFile::LegacyLocal)
+        && get(mapping, POOLS_KEY).is_some()
+    {
+        return Err(ConfigFailure::at(
+            target.file,
+            format!("{label}.{POOLS_KEY} is project policy; set it in sqlbuild_project.toml"),
+        ));
+    }
     if let Some(recall) = get(mapping, RECALL_SECTION) {
         recall_section(recall, &format!("{label}.{RECALL_SECTION}"))
             .map_err(|message| ConfigFailure::at(target.file, message))?;
@@ -415,6 +424,10 @@ fn local_target(payload: &ConfigValue, target: TargetPlace<'_>) -> Loaded<Fields
         .collect::<Loaded<Fields>>()?;
     fields.push(("clone", object("LocalClonePolicy", clone_fields)));
     fields.push(("concurrency", target_concurrency(mapping, target)?));
+    fields.push((
+        IGNORE_AUDIT_FAILURES_KEY,
+        bool_or_none(optional_nullable_bool(mapping, IGNORE_AUDIT_FAILURES_KEY)?),
+    ));
     fields.push((
         "catalog_connection",
         optional_text_field(mapping, "catalog_connection")?,

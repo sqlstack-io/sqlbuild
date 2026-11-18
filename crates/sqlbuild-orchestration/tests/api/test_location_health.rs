@@ -1,10 +1,12 @@
 use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope, DefaultRole};
-use crate::platform::main::read_person_location_health::read_person_location_health;
-use crate::platform::main::report_remote_location_health::report_remote_location_health;
-use crate::platform::models::{LocationHealth, LocationHealthObservation, LocationHealthReport};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::platform::main::health::read_person_location_health::read_person_location_health;
+use crate::platform::main::health::report_remote_location_health::report_remote_location_health;
+use crate::platform::models::{
+    ConnectionCheckTrigger, LocationHealth, LocationHealthObservation, LocationHealthReport,
+};
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Parameter, TransactionMode};
@@ -14,9 +16,11 @@ use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::api::tests::helpers::{start_api, stop_api};
-use crate::api::tests::test_types::LocationHealthTestCase;
+use crate::api::tests::helpers::{pool_capped, start_api, stop_api};
+use crate::api::tests::test_types::{LocationHealthTestCase, PoolCapHealthTestCase};
 use crate::credentials::tests::location_helpers::create_location;
+use crate::declarations::models::ServerPoolCaps;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::runs::tests::helpers::snapshot;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -137,6 +141,8 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                 health: LocationHealth::Connection {
                     generation: 1,
                     healthy: false,
+                    trigger: Some(ConnectionCheckTrigger::Startup),
+                    elapsed_millis: Some(410),
                 },
                 ..heartbeat.clone()
             };
@@ -184,12 +190,13 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
             let administrator = bootstrap_user(store, &audit, "orders-admin")
                 .await
                 .expect("administrator");
+            let no_caps = ServerPoolCaps::default();
             let person_read = |target: &'static str| {
                 read_person_location_health(
                     store,
                     (&audit, administrator),
                     (location_id, target),
-                    DefaultRole::None,
+                    (DefaultRole::None, &no_caps),
                 )
             };
             assert_eq!(
@@ -266,6 +273,8 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                     health: LocationHealth::Connection {
                         generation: 1,
                         healthy: true,
+                        trigger: None,
+                        elapsed_millis: None,
                     },
                     ..busy_heartbeat.clone()
                 };
@@ -285,6 +294,169 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                 "a busier target's newer observations do not push out this target's"
             );
             stop_api(api).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_pool_amounts_above_this_servers_caps_when_reading_health_then_a_pool_capped_warning_lists_them()
+ {
+    let test_cases = [
+        PoolCapHealthTestCase {
+            description: "a cap below a job's amount warns about that job only",
+            caps: &[("warehouse_heavy", 1)],
+            expected_warnings: &[(
+                "orders",
+                "warehouse_heavy",
+                3,
+                1,
+                "job orders takes 3 of pool warehouse_heavy; this server caps it at 1, so it runs \
+                 alone in that pool",
+            )],
+        },
+        PoolCapHealthTestCase {
+            description: "a cap below a group's amount names it a job group",
+            caps: &[("supplier_api", 1)],
+            expected_warnings: &[(
+                "nightly_group",
+                "supplier_api",
+                2,
+                1,
+                "job group nightly_group takes 2 of pool supplier_api; this server caps it at 1, \
+                 so it runs alone in that pool",
+            )],
+        },
+        PoolCapHealthTestCase {
+            description: "a cap at or above every amount warns about nothing",
+            caps: &[("warehouse_heavy", 3), ("supplier_api", 2)],
+            expected_warnings: &[],
+        },
+        PoolCapHealthTestCase {
+            description: "an uncapped server warns about nothing",
+            caps: &[],
+            expected_warnings: &[],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(Backend::Sqlite).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location_id = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = snapshot(location_id);
+            input.documents.insert(
+                "jobs".into(),
+                json!({
+                    "orders": {"description": "Build orders", "selection": ["orders"],
+                        "pools": {"warehouse_heavy": {"amount": 3, "limit": 4}}},
+                    "customers": {"description": "Build customers", "selection": ["customers"],
+                        "pools": {"warehouse_heavy": {"amount": 1, "limit": 4}}},
+                }),
+            );
+            input.documents.insert(
+                "groups".into(),
+                json!({"nightly_group": {"description": "Everything nightly",
+                    "selection": ["customers", "orders"],
+                    "pools": {"supplier_api": {"amount": 2, "limit": 2}},
+                    "jobs": {"customers": [], "orders": []}}}),
+            );
+            let published = publish_snapshot(store, &input).await.expect("publish");
+            let audit = AuditContext {
+                actor: "test-admin".into(),
+                granting_role: "admin".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let administrator = bootstrap_user(store, &audit, "orders-admin")
+                .await
+                .expect("administrator");
+            let caps = ServerPoolCaps {
+                launchers: [(
+                    (location_id, "development".to_owned()),
+                    test_case
+                        .caps
+                        .iter()
+                        .map(|(pool, cap)| {
+                            (
+                                (*pool).to_owned(),
+                                std::num::NonZeroU32::new(*cap).expect("cap"),
+                            )
+                        })
+                        .collect(),
+                )]
+                .into(),
+            };
+
+            let observations = read_person_location_health(
+                store,
+                (&audit, administrator),
+                (location_id, "development"),
+                (DefaultRole::None, &caps),
+            )
+            .await
+            .expect("health");
+
+            let capped = pool_capped(&observations);
+            assert!(
+                capped
+                    .iter()
+                    .all(|(generation, event_id, _)| (*generation, *event_id)
+                        == (1, published.snapshot_id)),
+                "{}: the warning belongs to the current snapshot",
+                test_case.description
+            );
+            let warnings: Vec<(String, String, u32, u32, String)> = capped
+                .into_iter()
+                .map(|(_, _, warning)| {
+                    (
+                        warning.job_key,
+                        warning.pool,
+                        warning.amount,
+                        warning.cap,
+                        warning.message,
+                    )
+                })
+                .collect();
+            assert_eq!(
+                warnings,
+                test_case
+                    .expected_warnings
+                    .iter()
+                    .map(|(job, pool, amount, cap, message)| (
+                        (*job).to_owned(),
+                        (*pool).to_owned(),
+                        *amount,
+                        *cap,
+                        (*message).to_owned()
+                    ))
+                    .collect::<Vec<_>>(),
+                "{}",
+                test_case.description
+            );
+            assert!(
+                report_location_health(
+                    store,
+                    location_id,
+                    &LocationHealthReport {
+                        event_id: Uuid::now_v7(),
+                        session_id: Uuid::now_v7(),
+                        target: "development".into(),
+                        health: LocationHealth::PoolCapped {
+                            generation: 1,
+                            jobs: Vec::new(),
+                        },
+                    },
+                )
+                .await
+                .is_err(),
+                "{}: a location cannot report the server's own warning",
+                test_case.description
+            );
             close_test_store(fixture).await;
         });
     }

@@ -37,10 +37,13 @@ pub struct CheckResult {
     pub evidence_count: Option<i64>,
     pub evidence_truncated: Option<String>,
     pub reused: String,
+    /// An error-severity failure its build let through instead of holding anything back.
+    #[serde(default)]
+    pub ignored: bool,
 }
 
 impl CheckResult {
-    pub(crate) fn new(event_id: Uuid, record: WarehouseAuditRecord) -> Self {
+    pub(crate) fn new(event_id: Uuid, record: WarehouseAuditRecord, ignored: bool) -> Self {
         Self {
             event_id,
             binding_key: record.binding_key,
@@ -67,6 +70,7 @@ impl CheckResult {
             evidence_count: record.evidence_count,
             evidence_truncated: record.evidence_truncated,
             reused: record.reused,
+            ignored,
         }
     }
 }

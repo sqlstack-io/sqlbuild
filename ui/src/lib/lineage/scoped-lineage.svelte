@@ -1,12 +1,17 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
+	import MinusIcon from '@lucide/svelte/icons/minus';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	// Focused, model-scoped lineage graph for the catalog detail page.
 	// Shows the selected node's neighborhood with adjustable upstream/downstream
 	// depth, lets you select nodes, and Execute acts on the current selection.
-	import '@xyflow/svelte/dist/style.css';
-	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
+	import PlayIcon from '@lucide/svelte/icons/play';
+	import type { Node, Edge } from '@xyflow/svelte';
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import { LABEL_MIN_ZOOM } from '$lib/lineage/fit';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import { layoutGraph } from '$lib/lineage/layout';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { tick } from 'svelte';
 
 	import { app } from '$lib/state/app.svelte';
@@ -152,81 +157,58 @@
 	<div class="flex items-center gap-3 border-b border-border px-4 py-2">
 		<div class="flex items-center gap-1.5">
 			<span class="text-[var(--sb-text-faint)] text-[12px] font-medium">Upstream</span>
-			<div class="bg-secondary flex items-center overflow-hidden rounded-[2px] border border-border">
-				<button class="text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] h-6 w-6 text-[13px] disabled:opacity-40 disabled:pointer-events-none" disabled={upDepth <= 0} onclick={() => (upDepth = Math.max(0, upDepth - 1))}>−</button>
+			<div class="flex items-center rounded-(--radius) border border-input">
+				<Button variant="ghost" size="icon-sm" aria-label="One fewer upstream level" disabled={upDepth <= 0} onclick={() => (upDepth = Math.max(0, upDepth - 1))}><MinusIcon /></Button>
 				<span class="w-5 text-center text-[11px]">{upDepth}</span>
-				<button class="text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] h-6 w-6 text-[13px] disabled:opacity-40 disabled:pointer-events-none" disabled={upDepth >= maxUp} title={upDepth >= maxUp ? 'No more upstream models' : undefined} onclick={() => upDepth++}>+</button>
+				<Button variant="ghost" size="icon-sm" aria-label="One more upstream level" disabled={upDepth >= maxUp} title={upDepth >= maxUp ? 'No more upstream models' : undefined} onclick={() => upDepth++}><PlusIcon /></Button>
 			</div>
 		</div>
 		<div class="flex items-center gap-1.5">
 			<span class="text-[var(--sb-text-faint)] text-[12px] font-medium">Downstream</span>
-			<div class="bg-secondary flex items-center overflow-hidden rounded-[2px] border border-border">
-				<button class="text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] h-6 w-6 text-[13px] disabled:opacity-40 disabled:pointer-events-none" disabled={downDepth <= 0} onclick={() => (downDepth = Math.max(0, downDepth - 1))}>−</button>
+			<div class="flex items-center rounded-(--radius) border border-input">
+				<Button variant="ghost" size="icon-sm" aria-label="One fewer downstream level" disabled={downDepth <= 0} onclick={() => (downDepth = Math.max(0, downDepth - 1))}><MinusIcon /></Button>
 				<span class="w-5 text-center text-[11px]">{downDepth}</span>
-				<button class="text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] h-6 w-6 text-[13px] disabled:opacity-40 disabled:pointer-events-none" disabled={downDepth >= maxDown} title={downDepth >= maxDown ? 'No more downstream models' : undefined} onclick={() => downDepth++}>+</button>
+				<Button variant="ghost" size="icon-sm" aria-label="One more downstream level" disabled={downDepth >= maxDown} title={downDepth >= maxDown ? 'No more downstream models' : undefined} onclick={() => downDepth++}><PlusIcon /></Button>
 			</div>
 		</div>
-		<button
-			class="text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2 py-1 text-[11px] disabled:opacity-40 disabled:pointer-events-none"
+		<Button
+			size="sm"
 			disabled={upDepth >= maxUp && downDepth >= maxDown}
 			onclick={() => {
 				upDepth = maxUp;
 				downDepth = maxDown;
-			}}>All</button
+			}}>All</Button
 		>
-		<button
-			class="text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2 py-1 text-[11px]"
-			onclick={resetLayout}
-			title="Reset layout">⤢ Reset</button
-		>
+		<Button size="sm" onclick={resetLayout} title="Reset layout"><RotateCcwIcon />Reset</Button>
 
 		<div class="ml-auto flex items-center gap-2.5">
 			<span class="text-[var(--sb-text-faint)] text-[12px]">--select <span class="text-muted-foreground">{selectExpr}</span></span>
-			{#if onExecute}<button
-				class="bg-primary rounded-[2px] px-3 py-1 text-[12px] font-medium text-white disabled:opacity-50"
+			{#if onExecute}<Button
+				variant="default"
+				size="sm"
 				disabled={!app.can('run.adhoc')}
 				title={app.can('run.adhoc') ? undefined : 'Requires run.adhoc'}
-				onclick={() => onExecute(effectiveSelection.map((id) => graphNodes.find((n) => n.id === id)?.name ?? id))}>▷ Execute {effectiveSelection.length > 1 ? `(${effectiveSelection.length})` : ''}</button
+				onclick={() => onExecute(effectiveSelection.map((id) => graphNodes.find((n) => n.id === id)?.name ?? id))}><PlayIcon class="size-3.5 fill-current stroke-none" />Execute {effectiveSelection.length > 1 ? `(${effectiveSelection.length})` : ''}</Button
 			>{/if}
 		</div>
 	</div>
 
 	<!-- graph -->
-	<div class="sb-flow relative min-h-0 flex-1" class:unfitted={!fitted && nodes.length > 0} style="background: var(--sb-inset)">
-		<SvelteFlow
+	<div class="relative flex min-h-0 flex-1">
+		<GraphCanvas
 			bind:nodes
 			bind:edges
+			bind:fit={fitFn}
+			bind:fitted
+			readable={false}
+			fitOnInit
 			{nodeTypes}
-			fitView
-			fitViewOptions={{ minZoom: 0.3 }}
-			minZoom={0.1}
+			fitViewOptions={{ minZoom: LABEL_MIN_ZOOM }}
 			elementsSelectable
 			nodesDraggable
 			multiSelectionKey={['Shift', 'Meta', 'Control']}
 			selectionKey="Shift"
-			proOptions={{ hideAttribution: true }}
-		>
-			<FlowController bind:fitView={fitFn} bind:fitted fitFloor={0.3} />
-			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-			<Controls />
-		</SvelteFlow>
+		/>
 	</div>
 </div>
 
-<style>
-	.unfitted :global(.svelte-flow__viewport),
-	.unfitted :global(.svelte-flow__controls) {
-		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
-		opacity: 0;
-	}
-	.sb-flow :global(.svelte-flow__controls-button) {
-		background: var(--card);
-		border-bottom: 1px solid var(--border);
-	}
-	.sb-flow :global(.svelte-flow__controls-button svg) {
-		fill: var(--muted-foreground);
-	}
-	.sb-flow :global(.svelte-flow__attribution) {
-		display: none;
-	}
-</style>

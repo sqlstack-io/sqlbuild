@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toColumnLineage, toMicrobatchCoverage, toNodeRuns } from './http-catalog';
+import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toColumnLineage, toMicrobatchCoverage, toNodeRuns, toNodeStates } from './http-catalog';
 import { toCheck } from './http-checks';
 
 type W = components['schemas'];
@@ -28,6 +28,33 @@ describe('catalog node mapping', () => {
 			['seed:countries', 'seed', null],
 			['source:raw_orders', 'source', null]
 		]);
+	});
+
+	it('lists Python nodes and functions with their edges, and leaves out audits, tests, scenarios, checks, macros and hooks', () => {
+		const nodes = toCatalogNodes([
+			node('asset:order_feed'),
+			node('loader:raw_customers'),
+			node('task:refresh_inventory', { dependencies: ['model:orders'] }),
+			node('udf:cents_to_amount'),
+			node('table_fn:orders_between'),
+			node('model:orders', { materialization: 'table', dependencies: ['asset:order_feed', 'udf:cents_to_amount', 'audit:orders_positive'] }),
+			node('audit:orders_positive'),
+			node('sql_test:orders_total'),
+			node('sql_scenario:orders_backfill'),
+			node('check:orders_recent'),
+			node('macro:cents'),
+			node('hook:notify')
+		]);
+		expect(nodes.map((n) => [n.key, n.kind, n.materialization])).toEqual([
+			['asset:order_feed', 'asset', null],
+			['loader:raw_customers', 'loader', null],
+			['task:refresh_inventory', 'task', null],
+			['udf:cents_to_amount', 'udf', null],
+			['table_fn:orders_between', 'table_fn', null],
+			['model:orders', 'table', 'table']
+		]);
+		expect(nodes.find((n) => n.key === 'model:orders')?.upstream).toEqual(['asset:order_feed', 'udf:cents_to_amount']);
+		expect(nodes.find((n) => n.key === 'task:refresh_inventory')?.upstream).toEqual(['model:orders']);
 	});
 
 	it('keeps only upstream nodes that are listed, so graphs never point at a hidden node', () => {
@@ -157,7 +184,7 @@ describe('catalog node detail', () => {
 
 describe('catalog node runs and jobs', () => {
 	const snapshot = '01a1b000-0000-7000-8000-000000000001';
-	const job = (key: string, kind: 'job' | 'group', selection: string[]): W['JobRecord'] => ({ job_key: key, kind, description: key, selection, concurrency_groups: [], snapshot_id: snapshot, overlap: 'queue' });
+	const job = (key: string, kind: 'job' | 'group', selection: string[]): W['JobRecord'] => ({ job_key: key, kind, description: key, selection, pools: [], snapshot_id: snapshot, overlap: 'queue' });
 	const trigger = (id: string, jobKey: string) => ({ trigger_id: id, job_key: jobKey }) as W['TriggerRecord'];
 	const run = (id: string, status: string, extra: Partial<W['NodeRunRecord']> = {}): W['NodeRunRecord'] => ({ run_id: id, job_key: 'orders', queued_at: '2026-11-08T05:59:00Z', status, ...extra });
 
@@ -222,5 +249,16 @@ describe('column lineage mapping', () => {
 
 	it('has nothing to show when no lineage reaches the node', () => {
 		expect(toColumnLineage({ snapshot_id: 's', nodes: [], edges: [] }, nodes)).toBeNull();
+	});
+});
+
+describe('node states mapping', () => {
+	it('carries the changed build planned for the current snapshot, and none from an older server', () => {
+		const record = { snapshot_id: 'snap-1', version: 3, states: {} };
+		const build = { generation: 2, reported_at: '2026-11-08T12:00:00Z', changed: ['model:orders'], downstream: ['model:customers'] };
+		expect(toNodeStates({ ...record, changed_build: build }).changedBuild).toEqual({ generation: 2, changed: ['model:orders'], downstream: ['model:customers'], failing: null });
+		const failed = { ...build, changed: [], downstream: [], failing: 'Model orders cannot plan a full rebuild' };
+		expect(toNodeStates({ ...record, changed_build: failed }).changedBuild?.failing).toBe('Model orders cannot plan a full rebuild');
+		expect(toNodeStates(record).changedBuild).toBeNull();
 	});
 });

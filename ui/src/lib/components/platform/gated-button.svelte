@@ -16,7 +16,7 @@
 		size?: ButtonSize;
 		children: Snippet;
 	};
-	let { requires, onclick, disabled = false, busy = false, title, variant = 'outline', size = 'sm', children }: Props = $props();
+	let { requires, onclick, disabled = false, busy = false, title, variant = 'outline', size = 'bar', children }: Props = $props();
 
 	const allowed = $derived(app.can(requires));
 </script>

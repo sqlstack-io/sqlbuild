@@ -28,6 +28,6 @@ pub async fn read_person_check(
     commit(transaction).await?;
     Ok(rows
         .into_iter()
-        .map(|row| CheckResult::new(row.event_id, row.record))
+        .map(|row| CheckResult::new(row.event_id, row.record, row.ignored))
         .collect())
 }

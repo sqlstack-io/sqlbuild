@@ -1,122 +1,73 @@
-//! A requested plan runs as a `sqb plan --json` child on frozen node keys, from the synced copy.
+//! A requested plan runs in the location's runtime interpreter on frozen node keys, from the synced copy.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
 
-use serde_json::Value;
-use sqlbuild_core::plan_display::constants::PLAN_SYNCED_COPY_ENV;
+use serde_json::{Value, json};
 use sqlbuild_orchestration::platform::models::LocationWorkClient;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::PreviewCopyRead;
-use tokio::io::AsyncReadExt;
-use tokio::process::Child;
+use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use crate::argv::main::accepted_settings_arguments::accepted_settings_arguments;
-use crate::native_commands::_helpers::execution::location_child;
-use crate::native_commands::_helpers::execution::plan_failure;
-use crate::native_commands::constants::{PLAN_COMMAND, PLAN_OUTPUT_BYTES};
-use crate::native_commands::main::_plan_document::plan_document;
-use crate::native_commands::models::LocationServe;
+use crate::native_commands::_helpers::location::execution::{plan_failure, without_diffs};
+use crate::native_commands::_helpers::location::held_copy::{
+    HELD_COPY, held_copy, hold_copy, read_copy,
+};
+use crate::native_commands::_helpers::location::plan_request::{
+    plan_arguments, run_plan, selected_names,
+};
+use crate::native_commands::models::{HeldCopy, LocationRuntimeRequest, LocationServe};
+use crate::native_commands::types::LocationPlan;
 
-/// The plan document, an `{"error": ...}` report when planning failed, or `None` when stopped first.
+/// The plan document with the diffs it left out, an `{"error": ...}` report, or `None` when stopped first.
 pub(super) async fn plan_location(
-    (options, script): (&LocationServe, &Path),
+    (options, runtime): (&LocationServe, &mpsc::Sender<LocationRuntimeRequest>),
     (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
     (client, session_id, generation): (&LocationWorkClient, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<Value>, ControlError> {
-    let read = PreviewCopyRead {
-        session_id,
-        generation,
-        consumption: settings
-            .get("changed")
-            .is_some_and(|changed| !matches!(changed, Value::Null | Value::Bool(false))),
+) -> Result<Option<LocationPlan>, ControlError> {
+    let (argv, select) = match plan_arguments(options, settings)
+        .and_then(|argv| Ok((argv, selected_names(selection)?)))
+    {
+        Ok(planned) => planned,
+        Err(message) => return Ok(Some(without_diffs(plan_failure(&message)))),
     };
-    let copy = match client.preview_copy(&options.target, &read).await {
+    let consumption: bool = settings
+        .get("changed")
+        .is_some_and(|changed| !matches!(changed, Value::Null | Value::Bool(false)));
+    let held: Option<HeldCopy> = held_copy(&HELD_COPY, (&options.target, generation), consumption);
+    let read_consumption: bool = consumption || held.as_ref().is_some_and(|held| held.consumption);
+    let copy = match read_copy(
+        client,
+        &options.target,
+        PreviewCopyRead {
+            session_id,
+            generation,
+            consumption: read_consumption,
+            versioned: true,
+            known_version: held.as_ref().map(|held| held.version.clone()),
+        },
+    )
+    .await
+    {
         Ok(copy) => copy,
         Err(error) => {
-            return Ok(Some(plan_failure(&format!(
+            return Ok(Some(without_diffs(plan_failure(&format!(
                 "the synced warehouse copy is unavailable: {error}"
-            ))));
+            )))));
         }
     };
-    let path: PathBuf =
-        std::env::temp_dir().join(format!("sqlbuild-plan-copy-{}.json", Uuid::now_v7()));
-    std::fs::write(
-        &path,
-        serde_json::to_vec(&copy).map_err(std::io::Error::other)?,
-    )?;
-    let planned = run_plan((options, script), (selection, settings), &path, stopped).await;
-    drop(std::fs::remove_file(&path));
-    planned
-}
-
-async fn run_plan(
-    (options, script): (&LocationServe, &Path),
-    (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
-    copy: &Path,
-    stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<Value>, ControlError> {
-    let mut child = match plan_child((options, script), (selection, settings), copy) {
-        Ok(child) => child?,
-        Err(message) => return Ok(Some(plan_failure(&message))),
+    let planned: HeldCopy = match held {
+        Some(held) if copy.unchanged => held,
+        _ => hold_copy(&HELD_COPY, options, generation, (copy, read_consumption))?,
     };
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| ControlError::Invalid("plan output is unavailable".into()))?;
-    let mut output: Vec<u8> = Vec::new();
-    let limit = u64::try_from(PLAN_OUTPUT_BYTES).unwrap_or(u64::MAX) + 1;
-    tokio::pin!(stopped);
-    let status = tokio::select! {
-        result = &mut stopped => {
-            child.kill().await?;
-            result?;
-            return Ok(None);
-        },
-        result = async {
-            let mut reader = stdout.take(limit);
-            reader.read_to_end(&mut output).await?;
-            drop(reader);
-            child.wait().await
-        } => result?,
-    };
-    Ok(Some(plan_document(
-        &output,
-        matches!(status.code(), Some(0 | 1)),
-    )))
-}
-
-/// The started child, or why the frozen request cannot become plan arguments.
-fn plan_child(
-    (options, script): (&LocationServe, &Path),
-    (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
-    copy: &Path,
-) -> Result<std::io::Result<Child>, String> {
-    let flags = accepted_settings_arguments(PLAN_COMMAND, settings)?;
-    let mut command = location_child(options, script);
-    command
-        .args([
-            PLAN_COMMAND,
-            "--target",
-            &options.target,
-            "--json",
-            "--no-color",
-        ])
-        .args(flags);
-    for key in selection {
-        let (_, name) = key
-            .split_once(':')
-            .ok_or_else(|| "the plan request names an invalid node".to_owned())?;
-        command.args(["--select", name]);
-    }
-    Ok(command
-        .env_remove("SQLBUILD_LOCATION_TOKEN")
-        .env_remove("SQLBUILD_RUN_TOKEN")
-        .env(PLAN_SYNCED_COPY_ENV, copy)
-        .stdout(Stdio::piped())
-        .spawn())
+    let request = json!({"plan": {
+        "argv": argv,
+        "select": select,
+        "copy": planned.path.to_string_lossy(),
+        "version": planned.version,
+        "consumption": planned.consumption,
+    }});
+    run_plan(runtime, request, stopped).await
 }

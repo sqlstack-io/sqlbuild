@@ -43,8 +43,8 @@ export type RunScript = {
 	lastHeartbeatAt: number | null;
 	imageId: string;
 	snapshotGeneration: number;
-	/** Concurrency groups the run takes a slot in. */
-	concurrencyGroups: string[];
+	/** Each pool the run takes, with how many of its slots. */
+	pools: Record<string, number>;
 };
 
 export type RunRecord = { run: Run; script: RunScript };
@@ -277,7 +277,9 @@ const LEVEL: Record<RunEvent['type'], RunEventLevel> = {
 	launched: 'info',
 	cancel_requested: 'warn',
 	presumed_failed: 'error',
-	terminated: 'info'
+	terminated: 'info',
+	member_retrying: 'warn',
+	member_recovered: 'info'
 };
 
 export function invocationId(run: Run, attempt = 1): string {
@@ -365,7 +367,7 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 	fact('queued', queued, `Queued at priority ${run.priority}`);
 	if (run.launchedAt) {
 		const launched = Date.parse(run.launchedAt);
-		fact('claimed', launched - 300, script.nodes.length ? `Claimed ${script.nodes.length} write-set nodes${script.concurrencyGroups.length ? ` and a slot in ${script.concurrencyGroups.join(', ')}` : ''}` : 'Claimed');
+		fact('claimed', launched - 300, script.nodes.length ? `Claimed ${script.nodes.length} write-set nodes${Object.keys(script.pools).length ? ` and slots in pool ${Object.keys(script.pools).join(', ')}` : ''}` : 'Claimed');
 		fact('launched', launched, script.nodes.length ? `Container started from image ${script.imageId.slice(0, 19)}` : `Started ${run.childRunCount} child runs in order`);
 	}
 	if (script.cancel) fact('cancel_requested', script.cancel.requestedAt, `Cancel requested by ${script.cancel.requestedBy.displayName}`);

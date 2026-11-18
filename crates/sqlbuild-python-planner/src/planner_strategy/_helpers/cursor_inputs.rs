@@ -6,6 +6,7 @@ use crate::planner_strategy::main::values::text::text;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyTuple};
+use sqlbuild_python_base::native_host::models::Dialect;
 
 use sqlbuild_analysis::planner_strategy::main::cursor_input_column::cursor_input_column_failure;
 use sqlbuild_analysis::planner_strategy::models::{CursorInputColumnCheck, CursorInputColumnOwner};
@@ -25,10 +26,12 @@ use sqlbuild_python_front::model_config::main::config::config_text_object::confi
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
-use sqlbuild_python_project::planner_strategy::constants::{
-    ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
-    SOURCE_REFERENCE, TIMESTAMP_CURSOR,
-};
+use sqlbuild_python_project::planner_strategy::constants::ENFORCED_CONTRACT;
+use sqlbuild_python_project::planner_strategy::constants::INCREMENTAL_MATERIALIZATION;
+use sqlbuild_python_project::planner_strategy::constants::MODEL_REFERENCE;
+use sqlbuild_python_project::planner_strategy::constants::SEED_REFERENCE;
+use sqlbuild_python_project::planner_strategy::constants::SOURCE_REFERENCE;
+use sqlbuild_python_project::planner_strategy::constants::TIMESTAMP_CURSOR;
 use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 
@@ -171,10 +174,10 @@ pub(crate) fn reject_unexposed_cursor_input_columns<'py>(
 
 /// The qualified relation one cursor input reference reads, when it resolves.
 fn input_relation<'py>(
-    (lookups, adapter): (&CursorInputLookups<'py>, &Bound<'py, PyAny>),
+    (lookups, dialect): (&CursorInputLookups<'py>, &Bound<'py, Dialect>),
     (kind, name): (&str, &str),
 ) -> PyResult<Option<String>> {
-    let py: Python<'py> = adapter.py();
+    let py: Python<'py> = dialect.py();
     let location: Bound<'py, PyAny> = match kind {
         MODEL_REFERENCE => {
             let model: Bound<'py, PyAny> = mapping_get(&lookups.model_locations, name)?;
@@ -190,7 +193,7 @@ fn input_relation<'py>(
             if source.is_none() {
                 return Ok(None);
             }
-            return render_source_relation(&source, Some(adapter)).map(Some);
+            return render_source_relation(&source, Some(dialect.as_any())).map(Some);
         }
         _ => py.None().into_bound(py),
     };
@@ -237,7 +240,7 @@ pub(crate) fn cursor_input_relations_of<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let request = Request::new("build_cursor_input_relations", request)?;
     for name in [
-        "adapter",
+        "dialect",
         "model_locations",
         "models_by_name",
         "seed_locations",
@@ -247,7 +250,10 @@ pub(crate) fn cursor_input_relations_of<'py>(
         request.get(name)?;
     }
     build_cursor_input_relations(
-        (&request.get("model")?, &request.get("adapter")?),
+        (
+            &request.get("model")?,
+            &Dialect::passed(request.get("dialect")?)?,
+        ),
         &request.get("cursor_column")?,
         &lookups_of(&request)?,
     )
@@ -255,7 +261,7 @@ pub(crate) fn cursor_input_relations_of<'py>(
 
 /// Cursor-bearing input relations of an incremental model, for runtime range discovery.
 pub(crate) fn build_cursor_input_relations<'py>(
-    (model, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (model, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
     cursor_column: &Bound<'py, PyAny>,
     lookups: &CursorInputLookups<'py>,
 ) -> PyResult<Bound<'py, PyTuple>> {
@@ -287,7 +293,7 @@ pub(crate) fn build_cursor_input_relations<'py>(
         let kind: String = text(&native_field(&reference, "ref_kind")?)?;
         let name: Bound<'py, PyAny> = native_field(&reference, "ref_name")?;
         let name_text: String = text(&name)?;
-        let Some(relation) = input_relation((lookups, adapter), (&kind, &name_text))? else {
+        let Some(relation) = input_relation((lookups, dialect), (&kind, &name_text))? else {
             continue;
         };
         let producer: Option<Bound<'py, PyAny>> = if kind == MODEL_REFERENCE {

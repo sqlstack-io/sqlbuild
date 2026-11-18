@@ -1,9 +1,13 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import { to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import SqlViewer from '$lib/components/code/sql-viewer.svelte';
@@ -14,9 +18,11 @@
 	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { untrack } from 'svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
-	import { kindLine, nodeIcon, nodeIconKey, nodeKindPlural, shortName, sqlVersions } from '$lib/build-area/labels';
+	import { kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, shortName, sqlVersions } from '$lib/build-area/labels';
 	import { cardData } from '$lib/lineage/catalog-graph';
 	import OverviewTab from './overview-tab.svelte';
 	import DriftTab from './drift-tab.svelte';
@@ -24,19 +30,21 @@
 	import ChecksTab from './checks-tab.svelte';
 	import WarehouseTab from './warehouse-tab.svelte';
 	import HistoryTab from './history-tab.svelte';
+	import SyncingNote from '$lib/components/platform/syncing-note.svelte';
 	import { upstreamNote, type Tab } from './utils';
 
 	let { name }: { name: string } = $props();
 	const COST_DAYS = 30;
 
-	const res = createResource((client, scope) => client.getCatalogNode(scope, name), ['runs', 'checks', 'snapshot', 'node_status', 'warehouse_sync']);
+	const catalog = useCatalogNodes();
+	// The shared listing, when held, saves the detail read from listing every node again; it is not a dependency.
+	const res = createResource((client, scope) => client.getCatalogNode(scope, name, untrack(() => catalog.data)), ['runs', 'checks', 'snapshot', 'node_status', 'warehouse_sync']);
 	const n = $derived(res.data ?? null);
 	// Checks and migrations link nodes by bare name; settle on the node key so the graph and links agree.
 	$effect(() => {
 		if (n && n.key !== name) goto(to(`/catalog/${n.key}${page.url.search}`), { replaceState: true });
 	});
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs']);
-	const colLineage = createResource((client, scope) => client.getColumnLineage(scope, name), ['snapshot']);
+	const colLineage = createResource((client, scope) => client.getColumnLineage(scope, name, untrack(() => catalog.data)), ['snapshot']);
 	const costs = createResource((client, scope) => (n && client.supports('listNodeCosts') ? client.listNodeCosts(scope, n.key, COST_DAYS) : Promise.resolve([])), ['runs', 'warehouse_sync']);
 
 	const tabs = $derived.by<[Tab, string][]>(() => {
@@ -81,18 +89,24 @@
 		void goto(to(planHref(selection)));
 	}
 	const Glyph = $derived(n ? (nodeIcon[nodeIconKey(n)] ?? nodeIcon.table) : nodeIcon.table);
+	const columnColumns: TableColumn[] = [
+		{ id: 'column', label: 'Column', minWidth: 180 },
+		{ id: 'type', label: 'Type', width: '160px' },
+		{ id: 'description', label: 'Description', width: '40%' },
+		{ id: 'audits', label: 'Audits', width: '22%', truncate: false }
+	];
 </script>
 
 <AppTopbar title="Catalog">
-	<Button variant="outline" size="sm" onclick={() => res.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => res.refresh()} />
 	{#if n && n.kind !== 'source' && canRun}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => execute([name])}>▷ Build</GatedButton>
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => execute([name])}><PlayIcon class="size-3.5 fill-current stroke-none" />Build</GatedButton>
 	{/if}
 </AppTopbar>
 
 <div class="asset-page">
 	<header class="asset-header">
-		<nav class="crumbs"><a href={to(`/catalog`)}>Catalog</a><span>/</span>{#if n}<a href={to(`/catalog?kind=${n.kind}`)}>{nodeKindPlural[n.kind]}</a>{/if}</nav>
+		<nav class="crumbs"><a href={to(`/catalog`)}>Catalog</a><span>/</span>{#if n}<a href={to(`/catalog?kind=${kindTabOf(n.kind)}`)}>{kindTabLabel[kindTabOf(n.kind)]}</a>{/if}</nav>
 		<div class="title-row">
 			<Glyph size={18} strokeWidth={1.75} />
 			<h2 title={name}>{shortName(n?.key ?? name)}</h2>
@@ -107,7 +121,7 @@
 				<StaleBadges reasons={n.stale} />
 			{/if}
 			<div class="header-actions">
-				<a class="btn-ghost" href={to(`/lineage?select=${name}`)}>View in lineage</a>
+				<a class="btn-ghost" href={to(`/lineage?focus=${encodeURIComponent(name)}`)}>View in lineage</a>
 			</div>
 		</div>
 		{#if n}
@@ -117,11 +131,7 @@
 				{:else}<span>{n.lastBuild ? `Last built ${formatAgo(n.lastBuild.builtAt, app.now)}` : 'Never built'}</span>{/if}
 			</div>
 		{/if}
-		<div class="tabs" role="tablist">
-			{#each tabs as [t, label] (t)}
-				<button role="tab" aria-selected={tab === t} class:on={tab === t} onclick={() => setTab(t)}>{label}</button>
-			{/each}
-		</div>
+		<div class="mt-2.5"><PageTabs flush value={tab} tabs={tabs.map(([value, label]) => ({ value, label }))} onselect={setTab} /></div>
 	</header>
 
 	{#if res.error}<div class="msg err">Couldn't load {name}: {res.error}</div>{:else if res.data === null}<div class="msg">There's no node <code>{name}</code> in the version deployed to {app.location?.name}.</div>{/if}
@@ -131,19 +141,16 @@
 			{#if tab === 'overview'}
 				<OverviewTab node={n} onTab={setTab} onSql={(mode) => { viewerMode = mode; setTab('sql'); }} />
 			{:else if tab === 'columns'}
-				<table class="sb-list">
-					<thead><tr><th>Column</th><th>Type</th><th>Description</th><th>Audits</th></tr></thead>
-					<tbody>
-						{#each n.columns as c (c.name)}
-							<tr>
-								<td><code>{c.name}</code></td>
-								<td><code class="muted">{c.type ?? '—'}</code></td>
-								<td class="muted">{c.description}</td>
-								<td><div class="flex flex-wrap gap-1">{#each c.audits as a (a)}<span class="sb-tag">{a}</span>{:else}<span class="muted">—</span>{/each}</div></td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<DataTable class="static" embedded columns={columnColumns} rows={n.columns} key={(c) => c.name} empty="No columns declared.">
+					{#snippet row(c)}
+						<tr>
+							<td><code>{c.name}</code></td>
+							<td><code class="muted">{c.type ?? '—'}</code></td>
+							<td class="muted">{c.description}</td>
+							<td><div class="flex flex-wrap gap-1">{#each c.audits as a (a)}<span class="sb-tag">{a}</span>{:else}<span class="muted">—</span>{/each}</div></td>
+						</tr>
+					{/snippet}
+				</DataTable>
 			{:else if tab === 'sql'}
 				{#if n.sql}
 					<SqlViewer name={shortName(n.key)} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={viewerMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(to(`/catalog/${m}?tab=sql`))} />
@@ -163,12 +170,15 @@
 					<ColumnLineage focal={name} models={colLineage.data.models} colEdges={colLineage.data.edges} modelSql={colLineage.data.sql} modelColExpr={colLineage.data.expressions} />
 				{/if}
 			{:else if tab === 'runs'}
+				<SyncingNote what="Builds and costs" />
 				<RunsTab node={n} costs={costs.data ?? []} costDays={COST_DAYS} />
 			{:else if tab === 'checks'}
+				<SyncingNote what="Check results" />
 				<ChecksTab node={n} />
 			{:else if tab === 'warehouse' && n.warehouse}
 				<WarehouseTab warehouse={n.warehouse} microbatch={n.microbatch} />
 			{:else if tab === 'history' && n.history}
+				<SyncingNote what="History" />
 				<HistoryTab node={n} history={n.history} />
 			{/if}
 		</div>
@@ -238,36 +248,6 @@
 		content: '·';
 		margin-right: 12px;
 		color: var(--sb-text-faint);
-	}
-	.tabs {
-		display: flex;
-		gap: 4px;
-		margin-top: 14px;
-	}
-	.tabs button {
-		position: relative;
-		height: 38px;
-		padding: 0 10px;
-		border: 0;
-		background: transparent;
-		color: var(--muted-foreground);
-		font-size: 13px;
-	}
-	.tabs button:hover {
-		color: var(--foreground);
-	}
-	.tabs button.on {
-		color: var(--foreground);
-		font-weight: 500;
-	}
-	.tabs button.on::after {
-		content: '';
-		position: absolute;
-		right: 6px;
-		bottom: -1px;
-		left: 6px;
-		height: 2px;
-		background: var(--primary);
 	}
 	.asset-body {
 		min-height: 0;

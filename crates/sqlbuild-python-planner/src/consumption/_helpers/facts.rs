@@ -1,14 +1,20 @@
 //! The facts `--changed` and the consumption recorder read from the plan and compiled project.
 
 use crate::consumption::main::relation::relation;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::collections::VecDeque;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_state::consumption::models::{ForcedRun, InputFact, NodeFacts, NodeKey, RelationKey};
 
-use crate::consumption::_helpers::relation_reads::{Locations, sql_reads_undeclared};
+use crate::consumption::_helpers::relation_reads::Locations;
+use crate::consumption::_helpers::relation_reads::prefetch_reads;
+use crate::consumption::_helpers::relation_reads::sql_reads_undeclared;
 use crate::planner_identity::main::function_local_hashes::function_local_hashes;
 use crate::planner_identity::main::hook_version_hashes::hook_version_hashes;
 use crate::planner_identity::main::model_version_identity_metadata_json::model_version_identity_metadata_json;
@@ -312,6 +318,7 @@ pub(crate) fn build_facts(
             checked: HashMap::new(),
         });
     let mut nodes: Vec<NodeFacts> = Vec::new();
+    let mut reads: Vec<ReadCheck> = Vec::new();
     let mut pending: VecDeque<NodeKey> = selected.keys().cloned().collect();
     let mut visited: BTreeSet<NodeKey> = BTreeSet::new();
     while let Some(key) = pending.pop_front() {
@@ -346,34 +353,66 @@ pub(crate) fn build_facts(
                 pending.push_back(upstream.clone());
             }
         }
-        let mut forced: Vec<ForcedRun> = selected.get(&key).cloned().unwrap_or_default();
         let destination: Bound<'_, PyAny> = node.destination()?;
-        let relation: Option<RelationKey> = (!native_field(&destination, "schema")?.is_none())
-            .then(|| relation(&destination))
-            .transpose()?;
-        if let (Compiled::Model(model), Some(locations), Some(function_checks)) =
-            (node, &locations, &mut function_checks)
-            && (sql_reads_undeclared(
-                py,
-                query_sql(model)?.extract()?,
-                (&node_inputs, relation.as_ref()),
-                (locations, dialect.as_deref()),
-            )? || function_checks.undeclared(py, &deps)?)
-        {
-            forced.push(ForcedRun::InputsNotEnumerable);
-        }
-        let Some(relation) = relation else {
+        if native_field(&destination, "schema")?.is_none() {
             continue;
-        };
+        }
+        if let (Compiled::Model(model), Some(_)) = (node, &locations) {
+            reads.push(ReadCheck {
+                position: nodes.len(),
+                sql: query_sql(model)?.extract()?,
+                deps,
+            });
+        }
         nodes.push(NodeFacts {
             selected: selected.contains_key(&key),
+            forced: selected.get(&key).cloned().unwrap_or_default(),
             key,
-            relation,
+            relation: relation(&destination)?,
             version_hash,
-            forced,
             inputs: node_inputs,
         });
     }
-    runnable.retain(|key| nodes.iter().any(|node| node.key == *key));
+    if let (Some(locations), Some(function_checks)) = (&locations, &mut function_checks) {
+        undeclared_reads(py, (&mut nodes, reads), (locations, function_checks))?;
+    }
+    let walked: HashSet<NodeKey> = nodes.iter().map(|node| node.key.clone()).collect();
+    runnable.retain(|key| walked.contains(key));
     Ok(BuildFacts { nodes, runnable })
+}
+
+/// A walked model whose compiled SQL must read only its declared inputs.
+struct ReadCheck {
+    position: usize,
+    sql: String,
+    deps: Vec<(String, String)>,
+}
+
+/// Force each checked model whose SQL or functions read beyond its declared inputs.
+fn undeclared_reads(
+    py: Python<'_>,
+    (nodes, reads): (&mut [NodeFacts], Vec<ReadCheck>),
+    (locations, function_checks): (&Locations, &mut FunctionReads<'_>),
+) -> PyResult<()> {
+    let dialect: Option<&str> = function_checks.dialect;
+    prefetch_reads(
+        py,
+        reads.iter().map(|read| read.sql.clone()).collect(),
+        dialect,
+    )?;
+    for read in reads {
+        let Some(node) = nodes.get_mut(read.position) else {
+            continue;
+        };
+        if sql_reads_undeclared(
+            py,
+            read.sql,
+            (&node.inputs, Some(&node.relation)),
+            (locations, dialect),
+        )? || function_checks.undeclared(py, &read.deps)?
+        {
+            node.forced.push(ForcedRun::InputsNotEnumerable);
+        }
+    }
+    Ok(())
 }

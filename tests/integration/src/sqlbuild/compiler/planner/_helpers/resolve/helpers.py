@@ -18,6 +18,7 @@ from sqlbuild._native import (
     CompileModelConfig,
     CompileSqlReference,
     CursorOverridePair,
+    Dialect,
     ModelCursorSnapshot,
     ModelPlanContext,
     SourceEntry,
@@ -182,7 +183,7 @@ def resolve_and_execute(
     """Resolve model SQL and execute it against a real connection."""
 
     resolved_sql: str = resolve_model_sql(
-        adapter=DuckDbAdapter(),
+        dialect=Dialect(DuckDbAdapter()),
         model=model,
         snapshot=snapshot,
         context=ModelPlanContext(

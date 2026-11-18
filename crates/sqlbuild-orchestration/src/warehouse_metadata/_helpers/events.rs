@@ -6,8 +6,10 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::ingestion::{
-    begin_ingestion, commit_ingestion, outside_scan, scoped_event_id, validate_fields,
+    begin_ingestion, commit_ingestion, next_ingestion_chunk, outside_scan, scoped_event_id,
+    validate_fields,
 };
+use crate::warehouse_metadata::constants::INGESTION_CHUNK_RECORDS;
 use crate::warehouse_metadata::models::{MetadataBatch, StateEventImport, WarehouseSyncResponse};
 
 /// Mirror a state-history page; a source id keeps its earliest row (its latest for kinds whose `mirror_keeps_latest` holds), then its smallest record text in byte order. SQLite and PostgreSQL format that text differently, so on an exact tie each store is deterministic but they may keep different rows; a store migration rebuilds the mirror.
@@ -52,7 +54,12 @@ pub(crate) async fn ingest_events(
     .await?;
     let mut applied = false;
     let mut keys: Vec<Uuid> = Vec::new();
-    for record in records {
+    for (index, record) in records.into_iter().enumerate() {
+        if index > 0 && index % INGESTION_CHUNK_RECORDS == 0 {
+            transaction =
+                next_ingestion_chunk(transaction, (store, location_id, target), batch, applied)
+                    .await?;
+        }
         let event_id = scoped_event_id(
             (location_id, target),
             (

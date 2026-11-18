@@ -1,4 +1,7 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
+	import PageTabs from '$lib/components/platform/page-tabs.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { app } from '$lib/state/app.svelte';
 	import LogTab from './log-tab.svelte';
@@ -30,20 +33,20 @@
 </script>
 
 <div class="bar">
-	{#each TABS as t (t.value)}
-		<button class:on={view.tab === t.value} onclick={() => (view.tab = t.value)} title={t.value === 'statements' ? 'SQL statements the run sent to the warehouse' : t.value === 'cost' ? 'Estimated query cost of this run, by node and warehouse' : undefined}>
-			{t.label} <span>{count(t.value)}</span>
-		</button>
-	{/each}
+	<PageTabs
+		flush
+		bind:value={view.tab}
+		tabs={TABS.map((t) => ({ value: t.value, label: t.label, count: count(t.value), title: t.value === 'statements' ? 'SQL statements the run sent to the warehouse' : t.value === 'cost' ? 'Estimated query cost of this run, by node and warehouse' : undefined }))}
+	/>
 	{#if filtering}
 		<span class="chip" title={view.selected.join(', ')}>
 			Filtered: <b>{chipText}</b>
-			<button onclick={() => view.clearSelection()} aria-label="Clear the node filter"><XIcon size={12} /></button>
+			<Button variant="ghost" size="icon-xs" class="rounded-full" onclick={() => view.clearSelection()} aria-label="Clear the node filter"><XIcon /></Button>
 		</span>
 	{/if}
 </div>
 
-<div class="body sb-scroll">
+<PageBody padding="0">
 	{#if view.tab === 'statements'}
 		<StatementsTab {statements} total={view.statements.length} {grouped} />
 	{:else if view.tab === 'cost'}
@@ -55,7 +58,7 @@
 	{:else}
 		<LogTab entries={shownEntries} {grouped} bind:printed runId={view.run?.id ?? ''} filteredBy={view.selected} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
-</div>
+</PageBody>
 
 <style>
 	.err {
@@ -70,21 +73,6 @@
 		gap: 2px;
 		padding: 0 16px;
 		border-bottom: 1px solid var(--border);
-	}
-	.bar > button {
-		padding: 9px 12px;
-		border-bottom: 2px solid transparent;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-		font-weight: 500;
-	}
-	.bar > button span {
-		color: var(--sb-text-faint);
-		font-weight: 400;
-	}
-	.bar > button.on {
-		border-color: var(--primary);
-		color: var(--foreground);
 	}
 	.chip {
 		display: inline-flex;
@@ -101,26 +89,5 @@
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 		font-weight: 500;
-	}
-	.chip button {
-		display: grid;
-		width: 18px;
-		height: 18px;
-		place-items: center;
-		border-radius: 50%;
-		color: var(--muted-foreground);
-	}
-	.chip button:hover {
-		background: var(--sb-hover);
-		color: var(--foreground);
-	}
-	.body {
-		min-height: 0;
-		flex: 1;
-		overflow: auto;
-	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
 	}
 </style>

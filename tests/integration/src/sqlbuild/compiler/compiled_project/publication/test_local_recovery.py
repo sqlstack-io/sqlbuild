@@ -112,7 +112,7 @@ def test_given_a_running_local_worker_when_scheduler_dies_then_restart_adopts_an
             "failed",
             [],
             launcher="uncooperative",
-            concurrency_limits={"orders_limit": 1},
+            pools={"orders_limit": 1},
             files={
                 **duckshop_orchestration("local_recovery_orders"),
             },
@@ -142,7 +142,9 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute(
                 "SELECT group_key, run_id FROM sqb_concurrency_slots"
-            ).fetchall() == [("orders_limit", active["run_id"])]
+            ).fetchall() == [
+                (f"{worker.api.location_id}/development/orders_limit", active["run_id"])
+            ]
             retained: dict[str, list[tuple[Any, ...]]] = {
                 claim: control.execute(claim).fetchall() for claim in claims
             }

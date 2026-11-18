@@ -30,11 +30,13 @@ use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 use sqlbuild_python_base::compile_context::models::DeltaInjection;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_project::compiled_project::models::DiagnosticSettings;
+use sqlbuild_python_project::compiled_project::models::HookDescriptionRow;
 use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
-use sqlbuild_python_project::compiled_project::models::{
-    DiagnosticSettings, HookDescriptionRow, PythonResourceRow, ScenarioDescriptionRow,
-};
-use sqlbuild_python_project::compiled_project::types::{LoaderRow, ResourceDiagnostics};
+use sqlbuild_python_project::compiled_project::models::PythonResourceRow;
+use sqlbuild_python_project::compiled_project::models::ScenarioDescriptionRow;
+use sqlbuild_python_project::compiled_project::types::LoaderRow;
+use sqlbuild_python_project::compiled_project::types::ResourceDiagnostics;
 use sqlbuild_python_project::resource_views::models::SeedParts;
 use sqlbuild_python_project::resource_views::types::SeedViews;
 

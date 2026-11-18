@@ -5,6 +5,7 @@ use crate::planner_strategy::main::audit_entries::audit_is_selected::audit_is_se
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyList, PyListMethods};
 use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_project::compiled_views::main::project::audits::audits;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
@@ -34,7 +35,7 @@ pub fn build_selected_audit_entries<'py>(
         model_locations: native_field(&relations, "model_locations")?,
         seed_locations: native_field(&relations, "seed_locations")?,
         source_map: native_field(&relations, "source_read_map")?,
-        adapter: request.get("adapter")?,
+        dialect: Dialect::passed(request.get("dialect")?)?,
         model_materializations: request.get("model_materializations")?,
         lineage: native_field(&project, "lineage_graph")?.extract()?,
     };

@@ -10,6 +10,7 @@ from sqlbuild._native import (
     CompiledResourceType,
     CompiledSqlTest,
     CompileSqlReference,
+    Dialect,
     PlanWarning,
     RelationFixtureCompletion,
     RelationFixturePlanningContext,
@@ -98,7 +99,7 @@ def test_given_many_tests_when_building_entries_then_project_fixture_metadata_is
     entries, warnings = build_selected_test_entries(
         sql_test_selection=SqlTestSelection(),
         project=test_project,
-        adapter=PlannerTestAdapter(),
+        dialect=Dialect(PlannerTestAdapter()),
         selected_keys=frozenset((model.key,)),
     )
 
@@ -220,7 +221,7 @@ def test_given_complete_authoritative_fixture_when_completing_then_skips_column_
 
     completed: RelationFixtureCompletion = fixture_completion.build_relation_fixture_completion(
         project=project_with(project=project, models=(model,)),
-        adapter=PlannerTestAdapter(),
+        dialect=Dialect(PlannerTestAdapter()),
         request=(
             (model.name,),
             ((CompiledResourceType.SOURCE, {"raw_orders": test_case.fixture_sql}),),

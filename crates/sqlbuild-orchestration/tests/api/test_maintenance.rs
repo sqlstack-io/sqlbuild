@@ -9,10 +9,10 @@ use crate::api::tests::test_types::WarehouseMetadataTestCase;
 use crate::api::tests::warehouse_history_helpers::{
     batch, fixture, get, ids, login, records, seed_target, start_password_api,
 };
-use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest::{
@@ -180,6 +180,46 @@ fn given_moves_views_and_cleanups_when_people_read_maintenance_then_each_model_s
                 .await
                 .0,
                 StatusCode::FORBIDDEN
+            );
+            let totals_path =
+                format!("/api/control/locations/{location}/targets/development/mirrored-totals");
+            let (status, totals) = get(&client, (&api.url, &viewer), &totals_path).await;
+            assert_eq!(status, StatusCode::OK, "{}", test_case.description);
+            let counted: Vec<(&str, u64)> = totals
+                .as_array()
+                .expect("totals")
+                .iter()
+                .filter(|total| total["records"] != 0)
+                .map(|total| {
+                    (
+                        total["table"].as_str().expect("table"),
+                        total["records"].as_u64().expect("records"),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                (totals.as_array().expect("totals").len(), counted),
+                (
+                    14,
+                    vec![
+                        ("janitor_events", 2),
+                        ("migrations", 3),
+                        ("old_name_views", 4)
+                    ]
+                ),
+                "{}: every state table, counting only this target's mirrored records",
+                test_case.description
+            );
+            assert_eq!(
+                get(
+                    &client,
+                    (&api.url, &viewer),
+                    &totals_path.replace("development", "preview")
+                )
+                .await
+                .0,
+                StatusCode::FORBIDDEN,
+                "mirrored totals need the same view as the target's health"
             );
             stop_api(api).await;
             close_test_store(fixture_store).await;

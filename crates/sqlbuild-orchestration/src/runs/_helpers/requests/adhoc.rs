@@ -1,15 +1,15 @@
 //! Resolve a command against the current publication and freeze it as an ad-hoc run request.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::{Value, json};
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::decide_person_scopes::decide_person_scopes;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
-use crate::declarations::main::frozen_definitions::frozen_definitions;
+use crate::runs::_helpers::lifecycle::publications::{cached_publication, current_publication};
 use crate::runs::_helpers::requests::permissions::{authorize_execution, execution_scopes};
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
@@ -17,28 +17,14 @@ use crate::runs::_helpers::requests::publication::{
 use crate::runs::_helpers::requests::run_id::refuse_derived_run_id;
 use crate::runs::constants::{ADHOC_AUDIT_TAG, LOAD_VERB};
 use crate::runs::models::{
-    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, CommandPlan, PlannerResource, RunCommand,
-    RunKind, RunOrigin, RunRequest,
+    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, CachedPublication, CommandPlan,
+    RunCommand, RunKind, RunOrigin, RunRequest,
 };
-use crate::runs::types::{CommandPlanner, PublishedJobs};
-use crate::snapshots::main::job_write_set::job_write_set;
-use crate::snapshots::main::read_current_record::read_current_record;
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
-use crate::snapshots::models::SnapshotNode;
+use crate::runs::types::CommandPlanner;
+use crate::snapshots::main::write_sets::held_write_set::held_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
-
-/// Graph kinds in the order the CLI builds its project graph: models, sources, seeds, then functions.
-const GRAPH_KINDS: [&str; 5] = ["model", "source", "seed", "udf", "table_fn"];
-/// Python node kinds, in the order the CLI discovers them.
-const PYTHON_NODE_KINDS: [&str; 4] = ["task", "asset", "loader", "check"];
-/// SQL unit tests, which `test:` selects; each lists the models it tests.
-const SQL_TEST_KIND: &str = "sql_test";
-/// Where a SQL unit test's definition lists the models it tests.
-const SQL_TEST_MODELS_POINTER: &str = "/test/payload/expected_model_names";
-/// Marks the source node an intermediate loader writes, which the CLI's SQL graph does not list.
-const INTERMEDIATE_LOADER_FIELD: &str = "intermediate_loader";
 
 /// The frozen request and its verb, or why the command cannot run; `run_id` comes from the caller.
 pub(crate) async fn frozen_adhoc_request(
@@ -46,21 +32,31 @@ pub(crate) async fn frozen_adhoc_request(
     (context, planner): (&AuditContext, &dyn CommandPlanner),
     (request, run_id): (&AdhocCheckRequest, Uuid),
 ) -> Result<(ControlTransaction, Result<(String, RunRequest), String>), ControlError> {
-    let (transaction, snapshot) =
-        read_current_record(transaction, (request.location_id, &request.target)).await?;
-    let Some(snapshot) = snapshot else {
+    let (transaction, current) =
+        current_publication(transaction, planner, (request.location_id, &request.target)).await?;
+    let Some((snapshot, publication)) = current else {
         return Ok((
             transaction,
             Err("this target has no publication yet".into()),
         ));
     };
-    let (transaction, plan) = publication_plan(
+    frozen_publication_request(
         transaction,
-        (planner, snapshot.snapshot_id),
-        &request.command,
+        context,
+        (snapshot.snapshot_id, &publication),
+        (request, run_id),
     )
-    .await?;
-    let plan = match plan {
+    .await
+}
+
+/// [`frozen_adhoc_request`] over a publication the caller already holds.
+pub(crate) async fn frozen_publication_request(
+    transaction: ControlTransaction,
+    context: &AuditContext,
+    (snapshot_id, publication): (Uuid, &CachedPublication),
+    (request, run_id): (&AdhocCheckRequest, Uuid),
+) -> Result<(ControlTransaction, Result<(String, RunRequest), String>), ControlError> {
+    let plan = match publication.prepared.plan(&request.command) {
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
@@ -73,16 +69,11 @@ pub(crate) async fn frozen_adhoc_request(
         let refusal = format!("workers do not run sqb {}", plan.verb);
         return Ok((transaction, Err(refusal)));
     };
-    let (transaction, writers) = job_write_set(
-        transaction,
-        snapshot.snapshot_id,
-        (&plan.selection, &plan.settings),
-    )
-    .await?;
+    let writers = held_write_set(&publication.writers, (&plan.selection, &plan.settings));
     let (transaction, images) = query(
         transaction,
         "SELECT image_id FROM sqb_snapshots WHERE snapshot_id=$1",
-        vec![Parameter::Id(snapshot.snapshot_id)],
+        vec![Parameter::Id(snapshot_id)],
     )
     .await?;
     let image_id = images
@@ -105,7 +96,7 @@ pub(crate) async fn frozen_adhoc_request(
                 run_id,
                 location_id: request.location_id,
                 target: request.target.clone(),
-                snapshot_id: snapshot.snapshot_id,
+                snapshot_id,
                 image_id,
                 kind: RunKind::Adhoc,
                 command,
@@ -122,9 +113,10 @@ pub(crate) async fn frozen_adhoc_request(
                 write_set,
                 settings: plan.settings,
                 window: None,
-                concurrency_groups: BTreeSet::new(),
+                pools: BTreeMap::new(),
                 narrowing: None,
                 retry: None,
+                member_attempt: None,
             },
         )),
     ))
@@ -133,103 +125,12 @@ pub(crate) async fn frozen_adhoc_request(
 /// `command` planned over one publication's nodes and its jobs, or why the planner refuses it.
 pub(crate) async fn publication_plan(
     transaction: ControlTransaction,
-    (planner, snapshot_id): (&dyn CommandPlanner, Uuid),
+    (planner, scope, snapshot_id): (&dyn CommandPlanner, (Uuid, &str), Uuid),
     command: &[String],
 ) -> Result<(ControlTransaction, Result<CommandPlan, String>), ControlError> {
-    let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot_id, None).await?;
-    let (transaction, definitions) = frozen_definitions(transaction, snapshot_id).await?;
-    let jobs: PublishedJobs = definitions
-        .jobs
-        .into_iter()
-        .map(|(name, job)| (name, job.selection))
-        .chain(
-            definitions
-                .groups
-                .into_iter()
-                .map(|(name, group)| (name, group.job.selection)),
-        )
-        .collect();
-    Ok((
-        transaction,
-        planner.plan(command, (&planner_resources(&nodes), &jobs)),
-    ))
-}
-
-/// The selector graph rebuilt from published definitions, in the CLI's kind order; sources intermediate loaders write are selected through their loader.
-fn planner_resources(
-    nodes: &std::collections::BTreeMap<String, SnapshotNode>,
-) -> Vec<PlannerResource> {
-    let mut resources: Vec<PlannerResource> = Vec::new();
-    for kind in GRAPH_KINDS.iter().chain(&PYTHON_NODE_KINDS) {
-        for (key, node) in nodes {
-            let definition = &node.definition;
-            if node.kind != *kind || definition.get(INTERMEDIATE_LOADER_FIELD).is_some() {
-                continue;
-            }
-            let (tags, folder) = match *kind {
-                "model" => (
-                    definition.pointer("/config/tags"),
-                    Some(model_folder(definition)),
-                ),
-                "seed" => (definition.pointer("/schema/tags"), None),
-                _ if PYTHON_NODE_KINDS.contains(kind) => {
-                    (definition.get("tags"), Some(model_folder(definition)))
-                }
-                _ => (definition.get("tags"), None),
-            };
-            resources.push(PlannerResource {
-                key: key.clone(),
-                deps: texts(definition.get("deps")),
-                tags: texts(tags),
-                folder,
-                loader: definition
-                    .pointer("/entry/loader")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned),
-            });
-        }
-    }
-    resources.extend(
-        nodes
-            .iter()
-            .filter(|(_, node)| node.kind == SQL_TEST_KIND)
-            .map(|(key, node)| PlannerResource {
-                key: key.clone(),
-                deps: tested_models(&node.definition),
-                tags: Vec::new(),
-                folder: None,
-                loader: None,
-            }),
-    );
-    resources
-}
-
-/// The model file's folder relative to the project, with `/` separators whichever platform published it.
-fn model_folder(definition: &Value) -> String {
-    let path = definition
-        .get("path")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .replace('\\', "/");
-    path.rsplit_once('/')
-        .map_or_else(|| ".".to_owned(), |(folder, _)| folder.to_owned())
-}
-
-/// The model keys a SQL unit test tests.
-fn tested_models(definition: &Value) -> Vec<String> {
-    texts(definition.pointer(SQL_TEST_MODELS_POINTER))
-        .into_iter()
-        .map(|model| format!("model:{model}"))
-        .collect()
-}
-
-fn texts(value: Option<&Value>) -> Vec<String> {
-    value
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|item| item.as_str().map(str::to_owned))
-        .collect()
+    let (transaction, publication) =
+        cached_publication(transaction, planner, (scope, snapshot_id)).await?;
+    Ok((transaction, publication.prepared.plan(command)))
 }
 
 /// Every permission launching `frozen` needs, decided as the launch would but without recording a denial.

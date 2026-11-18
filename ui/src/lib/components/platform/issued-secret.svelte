@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 
 	type Props = { label: string; secret: string; ondismiss: () => void };
@@ -20,8 +21,8 @@
 		<code>{secret}</code>
 	</div>
 	<div class="actions">
-		<button onclick={copy}>{copied ? 'Copied' : 'Copy'}</button>
-		<button onclick={ondismiss}>Done</button>
+		<Button size="sm" onclick={copy}>{copied ? 'Copied' : 'Copy'}</Button>
+		<Button size="sm" onclick={ondismiss}>Done</Button>
 	</div>
 </div>
 
@@ -57,16 +58,5 @@
 	.actions {
 		display: flex;
 		gap: 6px;
-	}
-	.actions button {
-		height: 28px;
-		padding: 0 10px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--background);
-		font-size: 12.5px;
-	}
-	.actions button:hover {
-		background: var(--sb-hover);
 	}
 </style>

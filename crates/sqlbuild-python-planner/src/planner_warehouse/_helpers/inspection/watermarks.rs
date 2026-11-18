@@ -1,9 +1,9 @@
 //! Validate reliable watermark column contracts before warehouse inspection.
 
 use crate::planner_strategy::main::cursor_types::classify_cursor_sql_type::classify_cursor_sql_type;
-use crate::planner_warehouse::constants::{
-    CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, WATERMARK_CONTRACT_CODE,
-};
+use crate::planner_warehouse::constants::CURSOR_TYPE_INTEGER;
+use crate::planner_warehouse::constants::CURSOR_TYPE_TIMESTAMP;
+use crate::planner_warehouse::constants::WATERMARK_CONTRACT_CODE;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};

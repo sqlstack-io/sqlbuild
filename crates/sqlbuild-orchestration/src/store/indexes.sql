@@ -8,3 +8,7 @@ CREATE INDEX IF NOT EXISTS sqb_location_work_snapshot ON sqb_location_work(snaps
 CREATE INDEX IF NOT EXISTS sqb_run_requests_run ON sqb_run_requests(run_id);
 CREATE INDEX IF NOT EXISTS sqb_warehouse_fingerprints_text ON sqb_warehouse_fingerprints(definition_text_hash);
 CREATE INDEX IF NOT EXISTS sqb_role_assignments_location ON sqb_role_assignments(location_id);
+CREATE INDEX IF NOT EXISTS sqb_warehouse_catalog_received ON sqb_warehouse_catalog(location_id, target, received_at);
+CREATE INDEX IF NOT EXISTS sqb_warehouse_fingerprints_received ON sqb_warehouse_fingerprints(location_id, target, received_at);
+CREATE INDEX IF NOT EXISTS sqb_warehouse_consumption_received ON sqb_warehouse_consumption(location_id, target, received_at);
+CREATE INDEX IF NOT EXISTS sqb_warehouse_observations_received ON sqb_warehouse_observations(location_id, target, received_at);

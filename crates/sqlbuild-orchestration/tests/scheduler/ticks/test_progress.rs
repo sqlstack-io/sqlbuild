@@ -13,7 +13,7 @@ use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::scheduler::main::{_acquire_lease::acquire_lease, _evaluate_trigger::evaluate_trigger};
 use crate::scheduler::tests::contracts::ticks::helpers::{calendar_time, snapshot};
 use crate::scheduler::tests::contracts::ticks::test_types::TriggerControlsTestCase;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
 use crate::store::models::TransactionMode;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};

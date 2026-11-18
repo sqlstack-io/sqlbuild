@@ -8,13 +8,13 @@ use sqlbuild_orchestration::credentials::main::locations::create_location::creat
 use sqlbuild_orchestration::credentials::main::tokens::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::main::tokens::revoke_token::revoke_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope, IssuedToken};
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
+use sqlbuild_orchestration::runs::main::execution::change_run::change_run;
+use sqlbuild_orchestration::runs::main::execution::claim_next_run::claim_next_run;
 use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::{SchedulerLease, SchedulerState};
 use sqlbuild_orchestration::scheduler::types::RunLauncher;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
+use sqlbuild_orchestration::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::open_store::open_store;

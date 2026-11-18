@@ -13,10 +13,10 @@ use crate::api::constants::DECOMPRESSED_BODY_BYTES;
 use crate::api::errors::ApiError;
 use crate::api::models::{DevelopmentScope, DockerImageSource};
 use crate::credentials::models::TokenIdentity;
-use crate::snapshots::main::current_snapshot::current_snapshot;
-use crate::snapshots::main::current_snapshot_record::current_snapshot_record;
-use crate::snapshots::main::publish_development_snapshot::publish_development_snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_development_snapshot::publish_development_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::reads::current_snapshot::current_snapshot;
+use crate::snapshots::main::reads::current_snapshot_record::current_snapshot_record;
 use crate::snapshots::models::{CurrentSnapshot, SnapshotInput, SnapshotRecord};
 use crate::store::models::ControlStore;
 

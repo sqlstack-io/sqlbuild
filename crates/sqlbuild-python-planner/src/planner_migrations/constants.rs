@@ -2,7 +2,6 @@
 
 use crate::planner_migrations::_helpers::projections::getters::read_migration_state_inspection;
 use crate::planner_migrations::models::MigrationStateInspection;
-use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 
@@ -13,11 +12,6 @@ pub(crate) const DONE: &str = "done";
 pub(crate) const PENDING_ARCHIVE: &str = "pending_archive";
 
 pub(crate) const PENDING_VIEW: &str = "pending_view";
-
-pub(crate) const LIST_RELATIONS_FOR_INSPECTION: AdapterHost =
-    AdapterHost::ListRelationsForInspection;
-
-pub(crate) const GET_COLUMNS_FOR_INSPECTION: AdapterHost = AdapterHost::GetColumnsForInspection;
 
 pub(crate) const QUALIFIED_RELATION_MAX_PARTS: usize = 3;
 

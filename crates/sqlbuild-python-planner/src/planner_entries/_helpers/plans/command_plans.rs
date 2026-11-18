@@ -1,31 +1,30 @@
 //! Static plans for commands that do not build models, and direct seed identity reads.
 
-use crate::planner_entries::_helpers::entries::values::{
-    boolean, none, planner_model, planner_type,
-};
+use crate::planner_entries::_helpers::entries::values::{none, planner_model, planner_type};
 use crate::planner_entries::_helpers::plans::plan_output::{
     function_entry, selected_test_entries, test_selected,
 };
 use crate::planner_identity::main::build_compiled_function_fingerprint_sql::build_compiled_function_fingerprint_sql;
 use crate::planner_identity::main::build_seed_identity::build_seed_identity;
 use crate::planner_strategy::main::model_entries::extract_seed_columns::extract_seed_columns;
+use crate::planner_warehouse::models::FingerprintRead;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{
-    PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyString,
-    PyTuple,
+    PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyTuple,
 };
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_SEED;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
-use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
-use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_phases::main::optional_text::optional_text;
 use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
 use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
@@ -141,18 +140,18 @@ pub(crate) fn build_test_command_plan<'py>(
         "build_test_command_plan",
         kwargs,
         (
-            &["project", "adapter", "scope", "relations"],
+            &["project", "dialect", "scope", "relations"],
             &["case_name"],
         ),
     )?;
     let project = args.value("project")?;
-    let adapter = args.value("adapter")?;
+    let dialect = Dialect::passed(args.value("dialect")?)?;
     let scope = args.value("scope")?;
     let relations = args.value("relations")?;
     let selected_keys = native_field(&scope, "selected_keys")?;
     let selection = native_field(&scope, "sql_test_selection")?;
     let selected = selected_test_entries(
-        (&project, &adapter),
+        (&project, &dialect),
         &selected_keys,
         &selection,
         &args.value("case_name")?,
@@ -189,7 +188,7 @@ pub(crate) fn build_test_command_plan<'py>(
         let fingerprint_sql = object(py, build_compiled_function_fingerprint_sql(&function)?)?;
         functions.push(function_entry(
             &function,
-            &adapter,
+            &dialect,
             &relations,
             (
                 fingerprint_sql,
@@ -300,13 +299,13 @@ type Target = (Option<String>, String);
 
 /// Read only fingerprint state required by selected direct seeds.
 #[pyfunction]
-#[pyo3(signature = (*, adapter, connection, seeds))]
+#[pyo3(signature = (*, reads, seeds))]
 pub(crate) fn read_selected_seed_fingerprints<'py>(
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
+    reads: &Bound<'py, PlannerReads>,
     seeds: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let py = adapter.py();
+    let py = reads.py();
+    let warehouse = reads.get().reads();
     let table_name: &str = FINGERPRINT_TABLE_NAME;
     let mut names_by_target: BTreeMap<(String, String), (Target, BTreeSet<String>)> =
         BTreeMap::new();
@@ -334,14 +333,14 @@ pub(crate) fn read_selected_seed_fingerprints<'py>(
     let fingerprints = PyDict::new(py);
     let mut relations_by_target: Vec<Bound<'py, PyAny>> = Vec::new();
     for ((database, schema), _) in names_by_target.values() {
-        let names = PyTuple::new(py, [table_name])?;
-        let schemas = PyTuple::new(py, [schema.as_str()])?;
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("connection", connection)?;
-        kwargs.set_item("database", database)?;
-        kwargs.set_item("schemas", schemas)?;
-        kwargs.set_item("names", names)?;
-        relations_by_target.push(native_field(adapter, "list_relations")?.call((), Some(&kwargs))?);
+        relations_by_target.push(warehouse.relations(
+            py,
+            &optional_text(py, database.as_deref()),
+            (
+                PyTuple::new(py, [schema.as_str()])?.into_any(),
+                PyTuple::new(py, [table_name])?.into_any(),
+            ),
+        )?);
     }
     for (((database, schema), names), relations) in
         names_by_target.values().zip(relations_by_target)
@@ -354,31 +353,16 @@ pub(crate) fn read_selected_seed_fingerprints<'py>(
                 break;
             }
         }
-        let node_names = PyTuple::new(py, names.iter())?;
-        let latest = read_latest_fingerprints(Some(&keywords(
+        let latest = warehouse.fingerprints(
             py,
-            &[
-                ("connection", connection.clone()),
-                ("execute", native_field(adapter, "execute")?),
-                ("table_exists", boolean(py, table_exists)?),
-                (
-                    "database",
-                    database
-                        .as_deref()
-                        .map_or_else(|| none(py), |name| PyString::new(py, name).into_any()),
-                ),
-                ("schema", PyString::new(py, schema).into_any()),
-                (
-                    "render_qualified_name",
-                    native_field(adapter, "render_qualified_name")?,
-                ),
-                (
-                    "render_read_latest_sql",
-                    native_field(adapter, "render_read_latest_fingerprints_sql")?,
-                ),
-                ("node_names", node_names.into_any()),
-            ],
-        )?))?;
+            FingerprintRead {
+                database: database.clone(),
+                schema,
+                table_exists,
+                node_names: Some(names.iter().cloned().collect()),
+                filtered_node_types: Vec::new(),
+            },
+        )?;
         let items = PyList::new(
             py,
             native_field(&latest, "fingerprints")?

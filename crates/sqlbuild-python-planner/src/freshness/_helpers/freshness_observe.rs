@@ -1,19 +1,23 @@
 //! Observe the current freshness of selected sources and compare it with previous state.
 
 use crate::freshness::models::PreviousState;
+use crate::live_reads::models::LiveReads;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::{PyException, PyValueError};
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString};
 use sqlbuild_core::freshness_text::main::freshness_json::freshness_json;
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::freshness::_helpers::observation::{
-    observation_record, observation_source, observe_adapter_batch, observe_configured, strategy,
-};
+use crate::freshness::_helpers::observation::observation_record;
+use crate::freshness::_helpers::observation::observation_source;
+use crate::freshness::_helpers::observation::observe_adapter_batch;
+use crate::freshness::_helpers::observation::observe_configured;
+use crate::freshness::_helpers::observation::strategy;
 use crate::freshness::models::Observer;
 use sqlbuild_core::freshness_text::main::freshness_status::freshness_status;
 use sqlbuild_core::freshness_text::models::{
@@ -40,12 +44,15 @@ fn optional_text(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {
     Ok(Some(value.str()?.extract()?))
 }
 
-/// `str(exc)` of an `Exception`, or the error itself for anything else.
-fn exception_message(py: Python<'_>, error: PyErr) -> PyResult<String> {
-    if !error.is_instance_of::<PyException>(py) {
-        return Err(error);
+/// `result`, with an `Exception` caught as its `str(exc)`; anything else still raises.
+fn caught<T>(py: Python<'_>, result: PyResult<T>) -> PyResult<Result<T, String>> {
+    match result {
+        Ok(value) => Ok(Ok(value)),
+        Err(error) if error.is_instance_of::<PyException>(py) => {
+            Ok(Err(error.value(py).str()?.extract()?))
+        }
+        Err(error) => Err(error),
     }
-    error.value(py).str()?.extract()
 }
 
 fn target_result(
@@ -136,18 +143,6 @@ fn observed_result(
     Ok(result)
 }
 
-/// Adapter-strategy observations in one batch, or the message of the batch failure.
-fn adapter_batch<'py>(
-    observer: &Observer<'py>,
-    sources: &[Bound<'py, PyAny>],
-) -> PyResult<Result<Bound<'py, PyAny>, String>> {
-    let py: Python<'py> = observer.adapter.py();
-    match observe_adapter_batch(observer, sources) {
-        Ok(batch) => Ok(Ok(batch)),
-        Err(error) => Ok(Err(exception_message(py, error)?)),
-    }
-}
-
 /// One adapter-strategy source's observation, or its unknown or error result.
 fn adapter_observation<'py>(
     batch: &Result<Bound<'py, PyAny>, String>,
@@ -195,13 +190,12 @@ fn configured_observation<'py>(
     observer: &Observer<'py>,
     (name, source): (&str, &Bound<'py, PyAny>),
 ) -> PyResult<Result<Bound<'py, PyAny>, FreshnessSourceResult>> {
-    let py: Python<'py> = source.py();
-    match observe_configured(observer, source) {
+    match caught(source.py(), observe_configured(observer, source))? {
         Ok(observation) => Ok(Ok(observation)),
-        Err(error) => Ok(Err(target_result(
+        Err(message) => Ok(Err(target_result(
             source,
             (name, FreshnessStatus::Error),
-            Some(exception_message(py, error)?),
+            Some(message),
         )?)),
     }
 }
@@ -217,7 +211,7 @@ fn observe_sources(
     let mut adapter_sources: Vec<Bound<'_, PyAny>> = Vec::new();
     for source in sources {
         let name: String = native_field(source, "name")?.extract()?;
-        let Some(observed_source) = observation_source(&observer.adapter, source)? else {
+        let Some(observed_source) = observation_source(&observer.dialect, source)? else {
             results.push(target_result(
                 source,
                 (&name, FreshnessStatus::Unknown),
@@ -236,7 +230,10 @@ fn observe_sources(
             }
         }
     }
-    let batch = adapter_batch(observer, &adapter_sources)?;
+    let batch = caught(
+        observer.reads.py(),
+        observe_adapter_batch(observer, &adapter_sources),
+    )?;
     for (name, source) in &observed {
         let observation = if strategy(source)?.as_deref() == Some(ADAPTER_STRATEGY) {
             adapter_observation(&batch, (name, source))?
@@ -258,7 +255,7 @@ pub(crate) fn observe_freshness(
     (sources, select, exclude): (&Bound<'_, PyAny>, &[String], &[String]),
     (run_id, state): (Option<String>, &PreviousState<'_>),
 ) -> PyResult<Vec<FreshnessSourceResult>> {
-    let py: Python<'_> = observer.adapter.py();
+    let py: Python<'_> = observer.reads.py();
     let selected: HashSet<&str> = select.iter().map(String::as_str).collect();
     let excluded: HashSet<&str> = exclude.iter().map(String::as_str).collect();
     let mut chosen: Vec<Bound<'_, PyAny>> = Vec::new();
@@ -314,9 +311,11 @@ pub(crate) fn observe_source_freshness_json(
         }
         value.extract()
     };
+    let adapter: Bound<'_, PyAny> = arguments.value("adapter")?;
     let observer: Observer<'_> = Observer {
-        adapter: arguments.value("adapter")?,
-        connection: arguments.value("connection")?,
+        dialect: Dialect::of(&adapter)?,
+        reads: LiveReads::new(&adapter, &arguments.value("connection")?, None)
+            .handle(adapter.py())?,
         observed_at: arguments.value("observed_at")?,
     };
     let previous: Bound<'_, PyAny> = arguments.value("previous_records")?;

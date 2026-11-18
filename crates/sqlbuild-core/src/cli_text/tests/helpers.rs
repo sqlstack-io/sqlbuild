@@ -55,6 +55,7 @@ pub(super) fn plan_report(models: Vec<ModelPlanText>) -> PlanTextReport {
         remaining_stale_models: Vec::new(),
         pruned_models: Vec::new(),
         pre_build_lines: Vec::new(),
+        ignore_audit_failures: false,
     }
 }
 

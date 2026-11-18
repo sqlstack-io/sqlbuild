@@ -134,7 +134,9 @@ Native warehouse adapters best-effort append confirmed audit outcomes to
 `_sqlbuild_audit_results`. Rows are immutable and use deterministic IDs, so retrying the same result
 is idempotent. Projection failure is reported separately and does not change the audit outcome or
 command exit code. A results table created before `audit_meta_json` existed gains that nullable
-column the first time a result with `meta` is recorded. Lifecycle sinks can also consume the corresponding `audit_completed` fact, which
+column the first time a result with `meta` is recorded. A failure a build [ignored](#ignoring-audit-failures) is
+recorded with outcome `error` and `{"ignored": true}` in `metadata_json`; its `audit_completed`
+event carries `"ignored": true`. Lifecycle sinks can also consume the corresponding `audit_completed` fact, which
 is published as each audit finishes.
 
 ## Built-in audits
@@ -408,7 +410,7 @@ the build continues. A seed audit cannot read a model built from that seed (`P00
 
 | Severity | Behavior |
 |----------|----------|
-| `error` | Blocks the build. Staging table is not promoted, DML is not applied. |
+| `error` | Blocks the build. Staging table is not promoted, DML is not applied, unless the build [ignores audit failures](#ignoring-audit-failures). |
 | `warn` | Reports a warning but allows the build to continue. |
 
 An audit whose query raises a warehouse error, for example because a relation it reads is missing,
@@ -429,6 +431,55 @@ columns (
   order_id (audits [not_null (severity error)]),
 ),
 ```
+
+## Ignoring audit failures
+
+Sometimes a build must go on even though an audit fails, for example to load a day's data before
+anyone has looked at the failure. `--ignore-audit-failures` on `sqb build` lets every failure
+through:
+
+```bash
+sqb build --ignore-audit-failures
+```
+
+Every audit still runs at the same point and records its outcome, but no failure holds anything
+back: staged tables are promoted, incremental batches are applied, a source whose audit fails
+doesn't block the models that read it, and everything downstream runs. It
+applies to every audit, including ones whose query raises an error. Unit tests are not affected; use
+`--no-tests` to skip them.
+
+The build says so before and after it runs. The plan starts with `Audit failures won't stop this
+build`, each ignored failure is listed with its model and audit and marked `(ignored)`, and the final
+line reads `Completed successfully · 3 audit failures ignored` instead of plain success. The exit code
+is 0 unless something else failed.
+
+Set it for every build of a project, of one target, or of one job instead of passing the flag:
+
+```toml
+# sqlbuild_project.toml
+[settings]
+ignore_audit_failures = true
+
+[targets.prod]
+ignore_audit_failures = false
+```
+
+```toml
+# orchestration/jobs/nightly_job.toml
+[settings]
+ignore_audit_failures = true
+```
+
+The flag wins over a job, a job over its target and a target over `[settings]`. The default is
+`false`. `--no-ignore-audit-failures` makes failures block even where a setting ignores them, and a
+job's `ignore_audit_failures = false` does the same for its runs. Each job in a
+[group](/docs/concepts/orchestration#group-jobs) uses its own setting, so members can differ.
+`--ignore-audit-failures` with `--no-audits` is an error (`C419`): no audit runs, so there is no
+failure to ignore.
+
+On the server, a run that ignored failures still ends `success` or `warn`, and the run records how
+many it ignored: a group adds up its members'. Each ignored failure is recorded with outcome `error`,
+marked as ignored: see [Result history](#result-history).
 
 ## Run scope
 

@@ -1,11 +1,14 @@
 //! Assemble model plan dataclasses from resolved plan decisions and authored model config.
 
+use crate::planner_strategy::main::model_entries::column_info::column_info;
 use crate::planner_strategy::main::values::input_error::input_error;
 use crate::planner_strategy::main::values::text::text;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use sqlbuild_analysis::planner_strategy::main::group_replacement_refusal::group_replacement_refusal;
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
@@ -19,15 +22,16 @@ use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_
 use sqlbuild_model_config::execution_limits::models::ExecutionLimit;
 use sqlbuild_model_config::model_validation::constants::PHYSICAL_STORAGE_KEYS;
 
-use crate::planner_strategy::_helpers::cursor_types::{
-    cursor_type_warning_record, warehouse_column_types,
-};
-use crate::planner_strategy::_helpers::microbatch_limits::{replay_grain, unknown_grain};
+use crate::planner_strategy::_helpers::cursor_types::cursor_type_warning_record;
+use crate::planner_strategy::_helpers::cursor_types::warehouse_column_types;
+use crate::planner_strategy::_helpers::microbatch_limits::replay_grain;
+use crate::planner_strategy::_helpers::microbatch_limits::unknown_grain;
 use crate::planner_strategy::_helpers::microbatches::microbatch_limit_config;
-use crate::planner_strategy::_helpers::strategy::{
-    model_warning_records, resolve_schema_actions, warning_inputs,
-};
-use crate::planner_strategy::_helpers::values::{optional_string, plan_warning};
+use crate::planner_strategy::_helpers::strategy::model_warning_records;
+use crate::planner_strategy::_helpers::strategy::resolve_schema_actions;
+use crate::planner_strategy::_helpers::strategy::warning_inputs;
+use crate::planner_strategy::_helpers::values::optional_string;
+use crate::planner_strategy::_helpers::values::plan_warning;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
@@ -52,11 +56,14 @@ use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use sqlbuild_python_project::compiled_views::main::compiled_models::relative_path::relative_path;
-use sqlbuild_python_project::planner_strategy::constants::{
-    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, GROUP_REPLACEMENT_UNSUPPORTED_CODE,
-    MICROBATCH_MODE, PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE,
-    TABLE_RECREATING_ACTIONS,
-};
+use sqlbuild_python_project::planner_strategy::constants::CUSTOM_MATERIALIZATION;
+use sqlbuild_python_project::planner_strategy::constants::DDL_SEPARATOR;
+use sqlbuild_python_project::planner_strategy::constants::ENFORCED_CONTRACT;
+use sqlbuild_python_project::planner_strategy::constants::GROUP_REPLACEMENT_UNSUPPORTED_CODE;
+use sqlbuild_python_project::planner_strategy::constants::MICROBATCH_MODE;
+use sqlbuild_python_project::planner_strategy::constants::PHYSICAL_STORAGE_DIALECT;
+use sqlbuild_python_project::planner_strategy::constants::PHYSICAL_STORAGE_UNSUPPORTED_CODE;
+use sqlbuild_python_project::planner_strategy::constants::TABLE_RECREATING_ACTIONS;
 use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
 
 /// Model config keys copied to the plan entry as optional strings, with their entry fields.
@@ -101,14 +108,6 @@ fn none(py: Python<'_>) -> Bound<'_, PyAny> {
 
 fn or_none<'py>(py: Python<'py>, value: Option<Bound<'py, PyAny>>) -> Bound<'py, PyAny> {
     value.unwrap_or_else(|| none(py))
-}
-
-/// `ColumnInfo(name=..., type=...)`.
-fn column_info<'py>(
-    class: &Bound<'py, PyAny>,
-    (name, column_type): (Bound<'py, PyAny>, Bound<'py, PyAny>),
-) -> PyResult<Bound<'py, PyAny>> {
-    call_with(class, &[("name", name), ("type", column_type)])
 }
 
 /// Declared schema columns as `ColumnInfo`: typed columns only, or every column with an empty default type.
@@ -256,7 +255,7 @@ fn logical_ddl<'py>(
     (warehouse_columns, cursor_bounds): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
 ) -> PyResult<String> {
     let py: Python<'py> = request.model.py();
-    let adapter: &Bound<'py, PyAny> = &request.adapter;
+    let dialect: &Bound<'py, Dialect> = &request.dialect;
     let model: &Bound<'py, PyAny> = &request.model;
     let destination: Bound<'py, PyAny> =
         sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
@@ -314,7 +313,7 @@ fn logical_ddl<'py>(
         }
         _ => return Ok(String::new()),
     };
-    let statements: Vec<String> = call_with(&adapter.getattr(method)?, &pairs)?
+    let statements: Vec<String> = call_with(&dialect.getattr(method)?, &pairs)?
         .try_iter()?
         .map(|statement| statement?.extract())
         .collect::<PyResult<_>>()?;
@@ -352,8 +351,10 @@ fn storage_fields<'py>(
         }
     }
     if !keys.is_empty() {
-        let dialect: Option<String> =
-            native_field(&request.adapter, "sql_analysis_dialect_name")?.extract()?;
+        let dialect: Option<String> = request
+            .dialect
+            .syntax("sql_analysis_dialect_name")?
+            .extract()?;
         if dialect.as_deref() != Some(PHYSICAL_STORAGE_DIALECT) {
             return Err(input_error(
                 py,
@@ -362,7 +363,7 @@ fn storage_fields<'py>(
                     "model '{}' sets {}, but adapter '{}' has no physical table layout settings",
                     model_name(&request.model)?,
                     keys.join(", "),
-                    native_field(&request.adapter, "adapter_name")?.str()?
+                    request.dialect.syntax("adapter_name")?.str()?
                 ),
                 Some(PHYSICAL_STORAGE_UNSUPPORTED_CODE),
             ));
@@ -669,10 +670,10 @@ pub(crate) fn assemble_model_plan_entry<'py>(
     if let Some(refusal) = group_replacement_refusal(
         &model_name(model)?,
         (
-            &native_field(&request.adapter, "adapter_name")?
-                .str()?
-                .to_string(),
-            native_field(&request.adapter, "sql_analysis_dialect_name")?
+            &request.dialect.syntax("adapter_name")?.str()?.to_string(),
+            request
+                .dialect
+                .syntax("sql_analysis_dialect_name")?
                 .extract::<Option<String>>()?
                 .as_deref(),
         ),

@@ -13,7 +13,7 @@ from typing import Any
 import duckdb
 import pytest
 
-from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import TYPE_PROOF_FILES
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import PUBLISHABLE_FILES
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     LocationDatabaseTestCase,
     LocationReloadTestCase,
@@ -22,6 +22,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     current_snapshot,
     location_process,
+    published_connection_health,
     snapshot_api,
     wait_for_generation,
     wait_for_interpreter,
@@ -53,7 +54,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_served_location_when_inputs_change_or_restart_then_generations_reload_without_losing_last_good(
+def test_given_a_served_location_when_inputs_change_or_restart_then_generations_reload_without_losing_last_good(  # noqa: PLR0915
     test_case: LocationReloadTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project: Path = tmp_path / "project"
@@ -72,8 +73,8 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             'name = "daily_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
         ),
     }
-    files: dict[str, str] = TYPE_PROOF_FILES | {
-        "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+    files: dict[str, str] = PUBLISHABLE_FILES | {
+        "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
         + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
         + f'\n[targets.{json.dumps(test_case.target)}]\nschema = "main"\n',
         **orchestration,
@@ -108,10 +109,10 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             heartbeat: dict[str, Any] = wait_for_location_health(
                 api, test_case.target, {"kind": "heartbeat"}, process, log
             )
-            initial_health: dict[str, Any] = wait_for_location_health(
+            initial_health: dict[str, Any] = published_connection_health(
                 api,
-                test_case.target,
-                {"kind": "connection", "generation": 1, "healthy": test_case.expected_connection},
+                (test_case.target, test_case.expected_connection),
+                (first, "startup"),
                 process,
                 log,
             )
@@ -128,6 +129,13 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             assert int(compiler_pid.read_text()) == first_interpreter
             assert "CAST(13 AS INTEGER)" in second["nodes"]["model:stg_orders"]["raw_sql"]
             assert {change["subject_key"] for change in second["changes"]} == {"model:stg_orders"}
+            _ = published_connection_health(
+                api,
+                (test_case.target, test_case.expected_connection),
+                (second, "publish"),
+                process,
+                log,
+            )
 
             _ = staging.write_text("SELECT FROM invalid SQL !\n")
             _ = wait_for_location_health(
@@ -204,10 +212,10 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             )
             assert int(compiler_pid.read_text()) != replacement_interpreter
             assert restarted["nodes"] == configured["nodes"]
-            restarted_health: dict[str, Any] = wait_for_location_health(
+            restarted_health: dict[str, Any] = published_connection_health(
                 api,
-                test_case.target,
-                {"kind": "connection", "generation": 7, "healthy": test_case.expected_connection},
+                (test_case.target, test_case.expected_connection),
+                (restarted, "startup"),
                 process,
                 log,
             )
@@ -256,9 +264,9 @@ def test_given_a_busy_location_when_stopped_then_its_interpreter_is_reaped(
     child_pid: Path = tmp_path / "interpreter.pid"
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
             "adapters/slow.py": (
@@ -325,9 +333,9 @@ def test_given_a_location_using_a_local_database_when_it_is_created_and_written_
     project: Path = tmp_path / "project"
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + f"\n[connections.local]\n{test_case.connection_toml}\n"
             + '\n[targets.development]\nschema = "main"\n',
         },

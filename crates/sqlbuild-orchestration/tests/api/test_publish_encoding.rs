@@ -19,7 +19,7 @@ use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
+use crate::snapshots::main::publication::publish_remote_snapshot::publish_remote_snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotRecord};
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{open_test_store, run};

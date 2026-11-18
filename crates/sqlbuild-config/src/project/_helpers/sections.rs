@@ -1,5 +1,7 @@
 //! Loaders for the scalar sections of the project and local configuration files.
 
+use std::collections::BTreeMap;
+
 use crate::models::ConfigValue;
 use crate::project::_helpers::durations::parse_duration;
 use crate::project::_helpers::fields::{
@@ -12,8 +14,9 @@ use crate::project::_helpers::targets::seconds_value;
 use crate::project::_helpers::values::{int_below, python_equal};
 use crate::project::constants::{
     ALLOW_MISSING_SECRETS_KEY, ALLOW_WAREHOUSE_ROUND_TRIPS_KEY, DEFAULT_TEST_TIMEOUT,
-    DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE, SCENARIO_TIMEOUT_KEY,
-    TEST_TIMEOUT_KEY, UNIT_TEST_MAX_REAL_MODELS_KEY,
+    DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE,
+    IGNORE_AUDIT_FAILURES_KEY, SCENARIO_TIMEOUT_KEY, TEST_TIMEOUT_KEY,
+    UNIT_TEST_MAX_REAL_MODELS_KEY,
 };
 use crate::project::constants::{
     AUDIT_SEVERITIES, CHECK_DECLARED_COLUMNS_KEY, COLLECTION_RENDERINGS, COLUMN_CONTRACT_MODES,
@@ -28,8 +31,8 @@ use crate::project::constants::{
     USD_PER_CREDIT_KEY, ZERO_FIXED_DURATION, ZERO_FLOAT,
 };
 use crate::project::constants::{
-    CHANGE_COUNTS, CHANGE_REACHES, CHANGES_KEYS, CONTROL_KEYS, MIN_SYNC_INTERVAL_SECONDS,
-    SYNC_INTERVAL_HELP, SYNC_INTERVAL_OFF,
+    CHANGE_COUNTS, CHANGE_REACHES, CHANGES_KEYS, CONTROL_KEYS, MAX_POOL_LIMIT,
+    MIN_SYNC_INTERVAL_SECONDS, SYNC_INTERVAL_HELP, SYNC_INTERVAL_OFF,
 };
 use crate::project::errors::ConfigFailure;
 use crate::project::models::{Built, ChangesConfig, ConfigFile, ControlConfig, ReviewConfig};
@@ -290,6 +293,14 @@ pub(crate) fn load_settings(payload: Option<&ConfigValue>, file: ConfigFile) -> 
             Built::Value(ConfigValue::Bool(optional_bool(
                 mapping,
                 ALLOW_WAREHOUSE_ROUND_TRIPS_KEY,
+                false,
+            )?)),
+        ),
+        (
+            IGNORE_AUDIT_FAILURES_KEY,
+            Built::Value(ConfigValue::Bool(optional_bool(
+                mapping,
+                IGNORE_AUDIT_FAILURES_KEY,
                 false,
             )?)),
         ),
@@ -640,6 +651,49 @@ pub(crate) fn load_control(
         location,
         sync_at_least_every_seconds,
     })
+}
+
+/// A `pools` table at `label`: each pool's limit, by pool name.
+pub(crate) fn load_pools(
+    payload: Option<&ConfigValue>,
+    (label, file): (&str, ConfigFile),
+) -> Loaded<BTreeMap<String, u32>> {
+    let mapping = coerce_mapping(payload, place(file, label))?;
+    let mut pools: BTreeMap<String, u32> = BTreeMap::new();
+    for (key, value) in mapping {
+        let name = key_name(key);
+        if !pool_name(name) {
+            return Err(ConfigFailure::at(
+                file,
+                format!("{label}.{name} must be named with letters, digits, '_' and '-'"),
+            ));
+        }
+        let invalid = || {
+            ConfigFailure::at(
+                file,
+                format!(
+                    "{label}.{name} must be the pool's limit, a whole number of slots from 1 to \
+                     {MAX_POOL_LIMIT}, such as {name} = 1"
+                ),
+            )
+        };
+        let limit: u32 = match value {
+            ConfigValue::Integer(limit) if (1..=MAX_POOL_LIMIT).contains(limit) => {
+                u32::try_from(*limit).map_err(|_| invalid())?
+            }
+            _ => return Err(invalid()),
+        };
+        pools.insert(name.to_owned(), limit);
+    }
+    Ok(pools)
+}
+
+/// Pool names are TOML bare keys: letters, digits, `_` and `-`.
+fn pool_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
 }
 
 /// `[changes]`: what `--changed` counts as a change and how far a change reaches downstream.

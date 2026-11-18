@@ -1,8 +1,16 @@
 //! Public records of planner phases.
 
+use crate::planner_phases::_helpers::timing::timings::STEPS;
+use crate::planner_phases::_helpers::timing::timings::timings_of;
+use crate::planner_phases::constants::MILLISECONDS;
+use crate::planner_phases::constants::PERCENT;
+use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
+use serde_json::{Value, json};
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::BTreeMap;
+use std::time::Instant;
 
 /// The plan output's fields and metadata entries, each set before the output is built.
 #[derive(Debug)]
@@ -65,15 +73,15 @@ pub struct PlanWarningContext<'a, 'py> {
 #[pyclass(module = "sqlbuild._native", frozen, get_all)]
 #[derive(Debug)]
 pub struct PlannerRuntime {
-    pub project: Py<PyAny>,
-    pub adapter: Py<PyAny>,
-    pub connection: Py<PyAny>,
-    pub project_config: Py<PyAny>,
-    pub local_config: Py<PyAny>,
-    pub on_progress: Py<PyAny>,
-    pub invocation_time: Py<PyAny>,
+    pub(crate) project: Py<PyAny>,
+    pub(crate) dialect: Py<Dialect>,
+    pub(crate) reads: Py<PlannerReads>,
+    pub(crate) project_config: Py<PyAny>,
+    pub(crate) local_config: Py<PyAny>,
+    pub(crate) on_progress: Py<PyAny>,
+    pub(crate) invocation_time: Py<PyAny>,
     /// Python nodes' `(database, schema)`, where their results and fingerprints live; `None` when unknown.
-    pub node_results_location: Option<(Option<String>, Option<String>)>,
+    pub(crate) node_results_location: Option<(Option<String>, Option<String>)>,
 }
 
 /// Warehouse snapshot, inspection relations and migration plans gathered once per plan.
@@ -105,4 +113,88 @@ pub struct PlannerIdentityContext {
 pub(crate) struct IdentityWork {
     pub identity_builds: u64,
     pub stale_detections: BTreeMap<String, u64>,
+}
+
+/// While held, this thread's planning steps are recorded for one plan command.
+#[derive(Debug)]
+pub struct PlanTimingScope {
+    started: Instant,
+    previous: Option<Vec<(&'static str, f64)>>,
+}
+
+/// A plan's steps in pipeline order with `Other` last, and its total, in seconds.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlanTimings {
+    pub(crate) total_seconds: f64,
+    pub(crate) steps: Vec<(&'static str, f64)>,
+}
+
+impl PlanTimingScope {
+    pub fn enter() -> Self {
+        Self {
+            started: Instant::now(),
+            previous: STEPS.replace(Some(Vec::new())),
+        }
+    }
+
+    /// The steps recorded so far and the time since the scope opened; `Other` is the remainder.
+    pub fn timings(&self) -> PlanTimings {
+        let total_seconds: f64 = self.started.elapsed().as_secs_f64();
+        let recorded: Vec<(&'static str, f64)> =
+            STEPS.with(|steps| steps.borrow().clone().unwrap_or_default());
+        timings_of(recorded, total_seconds)
+    }
+}
+
+impl Drop for PlanTimingScope {
+    fn drop(&mut self) {
+        STEPS.set(self.previous.take());
+    }
+}
+
+impl PlanTimings {
+    /// The `--timings` table: each step's seconds and share of the total, then the total.
+    pub fn table(&self) -> String {
+        const HEADER: &str = "Plan timings";
+        let name_width: usize = self
+            .steps
+            .iter()
+            .map(|(name, _)| name.len() + 2)
+            .max()
+            .unwrap_or(0)
+            .max(HEADER.len());
+        let mut lines: Vec<String> = vec![format!(
+            "{HEADER:<name_width$}  {:>7}  {:>5}",
+            "seconds", "share"
+        )];
+        let row_width: usize = name_width - 2;
+        for (name, seconds) in &self.steps {
+            let share: f64 = Some(seconds / self.total_seconds * PERCENT)
+                .filter(|share| share.is_finite())
+                .unwrap_or_default();
+            lines.push(format!(
+                "  {name:<row_width$}  {seconds:>7.1}  {:>4.0}%",
+                share
+            ));
+        }
+        lines.push(format!(
+            "  {:<row_width$}  {:>7.1}",
+            "Total", self.total_seconds
+        ));
+        lines.join("\n")
+    }
+
+    /// The plan document's `timings`: total and steps in seconds, and what the plan read.
+    pub fn json(&self, planned_from: &str) -> Value {
+        let rounded = |seconds: f64| (seconds * MILLISECONDS).round() / MILLISECONDS;
+        json!({
+            "total_seconds": rounded(self.total_seconds),
+            "steps": self
+                .steps
+                .iter()
+                .map(|(name, seconds)| json!({"name": name, "seconds": rounded(*seconds)}))
+                .collect::<Vec<Value>>(),
+            "planned_from": planned_from,
+        })
+    }
 }

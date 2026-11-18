@@ -13,11 +13,11 @@ use sqlbuild_orchestration::credentials::main::tokens::rotate_token::rotate_toke
 use sqlbuild_orchestration::credentials::models::{AuditContext, PasswordAuthority};
 use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
 use sqlbuild_orchestration::declarations::models::TriggerChangeRequest;
-use sqlbuild_orchestration::platform::main::location_work::location_work;
-use sqlbuild_orchestration::platform::main::request_location_work::request_location_work;
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::main::request_job_run::request_job_run;
-use sqlbuild_orchestration::runs::main::request_rerun::request_rerun;
+use sqlbuild_orchestration::platform::main::work::location_work::location_work;
+use sqlbuild_orchestration::platform::main::work::request_location_work::request_location_work;
+use sqlbuild_orchestration::runs::main::execution::change_run::change_run;
+use sqlbuild_orchestration::runs::main::requests::request_job_run::request_job_run;
+use sqlbuild_orchestration::runs::main::requests::request_rerun::request_rerun;
 use sqlbuild_orchestration::runs::models::JobRunRequest;
 use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -25,8 +25,8 @@ use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
-use crate::native_commands::_helpers::decision::control_admin;
-use crate::native_commands::_helpers::execution::open_control_store;
+use crate::native_commands::_helpers::command::decision::control_admin;
+use crate::native_commands::_helpers::location::execution::open_control_store;
 use crate::native_commands::models::ControlAdmin;
 
 pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlError> {

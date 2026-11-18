@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::api::models::{ApiAuthentication, DevelopmentScope, HumanLogin};
 use crate::credentials::main::identities::development_person::development_person;
 use crate::credentials::main::locations::development_location::development_location;
+use crate::credentials::main::locations::location_named::location_named;
 use crate::credentials::models::AuditContext;
 use crate::declarations::main::{
     change_trigger::change_trigger, list_triggers::list_triggers,
@@ -12,7 +13,7 @@ use crate::declarations::main::{
 };
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest, TriggerStatus};
 use crate::snapshots::main::{
-    current_snapshot::current_snapshot, publish_snapshot::publish_snapshot,
+    publication::publish_snapshot::publish_snapshot, reads::current_snapshot::current_snapshot,
 };
 use crate::store::main::migrate_store::migrate_store;
 
@@ -33,11 +34,13 @@ fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pause
             description: "SQLite atomic development defaults",
             backend: Backend::Sqlite,
             expected_status: TriggerStatus::Paused,
+            expected_names: ["orders", "orders (2)"],
         },
         DevelopmentTestCase {
             description: "PostgreSQL atomic development defaults",
             backend: Backend::Postgres,
             expected_status: TriggerStatus::Paused,
+            expected_names: ["orders", "orders (2)"],
         },
     ];
     for test_case in test_cases {
@@ -63,26 +66,49 @@ fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pause
             };
             install_fault(store, &fault).await;
             assert!(
-                development_location(store, "/synthetic/orders", "development", &context)
-                    .await
-                    .is_err()
+                development_location(
+                    store,
+                    ("/synthetic/orders", "orders"),
+                    "development",
+                    &context
+                )
+                .await
+                .is_err()
             );
             assert_eq!(location_state(store).await, (0, 0));
             remove_fault(store, &fault).await;
-            let location =
-                development_location(store, "/synthetic/orders", "development", &context)
-                    .await
-                    .expect("create identity");
+            let location = development_location(
+                store,
+                ("/synthetic/orders", "orders"),
+                "development",
+                &context,
+            )
+            .await
+            .expect("create identity");
             assert_eq!(
-                development_location(store, "/synthetic/orders", "development", &context)
-                    .await
-                    .expect("retained identity"),
+                development_location(
+                    store,
+                    ("/synthetic/orders", "orders"),
+                    "development",
+                    &context
+                )
+                .await
+                .expect("retained identity"),
                 location
             );
-            let other = development_location(store, "/synthetic/orders", "preview", &context)
-                .await
-                .expect("target-specific identity");
+            let other =
+                development_location(store, ("/synthetic/orders", "orders"), "preview", &context)
+                    .await
+                    .expect("target-specific identity");
             assert_ne!(location, other);
+            for (name, expected) in test_case.expected_names.into_iter().zip([location, other]) {
+                assert_eq!(
+                    location_named(store, name).await.expect("named location"),
+                    Some(expected),
+                    "{}: development locations are named after the project",
+                    test_case.description
+                );
+            }
             let person = development_person(store, &context)
                 .await
                 .expect("development person");

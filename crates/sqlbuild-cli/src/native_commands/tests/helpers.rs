@@ -5,9 +5,16 @@ use uuid::Uuid;
 
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
 use crate::argv::models::{ArgvOutcome, ArgvSettings};
-use crate::native_commands::_helpers::argv_host::{NativeArgvHost, namespace_defaults};
-use crate::native_commands::_helpers::execution::acknowledge_metadata_page;
-use crate::native_commands::models::{LocationMetadataPage, LocationMetadataSync};
+use crate::native_commands::_helpers::command::argv_host::{NativeArgvHost, namespace_defaults};
+use crate::native_commands::_helpers::command::paths::location_watch;
+use crate::native_commands::_helpers::location::execution::{
+    acknowledge_metadata_page, settle_publication,
+};
+use crate::native_commands::models::{LocationMetadataPage, LocationMetadataSync, LocationServe};
+use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
+use sqlbuild_orchestration::platform::models::{
+    ConnectionCheckTrigger, LocationWorkClient, LocationWorkPoll,
+};
 
 /// Parse `argv` onto the `CliNamespace` defaults with the native host.
 pub(super) fn parse(argv: &[&str]) -> (ArgvOutcome, NativeArgvHost) {
@@ -67,4 +74,62 @@ pub(super) fn one_location() -> Vec<WarehouseStateLocation> {
         database: Some("analytics".into()),
         schema: "state".into(),
     }]
+}
+
+/// A location in `directory` whose `sqb debug` reports `wakes_compute` and whose every history read fails, published to an unreachable server: its options, script, work channel and the sync the publication starts.
+pub(super) fn published_location(
+    directory: &Path,
+    wakes_compute: bool,
+) -> (
+    (LocationServe, std::path::PathBuf),
+    (LocationWorkClient, LocationWorkPoll),
+    LocationMetadataSync,
+) {
+    let script = directory.join(format!("location-{wakes_compute}"));
+    std::fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\ncase \" $* \" in *\" debug \"*) echo '{{\"history_reads_wake_compute\": \
+             {wakes_compute}, \"local_files\": [], \"missing_secrets\": 0}}'; exit 0;; esac\n\
+             while read line; do echo '{{\"failed\":{{\"reason\":\"permission denied\",\"page_size\":false}}}}'; done\n"
+        ),
+    )
+    .expect("location script");
+    let mut permissions = std::fs::metadata(&script).expect("metadata").permissions();
+    std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
+    std::fs::set_permissions(&script, permissions).expect("executable");
+    let options = LocationServe {
+        project_dir: directory.to_path_buf(),
+        server_url: "http://127.0.0.1:1".into(),
+        location_id: Uuid::nil(),
+        target: "development".into(),
+        image_id: None,
+        metadata_reconcile_seconds: 3600,
+        safety_sync_seconds: 1800,
+        safety_sync_explicit: false,
+        dev_events: false,
+    };
+    let client = connect_location_work((&options.server_url, "token"), options.location_id)
+        .expect("work client");
+    let poll = LocationWorkPoll {
+        session_id: Uuid::nil(),
+        target: options.target.clone(),
+    };
+    let (_, metadata, _) = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime")
+        .block_on(settle_publication(
+            (&options, &script, ("token", Uuid::nil())),
+            ((one_location(), 1), true, ConnectionCheckTrigger::Publish),
+            (location_watch(directory), None),
+            std::future::pending(),
+        ))
+        .expect("no control error")
+        .expect("not stopped");
+    let mut state = metadata.expect("a connected publication starts a sync");
+    state.begin_sync(chrono::Utc::now());
+    state.idle = false;
+    state.page_seconds = 5;
+    ((options, script), (client, poll), state)
 }

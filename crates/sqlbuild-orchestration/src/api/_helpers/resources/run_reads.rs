@@ -9,8 +9,8 @@ use crate::api::_helpers::authentication::bearer::{require_location, require_res
 use crate::api::errors::ApiError;
 use crate::api::models::{ReadQuery, ReadResource, RunRecallPath, RunRecallQuery};
 use crate::credentials::models::TokenIdentity;
-use crate::runs::main::list_run_nodes::list_run_nodes;
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::listings::list_run_nodes::list_run_nodes;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::{RunNodeRecord, RunRecord};
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;

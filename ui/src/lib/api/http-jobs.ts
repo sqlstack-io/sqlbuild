@@ -2,6 +2,7 @@ import type { components } from '$control/schema.d.ts';
 import { ApiError } from './client';
 import type { Iso } from './types';
 import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, SensorEvaluation, SensorEvaluationOutcome, Tick, Trigger, TriggerDetail, TriggerKind, TriggerStateEvent, TriggerStateEventKind } from './types/operate';
+import { plural } from '$lib/format/plural';
 
 type Wire = components['schemas'];
 
@@ -30,7 +31,7 @@ export function triggerKindOf(declaration: Wire['TriggerDeclaration']): TriggerK
 export function cadenceOf(declaration: Wire['TriggerDeclaration']): string {
 	if (isSchedule(declaration)) {
 		const s = declaration.schedule;
-		return s.kind === 'cron' ? `${s.expression} (${s.timezone})` : `${s.times.length} calendar time${s.times.length === 1 ? '' : 's'}`;
+		return s.kind === 'cron' ? `${s.expression} (${s.timezone})` : `${plural(s.times.length, 'calendar time')}`;
 	}
 	const w = declaration.when;
 	if (w.kind === 'run_event') return `when ${w.job_key} ${w.kinds.join(' or ')}`;
@@ -194,9 +195,13 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		select: wire.select ?? null,
 		members: null,
 		nodeCount: wire.selection.length,
+		nodes: wire.selection,
 		overlap: wire.overlap,
 		onFailure: wire.on_failure ? { retries: wire.on_failure.retries, retryDelaySeconds: wire.on_failure.retry_delay_seconds } : null,
-		concurrencyGroups: wire.concurrency_groups,
+		pools: wire.pools.map((use) => ({ pool: use.pool, amount: use.amount, limit: use.limit, cap: use.cap ?? null, serverLimit: use.server_limit, clamped: use.clamped, sharedWith: use.shared_with })),
+		concurrency: wire.concurrency ?? null,
+		resolvedConcurrency: wire.resolved_concurrency ?? null,
+		ignoreAuditFailures: wire.ignore_audit_failures ?? null,
 		priority: null,
 		owner: wire.owner?.trim() || null,
 		sourceFile: wire.declared_at ? `${wire.declared_at.path}:${wire.declared_at.line}` : null,
@@ -215,7 +220,8 @@ function groupMembersOf(members: Wire['JobMember'][]): JobGroupMember[] {
 		const stage = Math.max(-1, ...m.waits_for.map((w) => stageOf.get(w) ?? -1)) + 1;
 		stageOf.set(m.job_key, stage);
 		// The server reports the waits, not whether lineage or `after` caused each one.
-		return { jobKey: m.job_key, upstream: m.waits_for.map((jobKey) => ({ jobKey, source: null })), stage };
+		const reasons = (m.reasons ?? []).map((r) => ({ upstreamJob: r.upstream_job, fromNode: r.from_node, toNode: r.to_node }));
+		return { jobKey: m.job_key, upstream: m.waits_for.map((jobKey) => ({ jobKey, source: null })), stage, reasons };
 	});
 }
 
@@ -228,7 +234,7 @@ export function jobDetailOf(job: Job, wire: Wire['JobDetailRecord']): JobDetail 
 		exclude: wire.exclude?.split(/\s+/).filter(Boolean) ?? [],
 		settings: Object.fromEntries(Object.entries(wire.settings).map(([name, value]) => [name, shownSetting(value)])),
 		resolvedNodes: wire.selection,
-		concurrency: null,
+		poolHolders: null,
 		targets: wire.targets.length ? wire.targets : null,
 		groupMembers: wire.kind === 'group' ? groupMembersOf(wire.members) : null,
 		criticalNodes: wire.critical_nodes,

@@ -1,4 +1,4 @@
-//! A dev project/target retains its opaque location identity across process restarts.
+//! A dev project/target retains its location identity across restarts, named after the project.
 
 use uuid::Uuid;
 
@@ -10,7 +10,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn development_location(
     store: &ControlStore,
-    project_path: &str,
+    (project_path, project_name): (&str, &str),
     target: &str,
     context: &AuditContext,
 ) -> Result<Uuid, ControlError> {
@@ -32,12 +32,22 @@ pub async fn development_location(
         commit(transaction).await?;
         return Ok(id);
     }
-    let (transaction, id) = create_location_in(
-        transaction,
-        &format!("development-{}", Uuid::now_v7()),
-        context,
-    )
-    .await?;
+    let mut transaction = transaction;
+    let mut name = project_name.to_owned();
+    for suffix in 2.. {
+        let rows;
+        (transaction, rows) = query(
+            transaction,
+            "SELECT 1 AS taken FROM sqb_locations WHERE name=$1",
+            vec![Parameter::Text(name.clone())],
+        )
+        .await?;
+        if rows.is_empty() {
+            break;
+        }
+        name = format!("{project_name} ({suffix})");
+    }
+    let (transaction, id) = create_location_in(transaction, &name, context).await?;
     let (transaction, _) = query(
         transaction,
         "INSERT INTO sqb_development_locations (project_path,target,location_id) VALUES ($1,$2,$3)",

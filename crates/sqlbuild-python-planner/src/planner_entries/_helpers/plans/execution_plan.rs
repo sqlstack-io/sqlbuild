@@ -1,7 +1,16 @@
 //! Top-level planner orchestration producing an execution plan.
 
+use crate::planner_phases::constants::ASSEMBLING;
+use crate::planner_phases::constants::BUILDING_ENTRIES;
+use crate::planner_phases::constants::DETECTING_CHANGES;
+use crate::planner_phases::constants::READING_WAREHOUSE;
+use crate::planner_phases::constants::SOURCE_FRESHNESS;
+use crate::planner_phases::constants::TEST_FIXTURES;
+use crate::planner_phases::main::timing::record_step::record_step;
+use crate::planner_phases::main::timing::timed::timed;
+use crate::planner_warehouse::models::PlannerReads;
 use sqlbuild_analysis::planner_scope::constants::MODEL;
-use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_python_base::native_host::models::Dialect;
 
 use crate::planner_changes::main::detect_changes::detect_changes;
 use crate::planner_changes::main::resolve_model_actions::resolve_model_actions;
@@ -38,7 +47,6 @@ use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use std::time::Instant;
 
-pub(crate) const INSPECTION_CATALOG: AdapterHost = AdapterHost::OpenInspectionCatalog;
 /// Selected scopes, and the overrides with cursor overrides typed for the selected models.
 pub(crate) fn scopes_and_cursor_overrides<'py>(
     args: &KeywordArguments<'py>,
@@ -120,8 +128,8 @@ fn deferred_migration_origins<'py>(
     defer_to_migration_origins(
         (
             &args.value("project")?,
-            &args.value("adapter")?,
-            &args.value("connection")?,
+            &Dialect::passed(args.value("dialect")?)?,
+            &PlannerReads::passed(args.value("reads")?)?,
         ),
         (
             locations.downcast::<PyDict>()?,
@@ -143,9 +151,12 @@ pub(crate) fn planned_output<'py>(
     let deferral = args.value("deferral")?;
     let policies = args.value("policies")?;
     let origin_failures = deferred_migration_origins(args, scopes, &deferral)?;
-    let warehouse = gather_planner_warehouse_state(runtime, scopes, overrides, &deferral)?;
+    let warehouse = timed(READING_WAREHOUSE, || {
+        gather_planner_warehouse_state(runtime, scopes, overrides, &deferral)
+    })?;
     let started = Instant::now();
     let snapshot = warehouse_field(&warehouse, |warehouse| &warehouse.snapshot)?;
+    let changes_started = Instant::now();
     let identities = build_planner_identity_context(
         &project,
         (scopes, &snapshot),
@@ -160,12 +171,19 @@ pub(crate) fn planned_output<'py>(
     )?;
     let inspection_scope = class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?;
     let resolved_actions = resolve_model_actions(&inspection_scope, &changes)?;
-    let source_freshness = build_planner_source_freshness_result(
-        (&project, &inspection_scope),
-        (&args.value("adapter")?, &args.value("connection")?),
-        &warehouse_field(&warehouse, |warehouse| &warehouse.inspection_relations)?,
-        &native_field(&snapshot, "source_freshness_state_schemas")?,
-    )?;
+    record_step(DETECTING_CHANGES, changes_started.elapsed().as_secs_f64());
+    let source_freshness = timed(SOURCE_FRESHNESS, || {
+        build_planner_source_freshness_result(
+            (&project, &inspection_scope),
+            (
+                &Dialect::passed(args.value("dialect")?)?,
+                &PlannerReads::passed(args.value("reads")?)?,
+            ),
+            &warehouse_field(&warehouse, |warehouse| &warehouse.inspection_relations)?,
+            &native_field(&snapshot, "source_freshness_state_schemas")?,
+        )
+    })?;
+    let entries_started = Instant::now();
     let reconciliation = reconcile_execution_changes(
         (&inspection_scope, &snapshot),
         &identities,
@@ -174,11 +192,13 @@ pub(crate) fn planned_output<'py>(
     )?;
     let entries = build_planner_entry_results(
         (runtime, &warehouse),
-        (overrides, &deferral),
+        overrides,
         (&inspection_scope, &reconciliation),
         &source_freshness,
     )?;
-    let planned_sql_tests = test_planning.result(py)?.into_bound(py);
+    record_step(BUILDING_ENTRIES, entries_started.elapsed().as_secs_f64());
+    let planned_sql_tests = timed(TEST_FIXTURES, || test_planning.result(py))?.into_bound(py);
+    let assembling_started = Instant::now();
     let output = base_plan_output(
         PlanOutputContext {
             runtime,
@@ -216,6 +236,7 @@ pub(crate) fn planned_output<'py>(
     let output =
         add_deferred_origin_notes(output, (&project, scopes), (&deferral, &origin_failures))?;
     let plan_output = add_plan_metadata(output, &source_freshness, &policies)?.build(py)?;
+    record_step(ASSEMBLING, assembling_started.elapsed().as_secs_f64());
     let on_progress = args.value("on_progress")?;
     if !on_progress.is_none() {
         on_progress.call1((format!(

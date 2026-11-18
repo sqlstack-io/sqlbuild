@@ -1,7 +1,7 @@
 //! Resolve host entries: targets read once from `sqlbuild._native_host`, attributes read live.
 
-use std::path::PathBuf;
-
+use crate::boundary::main::within::within;
+use crate::build_progress::main::progress::write_persistent::write_persistent;
 use pyo3::PyErr;
 use pyo3::exceptions::PyImportError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -10,8 +10,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple, PyTupleMethods};
 use sqlbuild_host::entries::constants::{HOST_ENTRIES, HOST_MODULE, HOST_TARGETS_FUNCTION};
 use sqlbuild_host::entries::models::{HostId, UserCodeHost};
 use sqlbuild_host::entries::types::HostEntries;
-
-use crate::boundary::main::within::within;
+use std::path::PathBuf;
 
 /// One entry's target module path and attribute name.
 type Target = (Py<PyString>, Py<PyString>);
@@ -69,12 +68,10 @@ pub(crate) fn entry<'py>(py: Python<'py>, id: impl Into<HostId>) -> PyResult<Bou
     PythonHost(py).entry(id.into())
 }
 
-/// Write through the interpreter's live console, respecting redirection and surfacing delivery errors.
+/// Write through the live console, clearing then redrawing any spinner line; errors surface.
 pub(crate) fn write_console(py: Python<'_>, stream: &str, text: &str) -> PyResult<()> {
     let stream = py.import("sys")?.getattr(stream)?;
-    stream.call_method1("write", (text,))?;
-    stream.call_method0("flush")?;
-    Ok(())
+    write_persistent(py, &stream, text)
 }
 
 /// Flush the interpreter's live console `stream` so text written before a child process appears first.

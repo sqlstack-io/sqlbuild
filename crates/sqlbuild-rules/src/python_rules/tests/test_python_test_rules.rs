@@ -186,6 +186,30 @@ fn given_project_python_tests_when_evaluating_test_rules_then_reports_misplaced_
             ],
         },
         PythonRunTestCase {
+            description: "an orchestration test mirrors its sensor code; one mirroring nothing is reported",
+            files: &[
+                (
+                    "orchestration/sensors/orders/_helpers/restock_window.py",
+                    "def restock_due(hours):\n    return hours >= 6\n",
+                ),
+                (
+                    "tests/orchestration/sensors/orders/_helpers/test_restock_window.py",
+                    ROW_MAPPING_TEST,
+                ),
+                (
+                    "tests/orchestration/sensors/inventory/test_stock.py",
+                    ROW_MAPPING_TEST,
+                ),
+            ],
+            config: json!({"select": ["SQBRPYTHON021"]}),
+            expected_faults: vec![(
+                "SQBRPYTHON021",
+                "tests/orchestration/sensors/inventory/test_stock.py",
+                1,
+                1,
+            )],
+        },
+        PythonRunTestCase {
             description: "a relative import, a top-level helper and a branch in a test break the test conventions",
             files: &[
                 RUNTIME_FILES[0],

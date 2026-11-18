@@ -139,6 +139,7 @@ E2E_DUCKDB_BUILD_CORE_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_execution_limits.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_explicit_references.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_expression_sources.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_ignored_audit_failures.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_lifecycle_commands.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_manifest_artifact_gating.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_materialization_type_change.py \
@@ -340,7 +341,7 @@ test-e2e-performance:
 	@log="/tmp/opencode/test-e2e-performance-$$(date +%Y%m%d-%H%M%S).log"; \
 	echo "Logging to $$log"; \
 	env PYTHONUNBUFFERED=1 SQLBUILD_CONCURRENCY=$(SQLBUILD_CONCURRENCY) uv run pytest tests/e2e \
-		-m "performance and not cold_compile_performance and not cache_compile_performance and not real_warehouse and not dbt" \
+		-m "performance and not cold_compile_performance and not cache_compile_performance and not preview_performance and not real_warehouse and not dbt" \
 		-vv --log-cli-level=INFO --color=yes 2>&1 | tee "$$log"; \
 	status=$${PIPESTATUS[0]}; \
 	echo "TEST_E2E_PERFORMANCE_EXIT=$$status (log: $$log)" | tee -a "$$log"; \
@@ -370,13 +371,17 @@ test-e2e-dense-compile-performance:
 		-n auto --dist loadfile \
 		-m cold_compile_performance -k "models_$(SQLBUILD_BENCHMARK_MODELS)_" \
 		-vv -rP --log-level=INFO --log-cli-level=INFO --color=yes
-# DuckShop 10K runs after the dense guards, alone, so its compile never overlaps theirs.
+# DuckShop 10K runs after the dense guards, alone, so its compile never overlaps theirs; then its
+# plan preview guard, which serves the project on a location.
 	if [ "$(SQLBUILD_BENCHMARK_MODELS)" = "10000" ]; then \
 		env PYTHONUNBUFFERED=1 uv run pytest benchmarks/duckshop-10k/tests -q --color=yes && \
 		env PYTHONUNBUFFERED=1 SQLBUILD_CONCURRENCY=4 uv run pytest \
 			tests/e2e/src/sqlbuild/cli/commands/main/compile/test_duckshop_10k_compile.py \
 			-m cold_compile_performance -k "models_$(SQLBUILD_BENCHMARK_MODELS)_" \
-			-vv -rP --log-level=INFO --log-cli-level=INFO --color=yes; \
+			-vv -rP --log-level=INFO --log-cli-level=INFO --color=yes && \
+		env PYTHONUNBUFFERED=1 uv run pytest \
+			tests/e2e/src/sqlbuild/cli/commands/main/plan/test_duckshop_10k_preview_performance.py \
+			-m preview_performance -vv -rP --log-level=INFO --log-cli-level=INFO --color=yes; \
 	fi
 
 test-e2e-cache-compile-performance:

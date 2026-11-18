@@ -8,7 +8,7 @@ use crate::authorization::_helpers::custom_roles::{decode_grants, decode_roles_d
 use crate::authorization::_helpers::person_grants::builtin_actions;
 use crate::authorization::models::{CurrentSnapshotId, RoleFacts, RoleHolderCount};
 use crate::credentials::models::{BuiltinRole, RoleGrant, RoleOverview, RoleOverviewGrant};
-use crate::snapshots::main::read_snapshot_documents::read_snapshot_documents;
+use crate::snapshots::main::reads::read_snapshot_documents::read_snapshot_documents;
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
 use crate::store::models::{ControlTransaction, Parameter};

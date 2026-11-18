@@ -9,7 +9,7 @@ use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;

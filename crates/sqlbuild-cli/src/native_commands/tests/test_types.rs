@@ -50,6 +50,12 @@ pub(super) struct ProjectFactsTestCase {
     pub(super) expected_native: bool,
 }
 
+pub(super) struct ProjectNameTestCase {
+    pub(super) description: &'static str,
+    pub(super) project_file: &'static str,
+    pub(super) expected_name: Option<&'static str>,
+}
+
 /// One `rules` inspection over a project and the start of what it prints.
 pub(super) struct RulesTestCase {
     pub(super) description: &'static str,
@@ -90,6 +96,8 @@ pub(super) struct PlanDocumentTestCase {
     pub(super) output: Vec<u8>,
     pub(super) planned: bool,
     pub(super) expected_first_model: serde_json::Value,
+    /// How many models' diffs travel beside the document, and the first one's query diff.
+    pub(super) expected_diffs: (usize, Option<Vec<String>>),
 }
 
 /// One failed metadata read, whether it was a page-size failure, and the statistics page size afterwards.
@@ -113,11 +121,24 @@ pub(super) struct MetadataBackoffTestCase {
     pub(super) expected_paging: (bool, bool),
 }
 
+/// A sync that applied a page and stopped at statistics on a server whose clock runs an hour ahead.
+pub(super) struct StoppedPassTestCase {
+    pub(super) description: &'static str,
+    /// When the last run ended, in seconds after the stop by the server's clock.
+    pub(super) run_ended_after_stop: i64,
+    /// Whether it resumed, whether its pass restarts, and whether its completion plans what changed.
+    pub(super) expected_outcome: (bool, bool, bool),
+}
+
 /// A sync stopped by failed reads, its safety interval and how soon the safety sync is due.
 pub(super) struct SafetyResumeTestCase {
     pub(super) description: &'static str,
     pub(super) safety_seconds: u64,
     pub(super) due_in: std::time::Duration,
+    /// History reads wake billed compute and the safety interval is the default.
+    pub(super) billed: bool,
+    /// A run ended after the sync stopped.
+    pub(super) ran: bool,
     /// Whether it resumed and pages, the next failure's wait, and whether that stopped it again.
     pub(super) expected_outcome: (bool, bool, Option<std::time::Duration>, bool),
 }
@@ -161,4 +182,127 @@ pub(super) struct SafetySyncIdleTestCase {
     pub(super) safety_seconds: u64,
     pub(super) safety_due_after_seconds: u64,
     pub(super) expected_sync_due: bool,
+}
+
+pub(crate) struct NewestVersionsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) kind: WarehouseHistoryKind,
+    pub(crate) incremental: bool,
+    pub(crate) server_limit: Option<u16>,
+    pub(crate) expected_newest_versions: Option<u16>,
+}
+
+pub(crate) struct ReadFailureTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) script: std::path::PathBuf,
+    pub(crate) kind: WarehouseHistoryKind,
+    pub(crate) expected: fn(&crate::native_commands::models::ReadFailure) -> bool,
+    pub(crate) expected_line: &'static str,
+}
+
+pub(super) struct BilledDeferralTestCase {
+    pub(super) description: &'static str,
+    /// What the publication's connection check reports for the adapter.
+    pub(super) wakes_compute: bool,
+    /// Whether the sync stopped, whether it defers safety syncs, and whether one is due once its interval passed.
+    pub(super) expected_outcome: (bool, bool, bool),
+}
+
+#[derive(Debug)]
+pub(super) struct SyncCompletionTestCase {
+    pub(super) description: &'static str,
+    pub(super) acknowledged_scans: usize,
+    pub(super) more_pages: bool,
+    pub(super) failure: Option<sqlbuild_orchestration::platform::models::WarehouseSyncFailure>,
+    pub(super) safety_seconds: u64,
+    pub(super) reads_wake_compute: bool,
+    pub(super) safety_explicit: bool,
+    pub(super) expected_next_in_seconds: Option<i64>,
+}
+
+#[derive(Debug)]
+pub(super) struct ChangedBuildNodesTestCase {
+    pub(super) description: &'static str,
+    pub(super) document: serde_json::Value,
+    pub(super) expected_nodes: Result<(Vec<&'static str>, Vec<&'static str>), &'static str>,
+}
+
+pub(super) struct LineResetTestCase {
+    pub(super) description: &'static str,
+    pub(super) shared: bool,
+    pub(super) terminal: bool,
+    pub(super) expected_reset: &'static [u8],
+}
+
+/// One turn of named work and how long the location waits before it checks for work again.
+pub(super) struct WorkCheckTestCase {
+    pub(super) description: &'static str,
+    pub(super) claimed: bool,
+    pub(super) sync: bool,
+    pub(super) expected_wait: std::time::Duration,
+}
+
+/// One failed read after earlier failures in a row, on a warehouse whose reads may wake compute.
+pub(crate) struct FailedReadHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) failure: crate::native_commands::models::ReadFailure,
+    pub(crate) failures_before: usize,
+    pub(crate) billed: bool,
+    /// Shrinks, closed cause, reported error, whether the sync stops, and seconds to the announced next sync.
+    pub(crate) expected_report: (
+        bool,
+        Option<sqlbuild_orchestration::platform::models::WarehouseReadFailure>,
+        Option<&'static str>,
+        bool,
+        Option<i64>,
+    ),
+}
+
+/// A table's progress line after a sync read it or found it unchanged.
+pub(crate) struct ScanLineTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) index: usize,
+    pub(crate) scan_rows: u64,
+    pub(crate) unchanged: bool,
+    pub(crate) expected_prefix: &'static str,
+}
+
+/// A row count as the progress lines write it.
+pub(crate) struct RowsTextTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) rows: u64,
+    pub(crate) expected_text: &'static str,
+}
+
+/// A delivered or failed page's progress report at one kind of history.
+pub(crate) struct SyncProgressTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) index: usize,
+    pub(crate) more_pages: bool,
+    pub(crate) clean: bool,
+    /// Position, kinds, rows and whether the sync completed.
+    pub(crate) expected_progress: (u64, u64, u64, bool),
+}
+
+/// An idle location on a warehouse whose reads may wake compute, after a run or a request.
+pub(crate) struct WakingIdleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) wakes: bool,
+    pub(crate) explicit: bool,
+    pub(crate) run_ended: bool,
+    pub(crate) requested: bool,
+    pub(crate) expected_due: bool,
+}
+
+/// The options a changed build is frozen with.
+pub(super) struct ChangedBuildSettingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) expected_settings: serde_json::Value,
+}
+
+/// Completed syncs in order, each as (applied a page, plan reached the server), after a publication.
+pub(super) struct ReplanTestCase {
+    pub(super) description: &'static str,
+    pub(super) syncs: Vec<(bool, bool)>,
+    pub(super) expected_replans: Vec<bool>,
 }

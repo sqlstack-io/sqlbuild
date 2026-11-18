@@ -2,10 +2,10 @@
 
 use crate::planner_migrations::_helpers::column::column_objects::native;
 use crate::planner_migrations::_helpers::column::column_objects::text;
-use crate::planner_migrations::constants::{
-    DONE, MISSING_ORIGIN_ALLOW_OUTCOME, MISSING_ORIGIN_CONFIRMATION_OUTCOME,
-    MISSING_ORIGIN_DENY_OUTCOME,
-};
+use crate::planner_migrations::constants::DONE;
+use crate::planner_migrations::constants::MISSING_ORIGIN_ALLOW_OUTCOME;
+use crate::planner_migrations::constants::MISSING_ORIGIN_CONFIRMATION_OUTCOME;
+use crate::planner_migrations::constants::MISSING_ORIGIN_DENY_OUTCOME;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::planner_migrations::main::column_warning::column_warning;

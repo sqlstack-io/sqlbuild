@@ -110,7 +110,7 @@ pub(crate) const DAG_ROUTE: Route = routed(
     },
 );
 
-const PLAN_FIELDS: [Field; 22] = [
+const PLAN_FIELDS: [Field; 24] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -133,6 +133,8 @@ const PLAN_FIELDS: [Field; 22] = [
     CLI_VARS,
     same("max_microbatches"),
     same("selection_diagnostics"),
+    same("timings"),
+    same("ignore_audit_failures"),
 ];
 const PLAN_ARGUMENTS: [Field; 1] = [request(class("PlanCommandRequest"), &PLAN_FIELDS)];
 pub(crate) const PLAN_ROUTE: Route = routed(
@@ -142,7 +144,7 @@ pub(crate) const PLAN_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const BUILD_FIELDS: [Field; 38] = [
+const BUILD_FIELDS: [Field; 39] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -174,6 +176,7 @@ const BUILD_FIELDS: [Field; 38] = [
     CLI_VARS,
     same("run_tests"),
     same("run_audits"),
+    same("ignore_audit_failures"),
     same("manifest"),
     JSON_OUTPUT,
     JSON_OUTPUT_PATH,
