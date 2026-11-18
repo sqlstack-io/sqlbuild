@@ -857,6 +857,45 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                     "run_tests = false\n"
                 ),
             },
+            expected_compiles_again=True,
+        ),
+        WorkerExecutionTestCase(
+            "a job with SQL validation off compiles again instead of reusing the verified compile",
+            "SELECT 47 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(47,)],
+            files={
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
+                    "\n"
+                    "[settings]\n"
+                    "no_sql_validation = true\n"
+                ),
+            },
+            expected_compiles_again=True,
+        ),
+        WorkerExecutionTestCase(
+            "a job with the compile cache off compiles again instead of reusing the verified compile",
+            "SELECT 47 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(47,)],
+            files={
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
+                    "\n"
+                    "[settings]\n"
+                    "no_cache = true\n"
+                ),
+            },
+            expected_compiles_again=True,
         ),
         WorkerExecutionTestCase(
             "a selected upstream source succeeds once the build returns",

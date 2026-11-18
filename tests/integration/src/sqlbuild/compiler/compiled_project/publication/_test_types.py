@@ -142,6 +142,8 @@ class WorkerExecutionTestCase:
     expected_run_nodes: list[tuple[str, str, str | None, str | None, str | None]] = field(
         default_factory=list
     )
+    # Whether the build compiles again instead of planning from the compile the worker verified.
+    expected_compiles_again: bool = False
 
 
 @dataclass(frozen=True)
