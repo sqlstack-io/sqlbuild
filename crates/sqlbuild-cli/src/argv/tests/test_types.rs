@@ -81,3 +81,10 @@ pub(super) struct JobSettingsRejectionTestCase {
     pub(super) settings: BTreeMap<String, Json>,
     pub(super) expected_error: &'static str,
 }
+
+/// A command line and the settings it gives itself.
+pub(super) struct GivenSettingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) argv: &'static [&'static str],
+    pub(super) expected_given: Option<&'static [&'static str]>,
+}

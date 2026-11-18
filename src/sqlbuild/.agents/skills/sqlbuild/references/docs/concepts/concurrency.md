@@ -46,7 +46,10 @@ concurrency = 2
 ```
 
 `--concurrency` on the command line wins over all of them; see
-[Target concurrency](project-configuration.md#target-concurrency) for the full order. The job's page shows the value its runs use on the target and where it came from.
+[Target concurrency](project-configuration.md#target-concurrency) for the full order.
+A job's `concurrency` limits how many of that job's nodes build at once in a build that names the
+job, within the build's own limit. When one job is at its limit, a ready node of another job starts
+instead; see [Settings when a build names a job](orchestration.md#settings-when-a-build-names-a-job). The job's page shows the value its runs use on the target and where it came from.
 
 ## Runs at once on a server: `max_workers`
 

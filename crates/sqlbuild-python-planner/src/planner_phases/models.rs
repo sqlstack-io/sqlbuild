@@ -202,8 +202,7 @@ impl PlanTimings {
     }
 }
 
-/// Which models the invocation asks to rebuild from scratch: every model with `--full-refresh`, or
-/// the models of the named jobs that set `full_refresh`.
+/// The models to rebuild: all with `--full-refresh`, else those of `full_refresh` jobs.
 #[derive(Clone, Debug, Default)]
 pub struct FullRefreshRequest {
     pub all: bool,

@@ -1,5 +1,7 @@
 //! Parse `sqb dbt plan|run|build` arguments as their `argparse` parser did.
 
+use std::collections::BTreeSet;
+
 use sqlbuild_core::dbt_cli::models::DbtParsedFlags;
 
 use crate::argv::_helpers::dbt_execution::{PlainHost, parsed_flags};
@@ -29,6 +31,7 @@ pub fn parse_dbt_execution_arguments(
         writes: Vec::new(),
         command_prog: None,
         usage_failure: None,
+        given: BTreeSet::new(),
     };
     let known: Result<KnownArgs, Failure> =
         run.known_args(&parser, head.to_vec(), Namespace::default());

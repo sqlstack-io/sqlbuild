@@ -3,18 +3,9 @@ use std::collections::BTreeMap;
 use serde_json::json;
 
 use crate::job_settings::errors::NodeJobSettingsError;
-use crate::job_settings::main::node_job_settings::node_job_settings;
 use crate::job_settings::models::NodeJobSettings;
-use crate::job_settings::tests::helpers::{declared, graph_with_jobs, strings};
+use crate::job_settings::tests::helpers::resolved_settings;
 use crate::job_settings::tests::test_types::{NodeJobConflictTestCase, NodeJobSettingsTestCase};
-
-fn settings(select: &[&str], exclude: &[&str]) -> Result<NodeJobSettings, NodeJobSettingsError> {
-    node_job_settings(
-        &graph_with_jobs(),
-        (&strings(select), &strings(exclude)),
-        &declared(),
-    )
-}
 
 #[test]
 fn given_named_jobs_when_resolving_node_settings_then_only_their_own_selected_nodes_take_them() {
@@ -105,7 +96,7 @@ fn given_named_jobs_when_resolving_node_settings_then_only_their_own_selected_no
     ];
     for test_case in test_cases {
         let resolved: NodeJobSettings =
-            settings(test_case.select, test_case.exclude).expect(test_case.description);
+            resolved_settings(test_case.select, test_case.exclude).expect(test_case.description);
         let node_jobs: BTreeMap<&str, Vec<&str>> = resolved
             .node_jobs
             .iter()
@@ -165,7 +156,9 @@ fn given_two_named_jobs_setting_one_node_differently_when_resolving_then_it_is_a
         },
     ];
     for test_case in test_cases {
-        let Err(NodeJobSettingsError::Conflict(conflict)) = settings(test_case.select, &[]) else {
+        let Err(NodeJobSettingsError::Conflict(conflict)) =
+            resolved_settings(test_case.select, &[])
+        else {
             panic!("{}: expected a conflict", test_case.description);
         };
         assert_eq!(

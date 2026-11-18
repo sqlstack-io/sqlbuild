@@ -37,3 +37,18 @@ class SchedulerIdentityTestCase:
     description: str
     expected_invocation_id: str
     expected_run_id: str
+
+
+@dataclass(frozen=True)
+class JobLimitDispatchTestCase:
+    """Ready nodes, each node's limiting jobs and their limits, and the dispatch order expected."""
+
+    description: str
+    ready: tuple[str, ...]
+    node_jobs: dict[str, tuple[str, ...]]
+    job_limits: dict[str, int]
+    blocked: frozenset[str]
+    # Before each dispatch, the running node that finishes first, or "" for none.
+    finished_before: tuple[str, ...]
+    # Each dispatch's node, or None when no ready node has room.
+    expected_dispatched: tuple[str | None, ...]

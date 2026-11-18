@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 
 use serde_json::Value as Json;
 
+use crate::job_settings::_helpers::scope::setting_scope;
 use crate::job_settings::constants::CONFLICT_HELP;
 use crate::job_settings::errors::JobSettingConflict;
-use crate::job_settings::main::setting_scope::setting_scope;
 use crate::job_settings::models::{DeclaredRun, SettingScope};
 
 fn settings_of<'a>(
@@ -23,7 +23,7 @@ fn shown(value: Option<&Json>) -> String {
     value.map_or_else(|| "not set".to_owned(), Json::to_string)
 }
 
-/// Each build-wide setting the named jobs give the build; a job that leaves one unset differs from one that sets it.
+/// The named jobs' build-wide settings, which must agree; unset differs from set.
 pub fn build_job_settings(
     named: &[String],
     declared: &BTreeMap<String, DeclaredRun>,

@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use crate::bindings::_helpers::audit_command::command::run_audit_command;
 use crate::bindings::_helpers::build_command::command::run_build_command;
 use crate::bindings::_helpers::check::check_command::run_check_command;
-use crate::bindings::_helpers::cli::named_job_settings::apply_named_job_settings;
 use crate::bindings::_helpers::clone::clone_command::run_clone_command;
 use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
 use crate::bindings::_helpers::command_runtime::warehouses::validate_cli_warehouse;
@@ -499,7 +498,6 @@ fn routed_command<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = args.py();
     let invocation = Invocation::new(args)?;
-    apply_named_job_settings(args, &invocation.select.extract::<Vec<String>>()?)?;
     let _secrets = MissingSecretsScope::enter(
         args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
             .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),

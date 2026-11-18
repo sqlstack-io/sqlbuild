@@ -23,11 +23,11 @@ pub(super) struct BuildJobSettingsTestCase {
     pub(super) description: &'static str,
     pub(super) select: &'static [&'static str],
     pub(super) expected_named: Vec<&'static str>,
-    pub(super) expected: Result<BTreeMap<&'static str, Json>, &'static str>,
+    pub(super) expected_settings: Result<BTreeMap<&'static str, Json>, &'static str>,
 }
 
 pub(super) struct GroupMismatchTestCase {
     pub(super) description: &'static str,
     pub(super) members: &'static [&'static str],
-    pub(super) expected: Option<&'static str>,
+    pub(super) expected_mismatch: Option<&'static str>,
 }

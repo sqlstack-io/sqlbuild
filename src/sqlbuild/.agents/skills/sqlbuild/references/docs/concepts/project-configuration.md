@@ -273,9 +273,11 @@ concurrency = 8
 value set in this order:
 
 1. `--concurrency` on the command line, for that invocation only
-2. The selected target's `concurrency`, from `[targets.<name>]` in either file
-3. `[settings] concurrency` in `sqlbuild_local.toml`
-4. `[settings] concurrency` in `sqlbuild_project.toml` (default `1`)
+2. For `sqb build`, a named job's `concurrency`, which limits that job's nodes within the build's
+   own limit; see [Settings when a build names a job](orchestration.md#settings-when-a-build-names-a-job)
+3. The selected target's `concurrency`, from `[targets.<name>]` in either file
+4. `[settings] concurrency` in `sqlbuild_local.toml`
+5. `[settings] concurrency` in `sqlbuild_project.toml` (default `1`)
 
 The value must be an integer of at least `1`; anything else fails with `D001`. `sqb build
 --verbose` shows the effective limit and the setting it came from, for example

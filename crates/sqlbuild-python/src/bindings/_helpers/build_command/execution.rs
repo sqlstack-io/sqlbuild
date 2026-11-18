@@ -309,14 +309,13 @@ pub(crate) fn prepare_build_execution<'py>(
     })
 }
 
-/// The build's connections: its limit, or no more than its named jobs' limits add up to when each
-/// planned node belongs to a limited job, so a small job never opens connections it cannot use.
+/// The build's limit, capped at the sum of its jobs' limits when every planned node has one.
 fn connection_limit(limit: i64, pipeline: &Bound<'_, PyAny>) -> PyResult<i64> {
-    let limits: Bound<'_, PyAny> = native_field(pipeline, "job_limits")?;
-    if !limits.is_truthy()? {
+    let limits: Bound<'_, PyDict> = native_field(pipeline, "job_limits")?.cast_into()?;
+    if limits.is_empty() {
         return Ok(limit);
     }
-    let node_jobs: Bound<'_, PyAny> = native_field(pipeline, "node_jobs")?;
+    let node_jobs: Bound<'_, PyDict> = native_field(pipeline, "node_jobs")?.cast_into()?;
     for key in
         native_field(&native_field(pipeline, "plan_output")?, "execution_order")?.try_iter()?
     {
@@ -325,8 +324,8 @@ fn connection_limit(limit: i64, pipeline: &Bound<'_, PyAny>) -> PyResult<i64> {
         }
     }
     let mut total: i64 = 0;
-    for value in limits.call_method0("values")?.try_iter()? {
-        total = total.saturating_add(value?.extract::<i64>()?);
+    for value in limits.values() {
+        total = total.saturating_add(value.extract::<i64>()?);
     }
     Ok(limit.min(total.max(1)))
 }

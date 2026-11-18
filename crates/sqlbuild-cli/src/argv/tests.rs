@@ -1,3 +1,5 @@
+#[path = "tests/test_given_setting_dests.rs"]
+mod given_setting_dests;
 #[path = "tests/helpers.rs"]
 mod helpers;
 #[path = "tests/test_parse_cli_arguments.rs"]
