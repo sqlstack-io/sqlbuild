@@ -64,8 +64,12 @@
 	};
 	const canAck = (item: AttentionItem) => ('acknowledged' in item ? canAcknowledge : !!conditionFor(item) && canAcknowledgeConditions);
 	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
-	const issues = $derived(viewed.filter(({ item }) => !acknowledgementOf(item)));
-	const handled = $derived(viewed.filter(({ item }) => acknowledgementOf(item)));
+	// Acknowledged or undone here, and saved, while the Overview reads again: the item moves at once rather
+	// than after the whole Overview is rebuilt, which on a large project takes a while.
+	let settling = $state<ReadonlyMap<string, boolean>>(new Map());
+	const isHandled = (item: AttentionItem, key: string) => settling.get(key) ?? !!acknowledgementOf(item);
+	const issues = $derived(viewed.filter(({ item, view }) => !isHandled(item, view.key)));
+	const handled = $derived(viewed.filter(({ item, view }) => isHandled(item, view.key)));
 	let showHandled = $state(false);
 	let acknowledging = $state<string | null>(null);
 	let acknowledgeError = $state<string | null>(null);
@@ -79,11 +83,16 @@
 		try {
 			if ('acknowledged' in item) await app.client.acknowledgeRun(scope, item.run.id, acknowledged);
 			else if (condition) await app.client.acknowledgeCondition(scope, condition.key, condition.shape, acknowledged);
+			settling = new Map([...settling, [key, acknowledged]]);
+			acknowledging = null;
 			await overview.refresh();
 		} catch (error) {
 			acknowledgeError = error instanceof Error ? error.message : String(error);
 		} finally {
 			acknowledging = null;
+			const rest = new Map(settling);
+			rest.delete(key);
+			settling = rest;
 		}
 	}
 	const staleListed = $derived(issues.some(({ item }) => item.kind === 'stale_models'));
@@ -206,7 +215,7 @@
 						{#if showHandled}
 							<div class="handled-rows">
 							{#each handled as { item, view } (view.key)}
-								{@const ack = acknowledgementOf(item)}
+								{@const ack = acknowledgementOf(item) ?? { by: 'you', at: new Date(app.now).toISOString(), until: 'acknowledged' in item ? undefined : new Date(app.now + 86_400_000).toISOString() }}
 								<div class="issue muted">
 									<span class="issue-icon info"><BellOffIcon size={13} /></span>
 									<div class="issue-copy">
