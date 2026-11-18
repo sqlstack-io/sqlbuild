@@ -665,6 +665,15 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
         if state.kind() == WarehouseHistoryKind::Statistics {
             state.statistics_limit = MAX_HISTORY_RECORDS;
         }
+        if let Some(count) = state.progress.scan_mirrored {
+            let kinds = WarehouseHistoryKind::ALL.len();
+            let kind = state.index % kinds;
+            state
+                .change_tokens
+                .iter_mut()
+                .filter(|(index, _)| *index % kinds == kind)
+                .for_each(|(_, recorded)| recorded.mirrored = Some(count));
+        }
         match state.scan_token.take() {
             Some(token) => {
                 let recorded = ScanToken {

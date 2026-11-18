@@ -377,7 +377,8 @@ pub(crate) struct ScanToken {
     pub(crate) reconciled: bool,
     /// The read delivered rows or read on top of mirrored rows, so an empty mirror lost rows.
     pub(crate) delivered: bool,
-    /// The mirror's row count the server reported after the read, which a skipped read reports again.
+    /// The newest row count the server reported for this kind's mirror, which covers every state
+    /// location, so a later read of the same kind elsewhere replaces it; a skipped read reports it again.
     pub(crate) mirrored: Option<u64>,
 }
 
@@ -506,8 +507,7 @@ impl LocationMetadataSync {
             && (self.reconcile || self.kind() == WarehouseHistoryKind::Catalog)
     }
 
-    /// The recorded token a scan may skip on, given whether it reconciles and the mirror holds rows.
-    /// Skip a table unchanged since its recorded read, reporting that read's mirrored count again.
+    /// Skip a table unchanged since its recorded read, reporting the newest mirrored count of its kind again.
     pub(crate) fn skip_unchanged(&mut self) {
         self.progress.scan_unchanged = true;
         self.progress.scan_mirrored = self
@@ -516,6 +516,7 @@ impl LocationMetadataSync {
             .and_then(|recorded| recorded.mirrored);
     }
 
+    /// The recorded token a scan may skip on, given whether it reconciles and the mirror holds rows.
     pub(crate) fn unchanged_token(&self) -> Option<&str> {
         let recorded = self.change_tokens.get(&self.index)?;
         ((recorded.reconciled || !self.reconciling())

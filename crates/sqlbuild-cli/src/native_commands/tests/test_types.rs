@@ -304,3 +304,11 @@ pub(super) struct ReplanTestCase {
     pub(super) syncs: Vec<(bool, bool)>,
     pub(super) expected_replans: Vec<bool>,
 }
+
+pub(crate) struct SkippedCountTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) locations: usize,
+    /// The count a read of the same kind in the first location reports after the skipped one's read.
+    pub(crate) later_read: Option<u64>,
+    pub(crate) expected_mirrored: Option<u64>,
+}

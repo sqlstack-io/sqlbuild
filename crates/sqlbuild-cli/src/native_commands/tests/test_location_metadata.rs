@@ -19,7 +19,8 @@ use crate::native_commands::tests::test_types::{
 };
 use crate::native_commands::tests::test_types::{
     MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
-    SafetySyncSettingTestCase, StoppedPassTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
+    SafetySyncSettingTestCase, SkippedCountTestCase, StoppedPassTestCase, SyncCoalescingTestCase,
+    UnchangedScanTestCase,
 };
 use crate::native_commands::tests::test_types::{
     RowsTextTestCase, ScanLineTestCase, SyncProgressTestCase, WakingIdleTestCase,
@@ -406,26 +407,64 @@ fn given_recorded_change_token_when_scanning_again_then_only_proven_unchanged_re
 }
 
 #[test]
-fn given_a_table_skipped_as_unchanged_when_reporting_health_then_its_last_mirrored_count_repeats() {
-    let mut state = metadata_sync((one_location(), 1), (3600, 0));
-    state.scan_token = Some("t1".into());
-    state.scan_delivered = true;
-    state.progress.scan_mirrored = Some(42);
-    let mut state = acknowledge_complete_pages(state, 1);
-    assert_eq!(
-        state.progress.scan_mirrored, None,
-        "the next table starts without a count"
-    );
-    state.index = 0;
-    state.skip_unchanged();
-    let health = metadata_health_of(&state, (Instant::now(), None, None), Utc::now());
-    let LocationHealth::WarehouseSync {
-        mirrored_records, ..
-    } = health
-    else {
-        panic!("not a warehouse sync report");
-    };
-    assert_eq!(mirrored_records, Some(42));
+fn given_a_table_skipped_as_unchanged_when_reporting_health_then_the_newest_mirrored_count_of_its_kind_repeats()
+ {
+    let test_cases = [
+        SkippedCountTestCase {
+            description: "one state location repeats its own read's count",
+            locations: 1,
+            later_read: None,
+            expected_mirrored: Some(120),
+        },
+        SkippedCountTestCase {
+            description: "a later read of the same kind in another location replaces the repeated count",
+            locations: 2,
+            later_read: Some(130),
+            expected_mirrored: Some(130),
+        },
+    ];
+    for test_case in test_cases {
+        let locations: Vec<WarehouseStateLocation> = (0..test_case.locations)
+            .map(|position| WarehouseStateLocation {
+                database: Some("analytics".into()),
+                schema: format!("state_{position}"),
+            })
+            .collect();
+        let kinds = WarehouseHistoryKind::ALL.len();
+        let skipped = (test_case.locations - 1) * kinds;
+        let mut state = metadata_sync((locations, 1), (3600, 0));
+        state.index = skipped;
+        state.scan_token = Some("t1".into());
+        state.scan_delivered = true;
+        state.progress.scan_mirrored = Some(120);
+        let mut state = acknowledge_complete_pages(state, 1);
+        assert_eq!(
+            state.progress.scan_mirrored, None,
+            "{}: the next table starts without a count",
+            test_case.description
+        );
+        if let Some(count) = test_case.later_read {
+            state.index = 0;
+            state.scan_token = Some("t2".into());
+            state.scan_delivered = true;
+            state.progress.scan_mirrored = Some(count);
+            state = acknowledge_complete_pages(state, 1);
+        }
+        state.index = skipped;
+        state.skip_unchanged();
+        let health = metadata_health_of(&state, (Instant::now(), None, None), Utc::now());
+        let LocationHealth::WarehouseSync {
+            mirrored_records, ..
+        } = health
+        else {
+            panic!("{}: not a warehouse sync report", test_case.description);
+        };
+        assert_eq!(
+            mirrored_records, test_case.expected_mirrored,
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]
