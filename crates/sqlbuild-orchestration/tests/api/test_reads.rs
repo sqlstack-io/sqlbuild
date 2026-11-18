@@ -1,7 +1,7 @@
 //! Real HTTP reads keep both location and target scope, including guessed nested resource IDs.
 
-use crate::authorization::main::assign_builtin_role::assign_builtin_role;
-use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
+use crate::authorization::main::roles::assign_builtin_role::assign_builtin_role;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
 use crate::scheduler::tests::contracts::ticks::helpers::{calendar_text, calendar_time};

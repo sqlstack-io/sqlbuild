@@ -3,7 +3,7 @@
 use crate::runs::types::RunsListing;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::_helpers::lifecycle::reads::list_runs_in;
 use crate::runs::models::RunRecord;

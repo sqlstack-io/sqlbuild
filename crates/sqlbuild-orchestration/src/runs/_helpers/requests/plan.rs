@@ -3,8 +3,8 @@
 use chrono::Duration;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::authorization::main::authorize_person::authorize_person;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::platform::constants::{LOCATION_SILENCE_SECONDS, PLAN_EXPIRY_SECONDS, PLAN_QUEUE_LIMIT};
 use crate::platform::main::work::enqueue_location_work::enqueue_location_work;

@@ -3,9 +3,9 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::authorization::main::authorize_person::authorize_person;
-use crate::authorization::main::refuse_unknown::refuse_unknown;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_person::authorize_person;
+use crate::authorization::main::decisions::refuse_unknown::refuse_unknown;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::permissions::authorize_execution;

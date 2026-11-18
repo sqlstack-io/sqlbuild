@@ -6,9 +6,9 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::models::GroupRole;
-use crate::authorization::main::compile_roles::compile_roles;
-use crate::authorization::main::list_role_definitions::list_role_definitions;
-use crate::authorization::main::publish_group_roles::publish_group_roles;
+use crate::authorization::main::roles::compile_roles::compile_roles;
+use crate::authorization::main::roles::list_role_definitions::list_role_definitions;
+use crate::authorization::main::roles::publish_group_roles::publish_group_roles;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{Action, RoleAssignmentRequest, RoleKey};
 use crate::credentials::tests::role_helpers::{

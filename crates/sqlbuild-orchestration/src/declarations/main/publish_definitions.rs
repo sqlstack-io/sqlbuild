@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::authorization::main::publish_custom_roles::publish_custom_roles;
+use crate::authorization::main::roles::publish_custom_roles::publish_custom_roles;
 use crate::declarations::_helpers::development::{pause_triggers, trigger_ids};
 use crate::declarations::_helpers::publication::publish_projections;
 use crate::declarations::models::Definitions;

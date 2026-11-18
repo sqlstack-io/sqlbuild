@@ -1,4 +1,4 @@
-use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope, DefaultRole};
 use crate::platform::main::health::read_person_location_health::read_person_location_health;

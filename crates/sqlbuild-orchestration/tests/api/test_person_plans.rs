@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::api::tests::plans_helpers::{ask, person, plan_request, register_instance, run_rows};
 use crate::api::tests::test_types::{PlanDiffTestCase, PlanTestCase};
 use crate::api::tests::work_helpers::execute;
-use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, BuiltinRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::_helpers::maintenance::retention::retain;

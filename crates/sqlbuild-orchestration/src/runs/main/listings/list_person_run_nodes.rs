@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::row_in_target::row_in_target;
+use crate::authorization::main::decisions::row_in_target::row_in_target;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::_helpers::lifecycle::reads::run_nodes_in;
 use crate::runs::models::RunNodeRecord;

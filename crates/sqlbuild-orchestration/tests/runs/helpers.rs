@@ -3,8 +3,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::api::errors::ApiError;
-use crate::authorization::main::assign_builtin_role::assign_builtin_role;
-use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
+use crate::authorization::main::roles::assign_builtin_role::assign_builtin_role;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, BuiltinRole, RoleAssignmentRequest};
 use crate::credentials::tests::location_helpers::create_location;
