@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.247.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.246.0...v0.247.0) (2026-11-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **server:** sign in through a trusted reverse proxy ([#1574](https://github.com/sqlstack-io/sqlbuild/issues/1574))
+
+### Features
+
+* **server:** sign in through a trusted reverse proxy ([#1574](https://github.com/sqlstack-io/sqlbuild/issues/1574)) ([7e09416](https://github.com/sqlstack-io/sqlbuild/commit/7e0941649d56738be6d5354f12e73e2fcecbb5be))
+
 ## [0.246.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.245.0...v0.246.0) (2026-11-18)
 
 
