@@ -36,7 +36,8 @@ async function loadRecording(): Promise<Recording> {
  * The client the app uses: the server, or the mock with `?mock` or `VITE_SQB_MOCK=1`.
  * With the mock, `?as=<role>`, `?events=none|all` and `?live=reconnecting|offline`
  * adjust it for demos, `?awkward` stretches every list to thousands of rows with very long
- * names, for the layout test, and `?large` swaps in a catalog the size of a real project.
+ * names, for the layout test, `?large` swaps in a catalog the size of a real project, and `?still`
+ * keeps runs from advancing on their own.
  */
 export function createClient(search: URLSearchParams, onUnauthorized: () => void = () => {}): ApiClient {
 	if (DEMO) return createHttpClient({ onUnauthorized, fetch: replayFetch(loadRecording), changes: new LocalChangeBus() });
@@ -47,8 +48,27 @@ export function createClient(search: URLSearchParams, onUnauthorized: () => void
 	const mock = new MockApiClient({
 		role: ROLES.find((r) => r === role),
 		events: EVENTS.find((e) => e === events),
-		connection: LIVE.find((l) => l === live)
+		connection: LIVE.find((l) => l === live),
+		still: search.has('still')
 	});
 	const sized = search.has('large') ? largeProject(mock) : mock;
-	return search.has('awkward') ? awkward(sized) : sized;
+	return countedReads(search.has('awkward') ? awkward(sized) : sized);
+}
+
+/** Calls to each mock client method so far, by name, for the browser suite's work budgets. */
+const mockReads: Record<string, number> = {};
+
+/** The mock client, counting each method call in `mockReads` (also `window.__sqbMockReads`). */
+function countedReads(client: ApiClient): ApiClient {
+	(globalThis as { __sqbMockReads?: Record<string, number> }).__sqbMockReads = mockReads;
+	return new Proxy(client, {
+		get(target, name, receiver) {
+			const value = Reflect.get(target, name, receiver);
+			if (typeof value !== 'function' || typeof name !== 'string') return value;
+			return (...args: unknown[]) => {
+				mockReads[name] = (mockReads[name] ?? 0) + 1;
+				return value.apply(target, args);
+			};
+		}
+	});
 }

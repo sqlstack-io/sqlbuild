@@ -111,5 +111,14 @@ pub(super) struct DetachTestCase {
 pub(super) struct SummarySizeTestCase {
     pub(super) description: &'static str,
     pub(super) models: usize,
+    /// Every model runs under `--changed`, and each has its own distinct warning.
+    pub(super) changed_with_warnings: bool,
     pub(super) expected_max_bytes: usize,
+}
+
+pub(super) struct ConfigChangeTestCase {
+    pub(super) description: &'static str,
+    pub(super) section: PlanPageSection,
+    pub(super) model: &'static str,
+    pub(super) expected_change: Option<&'static str>,
 }

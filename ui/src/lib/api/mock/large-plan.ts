@@ -3,6 +3,8 @@
 // first runs, renames, loads, Python nodes, repeated warnings and 1,507 routine models. Served as the
 // server does: a summary, with routine models, held-back and skipped nodes a page at a time. Pure.
 
+import { groupWarnings } from '$lib/run/plan-index';
+import { seedSection } from '$lib/run/plan-text';
 import type { PlanDiff, PlanDiffStats, PlanDocument, PlanModel, PlanPage, PlanPageSection, PlanSectionCount, PlanSectionNote, PlanWarning } from '../types';
 
 const DOMAINS = ['orders', 'customers', 'inventory', 'payments', 'shipping', 'returns', 'pricing', 'suppliers', 'regions', 'finance', 'marketing', 'support'];
@@ -43,8 +45,8 @@ export function largePlanDocument(changed: boolean): PlanDocument {
 	for (let k = 0; k < 80; k++) models.push(model(i++, 'query_changed', { action: 'create_table', backfill: { action: k % 3 ? 'forward' : 'full', duration: null }, query_diff: queryDiff(i, 1 + ((k * 7) % 90), (k * 5) % 60) }));
 	for (let k = 0; k < 5; k++) models.push(model(i++, 'query_changed', { query_diff: [...HEAD, '@@ -1,2 +1,3 @@', '-select id,  amount', '-from orders', '+select id,', '+       amount', '+from orders'] }));
 	for (let k = 0; k < 2; k++) models.push(model(i++, 'query_changed', { query_diff: [...HEAD, '@@ -1,2 +1,2 @@', '-select id from orders', '+SELECT id FROM orders'] }));
-	for (let k = 0; k < 4; k++) models.push(model(i++, 'config_changed', { config_diff: [...HEAD, '@@ -1,3 +1,3 @@', '   "materialized": "table",', '-  "full_refresh": true,', '+  "full_refresh": false,'] }));
-	models.push(model(i++, 'config_changed', { ...incremental(), config_diff: ['-  "cursor": "observed_at",', '+  "cursor": "event_date",'], query_diff: queryDiff(i, 3, 2) }));
+	for (let k = 0; k < 4; k++) models.push(model(i++, 'config_changed', { config_diff: [...HEAD, '@@ -1,3 +1,3 @@', '   "materialized": "table",', '-  "full_refresh": true,', '+  "full_refresh": false,'], config_change: 'full_refresh true → false' }));
+	models.push(model(i++, 'config_changed', { ...incremental(), config_diff: ['-  "cursor": "observed_at",', '+  "cursor": "event_date",'], config_change: 'cursor observed_at → event_date', query_diff: queryDiff(i, 3, 2) }));
 	models.push(model(i++, 'config_changed', { config_diff: ['-  "grain": "hour",', '+  "grain": "day",', '-  "lookback": 2,', '+  "lookback": 3,', '-  "partition_by": "event_date",', '+  "partition_by": "event_hour",'] }));
 	models.push(model(i++, 'function_changed', { changed_functions: ['parse_orders_html'] }));
 	// 672 first runs; a third are incremental, their range the run's own bounds.
@@ -56,7 +58,7 @@ export function largePlanDocument(changed: boolean): PlanDocument {
 	return {
 		selected_count: 2400,
 		models,
-		seeds: Array.from({ length: 10 }, (_, k) => ({ name: `reference_codes_${k}`, reason: 'no_change' })),
+		seeds: Array.from({ length: 10 }, (_, k) => ({ name: `reference_codes_${k}`, reason: k < 2 ? 'first_run' : k < 3 ? 'config_changed' : 'no_change' })),
 		source_loads: Array.from({ length: 64 }, (_, k) => ({ name: `${DOMAINS[k % DOMAINS.length]}_feed_${k}`, kind: 'source', write_strategy: 'append', cursor_column: 'loaded_at', is_reload: false })),
 		functions: Array.from({ length: 12 }, (_, k) => ({ name: `format_${DOMAINS[k % DOMAINS.length]}_code`, language: 'sql', reason: 'no_change' })),
 		python_nodes: Array.from({ length: 433 }, (_, k) => ({ name: `${DOMAINS[k % DOMAINS.length]}_export_${k}`, kind: 'asset', phase: 'after_models', identity_status: 'known' })),
@@ -84,7 +86,7 @@ export function largePlanDocument(changed: boolean): PlanDocument {
 
 const MODEL_SECTIONS: PlanPageSection[] = ['full_refresh', 'query_changed', 'function_changed', 'config_changed', 'schema_changed', 'first_run', 'renamed'];
 /** Every section in plan order, as the server counts them. */
-const SECTIONS: PlanPageSection[] = [...MODEL_SECTIONS, 'routine_models', 'migrations', 'column_migrations', 'table_type_conversions', 'retention', 'loader_reloads', 'loader_loads', 'source_reloads', 'source_loads', 'changed_functions', 'functions', 'seeds', 'python_nodes', 'held_back', 'unchanged', 'warnings'];
+const SECTIONS: PlanPageSection[] = [...MODEL_SECTIONS, 'routine_models', 'migrations', 'column_migrations', 'table_type_conversions', 'retention', 'loader_reloads', 'loader_loads', 'source_reloads', 'source_loads', 'changed_functions', 'functions', 'first_run_seeds', 'changed_seeds', 'unchanged_seeds', 'python_nodes', 'held_back', 'unchanged', 'warnings'];
 const ROW_LISTS = ['models', 'seeds', 'source_loads', 'functions', 'python_nodes', 'warnings', 'migrations', 'column_migrations', 'table_type_conversions', 'retention'] as const;
 const keyName = (key: string) => key.slice(key.indexOf(':') + 1);
 
@@ -121,8 +123,10 @@ function sectionRows(doc: PlanDocument, section: PlanPageSection): { rows: unkno
 			return named(doc.functions.filter(changedFunction));
 		case 'functions':
 			return named(doc.functions.filter((f) => !changedFunction(f)));
-		case 'seeds':
-			return named(doc.seeds.filter((s) => runsNode(`seed:${s.name}`)));
+		case 'first_run_seeds':
+		case 'changed_seeds':
+		case 'unchanged_seeds':
+			return named(doc.seeds.filter((s) => runsNode(`seed:${s.name}`) && seedSection(s.reason) === section));
 		case 'python_nodes':
 			return named(doc.python_nodes);
 		case 'held_back':
@@ -130,7 +134,7 @@ function sectionRows(doc: PlanDocument, section: PlanPageSection): { rows: unkno
 		case 'unchanged':
 			return { rows: doc.changed?.unchanged ?? [], name: (row) => keyName(row as string) };
 		default:
-			return { rows: doc.warnings, name: (row) => `${(row as PlanWarning).model_name ?? ''} ${(row as PlanWarning).message}` };
+			return { rows: groupWarnings(doc.warnings).flatMap((g) => g.warnings), name: (row) => `${(row as PlanWarning).model_name ?? ''} ${(row as PlanWarning).message}` };
 	}
 }
 
@@ -149,6 +153,12 @@ function runNotes(doc: PlanDocument, rows: unknown[]): PlanSectionNote[] {
 	return [...counts.values()].sort((a, b) => b.count - a.count);
 }
 
+/** The things a group's label counts, "71 in 24 scenarios", as the server's `subject`. */
+function subjectOf(label: string): { noun: string; count: number } | null {
+	const found = / in (\d+) (\w+?)s?$/.exec(label);
+	return found ? { noun: found[2], count: Number(found[1]) } : null;
+}
+
 /** The server's summary of `doc`: its facts, every row list empty, and each section counted. */
 export function planSummary(doc: PlanDocument): PlanDocument {
 	const sections: PlanSectionCount[] = SECTIONS.flatMap((section) => {
@@ -162,6 +172,7 @@ export function planSummary(doc: PlanDocument): PlanDocument {
 		...empty,
 		sections,
 		pages: Object.fromEntries(sections.map((s) => [s.section, s.total])),
+		warning_groups: groupWarnings(doc.warnings).map((g) => ({ template: g.template, count: g.count, subject: subjectOf(g.label) })),
 		changed: doc.changed && { ...doc.changed, runs: [], held_back: [], unchanged: [] },
 		synced_copy: doc.synced_copy && { ...doc.synced_copy, cursor_window_starts: {} }
 	};

@@ -5,11 +5,16 @@ use std::num::NonZeroU32;
 
 use crate::runs::main::execution::change_run::change_run;
 use crate::runs::main::execution::claim_next_run::claim_next_run;
+use crate::runs::main::execution::publish_run_recall::publish_run_recall;
 use crate::runs::models::{
-    NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome,
+    NodeOutcome, RecallBatch, RecallRecord, RunAuthority, RunChange, RunChangeRequest, RunClaim,
+    RunOutcome,
 };
 use crate::scheduler::models::SchedulerLease;
 use crate::store::models::ControlStore;
+use serde_json::json;
+use sqlbuild_recall::records::models::RecallValue;
+use sqlbuild_recall::schema::models::Table;
 use uuid::Uuid;
 
 pub(crate) async fn slot_counts(store: &ControlStore) -> BTreeMap<String, i64> {
@@ -64,6 +69,58 @@ pub(crate) async fn succeed_ignoring_audit_failures(
         vec![RunChange::AuditFailuresIgnored { count: ignored }],
     )
     .await;
+}
+
+/// The claimed worker records one `audit_completed` result per `(audit, ignored)` on the claim's `orders` model.
+pub(crate) async fn publish_audit_results(
+    store: &ControlStore,
+    claim: &RunClaim,
+    audits: &[(String, bool)],
+) {
+    let records = audits
+        .iter()
+        .enumerate()
+        .map(|(index, (audit, ignored))| {
+            let severity = ["warn", "error"][usize::from(*ignored)];
+            let payload = json!({"audit_name": audit, "audit_definition_name": "not_null",
+                "evaluation_mode": "violations", "outcome": severity, "severity": severity,
+                "run_scope_phase": "model", "attachment_kind": "column", "attached_target_kind": "model",
+                "attached_target_name": "orders", "attached_column_name": "order_id",
+                "binding_key": format!("orders.{audit}"), "violation_count": index + 2,
+                "executed_sql": "select 1", "ignored": ignored});
+            RecallRecord {
+                table: Table::Events,
+                values: BTreeMap::from([
+                    ("event_id".into(), RecallValue::Text(format!("audit-{audit}"))),
+                    ("event_type".into(), RecallValue::Text("audit_completed".into())),
+                    ("event_schema_version".into(), RecallValue::Integer(1)),
+                    ("event_kind".into(), RecallValue::Text("lifecycle".into())),
+                    ("severity".into(), RecallValue::Text("info".into())),
+                    (
+                        "occurred_at".into(),
+                        RecallValue::Text(format!("2026-01-01T00:00:{index:02}Z")),
+                    ),
+                    ("producer".into(), RecallValue::Text("sqb".into())),
+                    ("run_id".into(), RecallValue::Text("sqb-run".into())),
+                    (
+                        "invocation_sequence".into(),
+                        RecallValue::Integer(i64::try_from(index).expect("small index")),
+                    ),
+                    ("payload".into(), RecallValue::Text(payload.to_string())),
+                ]),
+            }
+        })
+        .collect();
+    publish_run_recall(
+        store,
+        (claim.request.run_id, claim.claim_id),
+        &RecallBatch {
+            invocation_id: "execution".into(),
+            records,
+        },
+    )
+    .await
+    .expect("publish audit results");
 }
 
 /// Every selected node and the run end with the given outcomes.

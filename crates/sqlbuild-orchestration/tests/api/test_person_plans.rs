@@ -339,7 +339,8 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             }
             let document = json!({
                 "models": [{"name": "orders", "action": "create_table", "reason": "first_run", "query_diff": ["-SELECT 1", "+SELECT 2"], "config_diff": ["-a", "+b"]},
-                    {"name": "customers", "action": "create_view", "reason": "no_change", "config_diff": ["-a", "+b"]}],
+                    {"name": "customers", "action": "create_view", "reason": "no_change", "config_diff": ["-a", "+b"],
+                        "config_change": "full_refresh true → false"}],
                 "warnings": [{"severity": "warning", "message": "connect failed: db_password=orders-pass"}],
                 "python_nodes": [{"name": "orders_export", "identity_diff": {"source_diff": ["-a", "+b"]}}],
                 "timings": {"total_seconds": 1.5, "steps": [{"name": "Reading warehouse state", "seconds": 1.0}, {"name": "Other", "seconds": 0.5}], "planned_from": "synced_state"},
@@ -453,9 +454,8 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                     summary["pages"].clone(),
                     page.total,
                     page.rows.first().map(|row| row["name"].clone()),
-                    page.rows
-                        .first()
-                        .map(|row| row.get("config_diff").is_none()),
+                    page.rows.first().map(|row| row.get("config_diff").is_none()
+                        && row.get("config_change").is_none()),
                     rows(viewer, 1)
                         .await
                         .expect("rows")
@@ -554,18 +554,20 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
                     "reason": "query_changed", "query_diff": ["-select  id", "+select id"]})
                 })
                 .chain([
+                    json!({"name": "totals", "action": "create_table", "reason": "config_changed",
+                    "config_diff": ["-  \"full_refresh\": true,", "+  \"full_refresh\": false,"]}),
                     json!({"name": "customers", "action": "create_view", "reason": "config_changed",
                     "config_diff": ["-a", "+b"]}),
                 ])
                 .collect();
             let (detached_plan, detached) =
-                detach_model_diffs(json!({"models": models[..450].to_vec(), "warnings": []}));
+                detach_model_diffs(json!({"models": models[..451].to_vec(), "warnings": []}));
             let document = json!({
                 "models": detached_plan["models"]
                     .as_array()
                     .into_iter()
                     .flatten()
-                    .chain([&models[450]])
+                    .chain([&models[451]])
                     .collect::<Vec<_>>(),
                 "warnings": [],
             });
@@ -674,6 +676,24 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
                 ),
                 "{}: pages count the left-out diffs, each diff reads from the document or apart from it, \
                  and the stored plan never carries them",
+                test_case.description
+            );
+            let config_changes: Vec<(serde_json::Value, Option<serde_json::Value>)> =
+                page(PlanRowSection::ConfigChanged, None)
+                    .await
+                    .expect("rows")
+                    .expect("planned")
+                    .rows
+                    .iter()
+                    .map(|row| (row["name"].clone(), row.get("config_change").cloned()))
+                    .collect();
+            assert_eq!(
+                config_changes,
+                [
+                    (json!("totals"), Some(json!("full_refresh true → false"))),
+                    (json!("customers"), None),
+                ],
+                "{}: a short config change reads in words whether its diff was detached or not",
                 test_case.description
             );
             execute(

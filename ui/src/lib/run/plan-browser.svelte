@@ -6,9 +6,9 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { to } from '$lib/paths';
-	import { mergePlanPage, type PlanDiff, type PlanDocument, type PlanPage, type PlanPageSection } from '$lib/api';
+	import { mergePlanPage, type PlanDiff, type PlanDocument, type PlanPage, type PlanPageSection, type PlanWarning } from '$lib/api';
 	import { warningText } from './plan-text';
-	import { AFTER_DIVIDER, WARNINGS_SHOWN, diffPreview, planGroups, planSummaryLine, selectedGroup, withoutRows, type PlanGroupKey, type PlanRow } from './plan-index';
+	import { AFTER_DIVIDER, WARNINGS_SHOWN, diffPreview, planGroups, planSummaryLine, selectedGroup, withoutRows, type PlanGroupKey, type PlanRow, type WarningGroup } from './plan-index';
 
 	/**
 	 * `section` is the group shown, kept in the address by the page; `more` adds the next page of a
@@ -38,8 +38,7 @@
 	const PAGE = 50;
 	/** How long the filter waits for typing to stop before asking the server. */
 	const FILTER_WAIT_MS = 250;
-	/** Warnings group by message only once read, so the Warnings pane reads them in larger pages, up to a cap. */
-	const WARNING_PAGE = 200;
+	/** The most warnings one read brings, as the server pages them. */
 	const WARNINGS_READ = 1000;
 
 	/** Diffs read on demand, by model; null when the server has none to give. */
@@ -57,14 +56,58 @@
 	const groups = $derived(planGroups(plan, refresh, diffs));
 	const group = $derived(selectedGroup(groups, section));
 	const warningGroups = $derived(group?.warningGroups ?? []);
+	/** A server summary's groups come counted; each one's warnings are read when it opens, by where they start. */
+	let readWarnings = $state<Record<number, PlanWarning[]>>({});
+	/** Which warning groups are open, and which show all their warnings, by where their warnings start. */
+	let openWarnings = $state<Record<number, boolean>>({});
+	let allWarnings = $state<Record<number, boolean>>({});
+	/** The groups being read, by where their warnings start, one read each, and the summary groups they were read for. */
+	const readingWarnings = new Set<number>();
+	let readFor: unknown = null;
+	// Another plan's groups start closed and unread; a page of this plan's rows keeps the same groups.
+	$effect.pre(() => {
+		if (plan.warning_groups === readFor) return;
+		readFor = plan.warning_groups;
+		readWarnings = {};
+		readingWarnings.clear();
+		openWarnings = {};
+		allWarnings = {};
+	});
+	function readGroup(w: WarningGroup, limit: number) {
+		const want = Math.min(limit, w.count);
+		const have = readWarnings[w.offset]?.length ?? 0;
+		if (w.warnings.length || !load || have >= want || readingWarnings.has(w.offset)) return;
+		const read = readWarnings;
+		readingWarnings.add(w.offset);
+		load('warnings', w.offset + have, want - have, '')
+			.then((page) => {
+				// A read another plan replaced lands nowhere.
+				if (read !== readWarnings) return;
+				readingWarnings.delete(w.offset);
+				readWarnings[w.offset] = [...(readWarnings[w.offset] ?? []), ...(page.rows as PlanWarning[])];
+				// "show all" asked while the first rows were read.
+				if (page.rows.length) readGroup(w, allWarnings[w.offset] ? WARNINGS_READ : limit);
+			})
+			.catch((e: unknown) => {
+				if (read === readWarnings) readingWarnings.delete(w.offset);
+				loadError = e instanceof Error ? e.message : String(e);
+			});
+	}
+	function toggleWarnings(w: WarningGroup) {
+		openWarnings[w.offset] = !openWarnings[w.offset];
+		if (openWarnings[w.offset]) readGroup(w, WARNINGS_SHOWN);
+	}
+	function showAllWarnings(w: WarningGroup) {
+		allWarnings[w.offset] = true;
+		readGroup(w, WARNINGS_READ);
+	}
+	const warningsOf = (w: WarningGroup) => (w.warnings.length ? w.warnings : (readWarnings[w.offset] ?? []));
 
-	/** Per group: rows shown, the filter typed and the one asked for, and which diffs and warning groups are open. */
+	/** Per group: rows shown, the filter typed and the one asked for, and which diffs are open. */
 	let shownOf = $state<Record<string, number>>({});
 	let filterOf = $state<Record<string, string>>({});
 	let askedOf = $state<Record<string, string>>({});
 	let openDiff = $state<Record<string, 'preview' | 'full'>>({});
-	let openWarnings = $state<Record<string, boolean>>({});
-	let allWarnings = $state<Record<string, boolean>>({});
 	let loading = $state(false);
 	let loadError = $state<string | null>(null);
 
@@ -135,17 +178,11 @@
 	/** The next server page the group needs to show `shown` rows: its first section with rows still to load. */
 	const nextPage = $derived(shownGroup?.pages.find((p) => p.loaded < p.total) ?? null);
 
-	/** Warnings read so far, of the plan's. */
-	const warningsRead = $derived(group?.key === 'warnings' ? group.pages.reduce((n, p) => n + p.loaded, 0) : 0);
-
-	// Load pages until the group holds the rows it shows (the warnings, up to the cap), one at a time.
+	// Load pages until the group holds the rows it shows, one at a time; warnings are read by group.
 	$effect(() => {
 		const g = shownGroup;
 		const page = nextPage;
-		const warnings = g?.key === 'warnings';
-		const held = warnings ? warningsRead : (g?.rows.length ?? 0);
-		const want = warnings ? WARNINGS_READ : shown;
-		if (!g || !page || loading || held >= Math.min(want, g.count)) return;
+		if (!g || !page || loading || g.key === 'warnings' || g.rows.length >= Math.min(shown, g.count)) return;
 		if (filtering && !serverFilter) return;
 		const current = view;
 		const step = filtering
@@ -155,16 +192,11 @@
 						view = { ...current, doc: viewDoc(current.matches, mergePlanPage(current.doc, page.section, rows)) };
 					})
 				: null
-			: (more?.(page.section, warnings ? WARNING_PAGE : PAGE) ?? null);
+			: (more?.(page.section, PAGE) ?? null);
 		if (!step) return;
 		loading = true;
 		loadError = null;
 		step.catch((e: unknown) => (loadError = e instanceof Error ? e.message : String(e))).finally(() => (loading = false));
-	});
-
-	// A small config change reads inline, so the rows shown read theirs.
-	$effect(() => {
-		for (const r of visible) if (r.pendingConfig && r.fetch === 'diff') readDiff(r.name);
 	});
 
 	function showMore() {
@@ -207,21 +239,23 @@
 			</header>
 
 			{#if group.key === 'warnings'}
-				{#if warningsRead < group.count}<p class="hint">{loading ? 'Reading the warnings…' : `Grouping the first ${warningsRead.toLocaleString()} of ${group.count.toLocaleString()} warnings.`}</p>{/if}
-				{#each warningGroups as w (w.template)}
+				{#each warningGroups as w (w.offset)}
 					<div class="warning-group">
 						<div class="row">
 							<span class="template">{w.template}</span>
 							<span class="detail">{w.label}</span>
-							<Button variant="link" size="inline" class="text-[11.5px]" onclick={() => (openWarnings[w.template] = !openWarnings[w.template])}>{openWarnings[w.template] ? 'hide' : 'show'}</Button>
+							<Button variant="link" size="inline" class="text-[11.5px]" onclick={() => toggleWarnings(w)}>{openWarnings[w.offset] ? 'hide' : 'show'}</Button>
 						</div>
-						{#if openWarnings[w.template]}
-							{@const all = allWarnings[w.template]}
+						{#if openWarnings[w.offset]}
+							{@const all = allWarnings[w.offset]}
+							{@const listed = warningsOf(w)}
 							<ul class="warning-list">
-								{#each all ? w.warnings : w.warnings.slice(0, WARNINGS_SHOWN) as one, i (i)}<li class:err={one.severity === 'error'}>{#if one.code}<code>{one.code}</code> {/if}{one.message}</li>{/each}
+								{#each all ? listed : listed.slice(0, WARNINGS_SHOWN) as one, i (i)}<li class:err={one.severity === 'error'}>{#if one.code}<code>{one.code}</code> {/if}{one.message}</li>{/each}
 							</ul>
-							{#if !all && w.warnings.length > WARNINGS_SHOWN}
-								<Button variant="link" size="inline" class="ml-4 text-[11.5px]" onclick={() => (allWarnings[w.template] = true)}>show all {w.warnings.length.toLocaleString()}</Button>
+							{#if all && listed.length >= WARNINGS_READ && listed.length < w.count}
+								<p class="hint">The first {listed.length.toLocaleString()} of {w.count.toLocaleString()}.</p>
+							{:else if !all && w.count > WARNINGS_SHOWN}
+								<Button variant="link" size="inline" class="ml-4 text-[11.5px]" onclick={() => showAllWarnings(w)}>show all {w.count.toLocaleString()}</Button>
 							{/if}
 						{/if}
 					</div>

@@ -1,7 +1,7 @@
 // The plan page's list as an index and a pane: the plan's sections (plan-text.ts) gathered into a few
 // groups, one shown at a time, each row one line of name · action · detail. Pure.
 
-import type { PlanDiff, PlanDocument, PlanPageSection, PlanSectionCount, PlanWarning } from '$lib/api';
+import type { PlanDiff, PlanDocument, PlanPageSection, PlanSectionCount, PlanWarning, PlanWarningGroup } from '$lib/api';
 import { plural } from '$lib/format/plural';
 import { changedSections, loadedRows, looseWarnings, planSections, sectionSize, type PlanEntry, type PlanSection } from './plan-text';
 
@@ -45,7 +45,9 @@ const GROUP_OF: Record<PlanPageSection, PlanGroupKey> = {
 	warnings: 'warnings',
 	routine_models: 'unchanged',
 	functions: 'unchanged',
-	seeds: 'unchanged',
+	first_run_seeds: 'first_run',
+	changed_seeds: 'changed',
+	unchanged_seeds: 'unchanged',
 	unchanged: 'skipped'
 };
 /** The kind of change a Changed section counts as, for its breakdown. */
@@ -60,7 +62,9 @@ const CHANGE_KIND: Partial<Record<PlanPageSection, ChangeKind>> = {
 const SECTION_WORD: Partial<Record<PlanPageSection, string>> = {
 	routine_models: 'models',
 	functions: 'functions',
-	seeds: 'seeds',
+	first_run_seeds: 'seeds',
+	changed_seeds: 'seeds',
+	unchanged_seeds: 'seeds',
 	renamed: 'renamed',
 	migrations: 'migrations',
 	column_migrations: 'column migrations',
@@ -72,14 +76,14 @@ const SECTION_WORD: Partial<Record<PlanPageSection, string>> = {
 	source_loads: 'source loads'
 };
 const sectionWord = (section: PlanPageSection) => SECTION_WORD[section] ?? section.replace(/_/g, ' ');
+/** A count in a breakdown, such as "87 query" or "1 seed": seeds say one or many. */
+const counted = (n: number, word: string) => (word === 'seeds' ? plural(n, 'seed') : `${n.toLocaleString()} ${word}`);
 /** Sections whose rows are catalog models, so they link to the catalog. */
 const MODEL_ROWS = new Set<PlanPageSection>(['query_changed', 'function_changed', 'config_changed', 'schema_changed', 'first_run', 'renamed', 'routine_models', 'migrations', 'column_migrations', 'table_type_conversions', 'retention', 'held_back', 'unchanged']);
 /** A whole plan's full refresh, which plan-text sums by materialization rather than listing as a section of models. */
 const TITLE_SECTION: Record<string, PlanPageSection> = { 'Full refresh': 'full_refresh' };
 /** The notes a section's subtitle can say once for its rows: why `--changed` runs them. */
 const ROW_NOTES = new Set(['run_reason', 'reads']);
-/** A seed's plan reason in words, for the Seeds breakdown; a current seed goes unsaid. */
-const SEED_REASON: Record<string, string> = { first_run: 'first run', config_changed: 'changed' };
 
 export type ChangeKind = 'query' | 'config' | 'function' | 'schema';
 
@@ -105,8 +109,6 @@ export type PlanRow = {
 	kinds?: string[];
 	/** The row's diff is read on demand ('diff'), or the server has none to give ('unavailable'). */
 	fetch: 'diff' | 'unavailable' | null;
-	/** A config change of at most two keys, read on demand to show inline. */
-	pendingConfig: boolean;
 };
 
 export type PlanGroup = {
@@ -125,8 +127,11 @@ export type PlanGroup = {
 	sections: PlanPageSection[];
 };
 
-/** A warnings group: one message template and the warnings that fill it in. */
-export type WarningGroup = { template: string; warnings: PlanWarning[]; label: string };
+/**
+ * A warnings group: one message template, how many warnings fill it in and those read so far. A server
+ * summary's group starts empty; its warnings are rows `offset` onwards of the warnings section.
+ */
+export type WarningGroup = { template: string; count: number; offset: number; warnings: PlanWarning[]; label: string };
 
 const DIFF_HEAD = /^(---|\+\+\+|@@)/;
 const lineClass = (line: string): DiffLine['cls'] => (DIFF_HEAD.test(line) ? 'hunk' : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : '');
@@ -150,25 +155,6 @@ export function whitespaceOnly(diff: string[]): boolean {
 			.replace(/\s+/g, '');
 	const [removed, added] = [changedLines(diff, '-'), changedLines(diff, '+')];
 	return (removed.length > 0 || added.length > 0) && side('-') === side('+');
-}
-
-/**
- * A config diff's changes in one line, such as `full_refresh true → false`, when it changes at most
- * `most` top-level keys with plain values; null otherwise, and the row links to the diff instead.
- */
-export function configChange(diff: string[], most = 2): string | null {
-	const values = new Map<string, { old?: string; new?: string }>();
-	for (const line of diff) {
-		if (DIFF_HEAD.test(line) || !(line.startsWith('+') || line.startsWith('-'))) continue;
-		const m = /^[-+]\s*"([^"]+)":\s*(.*?),?\s*$/.exec(line);
-		// A nested value, or a line that isn't one key's value, can't be read in one line.
-		if (!m || /[{[]$/.test(m[2])) return null;
-		const entry = values.get(m[1]) ?? {};
-		entry[line.startsWith('-') ? 'old' : 'new'] = m[2].replace(/^"(.*)"$/, '$1');
-		values.set(m[1], entry);
-	}
-	if (!values.size || values.size > most) return null;
-	return [...values].map(([key, v]) => `${key} ${v.old ?? '(unset)'} → ${v.new ?? '(unset)'}`).join('; ');
 }
 
 /** The executor's placeholders for a microbatch's bounds, which a preview reports as the range. */
@@ -201,9 +187,7 @@ function changedRow(e: PlanEntry, kind: ChangeKind | undefined, linked: boolean,
 	if (e.schema?.length) kinds.add('schema');
 	const cause = e.detail.find((d) => d.startsWith('cause: function '));
 	if (cause) kinds.add('function');
-	const config = configText?.length ? configChange(configText) : null;
-	// A config change of at most two keys reads inline once its text is read; until then the row waits for it.
-	const pendingConfig = !configText && !!configStats && configStats.added <= 2 && configStats.removed <= 2 && fetched === undefined;
+	const config = e.configChange ?? null;
 	const quiet = !!query?.whitespace_only;
 	const label = KIND_ORDER.filter((k) => kinds.has(k)).join(' + ');
 	const counts = query && !quiet ? `+${query.added} −${query.removed}` : null;
@@ -218,7 +202,7 @@ function changedRow(e: PlanEntry, kind: ChangeKind | undefined, linked: boolean,
 	if (cause) parts.push(cause.slice('cause: function '.length));
 	if (e.schema?.length) parts.push(plural(e.schema.length, 'column'));
 	// The diff the link opens: the query, else a config too long to read inline, else the schema.
-	const diffOf = query ? 'query' : configStats && !config && !pendingConfig ? 'config' : e.schema?.length ? 'schema' : null;
+	const diffOf = query ? 'query' : configStats && !config ? 'config' : e.schema?.length ? 'schema' : null;
 	// Whether the row holds the text of the diff its link opens; if not, opening it reads it.
 	const held = diffOf === 'query' ? !!queryText : diffOf === 'config' ? !!configText : true;
 	const diff: DiffLine[] | null =
@@ -239,14 +223,13 @@ function changedRow(e: PlanEntry, kind: ChangeKind | undefined, linked: boolean,
 		warnings: e.warnings ?? [],
 		linked,
 		kinds: [...kinds],
-		fetch: (diffOf && !held && fetched === undefined) || pendingConfig ? 'diff' : diffOf && !held ? 'unavailable' : null,
-		pendingConfig
+		fetch: diffOf && !held ? (fetched === undefined ? 'diff' : 'unavailable') : null
 	};
 }
 
 const plainRow = (e: PlanEntry, linked: boolean): PlanRow => {
 	const [first = '', ...rest] = e.detail.map(cursorWords);
-	return { name: e.name, action: e.value, detail: first, notes: rest, diff: null, diffOf: null, warnings: e.warnings ?? [], linked, fetch: null, pendingConfig: false };
+	return { name: e.name, action: e.value, detail: first, notes: rest, diff: null, diffOf: null, warnings: e.warnings ?? [], linked, fetch: null };
 };
 
 /** A note every loaded row shares, such as "no completed record": for a whole plan, which comes without counted notes. */
@@ -302,15 +285,38 @@ export function groupWarnings(warnings: PlanWarning[]): WarningGroup[] {
 		const t = warningTemplate(w);
 		groups.set(t, [...(groups.get(t) ?? []), w]);
 	}
-	return [...groups]
-		.map(([template, list]) => {
-			const noun = /^(\w+) …/.exec(template)?.[1];
-			const firsts = new Set(list.map((w) => /'([^']*)'|`([^`]*)`|"([^"]*)"/.exec(w.message)?.slice(1).find(Boolean) ?? ''));
-			const label = noun && list.length > 1 && firsts.size < list.length ? `${list.length} in ${plural(firsts.size, noun.toLowerCase())}` : plural(list.length, 'warning');
-			return { template, warnings: list, label };
-		})
-		.sort((a, b) => b.warnings.length - a.warnings.length);
+	const sorted = [...groups].sort((a, b) => b[1].length - a[1].length);
+	let offset = 0;
+	return sorted.map(([template, list]) => {
+		const noun = /^(\w+) …/.exec(template)?.[1];
+		const firsts = new Set(list.map((w) => /'([^']*)'|`([^`]*)`|"([^"]*)"/.exec(w.message)?.slice(1).find(Boolean) ?? ''));
+		const subject = noun && list.length > 1 && firsts.size < list.length ? { noun: noun.toLowerCase(), count: firsts.size } : null;
+		const group = { template, count: list.length, offset, warnings: list, label: warningGroupLabel(list.length, subject) };
+		offset += list.length;
+		return group;
+	});
 }
+
+/** A warning group's size, and how many named things it covers when they repeat: "71 in 24 scenarios". */
+function warningGroupLabel(count: number, subject: PlanWarningGroup['subject']): string {
+	return subject ? `${count} in ${plural(subject.count, subject.noun)}` : plural(count, 'warning');
+}
+
+/** A server summary's warning groups, each starting where the one before ends in the warnings section. */
+function serverWarningGroups(groups: PlanWarningGroup[], total: number): WarningGroup[] {
+	let offset = 0;
+	const listed: WarningGroup[] = groups.map((g) => {
+		const group = { template: g.template, count: g.count, offset, warnings: [], label: warningGroupLabel(g.count, g.subject) };
+		offset += g.count;
+		return group;
+	});
+	// The summary lists only the largest groups; the warnings past them page as one rest.
+	const rest = total - offset;
+	return rest > 0 ? [...listed, { template: REST_TEMPLATE, count: rest, offset, warnings: [], label: `${plural(rest, 'warning')} of smaller kinds` }] : listed;
+}
+
+/** The group holding the warnings past a server summary's largest groups. */
+const REST_TEMPLATE = 'Other warnings';
 
 /** The plan's sections with their sizes and notes: the server summary's, else counted from a whole plan's rows. */
 export function sectionCounts(plan: PlanDocument, sections: PlanSection[]): PlanSectionCount[] {
@@ -333,7 +339,9 @@ export function planGroups(plan: PlanDocument, refresh: (job: string) => string 
 	const textOf = new Map(sections.map((s) => [s.section ?? TITLE_SECTION[s.title], s]));
 	const counts = sectionCounts(plan, sections);
 	const warnings = looseWarnings(plan, sections);
-	const grouped = warnings.length ? groupWarnings(warnings) : [];
+	const warningTotal = counts.find((c) => c.section === 'warnings')?.total ?? 0;
+	const grouped = plan.warning_groups ? serverWarningGroups(plan.warning_groups, warningTotal) : warnings.length ? groupWarnings(warnings) : [];
+	const warningKinds = plan.warning_groups ? plural(plan.warning_groups.length, 'kind') + (grouped.length > plan.warning_groups.length ? ' and more' : '') : plural(grouped.length, 'kind');
 	// A whole plan (an older server's, or the mock's) has every row and no counted notes.
 	const whole = !plan.sections;
 	return ORDER.flatMap((key) => {
@@ -348,10 +356,6 @@ export function planGroups(plan: PlanDocument, refresh: (job: string) => string 
 			const entries = textOf.get(c.section)?.entries ?? [];
 			const loaded = key === 'warnings' ? loadedRows(plan, 'warnings') : entries.length;
 			if (!whole) pages.push({ section: c.section, loaded, total: c.total });
-			if (c.section === 'seeds') {
-				const reasons = c.notes.filter((n) => n.kind === 'reason' && n.value && SEED_REASON[n.value]).map((n) => `${n.count.toLocaleString()} ${SEED_REASON[n.value!]}`);
-				if (reasons.length) notes.push(`seeds: ${reasons.join(', ')}`);
-			}
 			// A section's rows follow the one before only once that one is all loaded, so rows read in order.
 			if (key === 'warnings' || !complete) continue;
 			const linked = MODEL_ROWS.has(c.section);
@@ -370,13 +374,13 @@ export function planGroups(plan: PlanDocument, refresh: (job: string) => string 
 		if (key === 'changed') for (const c of mine) kinds.set(CHANGE_KIND[c.section] ?? sectionWord(c.section), (kinds.get(CHANGE_KIND[c.section] ?? sectionWord(c.section)) ?? 0) + c.total);
 		const breakdown =
 			key === 'changed'
-				? [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n.toLocaleString()} ${k}`)
+				? [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n]) => counted(n, k))
 				: key === 'warnings'
-					? grouped.length && (whole || loadedRows(plan, 'warnings') >= count)
-						? [plural(grouped.length, 'kind')]
+					? grouped.length && (whole || plan.warning_groups || loadedRows(plan, 'warnings') >= count)
+						? [warningKinds]
 						: []
 					: mine.length > 1
-						? mine.map((c) => `${c.total.toLocaleString()} ${sectionWord(c.section)}`)
+						? mine.map((c) => counted(c.total, sectionWord(c.section)))
 						: [];
 		return [{ key, title: TITLES[key], count, subtitle: [...breakdown, ...notes].join(' · '), rows, pages, sections: mine.map((c) => c.section), ...(key === 'warnings' ? { warningGroups: grouped } : {}) }];
 	});

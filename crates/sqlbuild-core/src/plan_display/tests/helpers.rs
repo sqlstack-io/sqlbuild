@@ -38,16 +38,53 @@ pub(super) fn full_plan() -> serde_json::Value {
     let mut payments = planned_model("payments", ("create_table", "query_changed"));
     payments["query_diff"] = serde_json::json!(["-select id", "+SELECT id"]);
     payments["config_diff"] = serde_json::json!(["-  \"tags\": []", "+  \"tags\": [\"finance\"]"]);
+    let mut totals = planned_model("totals", ("create_table", "config_changed"));
+    totals["config_diff"] = serde_json::json!([
+        "--- a",
+        "+++ b",
+        "@@ -1,2 +1,2 @@",
+        "   \"materialized\": \"table\",",
+        "-  \"full_refresh\": true,",
+        "+  \"full_refresh\": false,"
+    ]);
+    let mut daily_orders = planned_model("daily_orders", ("create_table", "first_run"));
+    daily_orders["config_diff"] = serde_json::json!([
+        "--- a",
+        "+++ b",
+        "@@ -2,3 +2,3 @@",
+        "   \"meta\": {",
+        "-    \"owner\": \"sales\"",
+        "+    \"owner\": \"finance\"",
+        "   },"
+    ]);
+    let mut daily_payments = planned_model("daily_payments", ("create_table", "first_run"));
+    daily_payments["config_diff"] = serde_json::json!([
+        "--- a",
+        "+++ b",
+        "@@ -1,3 +1,4 @@",
+        "-  \"materialized\": \"table\"",
+        "+  \"materialized\": \"table\",",
+        "+  \"tags\": \"none\""
+    ]);
+    let mut ledger = planned_model("ledger", ("create_table", "schema_changed"));
+    ledger["config_diff"] = serde_json::json!([
+        "-  \"grain\": \"hour\",",
+        "+  \"grain\": \"day\",",
+        "-  \"lookback\": 2,",
+        "+  \"lookback\": 3,",
+        "-  \"partition_by\": \"event_date\"",
+        "+  \"partition_by\": \"event_hour\""
+    ]);
     serde_json::json!({
         "selected_count": 12,
         "models": [
             orders,
             payments,
             planned_model("refunds", ("create_table", "function_changed")),
-            planned_model("totals", ("create_table", "config_changed")),
-            planned_model("ledger", ("create_table", "schema_changed")),
-            planned_model("daily_orders", ("create_table", "first_run")),
-            planned_model("daily_payments", ("create_table", "first_run")),
+            totals,
+            ledger,
+            daily_orders,
+            daily_payments,
             planned_model("old_orders", ("create_table", "renamed")),
             planned_model("archive", ("create_table", "full_refresh")),
             planned_model("customers", ("create_view", "no_change")),
@@ -56,7 +93,12 @@ pub(super) fn full_plan() -> serde_json::Value {
             planned_model("skipped_model", ("skip", "no_change")),
             planned_model("not_run", ("create_view", "no_change")),
         ],
-        "seeds": [{"name": "countries", "reason": "first_run"}, {"name": "idle_seed", "reason": "no_change"}],
+        "seeds": [
+            {"name": "countries", "reason": "first_run"},
+            {"name": "currency_rates", "reason": "config_changed"},
+            {"name": "regions", "reason": "no_change"},
+            {"name": "idle_seed", "reason": "no_change"},
+        ],
         "source_loads": [
             {"name": "raw_orders", "kind": "loader", "is_reload": true, "write_strategy": "replace"},
             {"name": "raw_payments", "kind": "loader", "is_reload": false, "write_strategy": "append"},
@@ -69,8 +111,12 @@ pub(super) fn full_plan() -> serde_json::Value {
         ],
         "python_nodes": [{"name": "score_orders", "kind": "task", "phase": "after", "identity_status": "changed"}],
         "warnings": [
-            {"severity": "warning", "message": "orders: already-built dates keep their old results"},
-            {"severity": "warning", "message": "scenario 'checkout' is stale", "code": "W1"},
+            {"severity": "warning", "model_name": "orders", "message": "orders: already-built dates keep their old results"},
+            {"severity": "warning", "message": "scenario 'checkout' step 'pay' is stale", "code": "W1"},
+            {"severity": "warning", "message": "model stg__orders_2 has no tests."},
+            {"severity": "warning", "message": "scenario 'checkout' step 'ship' is stale", "code": "W1"},
+            {"severity": "warning", "message": "model stg__customers_3 has no tests."},
+            {"severity": "warning", "message": "scenario 'returns' step `refund` is stale", "code": "W1"},
         ],
         "migrations": [{"model": "old_orders", "origin_model": "orders_v1", "decision": "rename", "completed_at": null}],
         "column_migrations": [{"model": "ledger", "origin_column": "amt", "destination_column": "amount", "decision": "rename"}],
@@ -95,6 +141,8 @@ pub(super) fn full_plan() -> serde_json::Value {
                 {"node": "model:Customer_Notes", "reason": "no completed record", "downstream_of": null},
                 {"node": "model:events", "reason": "no completed record", "downstream_of": null},
                 {"node": "seed:countries", "reason": "no completed record", "downstream_of": null},
+                {"node": "seed:currency_rates", "reason": "definition changed", "downstream_of": null},
+                {"node": "seed:regions", "reason": "no completed record", "downstream_of": null},
             ],
             "held_back": [
                 {"node": "model:daily_revenue", "refreshed_by": ["finance"]},
@@ -105,8 +153,8 @@ pub(super) fn full_plan() -> serde_json::Value {
     })
 }
 
-/// A first build of `count` table models, as large projects plan it.
-pub(super) fn first_build(count: usize) -> serde_json::Value {
+/// A first build of `count` table models, as large projects plan it; `changed` runs each under `--changed` with a warning of its own.
+pub(super) fn first_build(count: usize, changed: bool) -> serde_json::Value {
     let models: Vec<serde_json::Value> = (0..count)
         .map(|index| {
             let mut model =
@@ -117,11 +165,35 @@ pub(super) fn first_build(count: usize) -> serde_json::Value {
             model
         })
         .collect();
+    let names = (0..count).map(|index| format!("model_{index:05}"));
+    let runs: Vec<serde_json::Value> = names
+        .clone()
+        .map(|name| serde_json::json!({"node": format!("model:{name}"), "reason": "no completed record", "downstream_of": null}))
+        .take(count * usize::from(changed))
+        .collect();
+    let warnings: Vec<serde_json::Value> = (0..count * usize::from(changed))
+        .map(|index| serde_json::json!({"severity": "warning", "message": format!("unusual setting {} on this model", word(index))}))
+        .collect();
+    let decision = [
+        serde_json::Value::Null,
+        serde_json::json!({"counts": ["definition"], "reach": "all", "runs": runs, "held_back": [], "unchanged": []}),
+    ][usize::from(changed)]
+    .clone();
     serde_json::json!({
         "selected_count": count, "models": models, "seeds": [], "source_loads": [], "functions": [],
-        "python_nodes": [], "warnings": [], "migrations": [], "column_migrations": [],
-        "table_type_conversions": [], "retention": [], "synced_copy": null, "changed": null,
+        "python_nodes": [], "warnings": warnings, "migrations": [], "column_migrations": [],
+        "table_type_conversions": [], "retention": [], "synced_copy": null,
+        "changed": decision,
     })
+}
+
+/// A distinct three-letter word for each index below 17,576, so no warning template elides it.
+fn word(index: usize) -> String {
+    (0..3)
+        .map(|place: u32| {
+            char::from(b'a' + u8::try_from(index / 26_usize.pow(place) % 26).unwrap_or_default())
+        })
+        .collect()
 }
 
 /// A row's name: a model's or migration's, a node key's name, or a warning's message.

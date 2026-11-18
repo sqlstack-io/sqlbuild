@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -39,7 +39,8 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			changed: document.changed ?? null,
 			...(document.ignore_audit_failures ? { ignore_audit_failures: true } : {}),
 			...(document.pages ? { pages: document.pages } : {}),
-			...(document.sections ? { sections: document.sections } : {})
+			...(document.sections ? { sections: document.sections } : {}),
+			...(document.warning_groups ? { warning_groups: document.warning_groups } : {})
 		},
 		error: null
 	};
@@ -65,7 +66,9 @@ const SECTION_LIST: Record<PlanPageSection, keyof PlanDocument | 'held_back' | '
 	source_loads: 'source_loads',
 	changed_functions: 'functions',
 	functions: 'functions',
-	seeds: 'seeds',
+	first_run_seeds: 'seeds',
+	changed_seeds: 'seeds',
+	unchanged_seeds: 'seeds',
 	python_nodes: 'python_nodes',
 	held_back: 'held_back',
 	unchanged: 'unchanged',
@@ -448,6 +451,21 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 		attempt: null,
 		message
 	};
+}
+
+/** A run's ignored audit failures as the server lists them, run by run. */
+export function toIgnoredAuditFailures(wire: Wire['RunIgnoredAuditFailure'][]): IgnoredAuditFailure[] {
+	return wire.map((f) => ({
+		runId: f.run_id,
+		jobKey: f.job_key ?? null,
+		at: f.occurred_at,
+		checkId: f.binding_key ?? null,
+		audit: f.audit_name,
+		node: f.attached_target_name ?? null,
+		column: f.attached_column_name ?? null,
+		severity: f.severity,
+		violationCount: f.violation_count ?? null
+	}));
 }
 
 /** Statement metadata in start order; error text is never sent, only its type and code. */

@@ -47,6 +47,8 @@ pub const SYNCED_COPY_DEFER_HELP: &str = "Run re-plans live, including deferral.
 pub(crate) const SKIP_ACTION: &str = "skip";
 /// The reason of a function or seed without a change.
 pub(crate) const NO_CHANGE_REASON: &str = "no_change";
+/// The reason of a model or seed without a recorded build.
+pub(crate) const FIRST_RUN_REASON: &str = "first_run";
 /// The plan document field of per-model metadata, which a summary leaves out.
 pub(crate) const METADATA_FIELD: &str = "metadata";
 /// The plan document's row lists, which a summary empties and counts by section instead.
@@ -72,3 +74,19 @@ pub(crate) const DIFF_HEADER_PREFIXES: [&str; 3] = ["---", "+++", "@@"];
 pub const MODEL_DIFF_FIELDS: [&str; 2] = ["query_diff", "config_diff"];
 /// The model field holding the counts of its diffs, kept when the diff text is not.
 pub const DIFF_STATS_FIELD: &str = "diff_stats";
+/// The model field of a short config change in words, such as `full_refresh true → false`.
+pub const CONFIG_CHANGE_FIELD: &str = "config_change";
+/// The most top-level config keys a config change reads in one line.
+pub(crate) const CONFIG_CHANGE_KEYS: usize = 2;
+/// The indent of a top-level key in a config diff, which prints the config as JSON with two-space indents.
+pub(crate) const CONFIG_TOP_LEVEL_INDENT: &str = "  ";
+/// A config key's value on the side of a change where it is not set.
+pub(crate) const UNSET_CONFIG_VALUE: &str = "(unset)";
+/// What a warning template says in place of a quoted or generated name.
+pub(crate) const ELIDED_NAME: &str = "…";
+/// The quotes a warning puts around a name.
+pub(crate) const QUOTE_CHARACTERS: [char; 3] = ['\'', '`', '"'];
+/// The summary field listing warning templates with their counts.
+pub(crate) const WARNING_GROUPS_FIELD: &str = "warning_groups";
+/// The most warning groups a summary lists, the largest first; warnings past them page as the rest.
+pub(crate) const MAX_WARNING_GROUPS: usize = 50;

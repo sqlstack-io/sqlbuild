@@ -5,9 +5,8 @@ use uuid::Uuid;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::models::RunEventRecord;
 use crate::store::errors::ControlError;
-use crate::store::main::commit::commit;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::_helpers::run_recall::{begin_run_recall, run_events_in};
+use crate::warehouse_history::_helpers::run_recall::{run_events_in, run_read};
 
 /// Events after the storage cursor, oldest first; `None` when the run is not in this location and target.
 pub async fn read_person_run_events(
@@ -16,12 +15,11 @@ pub async fn read_person_run_events(
     (run, page): ((Uuid, &str, Uuid), (i64, u32)),
     default_role: DefaultRole,
 ) -> Result<Option<Vec<RunEventRecord>>, ControlError> {
-    let Some((transaction, scope, _)) =
-        begin_run_recall(store, credentials, run, (default_role, None)).await?
-    else {
-        return Ok(None);
-    };
-    let (transaction, events) = run_events_in(transaction, &scope, page).await?;
-    commit(transaction).await?;
-    Ok(Some(events))
+    run_read(
+        store,
+        credentials,
+        (run, default_role),
+        async |transaction, scope| run_events_in(transaction, scope, page).await,
+    )
+    .await
 }
