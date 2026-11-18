@@ -34,6 +34,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import (
     OfflineSnowflakeAdapter,
     RecordedQuery,
     RecordingSnowflakeWarehouse,
+    SchemaListingSnowflakeAdapter,
     SyntheticSnowflakeProject,
     write_synthetic_snowflake_project,
 )
@@ -82,7 +83,7 @@ def test_given_large_multi_schema_project_when_planning_then_metadata_reads_stay
     )
 
     result: CompilePipelineResult = plan_offline_snowflake_project(
-        project=project, warehouse=warehouse
+        project=project, warehouse=warehouse, adapter_type=SchemaListingSnowflakeAdapter
     )
 
     metadata: tuple[RecordedQuery, ...] = offline_metadata_queries(warehouse)
@@ -200,7 +201,7 @@ def test_given_many_small_schemas_when_planning_then_columns_are_read_per_schema
     )
 
     result: CompilePipelineResult = plan_offline_snowflake_project(
-        project=project, warehouse=warehouse
+        project=project, warehouse=warehouse, adapter_type=SchemaListingSnowflakeAdapter
     )
 
     assert len(result.plan_output.model_entries) == len(project.model_schemas)

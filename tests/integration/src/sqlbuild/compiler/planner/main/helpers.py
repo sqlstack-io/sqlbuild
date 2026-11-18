@@ -502,13 +502,14 @@ def plan_offline_snowflake_project(
     warehouse: RecordingSnowflakeWarehouse,
     no_cache: bool = True,
     plan_from: str | None = None,
+    adapter_type: type[OfflineSnowflakeAdapter] = OfflineSnowflakeAdapter,
 ) -> CompilePipelineResult:
     """Compile and plan a synthetic Snowflake project against the recording warehouse."""
 
     inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=project.project_dir)
     return run_compile_pipeline(
         discovered_inputs=inputs,
-        adapter=OfflineSnowflakeAdapter(warehouse=warehouse),
+        adapter=adapter_type(warehouse=warehouse),
         options=CompilePipelineOptions(
             no_sql_validation=True,
             no_cache=no_cache,

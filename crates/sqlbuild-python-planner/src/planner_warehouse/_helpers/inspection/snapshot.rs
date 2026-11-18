@@ -386,17 +386,21 @@ fn gather_relations<'py>(
     Ok((result, states))
 }
 
+/// Listed columns of `relevant` nodes, the selection and the upstream its warnings check; else all.
 fn gather_columns<'py>(
     request: &SnapshotRequest<'py>,
     relations: &Bound<'py, PyDict>,
+    relevant: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let py = request.project.py();
     let mut node_names: HashSet<String> = HashSet::new();
     for node in destination_nodes(&request.project)? {
-        node_names.insert(
-            sqlbuild_python_project::resource_views::main::resource_reads::name::name(&node)?
-                .extract()?,
-        );
+        if selected_node(relevant, &node)? {
+            node_names.insert(
+                sqlbuild_python_project::resource_views::main::resource_reads::name::name(&node)?
+                    .extract()?,
+            );
+        }
     }
     let mut needed: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)> = Vec::new();
     for (logical, relation) in relations.iter() {
@@ -693,7 +697,7 @@ pub(crate) fn warehouse_snapshot<'py>(
         optional_names(py, query_schemas)?,
         optional_names(py, metadata_names.as_ref())?,
     )?;
-    let columns = gather_columns(request, &relations)?;
+    let columns = gather_columns(request, &relations, &relevant)?;
     let fingerprints = gather_fingerprints(
         request,
         &database,
