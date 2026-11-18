@@ -33,7 +33,6 @@ pub struct AttentionAcknowledgementRequest {
     pub key: String,
     /// What the condition looked like (counts, members, error codes), which later states are compared
     /// with; a JSON object of at most 8 KiB. Never message text, which can hold relative times.
-    #[schema(value_type = Object)]
     pub shape: serde_json::Value,
     pub acknowledged: bool,
 }
@@ -42,7 +41,6 @@ pub struct AttentionAcknowledgementRequest {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AttentionAcknowledgement {
     pub key: String,
-    #[schema(value_type = Object)]
     pub shape: serde_json::Value,
     /// The person's name, or the audit actor when the person no longer exists.
     pub acknowledged_by: String,

@@ -1654,7 +1654,7 @@ export interface components {
             /** @description The person's name, or the audit actor when the person no longer exists. */
             acknowledged_by: string;
             key: string;
-            shape: Record<string, never>;
+            shape: unknown;
             /**
              * Format: date-time
              * @description When the acknowledgement lapses even if the condition never changes.
@@ -1678,7 +1678,7 @@ export interface components {
              * @description What the condition looked like (counts, members, error codes), which later states are compared
              *     with; a JSON object of at most 8 KiB. Never message text, which can hold relative times.
              */
-            shape: Record<string, never>;
+            shape: unknown;
         };
         AuthenticationDenial: {
             error: string;
