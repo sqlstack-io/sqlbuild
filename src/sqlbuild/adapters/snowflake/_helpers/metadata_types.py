@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapters.snowflake.constants import NUMBER_TYPE_NAME, TEXT_TYPE_NAMES
@@ -11,6 +12,7 @@ _SHOW_TYPE_TO_INFORMATION_SCHEMA_TYPE: dict[str, str] = {
     "FIXED": NUMBER_TYPE_NAME,
     "REAL": "FLOAT",
 }
+_SHOW_TYPE_CACHE_SIZE: int = 4096
 _INVALID_SHOW_TYPE_MESSAGE: str = "Snowflake SHOW COLUMNS returned invalid type metadata"
 
 
@@ -38,8 +40,15 @@ def information_schema_type(
 def show_columns_type(raw_data_type: object) -> str:
     """Render the same type string as INFORMATION_SCHEMA for one SHOW COLUMNS data_type JSON."""
 
+    return _show_type(str(raw_data_type))
+
+
+@lru_cache(maxsize=_SHOW_TYPE_CACHE_SIZE)
+def _show_type(raw_data_type: str) -> str:
+    """`show_columns_type` of one JSON text; a schema repeats a few hundred texts in 100K+ rows."""
+
     try:
-        decoded: object = json.loads(str(raw_data_type))
+        decoded: object = json.loads(raw_data_type)
     except (json.JSONDecodeError, TypeError) as error:
         raise AdapterUserError(message=_INVALID_SHOW_TYPE_MESSAGE) from error
     if not isinstance(decoded, dict) or not isinstance(decoded.get("type"), str):

@@ -1464,6 +1464,18 @@ symbols = ["UserCodeFinder.find_spec"]
 reason = "importlib calls meta-path finders positionally as find_spec(fullname, path, target)."
 
 [[targets.python.rule_exceptions]]
+rule = "FFS130"
+path = "src/sqlbuild/runtime/user_code/classes/source_only_loader.py"
+symbols = ["SourceOnlyLoader.get_code"]
+reason = "Counting project module executions is process-wide and monotonic: per-process memos of facts read through module globals compare it to know a module may have been reloaded."
+
+[[targets.python.rule_exceptions]]
+rule = "FFS130"
+path = "src/sqlbuild/compiler/python_nodes/_helpers/identity.py"
+symbols = ["_reached"]
+reason = "Python nodes share most first-party helpers, so each helper's dependency walk is memoised per live object for the process, keyed by the project module execution count that invalidates it."
+
+[[targets.python.rule_exceptions]]
 rule = "FFS120"
 path = "src/sqlbuild/refs.py"
 symbols = ["job", "tag"]
@@ -1755,6 +1767,12 @@ reason = "Webhook implements Debug manually to redact its endpoint, which may co
 rule = "FPRSS201"
 path = "crates/sqlbuild-analysis/src/assembly/analysis_session/models.rs"
 reason = "NullabilityCallback implements Debug manually because it holds the adapter's nullability rule closure, which cannot implement Debug; other models derive it."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
+path = "crates/sqlbuild-analysis/src/sql_macros/_helpers/typing/typed_calls.rs"
+symbols = ["marker_memo"]
+reason = "Verifying typed markers parses the model once per marked call; the result depends only on the SQL, the calls and the dialect, so a bounded process-wide memo serves a compile's repeated reads and recompiles in long-lived processes."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"

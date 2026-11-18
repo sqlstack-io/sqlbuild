@@ -188,6 +188,7 @@ from sqlbuild.runtime.observability.constants import COST_TELEMETRY_PURPOSE
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 _EXACT_COLUMN_INSPECTION_LIMIT: int = 32
+_CONCURRENT_EXACT_COLUMN_INSPECTION_LIMIT: int = 200
 _STATE_TABLE_RETENTION_ATTRIBUTE: str = "_state_table_retention_fallbacks_state"
 _METADATA_INSPECTION_CONCURRENCY: int = 8
 _SHOW_RESULT_LIMIT: int = 10_000
@@ -229,7 +230,7 @@ class SnowflakeAdapter(
     statement_limit_excludes_queueing: ClassVar[bool] = True
     metadata_inspection_concurrency: ClassVar[int] = _METADATA_INSPECTION_CONCURRENCY
     concurrent_ddl_limit: ClassVar[int] = 16
-    exact_column_inspection_limit: ClassVar[int] = _EXACT_COLUMN_INSPECTION_LIMIT
+    exact_column_inspection_limit: ClassVar[int] = _CONCURRENT_EXACT_COLUMN_INSPECTION_LIMIT
 
     max_identifier_length: ClassVar[int] = 255
     supports_session_warehouse: ClassVar[bool] = True

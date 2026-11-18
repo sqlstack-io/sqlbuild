@@ -523,6 +523,11 @@ rule = 2
 note = "Hands the running macro bridge its user macro call store."
 
 [[stays]]
+path = "compiler/python_nodes/models.py"
+rule = 2
+note = "The memoised walk record of identity.py: dependencies resolved through live user functions' module globals, valid until a project module executes again."
+
+[[stays]]
 path = "compiler/python_nodes/main/identity.py"
 rule = 2
 note = "Identity entry point over live user node functions."

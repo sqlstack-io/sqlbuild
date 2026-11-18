@@ -224,6 +224,30 @@ _REVENUE_KEY: CompiledObjectKey = CompiledObjectKey(
             expected_column_table_names=frozenset(f"model_{index}" for index in range(251)),
             expected_fingerprint_names=frozenset(),
         ),
+        GatherWarehouseSnapshotTestCase(
+            description=(
+                "lists the whole schema beyond the name threshold but reads columns only for "
+                "the selection and what it reads"
+            ),
+            setup_sql=(
+                *(f"CREATE TABLE staging.model_{index} (id INTEGER)" for index in range(251)),
+                "CREATE TABLE staging.unselected (value VARCHAR)",
+            ),
+            model_locations={
+                **{f"model_{index}": "staging" for index in range(METADATA_NAME_FILTER_LIMIT + 1)},
+                "unselected": "staging",
+            },
+            seed_locations={},
+            selected_keys=frozenset(
+                CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=f"model_{index}")
+                for index in range(METADATA_NAME_FILTER_LIMIT + 1)
+            ),
+            expected_relation_names=frozenset(
+                {*(f"model_{index}" for index in range(251)), "unselected"}
+            ),
+            expected_column_table_names=frozenset(f"model_{index}" for index in range(251)),
+            expected_fingerprint_names=frozenset(),
+        ),
     ],
     ids=lambda case: case.description,
 )

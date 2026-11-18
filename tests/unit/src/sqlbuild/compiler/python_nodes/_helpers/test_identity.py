@@ -11,11 +11,13 @@ import pytest
 from sqlbuild._native import PythonNodeIdentity
 from sqlbuild.compiler.python_nodes.main.identity import build_python_node_identity
 from tests.unit.src.sqlbuild.compiler.python_nodes._helpers._test_types import (
+    PythonIdentityReloadTestCase,
     PythonNodeIdentityChangeTestCase,
     PythonNodeIdentityTestCase,
 )
 from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
     load_python_identity_module,
+    reexecute_project_module,
     write_python_identity_repo,
 )
 
@@ -510,3 +512,55 @@ def test_given_python_node_source_change_when_building_identity_then_hashes_chan
     assert (
         before_identity.version_hash != after_identity.version_hash
     ) is test_case.expected_version_hash_changed
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonIdentityReloadTestCase(
+            description="a reloaded module two calls away changes the identity",
+            inner_before="def value():\n    return 1\n",
+            inner_after="def value():\n    return 2\n",
+            expected_version_hash_changed=True,
+        ),
+        PythonIdentityReloadTestCase(
+            description="a module reloaded unchanged keeps the identity",
+            inner_before="def value():\n    return 1\n",
+            inner_after="def value():\n    return 1\n",
+            expected_version_hash_changed=False,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_module_reloaded_in_place_when_building_identity_again_then_follows_its_source(
+    test_case: PythonIdentityReloadTestCase,
+    tmp_path: Path,
+) -> None:
+    write_python_identity_repo(
+        project_dir=tmp_path,
+        repo_files={
+            "node.py": "import shared\n\n\ndef node():\n    return shared.outer()\n",
+            "shared.py": "import inner\n\n\ndef outer():\n    return inner.value()\n",
+            "inner.py": test_case.inner_before,
+        },
+    )
+    module: ModuleType = load_python_identity_module(project_dir=tmp_path, module_path="node.py")
+    before: PythonNodeIdentity = build_python_node_identity(
+        node_type="task",
+        node_name="node",
+        function=module.node,
+        project_dir=tmp_path,
+        decorator_config={},
+    )
+    _ = (tmp_path / "inner.py").write_text(test_case.inner_after, encoding="utf-8")
+    reexecute_project_module(project_dir=tmp_path, module_name="inner")
+
+    after: PythonNodeIdentity = build_python_node_identity(
+        node_type="task",
+        node_name="node",
+        function=module.node,
+        project_dir=tmp_path,
+        decorator_config={},
+    )
+
+    assert (before.version_hash != after.version_hash) is test_case.expected_version_hash_changed
