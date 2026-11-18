@@ -28,3 +28,11 @@ pub(crate) struct SpecKindsTestCase {
     pub(crate) materialization_type: &'static str,
     pub(crate) expected_kinds: Vec<&'static str>,
 }
+
+pub(crate) struct DagEdgeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) project: DagProjectInput,
+    pub(crate) python: DagPythonGraphInput,
+    /// `(from_id, to_id)` of every edge, sorted.
+    pub(crate) expected_edges: &'static [(&'static str, &'static str)],
+}

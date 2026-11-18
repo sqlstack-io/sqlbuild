@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -217,3 +218,12 @@ class LoaderOperationLifecycleTestCase:
     description: str
     expected_status: ExecutionStatus
     expected_event_types: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class LoaderReferenceRejectionTestCase:
+    """A function passed to `ctx.loader()` that is not a loader, and the error it raises."""
+
+    description: str
+    reference: Callable[..., object]
+    expected_message: str

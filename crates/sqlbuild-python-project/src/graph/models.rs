@@ -6,6 +6,7 @@ use crate::graph::_helpers::project::project_graph::UniqueIdMap;
 use crate::graph::_helpers::project::project_graph::dependency_edges;
 use crate::graph::_helpers::project::project_graph::outcome;
 use crate::graph::_helpers::project::views::lineage_graph_views;
+use crate::graph::_helpers::python_nodes::python_selection::allows_round_trips;
 use crate::graph::_helpers::python_nodes::python_selection::project_sources;
 use crate::graph::_helpers::python_nodes::python_selection::selection_graph;
 use crate::graph::constants::LOADER_KIND;
@@ -395,6 +396,7 @@ impl NativeProjectGraph {
 #[derive(Debug)]
 pub struct ProjectSelection {
     pub(crate) sources: Vec<(String, Option<String>)>,
+    allow_warehouse_round_trips: bool,
     pub nodes: PythonSelectionGraph,
 }
 
@@ -402,6 +404,7 @@ impl ProjectSelection {
     pub fn new(project: &Bound<'_, PyAny>, discovered_inputs: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             sources: project_sources(project)?,
+            allow_warehouse_round_trips: allows_round_trips(project)?,
             nodes: selection_graph(&python_node_graph(discovered_inputs)?)?,
         })
     }
@@ -498,6 +501,7 @@ impl ProjectSelection {
         SqlSelectionGraph {
             graph,
             sources: &self.sources,
+            allow_warehouse_round_trips: self.allow_warehouse_round_trips,
         }
     }
 

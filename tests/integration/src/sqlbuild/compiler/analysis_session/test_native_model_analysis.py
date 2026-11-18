@@ -565,7 +565,7 @@ def test_given_pending_postgres_expression_source_when_analysing_then_star_lists
         CyclicCompileTestCase(
             description="a ref cycle, a model reading itself and a star consumer of the cycle",
             files=_CYCLIC_PROJECT,
-            expected_exit_code=0,
+            expected_exit_code=1,
             expected_compiled=(
                 "models/order_audit.sql",
                 "models/order_summary.sql",

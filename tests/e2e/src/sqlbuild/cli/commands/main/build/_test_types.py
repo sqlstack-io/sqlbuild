@@ -1697,3 +1697,27 @@ class AdapterDefaultResultsFallbackE2ETestCase:
     kept_loader: str
     reading_task: str
     expected_payload_keys: tuple[str, str]
+
+
+@dataclass(frozen=True)
+class WarehouseRoundTripE2ETestCase:
+    """A build of orders -> score task -> partner loader -> source -> scored model."""
+
+    description: str
+    project_settings: str
+    task_body: str
+    expected_exit_code: int
+    expected_output_order: tuple[str, ...]
+    expected_output_fragments: tuple[str, ...]
+    expected_scored_rows: tuple[tuple[object, ...], ...] | None
+    expected_scored_table_exists: bool = True
+
+
+@dataclass(frozen=True)
+class ChangedRoundTripE2ETestCase:
+    """A second `--changed` build of a round trip after an optional change to `orders`."""
+
+    description: str
+    orders_sql: str
+    expected_output_fragments: tuple[str, ...]
+    expected_scored_rows: tuple[tuple[object, ...], ...]

@@ -32,6 +32,8 @@ pub struct SqlSelectionGraph<'graph> {
     pub graph: &'graph ProjectGraph,
     /// `(source name, loader)` for every compiled source.
     pub sources: &'graph [(String, Option<String>)],
+    /// `[settings] allow_warehouse_round_trips`: a loader may depend on Python that reads SQL.
+    pub allow_warehouse_round_trips: bool,
 }
 
 /// The SQL keys and runnable Python node names a run selects, both sorted.

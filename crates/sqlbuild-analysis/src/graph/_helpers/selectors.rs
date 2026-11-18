@@ -1,22 +1,24 @@
 //! Python's planner selector grammar and resolution over the project graph.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use std::convert::Infallible;
 
 use crate::assembly::project::types::ObjectKey;
 use crate::graph::constants::{
     EMPTY_SELECTOR_CODE, EMPTY_VALUE_CODE, EXPANSION_MARKER, FOLDER_SEPARATOR,
     INTERSECTION_SEPARATOR, JOB_KIND, KIND_SEPARATOR, MISPLACED_MARKER_CODE, MISSING_NAME_CODE,
-    MODEL_RESOURCE, MODEL_ROOT, MODEL_ROOT_PREFIX, NAME_KIND, PATH_KIND, PATH_ROOT_CODE,
-    PATH_ROOT_ERROR, PATH_SELECTOR_CODE, PATH_SEPARATOR, PATTERN_CHARACTERS, PLANNER_DEFAULT_CODE,
-    SEED_RESOURCE, SOURCE_RESOURCE, SQL_FILE_SUFFIX, SUGGESTION_CUTOFF, SUGGESTION_LIMIT,
-    TABLE_FUNCTION_RESOURCE, TAG_KIND, TEST_KIND, UDF_RESOURCE, UNIT_TEST_CODE,
-    UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_KIND_CODE, UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE,
-    UNKNOWN_TAG_CODE, UNMAPPED_KIND_CODE, UNMAPPED_KINDS,
+    MODEL_RESOURCE, MODEL_ROOT, MODEL_ROOT_PREFIX, NAME_KIND, NODE_KIND_KIND, PATH_KIND,
+    PATH_ROOT_CODE, PATH_ROOT_ERROR, PATH_SELECTOR_CODE, PATH_SEPARATOR, PATTERN_CHARACTERS,
+    PLANNER_DEFAULT_CODE, SEED_RESOURCE, SELECTABLE_NODE_KINDS, SOURCE_RESOURCE, SQL_FILE_SUFFIX,
+    SUGGESTION_CUTOFF, SUGGESTION_LIMIT, TABLE_FUNCTION_RESOURCE, TAG_KIND, TEST_KIND,
+    UDF_RESOURCE, UNIT_TEST_CODE, UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_KIND_CODE,
+    UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE, UNKNOWN_TAG_CODE, UNMAPPED_KIND_CODE, UNMAPPED_KINDS,
 };
 use crate::graph::errors::SelectorError;
 use crate::graph::models::{
     BuildResources, EdgeDirection as Direction, ParsedSelector, ProjectGraph,
 };
+use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::text::main::close_matches::close_matches;
 use sqlbuild_core::text::main::glob_match::glob_match;
 
@@ -36,12 +38,12 @@ pub(crate) fn resolve(
     select: &[String],
     exclude: &[String],
 ) -> Result<Vec<ObjectKey>, SelectorError> {
-    let all: Keys = graph.names.iter().map(|(_, key)| key.clone()).collect();
+    let all = || -> Keys { graph.names.iter().map(|(_, key)| key.clone()).collect() };
     if select.is_empty() && exclude.is_empty() {
-        return Ok(all.into_iter().collect());
+        return Ok(all().into_iter().collect());
     }
     let selected: Keys = if select.is_empty() {
-        all
+        all()
     } else {
         tokens(graph, select)?
     };
@@ -52,21 +54,27 @@ pub(crate) fn resolve(
         .collect())
 }
 
-/// Python's `expand_required_build_resources`: functions and seeds a selected scope needs.
+/// Python's `expand_required_build_resources`: functions and seeds a selected scope needs; one walk from every selected key reaches the union of their upstream closures.
 pub(crate) fn build_resources(
     graph: &ProjectGraph,
     selected: &Keys,
     include: BuildResources,
 ) -> Keys {
     let mut expanded: Keys = selected.clone();
-    for key in selected {
-        for upstream in graph.closure(key, Direction::Upstream) {
-            let wanted: bool = (include.upstream_functions && is_function(&upstream))
-                || (include.upstream_seeds && upstream.0 == SEED_RESOURCE);
-            if wanted {
-                expanded.insert(upstream);
-            }
-        }
+    if include.upstream_functions || include.upstream_seeds {
+        let mut reached: HashSet<&ObjectKey> = HashSet::new();
+        let Ok(()) = breadth_first_reach(selected, None, &mut reached, |current| {
+            Ok::<_, Infallible>(graph.edges(current, Direction::Upstream))
+        });
+        expanded.extend(
+            reached
+                .into_iter()
+                .filter(|upstream| {
+                    (include.upstream_functions && is_function(upstream))
+                        || (include.upstream_seeds && upstream.0 == SEED_RESOURCE)
+                })
+                .cloned(),
+        );
     }
     if include.downstream_functions {
         for key in selected.iter().filter(|key| key.0 == MODEL_RESOURCE) {
@@ -273,6 +281,7 @@ fn is_selector_kind(prefix: &str) -> bool {
         PATH_KIND,
         TEST_KIND,
         JOB_KIND,
+        NODE_KIND_KIND,
     ]
     .contains(&prefix)
         || UNMAPPED_KINDS.contains(&prefix)
@@ -293,6 +302,7 @@ pub(crate) fn matched(graph: &ProjectGraph, kind: &str, value: &str) -> Resolved
         }
         PATH_KIND => folder(graph, value),
         JOB_KIND => job(graph, value),
+        NODE_KIND_KIND => of_kind(graph, value),
         TEST_KIND => Err(error(
             UNIT_TEST_CODE,
             format!(
@@ -371,6 +381,49 @@ fn lookup(graph: &ProjectGraph, kind: &str, value: &str) -> Resolved {
         .filter(|(name, key)| kind_matches(key) && glob_matches(value, name))
         .map(|(_, key)| key.clone())
         .collect())
+}
+
+/// The SQL resources of one node kind; Python node kinds need the Python node graph.
+fn of_kind(graph: &ProjectGraph, value: &str) -> Resolved {
+    if !SELECTABLE_NODE_KINDS.contains(&value) {
+        return Err(unknown_node_kind(value));
+    }
+    if UNMAPPED_KINDS.contains(&value) {
+        return Err(error(
+            UNMAPPED_KIND_CODE,
+            format!(
+                "selector '{NODE_KIND_KIND}{KIND_SEPARATOR}{value}' selects Python nodes; \
+                 they cannot be selected here"
+            ),
+        ));
+    }
+    let keys: Keys = graph
+        .names
+        .iter()
+        .filter(|(_, key)| key.0 == value)
+        .map(|(_, key)| key.clone())
+        .collect();
+    if keys.is_empty() {
+        return Err(error(
+            PLANNER_DEFAULT_CODE,
+            format!("no nodes found of kind '{value}'"),
+        ));
+    }
+    Ok(keys)
+}
+
+/// `value` is not a node kind; suggest the closest ones.
+pub(crate) fn unknown_node_kind(value: &str) -> SelectorError {
+    SelectorError {
+        code: UNKNOWN_NAME_CODE,
+        message: format!("unknown node kind '{value}'"),
+        help: suggestion(value, SELECTABLE_NODE_KINDS.to_vec()).or_else(|| {
+            Some(format!(
+                "node kinds are {}",
+                SELECTABLE_NODE_KINDS.join(", ")
+            ))
+        }),
+    }
 }
 
 /// The nodes the jobs and job groups `value` names or matches select.

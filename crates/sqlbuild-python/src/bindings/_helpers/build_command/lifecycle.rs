@@ -1,12 +1,14 @@
 //! Ingress Python before the build and read-side tasks and assets dispatched as SQL completes.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyclass, pymethods};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::python_plan::models::RoundTripLoader;
 use sqlbuild_core::build_command::main::render_python_node_rows::render_python_node_rows;
 use sqlbuild_core::build_command::models::PythonNodeRow;
 use sqlbuild_core::cli_text::models::CliStyle;
@@ -31,10 +33,14 @@ use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
+use sqlbuild_python_project::graph::main::python_nodes::native_run_lifecycle::native_run_lifecycle;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::planner_scope::main::build_intermediate_source_map::build_intermediate_source_map;
 
 const SUCCESS_STATUS: &str = "success";
+const SKIPPED_STATUS: &str = "skipped";
+const HARD_SKIP: &str = "hard";
+const SOFT_SKIP: &str = "soft";
 
 /// The cursor window and output settings the Python lifecycle runs with.
 pub(crate) struct LifecycleInputs<'py> {
@@ -95,6 +101,10 @@ pub(crate) struct DirectPythonLifecycle {
     ingress_python_results: Py<PyAny>,
     ingress_load_results: Py<PyAny>,
     ingress_loader_names: Py<PyAny>,
+    /// Each round-trip loader's selected upstream tasks and assets, `(kind, name)`, which must succeed.
+    round_trip_gates: HashMap<String, Vec<ObjectKey>>,
+    /// Each round-trip loader's source load key and the SQL keys it waits for.
+    round_trip_waits: Vec<(ObjectKey, Vec<ObjectKey>)>,
 }
 
 #[pymethods]
@@ -216,6 +226,75 @@ impl DirectPythonLifecycle {
         self.ingress_load_results.bind(py).clone()
     }
 
+    /// The gate a build consults before each source load, for round-trip loaders' upstreams.
+    pub(crate) fn source_load_gate<'py>(
+        slf: &Bound<'py, Self>,
+    ) -> PyResult<Bound<'py, SourceLoadGate>> {
+        Bound::new(
+            slf.py(),
+            SourceLoadGate {
+                lifecycle: slf.clone().unbind(),
+            },
+        )
+    }
+
+    /// `plan` with each round-trip loader's source load waiting for the SQL its upstream reads.
+    pub(crate) fn ordered_plan<'py>(
+        &self,
+        plan: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if self.round_trip_waits.is_empty() {
+            return Ok(plan.clone());
+        }
+        let py: Python<'py> = plan.py();
+        let upstream: Bound<'py, PyDict> = native_field(plan, "upstream_deps")?
+            .cast_into::<PyDict>()?
+            .copy()?;
+        let downstream: Bound<'py, PyDict> = native_field(plan, "downstream_deps")?
+            .cast_into::<PyDict>()?
+            .copy()?;
+        let mut planned: HashMap<ObjectKey, Bound<'py, PyAny>> = HashMap::new();
+        for key in native_field(plan, "execution_order")?.try_iter()? {
+            let key: Bound<'py, PyAny> = key?;
+            planned.insert(
+                (
+                    native_field(&key, "resource_type")?.extract()?,
+                    native_field(&key, "name")?.extract()?,
+                ),
+                key,
+            );
+        }
+        for (source, waits) in &self.round_trip_waits {
+            let Some(source) = planned.get(source) else {
+                continue;
+            };
+            let waits: Vec<&Bound<'py, PyAny>> =
+                waits.iter().filter_map(|wait| planned.get(wait)).collect();
+            let mut deps: Vec<Bound<'py, PyAny>> = match upstream.get_item(source)? {
+                Some(existing) => existing.try_iter()?.collect::<PyResult<_>>()?,
+                None => Vec::new(),
+            };
+            for wait in waits {
+                if !deps.iter().any(|dep| dep.eq(wait).unwrap_or(false)) {
+                    deps.push(wait.clone());
+                }
+                let mut dependents: Vec<Bound<'py, PyAny>> = match downstream.get_item(wait)? {
+                    Some(existing) => existing.try_iter()?.collect::<PyResult<_>>()?,
+                    None => Vec::new(),
+                };
+                if !dependents.iter().any(|dep| dep.eq(source).unwrap_or(false)) {
+                    dependents.push(source.clone());
+                }
+                downstream.set_item(wait, tuple(py, &dependents)?)?;
+            }
+            upstream.set_item(source, tuple(py, &deps)?)?;
+        }
+        let changes: Bound<'py, PyDict> = PyDict::new(py);
+        changes.set_item("upstream_deps", upstream)?;
+        changes.set_item("downstream_deps", downstream)?;
+        replaced_keywords(plan, &changes)
+    }
+
     /// Close the read-side connection and report Python nodes that never ran.
     pub(crate) fn finalize(&self, py: Python<'_>) -> PyResult<()> {
         let connection: Option<Py<PyAny>> = self
@@ -303,6 +382,7 @@ struct LifecyclePlan<'py> {
     graph: Bound<'py, PyAny>,
     plan: Bound<'py, PyAny>,
     source_map: Bound<'py, PyAny>,
+    round_trips: Vec<RoundTripLoader>,
 }
 
 fn lifecycle_plan<'py>(
@@ -328,6 +408,8 @@ fn lifecycle_plan<'py>(
         ],
     )?;
     let plan: Bound<'py, PyAny> = build_python_sql_run_lifecycle(&selection, &graph.clone())?;
+    let round_trips: Vec<RoundTripLoader> =
+        native_run_lifecycle(&selection, &graph)?.round_trip_loaders;
     let source_type: Bound<'py, PyAny> = enum_member(py, RecordId::CompiledResourceType, "SOURCE")?;
     let mut keys: Vec<Bound<'py, PyAny>> = Vec::new();
     for name in native_field(&plan, "ingress_loader_names")?.try_iter()? {
@@ -351,6 +433,7 @@ fn lifecycle_plan<'py>(
         graph,
         plan,
         source_map,
+        round_trips,
     })
 }
 
@@ -518,6 +601,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         }
         read_side_tracker = Some(tracker.unbind());
     }
+    let (round_trip_gates, round_trip_waits) = round_trip_ordering(&lifecycle, &plan_output)?;
     Bound::new(
         py,
         DirectPythonLifecycle {
@@ -532,6 +616,84 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             ingress_python_results: ingress_python.unbind(),
             ingress_load_results: ingress_loads.unbind(),
             ingress_loader_names: native_field(&lifecycle.plan, "ingress_loader_names")?.unbind(),
+            round_trip_gates,
+            round_trip_waits,
         },
     )
+}
+
+type RoundTripGates = HashMap<String, Vec<ObjectKey>>;
+type RoundTripWaits = Vec<(ObjectKey, Vec<ObjectKey>)>;
+
+/// Each round-trip loader's gating upstreams, and its source load key with the SQL it waits for.
+fn round_trip_ordering(
+    lifecycle: &LifecyclePlan<'_>,
+    plan_output: &Bound<'_, PyAny>,
+) -> PyResult<(RoundTripGates, RoundTripWaits)> {
+    let nodes: Bound<'_, PyAny> = native_field(&lifecycle.graph, "nodes_by_name")?;
+    let mut gates: RoundTripGates = HashMap::new();
+    let mut waits: RoundTripWaits = Vec::new();
+    for loader in &lifecycle.round_trips {
+        let mut kinds: Vec<ObjectKey> = Vec::new();
+        for name in &loader.gates {
+            let kind: String = native_field(&nodes.get_item(name)?, "kind")?.extract()?;
+            kinds.push((kind, name.clone()));
+        }
+        gates.insert(loader.name.clone(), kinds);
+        for entry in native_field(plan_output, "source_load_entries")?.try_iter()? {
+            let entry: Bound<'_, PyAny> = entry?;
+            if native_field(&entry, "loader")?.extract::<String>()? == loader.name {
+                let key: Bound<'_, PyAny> = native_field(&entry, "key")?;
+                waits.push((
+                    (
+                        native_field(&key, "resource_type")?.extract()?,
+                        native_field(&key, "name")?.extract()?,
+                    ),
+                    loader.waits_for.clone(),
+                ));
+            }
+        }
+    }
+    Ok((gates, waits))
+}
+
+/// The build's source-load gate: why a round-trip loader's load is skipped, and how.
+#[pyclass(module = "sqlbuild._native", frozen)]
+pub(crate) struct SourceLoadGate {
+    lifecycle: Py<DirectPythonLifecycle>,
+}
+
+#[pymethods]
+impl SourceLoadGate {
+    /// Why a round-trip load is skipped: `hard` after a failed or skipped upstream, `soft` when it never ran.
+    fn __call__(
+        &self,
+        py: Python<'_>,
+        source: Bound<'_, PyAny>,
+    ) -> PyResult<Option<(String, &'static str)>> {
+        let loader: Option<String> = native_field(&source, "loader")?.extract()?;
+        let lifecycle: &DirectPythonLifecycle = self.lifecycle.get();
+        let Some(gates) = loader.and_then(|loader| lifecycle.round_trip_gates.get(&loader)) else {
+            return Ok(None);
+        };
+        let mut statuses: HashMap<String, String> = HashMap::new();
+        for result in lifecycle.python_results(py)?.try_iter()? {
+            let result: Bound<'_, PyAny> = result?;
+            statuses.insert(
+                native_field(&result, "node_name")?.extract()?,
+                native_field(&result, "status")?.str()?.extract()?,
+            );
+        }
+        for (kind, name) in gates {
+            let (outcome, mode): (&str, &'static str) = match statuses.get(name).map(String::as_str)
+            {
+                Some(SUCCESS_STATUS) => continue,
+                Some(SKIPPED_STATUS) => ("was skipped", HARD_SKIP),
+                Some(_) => ("failed", HARD_SKIP),
+                None => ("did not run; the SQL it reads was not rebuilt", SOFT_SKIP),
+            };
+            return Ok(Some((format!("Upstream {kind} '{name}' {outcome}"), mode)));
+        }
+        Ok(None)
+    }
 }

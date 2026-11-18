@@ -22,8 +22,8 @@ use crate::python_selection::_helpers::validation::{
 };
 use crate::python_selection::constants::{
     ASSET_KIND, CHECK_KIND, EXPANSION_MARKER, INTERSECTION_SEPARATOR, JOB_KIND, LOADER_KIND,
-    NAME_KIND, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PLANNER_DEFAULT_CODE, SEED_KIND,
-    SOURCE_KIND, SOURCE_RESOURCE, SQL_MODEL_PATH_ROOT, TAG_KIND, TASK_KIND, TEST_KIND,
+    NAME_KIND, NODE_KIND_KIND, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PLANNER_DEFAULT_CODE,
+    SEED_KIND, SOURCE_KIND, SOURCE_RESOURCE, SQL_MODEL_PATH_ROOT, TAG_KIND, TASK_KIND, TEST_KIND,
     UNKNOWN_NAME_CODE, UNKNOWN_TAG_CODE,
 };
 use crate::python_selection::models::{Atom, PythonSelectionNode, RunSelection, SelectionContext};
@@ -348,6 +348,12 @@ fn single_side(context: &SelectionContext<'_>, raw: &str) -> Resolved {
             return resolve_typed(context, raw, (&kind, &value));
         }
         TAG_KIND => resolve_tag(context, raw, &value)?,
+        NODE_KIND_KIND
+            if [TASK_KIND, ASSET_KIND, LOADER_KIND, CHECK_KIND].contains(&value.as_str()) =>
+        {
+            resolve_python(context, raw)?
+        }
+        NODE_KIND_KIND => resolve_sql(context, raw)?,
         NAME_KIND => resolve_name(context, raw, &value)?,
         _ => {
             return Err(error(

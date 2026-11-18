@@ -4,6 +4,7 @@ use crate::graph::main::build_project_graph::build_project_graph;
 use crate::graph::models::{GraphResource, ProjectGraph};
 use crate::python_selection::main::published_python_graph::published_python_graph;
 use crate::python_selection::main::python_node_graph_indexes::python_node_graph_indexes;
+use crate::python_selection::main::python_sql_graph_error::python_sql_graph_error;
 use crate::python_selection::main::resolve_python_node_excludes::resolve_python_node_excludes;
 use crate::python_selection::main::resolve_python_node_selectors::resolve_python_node_selectors;
 use crate::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
@@ -11,7 +12,7 @@ use crate::python_selection::models::{
     InventoryIndexes, InventoryNode, PublishedPythonNode, PythonSelectionGraph,
     PythonSelectionNode, RunSelection, SqlSelectionGraph,
 };
-use crate::python_selection::tests::test_types::{ExpectedRun, SelectorFailure};
+use crate::python_selection::tests::test_types::{ExpectedRun, RoundTripNodeSpec, SelectorFailure};
 
 type OwnedFailure = (String, String);
 type OwnedRun = (Vec<ObjectKey>, Vec<String>);
@@ -199,6 +200,7 @@ pub(super) fn run_over(
         SqlSelectionGraph {
             graph: &graph,
             sources: &sources,
+            allow_warehouse_round_trips: false,
         },
         python,
         &owned(select),
@@ -249,4 +251,125 @@ pub(super) fn indexed_folder(relative_path: &str) -> String {
 /// The Python node names `sqb check` exclude tokens name over the orders graph.
 pub(super) fn excluded_names(exclude: &[&str]) -> Result<Vec<String>, OwnedFailure> {
     resolve_python_node_excludes(&orders_python_graph(), &owned(exclude)).map_err(failure)
+}
+
+/// The orders round-trip SQL graph: `scored_orders` reads `orders` and the `partner_scores` source.
+fn round_trip_sql_graph() -> ProjectGraph {
+    build_project_graph(&[
+        GraphResource {
+            key: key(&("model", "orders")),
+            deps: Vec::new(),
+            tags: Vec::new(),
+            folder: Some(String::new()),
+        },
+        GraphResource {
+            key: key(&("source", "partner_scores")),
+            deps: Vec::new(),
+            tags: Vec::new(),
+            folder: None,
+        },
+        GraphResource {
+            key: key(&("model", "scored_orders")),
+            deps: vec![
+                key(&("model", "orders")),
+                key(&("source", "partner_scores")),
+            ],
+            tags: Vec::new(),
+            folder: Some(String::new()),
+        },
+    ])
+}
+
+/// A Python graph of `(name, kind, upstream, SQL reads)` nodes.
+fn round_trip_python_graph(nodes: &[RoundTripNodeSpec]) -> PythonSelectionGraph {
+    let inventory: Vec<InventoryNode> = nodes
+        .iter()
+        .map(|(name, _, upstream, _)| InventoryNode {
+            name: (*name).to_owned(),
+            tags: Vec::new(),
+            relative_path: "python/nodes.py".to_owned(),
+            upstream: owned(upstream),
+        })
+        .collect();
+    let indexes: InventoryIndexes = python_node_graph_indexes(&inventory);
+    PythonSelectionGraph {
+        nodes: nodes
+            .iter()
+            .map(|(name, kind, _, sql_deps)| PythonSelectionNode {
+                name: (*name).to_owned(),
+                kind: (*kind).to_owned(),
+                sql_deps: sql_deps.iter().map(key).collect(),
+            })
+            .collect(),
+        upstream: indexes.upstream,
+        downstream: indexes.downstream,
+        tags: indexes.tags,
+        paths: indexes.paths,
+    }
+}
+
+/// The run selection of a round-trip project, or the selector error's `(code, message, help)`.
+pub(super) fn round_trip_run(
+    nodes: &[RoundTripNodeSpec],
+    allow_warehouse_round_trips: bool,
+    select: &[&str],
+) -> Result<OwnedRun, (String, String, String)> {
+    let graph: ProjectGraph = round_trip_sql_graph();
+    let sources: Vec<(String, Option<String>)> = vec![(
+        "partner_scores".to_owned(),
+        Some("partner_scores".to_owned()),
+    )];
+    resolve_python_sql_run_selection(
+        SqlSelectionGraph {
+            graph: &graph,
+            sources: &sources,
+            allow_warehouse_round_trips,
+        },
+        &round_trip_python_graph(nodes),
+        &owned(select),
+        &[],
+    )
+    .map(
+        |RunSelection {
+             sql_keys,
+             python_node_names,
+         }| (sql_keys, python_node_names),
+    )
+    .map_err(|error| {
+        (
+            error.code.to_owned(),
+            error.message,
+            error.help.unwrap_or_default(),
+        )
+    })
+}
+
+/// A round-trip case's expected selection, or its expected `(code, message, help)`, owned.
+pub(super) fn expected_round_trip(
+    expected: Result<ExpectedRun, (&str, &str, &str)>,
+) -> Result<OwnedRun, (String, String, String)> {
+    expected
+        .map(|(keys, names)| (keys.iter().map(key).collect(), owned(names)))
+        .map_err(|(code, message, help)| (code.to_owned(), message.to_owned(), help.to_owned()))
+}
+
+/// The whole-graph error of a round-trip project, when it has one; the loader fills its source only when `filled`.
+pub(super) fn round_trip_graph_error(
+    nodes: &[RoundTripNodeSpec],
+    (filled, allow_warehouse_round_trips): (bool, bool),
+) -> Option<String> {
+    let graph: ProjectGraph = round_trip_sql_graph();
+    let sources: Vec<(String, Option<String>)> = vec![(
+        "partner_scores".to_owned(),
+        filled.then(|| "partner_scores".to_owned()),
+    )];
+    python_sql_graph_error(
+        SqlSelectionGraph {
+            graph: &graph,
+            sources: &sources,
+            allow_warehouse_round_trips,
+        },
+        &round_trip_python_graph(nodes),
+    )
+    .map(|error| error.message)
 }

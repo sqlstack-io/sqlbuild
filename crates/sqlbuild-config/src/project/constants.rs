@@ -9,6 +9,10 @@ pub(crate) const CHECK_DECLARED_COLUMNS_KEY: &str = "check_declared_columns";
 /// The deprecated alias of `check_declared_columns`.
 pub(crate) const LEGACY_COLUMN_CONTRACT_MODE_KEY: &str = "column_contract_mode";
 pub(crate) const REQUIRE_SQL_ANALYSIS_KEY: &str = "require_sql_analysis";
+pub(crate) const ALLOW_WAREHOUSE_ROUND_TRIPS_KEY: &str = "allow_warehouse_round_trips";
+/// The `[settings]` keys that are shared project policy, which only the project file may set.
+pub(crate) const SHARED_POLICY_SETTINGS: [&str; 2] =
+    [REQUIRE_SQL_ANALYSIS_KEY, ALLOW_WAREHOUSE_ROUND_TRIPS_KEY];
 pub(crate) const QUERY_CHANGE_TRACKING_KEY: &str = "query_change_tracking";
 pub(crate) const CONCURRENCY_KEY: &str = "concurrency";
 pub(crate) const LEGACY_CONCURRENCY_KEY: &str = "max_concurrency";
@@ -50,7 +54,7 @@ pub(crate) const DELTA_COMPILE_KEY: &str = "delta_compile";
 pub(crate) const ALLOW_MISSING_SECRETS_KEY: &str = "allow_missing_secrets";
 pub(crate) const SCENARIO_TIMEOUT_KEY: &str = "scenario_timeout";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";
-pub(crate) const SETTINGS_KEYS: [&str; 16] = [
+pub(crate) const SETTINGS_KEYS: [&str; 17] = [
     "sql_analysis",
     "require_sql_analysis",
     "query_change_tracking",
@@ -67,6 +71,7 @@ pub(crate) const SETTINGS_KEYS: [&str; 16] = [
     "scenario_timeout",
     "delta_compile",
     "allow_missing_secrets",
+    "allow_warehouse_round_trips",
 ];
 pub(crate) const DEFAULTS_KEYS: [&str; 33] = [
     "append_cursor_inclusive",

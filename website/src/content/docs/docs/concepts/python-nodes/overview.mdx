@@ -50,8 +50,8 @@ Code that extends SQLBuild itself keeps its own folder, such as `rules/`, `mater
 The most important rule: **SQL models never depend on Python nodes.** The dependency direction is strictly one way.
 
 - SQL models depend only on other SQL resources (models, sources, seeds, functions).
-- Python nodes may depend on other Python nodes.
-- The only way Python data reaches SQL is through a **loader populating a source**: `loader -> source -> model`.
+- Python nodes may depend on other Python nodes; a loader may depend on any Python node, including tasks and assets.
+- Python data reaches SQL only through a **loader filling a source**: `loader -> source -> model`.
 - Tasks, assets, and checks may **read** SQL models, sources, and seeds at runtime through typed references (see [SQL references](/docs/concepts/python-nodes/sql-references)), but reading a model does not make it a SQL dependency.
 
 This keeps the SQL graph fully analyzable and testable on its own, while letting Python participate around the edges.
@@ -68,6 +68,45 @@ This keeps the SQL graph fully analyzable and testable on its own, while letting
    v
  model (SQL) ----> model (SQL)
 ```
+
+### Warehouse round trips
+
+A loader that depends on a task or asset that reads SQL, directly or through other Python nodes,
+makes a warehouse round trip: data leaves the warehouse and comes back through the loader. For
+example, a task reads `orders`, sends them to a partner's scoring service, and a loader loads the
+scores it returned into the `partner_scores` source that `scored_orders` reads:
+
+```
+ model orders --> task score_orders --> loader partner_scores --> source partner_scores --> model scored_orders
+```
+
+Round trips are off by default. Turn them on with `allow_warehouse_round_trips` in
+`sqlbuild_project.toml` (see [Settings](/docs/concepts/project-configuration#settings)); without it,
+a plan or build that includes such a loader stops with an error naming the loader and the task or
+asset that reads SQL. A loader that depends on a task or asset that reads no SQL is ordinary
+ingestion and is always allowed.
+
+```toml
+[settings]
+allow_warehouse_round_trips = true
+```
+
+With the setting on:
+
+- One `sqb build` runs the SQL the task reads, then the task, then the loader, then the models that
+  read the loader's source. If the task fails or is skipped, the loader and everything downstream of
+  its source are skipped.
+- Lineage and column lineage restart at the source: the source's columns come from the loader, not
+  from the models the task read.
+- Job groups run a member that builds the task before the member that runs the loader, and that one
+  before the members that build models reading its source.
+- `--changed` follows the chain: when the SQL the task reads is rebuilt, the task and loader run and
+  the models reading the source rebuild. When it is not rebuilt, the task does not run and the
+  loader is skipped softly, so the source keeps its data and models selected for their own changes
+  still build.
+- A task that reads anything built from the source its own downstream loader fills is a cycle,
+  which stops the plan or build with the path, such as
+  `loader 'partner_scores' -> task 'score_orders' -> model 'scored_orders' -> source 'partner_scores' -> loader 'partner_scores'`.
 
 ## Decorators
 
@@ -105,7 +144,7 @@ Each node receives a context object as its first argument (`TaskContext`, `Asset
 | `ctx.query(sql)` / `ctx.execute_sql(sql)` | Run SQL on the connection |
 | `ctx.qualify_name(name)` | Qualify a relation name |
 | `ctx.relation(ref)` | Resolve a declared `model()`/`source()` reference to a relation |
-| `ctx.result_of(node_fn)` | Read the latest persisted result of an upstream node (current or previous run) |
+| `ctx.result_of(node_fn)` | Read the result of an upstream node: its result from this run, else its latest successful one |
 | `ctx.results_of(node_fn, limit=N)` | Read the last N successful results of an upstream node, newest first |
 | `ctx.providers` | Access discovered [providers](/docs/concepts/python-nodes/providers) by name |
 
@@ -191,6 +230,8 @@ Python nodes run in two phases relative to SQL:
 
 - **Ingress (pre-SQL):** loaders, and tasks/assets that feed sources, run before SQL models are built.
 - **Read-side (post-SQL):** tasks/assets that read SQL run after their SQL dependencies are built.
+  A loader in a [warehouse round trip](#warehouse-round-trips) loads after them, and before the
+  models that read its source.
 
 Read-side tasks and assets follow the same selection rule as SQL models. A SQL dependency that is
 part of the run gates the node: it waits for that model, seed, or source load, and is skipped if the

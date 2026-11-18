@@ -26,7 +26,7 @@ use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
     ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, LEGACY_COLUMN_CONTRACT_MODE_KEY,
     LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY,
-    REQUIRE_SQL_ANALYSIS_KEY, SQL_ANALYSIS_KEY,
+    REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{
@@ -316,15 +316,15 @@ pub(crate) fn project_config(paths: &ConfigPaths) -> Result<Built, LoadFailure> 
     Ok(object("ProjectConfig", project_fields(payload)?))
 }
 
-fn shared_policy_failure(value: &ConfigValue) -> ConfigFailure {
+fn shared_policy_failure(key: &str, value: &ConfigValue) -> ConfigFailure {
     let help = join_helps(&[
-        format!("remove {REQUIRE_SQL_ANALYSIS_KEY} from {LOCAL_CONFIG_FILENAME}"),
+        format!("remove {key} from {LOCAL_CONFIG_FILENAME}"),
         setting_help(
             "to change the policy for everyone",
             &Setting {
                 file_name: PROJECT_CONFIG_FILENAME,
                 section: SETTINGS_SECTION,
-                key: REQUIRE_SQL_ANALYSIS_KEY,
+                key,
                 value: SettingValue::Bool(!is_truthy(value)),
             },
         ),
@@ -332,8 +332,8 @@ fn shared_policy_failure(value: &ConfigValue) -> ConfigFailure {
     ConfigFailure::at(
         LOCAL_FILE,
         format!(
-            "cannot set [settings] {REQUIRE_SQL_ANALYSIS_KEY}; it is a shared project policy \
-             that only {PROJECT_CONFIG_FILENAME} can set"
+            "cannot set [settings] {key}; it is a shared project policy that only \
+             {PROJECT_CONFIG_FILENAME} can set"
         ),
     )
     .with_help(help)
@@ -347,9 +347,12 @@ fn local_settings(payload: Option<&ConfigValue>) -> Loaded<Fields> {
             label: "settings",
         },
     )?;
-    if has(mapping, REQUIRE_SQL_ANALYSIS_KEY) {
-        let value = get(mapping, REQUIRE_SQL_ANALYSIS_KEY).unwrap_or(&ConfigValue::Null);
-        return Err(shared_policy_failure(value));
+    if let Some(key) = SHARED_POLICY_SETTINGS
+        .into_iter()
+        .find(|key| has(mapping, key))
+    {
+        let value = get(mapping, key).unwrap_or(&ConfigValue::Null);
+        return Err(shared_policy_failure(key, value));
     }
     let overrides = setting_overrides(mapping);
     Ok(vec![

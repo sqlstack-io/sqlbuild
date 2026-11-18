@@ -40,6 +40,7 @@ from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecord
 from sqlbuild.adapter.contract.models import RelationInfo
 from sqlbuild.adapter.contract.types import TablePromotionMode
 from sqlbuild.compiler.auditing.types import AuditOutcome
+from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.cost.models import StatementExecutionTelemetry
 from sqlbuild.diagnostics.main.diagnostics_context import diagnostics_context
 from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
@@ -212,6 +213,9 @@ class BuildScheduler:
         self._before_node_write: BeforeNodeWriteCallback | None = callbacks.before_node_write
         self._custom_materializations: Mapping[str, Callable[..., MaterializationResult]] = (
             customizations.custom_materializations or {}
+        )
+        self._source_load_gate: Callable[[SourceEntry], tuple[str, str] | None] | None = (
+            customizations.source_load_gate
         )
         self._loader_functions_by_name: dict[str, DiscoveredLoaderFunction] = {
             loader.name: loader for loader in customizations.loader_functions
@@ -423,6 +427,10 @@ class BuildScheduler:
                     break
                 key: CompiledObjectKey = self._ready.popleft()
                 if key.resource_type == CompiledResourceType.SOURCE:
+                    if key in self._blocked_keys:
+                        self._record_skipped(key)
+                        self._mark_complete(key)
+                        continue
                     if not self._pre_dispatch(key):
                         self._mark_complete(key)
                         continue
@@ -474,6 +482,10 @@ class BuildScheduler:
                         break
                     key: CompiledObjectKey = self._ready.popleft()
                     if key.resource_type == CompiledResourceType.SOURCE:
+                        if key in self._blocked_keys:
+                            self._record_skipped(key)
+                            self._mark_complete(key)
+                            continue
                         if not self._pre_dispatch(key):
                             self._mark_complete(key)
                             continue
@@ -953,6 +965,12 @@ class BuildScheduler:
     def _execute_source_node(
         self, *, key: CompiledObjectKey, connection: Any
     ) -> LoadExecutionResult:
+        gate: Callable[[SourceEntry], tuple[str, str] | None] | None = self._source_load_gate
+        if gate is not None:
+            source: SourceEntry = self._plan.source_map[key.name]
+            skip: tuple[str, str] | None = gate(source)
+            if skip is not None:
+                return skipped_load_result(source=source, reason=skip[0], mode=SkipMode(skip[1]))
         return execute_build_source_node(
             key=key,
             plan=self._plan,
@@ -1394,7 +1412,9 @@ class BuildScheduler:
             self._load_results.append(result)
             if self._on_node_complete is not None:
                 self._on_node_complete(result)
-            failed = result.status == ExecutionStatus.FAILED
+            failed = result.status == ExecutionStatus.FAILED or (
+                result.status == ExecutionStatus.SKIPPED and result.skip_mode == SkipMode.HARD
+            )
 
         elif isinstance(result, ModelExecutionResult):
             self._model_results.append(result)

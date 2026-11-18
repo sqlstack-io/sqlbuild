@@ -143,6 +143,21 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
             ),
         },
         ProjectFailureTestCase {
+            description: "a local file cannot allow warehouse round trips",
+            project: PROJECT,
+            local: "[settings]\nallow_warehouse_round_trips = true\n",
+            expected_failure: failure_at(
+                ConfigFile::Local,
+                "cannot set [settings] allow_warehouse_round_trips; it is a shared project policy \
+                 that only sqlbuild_project.toml can set",
+                Some(
+                    "remove allow_warehouse_round_trips from sqlbuild_local.toml\n  = help: to \
+                     change the policy for everyone, set this in sqlbuild_project.toml:\n            \
+                     [settings]\n\x20           allow_warehouse_round_trips = false",
+                ),
+            ),
+        },
+        ProjectFailureTestCase {
             description: "a path default normalizing to an existing key is rejected",
             project: "name = 'orders'\nadapter = 'duckdb'\n[path_defaults.staging]\n[path_defaults.' staging ']\n",
             local: "",

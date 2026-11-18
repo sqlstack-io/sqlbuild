@@ -2093,8 +2093,10 @@ def test_given_source_task_loader_chain_when_running_run_then_command_rejects_bo
 
     assert result.returncode == test_case.expected_exit_code
     combined_output: str = result.stdout + result.stderr
-    assert "Loader 'stage_orders' depends on Python node 'prepare_orders'" in combined_output
-    assert "depends on SQL" in combined_output
+    assert "loader 'stage_orders' depends on" in combined_output
+    assert "'prepare_orders'" in combined_output
+    assert "which reads SQL" in combined_output
+    assert "allow_warehouse_round_trips" in combined_output
 
 
 @pytest.mark.parametrize(
@@ -2170,8 +2172,10 @@ def test_given_model_task_loader_chain_when_running_run_then_command_rejects_bou
 
     assert result.returncode == test_case.expected_exit_code
     combined_output: str = result.stdout + result.stderr
-    assert "Loader 'stage_orders' depends on Python node 'prepare_orders'" in combined_output
-    assert "depends on SQL" in combined_output
+    assert "loader 'stage_orders' depends on" in combined_output
+    assert "'prepare_orders'" in combined_output
+    assert "which reads SQL" in combined_output
+    assert "allow_warehouse_round_trips" in combined_output
 
 
 @pytest.mark.parametrize(

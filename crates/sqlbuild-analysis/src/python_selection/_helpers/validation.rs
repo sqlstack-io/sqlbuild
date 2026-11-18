@@ -1,6 +1,10 @@
 //! Python's SQL/Python graph boundary rules and selected-dependency checks.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+
+use sqlbuild_core::graph_walk::main::find_cycle::find_cycle as find_dependency_cycle;
+
+use crate::assembly::project::types::ObjectKey;
 
 use crate::graph::errors::SelectorError;
 use crate::graph::models::EdgeDirection;
@@ -127,34 +131,180 @@ fn validate_python_sql_refs(context: &SelectionContext<'_>) -> Result<(), Select
     Ok(())
 }
 
-fn validate_loader_upstreams(context: &SelectionContext<'_>) -> Result<(), SelectorError> {
-    for loader in context
+/// The dependency cycle through a loader, which every cycle across SQL and Python passes.
+fn dependency_cycle(context: &SelectionContext<'_>) -> Option<SelectorError> {
+    let cycle: Vec<String> = round_trip_cycle(context, &loader_names(context))?;
+    Some(SelectorError {
+        code: PLANNER_DEFAULT_CODE,
+        message: format!(
+            "{} is in a dependency cycle: {}",
+            cycle[0],
+            cycle.join(" -> ")
+        ),
+        help: Some(
+            "each arrow points to what a node depends on; a task or asset upstream of a \
+             loader cannot read anything built from the source that loader fills"
+                .to_owned(),
+        ),
+    })
+}
+
+fn loader_names<'graph>(context: &SelectionContext<'graph>) -> Vec<&'graph str> {
+    context
         .nodes
         .graph
         .nodes
         .iter()
         .filter(|node| node.kind == LOADER_KIND)
-    {
-        for upstream_name in context
+        .map(|node| node.name.as_str())
+        .collect()
+}
+
+fn validate_loader_upstreams(context: &SelectionContext<'_>) -> Result<(), SelectorError> {
+    if let Some(cycle) = dependency_cycle(context) {
+        return Err(cycle);
+    }
+    let loaders: Vec<&str> = loader_names(context);
+    if context.sql.allow_warehouse_round_trips {
+        return Ok(());
+    }
+    let terminal: HashMap<&str, &str> = terminal_loaders(context.sql);
+    for loader in loaders {
+        let Some(path) = sql_reading_upstream(context, loader) else {
+            continue;
+        };
+        let reader: &str = path[path.len() - 1];
+        let kind: &str = context
             .nodes
-            .closure([loader.name.as_str()], EdgeDirection::Upstream)
+            .node(reader)
+            .map_or(TASK_KIND, |node| &node.kind);
+        let through: String = if path.len() > 1 {
+            let names: Vec<String> = path[..path.len() - 1]
+                .iter()
+                .map(|name| python_label(context, name))
+                .collect();
+            format!(" (through {})", names.join(", "))
+        } else {
+            String::new()
+        };
+        let source: &str = terminal.get(loader).copied().unwrap_or(loader);
+        return Err(SelectorError {
+            code: PLANNER_DEFAULT_CODE,
+            message: format!(
+                "loader '{loader}' depends on {kind} '{reader}'{through}, which reads SQL\n  \
+                 This is a warehouse round trip: data leaves the warehouse and comes back \
+                 through this loader.\n  Lineage and column lineage restart at the source \
+                 '{source}', and builds and job\n  groups run the {kind} before the loader."
+            ),
+            help: Some(
+                "if this is intended, set `allow_warehouse_round_trips = true` under [settings] \
+                 in sqlbuild_project.toml"
+                    .to_owned(),
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// `kind 'name'` of a Python node, as round-trip errors name it.
+fn python_label(context: &SelectionContext<'_>, name: &str) -> String {
+    let kind: &str = context.nodes.node(name).map_or("node", |node| &node.kind);
+    format!("{kind} '{name}'")
+}
+
+/// The nearest task or asset upstream of `loader` that reads SQL, with the Python nodes between.
+fn sql_reading_upstream<'graph>(
+    context: &SelectionContext<'graph>,
+    loader: &str,
+) -> Option<Vec<&'graph str>> {
+    let mut parents: HashMap<&'graph str, Option<&'graph str>> = HashMap::new();
+    let mut queue: VecDeque<&'graph str> = VecDeque::new();
+    for upstream in context.nodes.edges(loader, EdgeDirection::Upstream) {
+        if !parents.contains_key(upstream.as_str()) {
+            parents.insert(upstream, None);
+            queue.push_back(upstream);
+        }
+    }
+    while let Some(name) = queue.pop_front() {
+        if let Some(node) = context.nodes.node(name)
+            && (node.kind == TASK_KIND || node.kind == ASSET_KIND)
+            && !node.sql_deps.is_empty()
         {
-            let Some(upstream) = context.nodes.node(&upstream_name) else {
-                continue;
-            };
-            if (upstream.kind == TASK_KIND || upstream.kind == ASSET_KIND)
-                && !upstream.sql_deps.is_empty()
-            {
-                return Err(failure(format!(
-                    "Loader '{}' depends on Python node '{}' which depends on SQL; \
-                     Python-to-SQL writes must flow through a pre-SQL task/asset -> loader -> \
-                     source path",
-                    loader.name, upstream.name
-                )));
+            let mut path: Vec<&'graph str> = vec![name];
+            let mut current: Option<&'graph str> = parents[name];
+            while let Some(parent) = current {
+                path.push(parent);
+                current = parents[parent];
+            }
+            path.reverse();
+            return Some(path);
+        }
+        for upstream in context.nodes.edges(name, EdgeDirection::Upstream) {
+            if upstream != loader && !parents.contains_key(upstream.as_str()) {
+                parents.insert(upstream, Some(name));
+                queue.push_back(upstream);
             }
         }
     }
-    Ok(())
+    None
+}
+
+/// A node of the combined dependency graph a round trip can close a cycle in.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum RoundTripNode {
+    Python(String),
+    Sql(ObjectKey),
+}
+
+/// The first cycle through a loader, its Python upstreams, the SQL they read and the source it fills.
+fn round_trip_cycle(context: &SelectionContext<'_>, loaders: &[&str]) -> Option<Vec<String>> {
+    let source_loaders: HashMap<&str, &str> = source_loaders(context.sql).into_iter().collect();
+    let roots = loaders
+        .iter()
+        .map(|name| RoundTripNode::Python((*name).to_owned()));
+    let path: Vec<RoundTripNode> = find_dependency_cycle(roots, |node| match node {
+        RoundTripNode::Python(name) => {
+            let mut next: Vec<RoundTripNode> = context
+                .nodes
+                .edges(name, EdgeDirection::Upstream)
+                .iter()
+                .map(|upstream| RoundTripNode::Python(upstream.clone()))
+                .collect();
+            if let Some(node) = context.nodes.node(name)
+                && node.kind != CHECK_KIND
+            {
+                next.extend(node.sql_deps.iter().cloned().map(RoundTripNode::Sql));
+            }
+            next
+        }
+        RoundTripNode::Sql(key) => {
+            let mut next: Vec<RoundTripNode> = context
+                .sql
+                .graph
+                .edges(key, EdgeDirection::Upstream)
+                .iter()
+                .cloned()
+                .map(RoundTripNode::Sql)
+                .collect();
+            if key.0 == SOURCE_RESOURCE
+                && let Some(loader) = source_loaders.get(key.1.as_str())
+            {
+                next.push(RoundTripNode::Python((*loader).to_owned()));
+            }
+            next
+        }
+    })?;
+    let last: &RoundTripNode = path.last()?;
+    let start: usize = path.iter().position(|node| node == last)?;
+    Some(
+        path[start..]
+            .iter()
+            .map(|node| match node {
+                RoundTripNode::Python(name) => python_label(context, name),
+                RoundTripNode::Sql((kind, name)) => format!("{kind} '{name}'"),
+            })
+            .collect(),
+    )
 }
 
 /// Selected managed sources have their loaders selected; a Python node may run without its Python upstream, whose latest persisted result it reads.

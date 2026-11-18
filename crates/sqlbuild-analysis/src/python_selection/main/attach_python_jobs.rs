@@ -23,6 +23,7 @@ pub fn attach_python_jobs(
             SqlSelectionGraph {
                 graph,
                 sources: sql.sources,
+                allow_warehouse_round_trips: sql.allow_warehouse_round_trips,
             },
             python,
         );

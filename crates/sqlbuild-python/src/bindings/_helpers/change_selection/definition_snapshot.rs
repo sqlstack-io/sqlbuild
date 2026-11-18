@@ -62,9 +62,10 @@ const PROJECT_CONFIG_ELSEWHERE: [&str; 11] = [
 ];
 const LOCAL_CONFIG_ELSEWHERE: [&str; 4] = ["settings", "setting_overrides", "vars", "scenario"];
 /// Settings that tune how a run executes or validates, not what a node computes.
-const RUNTIME_SETTINGS: [&str; 9] = [
+const RUNTIME_SETTINGS: [&str; 10] = [
     "sql_analysis",
     "require_sql_analysis",
+    "allow_warehouse_round_trips",
     "concurrency",
     "microbatch_concurrency",
     "test_timeout",

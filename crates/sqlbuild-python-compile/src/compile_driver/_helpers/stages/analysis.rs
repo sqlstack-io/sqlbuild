@@ -18,6 +18,8 @@ use crate::rules::main::rule::evaluate_rules::evaluate_rules;
 use crate::rules::models::EarlyRulesScope;
 use crate::rules::models::EarlyRulesSettings;
 use crate::rules::models::EarlySqlLint;
+use sqlbuild_analysis::graph::constants::PLANNER_DEFAULT_CODE;
+use sqlbuild_analysis::graph::errors::SelectorError;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -35,7 +37,9 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_project::contracts::main::evaluate_model_contracts::evaluate_model_contracts;
+use sqlbuild_python_project::graph::main::python_nodes::project_graph_error::project_graph_error;
 use sqlbuild_python_project::graph::models::CompiledProjectGraph;
+use sqlbuild_python_project::planner_identity::main::execution_cycle::execution_cycle;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 use sqlbuild_python_project::project_snapshot::main::job_group_cycles::job_group_cycles;
@@ -239,10 +243,16 @@ fn analyzed<'py>(
     )?)?;
     let selected_keys: Bound<'py, PyAny> =
         select_project_graph(&graph, &driver.select, &driver.exclude)?.into_any();
+    let boundary: Vec<Bound<'py, PyAny>> = if graph_failed {
+        Vec::new()
+    } else {
+        boundary_diagnostics(&graph, &discovered)?
+    };
     let core_diagnostics: Bound<'py, PyTuple> = PyTuple::new(
         py,
         native_field(&project, "diagnostics")?
             .try_iter()?
+            .chain(boundary.into_iter().map(Ok))
             .chain(native_field(&contracts.result, "diagnostics")?.try_iter()?)
             .collect::<PyResult<Vec<_>>>()?,
     )?;
@@ -558,6 +568,51 @@ impl<'py> Driver<'_, 'py> {
         self.status.complete(&progress)?;
         Ok(result)
     }
+}
+
+/// Compile errors for what every plan refuses: an execution-order cycle and the first SQL/Python boundary error.
+fn boundary_diagnostics<'py>(
+    graph: &Bound<'py, PyAny>,
+    discovered: &Bound<'py, PyAny>,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    let py: Python<'py> = graph.py();
+    let mut refusals: Vec<SelectorError> = Vec::new();
+    if let Some(message) = execution_cycle(&native_field(graph, "project")?)? {
+        refusals.push(SelectorError {
+            code: PLANNER_DEFAULT_CODE,
+            message,
+            help: None,
+        });
+    }
+    refusals.extend(project_graph_error(graph, discovered)?);
+    let none: Bound<'py, PyAny> = py.None().into_bound(py);
+    refusals
+        .into_iter()
+        .map(|refusal| {
+            new_record_with(
+                py,
+                RecordId::CompilerDiagnostic,
+                &[
+                    (
+                        "phase",
+                        enum_member(py, RecordId::DiagnosticPhase, "COMPILE")?,
+                    ),
+                    (
+                        "severity",
+                        enum_member(py, RecordId::DiagnosticSeverity, "ERROR")?,
+                    ),
+                    ("code", PyString::new(py, refusal.code).into_any()),
+                    ("message", PyString::new(py, &refusal.message).into_any()),
+                    ("path", none.clone()),
+                    ("line", none.clone()),
+                    ("column", none.clone()),
+                    ("help", refusal.help.into_pyobject(py)?.into_any()),
+                    ("notes", PyTuple::empty(py).into_any()),
+                    ("affected_rules", PyTuple::empty(py).into_any()),
+                ],
+            )
+        })
+        .collect()
 }
 
 /// The core diagnostics followed by one rule-phase error per rule finding; lint-unavailable ones only warn.
