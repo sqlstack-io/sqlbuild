@@ -5,9 +5,9 @@ use crate::project::_helpers::defaults::{
     InheritableField, optional_retention_policy, optional_table_type,
 };
 use crate::project::_helpers::fields::{
-    bool_or_none, coerce_mapping, get, key_name, keyed, object, optional_nullable_bool,
-    optional_str, optional_strict_int, optional_text_field, string_mapping, text_or_none,
-    value_or_none,
+    bool_or_none, coerce_mapping, get, key_name, keyed, object, optional_choice,
+    optional_nullable_bool, optional_str, optional_strict_int, optional_text_field, string_mapping,
+    text_or_none, value_or_none,
 };
 use crate::project::_helpers::keys::{
     Place, reject_removed_virtual_keys, reject_unknown_mapping_keys, validate_allowed_keys,
@@ -16,8 +16,8 @@ use crate::project::_helpers::sections::{fixed_duration_seconds, item_timeout};
 use crate::project::_helpers::values::{int_below, is_int};
 use crate::project::constants::{
     CLONE_KEYS, CONCURRENCY_KEY, CONFIRMATION_POLICIES, EXECUTION_LIMIT_KEYS,
-    IGNORE_AUDIT_FAILURES_KEY, MAX_FULL_ROWS_KEY, POOLS_KEY, RETENTION_MATERIALIZATIONS,
-    TARGET_KEYS, UNLIMITED_DIFF_FULL_ROWS, WAREHOUSE_GROUPS,
+    IGNORE_AUDIT_FAILURES_KEY, MAX_FULL_ROWS_KEY, PLAN_FROM_KEY, PLAN_FROM_SOURCES, POOLS_KEY,
+    RETENTION_MATERIALIZATIONS, TARGET_KEYS, UNLIMITED_DIFF_FULL_ROWS, WAREHOUSE_GROUPS,
 };
 use crate::project::errors::ConfigFailure;
 use crate::project::models::{Built, ConfigFile};
@@ -432,7 +432,21 @@ fn local_target(payload: &ConfigValue, target: TargetPlace<'_>) -> Loaded<Fields
         "catalog_connection",
         optional_text_field(mapping, "catalog_connection")?,
     ));
+    fields.push((PLAN_FROM_KEY, plan_from(mapping)?));
     Ok(fields)
+}
+
+/// The target's `plan_from`, or `None` when it leaves the source to another layer.
+fn plan_from(mapping: &Entries) -> Loaded<Built> {
+    Ok(match get(mapping, PLAN_FROM_KEY) {
+        None => text_or_none(None),
+        Some(_) => text_or_none(Some(optional_choice(
+            mapping,
+            PLAN_FROM_KEY,
+            &PLAN_FROM_SOURCES,
+            PLAN_FROM_SOURCES[0],
+        )?)),
+    })
 }
 
 /// `_load_local_targets`: each target's fields by name.

@@ -8,12 +8,17 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
-    from sqlbuild.adapter.relations.models import SchemaColumnListing, SchemaRelationListing
+    from sqlbuild.adapter.relations.models import (
+        RelationChange,
+        SchemaColumnListing,
+        SchemaRelationListing,
+    )
 
 
 type RelationCacheKey = tuple[str, str | None, str | None, str]
 type RelationCacheVersion = tuple[int, int]
 type SchemaListingScope = tuple[str | None, str]
+type SyncedRow = tuple[str | None, str, str, list[tuple[str, str]], str]
 
 
 class RelationLocation(Protocol):
@@ -85,6 +90,17 @@ class PartedRelationListingReader(Protocol):
         self, *, database: str | None, schema: str, results: tuple[object, ...]
     ) -> SchemaRelationListing:
         """The schema's listing from its reads' results, in ``relation_listing_reads`` order."""
+        ...
+
+
+@runtime_checkable
+class RelationChangeReader(Protocol):
+    """Adapter that lists schemas with when each relation's data and definition last changed."""
+
+    def read_relation_changes(
+        self, *, connection: Any, database: str | None, schemas: tuple[str, ...]
+    ) -> dict[str, tuple[RelationChange, ...]]:
+        """Each schema's relations, by the schema's metadata name key, in one read."""
         ...
 
 

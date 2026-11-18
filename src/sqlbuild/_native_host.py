@@ -63,6 +63,7 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.adapter.relations.main.record_inspection_query",
         "record_inspection_query",
     ),
+    "SyncedCatalog": ("sqlbuild.adapter.relations.classes.synced_catalog", "SyncedCatalog"),
     "build_relation_lookup": (
         "sqlbuild.adapter.relations.main.relation_lookup",
         "build_relation_lookup",

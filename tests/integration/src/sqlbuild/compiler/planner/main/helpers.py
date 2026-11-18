@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import re
+import sqlite3
 from collections import Counter
 from collections.abc import Callable
+from contextlib import closing
 from dataclasses import fields, replace
 from datetime import UTC, datetime
 from itertools import chain
@@ -12,6 +15,7 @@ from pathlib import Path
 from tempfile import gettempdir
 from types import MappingProxyType
 from typing import Any, cast
+from uuid import uuid4
 
 from sqlbuild._native import (
     CompiledFunction,
@@ -52,7 +56,8 @@ from sqlbuild._native import (
     run_compile_pipeline,
     write_fingerprint,
 )
-from sqlbuild.adapter.contract.models import RelationInfo, RelationReadProbe
+from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo, RelationReadProbe
+from sqlbuild.adapter.relations.classes.inspection_catalog import InspectionCatalog
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import (
     CompiledFunctionView,
@@ -74,6 +79,8 @@ from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import (
     RecordedQuery,
     RecordingSnowflakeWarehouse,
     SyntheticSnowflakeProject,
+    live_inspection_catalog,
+    write_synthetic_snowflake_project,
 )
 
 
@@ -494,6 +501,7 @@ def plan_offline_snowflake_project(
     project: SyntheticSnowflakeProject,
     warehouse: RecordingSnowflakeWarehouse,
     no_cache: bool = True,
+    plan_from: str | None = None,
 ) -> CompilePipelineResult:
     """Compile and plan a synthetic Snowflake project against the recording warehouse."""
 
@@ -505,6 +513,7 @@ def plan_offline_snowflake_project(
             no_sql_validation=True,
             no_cache=no_cache,
             connection_config=dict(inputs.project_config.connection),
+            plan_from=plan_from,
         ),
         hooks=ConnectionHooks(),
     )
@@ -683,3 +692,101 @@ def plan_source_reading_project(
         adapter=adapter,
         options=CompilePipelineOptions(no_sql_validation=True),
     )
+
+
+def write_targeted_snowflake_project(
+    *, project_dir: Path, target: str, plan_from: str | None
+) -> SyntheticSnowflakeProject:
+    """A small synthetic project whose default target sets `plan_from`, or leaves it unset."""
+
+    project: SyntheticSnowflakeProject = write_synthetic_snowflake_project(
+        project_dir=project_dir,
+        models_per_schema=6,
+        incremental_every=3,
+        sources=4,
+        unmanaged_relations_per_schema=5,
+    )
+    toml: Path = project_dir / "sqlbuild_project.toml"
+    setting: str = ("", f'plan_from = "{plan_from}"\n')[plan_from is not None]
+    toml.write_text(
+        toml.read_text().replace(
+            'adapter = "snowflake"\n', f'adapter = "snowflake"\ndefault_target = "{target}"\n', 1
+        )
+        + f'\n[targets.{target}]\nschema = "preserve"\n{setting}',
+        encoding="utf-8",
+    )
+    return project
+
+
+def write_synced_control_store(
+    *,
+    project_dir: Path,
+    target: str,
+    warehouse: RecordingSnowflakeWarehouse,
+    schemas: tuple[str, ...],
+) -> None:
+    """A control store whose development location mirrored `schemas` of the warehouse just now."""
+
+    catalog: InspectionCatalog = live_inspection_catalog(warehouse)
+    relations: tuple[RelationInfo, ...] = catalog.list_relations(
+        database="analytics", schemas=schemas
+    )
+    columns: dict[tuple[str | None, str | None, str], tuple[ColumnInfo, ...]] = (
+        catalog.get_columns_for_relations(relations=relations)
+    )
+    location: str = str(uuid4())
+    observed: str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    (project_dir / ".sqlbuild").mkdir(parents=True)
+    with closing(sqlite3.connect(project_dir / ".sqlbuild/control.sqlite3")) as store:
+        _ = store.execute(
+            "CREATE TABLE sqb_development_locations (project_path TEXT, target TEXT, "
+            "location_id TEXT)"
+        )
+        _ = store.execute(
+            "CREATE TABLE sqb_warehouse_catalog (event_id TEXT, location_id TEXT, target TEXT, "
+            "state_database TEXT, state_schema TEXT, observed_at TEXT, record_json JSON)"
+        )
+        _ = store.execute(
+            "INSERT INTO sqb_development_locations VALUES (?, ?, ?)",
+            (str(project_dir), target, location),
+        )
+        _ = store.executemany(
+            "INSERT INTO sqb_warehouse_catalog VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [
+                _mirrored_row(
+                    relation=relation,
+                    columns=columns.get(relation.identity, ()),
+                    scope=(location, target, observed),
+                )
+                for relation in relations
+            ],
+        )
+        store.commit()
+
+
+def _mirrored_row(
+    *, relation: RelationInfo, columns: tuple[ColumnInfo, ...], scope: tuple[str, str, str]
+) -> tuple[str, ...]:
+    location, target, observed = scope
+    record: dict[str, object] = {
+        "state_database": "ANALYTICS",
+        "state_schema": str(relation.schema).upper(),
+        "name": relation.name,
+        "relation_type": relation.relation_type,
+        "columns": [{"name": column.name, "data_type": column.type} for column in columns],
+    }
+    return (
+        str(uuid4()),
+        location,
+        target,
+        "ANALYTICS",
+        str(relation.schema).upper(),
+        observed,
+        json.dumps(record),
+    )
+
+
+def planned_entries(result: CompilePipelineResult) -> list[tuple[str, str]]:
+    """Each planned model's name and reason, in name order."""
+
+    return sorted((entry.name, str(entry.reason)) for entry in result.plan_output.model_entries)
