@@ -364,6 +364,8 @@ pub struct PythonPlanText {
     pub identity_status: String,
     pub source_diff: Vec<String>,
     pub dependency_diff: Vec<String>,
+    /// What the node now also waits on, or no longer, through its job and tag dependencies.
+    pub wait_changes: Vec<String>,
 }
 
 /// One provider used by a selected Python surface.

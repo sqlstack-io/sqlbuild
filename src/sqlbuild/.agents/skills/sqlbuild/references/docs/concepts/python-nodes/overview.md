@@ -133,7 +133,7 @@ Every decorator accepts the same organizational metadata:
 
 | Argument | Description |
 |----------|-------------|
-| `depends_on` | A single function, tuple, or list of upstream nodes (and, where allowed, `model()`/`source()`/`seed()` references) |
+| `depends_on` | A single function, tuple, or list of upstream nodes (and, where allowed, `model()`/`source()`/`seed()` references or a `job()`/`tag()`; see [SQL References](sql-references.md#depending-on-a-job-or-a-tag)) |
 | `tags` | Labels for selection, filtering, and catalog grouping |
 | `group` | A display/catalog grouping string |
 | `description` | Required human-readable docs; defaults to the function docstring ([Descriptions](../models/configuration.md#descriptions)) |

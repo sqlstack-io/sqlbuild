@@ -7,6 +7,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{IntoPyObject, pyfunction};
 use serde_json::{Value, json};
+use sqlbuild_analysis::node_set_dependencies::models::GraphNode;
 use sqlbuild_analysis::planner_scope::main::node_loads::node_loads;
 use sqlbuild_core::models::DiagnosticSeverity;
 use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
@@ -168,6 +169,31 @@ fn python_nodes(
             )));
         };
         published.definition["deps"] = json!(deps);
+        if let Some(resolved) = selected
+            .sets
+            .iter()
+            .find(|resolved| resolved.name == node.name)
+        {
+            published.definition["set_dependencies"] = json!(
+                resolved
+                    .sets
+                    .iter()
+                    .map(|set| json!({
+                        "kind": set.dependency.kind,
+                        "name": set.dependency.name,
+                        "exclude": set.dependency.exclude,
+                        "ends": set
+                            .ends
+                            .iter()
+                            .filter_map(|end| match end {
+                                GraphNode::Sql((kind, name)) => Some(format!("{kind}:{name}")),
+                                GraphNode::Python(name) => selected.node_key(name),
+                            })
+                            .collect::<Vec<String>>(),
+                    }))
+                    .collect::<Vec<_>>()
+            );
+        }
         published.definition["tags"] =
             json!(tags.get(node.name.as_str()).cloned().unwrap_or_default());
         if let Some(source) = selected.intermediate_source(&node.kind, &node.name) {

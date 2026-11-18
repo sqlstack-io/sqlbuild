@@ -12,6 +12,7 @@ use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyCFunction, PyDict, PyTuple};
 
 use sqlbuild_host::compile_context::main::record_compile_timing::record_compile_timing;
+use sqlbuild_python_project::graph::main::python_nodes::resolve_node_sets::resolve_node_sets;
 
 use crate::compile_driver::_helpers::setup::target_defaults::TargetDefaults;
 use crate::compile_driver::_helpers::setup::target_defaults::apply_target_defaults;
@@ -125,10 +126,12 @@ pub(crate) fn compiled_project(
     py: Python<'_>,
     request: ProjectRequest,
 ) -> PyResult<Bound<'_, PyAny>> {
-    produced(
+    let project: Bound<'_, PyAny> = produced(
         FrontierStage::CompiledProject,
         python_compiled_project(py, &request)?,
-    )
+    )?;
+    let _ = resolve_node_sets(request.discovered_inputs.bind(py), &project)?;
+    Ok(project)
 }
 
 /// `_build_python_compiled_project`.
