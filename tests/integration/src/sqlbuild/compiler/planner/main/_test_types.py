@@ -204,3 +204,4 @@ class SyncedScanTestCase:
     description: str
     last_ddl_after_scan_start: timedelta
     expected_live_describe: bool
+    location_clock_ahead: timedelta = timedelta()

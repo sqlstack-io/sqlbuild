@@ -73,6 +73,7 @@ pub(crate) async fn catalog_history(
     )
     .await;
     batch["scan"]["scan_id"] = json!(Uuid::now_v7());
+    let before = times(store).await;
     assert_eq!(
         post((client, url, bearer), &batch, StatusCode::OK).await["applied"],
         false
@@ -81,6 +82,15 @@ pub(crate) async fn catalog_history(
         current(store).await,
         initial,
         "an unchanged scan changes nothing"
+    );
+    let after = times(store).await;
+    assert_eq!(
+        after["observed_at"], before["observed_at"],
+        "an unchanged record keeps the time it last changed"
+    );
+    assert_ne!(
+        after["received_at"], before["received_at"],
+        "an unchanged record takes the time it was received again"
     );
     batch["scan"]["scan_id"] = json!(Uuid::now_v7());
     batch["records"][0]["columns"][1]["data_type"] = json!("INTEGER");
@@ -213,4 +223,16 @@ async fn current(store: &ControlStore) -> Value {
     .expect("projection");
     commit(transaction).await.expect("close read");
     json!(current)
+}
+
+async fn times(store: &ControlStore) -> Value {
+    let (transaction, mut rows) = query(
+        begin(store, TransactionMode::Read).await.expect("read"),
+        "SELECT observed_at,received_at FROM sqb_warehouse_catalog",
+        vec![],
+    )
+    .await
+    .expect("record times");
+    commit(transaction).await.expect("close read");
+    json!(rows.remove(0))
 }

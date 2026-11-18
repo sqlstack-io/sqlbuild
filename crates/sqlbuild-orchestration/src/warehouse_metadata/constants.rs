@@ -54,7 +54,7 @@ pub(crate) const INGESTION_CHUNK_RECORDS: usize = 200;
 /// The audit result metadata field marking a failure its build let through.
 pub(crate) const IGNORED_KEY: &str = "ignored";
 /// The mirrored catalog of one location's target, with when each relation was observed.
-pub(crate) const SYNCED_CATALOG_SQL: &str = "SELECT record_json, observed_at, scan_id FROM sqb_warehouse_catalog \
+pub(crate) const SYNCED_CATALOG_SQL: &str = "SELECT record_json, observed_at, scan_id, received_at FROM sqb_warehouse_catalog \
     WHERE location_id=$1 AND target=$2 ORDER BY state_database, state_schema, event_id";
 /// The development locations of one target, by project path.
 pub(crate) const DEVELOPMENT_LOCATIONS_SQL: &str =

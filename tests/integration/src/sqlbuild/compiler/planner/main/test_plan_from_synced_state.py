@@ -34,6 +34,8 @@ _NO_STORE: str = "Planning live: the project has no control store"
 _LIVE: str = "Planning live:"
 _FIRST_OBSERVED: datetime = datetime(2026, 2, 1, tzinfo=UTC)
 _SCAN_STARTED: datetime = datetime(2026, 3, 1, tzinfo=UTC)
+# The scan read the page two seconds after it started, and the store received it a second later.
+_PAGE_RECEIVED: datetime = _SCAN_STARTED + timedelta(seconds=3)
 
 
 @pytest.mark.parametrize(
@@ -156,6 +158,23 @@ def test_given_plan_from_when_planning_then_reads_the_synced_copy_only_when_aske
             last_ddl_after_scan_start=timedelta(hours=1),
             expected_live_describe=True,
         ),
+        SyncedScanTestCase(
+            description="a table replaced a second after its page was read is described",
+            last_ddl_after_scan_start=timedelta(seconds=3),
+            expected_live_describe=True,
+        ),
+        SyncedScanTestCase(
+            description="a table replaced a second after its page was read by a location clock 10 minutes fast is described",
+            last_ddl_after_scan_start=timedelta(seconds=3),
+            expected_live_describe=True,
+            location_clock_ahead=timedelta(minutes=10),
+        ),
+        SyncedScanTestCase(
+            description="a table replaced with the same columns before a scan by a location clock 10 minutes fast is not described",
+            last_ddl_after_scan_start=timedelta(hours=-1),
+            expected_live_describe=False,
+            location_clock_ahead=timedelta(minutes=10),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -185,7 +204,8 @@ def test_given_a_later_scan_found_a_record_unchanged_when_planning_from_synced_s
         warehouse=warehouse,
         schemas=_MODEL_SCHEMAS,
         observed_at=_FIRST_OBSERVED,
-        scan_id=uuid7_at(_SCAN_STARTED),
+        scan_id=uuid7_at(_SCAN_STARTED + test_case.location_clock_ahead),
+        received_at=_PAGE_RECEIVED,
     )
     warehouse.queries.clear()
 

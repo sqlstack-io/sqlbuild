@@ -738,8 +738,12 @@ def write_synced_control_store(
     schemas: tuple[str, ...],
     observed_at: datetime | None = None,
     scan_id: str | None = None,
+    received_at: datetime | None = None,
 ) -> None:
-    """A control store whose location mirrored `schemas` at `observed_at` (default: now)."""
+    """A control store whose location mirrored `schemas` at `observed_at` (default: now).
+
+    `received_at` is when the store last received each record (default: `observed_at`).
+    """
 
     catalog: InspectionCatalog = live_inspection_catalog(warehouse)
     relations: tuple[RelationInfo, ...] = catalog.list_relations(
@@ -749,7 +753,9 @@ def write_synced_control_store(
         catalog.get_columns_for_relations(relations=relations)
     )
     location: str = str(uuid4())
-    observed: str = (observed_at or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    observed_time: datetime = observed_at or datetime.now(UTC)
+    observed: str = observed_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    received: str = (received_at or observed_time).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     (project_dir / ".sqlbuild").mkdir(parents=True)
     with closing(sqlite3.connect(project_dir / ".sqlbuild/control.sqlite3")) as store:
         _ = store.execute(
@@ -759,21 +765,21 @@ def write_synced_control_store(
         _ = store.execute(
             "CREATE TABLE sqb_warehouse_catalog (event_id TEXT, location_id TEXT, target TEXT, "
             "state_database TEXT, state_schema TEXT, observed_at TEXT, record_json JSON, "
-            "scan_id TEXT)"
+            "scan_id TEXT, received_at TEXT)"
         )
         _ = store.execute(
             "INSERT INTO sqb_development_locations VALUES (?, ?, ?)",
             (str(project_dir), target, location),
         )
         _ = store.executemany(
-            "INSERT INTO sqb_warehouse_catalog VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO sqb_warehouse_catalog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 _mirrored_row(
                     relation=relation,
                     columns=columns.get(relation.identity, ()),
                     scope=(location, target, observed),
                 )
-                + (scan_id,)
+                + (scan_id, received)
                 for relation in relations
             ],
         )
