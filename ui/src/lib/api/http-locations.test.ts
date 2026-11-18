@@ -128,21 +128,27 @@ describe('warehouseSyncOf', () => {
 		]);
 	});
 
-	it('counts the records mirrored of each table, and names the next sync from the report that completed one', () => {
+	it('counts the records mirrored of each table from its newest counted read, and names the next sync from the report that completed one', () => {
 		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
-		const completed = sync('2026-11-08T12:03:00Z', 'statistics', null);
-		const observations = [{ ...completed, report: { ...completed.report, health: { ...completed.report.health, next_sync_at: '2026-11-08T12:33:00Z' } } }, sync('2026-11-08T12:02:00Z', 'catalog', null)];
-		const connection = toWarehouseConnection(location, observations, null, [
-			{ table: 'catalog', records: 120 },
-			{ table: 'statistics', records: 4_800 }
-		]);
+		const counted = (at: string, table: 'catalog' | 'statistics', records: number) => {
+			const report = sync(at, table, null);
+			return { ...report, report: { ...report.report, health: { ...report.report.health, mirrored_records: records } } };
+		};
+		const completed = counted('2026-11-08T12:03:00Z', 'statistics', 4_800);
+		const observations = [
+			{ ...completed, report: { ...completed.report, health: { ...completed.report.health, next_sync_at: '2026-11-08T12:33:00Z' } } },
+			sync('2026-11-08T12:02:30Z', 'catalog', null),
+			counted('2026-11-08T12:02:00Z', 'catalog', 120),
+			counted('2026-11-08T12:01:00Z', 'catalog', 90)
+		];
+		const connection = toWarehouseConnection(location, observations);
 		expect(connection.tables.map((t) => [t.table, t.mirroredTotal])).toEqual([
 			['catalog', 120],
 			['statistics', 4_800]
 		]);
 		expect(connection.nextSyncAt).toBe('2026-11-08T12:33:00Z');
-		const running = toWarehouseConnection(location, [sync('2026-11-08T12:40:00Z', 'catalog', null), ...observations]);
-		expect([running.nextSyncAt, running.tables[0].mirroredTotal]).toEqual([null, null]);
+		const uncounted = toWarehouseConnection(location, [sync('2026-11-08T12:40:00Z', 'catalog', null)]);
+		expect([uncounted.nextSyncAt, uncounted.tables[0].mirroredTotal]).toEqual([null, null]);
 	});
 
 	it('marks a sync that failed reads stopped, from the newest report only', () => {
@@ -197,7 +203,7 @@ describe('warehouseSyncOf', () => {
 		expect(warehouseSyncOf([{ ...timedOut, report: { ...timedOut.report, health } }])?.lastError).toBe('statistics: failed while reading the warehouse: no reply within 130 s, on a page of 100 relations');
 		const erroring = sync('2026-11-08T12:04:00Z', 'catalog', 'read');
 		const error = { ...erroring.report.health, read_failure: { kind: 'read_error' as const }, page_limit: 2000 };
-		expect(warehouseSyncOf([{ ...erroring, report: { ...erroring.report, health: error } }])?.lastError).toBe('catalog: failed while reading the warehouse: the warehouse returned an error; the location’s log has it, on a page of 2,000 rows');
+		expect(warehouseSyncOf([{ ...erroring, report: { ...erroring.report, health: error } }])?.lastError).toBe('catalog: failed while reading the warehouse: the read failed; the location’s log has why, on a page of 2,000 rows');
 	});
 
 	it('shows a running sync and the newest completed one, and a first sync as pending until it completes', () => {

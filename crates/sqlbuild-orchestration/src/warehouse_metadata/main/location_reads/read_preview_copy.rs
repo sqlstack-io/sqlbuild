@@ -19,13 +19,8 @@ pub async fn read_preview_copy(
 ) -> Result<PreviewCopy, ControlError> {
     let transaction =
         begin_ingestion(store, scope, (request.session_id, request.generation)).await?;
-    let (transaction, version) = if request.versioned {
-        let (transaction, version) = preview_version(transaction, scope).await?;
-        (transaction, Some(version))
-    } else {
-        (transaction, None)
-    };
-    if version.is_some() && version == request.known_version {
+    let (transaction, version) = preview_version(transaction, scope).await?;
+    if request.known_version.as_ref() == Some(&version) {
         commit(transaction).await?;
         return Ok(PreviewCopy {
             synced_at: None,

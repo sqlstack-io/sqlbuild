@@ -88,6 +88,26 @@ fn given_moves_views_and_cleanups_when_people_read_maintenance_then_each_model_s
             )
             .await
             .expect("another target's view");
+            let mut last_page = batch(
+                session_id,
+                "old_name_views",
+                records("old_name_history.json", &data["old_name_views"]),
+            );
+            last_page.last_page = true;
+            let replies = [
+                ingest_old_name_views(store, scope, &batch(session_id, "old_name_views", vec![]))
+                    .await
+                    .expect("an earlier page"),
+                ingest_old_name_views(store, scope, &last_page)
+                    .await
+                    .expect("the read's last page"),
+            ];
+            assert_eq!(
+                replies.map(|reply| reply.mirrored_records),
+                [None, Some(4)],
+                "{}: only a read's last page counts the mirror, and only this target's records",
+                test_case.description
+            );
 
             let (api, client) = start_password_api(store).await;
             let viewer = login(&client, &api.url, "orders-viewer").await;
@@ -180,46 +200,6 @@ fn given_moves_views_and_cleanups_when_people_read_maintenance_then_each_model_s
                 .await
                 .0,
                 StatusCode::FORBIDDEN
-            );
-            let totals_path =
-                format!("/api/control/locations/{location}/targets/development/mirrored-totals");
-            let (status, totals) = get(&client, (&api.url, &viewer), &totals_path).await;
-            assert_eq!(status, StatusCode::OK, "{}", test_case.description);
-            let counted: Vec<(&str, u64)> = totals
-                .as_array()
-                .expect("totals")
-                .iter()
-                .filter(|total| total["records"] != 0)
-                .map(|total| {
-                    (
-                        total["table"].as_str().expect("table"),
-                        total["records"].as_u64().expect("records"),
-                    )
-                })
-                .collect();
-            assert_eq!(
-                (totals.as_array().expect("totals").len(), counted),
-                (
-                    14,
-                    vec![
-                        ("janitor_events", 2),
-                        ("migrations", 3),
-                        ("old_name_views", 4)
-                    ]
-                ),
-                "{}: every state table, counting only this target's mirrored records",
-                test_case.description
-            );
-            assert_eq!(
-                get(
-                    &client,
-                    (&api.url, &viewer),
-                    &totals_path.replace("development", "preview")
-                )
-                .await
-                .0,
-                StatusCode::FORBIDDEN,
-                "mirrored totals need the same view as the target's health"
             );
             stop_api(api).await;
             close_test_store(fixture_store).await;

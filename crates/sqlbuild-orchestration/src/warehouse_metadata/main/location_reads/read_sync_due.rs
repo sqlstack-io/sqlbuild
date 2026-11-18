@@ -11,7 +11,7 @@ use crate::warehouse_metadata::models::{WarehouseSyncDue, WarehouseSyncDueRead};
 pub async fn read_sync_due(
     store: &ControlStore,
     scope: (Uuid, &str),
-    request: &WarehouseSyncDueRead,
+    (request, state_history_versions): (&WarehouseSyncDueRead, u16),
 ) -> Result<WarehouseSyncDue, ControlError> {
     let transaction =
         begin_ingestion(store, scope, (request.session_id, request.generation)).await?;
@@ -25,5 +25,9 @@ pub async fn read_sync_due(
     let runs_ended_at = serde_json::from_value(rows[0]["ended_at"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     commit(transaction).await?;
-    Ok(WarehouseSyncDue { runs_ended_at, now })
+    Ok(WarehouseSyncDue {
+        runs_ended_at,
+        now,
+        state_history_versions,
+    })
 }

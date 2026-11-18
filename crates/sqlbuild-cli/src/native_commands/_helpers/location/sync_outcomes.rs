@@ -50,17 +50,18 @@ pub(crate) async fn failed_read(
     (started, failure): (Instant, ReadFailure),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
-    let stage = if state.busy {
+    let busy: bool = failure == ReadFailure::Busy;
+    let stage = if busy {
         WarehouseSyncFailure::Busy
     } else {
         WarehouseSyncFailure::Read
     };
-    let halts: bool = !state.busy && state.halts(failure.page_size());
+    let halts: bool = !busy && state.halts(failure.page_size());
     tokio::select! {
         result = stopped => { result?; return Ok(None); },
         () = report_metadata_health(&state, (client, poll), (started, Some(stage), Some((&failure, halts)))) => {},
     }
-    if state.busy {
+    if busy {
         state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
         return Ok(Some(state));
     }
@@ -135,6 +136,7 @@ pub(crate) async fn deliver_metadata_page(
         }
     };
     state.applied |= response.applied;
+    state.progress.scan_mirrored = response.mirrored_records;
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         () = metadata_health(&state, (client, poll), (started, None)) => {},

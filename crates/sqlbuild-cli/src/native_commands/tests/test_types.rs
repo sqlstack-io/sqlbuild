@@ -188,7 +188,7 @@ pub(crate) struct NewestVersionsTestCase {
     pub(crate) description: &'static str,
     pub(crate) kind: WarehouseHistoryKind,
     pub(crate) incremental: bool,
-    pub(crate) server_limit: Option<u16>,
+    pub(crate) server_limit: u16,
     pub(crate) expected_newest_versions: Option<u16>,
 }
 
@@ -216,7 +216,6 @@ pub(super) struct SyncCompletionTestCase {
     pub(super) failure: Option<sqlbuild_orchestration::platform::models::WarehouseSyncFailure>,
     pub(super) safety_seconds: u64,
     pub(super) reads_wake_compute: bool,
-    pub(super) safety_explicit: bool,
     pub(super) expected_next_in_seconds: Option<i64>,
 }
 
@@ -288,7 +287,6 @@ pub(crate) struct SyncProgressTestCase {
 pub(crate) struct WakingIdleTestCase {
     pub(crate) description: &'static str,
     pub(crate) wakes: bool,
-    pub(crate) explicit: bool,
     pub(crate) run_ended: bool,
     pub(crate) requested: bool,
     pub(crate) expected_due: bool,

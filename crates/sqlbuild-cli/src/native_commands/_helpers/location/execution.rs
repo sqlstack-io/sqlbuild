@@ -34,6 +34,7 @@ use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_co
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
+use crate::native_commands::constants::PLAN_NOT_PRODUCED;
 use crate::native_commands::constants::SCREEN_INDENT;
 use crate::native_commands::constants::{
     ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS,
@@ -42,7 +43,6 @@ use crate::native_commands::constants::{
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
     UNKNOWN_COMMAND,
 };
-use crate::native_commands::constants::{METADATA_PAGE_SECONDS, PLAN_NOT_PRODUCED};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
@@ -502,7 +502,6 @@ pub(crate) fn metadata_sync(
         server_offset: chrono::Duration::zero(),
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
-        busy: false,
         failed_reads: 0,
         halted: false,
         change_tokens: HashMap::new(),
@@ -511,10 +510,8 @@ pub(crate) fn metadata_sync(
         mirror_holds_rows: false,
         reader: None,
         state_history_versions: None,
-        page_seconds: METADATA_PAGE_SECONDS,
         progress: SyncProgress::new(),
         reads_wake_compute: false,
-        safety_explicit: true,
     }
 }
 
@@ -597,6 +594,7 @@ pub(crate) fn freeze_history_page(
             location: state.location().clone(),
             complete: page.next_after.is_none(),
         }),
+        last_page: page.next_after.is_none(),
     };
     if serde_json::to_vec(&batch)
         .map_err(|error| ControlError::Invalid(error.to_string()))?
@@ -648,10 +646,7 @@ pub(crate) async fn begin_after_run(
     };
     let ran = state.sync_due(due.runs_ended_at);
     if ran {
-        state.state_history_versions = match client.metadata_retention(target).await {
-            Ok(retention) => retention.map(|retention| retention.state_history_versions),
-            Err(error) => return (state, Err(error)),
-        };
+        state.state_history_versions = Some(due.state_history_versions);
         state.begin_sync(due.now);
     }
     (state, Ok(ran))
@@ -743,6 +738,7 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
     state.progress.sync_rows += state.progress.scan_rows;
     state.progress.scan_rows = 0;
     state.progress.scan_unchanged = false;
+    state.progress.scan_mirrored = None;
     state.progress.scan_started = Instant::now();
     state.index += 1;
     state.scan_id = Uuid::now_v7();
@@ -874,7 +870,6 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
     )
     .map_err(ControlError::Invalid)?;
     Ok(LocationServe {
-        safety_sync_explicit: safety_sync.is_some(),
         safety_sync_seconds: safety_sync.unwrap_or(METADATA_SAFETY_SYNC_SECONDS),
         project_dir,
         server_url: text(namespace, "location_server_url").unwrap_or_default(),
@@ -1364,8 +1359,9 @@ pub(crate) async fn stop_location_runtime(
 }
 
 /// An outer absence means shutdown; an inner error is a failed read, never an empty table.
+/// A state-table or catalog page that takes longer than `page_seconds` counts as failed.
 pub(crate) async fn read_metadata_page(
-    (options, script): (&LocationServe, &Path),
+    (options, script, page_seconds): (&LocationServe, &Path, u64),
     mut state: LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<
@@ -1375,7 +1371,6 @@ pub(crate) async fn read_metadata_page(
     )>,
     ControlError,
 > {
-    state.busy = false;
     if let Some(statistics) = &state.statistics
         && statistics.names.is_empty()
     {
@@ -1400,7 +1395,7 @@ pub(crate) async fn read_metadata_page(
             }
         },
     };
-    let seconds = read_timeout_seconds(&state);
+    let seconds = read_timeout_seconds(&state, page_seconds);
     tokio::pin!(stopped);
     let read = tokio::select! {
         result = &mut stopped => {
@@ -1417,7 +1412,6 @@ pub(crate) async fn read_metadata_page(
                 Ok(page)
             }
             Ok((reader, Ok(MetadataReply::Busy))) => {
-                state.busy = true;
                 state.reader = Some(reader);
                 Err(ReadFailure::Busy)
             }
@@ -1633,14 +1627,13 @@ pub(crate) async fn settle_publication(
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Settled>, ControlError> {
     let (mut metadata, deferred) = if connect {
-        let mut sync: LocationMetadataSync = metadata_sync(
+        let sync: LocationMetadataSync = metadata_sync(
             (locations, generation),
             (
                 options.metadata_reconcile_seconds,
                 options.safety_sync_seconds,
             ),
         );
-        sync.safety_explicit = options.safety_sync_explicit;
         (Some(sync), None)
     } else {
         (metadata, Some((locations, generation)))

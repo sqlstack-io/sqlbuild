@@ -114,7 +114,7 @@ pub(crate) async fn ingest_events(
     commit_ingestion(
         transaction,
         (table, location_id, target),
-        (batch.scan.as_ref(), &keys),
+        (batch.scan.as_ref(), &keys, batch.last_page),
         applied,
     )
     .await

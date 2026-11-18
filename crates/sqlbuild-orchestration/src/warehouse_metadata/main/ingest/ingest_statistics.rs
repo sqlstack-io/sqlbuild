@@ -70,7 +70,7 @@ pub async fn ingest_statistics(
     commit_ingestion(
         transaction,
         ("sqb_warehouse_statistics", scope.0, scope.1),
-        (None, &[]),
+        (None, &[], batch.last_page),
         applied,
     )
     .await
