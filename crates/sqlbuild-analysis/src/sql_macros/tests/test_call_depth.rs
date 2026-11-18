@@ -8,12 +8,12 @@ fn given_a_deeply_nested_macro_body_when_expanding_for_snowflake_then_the_shared
         NestedMacroTestCase {
             description: "a hundred nested calls expand",
             depth: 100,
-            expected: Ok(100),
+            expected_outcome: Ok(100),
         },
         NestedMacroTestCase {
             description: "one past the limit is P015 naming the limit",
             depth: MAX_FUNCTION_CALL_DEPTH + 1,
-            expected: Err(format!(
+            expected_outcome: Err(format!(
                 "body of macro cleaned_name() is not a valid expression macro: \
                  E_GUARD_FUNCTION_NESTING_DEPTH_EXCEEDED: value {} exceeds configured limit \
                  {MAX_FUNCTION_CALL_DEPTH}",
@@ -36,7 +36,7 @@ fn given_a_deeply_nested_macro_body_when_expanding_for_snowflake_then_the_shared
         assert_eq!(
             outcome,
             test_case
-                .expected
+                .expected_outcome
                 .map_err(|message| format!("P015: {message}")),
             "{}",
             test_case.description
