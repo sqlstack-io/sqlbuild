@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.245.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.244.0...v0.245.0) (2026-11-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* the control store schema changes: runs record ignored audit failures in `sqb_runs.ignored_audit_failures` instead of a reserved node-count key, and stored check results record them in `sqb_warehouse_audit_results.ignored` instead of the result metadata. Job and job group files rename `concurrency_groups` to `pools`, and server.toml launchers rename `concurrency_limits` to `pool_caps`.
+
+### Features
+
+* bring the large-project server work onto main ([#1566](https://github.com/sqlstack-io/sqlbuild/issues/1566)) ([3875c56](https://github.com/sqlstack-io/sqlbuild/commit/3875c56ebdcc73a9a7ae36b8fd146b66fa5d1a73))
+
 ## [0.244.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.243.0...v0.244.0) (2026-11-18)
 
 
