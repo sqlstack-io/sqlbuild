@@ -18,7 +18,7 @@ use crate::api::errors::ApiError;
 use crate::api::models::{
     BrowserLoginMethod, BrowserOrigin, ProxyLogoutUrl, ProxyPeers, TrustedProxyAuthentication,
 };
-use crate::authorization::main::resolve_proxy_person::resolve_proxy_person;
+use crate::authorization::main::people::resolve_proxy_person::resolve_proxy_person;
 use crate::authorization::models::ProxyPerson;
 use crate::credentials::models::{AuditContext, AuthenticatedPerson};
 use crate::store::errors::ControlError;

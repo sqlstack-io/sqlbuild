@@ -2,8 +2,8 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::authorization::main::person_assigns_roles::person_assigns_roles;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
+use crate::authorization::main::roles::person_assigns_roles::person_assigns_roles;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::snapshots::_helpers::published_listing::{
     published_changes, published_connections, published_snapshots,

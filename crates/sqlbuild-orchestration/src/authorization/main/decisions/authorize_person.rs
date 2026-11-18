@@ -7,7 +7,7 @@ use crate::authorization::_helpers::custom_roles::denial_reason;
 use crate::authorization::_helpers::person_grants::{
     GrantDecision, decide_grant, person_role_rows,
 };
-use crate::authorization::main::deny_authorization::deny;
+use crate::authorization::main::decisions::deny_authorization::deny;
 use crate::credentials::models::{AuditContext, DefaultRole, PermissionScope};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;

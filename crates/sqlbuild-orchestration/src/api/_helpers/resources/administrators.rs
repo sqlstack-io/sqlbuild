@@ -8,10 +8,10 @@ use crate::api::errors::ApiError;
 use crate::api::models::{
     LoginMode, MutationResponse, ServerFacts, ServerRetention, ServerSettings,
 };
-use crate::authorization::main::assign_builtin_role::assign_builtin_role;
-use crate::authorization::main::change_administrator::change_administrator;
-use crate::authorization::main::list_role_definitions::list_role_definitions;
-use crate::authorization::main::list_role_holdings::list_role_holdings;
+use crate::authorization::main::roles::assign_builtin_role::assign_builtin_role;
+use crate::authorization::main::roles::change_administrator::change_administrator;
+use crate::authorization::main::roles::list_role_definitions::list_role_definitions;
+use crate::authorization::main::roles::list_role_holdings::list_role_holdings;
 use crate::credentials::main::identities::list_people::list_people;
 use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{

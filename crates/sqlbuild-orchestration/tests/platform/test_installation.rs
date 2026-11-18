@@ -1,4 +1,4 @@
-use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::AuditContext;
 use crate::platform::main::installation::read_installation::read_installation;

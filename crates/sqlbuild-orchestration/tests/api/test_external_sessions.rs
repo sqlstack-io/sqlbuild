@@ -11,7 +11,7 @@ use crate::api::models::{
 };
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::ExternalSessionTestCase;
-use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::main::{
     identities::create_principal::create_principal, locations::create_location::create_location,
 };

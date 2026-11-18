@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};

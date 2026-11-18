@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
 use crate::platform::main::work::_read_target_work::read_target_work;
 use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkRecord};

@@ -5,7 +5,7 @@ use axum::{Extension, Json, extract::State};
 
 use crate::api::errors::ApiError;
 use crate::api::models::{ControlBootstrap, LoginMode, ProxyLogoutUrl, ProxyProfile};
-use crate::authorization::main::read_person_access::read_person_access;
+use crate::authorization::main::people::read_person_access::read_person_access;
 use crate::credentials::models::{AuthenticatedPerson, DefaultRole};
 use crate::store::models::ControlStore;
 

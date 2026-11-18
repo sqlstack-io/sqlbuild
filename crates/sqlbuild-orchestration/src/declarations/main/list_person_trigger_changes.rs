@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::row_in_target::row_in_target;
+use crate::authorization::main::decisions::row_in_target::row_in_target;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::_helpers::reads::trigger_changes_in;
 use crate::declarations::models::PersonTriggerChange;

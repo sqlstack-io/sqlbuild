@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::begin_authorized::begin_authorized;
+use crate::authorization::main::decisions::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::snapshots::main::reads::read_current_record::read_current_record;
 use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;

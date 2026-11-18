@@ -17,8 +17,8 @@ use crate::api::_helpers::authentication::password_transport::session_credential
 use crate::api::constants::{STREAM_BUFFERING_HEADER, STREAM_CACHE_CONTROL};
 use crate::api::errors::ApiError;
 use crate::api::models::{ChangeFeed, ChangeNotice, ChangeStream, ChangeSubscriber};
-use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::authorization::main::person_holds_target::person_holds_target;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::person_holds_target::person_holds_target;
 use crate::credentials::main::sessions::authenticate_session::authenticate_session;
 use crate::credentials::main::tokens::authenticate_token::authenticate_token;
 use crate::credentials::models::{

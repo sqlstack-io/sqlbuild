@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::authorization::main::{
-    assign_builtin_role::assign_builtin_role, authorize_person::authorize_person,
-    bootstrap_user::bootstrap_user,
+    decisions::authorize_person::authorize_person, people::bootstrap_user::bootstrap_user,
+    roles::assign_builtin_role::assign_builtin_role,
 };
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,

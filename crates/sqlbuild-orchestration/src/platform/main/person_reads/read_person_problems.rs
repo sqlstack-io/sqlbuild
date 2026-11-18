@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
-use crate::authorization::main::person_holds_target::person_holds_target;
+use crate::authorization::main::decisions::person_holds_target::person_holds_target;
 use crate::credentials::models::{Action, DefaultRole};
 use crate::platform::_helpers::health::problems::{late_ticks, scan_problems};
 use crate::platform::models::PlatformProblems;

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::platform::models::MirroredTotal;
 use crate::store::errors::ControlError;
