@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import hashlib
 import inspect
 import json
@@ -16,9 +17,12 @@ from types import ModuleType
 from typing import Any, cast
 
 from sqlbuild._native import PythonIdentityDependency, PythonNodeIdentity
+from sqlbuild.compiler.python_nodes.models import ReachedWalk
+from sqlbuild.runtime.user_code.classes.source_only_loader import SourceOnlyLoader
 
 _SOURCE_PATHS: weakref.WeakKeyDictionary[object, Path | None] = weakref.WeakKeyDictionary()
 _NORMALIZED_SOURCES: weakref.WeakKeyDictionary[object, str] = weakref.WeakKeyDictionary()
+_REACHED: weakref.WeakKeyDictionary[object, ReachedWalk] = weakref.WeakKeyDictionary()
 
 _IGNORED_PATH_PARTS: frozenset[str] = frozenset(
     {
@@ -117,14 +121,12 @@ def _collect_dependencies(
     allowed_roots: tuple[Path, ...],
 ) -> tuple[PythonIdentityDependency, ...]:
     dependencies: dict[tuple[str, str], PythonIdentityDependency] = {}
-    visited: set[tuple[str, str]] = set()
-    _visit_object(
-        obj=function,
-        allowed_roots=allowed_roots,
-        visited=visited,
-        dependencies=dependencies,
-        include_current=False,
-    )
+    start: tuple[str, str] | None = _object_key(function)
+    if start is None:
+        return ()
+    for target in _first_party_targets(obj=function, allowed_roots=allowed_roots):
+        dependencies.update(_reached(obj=target, allowed_roots=allowed_roots))
+    _ = dependencies.pop(start, None)
     return tuple(
         dependencies[key]
         for key in sorted(
@@ -134,56 +136,83 @@ def _collect_dependencies(
     )
 
 
-def _visit_object(
-    *,
-    obj: object,
-    allowed_roots: tuple[Path, ...],
-    visited: set[tuple[str, str]],
-    dependencies: dict[tuple[str, str], PythonIdentityDependency],
-    include_current: bool,
-) -> None:
+def _object_key(obj: object) -> tuple[str, str] | None:
+    """The object's identity in a walk: its resolved source file and qualified name."""
+
     source_path: Path | None = _source_path(obj)
-    qualname: str = _object_qualname(obj)
     if source_path is None:
-        return
-    key: tuple[str, str] = (str(source_path.resolve()), qualname)
-    if key in visited:
-        return
-    visited_objects: set[tuple[str, str]] = visited
-    visited_objects.add(key)
+        return None
+    return (str(source_path.resolve()), _object_qualname(obj))
 
-    if include_current:
-        dependency: PythonIdentityDependency | None = _dependency_for_object(
-            obj=obj,
-            source_path=source_path,
-            allowed_roots=allowed_roots,
-        )
-        if dependency is not None:
-            collected_dependencies: dict[tuple[str, str], PythonIdentityDependency] = dependencies
-            collected_dependencies[key] = dependency
 
-    source: str = _normalized_source(obj)
+def _first_party_targets(*, obj: object, allowed_roots: tuple[Path, ...]) -> tuple[object, ...]:
+    """The first-party objects `obj` calls by name through its module's globals."""
+
     module: ModuleType | None = inspect.getmodule(obj)
     if module is None:
-        return
+        return ()
     globals_map: dict[str, object] = vars(module)
-    for ref in _called_references(source):
+    targets: list[object] = []
+    for ref in _called_references(_normalized_source(obj)):
         target: object | None = _resolve_reference(ref=ref, globals_map=globals_map)
         if target is None or target is obj:
             continue
         target_path: Path | None = _source_path(target)
-        if target_path is None or not _is_first_party_source(
-            source_path=target_path,
-            allowed_roots=allowed_roots,
+        if target_path is not None and _is_first_party_source(
+            source_path=target_path, allowed_roots=allowed_roots
         ):
-            continue
-        _visit_object(
-            obj=target,
-            allowed_roots=allowed_roots,
-            visited=visited,
-            dependencies=dependencies,
-            include_current=True,
+            targets.append(target)
+    return tuple(targets)
+
+
+def _reached(
+    *, obj: object, allowed_roots: tuple[Path, ...]
+) -> dict[tuple[str, str], PythonIdentityDependency]:
+    """`obj` and each first-party object it reaches, kept until a project module executes again."""
+
+    executions: int = SourceOnlyLoader.executions
+    try:
+        cached: ReachedWalk | None = _REACHED.get(obj)
+    except TypeError:
+        cached = None
+    if (
+        cached is not None
+        and cached.executions == executions
+        and cached.allowed_roots == allowed_roots
+    ):
+        return cached.dependencies
+    dependencies: dict[tuple[str, str], PythonIdentityDependency] = _walk(
+        obj=obj, allowed_roots=allowed_roots
+    )
+    with contextlib.suppress(TypeError):
+        _REACHED[obj] = ReachedWalk(
+            executions=executions, allowed_roots=allowed_roots, dependencies=dependencies
         )
+    return dependencies
+
+
+def _walk(
+    *, obj: object, allowed_roots: tuple[Path, ...]
+) -> dict[tuple[str, str], PythonIdentityDependency]:
+    """`obj` and every first-party object it calls by name, directly or through others."""
+
+    dependencies: dict[tuple[str, str], PythonIdentityDependency] = {}
+    visited: set[tuple[str, str]] = set()
+    pending: list[object] = [obj]
+    while pending:
+        current: object = pending.pop()
+        key: tuple[str, str] | None = _object_key(current)
+        source_path: Path | None = _source_path(current)
+        if key is None or source_path is None or key in visited:
+            continue
+        visited.add(key)
+        dependency: PythonIdentityDependency | None = _dependency_for_object(
+            obj=current, source_path=source_path, allowed_roots=allowed_roots
+        )
+        if dependency is not None:
+            dependencies[key] = dependency
+        pending.extend(reversed(_first_party_targets(obj=current, allowed_roots=allowed_roots)))
+    return dependencies
 
 
 def _dependency_for_object(

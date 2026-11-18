@@ -111,3 +111,13 @@ class SqlOnlySelectorParityTestCase:
     description: str
     selector: str
     expected_sql_names: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PythonIdentityReloadTestCase:
+    """A helper module reloaded in place under an unchanged caller, and whether identity moves."""
+
+    description: str
+    inner_before: str
+    inner_after: str
+    expected_version_hash_changed: bool

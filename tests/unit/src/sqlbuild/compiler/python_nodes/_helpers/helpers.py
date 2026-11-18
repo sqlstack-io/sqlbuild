@@ -44,6 +44,7 @@ from sqlbuild.providers import Provider
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import PythonCheckSeverity
 from sqlbuild.refs import model, source
+from sqlbuild.runtime.user_code.main.user_code_spec import user_code_spec
 from sqlbuild.tasks import task
 from tests.unit.src.sqlbuild.compiler.graph.helpers import project_graph_from_indexes
 
@@ -564,3 +565,12 @@ def resolve_run_selection(
     return PythonSqlRunSelection(
         sql_keys=compiled_graph_keys(sql_keys), python_node_names=frozenset(python_node_names)
     )
+
+
+def reexecute_project_module(*, project_dir: Path, module_name: str) -> None:
+    """Execute an imported project module again in place, as a long-lived process reloads it."""
+
+    spec: ModuleSpec | None = user_code_spec(
+        name=module_name, file_path=project_dir / f"{module_name}.py", root=project_dir
+    )
+    cast(Any, cast(ModuleSpec, spec).loader).exec_module(sys.modules[module_name])
