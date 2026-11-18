@@ -320,6 +320,9 @@ pub struct TrustedProxyAuthentication {
         default = "crate::api::_helpers::authentication::proxy_settings::default_trusted_peers"
     )]
     pub trusted_peers: std::collections::BTreeSet<std::net::IpAddr>,
+    /// Host names a Host-preserving proxy sends, beyond loopback names and the origin's host.
+    #[serde(default)]
+    pub allowed_hosts: Vec<String>,
     /// Usernames pre-bound to existing principals; a binding wins over provisioning.
     #[serde(default)]
     pub identities: std::collections::BTreeMap<String, uuid::Uuid>,
@@ -362,12 +365,6 @@ pub(crate) struct ProxyProfile {
 /// The proxy's sign-out URL, shown to people signed in through it.
 #[derive(Clone, Debug)]
 pub(crate) struct ProxyLogoutUrl(pub(crate) String);
-
-/// Peers whose requests a trusted proxy authenticated, under whatever host name it serves.
-#[derive(Clone, Debug)]
-pub(crate) struct ProxyPeers(
-    pub(crate) std::sync::Arc<std::collections::BTreeSet<std::net::IpAddr>>,
-);
 
 /// Exact issuer/subject bindings authenticate existing people; beta group mappings grant roles.
 #[derive(Clone, Debug, Serialize, Deserialize)]

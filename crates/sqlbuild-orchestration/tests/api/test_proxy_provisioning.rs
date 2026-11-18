@@ -1,19 +1,14 @@
 //! A proxy that rewrites `Host` over plain HTTP signs people in, provisioning newcomers as viewers.
 
 use axum::body::Body;
-use axum::extract::ConnectInfo;
 use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
-use tower::ServiceExt;
 
-use crate::api::_helpers::authentication::configure::configure;
-use crate::api::models::{
-    ApiAuthentication, HumanLogin, TrustedProxyAuthentication, UnknownProxyUsers,
-};
+use crate::api::models::{HumanLogin, TrustedProxyAuthentication, UnknownProxyUsers};
 use crate::api::tests::helpers::stop_api;
 use crate::api::tests::proxy_provisioning_helpers::{
-    LOGOUT_URL, NAME_HEADER, ORIGIN, PUBLIC_HOST, USER_HEADER, default_proxy_login, forwarded,
-    rows, settings, start,
+    LOGOUT_URL, NAME_HEADER, ORIGIN, PUBLIC_HOST, USER_HEADER, forwarded, proxy_login, rows,
+    send_from_peer, settings, start,
 };
 use crate::api::tests::test_types::{
     ProxyPeerTrustTestCase, ProxyPeersDefaultTestCase, ProxyProvisioningTestCase,
@@ -301,7 +296,7 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
     let test_cases = [
         ProxyPeerTrustTestCase {
             description: "IPv4 loopback peer, the default proxy on the same host",
-            login: default_proxy_login(),
+            login: proxy_login(&[]),
             peer: "127.0.0.1",
             forwarding_headers: &[],
             username: "orders-ipv4-loopback",
@@ -310,7 +305,7 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
         },
         ProxyPeerTrustTestCase {
             description: "IPv6 loopback peer, the default proxy on the same host",
-            login: default_proxy_login(),
+            login: proxy_login(&[]),
             peer: "::1",
             forwarding_headers: &[],
             username: "orders-ipv6-loopback",
@@ -319,7 +314,7 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
         },
         ProxyPeerTrustTestCase {
             description: "IPv4-mapped loopback peer from a dual-stack listener",
-            login: default_proxy_login(),
+            login: proxy_login(&[]),
             peer: "::ffff:127.0.0.1",
             forwarding_headers: &[],
             username: "orders-mapped-loopback",
@@ -328,7 +323,7 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
         },
         ProxyPeerTrustTestCase {
             description: "IPv4 non-loopback peer not in trusted_peers",
-            login: default_proxy_login(),
+            login: proxy_login(&[]),
             peer: "192.0.2.24",
             forwarding_headers: &[],
             username: "orders-ipv4-remote",
@@ -337,7 +332,7 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
         },
         ProxyPeerTrustTestCase {
             description: "IPv6 non-loopback peer not in trusted_peers",
-            login: default_proxy_login(),
+            login: proxy_login(&[]),
             peer: "2001:db8::24",
             forwarding_headers: &[],
             username: "orders-ipv6-remote",
@@ -346,7 +341,7 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
         },
         ProxyPeerTrustTestCase {
             description: "IPv4-mapped non-loopback peer from a dual-stack listener",
-            login: default_proxy_login(),
+            login: proxy_login(&[]),
             peer: "::ffff:192.0.2.24",
             forwarding_headers: &[],
             username: "orders-mapped-remote",
@@ -355,7 +350,7 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
         },
         ProxyPeerTrustTestCase {
             description: "IPv4 non-loopback peer claiming a loopback client in forwarding headers",
-            login: default_proxy_login(),
+            login: proxy_login(&[]),
             peer: "192.0.2.24",
             forwarding_headers: &[
                 ("x-forwarded-for", "127.0.0.1"),
@@ -368,7 +363,7 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
         },
         ProxyPeerTrustTestCase {
             description: "IPv6 non-loopback peer claiming a loopback client in forwarding headers",
-            login: default_proxy_login(),
+            login: proxy_login(&[]),
             peer: "2001:db8::24",
             forwarding_headers: &[
                 ("x-forwarded-for", "::1"),
@@ -405,18 +400,6 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
         let store = &fixture.store;
         migrate_store(store).await.expect("migrate");
         for test_case in test_cases {
-            let (_, routes, _) = configure(
-                store,
-                ApiAuthentication {
-                    login: test_case.login,
-                    ..ApiAuthentication::default()
-                },
-                "127.0.0.1:8080".parse().expect("listener"),
-            )
-            .await
-            .expect("sign-in routes");
-            let peer = std::net::SocketAddr::new(test_case.peer.parse().expect("peer IP"), 40_000);
-            let application = routes.with_state(store.clone());
             let request = axum::http::Request::get("/api/control/bootstrap")
                 .header(header::HOST, PUBLIC_HOST)
                 .header("x-forwarded-host", PUBLIC_HOST)
@@ -427,10 +410,9 @@ fn given_the_default_proxy_peers_when_an_identity_header_arrives_then_only_a_loo
                 .fold(request, |request, (name, value)| {
                     request.header(*name, *value)
                 });
-            let mut request = request.body(Body::empty()).expect("request");
-            request.extensions_mut().insert(ConnectInfo(peer));
+            let request = request.body(Body::empty()).expect("request");
 
-            let response = application.oneshot(request).await.expect("response");
+            let response = send_from_peer(store, test_case.login, (test_case.peer, request)).await;
 
             assert_eq!(
                 response.status(),

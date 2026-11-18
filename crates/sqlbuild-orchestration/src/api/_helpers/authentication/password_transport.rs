@@ -9,20 +9,20 @@ use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
+use crate::api::_helpers::authentication::proxy_settings::ProxySettings;
 use crate::api::constants::{
     EVENT_STREAM_MEDIA_TYPE, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER,
     STREAM_BUFFERING_HEADER, STREAM_CACHE_CONTROL,
 };
 use crate::api::errors::ApiError;
-use crate::api::models::{
-    AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse, ProxyPeers,
-};
+use crate::api::models::{AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse};
 use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
 use crate::credentials::main::sessions::authenticate_session::authenticate_session;
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, IssuedSession, SessionAccess};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
+/// Refuses a trusted peer under another site's `Host`, as a DNS-rebinding page sends, then checks writes.
 pub(crate) async fn guard(
     Extension(origin): Extension<BrowserOrigin>,
     mut request: Request,
@@ -43,11 +43,25 @@ pub(crate) async fn guard(
         request_id: Uuid::now_v7(),
         ip_address: Some(peer.ip().to_canonical()),
     };
-    let from_proxy: bool = request
+    let proxy: Option<std::sync::Arc<ProxySettings>> = request
         .extensions()
-        .get::<ProxyPeers>()
-        .is_some_and(|ProxyPeers(peers)| peers.contains(&peer.ip().to_canonical()));
-    let allowed: bool = if from_proxy {
+        .get::<std::sync::Arc<ProxySettings>>()
+        .filter(|settings| settings.trusted_peers.contains(&peer.ip().to_canonical()))
+        .cloned();
+    if let Some(settings) = &proxy {
+        let host = single_header(request.headers(), header::HOST.as_str());
+        if !settings.host_allowed(host) {
+            settings.note_refused_host(host, peer.ip().to_canonical());
+            return Err(ApiError {
+                status: StatusCode::FORBIDDEN,
+                message: "the Host header does not name this server; add the proxy's host name to \
+                          [trusted_proxy] allowed_hosts"
+                    .into(),
+                decision_id: None,
+            });
+        }
+    }
+    let allowed: bool = if proxy.is_some() {
         proxy_request_allowed(&request, &origin)
     } else {
         browser_request_allowed(&request, &origin)
@@ -73,7 +87,7 @@ fn browser_request_allowed(request: &Request, origin: &BrowserOrigin) -> bool {
         && origin_allows(request, origin)
 }
 
-/// A proxied request under any host name; a write needs the origin or the CSRF header, which needs CORS.
+/// A proxied request for an allowed host; a write needs the origin or the CSRF header, which needs CORS.
 fn proxy_request_allowed(request: &Request, origin: &BrowserOrigin) -> bool {
     origin_allows(request, origin)
         || single_header(request.headers(), PASSWORD_CSRF_HEADER)

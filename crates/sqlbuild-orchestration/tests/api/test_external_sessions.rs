@@ -63,6 +63,7 @@ fn given_proxy_people_when_administrators_and_roles_change_then_live_authority_h
                 .expect("second person");
             let origin = inputs["origin"].as_str().expect("origin");
             let settings = TrustedProxyAuthentication {
+                allowed_hosts: Vec::new(),
                 origin: origin.into(),
                 trusted_peers: BTreeSet::from(["127.0.0.1".parse().expect("peer")]),
                 identities: BTreeMap::from([

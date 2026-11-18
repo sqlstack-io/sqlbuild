@@ -2,9 +2,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use axum::extract::ConnectInfo;
 use reqwest::{Client, RequestBuilder};
 use serde_json::{Value, json};
+use tower::ServiceExt;
 
+use crate::api::_helpers::authentication::configure::configure;
 use crate::api::models::{
     ApiAuthentication, HumanLogin, TrustedProxyAuthentication, UnknownProxyUsers,
 };
@@ -25,6 +28,7 @@ pub(crate) fn settings(
 ) -> TrustedProxyAuthentication {
     TrustedProxyAuthentication {
         origin: ORIGIN.into(),
+        allowed_hosts: Vec::new(),
         trusted_peers: BTreeSet::from([trusted_peer.parse().expect("peer IP")]),
         identities: BTreeMap::new(),
         username_header: "X-Example-User".into(),
@@ -35,12 +39,41 @@ pub(crate) fn settings(
     }
 }
 
-/// `[trusted_proxy]` with only its required origin, so `trusted_peers` takes its loopback default.
-pub(crate) fn default_proxy_login() -> HumanLogin {
+/// `[trusted_proxy]` with its origin and `allowed_hosts`, so `trusted_peers` takes its loopback default.
+pub(crate) fn proxy_login(allowed_hosts: &[&str]) -> HumanLogin {
     HumanLogin::TrustedProxy(
-        serde_json::from_value(json!({"origin": ORIGIN, "username_header": USER_HEADER}))
-            .expect("proxy settings with the default peers"),
+        serde_json::from_value(json!({
+            "origin": ORIGIN,
+            "username_header": USER_HEADER,
+            "allowed_hosts": allowed_hosts,
+        }))
+        .expect("proxy settings with the default peers"),
     )
+}
+
+/// Sends `request` through the sign-in routes `login` configures, as if it arrived from `peer`.
+pub(crate) async fn send_from_peer(
+    store: &ControlStore,
+    login: HumanLogin,
+    (peer, mut request): (&str, axum::http::Request<axum::body::Body>),
+) -> axum::response::Response {
+    let (_, routes, _) = configure(
+        store,
+        ApiAuthentication {
+            login,
+            ..ApiAuthentication::default()
+        },
+        "127.0.0.1:8080".parse().expect("listener"),
+    )
+    .await
+    .expect("sign-in routes");
+    let peer = std::net::SocketAddr::new(peer.parse().expect("peer IP"), 40_000);
+    request.extensions_mut().insert(ConnectInfo(peer));
+    routes
+        .with_state(store.clone())
+        .oneshot(request)
+        .await
+        .expect("response")
 }
 
 pub(crate) async fn start(store: &ControlStore, settings: TrustedProxyAuthentication) -> TestApi {

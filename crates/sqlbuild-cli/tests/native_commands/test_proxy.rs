@@ -96,6 +96,12 @@ fn given_invalid_or_conflicting_server_configuration_when_a_standalone_server_st
             expected_error: "requires explicit trusted peer IP addresses",
         },
         ServerConfigurationTestCase {
+            description: "an allowed host written as a URL",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\nallowed_hosts = [\"https://control-short\"]\n",
+            arguments: &[],
+            expected_error: "[trusted_proxy] allowed_hosts lists host names without a scheme, port or path; 'https://control-short' is not one",
+        },
+        ServerConfigurationTestCase {
             description: "neither an HTTP nor an HTTPS external origin",
             configuration: "[trusted_proxy]\norigin = \"ftp://control.example.com\"\ntrusted_peers = [\"127.0.0.1\"]\n",
             arguments: &[],
@@ -246,23 +252,38 @@ fn given_invalid_or_conflicting_server_configuration_when_a_standalone_server_st
 }
 
 #[test]
-fn given_an_http_proxy_origin_and_an_unconfigured_proxy_address_when_requests_arrive_then_startup_warns_and_each_peer_is_logged_once()
+fn given_a_misconfigured_proxy_when_requests_arrive_then_startup_warns_and_each_refusal_is_logged_once()
  {
-    let test_cases = [ProxyStartupTestCase {
-        description: "the proxy's real address differs from trusted_peers",
-        configuration: "[trusted_proxy]\norigin = \"http://control.example.com\"\ntrusted_peers = [\"192.0.2.1\"]\nusername_header = \"X-Example-User\"\n",
-        username: "orders-confidential-reader",
-        expected_warnings: &[
-            (
-                "warning: the trusted-proxy origin http://control.example.com is plain HTTP",
+    let test_cases = [
+        ProxyStartupTestCase {
+            description: "the proxy's real address differs from trusted_peers",
+            configuration: "[trusted_proxy]\norigin = \"http://control.example.com\"\ntrusted_peers = [\"192.0.2.1\"]\nusername_header = \"X-Example-User\"\n",
+            username: "orders-confidential-reader",
+            host: "127.0.0.1",
+            expected_status: StatusCode::UNAUTHORIZED,
+            expected_warnings: &[
+                (
+                    "warning: the trusted-proxy origin http://control.example.com is plain HTTP",
+                    1,
+                ),
+                (
+                    "warning: ignored the trusted-proxy username header x-example-user from 127.0.0.1, which is not in [trusted_proxy] trusted_peers",
+                    1,
+                ),
+            ],
+        },
+        ProxyStartupTestCase {
+            description: "a trusted peer's Host names neither this server nor allowed_hosts",
+            configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\nusername_header = \"X-Example-User\"\n",
+            username: "orders-rebound-reader",
+            host: "evil.example:8000",
+            expected_status: StatusCode::FORBIDDEN,
+            expected_warnings: &[(
+                "warning: refused a request from trusted proxy peer 127.0.0.1 with Host 'evil.example:8000', which is not a loopback name, the [trusted_proxy] origin's host or in [trusted_proxy] allowed_hosts; if your proxy keeps the browser's host name (ProxyPreserveHost On), add it to allowed_hosts",
                 1,
-            ),
-            (
-                "warning: ignored the trusted-proxy username header x-example-user from 127.0.0.1, which is not in [trusted_proxy] trusted_peers",
-                1,
-            ),
-        ],
-    }];
+            )],
+        },
+    ];
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -297,11 +318,12 @@ fn given_an_http_proxy_origin_and_an_unconfigured_proxy_address_when_requests_ar
             for _ in 0..2 {
                 let response = client
                     .get(format!("{url}/api/control/bootstrap"))
+                    .header(header::HOST, test_case.host)
                     .header("x-forwarded-host", "control.example.com")
                     .header("x-example-user", test_case.username)
                     .send()
                     .await
-                    .expect("untrusted proxy request");
+                    .expect("refused proxy request");
                 statuses.push(response.status());
             }
             let log = std::fs::read_to_string(&control.stderr).expect("server log");
@@ -317,7 +339,7 @@ fn given_an_http_proxy_origin_and_an_unconfigured_proxy_address_when_requests_ar
                     log.contains(test_case.username)
                 ),
                 (
-                    vec![StatusCode::UNAUTHORIZED; 2],
+                    vec![test_case.expected_status; 2],
                     test_case.expected_warnings,
                     false
                 ),

@@ -48,7 +48,7 @@ executable = "/usr/local/bin/sqb"
 | `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`) |
 | `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`; see [Set retention](#set-retention) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
-| `[trusted_proxy]` | `origin`, and optionally `trusted_peers` (`127.0.0.1` and `::1`), `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
+| `[trusted_proxy]` | `origin`, and optionally `trusted_peers` (`127.0.0.1` and `::1`), `allowed_hosts`, `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
 | `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
 | `[[launchers.local]]` | `location`, `target`, `server_url`, `max_workers`, absolute `project_dir` and `executable` paths, and an optional `pool_caps` table |
 
@@ -101,15 +101,17 @@ proxy_logout_url = "https://sign-in.example.com/logout"
 | --- | --- |
 | `origin` | The URL people open, such as `https://control.example.com`. `http://` works too: the server warns at start-up, and `https://` is recommended. |
 | `trusted_peers` | The proxy's IP addresses. Without this key the server trusts `127.0.0.1` and `::1`, for a proxy on the same host that connects to `localhost` over either IPv4 or IPv6, so any process on the server's host can send the header and sign in as anyone. Setting `trusted_peers` narrows this to the addresses you list: a proxy on another host, listed by its own address, keeps local processes out. The server takes the peer from the connection, never from `X-Forwarded-For` or `Forwarded`. |
+| `allowed_hosts` | Further host names the proxy sends in `Host`, needed only when it keeps the browser's host name, such as Apache with `ProxyPreserveHost On`. List every name people reach the server under, without a scheme or port. |
 | `username_header` | The header naming the signed-in person, `X-SQB-User` by default. |
 | `display_name_header`, `email_header` | Optional headers whose values the UI shows. The server doesn't store them. |
 | `unknown_users` | `provision_viewer` (default) gives a person signing in for the first time an account with the `viewer` role; `reject` refuses them. |
 | `proxy_logout_url` | Where the UI's **Sign out** link goes. Only the proxy can end its own sign-in, so without this key the UI shows no sign-out link. |
 | `[trusted_proxy.identities]` | Optional: binds a username to a principal you already created with `sqb admin create-principal`. |
 
-The proxy must authenticate every request, then set every identity header you configured itself.
-A header the proxy leaves alone passes through from the browser, so set the username header and
-set or unset the display name and email headers on every request. With Apache on the same host,
+Turn on the proxy's authentication for every location it forwards to the server, and have the proxy
+set every identity header you configured itself. A header the proxy leaves alone passes through
+from the browser, so set the username header and set or unset the display name and email headers
+on every request. With Apache on the same host,
 forwarding port 80 to the server on port 8000:
 
 ```apache
@@ -138,10 +140,13 @@ ProxyPassReverse "/" "http://127.0.0.1:8000/"
   doesn't remove people already provisioned. Disable a principal to remove their access.
   Removing someone at the proxy doesn't end their `sqb login` sessions: they last until they expire
   or the principal is disabled.
-- **Host names and writes.** The proxy can serve the UI under any host name, such as a short name,
-  the full name or an IP address. A browser write is accepted when it carries the `X-SQB-CSRF`
-  header, which the UI always sends and which a page on another site cannot send, or when its
-  `Origin` header is exactly `origin`. The server allows no cross-origin requests.
+- **Host names.** A request from a trusted peer must carry a `Host` of `127.0.0.1`, `localhost`,
+  `[::1]` or the host of `origin`, with any port, or a name in `allowed_hosts`; the server ignores
+  `X-Forwarded-Host` here. A proxy that sends the backend's address, as Apache does by default,
+  needs no `allowed_hosts`. Any other `Host` gets `403 Forbidden`, and the server logs it once.
+- **Writes.** A browser write is accepted when it carries the `X-SQB-CSRF` header, which the UI
+  always sends and which a page on another site cannot send, or when its `Origin` header is exactly
+  `origin`. The server allows no cross-origin requests.
 - **Finding the proxy's address.** When a request carrying the username header comes from a peer
   that is not in `trusted_peers`, the server ignores the header and logs the peer once, without the
   header's value:

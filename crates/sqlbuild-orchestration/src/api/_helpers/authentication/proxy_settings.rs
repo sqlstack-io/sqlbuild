@@ -4,21 +4,25 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::net::IpAddr;
 use std::sync::Mutex;
 
+use axum::http::uri::Authority;
 use axum::http::{HeaderMap, HeaderName};
 use uuid::Uuid;
 
 use crate::api::_helpers::authentication::proxy_warnings::{
-    warn_taken_username, warn_untrusted_overflow, warn_untrusted_source,
+    warn_refused_host, warn_taken_username, warn_untrusted_overflow, warn_untrusted_source,
 };
 use crate::api::constants::{
-    HTTP_SCHEME, HTTPS_SCHEME, LOOPBACK_PROXY_PEERS, PROXY_NOTED_SOURCES, PROXY_PROFILE_CHARS,
-    PROXY_RESERVED_HEADER_PREFIX, PROXY_RESERVED_HEADERS, PROXY_USER_HEADER, PROXY_USERNAME_CHARS,
+    HTTP_SCHEME, HTTPS_SCHEME, LOOPBACK_PROXY_PEERS, PROXY_LOOPBACK_HOSTS, PROXY_NOTED_SOURCES,
+    PROXY_PROFILE_CHARS, PROXY_RESERVED_HEADER_PREFIX, PROXY_RESERVED_HEADERS, PROXY_USER_HEADER,
+    PROXY_USERNAME_CHARS,
 };
 use crate::api::models::{ProxyProfile, TrustedProxyAuthentication, UnknownProxyUsers};
 use crate::store::errors::ControlError;
 
 pub(crate) struct ProxySettings {
     pub(crate) trusted_peers: BTreeSet<IpAddr>,
+    /// Lowercase host names a trusted peer's `Host` may carry, with any port.
+    allowed_hosts: BTreeSet<String>,
     /// Canonical usernames bound to existing principals.
     pub(crate) identities: BTreeMap<String, Uuid>,
     pub(crate) username_header: HeaderName,
@@ -30,6 +34,8 @@ pub(crate) struct ProxySettings {
     noted_sources: Mutex<BTreeSet<IpAddr>>,
     /// Usernames already logged for naming another principal.
     noted_usernames: Mutex<BTreeSet<String>>,
+    /// Refused `Host` values already logged.
+    noted_hosts: Mutex<BTreeSet<String>>,
 }
 
 /// Whether an item is logged now: the first time, or the one time the log fills up.
@@ -96,6 +102,26 @@ impl ProxySettings {
                     .into(),
             ));
         }
+        let origin = reqwest::Url::parse(&settings.origin).map_err(|_| {
+            ControlError::Invalid(
+                "trusted-proxy authentication requires an HTTP or HTTPS origin".into(),
+            )
+        })?;
+        let origin_host = origin.host_str().map(str::to_ascii_lowercase);
+        let mut allowed_hosts: BTreeSet<String> = PROXY_LOOPBACK_HOSTS
+            .iter()
+            .map(|host| (*host).to_owned())
+            .chain(origin_host)
+            .collect();
+        for host in &settings.allowed_hosts {
+            allowed_hosts.insert(host_name(host).ok_or_else(|| {
+                ControlError::Invalid(format!(
+                    "[trusted_proxy] allowed_hosts lists host names without a scheme, port or \
+                     path; '{}' is not one",
+                    host.escape_default()
+                ))
+            })?);
+        }
         let mut identities: BTreeMap<String, Uuid> = BTreeMap::new();
         for (subject, principal) in settings.identities {
             let username = canonical_username(&subject).ok_or_else(|| {
@@ -119,6 +145,7 @@ impl ProxySettings {
                 .into_iter()
                 .map(|peer| peer.to_canonical())
                 .collect(),
+            allowed_hosts,
             identities,
             username_header,
             display_name_header,
@@ -134,6 +161,7 @@ impl ProxySettings {
                 .transpose()?,
             noted_sources: Mutex::new(BTreeSet::new()),
             noted_usernames: Mutex::new(BTreeSet::new()),
+            noted_hosts: Mutex::new(BTreeSet::new()),
         })
     }
 
@@ -143,6 +171,26 @@ impl ProxySettings {
             Note::First => warn_untrusted_source(self.username_header.as_str(), peer),
             Note::Overflow => warn_untrusted_overflow(),
             Note::Quiet => {}
+        }
+    }
+
+    /// Whether a trusted peer's real `Host` is a loopback name, the origin's host or an allowed host.
+    pub(crate) fn host_allowed(&self, host: Option<&str>) -> bool {
+        host.map(str::parse::<Authority>).is_some_and(|parsed| {
+            parsed.is_ok_and(|authority| {
+                !authority.as_str().contains('@')
+                    && self
+                        .allowed_hosts
+                        .contains(&authority.host().to_ascii_lowercase())
+            })
+        })
+    }
+
+    /// Logs each refused `Host` value once, with the setting that allows it.
+    pub(crate) fn note_refused_host(&self, host: Option<&str>, peer: IpAddr) {
+        let key = host.unwrap_or_default().to_owned();
+        if let Note::First = note(&self.noted_hosts, key) {
+            warn_refused_host(host, peer);
         }
     }
 
@@ -195,6 +243,16 @@ fn profile_value(headers: &HeaderMap, name: &HeaderName) -> Option<String> {
         && text.chars().count() <= PROXY_PROFILE_CHARS
         && !text.chars().any(char::is_control);
     usable.then(|| text.to_owned())
+}
+
+/// A configured host name, lowercased, when it carries no scheme, port, user or path.
+fn host_name(value: &str) -> Option<String> {
+    match value.trim().parse::<Authority>() {
+        Ok(authority) if authority.port().is_none() && !authority.as_str().contains('@') => {
+            Some(authority.host().to_ascii_lowercase())
+        }
+        Ok(_) | Err(_) => None,
+    }
 }
 
 fn header_name(value: &str, key: &str) -> Result<HeaderName, ControlError> {

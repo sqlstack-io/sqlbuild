@@ -92,6 +92,8 @@ mod test_person_sessions;
 mod test_providers;
 #[path = "test_proxy.rs"]
 mod test_proxy;
+#[path = "test_proxy_hosts.rs"]
+mod test_proxy_hosts;
 #[path = "test_proxy_provisioning.rs"]
 mod test_proxy_provisioning;
 #[path = "test_publish_encoding.rs"]
