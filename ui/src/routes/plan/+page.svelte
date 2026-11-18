@@ -187,18 +187,51 @@
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const picked = $derived(shown?.selection ?? []);
 	let view = $state<'plan' | 'graph' | 'checks'>('plan');
-	/**
-	 * The recorded checks on the models and seeds the command selects, which run after them. The
-	 * selection is the one the command resolves to, as the plan request froze it; the plan's summary
-	 * carries no list of the nodes it builds.
-	 */
-	const planChecks = $derived.by(() => {
+	/** The most rows one read brings, as the server pages them. */
+	const ROWS_READ = 1000;
+	/** Under `--changed`, the nodes it skips: held back or unchanged, read from a server plan's pages when the Checks tab opens. */
+	let skippedKeys = $state<{ requestId: string; keys: string[] | null; failed?: boolean } | null>(null);
+	$effect(() => {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		const sections = plan?.changed ? plan.sections : undefined;
+		if (view !== 'checks' || !scope || !requestId || !sections || skippedKeys?.requestId === requestId) return;
+		skippedKeys = { requestId, keys: null };
+		(async () => {
+			const keys: string[] = [];
+			for (const s of sections.filter((c) => (c.section === 'held_back' || c.section === 'unchanged') && c.total)) {
+				for (let offset = 0; offset < s.total; offset += ROWS_READ) {
+					const page = await app.client.planRows(scope, requestId, s.section, offset, ROWS_READ);
+					keys.push(...(page.rows as (string | { node: string })[]).map((r) => (typeof r === 'string' ? r : r.node)));
+				}
+			}
+			if (planRequestId === requestId) skippedKeys = { requestId, keys };
+		})().catch(() => {
+			// Not retried: a plan whose rows can't be read has usually expired.
+			if (planRequestId === requestId) skippedKeys = { requestId, keys: null, failed: true };
+		});
+	});
+	/** Node keys `--changed` skips; a whole plan lists them, a server plan's are read above (null until then). */
+	const planSkipped = $derived.by(() => {
+		if (!plan?.changed) return [];
+		if (!plan.sections) return [...plan.changed.held_back.map((h) => h.node), ...plan.changed.unchanged];
+		return skippedKeys?.requestId === planRequestId ? skippedKeys.keys : null;
+	});
+	const keyName = (key: string) => key.slice(key.indexOf(':') + 1);
+	/** The recorded checks on the models and seeds the command selects, as the plan request froze the selection. */
+	const selectedChecks = $derived.by(() => {
 		if (!plan) return [];
-		const selected = new Set(picked);
+		const selected = new Set(picked.map(keyName));
 		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && selected.has(c.node));
 	});
+	/** Of those, the checks on nodes the build runs, which run after them: all but those `--changed` skips (null until read). */
+	const planChecks = $derived.by(() => {
+		if (!planSkipped) return null;
+		const skipped = new Set(planSkipped.map(keyName));
+		return selectedChecks.filter((c) => !skipped.has(c.node ?? ''));
+	});
 	/** The tab shown: a replan with no checks leaves the Checks tab for the plan. */
-	const tab = $derived(view === 'checks' && !(shown?.verb === 'build' && planChecks.length) ? 'plan' : view);
+	const tab = $derived(view === 'checks' && !(shown?.verb === 'build' && selectedChecks.length && planChecks?.length !== 0) ? 'plan' : view);
 	/** A large selection draws only what the plan changes; the whole of it would be unreadable. */
 	const GRAPH_LIMIT = 150;
 	/** Sections of models the plan changes, read a page each for the graph of a large selection. */
@@ -419,7 +452,7 @@
 					{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code" title="Option">{value === true ? name : `${name}=${value}`}</span>{/each}
 					{#if shown.verb === 'build' && plan?.ignore_audit_failures}<span class="audits-note" data-testid="plan-ignores-audit-failures" title="An error-severity audit that fails is recorded, and the build goes on">Audit failures won't stop this build</span>{/if}
 					<div class="tabs">
-						<SegmentedFilter label="View" value={tab} options={[{ value: 'plan' as const, label: shown.verb === 'build' ? 'Plan' : 'Nodes' }, { value: 'graph' as const, label: 'Graph' }, ...(shown.verb === 'build' && planChecks.length ? [{ value: 'checks' as const, label: 'Checks', count: planChecks.length }] : [])]} onselect={(v) => (view = v)} />
+						<SegmentedFilter label="View" value={tab} options={[{ value: 'plan' as const, label: shown.verb === 'build' ? 'Plan' : 'Nodes' }, { value: 'graph' as const, label: 'Graph' }, ...(shown.verb === 'build' && selectedChecks.length && planChecks?.length !== 0 ? [{ value: 'checks' as const, label: 'Checks', ...(planChecks ? { count: planChecks.length } : {}) }] : [])]} onselect={(v) => (view = v)} />
 					</div>
 					{#if shown.verb === 'build' && plan}
 						{#if plan.timings}<span class="ml-auto"><PlanTimings {plan} timings={plan.timings} /></span>{/if}
@@ -435,8 +468,8 @@
 					<div class="graph"><ScopeGraph keys={graphKeys} catalog={catalog.data} onselect={() => {}} /></div>
 				{/if}
 			{:else if tab === 'checks' && shown?.verb === 'build' && plan}
-				<p class="faint graph-note">{plural(planChecks.length, 'check')} <HelpTip text="Checks run after the models they check, and a failing error check stops what depends on it." /></p>
-				<DataTable class="static compact" embedded columns={checkColumns} rows={planChecks} key={(c) => c.id} empty="No checks in this plan.">
+				<p class="faint graph-note">{planChecks ? plural(planChecks.length, 'check') : skippedKeys?.failed ? "Couldn't read the nodes --changed skips; plan again." : 'Reading the nodes --changed skips…'} <HelpTip text="Checks run after the models they check, and a failing error check stops what depends on it." /></p>
+				<DataTable class="static compact" embedded columns={checkColumns} rows={planChecks ?? []} key={(c) => c.id} empty="No checks in this plan.">
 					{#snippet row(c)}
 						<tr>
 							<td><a href={to(`/checks/${encodeURIComponent(c.id)}`)} class="mono">{c.name}</a></td>

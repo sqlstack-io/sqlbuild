@@ -9,9 +9,11 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
-use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT};
+use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT, SUPERSEDED_CHILD};
+use crate::runs::main::listings::run_invocations::run_invocations;
 use crate::runs::models::{
-    RunErrorText, RunEventRecord, RunOutput, RunOutputLine, RunStatementRecord, RunStatementSql,
+    RunErrorText, RunEventRecord, RunIgnoredAuditFailure, RunOutput, RunOutputLine,
+    RunStatementRecord, RunStatementSql,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -69,6 +71,26 @@ pub(crate) async fn begin_run_recall(
     )
     .await?;
     Ok(Some((transaction, scope, Some((context, permission)))))
+}
+
+/// A run read under listing view, in the transaction that found the run.
+pub(crate) async fn run_read<T>(
+    store: &ControlStore,
+    credentials: (&AuditContext, Uuid),
+    (run, default_role): ((Uuid, &str, Uuid), DefaultRole),
+    read: impl AsyncFnOnce(
+        ControlTransaction,
+        &RunRecallScope,
+    ) -> Result<(ControlTransaction, T), ControlError>,
+) -> Result<Option<T>, ControlError> {
+    let Some((transaction, scope, _)) =
+        begin_run_recall(store, credentials, run, (default_role, None)).await?
+    else {
+        return Ok(None);
+    };
+    let (transaction, result) = read(transaction, &scope).await?;
+    commit(transaction).await?;
+    Ok(Some(result))
 }
 
 /// A sensitive run read, authorized for `action` and audited as `audit_action` in the same transaction.
@@ -129,20 +151,7 @@ async fn run_recall_scope(
         other => serde_json::from_value(other.clone()),
     }
     .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let scheduler = format!("scheduler/{run_id}");
-    let (transaction, claims) = query(
-        transaction,
-        "SELECT payload FROM recall_events WHERE invocation_id=$1 AND event_type='run_claimed' ORDER BY invocation_sequence DESC LIMIT 1",
-        vec![Parameter::Text(scheduler.clone())],
-    )
-    .await?;
-    let mut namespaces = vec![scheduler];
-    if let Some(claim_id) = claims
-        .first()
-        .and_then(|row| row["payload"]["claim"]["claim_id"].as_str())
-    {
-        namespaces.push(format!("worker/{claim_id}"));
-    }
+    let (transaction, namespaces) = run_invocations(transaction, run_id).await?;
     Ok((
         transaction,
         Some(RunRecallScope {
@@ -150,6 +159,54 @@ async fn run_recall_scope(
             selection,
         }),
     ))
+}
+
+/// The audit failures the run and its current group members let through, run by run in occurrence order.
+pub(crate) async fn ignored_audits_in(
+    transaction: ControlTransaction,
+    run_id: Uuid,
+) -> Result<(ControlTransaction, Vec<RunIgnoredAuditFailure>), ControlError> {
+    let (mut transaction, runs) = query(
+        transaction,
+        &format!(
+            "SELECT r.run_id, r.job_key FROM sqb_runs r \
+         WHERE r.run_id=$1 OR (r.parent_run_id=$1 AND NOT {SUPERSEDED_CHILD}) ORDER BY r.run_id"
+        ),
+        vec![Parameter::Id(run_id)],
+    )
+    .await?;
+    let mut failures: Vec<RunIgnoredAuditFailure> = Vec::new();
+    for run in runs {
+        let member = Uuid::parse_str(run["run_id"].as_str().unwrap_or_default())
+            .map_err(|error| ControlError::Schema(format!("stored run ID: {error}")))?;
+        let namespaces;
+        (transaction, namespaces) = run_invocations(transaction, member).await?;
+        let scope = RunRecallScope {
+            namespaces,
+            selection: BTreeSet::new(),
+        };
+        let (filter, parameters) = invocation_filter(&scope, 1);
+        let rows;
+        (transaction, rows) = query(
+            transaction,
+            &format!(
+                "SELECT a.occurred_at, e.payload ->> 'binding_key' AS binding_key, a.audit_name, \
+                 a.attached_target_kind, a.attached_target_name, a.\"column\" AS attached_column_name, \
+                 a.severity, a.violation_count \
+                 FROM (SELECT * FROM audit_results WHERE {filter} AND ignored=1) a \
+                 JOIN recall_events e ON e.invocation_id=a.invocation_id AND e.event_id=a.event_id \
+                 ORDER BY a.occurred_at, a.event_id"
+            ),
+            parameters,
+        )
+        .await?;
+        for mut row in rows {
+            row.insert("run_id".into(), run["run_id"].clone());
+            row.insert("job_key".into(), run["job_key"].clone());
+            failures.push(decode_row(row)?);
+        }
+    }
+    Ok((transaction, failures))
 }
 
 pub(crate) async fn run_events_in(

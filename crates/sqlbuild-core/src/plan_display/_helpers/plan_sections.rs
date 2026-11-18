@@ -4,12 +4,15 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::{Map, Value, json};
 
+use crate::plan_display::_helpers::diff_lines::config_change;
 use crate::plan_display::_helpers::plan_pages::{
-    Note, PlanRows, SECTIONS, model_rows, node_key, row_diff_stats, row_name, text, warnings_about,
+    Note, PlanRows, SECTIONS, lines, model_rows, node_key, row_diff_stats, row_name, text,
+    warnings_about,
 };
+use crate::plan_display::_helpers::warning_groups::{group_json, warning_groups};
 use crate::plan_display::constants::{
-    CHANGED_ROW_LISTS, DIFF_STATS_FIELD, MAX_SECTION_NOTES, METADATA_FIELD, MODEL_DIFF_FIELDS,
-    PLAN_ROW_LISTS,
+    CHANGED_ROW_LISTS, CONFIG_CHANGE_FIELD, DIFF_STATS_FIELD, MAX_SECTION_NOTES,
+    MAX_WARNING_GROUPS, METADATA_FIELD, MODEL_DIFF_FIELDS, PLAN_ROW_LISTS, WARNING_GROUPS_FIELD,
 };
 use crate::plan_display::models::PlanPageSection;
 
@@ -70,6 +73,20 @@ pub(crate) fn emptied(fields: &Map<String, Value>) -> Map<String, Value> {
     summary
 }
 
+/// The summary's largest warning groups, at most `MAX_WARNING_GROUPS`; the warnings section pages the rest after them.
+pub(crate) fn with_warning_groups(
+    plan: &PlanRows<'_>,
+    mut summary: Map<String, Value>,
+) -> Map<String, Value> {
+    let groups: Vec<Value> = warning_groups(&plan.rows(PlanPageSection::Warnings))
+        .iter()
+        .take(MAX_WARNING_GROUPS)
+        .map(group_json)
+        .collect();
+    summary.insert(WARNING_GROUPS_FIELD.to_owned(), Value::Array(groups));
+    summary
+}
+
 /// The rows whose name contains `name`, ignoring case; every row without a name.
 pub(crate) fn matching<'document>(
     section: PlanPageSection,
@@ -103,7 +120,9 @@ pub(crate) fn page_extras(
     page: &[&Value],
 ) -> PageExtras {
     let kind = match section {
-        PlanPageSection::Seeds => "seed",
+        PlanPageSection::FirstRunSeeds
+        | PlanPageSection::ChangedSeeds
+        | PlanPageSection::UnchangedSeeds => "seed",
         section if model_rows(section) => "model",
         _ => return PageExtras::default(),
     };
@@ -125,7 +144,7 @@ pub(crate) fn page_extras(
         }
         names.insert(name.to_owned());
     }
-    if section != PlanPageSection::Seeds {
+    if model_rows(section) {
         extras.warnings = warnings_about(plan.document, &names)
             .into_iter()
             .cloned()
@@ -146,6 +165,9 @@ pub(crate) fn shown_row(section: PlanPageSection, row: &Value) -> Value {
         .map(|(field, value)| (field.clone(), value.clone()))
         .collect();
     shown.remove(DIFF_STATS_FIELD);
+    if let Some(change) = lines(row, "config_diff").and_then(|diff| config_change(&diff)) {
+        shown.insert(CONFIG_CHANGE_FIELD.to_owned(), Value::String(change));
+    }
     if !stats.is_empty() {
         shown.insert(DIFF_STATS_FIELD.to_owned(), Value::Object(stats));
     }

@@ -289,6 +289,12 @@ export class MockOperate {
 		return this.#ctx.reply(rec ? this.#view(rec, scope) : null);
 	}
 
+	/** The run and its group's member runs, for the build mock's ignored audit failures. */
+	runAndMembers(runId: string): { id: string; jobKey: string | null }[] {
+		const rec = this.#byId(runId);
+		return rec ? [rec, ...this.#children(rec)].map((r) => ({ id: r.run.id, jobKey: r.run.jobKey })) : [];
+	}
+
 	getRunDetail(scope: Scope, runId: string): Promise<RunDetail | null> {
 		const rec = this.#byId(runId);
 		if (!rec) return this.#ctx.reply(null);

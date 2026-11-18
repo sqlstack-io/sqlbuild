@@ -8,8 +8,8 @@ use crate::plan_display::main::plan_summary::plan_summary;
 use crate::plan_display::models::{DiffStats, PlanPageSection};
 use crate::plan_display::tests::helpers::{first_build, full_plan, labels, owned};
 use crate::plan_display::tests::test_types::{
-    DetachTestCase, DiffStatsTestCase, ModelPageTestCase, NoteTestCase, PageTestCase,
-    SectionTestCase, SummaryFieldTestCase, SummarySizeTestCase,
+    ConfigChangeTestCase, DetachTestCase, DiffStatsTestCase, ModelPageTestCase, NoteTestCase,
+    PageTestCase, SectionTestCase, SummaryFieldTestCase, SummarySizeTestCase,
 };
 
 #[test]
@@ -106,9 +106,19 @@ fn given_a_plan_when_paging_each_section_then_every_section_pages_its_rows_in_pl
             expected_rows: &["clean_name"],
         },
         SectionTestCase {
-            description: "seeds --changed runs",
-            section: PlanPageSection::Seeds,
+            description: "first-run seeds --changed runs",
+            section: PlanPageSection::FirstRunSeeds,
             expected_rows: &["countries"],
+        },
+        SectionTestCase {
+            description: "changed seeds --changed runs",
+            section: PlanPageSection::ChangedSeeds,
+            expected_rows: &["currency_rates"],
+        },
+        SectionTestCase {
+            description: "unchanged seeds --changed runs",
+            section: PlanPageSection::UnchangedSeeds,
+            expected_rows: &["regions"],
         },
         SectionTestCase {
             description: "Python nodes",
@@ -126,11 +136,15 @@ fn given_a_plan_when_paging_each_section_then_every_section_pages_its_rows_in_pl
             expected_rows: &["not_run", "idle_seed"],
         },
         SectionTestCase {
-            description: "warnings",
+            description: "warnings, largest group first and each group in plan order",
             section: PlanPageSection::Warnings,
             expected_rows: &[
+                "scenario 'checkout' step 'pay' is stale",
+                "scenario 'checkout' step 'ship' is stale",
+                "scenario 'returns' step `refund` is stale",
+                "model stg__orders_2 has no tests.",
+                "model stg__customers_3 has no tests.",
                 "orders: already-built dates keep their old results",
-                "scenario 'checkout' is stale",
             ],
         },
     ];
@@ -200,9 +214,12 @@ fn given_a_name_filter_when_paging_then_matching_rows_page_with_their_count() {
             section: PlanPageSection::Warnings,
             window: (0, 50),
             name: Some("checkout"),
-            expected_rows: &["scenario 'checkout' is stale"],
-            expected_total: 1,
-            expected_section_total: 2,
+            expected_rows: &[
+                "scenario 'checkout' step 'pay' is stale",
+                "scenario 'checkout' step 'ship' is stale",
+            ],
+            expected_total: 2,
+            expected_section_total: 6,
         },
         PageTestCase {
             description: "nothing matching is an empty page",
@@ -316,12 +333,12 @@ fn given_a_plan_when_summarised_then_sections_are_counts_and_no_row_list_is_left
         },
         SummaryFieldTestCase {
             description: "warnings last",
-            pointer: "/sections/22/section",
+            pointer: "/sections/24/section",
             expected_value: json!("warnings"),
         },
         SummaryFieldTestCase {
             description: "no section beyond the plan's",
-            pointer: "/sections/23",
+            pointer: "/sections/25",
             expected_value: Value::Null,
         },
         SummaryFieldTestCase {
@@ -363,6 +380,30 @@ fn given_a_plan_when_summarised_then_sections_are_counts_and_no_row_list_is_left
             description: "--changed unchanged nodes are a row list",
             pointer: "/changed/unchanged",
             expected_value: json!([]),
+        },
+        SummaryFieldTestCase {
+            description: "seeds count by reason: first run",
+            pointer: "/pages/first_run_seeds",
+            expected_value: json!(1),
+        },
+        SummaryFieldTestCase {
+            description: "seeds count by reason: changed",
+            pointer: "/pages/changed_seeds",
+            expected_value: json!(1),
+        },
+        SummaryFieldTestCase {
+            description: "seeds count by reason: unchanged",
+            pointer: "/pages/unchanged_seeds",
+            expected_value: json!(1),
+        },
+        SummaryFieldTestCase {
+            description: "warnings grouped by template, largest first, with how many things the group names",
+            pointer: "/warning_groups",
+            expected_value: json!([
+                {"template": "scenario … step … is stale", "count": 3, "subject": {"noun": "scenario", "count": 2}},
+                {"template": "model … has no tests.", "count": 2, "subject": null},
+                {"template": "already-built dates keep their old results", "count": 1, "subject": null},
+            ]),
         },
         SummaryFieldTestCase {
             description: "--changed facts stay",
@@ -573,13 +614,22 @@ fn given_a_document_whose_diffs_were_detached_when_paged_then_counts_remain_and_
 
 #[test]
 fn given_a_large_first_build_when_summarised_then_the_summary_stays_small() {
-    let test_cases = [SummarySizeTestCase {
-        description: "10,000 first-run models",
-        models: 10_000,
-        expected_max_bytes: 1_024,
-    }];
+    let test_cases = [
+        SummarySizeTestCase {
+            description: "10,000 first-run models",
+            models: 10_000,
+            changed_with_warnings: false,
+            expected_max_bytes: 1_024,
+        },
+        SummarySizeTestCase {
+            description: "10,000 models under --changed, each with a warning of its own",
+            models: 10_000,
+            changed_with_warnings: true,
+            expected_max_bytes: 16_384,
+        },
+    ];
     for test_case in test_cases {
-        let document = first_build(test_case.models);
+        let document = first_build(test_case.models, test_case.changed_with_warnings);
 
         let summary = serde_json::to_vec(&plan_summary(&document)).unwrap_or_default();
 
@@ -589,6 +639,69 @@ fn given_a_large_first_build_when_summarised_then_the_summary_stays_small() {
             test_case.description,
             summary.len(),
             serde_json::to_vec(&document).unwrap_or_default().len()
+        );
+    }
+}
+
+#[test]
+fn given_config_diffs_when_paged_whole_or_detached_then_short_ones_read_as_one_config_change() {
+    let test_cases = [
+        ConfigChangeTestCase {
+            description: "one plain key changes",
+            section: PlanPageSection::ConfigChanged,
+            model: "totals",
+            expected_change: Some("full_refresh true → false"),
+        },
+        ConfigChangeTestCase {
+            description: "a key set from nothing to a list, beside a query change",
+            section: PlanPageSection::QueryChanged,
+            model: "payments",
+            expected_change: Some("tags [] → [\"finance\"]"),
+        },
+        ConfigChangeTestCase {
+            description: "three keys are too many for one line",
+            section: PlanPageSection::SchemaChanged,
+            model: "ledger",
+            expected_change: None,
+        },
+        ConfigChangeTestCase {
+            description: "a key nested in an object is not a top-level change",
+            section: PlanPageSection::FirstRun,
+            model: "daily_orders",
+            expected_change: None,
+        },
+        ConfigChangeTestCase {
+            description: "a comma moved by a new last key is not a change of the key before",
+            section: PlanPageSection::FirstRun,
+            model: "daily_payments",
+            expected_change: Some("tags (unset) → none"),
+        },
+        ConfigChangeTestCase {
+            description: "no config diff",
+            section: PlanPageSection::QueryChanged,
+            model: "orders",
+            expected_change: None,
+        },
+    ];
+    for test_case in test_cases {
+        let whole = full_plan();
+        let (detached, _) = detach_model_diffs(whole.clone());
+
+        let change = |document: &Value| {
+            plan_section_page(document, test_case.section, ((0, 50), None))
+                .rows
+                .into_iter()
+                .find(|row| row["name"] == test_case.model)
+                .and_then(|row| row.get("config_change").cloned())
+        };
+        assert_eq!(
+            (change(&whole), change(&detached)),
+            (
+                test_case.expected_change.map(|change| json!(change)),
+                test_case.expected_change.map(|change| json!(change)),
+            ),
+            "{}: the same with the diff text in the document or kept apart",
+            test_case.description
         );
     }
 }

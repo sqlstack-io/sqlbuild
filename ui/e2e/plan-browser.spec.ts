@@ -74,8 +74,8 @@ test('a changed row shows its kind and line counts, and opens its diff a few lin
 	await expect(rows(page).locator('.detail', { hasText: 'config · full_refresh true → false' })).toHaveCount(4);
 	await expect(rows(page).locator('.detail', { hasText: 'config + query · cursor observed_at → event_date' })).toHaveCount(1);
 	if (shots) await page.screenshot({ path: `${shots}/plan-b-changed.png` });
-	// Rows carry counts, not diff text: only the small config changes shown inline have been read.
-	expect(await diffReads(page)).toHaveLength(5);
+	// Rows carry counts and the server's short config change, not diff text: nothing has been read.
+	expect(await diffReads(page)).toHaveLength(0);
 
 	const big = rows(page).filter({ hasText: 'query +71 −50' }).first();
 	const bigName = await big.locator('.name').innerText();
@@ -141,8 +141,8 @@ test('warnings with one message about different names read as one row, opened to
 	await select(page, 'warnings');
 	const groups = pane(page).locator('.warning-group');
 	await expect(groups).toHaveCount(2);
-	// Warnings group by message once read, so the pane reads them all (up to a cap) in large pages.
-	expect((await calls(page)).filter((c) => c.section === 'warnings')).toEqual([{ section: 'warnings', offset: 0, limit: 200 }]);
+	// The server groups them: the pane lists its groups, counted, and reads a group's warnings when it opens.
+	expect((await calls(page)).filter((c) => c.section === 'warnings')).toEqual([]);
 	await expect(groups.first().locator('.template')).toHaveText('Scenario … provides fixture for unknown model …');
 	await expect(groups.first()).toContainText('71 in 24 scenarios');
 	await groups.first().getByRole('button', { name: 'show', exact: true }).click();
@@ -151,6 +151,67 @@ test('warnings with one message about different names read as one row, opened to
 	await groups.first().getByRole('button', { name: 'show all 71' }).click();
 	await expect(groups.first().locator('li')).toHaveCount(71);
 	await expect(groups.first().getByRole('button', { name: 'show all 71' })).toHaveCount(0);
+	await groups.nth(1).getByRole('button', { name: 'show', exact: true }).click();
+	await expect(groups.nth(1).locator('li')).toHaveCount(3);
+	await expect(groups.nth(1).locator('li').first()).toContainText('requires source');
+	expect((await calls(page)).filter((c) => c.section === 'warnings')).toEqual([
+		{ section: 'warnings', offset: 0, limit: 20 },
+		{ section: 'warnings', offset: 20, limit: 51 },
+		{ section: 'warnings', offset: 71, limit: 3 }
+	]);
+});
+
+test('an open warning group keeps its warnings while other sections load, and reads them once', async ({ page }) => {
+	await openPlan(page);
+	await select(page, 'warnings');
+	const groups = pane(page).locator('.warning-group');
+	await groups.first().getByRole('button', { name: 'show', exact: true }).click();
+	await expect(groups.first().locator('li')).toHaveCount(20);
+	// Another section's page joins the plan; the open group keeps what it read.
+	await select(page, 'changed');
+	await expect.poll(async () => (await calls(page)).some((c) => c.section !== 'warnings')).toBe(true);
+	await select(page, 'warnings');
+	await expect(groups.first().locator('li')).toHaveCount(20);
+	// Shown, hidden and shown again before the first read returns: one read, each warning once.
+	await groups.nth(1).getByRole('button', { name: 'show', exact: true }).evaluate((b: HTMLElement) => [b.click(), b.click(), b.click()]);
+	await expect(groups.nth(1).locator('li')).toHaveCount(3);
+	await page.waitForTimeout(300);
+	await expect(groups.nth(1).locator('li')).toHaveCount(3);
+	expect((await calls(page)).filter((c) => c.section === 'warnings')).toEqual([
+		{ section: 'warnings', offset: 0, limit: 20 },
+		{ section: 'warnings', offset: 71, limit: 3 }
+	]);
+	// Another plan's groups start closed and unread.
+	await page.getByRole('button', { name: 'Plan again' }).click();
+	await expect(groups.first().getByRole('button', { name: 'show', exact: true })).toBeVisible({ timeout: 30_000 });
+	await expect(groups.locator('li')).toHaveCount(0);
+});
+
+test('the Checks tab under --changed leaves out the checks of nodes it skips', async ({ page }) => {
+	const checksTab = async (cmd: string) => {
+		await page.goto(`/plan?mock&cmd=${encodeURIComponent(cmd)}`);
+		await expect(page.getByRole('button', { name: 'Plan again' })).toBeVisible({ timeout: 30_000 });
+		const tab = page.getByRole('tablist', { name: 'View' }).getByRole('tab', { name: /Checks/ });
+		await tab.click();
+		return tab;
+	};
+	await expect(await checksTab('sqb build')).toHaveText(/Checks\s*13/);
+	await expect(page.locator('.graph-note')).toHaveText('13 checks');
+	// Seven of them check nodes --changed runs; the rest check nodes held back or unchanged.
+	await expect(await checksTab('sqb build --changed')).toHaveText(/Checks\s*7/);
+	await expect(page.locator('.graph-note')).toHaveText('7 checks');
+});
+
+test('seeds sit with the models of the same reason: first runs, changes and unchanged', async ({ page }) => {
+	await openPlan(page, `/plan?mock&large&cmd=${encodeURIComponent('sqb build')}`);
+	await select(page, 'first_run');
+	await expect(pane(page).locator('.subtitle')).toHaveText('672 first run · 2 seeds');
+	await select(page, 'changed');
+	await expect(pane(page).locator('.subtitle')).toHaveText('87 query · 6 config · 1 function · 1 seed');
+	await select(page, 'unchanged');
+	await expect(pane(page).locator('.subtitle')).toHaveText('1,507 models · 12 functions · 7 seeds');
+	await expect(rows(page)).toHaveCount(50);
+	if (shots) await page.screenshot({ path: `${shots}/plan-b-seeds.png` });
 });
 
 test('a small plan reads as a short index', async ({ page }) => {

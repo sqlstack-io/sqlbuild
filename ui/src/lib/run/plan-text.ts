@@ -14,6 +14,8 @@ export type PlanEntry = {
 	detail: string[];
 	queryDiff?: string[];
 	configDiff?: string[];
+	/** A config change of at most two plain keys in words, as the server reads it from the config diff. */
+	configChange?: string;
 	/** A server page's diff counts, in place of the diff text, which is read on demand. */
 	diffStats?: PlanModel['diff_stats'];
 	schema?: { sign: '+' | '-' | '~'; text: string }[];
@@ -67,6 +69,18 @@ function runsUnderChanged(plan: PlanDocument, key: string): boolean {
 	let nodes = runNodes.get(plan.changed);
 	if (!nodes) runNodes.set(plan.changed, (nodes = new Set(plan.changed.runs.map((r) => r.node))));
 	return nodes.has(key);
+}
+
+/** The seed sections in plan order, with their titles and what the run does to each seed. */
+const SEED_SECTIONS: [string, PlanPageSection, string][] = [
+	['First-run seeds', 'first_run_seeds', 'load'],
+	['Changed seeds', 'changed_seeds', 'reload'],
+	['Seeds', 'unchanged_seeds', 'current']
+];
+
+/** A seed's section by its plan reason, as the server splits them: a first run, no change of its own, or any other change. */
+export function seedSection(reason: string): PlanPageSection {
+	return reason === 'first_run' ? 'first_run_seeds' : !reason || reason === 'no_change' ? 'unchanged_seeds' : 'changed_seeds';
 }
 
 /** The seeds the run loads or reports on: under `--changed`, only those it runs. */
@@ -125,6 +139,7 @@ function changedEntry(m: PlanModel, reason: string, windowStart?: string): PlanE
 		],
 		queryDiff: m.query_diff,
 		configDiff: m.config_diff,
+		configChange: m.config_change,
 		diffStats: m.diff_stats,
 		schema: m.schema_findings?.map((f) => {
 			const kind = SCHEMA_SIGNS[f.kind] ?? { sign: '~' as const, label: f.kind };
@@ -176,8 +191,8 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 		}), false, 'routine_models');
 	}
 	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry), false, 'functions');
-	const seedLabel: Record<string, string> = { first_run: 'first_run', config_changed: 'seed_changed', no_change: 'current' };
-	add('Seeds', builtSeeds(plan).map((s) => ({ name: s.name, value: seedLabel[s.reason] ?? '', detail: [] })), false, 'seeds');
+	const seeds = builtSeeds(plan);
+	for (const [title, section, value] of SEED_SECTIONS) add(title, seeds.filter((s) => seedSection(s.reason) === section).map((s) => ({ name: s.name, value, detail: [] })), false, section);
 	add('Python', plan.python_nodes.map((p) => ({ name: p.name, value: `${p.kind} · ${p.identity_status}`, detail: [] })), false, 'python_nodes');
 	// A planner warning names its model in `model_name`, or opens its message with it as the CLI prints it; it shows once, with the first entry for that model.
 	const claimed = new Set<PlanWarning>();

@@ -32,6 +32,7 @@ import type {
 	RunOutputLine,
 	RunStatement,
 	RunCostRow,
+	IgnoredAuditFailure,
 	CostSummary,
 	NodeBuildCost,
 	NodeState,
@@ -264,6 +265,11 @@ export class MockApiClient implements ApiClient {
 	async listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]> {
 		this.#location(scope);
 		return this.#operate.listRunStatements(scope, runId);
+	}
+
+	async listRunIgnoredAudits(scope: Scope, runId: string): Promise<IgnoredAuditFailure[]> {
+		this.#location(scope);
+		return this.#build.listRunIgnoredAudits(scope, runId);
 	}
 
 	async listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]> {

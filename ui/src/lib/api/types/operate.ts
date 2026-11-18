@@ -387,6 +387,21 @@ export type RunStatement = {
 	error: string | null;
 };
 
+/** One error-severity audit failure a run, or one of its group's member runs, let through (`ignore_audit_failures`). */
+export type IgnoredAuditFailure = {
+	/** The run that evaluated the audit: the run itself or one of its members. */
+	runId: string;
+	jobKey: string | null;
+	at: Iso;
+	/** The check's ID on the Checks page; null when the result named none. */
+	checkId: string | null;
+	audit: string;
+	node: string | null;
+	column: string | null;
+	severity: string;
+	violationCount: number | null;
+};
+
 /** One statement's SQL, loaded on demand. Null when it was not recorded. */
 export type StatementSql = { statementId: string; sql: string | null };
 
@@ -647,6 +662,8 @@ export type PlanModel = {
 	query_diff?: string[];
 	/** Unified diff lines of the model's config since its last build. */
 	config_diff?: string[];
+	/** A config change of at most two plain keys in words, such as `full_refresh true → false`. */
+	config_change?: string;
 	schema_findings?: { kind: string; column: string; expected_type: string | null; actual_type: string | null }[];
 	/** A paged row's diff counts in place of its diff text, which `planDiff` reads on demand. */
 	diff_stats?: { query?: PlanDiffStats; config?: PlanDiffStats };
@@ -659,6 +676,9 @@ export type PlanDiffStats = { added: number; removed: number; whitespace_only: b
 export type PlanDiff = { model: string; query_diff?: string[]; config_diff?: string[] };
 
 export type PlanWarning = { severity: string; message: string; model_name?: string; code?: string };
+
+/** One warning template and how many warnings fill it in; `subject` counts the named things it opens with, such as scenarios, when they repeat. */
+export type PlanWarningGroup = { template: string; count: number; subject: { noun: string; count: number } | null };
 
 /** `sqb plan --json` as the location printed it; sections the page doesn't show are kept as they are. */
 export type PlanDocument = {
@@ -683,6 +703,8 @@ export type PlanDocument = {
 	ignore_audit_failures?: boolean;
 	/** A server summary's sections, by size; their rows load a page at a time. */
 	pages?: Partial<Record<PlanPageSection, number>>;
+	/** A server summary's warnings by message template, largest first; the warnings section pages them in this order. */
+	warning_groups?: PlanWarningGroup[];
 	/** A server summary's nonempty sections in plan order, each with the notes its rows share most. */
 	sections?: PlanSectionCount[];
 	/** Rows of each paged section loaded so far, which is the offset of its next page. */
@@ -709,7 +731,9 @@ export type PlanPageSection =
 	| 'source_loads'
 	| 'changed_functions'
 	| 'functions'
-	| 'seeds'
+	| 'first_run_seeds'
+	| 'changed_seeds'
+	| 'unchanged_seeds'
 	| 'python_nodes'
 	| 'held_back'
 	| 'unchanged'

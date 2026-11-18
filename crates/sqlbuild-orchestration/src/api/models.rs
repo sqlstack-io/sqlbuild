@@ -35,6 +35,7 @@ use crate::api::_helpers::resources::{
     person_reads::node_runs,
     person_reads::run_events,
     person_reads::run_statements,
+    person_reads::run_ignored_audits,
     person_reads::run_cost,
     person_reads::cost_summary,
     person_reads::node_costs,
