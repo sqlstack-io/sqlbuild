@@ -8,10 +8,10 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cli::person_login::main::sync_after_build::sync_after_build;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 use sqlbuild_state::runs::constants::BUILD_COMMAND;
-use sqlbuild_state::runs::models::{RunEnding, RunNodeCounts};
+use sqlbuild_state::runs::models::RunNodeCounts;
 
 use crate::bindings::_helpers::build_command::completion::{
-    complete_direct_build, finalize_exceptional_cost, finalize_no_work_with_timings,
+    complete_direct_build, finalize_exceptional_cost, finalize_no_work_with_timings, finished_run,
     record_pending_cost, write_partial_timings,
 };
 use crate::bindings::_helpers::build_command::execution::execute_direct_build;
@@ -39,7 +39,6 @@ use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_planner::observations::main::arm_source_capture::arm_source_capture;
 use sqlbuild_python_planner::observations::main::take_source_capture::take_source_capture;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
-use sqlbuild_python_project::native_host::main::build_node_counts::build_node_counts;
 use sqlbuild_python_project::native_host::main::raised_ending::raised_ending;
 use sqlbuild_python_project::native_host::main::run_recorder::run_recorder;
 use sqlbuild_python_project::native_host::models::RunRecorder;
@@ -178,14 +177,15 @@ fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) 
             &native_field(&pipeline, "project")?,
         ),
         context.worker.as_ref().map(|worker| worker.server_run()),
-    );
+    )?;
     if let Some(recorder) = &recorder {
-        recorder.started();
+        recorder.started()?;
     }
     match execute_direct_build(context, &pipeline, providers) {
         Ok((preparation, outcome, checks)) => {
             if let Some(recorder) = &recorder {
-                recorder.finished(&build_node_counts(&outcome.result), RunEnding::Completed);
+                let (counts, ending) = finished_run(&outcome, &checks)?;
+                recorder.finished(&counts, ending)?;
             }
             complete_direct_build(
                 context,
@@ -196,7 +196,7 @@ fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) 
         }
         Err(error) => {
             if let Some(recorder) = &recorder {
-                recorder.finished(
+                let _ = recorder.finished(
                     &RunNodeCounts::default(),
                     raised_ending(context.py(), &error),
                 );

@@ -6,6 +6,7 @@ use crate::native_host::_helpers::runs_state::WAREHOUSE_USER_METHOD;
 use crate::native_host::_helpers::runs_state::row_cells;
 use crate::planner_scope::models::ScopeData;
 use pyo3::IntoPyObject;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
@@ -215,36 +216,47 @@ impl<'py> RunRecorder<'py> {
         }))
     }
 
-    /// Record that the run started.
-    pub fn started(&self) {
-        self.warn_on_error(STARTED_PHASE, self.append_row(STARTED_PHASE, None));
+    /// Record that the run started; only an interrupt, such as Ctrl+C, escapes as an error.
+    pub fn started(&self) -> PyResult<()> {
+        self.warn_on_error(STARTED_PHASE, self.append_row(STARTED_PHASE, None))
     }
 
-    /// Record how the run ended and what its nodes did.
-    pub fn finished(&self, counts: &RunNodeCounts, ending: RunEnding) {
+    /// Record how the run ended and what its nodes did; only an interrupt escapes as an error.
+    pub fn finished(&self, counts: &RunNodeCounts, ending: RunEnding) -> PyResult<()> {
         let finish = (run_status(counts, ending), counts);
         self.warn_on_error(
             FINISHED_PHASE,
             self.append_row(FINISHED_PHASE, Some(finish)),
-        );
+        )
     }
 
     /// Insert directly, and create the schema and table only when that fails, as on a first run.
     fn append_row(&self, phase: &str, finish: Option<(&str, &RunNodeCounts)>) -> PyResult<()> {
-        self.write(phase, finish, false)
-            .or_else(|_| self.write(phase, finish, true))
+        self.write(phase, finish, false).or_else(|error| {
+            if error.is_instance_of::<PyException>(self.adapter.py()) {
+                self.write(phase, finish, true)
+            } else {
+                Err(error)
+            }
+        })
     }
 
-    fn warn_on_error(&self, phase: &str, written: PyResult<()>) {
-        if let Err(error) = written {
-            let _ = write_console(
-                self.adapter.py(),
-                "stderr",
-                &format!(
-                    "Warning: could not record that run {} {phase} in {RUNS_TABLE_NAME}: {error}\n",
-                    self.identity.run_id
-                ),
-            );
+    /// Warn on a failed write and carry on; an interrupt is not a failed write, so it propagates.
+    fn warn_on_error(&self, phase: &str, written: PyResult<()>) -> PyResult<()> {
+        let py: Python<'py> = self.adapter.py();
+        match written {
+            Err(error) if error.is_instance_of::<PyException>(py) => {
+                let _ = write_console(
+                    py,
+                    "stderr",
+                    &format!(
+                        "Warning: could not record that run {} {phase} in {RUNS_TABLE_NAME}: {error}\n",
+                        self.identity.run_id
+                    ),
+                );
+                Ok(())
+            }
+            written => written,
         }
     }
 

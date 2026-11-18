@@ -1403,6 +1403,14 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
         '    """End the process without unwinding."""\n\n'
         "    os._exit(137)\n"
     ),
+    "python/fail.py": (
+        '"""A task that raises, so the build exits non-zero."""\n\n'
+        "from sqlbuild.tasks import task\n\n\n"
+        "@task()\n"
+        "def fail(ctx):\n"
+        '    """Raise."""\n\n'
+        '    raise RuntimeError("task failed")\n'
+    ),
 }
 
 

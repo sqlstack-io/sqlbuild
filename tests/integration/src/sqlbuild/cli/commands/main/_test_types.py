@@ -1459,6 +1459,12 @@ class RunRecordFailureTestCase:
 
 
 @dataclass(frozen=True)
+class InterruptedRunRecordTestCase:
+    description: str
+    expected_tables: frozenset[str]
+
+
+@dataclass(frozen=True)
 class KilledRunRecordTestCase:
     description: str
     expected_phases: list[str]
