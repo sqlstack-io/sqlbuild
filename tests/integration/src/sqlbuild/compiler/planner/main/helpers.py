@@ -15,7 +15,7 @@ from pathlib import Path
 from tempfile import gettempdir
 from types import MappingProxyType
 from typing import Any, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlbuild._native import (
     CompiledFunction,
@@ -725,8 +725,13 @@ def write_synced_control_store(
     target: str,
     warehouse: RecordingSnowflakeWarehouse,
     schemas: tuple[str, ...],
+    observed_at: datetime | None = None,
+    scan_started: datetime | None = None,
 ) -> None:
-    """A control store whose development location mirrored `schemas` of the warehouse just now."""
+    """A control store whose location mirrored `schemas` at `observed_at` (default now).
+
+    `scan_started` stamps every row with a later catalog scan that found it unchanged.
+    """
 
     catalog: InspectionCatalog = live_inspection_catalog(warehouse)
     relations: tuple[RelationInfo, ...] = catalog.list_relations(
@@ -736,7 +741,8 @@ def write_synced_control_store(
         catalog.get_columns_for_relations(relations=relations)
     )
     location: str = str(uuid4())
-    observed: str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    observed: str = (observed_at or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    scan_id: str | None = None if scan_started is None else _uuid7(scan_started)
     (project_dir / ".sqlbuild").mkdir(parents=True)
     with closing(sqlite3.connect(project_dir / ".sqlbuild/control.sqlite3")) as store:
         _ = store.execute(
@@ -745,29 +751,44 @@ def write_synced_control_store(
         )
         _ = store.execute(
             "CREATE TABLE sqb_warehouse_catalog (event_id TEXT, location_id TEXT, target TEXT, "
-            "state_database TEXT, state_schema TEXT, observed_at TEXT, record_json JSON)"
+            "state_database TEXT, state_schema TEXT, observed_at TEXT, record_json JSON, "
+            "scan_id TEXT)"
         )
         _ = store.execute(
             "INSERT INTO sqb_development_locations VALUES (?, ?, ?)",
             (str(project_dir), target, location),
         )
         _ = store.executemany(
-            "INSERT INTO sqb_warehouse_catalog VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO sqb_warehouse_catalog VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 _mirrored_row(
                     relation=relation,
                     columns=columns.get(relation.identity, ()),
                     scope=(location, target, observed),
                 )
+                + (scan_id,)
                 for relation in relations
             ],
         )
         store.commit()
 
 
+def _uuid7(started: datetime) -> str:
+    milliseconds: int = int(started.timestamp() * 1000)
+    random: int = uuid4().int
+    value: int = (
+        milliseconds << 80
+        | 0x7 << 76
+        | (random & 0xFFF) << 64
+        | 0b10 << 62
+        | (random >> 12) & ((1 << 62) - 1)
+    )
+    return str(UUID(int=value))
+
+
 def _mirrored_row(
     *, relation: RelationInfo, columns: tuple[ColumnInfo, ...], scope: tuple[str, str, str]
-) -> tuple[str, ...]:
+) -> tuple[str | None, ...]:
     location, target, observed = scope
     record: dict[str, object] = {
         "state_database": "ANALYTICS",

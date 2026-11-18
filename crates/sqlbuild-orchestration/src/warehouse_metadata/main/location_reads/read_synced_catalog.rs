@@ -1,5 +1,6 @@
 //! A plan from synced state reads the target's mirrored catalog and when each relation was seen.
 
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::store::errors::ControlError;
@@ -11,6 +12,10 @@ use crate::warehouse_metadata::constants::SYNCED_CATALOG_SQL;
 use crate::warehouse_metadata::models::{SyncedCatalogRelation, WarehouseCatalogRecord};
 
 /// Every mirrored relation of the location's target, with the time its catalog scan observed it.
+///
+/// A scan leaves an unchanged record's `observed_at` alone and only stamps its `scan_id`. The page
+/// that delivered the record was read after that scan started, so the record also holds as of the
+/// scan's start, the time in its UUIDv7 `scan_id`.
 pub async fn read_synced_catalog(
     store: &ControlStore,
     (location_id, target): (Uuid, &str),
@@ -28,10 +33,23 @@ pub async fn read_synced_catalog(
                 serde_json::from_value(row.remove("record_json").unwrap_or_default()).map_err(
                     |error| ControlError::Invalid(format!("invalid mirrored relation: {error}")),
                 )?;
-            let observed_at = serde_json::from_value(row.remove("observed_at").unwrap_or_default())
-                .map_err(|error| {
-                    ControlError::Invalid(format!("invalid mirrored observation time: {error}"))
-                })?;
+            let observed_at: DateTime<Utc> = serde_json::from_value(
+                row.remove("observed_at").unwrap_or_default(),
+            )
+            .map_err(|error| {
+                ControlError::Invalid(format!("invalid mirrored observation time: {error}"))
+            })?;
+            let scan_id: Option<Uuid> = serde_json::from_value(
+                row.remove("scan_id").unwrap_or_default(),
+            )
+            .map_err(|error| ControlError::Invalid(format!("invalid mirrored scan: {error}")))?;
+            let observed_at = scan_id
+                .and_then(|scan_id| scan_id.get_timestamp())
+                .and_then(|started| {
+                    let (seconds, nanos) = started.to_unix();
+                    DateTime::from_timestamp(i64::try_from(seconds).ok()?, nanos)
+                })
+                .map_or(observed_at, |started| started.max(observed_at));
             Ok(SyncedCatalogRelation {
                 record,
                 observed_at,

@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from sqlbuild._native import CompilePipelineResult
-from tests.integration.src.sqlbuild.compiler.planner.main._test_types import PlanFromTestCase
+from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
+    PlanFromTestCase,
+    SyncedScanTestCase,
+)
 from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
     plan_offline_snowflake_project,
     planned_entries,
@@ -15,6 +21,7 @@ from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
     write_targeted_snowflake_project,
 )
 from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import (
+    FakeRelation,
     RecordingSnowflakeWarehouse,
     SyntheticSnowflakeProject,
 )
@@ -24,6 +31,8 @@ _MODEL_SCHEMAS: tuple[str, ...] = ("staging", "intermediate", "marts")
 _SYNCED: str = "Planned from synced state: checked in "
 _NO_STORE: str = "Planning live: the project has no control store"
 _LIVE: str = "Planning live:"
+_FIRST_OBSERVED: datetime = datetime(2026, 2, 1, tzinfo=UTC)
+_SCAN_STARTED: datetime = datetime(2026, 3, 1, tzinfo=UTC)
 
 
 @pytest.mark.parametrize(
@@ -121,3 +130,68 @@ def test_given_plan_from_when_planning_then_reads_the_synced_copy_only_when_aske
     )
     assert test_case.expected_report in err
     assert not any(text in err for text in test_case.expected_absent)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SyncedScanTestCase(
+            description="a table replaced with the same columns before a later scan is not described",
+            last_ddl_after_scan_start=timedelta(hours=-1),
+            expected_live_describe=False,
+        ),
+        SyncedScanTestCase(
+            description="a table replaced within the clock skew before the scan started is described",
+            last_ddl_after_scan_start=timedelta(minutes=-1),
+            expected_live_describe=True,
+        ),
+        SyncedScanTestCase(
+            description="a table replaced after the scan started but before its page was read is described",
+            last_ddl_after_scan_start=timedelta(seconds=1),
+            expected_live_describe=True,
+        ),
+        SyncedScanTestCase(
+            description="a table replaced after the scan is described",
+            last_ddl_after_scan_start=timedelta(hours=1),
+            expected_live_describe=True,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_later_scan_found_a_record_unchanged_when_planning_from_synced_state_then_describes_only_tables_altered_since_it_started(
+    test_case: SyncedScanTestCase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SQLBUILD_CONTROL_DATABASE_URL", raising=False)
+    project: SyntheticSnowflakeProject = write_targeted_snowflake_project(
+        project_dir=tmp_path / "orders_platform", target=_TARGET, plan_from="synced_state"
+    )
+    name: str = project.incremental_model_names[0].upper()
+    replaced: tuple[FakeRelation, ...] = tuple(
+        replace(relation, last_ddl=_SCAN_STARTED + test_case.last_ddl_after_scan_start)
+        if relation.name == name
+        else relation
+        for relation in project.relations
+    )
+    warehouse: RecordingSnowflakeWarehouse = RecordingSnowflakeWarehouse(relations=replaced)
+    write_synced_control_store(
+        project_dir=project.project_dir,
+        target=_TARGET,
+        warehouse=warehouse,
+        schemas=_MODEL_SCHEMAS,
+        observed_at=_FIRST_OBSERVED,
+        scan_started=_SCAN_STARTED,
+    )
+    warehouse.queries.clear()
+
+    _ = plan_offline_snowflake_project(project=project, warehouse=warehouse)
+
+    assert (
+        any(
+            query.kind in ("show_columns", "columns")
+            and re.search(rf"\b{name}\b", f"{query.sql} {query.params}", re.IGNORECASE)
+            for query in warehouse.queries
+        )
+        == test_case.expected_live_describe
+    )
