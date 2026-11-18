@@ -3,7 +3,7 @@
 use serde_json::Value;
 
 use crate::plan_display::_helpers::plan_pages::PlanRows;
-use crate::plan_display::_helpers::plan_sections::{emptied, section_counts, summary_lists};
+use crate::plan_display::_helpers::plan_sections::{emptied, section_counts, with_warning_groups};
 
 /// The document with every row list emptied, each section counted and its warnings grouped; a failure report is returned unchanged.
 pub fn plan_summary(document: &Value) -> Value {
@@ -15,7 +15,7 @@ pub fn plan_summary(document: &Value) -> Value {
     };
     let plan = PlanRows::new(document);
     let (sections, pages) = section_counts(&plan);
-    let mut summary = summary_lists(&plan, emptied(fields));
+    let mut summary = with_warning_groups(&plan, emptied(fields));
     summary.insert("sections".into(), Value::Array(sections));
     summary.insert("pages".into(), Value::Object(pages));
     Value::Object(summary)

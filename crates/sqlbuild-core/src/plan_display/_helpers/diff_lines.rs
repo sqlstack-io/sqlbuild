@@ -1,7 +1,7 @@
 //! A unified diff's added and removed lines, whether they differ only in whitespace, and a short config change in words.
 
 use crate::plan_display::constants::{
-    CONFIG_CHANGE_KEYS, DIFF_HEADER_PREFIXES, UNSET_CONFIG_VALUE,
+    CONFIG_CHANGE_KEYS, CONFIG_TOP_LEVEL_INDENT, DIFF_HEADER_PREFIXES, UNSET_CONFIG_VALUE,
 };
 use crate::plan_display::models::DiffStats;
 
@@ -70,6 +70,7 @@ pub(crate) fn config_change(diff: &[String]) -> Option<String> {
             values[at].2 = Some(value);
         }
     }
+    values.retain(|(_, old, new)| old != new);
     if values.is_empty() || values.len() > CONFIG_CHANGE_KEYS {
         return None;
     }
@@ -86,9 +87,12 @@ pub(crate) fn config_change(diff: &[String]) -> Option<String> {
     Some(changes.join("; "))
 }
 
-/// One `"key": value` line's key and plain value; `None` for a nested value or any other line.
+/// One top-level `"key": value` line's key and plain value, the config printed with two-space indents; `None` for a nested key or value, or any other line.
 fn config_value(line: &str) -> Option<(&str, &str)> {
-    let (key, rest) = line.trim_start().strip_prefix('"')?.split_once('"')?;
+    let (key, rest) = line
+        .strip_prefix(CONFIG_TOP_LEVEL_INDENT)?
+        .strip_prefix('"')?
+        .split_once('"')?;
     let value = rest.strip_prefix(':')?.trim();
     let value = value.strip_suffix(',').unwrap_or(value).trim_end();
     if key.is_empty() || value.ends_with('{') || value.ends_with('[') {

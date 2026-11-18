@@ -397,27 +397,6 @@ fn given_a_plan_when_summarised_then_sections_are_counts_and_no_row_list_is_left
             expected_value: json!(1),
         },
         SummaryFieldTestCase {
-            description: "the nodes --changed runs, by key in plan order, for what they check",
-            pointer: "/changed/run_nodes",
-            expected_value: json!([
-                "model:orders",
-                "model:payments",
-                "model:refunds",
-                "model:totals",
-                "model:ledger",
-                "model:daily_orders",
-                "model:daily_payments",
-                "model:old_orders",
-                "model:archive",
-                "model:customers",
-                "model:Customer_Notes",
-                "model:events",
-                "seed:countries",
-                "seed:currency_rates",
-                "seed:regions"
-            ]),
-        },
-        SummaryFieldTestCase {
             description: "warnings grouped by template, largest first, with how many things the group names",
             pointer: "/warning_groups",
             expected_value: json!([
@@ -635,13 +614,22 @@ fn given_a_document_whose_diffs_were_detached_when_paged_then_counts_remain_and_
 
 #[test]
 fn given_a_large_first_build_when_summarised_then_the_summary_stays_small() {
-    let test_cases = [SummarySizeTestCase {
-        description: "10,000 first-run models",
-        models: 10_000,
-        expected_max_bytes: 1_024,
-    }];
+    let test_cases = [
+        SummarySizeTestCase {
+            description: "10,000 first-run models",
+            models: 10_000,
+            changed_with_warnings: false,
+            expected_max_bytes: 1_024,
+        },
+        SummarySizeTestCase {
+            description: "10,000 models under --changed, each with a warning of its own",
+            models: 10_000,
+            changed_with_warnings: true,
+            expected_max_bytes: 16_384,
+        },
+    ];
     for test_case in test_cases {
-        let document = first_build(test_case.models);
+        let document = first_build(test_case.models, test_case.changed_with_warnings);
 
         let summary = serde_json::to_vec(&plan_summary(&document)).unwrap_or_default();
 
@@ -675,6 +663,18 @@ fn given_config_diffs_when_paged_whole_or_detached_then_short_ones_read_as_one_c
             section: PlanPageSection::SchemaChanged,
             model: "ledger",
             expected_change: None,
+        },
+        ConfigChangeTestCase {
+            description: "a key nested in an object is not a top-level change",
+            section: PlanPageSection::FirstRun,
+            model: "daily_orders",
+            expected_change: None,
+        },
+        ConfigChangeTestCase {
+            description: "a comma moved by a new last key is not a change of the key before",
+            section: PlanPageSection::FirstRun,
+            model: "daily_payments",
+            expected_change: Some("tags (unset) → none"),
         },
         ConfigChangeTestCase {
             description: "no config diff",

@@ -78,6 +78,8 @@ pub const DIFF_STATS_FIELD: &str = "diff_stats";
 pub const CONFIG_CHANGE_FIELD: &str = "config_change";
 /// The most top-level config keys a config change reads in one line.
 pub(crate) const CONFIG_CHANGE_KEYS: usize = 2;
+/// The indent of a top-level key in a config diff, which prints the config as JSON with two-space indents.
+pub(crate) const CONFIG_TOP_LEVEL_INDENT: &str = "  ";
 /// A config key's value on the side of a change where it is not set.
 pub(crate) const UNSET_CONFIG_VALUE: &str = "(unset)";
 /// What a warning template says in place of a quoted or generated name.
@@ -86,5 +88,5 @@ pub(crate) const ELIDED_NAME: &str = "…";
 pub(crate) const QUOTE_CHARACTERS: [char; 3] = ['\'', '`', '"'];
 /// The summary field listing warning templates with their counts.
 pub(crate) const WARNING_GROUPS_FIELD: &str = "warning_groups";
-/// The `--changed` summary field listing the node keys the run builds.
-pub(crate) const RUN_NODES_FIELD: &str = "run_nodes";
+/// The most warning groups a summary lists, the largest first; warnings past them page as the rest.
+pub(crate) const MAX_WARNING_GROUPS: usize = 50;

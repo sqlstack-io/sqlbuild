@@ -173,7 +173,7 @@ export function planSummary(doc: PlanDocument): PlanDocument {
 		sections,
 		pages: Object.fromEntries(sections.map((s) => [s.section, s.total])),
 		warning_groups: groupWarnings(doc.warnings).map((g) => ({ template: g.template, count: g.count, subject: subjectOf(g.label) })),
-		changed: doc.changed && { ...doc.changed, runs: [], held_back: [], unchanged: [], run_nodes: doc.changed.runs.map((r) => r.node) },
+		changed: doc.changed && { ...doc.changed, runs: [], held_back: [], unchanged: [] },
 		synced_copy: doc.synced_copy && { ...doc.synced_copy, cursor_window_starts: {} }
 	};
 }

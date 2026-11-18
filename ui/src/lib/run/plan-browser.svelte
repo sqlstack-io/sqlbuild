@@ -58,17 +58,35 @@
 	const warningGroups = $derived(group?.warningGroups ?? []);
 	/** A server summary's groups come counted; each one's warnings are read when it opens, by template. */
 	let readWarnings = $state<Record<string, PlanWarning[]>>({});
-	// Another plan's groups start unread.
+	/** The templates being read, one read each, and the summary groups they were read for. */
+	const readingWarnings = new Set<string>();
+	let readFor: unknown = null;
+	// Another plan's groups start unread; a page of this plan's rows keeps the same groups.
 	$effect.pre(() => {
-		void plan.warning_groups;
+		if (plan.warning_groups === readFor) return;
+		readFor = plan.warning_groups;
 		readWarnings = {};
+		readingWarnings.clear();
 	});
 	function readGroup(w: WarningGroup, limit: number) {
+		const want = Math.min(limit, w.count);
 		const have = readWarnings[w.template]?.length ?? 0;
-		if (w.warnings.length || !load || have >= Math.min(limit, w.count)) return;
-		load('warnings', w.offset + have, Math.min(limit, w.count) - have, '')
-			.then((page) => (readWarnings[w.template] = [...(readWarnings[w.template] ?? []), ...(page.rows as PlanWarning[])]))
-			.catch((e: unknown) => (loadError = e instanceof Error ? e.message : String(e)));
+		if (w.warnings.length || !load || have >= want || readingWarnings.has(w.template)) return;
+		const read = readWarnings;
+		readingWarnings.add(w.template);
+		load('warnings', w.offset + have, want - have, '')
+			.then((page) => {
+				// A read another plan replaced lands nowhere.
+				if (read !== readWarnings) return;
+				readingWarnings.delete(w.template);
+				readWarnings[w.template] = [...(readWarnings[w.template] ?? []), ...(page.rows as PlanWarning[])];
+				// "show all" asked while the first rows were read.
+				if (page.rows.length) readGroup(w, allWarnings[w.template] ? WARNINGS_READ : limit);
+			})
+			.catch((e: unknown) => {
+				if (read === readWarnings) readingWarnings.delete(w.template);
+				loadError = e instanceof Error ? e.message : String(e);
+			});
 	}
 	function toggleWarnings(w: WarningGroup) {
 		openWarnings[w.template] = !openWarnings[w.template];

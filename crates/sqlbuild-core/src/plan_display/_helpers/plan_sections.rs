@@ -6,13 +6,13 @@ use serde_json::{Map, Value, json};
 
 use crate::plan_display::_helpers::diff_lines::config_change;
 use crate::plan_display::_helpers::plan_pages::{
-    Note, PlanRows, SECTIONS, lines, model_rows, node_key, row_diff_stats, row_name, run_node,
-    text, warnings_about,
+    Note, PlanRows, SECTIONS, lines, model_rows, node_key, row_diff_stats, row_name, text,
+    warnings_about,
 };
 use crate::plan_display::_helpers::warning_groups::{group_json, warning_groups};
 use crate::plan_display::constants::{
-    CHANGED_ROW_LISTS, CONFIG_CHANGE_FIELD, DIFF_STATS_FIELD, MAX_SECTION_NOTES, METADATA_FIELD,
-    MODEL_DIFF_FIELDS, PLAN_ROW_LISTS, RUN_NODES_FIELD, WARNING_GROUPS_FIELD,
+    CHANGED_ROW_LISTS, CONFIG_CHANGE_FIELD, DIFF_STATS_FIELD, MAX_SECTION_NOTES,
+    MAX_WARNING_GROUPS, METADATA_FIELD, MODEL_DIFF_FIELDS, PLAN_ROW_LISTS, WARNING_GROUPS_FIELD,
 };
 use crate::plan_display::models::PlanPageSection;
 
@@ -73,29 +73,17 @@ pub(crate) fn emptied(fields: &Map<String, Value>) -> Map<String, Value> {
     summary
 }
 
-/// The summary's warnings by template, and under `--changed` the node keys the run builds, which checks follow.
-pub(crate) fn summary_lists(
+/// The summary's largest warning groups, at most `MAX_WARNING_GROUPS`; the warnings section pages the rest after them.
+pub(crate) fn with_warning_groups(
     plan: &PlanRows<'_>,
     mut summary: Map<String, Value>,
 ) -> Map<String, Value> {
     let groups: Vec<Value> = warning_groups(&plan.rows(PlanPageSection::Warnings))
         .iter()
+        .take(MAX_WARNING_GROUPS)
         .map(group_json)
         .collect();
     summary.insert(WARNING_GROUPS_FIELD.to_owned(), Value::Array(groups));
-    let runs = plan
-        .document
-        .get("changed")
-        .and_then(|changed| changed.get("runs"))
-        .and_then(Value::as_array);
-    if let (Some(runs), Some(Value::Object(changed))) = (runs, summary.get_mut("changed")) {
-        let nodes: Vec<Value> = runs
-            .iter()
-            .filter_map(run_node)
-            .map(|node| Value::String(node.to_owned()))
-            .collect();
-        changed.insert(RUN_NODES_FIELD.to_owned(), Value::Array(nodes));
-    }
     summary
 }
 

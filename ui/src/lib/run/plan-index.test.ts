@@ -218,4 +218,15 @@ describe('a plan from a server summary', () => {
 			['Scenario … requires source …', '3 warnings', 3, 71, 0]
 		]);
 	});
+
+	it('pages the warnings past the largest groups the summary lists as one more group, after them', () => {
+		const capped = { ...summary, sections: summary.sections!.map((s) => (s.section === 'warnings' ? { ...s, total: 80 } : s)) };
+		const warnings = planGroups(capped).find((g) => g.key === 'warnings')!;
+		expect(warnings.subtitle).toBe('2 kinds and more');
+		expect(warnings.warningGroups?.map((g) => [g.template, g.label, g.count, g.offset])).toEqual([
+			['Scenario … provides fixture for unknown model …', '71 in 24 scenarios', 71, 0],
+			['Scenario … requires source …', '3 warnings', 3, 71],
+			['Other warnings', '6 warnings of smaller kinds', 6, 74]
+		]);
+	});
 });

@@ -111,6 +111,8 @@ pub(super) struct DetachTestCase {
 pub(super) struct SummarySizeTestCase {
     pub(super) description: &'static str,
     pub(super) models: usize,
+    /// Every model runs under `--changed`, and each has its own distinct warning.
+    pub(super) changed_with_warnings: bool,
     pub(super) expected_max_bytes: usize,
 }
 

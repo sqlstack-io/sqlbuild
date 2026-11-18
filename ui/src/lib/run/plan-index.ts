@@ -303,14 +303,20 @@ function warningGroupLabel(count: number, subject: PlanWarningGroup['subject']):
 }
 
 /** A server summary's warning groups, each starting where the one before ends in the warnings section. */
-function serverWarningGroups(groups: PlanWarningGroup[]): WarningGroup[] {
+function serverWarningGroups(groups: PlanWarningGroup[], total: number): WarningGroup[] {
 	let offset = 0;
-	return groups.map((g) => {
+	const listed: WarningGroup[] = groups.map((g) => {
 		const group = { template: g.template, count: g.count, offset, warnings: [], label: warningGroupLabel(g.count, g.subject) };
 		offset += g.count;
 		return group;
 	});
+	// The summary lists only the largest groups; the warnings past them page as one rest.
+	const rest = total - offset;
+	return rest > 0 ? [...listed, { template: REST_TEMPLATE, count: rest, offset, warnings: [], label: `${plural(rest, 'warning')} of smaller kinds` }] : listed;
 }
+
+/** The group holding the warnings past a server summary's largest groups. */
+const REST_TEMPLATE = 'Other warnings';
 
 /** The plan's sections with their sizes and notes: the server summary's, else counted from a whole plan's rows. */
 export function sectionCounts(plan: PlanDocument, sections: PlanSection[]): PlanSectionCount[] {
@@ -333,7 +339,9 @@ export function planGroups(plan: PlanDocument, refresh: (job: string) => string 
 	const textOf = new Map(sections.map((s) => [s.section ?? TITLE_SECTION[s.title], s]));
 	const counts = sectionCounts(plan, sections);
 	const warnings = looseWarnings(plan, sections);
-	const grouped = plan.warning_groups ? serverWarningGroups(plan.warning_groups) : warnings.length ? groupWarnings(warnings) : [];
+	const warningTotal = counts.find((c) => c.section === 'warnings')?.total ?? 0;
+	const grouped = plan.warning_groups ? serverWarningGroups(plan.warning_groups, warningTotal) : warnings.length ? groupWarnings(warnings) : [];
+	const warningKinds = plan.warning_groups ? plural(plan.warning_groups.length, 'kind') + (grouped.length > plan.warning_groups.length ? ' and more' : '') : plural(grouped.length, 'kind');
 	// A whole plan (an older server's, or the mock's) has every row and no counted notes.
 	const whole = !plan.sections;
 	return ORDER.flatMap((key) => {
@@ -369,7 +377,7 @@ export function planGroups(plan: PlanDocument, refresh: (job: string) => string 
 				? [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n]) => counted(n, k))
 				: key === 'warnings'
 					? grouped.length && (whole || plan.warning_groups || loadedRows(plan, 'warnings') >= count)
-						? [plural(grouped.length, 'kind')]
+						? [warningKinds]
 						: []
 					: mine.length > 1
 						? mine.map((c) => counted(c.total, sectionWord(c.section)))

@@ -768,8 +768,6 @@ export type PlanChanged = {
 	held_back: ({ node: string; refreshed_by: string[] } | { node: string; reads: string })[];
 	/** Selected nodes that run only when something they read changed; nothing did. */
 	unchanged: string[];
-	/** A server summary's keys of every node that runs, in plan order, for the checks that follow them. */
-	run_nodes?: string[];
 };
 
 /** How long one plan took: steps in pipeline order with `Other` last, and what it read. */

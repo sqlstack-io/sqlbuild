@@ -161,6 +161,43 @@ test('warnings with one message about different names read as one row, opened to
 	]);
 });
 
+test('an open warning group keeps its warnings while other sections load, and reads them once', async ({ page }) => {
+	await openPlan(page);
+	await select(page, 'warnings');
+	const groups = pane(page).locator('.warning-group');
+	await groups.first().getByRole('button', { name: 'show', exact: true }).click();
+	await expect(groups.first().locator('li')).toHaveCount(20);
+	// Another section's page joins the plan; the open group keeps what it read.
+	await select(page, 'changed');
+	await expect.poll(async () => (await calls(page)).some((c) => c.section !== 'warnings')).toBe(true);
+	await select(page, 'warnings');
+	await expect(groups.first().locator('li')).toHaveCount(20);
+	// Shown, hidden and shown again before the first read returns: one read, each warning once.
+	await groups.nth(1).getByRole('button', { name: 'show', exact: true }).evaluate((b: HTMLElement) => [b.click(), b.click(), b.click()]);
+	await expect(groups.nth(1).locator('li')).toHaveCount(3);
+	await page.waitForTimeout(300);
+	await expect(groups.nth(1).locator('li')).toHaveCount(3);
+	expect((await calls(page)).filter((c) => c.section === 'warnings')).toEqual([
+		{ section: 'warnings', offset: 0, limit: 20 },
+		{ section: 'warnings', offset: 71, limit: 3 }
+	]);
+});
+
+test('the Checks tab under --changed leaves out the checks of nodes it skips', async ({ page }) => {
+	const checksTab = async (cmd: string) => {
+		await page.goto(`/plan?mock&cmd=${encodeURIComponent(cmd)}`);
+		await expect(page.getByRole('button', { name: 'Plan again' })).toBeVisible({ timeout: 30_000 });
+		const tab = page.getByRole('tablist', { name: 'View' }).getByRole('tab', { name: /Checks/ });
+		await tab.click();
+		return tab;
+	};
+	await expect(await checksTab('sqb build')).toHaveText(/Checks\s*13/);
+	await expect(page.locator('.graph-note')).toHaveText('13 checks');
+	// Seven of them check nodes --changed runs; the rest check nodes held back or unchanged.
+	await expect(await checksTab('sqb build --changed')).toHaveText(/Checks\s*7/);
+	await expect(page.locator('.graph-note')).toHaveText('7 checks');
+});
+
 test('seeds sit with the models of the same reason: first runs, changes and unchanged', async ({ page }) => {
 	await openPlan(page, `/plan?mock&large&cmd=${encodeURIComponent('sqb build')}`);
 	await select(page, 'first_run');
