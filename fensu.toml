@@ -1973,6 +1973,12 @@ reason = "A once-per-process warning is process state by definition: a command r
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
+path = "crates/sqlbuild-analysis/src/sql_macros/_helpers/typing/typed_calls.rs"
+symbols = ["marker_memo"]
+reason = "Verifying typed markers parses the model once per marked call; the result depends only on the SQL, the calls and the dialect, so a bounded process-wide memo serves a compile's repeated reads and recompiles in long-lived processes."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
 path = "crates/sqlbuild-python-base/src/native_threads/_helpers/exit_signal.rs"
 symbols = ["signal_interpreter_exit"]
 reason = "The existing interpreter-exit signal is process-wide and monotonic: every native daemon wait must observe any exit hook before Python finalization. The atomic replaces the same global threading.Event, not per-command lifecycle state."

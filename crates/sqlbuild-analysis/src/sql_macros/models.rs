@@ -303,7 +303,7 @@ pub struct SlotCapture {
 }
 
 /// One expression macro call's expansion in a text: its byte range and the macro's `returns`.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TypedCall {
     pub start: usize,
     pub end: usize,
