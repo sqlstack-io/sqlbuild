@@ -73,6 +73,26 @@ pub(crate) async fn begin_run_recall(
     Ok(Some((transaction, scope, Some((context, permission)))))
 }
 
+/// A run read under listing view, in the transaction that found the run.
+pub(crate) async fn run_read<T>(
+    store: &ControlStore,
+    credentials: (&AuditContext, Uuid),
+    (run, default_role): ((Uuid, &str, Uuid), DefaultRole),
+    read: impl AsyncFnOnce(
+        ControlTransaction,
+        &RunRecallScope,
+    ) -> Result<(ControlTransaction, T), ControlError>,
+) -> Result<Option<T>, ControlError> {
+    let Some((transaction, scope, _)) =
+        begin_run_recall(store, credentials, run, (default_role, None)).await?
+    else {
+        return Ok(None);
+    };
+    let (transaction, result) = read(transaction, &scope).await?;
+    commit(transaction).await?;
+    Ok(Some(result))
+}
+
 /// A sensitive run read, authorized for `action` and audited as `audit_action` in the same transaction.
 pub(crate) async fn sensitive_run_read<T>(
     store: &ControlStore,
