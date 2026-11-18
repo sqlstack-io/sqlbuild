@@ -5,11 +5,14 @@ use std::collections::{HashMap, HashSet};
 use serde_json::Value;
 
 use crate::plan_display::_helpers::diff_lines::diff_stats;
-use crate::plan_display::constants::{DIFF_STATS_FIELD, NO_CHANGE_REASON, SKIP_ACTION};
+use crate::plan_display::_helpers::warning_groups::warning_groups;
+use crate::plan_display::constants::{
+    DIFF_STATS_FIELD, FIRST_RUN_REASON, NO_CHANGE_REASON, SKIP_ACTION,
+};
 use crate::plan_display::models::PlanPageSection;
 
 /// Every section, in the order the plan reads, with its name in the API.
-pub(crate) const SECTIONS: [(PlanPageSection, &str); 23] = [
+pub(crate) const SECTIONS: [(PlanPageSection, &str); 25] = [
     (PlanPageSection::FullRefresh, "full_refresh"),
     (PlanPageSection::QueryChanged, "query_changed"),
     (PlanPageSection::FunctionChanged, "function_changed"),
@@ -31,7 +34,9 @@ pub(crate) const SECTIONS: [(PlanPageSection, &str); 23] = [
     (PlanPageSection::SourceLoads, "source_loads"),
     (PlanPageSection::ChangedFunctions, "changed_functions"),
     (PlanPageSection::Functions, "functions"),
-    (PlanPageSection::Seeds, "seeds"),
+    (PlanPageSection::FirstRunSeeds, "first_run_seeds"),
+    (PlanPageSection::ChangedSeeds, "changed_seeds"),
+    (PlanPageSection::UnchangedSeeds, "unchanged_seeds"),
     (PlanPageSection::PythonNodes, "python_nodes"),
     (PlanPageSection::HeldBack, "held_back"),
     (PlanPageSection::Unchanged, "unchanged"),
@@ -89,11 +94,16 @@ impl<'document> PlanRows<'document> {
             PlanPageSection::SourceLoads => self.loads("source", false),
             PlanPageSection::ChangedFunctions => self.functions(true),
             PlanPageSection::Functions => self.functions(false),
-            PlanPageSection::Seeds => self.seeds(),
+            PlanPageSection::FirstRunSeeds
+            | PlanPageSection::ChangedSeeds
+            | PlanPageSection::UnchangedSeeds => self.seeds(section),
             PlanPageSection::PythonNodes => self.list("python_nodes"),
             PlanPageSection::HeldBack => self.changed_list("held_back"),
             PlanPageSection::Unchanged => self.changed_list("unchanged"),
-            PlanPageSection::Warnings => self.list("warnings"),
+            PlanPageSection::Warnings => warning_groups(&self.list("warnings"))
+                .into_iter()
+                .flat_map(|group| group.warnings)
+                .collect(),
             model_section => self.models(model_section),
         }
     }
@@ -149,8 +159,10 @@ impl<'document> PlanRows<'document> {
         })
     }
 
-    fn seeds(&self) -> Vec<&'document Value> {
-        self.kept("seeds", |seed| self.runs_node(&node_key("seed", seed)))
+    fn seeds(&self, section: PlanPageSection) -> Vec<&'document Value> {
+        self.kept("seeds", |seed| {
+            self.runs_node(&node_key("seed", seed)) && seed_section(seed) == section
+        })
     }
 
     /// The `--changed` run of a model or seed row.
@@ -176,7 +188,9 @@ impl<'document> PlanRows<'document> {
             PlanPageSection::ChangedFunctions | PlanPageSection::Functions => {
                 &[("language", "language"), ("reason", "reason")]
             }
-            PlanPageSection::Seeds => &[("reason", "reason")],
+            PlanPageSection::FirstRunSeeds
+            | PlanPageSection::ChangedSeeds
+            | PlanPageSection::UnchangedSeeds => &[("reason", "reason")],
             PlanPageSection::PythonNodes => &[
                 ("kind", "kind"),
                 ("identity_status", "identity_status"),
@@ -201,7 +215,11 @@ impl<'document> PlanRows<'document> {
                 notes.push(("completed", Some(completed.to_string())));
             }
             PlanPageSection::HeldBack => notes.extend(held_back_notes(row)),
-            PlanPageSection::Seeds => notes.extend(self.run_notes(&node_key("seed", row))),
+            PlanPageSection::FirstRunSeeds
+            | PlanPageSection::ChangedSeeds
+            | PlanPageSection::UnchangedSeeds => {
+                notes.extend(self.run_notes(&node_key("seed", row)));
+            }
             section if model_rows(section) => {
                 notes.extend(self.run_notes(&node_key("model", row)));
                 notes.extend(model_notes(row));
@@ -308,6 +326,15 @@ pub(crate) fn lines(row: &Value, field: &str) -> Option<Vec<String>> {
 pub(crate) fn model_rows(section: PlanPageSection) -> bool {
     MODEL_REASONS.iter().any(|(_, model)| *model == section)
         || section == PlanPageSection::RoutineModels
+}
+
+/// A seed's section by its plan reason: a first run, no change of its own, or any other change.
+fn seed_section(seed: &Value) -> PlanPageSection {
+    match text(seed, "reason") {
+        FIRST_RUN_REASON => PlanPageSection::FirstRunSeeds,
+        "" | NO_CHANGE_REASON => PlanPageSection::UnchangedSeeds,
+        _ => PlanPageSection::ChangedSeeds,
+    }
 }
 
 fn model_section(model: &Value) -> PlanPageSection {

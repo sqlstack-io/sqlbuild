@@ -59,8 +59,12 @@ pub enum PlanPageSection {
     ChangedFunctions,
     /// Functions without a change.
     Functions,
-    /// Seeds the run loads or reports on.
-    Seeds,
+    /// Seeds the run loads for the first time.
+    FirstRunSeeds,
+    /// Seeds whose definition or settings changed.
+    ChangedSeeds,
+    /// Seeds the run loads or reports on without a change of their own.
+    UnchangedSeeds,
     PythonNodes,
     /// `--changed` nodes held back for a job's own run.
     HeldBack,

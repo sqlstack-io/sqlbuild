@@ -31,6 +31,7 @@ import type {
 	RunRowPage,
 	RunRowQuery,
 	RunStatement,
+	IgnoredAuditFailure,
 	RunCostRow,
 	CostSummary,
 	NodeBuildCost,
@@ -110,6 +111,8 @@ export interface ApiClient extends PlatformApi {
 	/** Recall events and scheduler facts in storage order, paged by `after`. */
 	listRunEvents(scope: Scope, runId: string, query?: { after?: number; limit?: number }): Promise<RunEventPage>;
 	listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]>;
+	/** The audit failures a run and its group's current member runs let through, run by run. */
+	listRunIgnoredAudits(scope: Scope, runId: string): Promise<IgnoredAuditFailure[]>;
 	/** The latest estimated query cost observations of one run; empty until a collection synced. */
 	listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]>;
 	/** Estimated query cost of the runs that started in the last `days` days, by job, warehouse size and node. */

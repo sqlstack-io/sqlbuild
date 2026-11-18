@@ -56,7 +56,10 @@ fn without_code_diffs(record: &mut LocationWorkRecord) {
     };
     for (section, keys) in [
         ("python_nodes", &["identity_diff"][..]),
-        ("models", &["query_diff", "config_diff", "diff_stats"][..]),
+        (
+            "models",
+            &["query_diff", "config_diff", "diff_stats", "config_change"][..],
+        ),
     ] {
         let entries = document
             .get_mut(section)

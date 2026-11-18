@@ -113,3 +113,10 @@ pub(super) struct SummarySizeTestCase {
     pub(super) models: usize,
     pub(super) expected_max_bytes: usize,
 }
+
+pub(super) struct ConfigChangeTestCase {
+    pub(super) description: &'static str,
+    pub(super) section: PlanPageSection,
+    pub(super) model: &'static str,
+    pub(super) expected_change: Option<&'static str>,
+}

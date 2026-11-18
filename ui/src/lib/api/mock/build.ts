@@ -21,6 +21,7 @@ import type {
 	CheckOutcome,
 	ColumnLineage,
 	CostChange,
+	IgnoredAuditFailure,
 	MicrobatchCoverage,
 	NodeBuild,
 	NodeOutcome,
@@ -166,6 +167,28 @@ export class MockBuild {
 	}
 
 	// ---- checks ----
+
+	/** The error-severity audits whose latest failure the run, or one of its members, let through. */
+	listRunIgnoredAudits(scope: Scope, runId: string): Promise<IgnoredAuditFailure[]> {
+		const runs = this.#ctx.operate.runAndMembers(runId);
+		if (!runs.length) throw new ApiError(`Unknown run ${runId}`, 404);
+		const checks = new Map(this.#checks(scope, this.#states(scope)).map((c) => [c.id, c]));
+		return this.#ctx.reply(
+			runs.flatMap((run) =>
+				CHECK_SPECS.filter((spec) => spec.ignoredIn === run.id).map((spec) => ({
+					runId: run.id,
+					jobKey: run.jobKey,
+					at: checks.get(spec.id)?.latest?.evaluatedAt ?? '',
+					checkId: spec.id,
+					audit: spec.name,
+					node: spec.node,
+					column: spec.column,
+					severity: spec.severity,
+					violationCount: spec.latest.violations ?? null
+				}))
+			)
+		);
+	}
 
 	listChecks(scope: Scope): Promise<Check[]> {
 		return this.#ctx.reply(this.#checks(scope, this.#states(scope)));

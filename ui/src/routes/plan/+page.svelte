@@ -188,13 +188,12 @@
 	const picked = $derived(shown?.selection ?? []);
 	let view = $state<'plan' | 'graph' | 'checks'>('plan');
 	/**
-	 * The recorded checks on the models and seeds the command selects, which run after them. The
-	 * selection is the one the command resolves to, as the plan request froze it; the plan's summary
-	 * carries no list of the nodes it builds.
+	 * The recorded checks on the models and seeds the build runs, which run after them: under `--changed`
+	 * the nodes it runs, else the selection the command resolves to, as the plan request froze it.
 	 */
 	const planChecks = $derived.by(() => {
 		if (!plan) return [];
-		const selected = new Set(picked);
+		const selected = new Set((plan.changed?.run_nodes ?? picked).map((key) => key.slice(key.indexOf(':') + 1)));
 		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && selected.has(c.node));
 	});
 	/** The tab shown: a replan with no checks leaves the Checks tab for the plan. */

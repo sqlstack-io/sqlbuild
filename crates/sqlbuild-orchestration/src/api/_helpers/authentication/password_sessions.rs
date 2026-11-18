@@ -252,6 +252,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::run_cost),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/ignored-audits",
+            get(crate::api::_helpers::resources::person_reads::run_ignored_audits),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements",
             get(crate::api::_helpers::resources::person_reads::run_statements),
         )
