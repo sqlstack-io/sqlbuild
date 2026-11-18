@@ -91,6 +91,15 @@ pub struct ChangesConfig {
     pub reach: Option<String>,
 }
 
+/// `[maintained]` of `sqlbuild_project.toml`: when a build may take over paused maintained models.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MaintainedConfig {
+    /// Seconds a pausing build's heartbeat may be silent before another build resumes its models.
+    pub heartbeat_grace_seconds: u64,
+    /// Whether `sqb build --ignore-maintained-grace` may take over within the grace.
+    pub allow_ignore_grace: bool,
+}
+
 /// `[review]` of `sqlbuild_project.toml`: the defaults `sqb review` uses when flags are omitted.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReviewConfig {

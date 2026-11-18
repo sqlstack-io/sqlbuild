@@ -238,4 +238,11 @@ pub(crate) const TARGET_FIELDS: &[TargetField] = &[
             decided_by: &["plan_from"],
         },
     },
+    TargetField {
+        group: None,
+        name: "pause_maintained",
+        rule: MergeRule::Overlay {
+            decided_by: &["pause_maintained"],
+        },
+    },
 ];

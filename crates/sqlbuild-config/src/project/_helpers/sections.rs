@@ -21,21 +21,23 @@ use crate::project::constants::{
 use crate::project::constants::{
     AUDIT_SEVERITIES, CHECK_DECLARED_COLUMNS_KEY, COLLECTION_RENDERINGS, COLUMN_CONTRACT_MODES,
     CONCURRENCY_KEY, DBT_DEFER_CLONE_KEY, DBT_KEYS, DBT_REMOVED_KEYS, DBT_REUSE_KEYS,
-    DEFAULT_IN_USE_WINDOW, DEFAULT_QUERY_ARTIFACT_TTL, FUTURE_CURSOR_ACTIONS,
-    LEGACY_COLUMN_CONTRACT_MODE_KEY, LEGACY_CONCURRENCY_KEY, LEGACY_SQL_VALIDATION_KEY,
-    LOCAL_DBT_KEYS, MAX_BATCHES_KEY, MICROBATCH_LIMIT_ACTIONS, OLD_NAME_VIEWS_KEY,
-    QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, REVIEW_DOWNSTREAM_POLICIES, REVIEW_KEYS,
-    RUN_NAMESPACE_KEY, RUN_NAMESPACE_MAX_LENGTH, SCENARIO_KEYS, SETTINGS_KEYS,
-    SNAPSHOT_FULL_REFRESH_POLICIES, SNAPSHOT_KEYS, SNAPSHOT_LIMIT_KEYS,
-    SNAPSHOT_SCHEMA_CHANGE_POLICIES, SQL_ANALYSIS_KEY, UNACCOUNTED_PARTITION_POLICIES,
-    USD_PER_CREDIT_KEY, ZERO_FIXED_DURATION, ZERO_FLOAT,
+    DEFAULT_HEARTBEAT_GRACE_SECONDS, DEFAULT_IN_USE_WINDOW, DEFAULT_QUERY_ARTIFACT_TTL,
+    FUTURE_CURSOR_ACTIONS, LEGACY_COLUMN_CONTRACT_MODE_KEY, LEGACY_CONCURRENCY_KEY,
+    LEGACY_SQL_VALIDATION_KEY, LOCAL_DBT_KEYS, MAINTAINED_KEYS, MAX_BATCHES_KEY,
+    MICROBATCH_LIMIT_ACTIONS, OLD_NAME_VIEWS_KEY, QUERY_CHANGE_TRACKING_KEY,
+    REQUIRE_SQL_ANALYSIS_KEY, REVIEW_DOWNSTREAM_POLICIES, REVIEW_KEYS, RUN_NAMESPACE_KEY,
+    RUN_NAMESPACE_MAX_LENGTH, SCENARIO_KEYS, SETTINGS_KEYS, SNAPSHOT_FULL_REFRESH_POLICIES,
+    SNAPSHOT_KEYS, SNAPSHOT_LIMIT_KEYS, SNAPSHOT_SCHEMA_CHANGE_POLICIES, SQL_ANALYSIS_KEY,
+    UNACCOUNTED_PARTITION_POLICIES, USD_PER_CREDIT_KEY, ZERO_FIXED_DURATION, ZERO_FLOAT,
 };
 use crate::project::constants::{
     CHANGE_COUNTS, CHANGE_REACHES, CHANGES_KEYS, CONTROL_KEYS, MAX_POOL_LIMIT,
     MIN_SYNC_INTERVAL_SECONDS, SYNC_INTERVAL_HELP, SYNC_INTERVAL_OFF,
 };
 use crate::project::errors::ConfigFailure;
-use crate::project::models::{Built, ChangesConfig, ConfigFile, ControlConfig, ReviewConfig};
+use crate::project::models::{
+    Built, ChangesConfig, ConfigFile, ControlConfig, MaintainedConfig, ReviewConfig,
+};
 use crate::project::types::{Entries, Fields, Loaded};
 use sqlbuild_core::constants::ZERO_DAY_DURATION;
 
@@ -624,6 +626,44 @@ pub(crate) fn sync_interval(text: &str) -> Result<u64, &'static str> {
         return Err(SYNC_INTERVAL_HELP);
     }
     Ok(seconds)
+}
+
+/// `[maintained]`: how long a silent pausing build keeps its maintained models paused.
+pub(crate) fn load_maintained(
+    payload: Option<&ConfigValue>,
+    file: ConfigFile,
+) -> Loaded<MaintainedConfig> {
+    let mapping = coerce_mapping(payload, place(file, "maintained"))?;
+    validate_allowed_keys(mapping, &MAINTAINED_KEYS, place(file, "maintained"))?;
+    let heartbeat_grace_seconds: u64 = match get(mapping, "heartbeat_grace") {
+        None => DEFAULT_HEARTBEAT_GRACE_SECONDS,
+        Some(ConfigValue::String(text)) => match fixed_duration_seconds(text, false) {
+            Ok(Some(seconds)) => seconds.parse().map_err(|_| grace_failure(file))?,
+            Ok(None) | Err(_) => return Err(grace_failure(file)),
+        },
+        Some(_) => return Err(grace_failure(file)),
+    };
+    let allow_ignore_grace: bool = match get(mapping, "allow_ignore_grace") {
+        None => false,
+        Some(ConfigValue::Bool(flag)) => *flag,
+        Some(_) => {
+            return Err(ConfigFailure::at(
+                file,
+                "maintained.allow_ignore_grace must be true or false",
+            ));
+        }
+    };
+    Ok(MaintainedConfig {
+        heartbeat_grace_seconds,
+        allow_ignore_grace,
+    })
+}
+
+fn grace_failure(file: ConfigFile) -> ConfigFailure {
+    ConfigFailure::at(
+        file,
+        "maintained.heartbeat_grace must be a fixed duration such as 30m or 2h",
+    )
 }
 
 /// `[control]`: where a signed-in build asks for a sync, and how often a location syncs anyway.

@@ -151,6 +151,7 @@ const R_TARGET_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("catalog_connection", FieldDefault::None),
         FieldSpec::new("ignore_audit_failures", FieldDefault::None),
         FieldSpec::new("plan_from", FieldDefault::None),
+        FieldSpec::new("pause_maintained", FieldDefault::None),
     ],
 };
 const R_TARGET_SETTINGS: RecordSpec = RecordSpec {
@@ -210,6 +211,7 @@ const R_LOCAL_TARGET_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("catalog_connection", FieldDefault::None),
         FieldSpec::new("ignore_audit_failures", FieldDefault::None),
         FieldSpec::new("plan_from", FieldDefault::None),
+        FieldSpec::new("pause_maintained", FieldDefault::None),
     ],
 };
 const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {

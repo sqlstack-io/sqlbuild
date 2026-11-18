@@ -12015,6 +12015,7 @@ class TargetConfig(NativeRecord):
     catalog_connection: str | None
     ignore_audit_failures: bool | None
     plan_from: str | None
+    pause_maintained: bool | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12041,6 +12042,7 @@ class TargetConfig(NativeRecord):
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
+        pause_maintained: bool | None = ...,
     ) -> None: ...
 
 class LocalTargetConfig(NativeRecord):
@@ -12070,6 +12072,7 @@ class LocalTargetConfig(NativeRecord):
     catalog_connection: str | None
     ignore_audit_failures: bool | None
     plan_from: str | None
+    pause_maintained: bool | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12097,6 +12100,7 @@ class LocalTargetConfig(NativeRecord):
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
+        pause_maintained: bool | None = ...,
     ) -> None: ...
 
 class SettingsConfig(NativeRecord):
