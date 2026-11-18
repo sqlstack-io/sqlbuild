@@ -185,7 +185,7 @@ A target is a named build context - the database and schema you build into, plus
 | `defer_sources_to` | Target name to read managed source data from (see [Loaders](python-nodes/loaders.md#source-deferral)) |
 | `clone` | Clone policy (see below) |
 | `missing_migration_origin` | What a build does when a declared `migrate_from` origin does not exist in this target: `allow` (default), `require_confirmation`, or `deny`. See [Missing migration origins](models/migrations.md#missing-migration-origins) |
-| `warehouses` | Snowflake warehouse per command group, `build` and `query`. See [Command-group warehouses](adapters/snowflake.md#command-group-warehouses) |
+| `warehouses` | Snowflake warehouse per command group: `build`, `query` and `sync` (a location's warehouse syncs). See [Command-group warehouses](adapters/snowflake.md#command-group-warehouses) |
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
 

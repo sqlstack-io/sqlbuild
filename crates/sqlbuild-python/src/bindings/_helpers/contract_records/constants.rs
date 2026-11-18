@@ -102,6 +102,7 @@ const R_TARGET_WAREHOUSES_CONFIG: RecordSpec = RecordSpec {
     fields: &[
         FieldSpec::new("build", FieldDefault::None),
         FieldSpec::new("query", FieldDefault::None),
+        FieldSpec::new("sync", FieldDefault::None),
     ],
 };
 const R_TARGET_CONFIG: RecordSpec = RecordSpec {

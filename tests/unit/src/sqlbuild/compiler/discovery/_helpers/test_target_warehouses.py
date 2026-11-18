@@ -64,6 +64,11 @@ class DuckDbPlusAdapter(DuckDbAdapter):
             expected_warehouses=TargetWarehousesConfig(build="BUILD_WH", query="ADHOC_WH"),
         ),
         TargetWarehousesConfigTestCase(
+            description="project target sets a sync warehouse for its location",
+            contents=_SNOWFLAKE_PROJECT + '\n\n[targets.dev.warehouses]\nsync = "SYNC_WH"\n',
+            expected_warehouses=TargetWarehousesConfig(sync="SYNC_WH"),
+        ),
+        TargetWarehousesConfigTestCase(
             description="target without warehouses keeps both groups unset",
             contents=_SNOWFLAKE_PROJECT,
             expected_warehouses=TargetWarehousesConfig(),

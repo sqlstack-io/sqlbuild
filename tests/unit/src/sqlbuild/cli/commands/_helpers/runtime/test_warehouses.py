@@ -78,6 +78,35 @@ _LOCAL_QUERY_OVERRIDE: dict[str, LocalTargetConfig] = {
             expected_source="sqlbuild_project.toml [targets.dev.warehouses] build",
         ),
         CommandWarehouseResolutionTestCase(
+            description="a location syncs on the query warehouse, not the connection's",
+            command="location",
+            project_warehouses=_PROJECT_GROUPS,
+            expected_warehouse="ADHOC_WH",
+            expected_source="sqlbuild_project.toml [targets.dev.warehouses] query",
+        ),
+        CommandWarehouseResolutionTestCase(
+            description="a location syncs on the sync warehouse when the target sets one",
+            command="location",
+            project_warehouses=TargetWarehousesConfig(
+                build="BUILD_WH", query="ADHOC_WH", sync="SYNC_WH"
+            ),
+            expected_warehouse="SYNC_WH",
+            expected_source="sqlbuild_project.toml [targets.dev.warehouses] sync",
+        ),
+        CommandWarehouseResolutionTestCase(
+            description="a location with only a build warehouse syncs on it, not the connection's",
+            command="location",
+            project_warehouses=TargetWarehousesConfig(build="BUILD_WH"),
+            expected_warehouse="BUILD_WH",
+            expected_source="sqlbuild_project.toml [targets.dev.warehouses] build",
+        ),
+        CommandWarehouseResolutionTestCase(
+            description="a location whose target sets no warehouse keeps the connection's",
+            command="location",
+            expected_warehouse="ANALYTICS_WH",
+            expected_source="connection warehouse",
+        ),
+        CommandWarehouseResolutionTestCase(
             description="cli warehouse overrides the group",
             command="build",
             project_warehouses=_PROJECT_GROUPS,
@@ -360,6 +389,11 @@ def test_given_command_without_group_when_parsing_warehouse_flag_then_it_is_reje
             description="builds execute project resources",
             command=CliCommand.BUILD,
             expected_group=WarehouseGroup.BUILD,
+        ),
+        CommandWarehouseGroupTestCase(
+            description="a location's syncs read metadata and small state tables",
+            command=CliCommand.LOCATION,
+            expected_group=WarehouseGroup.SYNC,
         ),
     ],
     ids=lambda case: case.description,

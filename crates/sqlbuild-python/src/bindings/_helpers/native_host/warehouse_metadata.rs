@@ -6,7 +6,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyString};
 use serde_json::{Value, json};
 use sqlbuild_analysis::fingerprint_storage::constants::{COLUMN_TIMESTAMP, FINGERPRINT_COLUMNS};
 use sqlbuild_config::command_connection::constants::{
-    DUCKDB_ADAPTER, DUCKDB_MEMORY_DATABASE, LOCAL_DATABASE_PATH_KEYS,
+    CONNECTION_WAREHOUSE_KEY, DUCKDB_ADAPTER, DUCKDB_MEMORY_DATABASE, LOCAL_DATABASE_PATH_KEYS,
 };
 use sqlbuild_core::constants::{
     AUDIT_RESULTS_TABLE_NAME, COLUMN_MIGRATION_TABLE_NAME, CONSUMPTION_TABLE_NAME,
@@ -42,12 +42,14 @@ use crate::bindings::_helpers::fingerprints::latest_rows::row_fingerprint;
 use crate::bindings::_helpers::freshness::state_io::row_record;
 use crate::bindings::_helpers::freshness::support::presumed_utc_datetime;
 use crate::bindings::_helpers::native_host::constants::HISTORY_STREAM_PAGES;
+use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::native_host::warehouse_catalog::read_catalog;
 use crate::bindings::_helpers::native_host::warehouse_statistics::read_statistics;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
 use crate::bindings::_helpers::records::fields::field;
+use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::{construct::record_class, ids::RecordId};
 
 /// A node's builds share these columns, as the control store groups them.
@@ -88,6 +90,22 @@ pub(crate) struct HistoryStream<'py> {
     since: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+/// Say which warehouse a sync session runs on, so a deployment sees it is not the largest one.
+fn report_sync_warehouse(py: Python<'_>, connection_config: &Bound<'_, PyAny>) -> PyResult<()> {
+    let warehouse: Bound<'_, PyAny> = mapping_get(connection_config, CONNECTION_WAREHOUSE_KEY)?;
+    if warehouse.is_none() {
+        return Ok(());
+    }
+    write_console(
+        py,
+        "stderr",
+        &format!(
+            "Warehouse sync session opened on warehouse {}.\n",
+            warehouse.str()?
+        ),
+    )
+}
+
 pub(crate) fn open_history_session<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
@@ -107,6 +125,7 @@ pub(crate) fn open_history_session<'py>(
         (&py.None().into_bound(py), true),
         true,
     )?;
+    report_sync_warehouse(py, &connection_config)?;
     let adapter_name: String = adapter.getattr("adapter_name")?.extract()?;
     let local_path_key = LOCAL_DATABASE_PATH_KEYS
         .iter()

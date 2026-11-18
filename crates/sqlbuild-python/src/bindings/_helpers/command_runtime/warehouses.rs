@@ -35,9 +35,15 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::ids::RecordId;
 
-/// The `WarehouseGroup` whose warehouse is a target's `warehouses.build`; any other reads `query`.
 const BUILD_GROUP: &str = "build";
 const QUERY_GROUP: &str = "query";
+const SYNC_GROUP: &str = "sync";
+/// The target warehouses each group reads, in order; a sync never wakes the connection's while any is set.
+const GROUP_WAREHOUSES: [(&str, &[&str]); 3] = [
+    (BUILD_GROUP, &[BUILD_GROUP]),
+    (QUERY_GROUP, &[QUERY_GROUP]),
+    (SYNC_GROUP, &[SYNC_GROUP, QUERY_GROUP, BUILD_GROUP]),
+];
 
 const RESOLVE_OPTIONS: (&[&str], &[&str]) = (
     &[
@@ -116,15 +122,10 @@ fn resolved_warehouse<'py>(
     )
 }
 
-fn group_value(target: &Bound<'_, PyAny>, group_name: &str) -> PyResult<Option<String>> {
+fn group_value(target: &Bound<'_, PyAny>, attribute: &str) -> PyResult<Option<String>> {
     if target.is_none() {
         return Ok(None);
     }
-    let attribute: &str = if group_name == BUILD_GROUP {
-        BUILD_GROUP
-    } else {
-        QUERY_GROUP
-    };
     optional_text(&native_field(
         &native_field(target, "warehouses")?,
         attribute,
@@ -164,11 +165,20 @@ fn authored_group<'py>(
     let project_target: Bound<'py, PyAny> =
         native_field(&project_config, "targets")?.call_method1("get", (&target_name,))?;
     let target_name: String = target_name.extract()?;
-    Ok(authored_warehouse(
-        (&target_name, group_name),
-        group_value(&local_target, group_name)?,
-        group_value(&project_target, group_name)?,
-    ))
+    let attributes: &[&str] = GROUP_WAREHOUSES
+        .iter()
+        .find(|(group, _)| *group == group_name)
+        .map_or(&[QUERY_GROUP], |(_, attributes)| attributes);
+    for attribute in attributes {
+        if let Some(found) = authored_warehouse(
+            (&target_name, attribute),
+            group_value(&local_target, attribute)?,
+            group_value(&project_target, attribute)?,
+        ) {
+            return Ok(Some(found));
+        }
+    }
+    Ok(None)
 }
 
 /// The group warehouse with `${...}` templates expanded, checked as an identifier.
@@ -263,14 +273,14 @@ pub(crate) fn resolve_warehouse(
     })
 }
 
-/// Every warehouse the target configures: its `build` and `query` group warehouses and its connection warehouse.
+/// Every warehouse the target configures: its `build`, `query` and `sync` group warehouses and its connection warehouse.
 pub(crate) fn configured_warehouses(
     inputs: WarehouseInputs<'_, '_>,
     connection_config: &Bound<'_, PyAny>,
 ) -> PyResult<std::collections::BTreeSet<String>> {
     let none: Bound<'_, PyAny> = none(connection_config.py());
     let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    for group_name in [BUILD_GROUP, QUERY_GROUP] {
+    for group_name in [BUILD_GROUP, QUERY_GROUP, SYNC_GROUP] {
         if let Some(authored) = authored_group(inputs, group_name)? {
             names.insert(expand_authored(&authored, inputs, &none)?);
         }
