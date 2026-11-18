@@ -577,6 +577,8 @@ pub(crate) struct ChangeStream {
     pub(crate) receiver: tokio::sync::broadcast::Receiver<crate::store::models::ChangeMessage>,
     pub(crate) updates:
         tokio::sync::broadcast::Receiver<crate::node_states::models::NodeStatusUpdate>,
+    /// Keeps the target's node states refreshed while the stream is open.
+    pub(crate) _watch: crate::node_states::models::NodeStatesWatch,
     pub(crate) stopped: tokio::sync::watch::Receiver<bool>,
     pub(crate) keepalive: tokio::time::Interval,
     pub(crate) initial: bool,

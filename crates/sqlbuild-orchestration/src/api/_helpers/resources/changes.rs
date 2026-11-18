@@ -110,7 +110,7 @@ async fn stream_changes(
     (location_id, target): (Uuid, String),
 ) -> Result<Response, ApiError> {
     let receiver = feed.sender.subscribe();
-    let updates = watch_node_states(&cache, (location_id, &target)).await?;
+    let (updates, watch) = watch_node_states(&cache, (location_id, &target)).await?;
     let state = ChangeStream {
         store,
         subscriber,
@@ -119,6 +119,7 @@ async fn stream_changes(
         target,
         receiver,
         updates,
+        _watch: watch,
         stopped: feed.stopped,
         keepalive: tokio::time::interval(Duration::from_secs(15)),
         initial: true,

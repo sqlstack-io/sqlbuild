@@ -1,6 +1,7 @@
 //! Held node lists and states: ETag revalidation, pushed state changes, recovery reads and snapshot resets on both control stores.
 
 use std::collections::BTreeSet;
+use std::time::Duration;
 
 use reqwest::{StatusCode, header};
 use serde_json::{Value, json};
@@ -11,10 +12,10 @@ use crate::api::tests::changes_helpers::{next_notice, opened, request_person_fee
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::node_states_helpers::{builds, notices, orders_snapshot, reader};
 use crate::api::tests::test_types::{
-    ChangedBuildTestCase, NodeStatesTestCase, PushedStatesTestCase,
+    ChangedBuildTestCase, HeldTargetTestCase, NodeStatesTestCase, PushedStatesTestCase,
 };
 use crate::credentials::tests::role_helpers::role_fixture;
-use crate::node_states::_helpers::views::{current_view, refresh_view, target_cache};
+use crate::node_states::_helpers::views::{current_view, refresh_view, target_cache, watch_target};
 use crate::node_states::main::report_changed_build::report_changed_build;
 use crate::node_states::main::start_node_states::start_node_states;
 use crate::node_states::models::ChangedBuildReport;
@@ -23,9 +24,11 @@ use crate::runs::models::JobRunRequest;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
+use crate::store::models::{ChangeMessage, ChangeTopic};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest::ingest_fingerprints::ingest_fingerprints;
+use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
 #[test]
 fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_changes_are_pushed_and_snapshots_reset()
@@ -111,13 +114,13 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
                     other_tag
                 ),
                 (
-                    format!("\"{}:1\"", published.snapshot_id),
+                    format!("\"{}\"", published.snapshot_id),
                     test_case.expected_listed,
                     StatusCode::NOT_MODIFIED,
                     first_tag.clone(),
                     StatusCode::OK
                 ),
-                "{}: the list is tagged with its snapshot and version and revalidates to 304",
+                "{}: the list is tagged with its snapshot and revalidates to 304",
                 test_case.description
             );
             assert_eq!(
@@ -217,20 +220,11 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
             );
             let relisted = read("nodes", &admin, Some(&first_tag))
                 .await
-                .expect("stale revalidation");
-            let second_tag = etag(&relisted);
-            let relisted: Vec<Value> = relisted.json().await.expect("relisted");
-            let orders = relisted
-                .iter()
-                .find(|node| node["node_key"] == "model:orders")
-                .expect("orders listed");
+                .expect("revalidation after a build");
             assert_eq!(
-                (second_tag, &orders["last_build"]),
-                (
-                    format!("\"{}:2\"", published.snapshot_id),
-                    &pushed["states"]["model:orders"]["last_build"]
-                ),
-                "{}: a changed state invalidates the old ETag",
+                (relisted.status(), etag(&relisted)),
+                (StatusCode::NOT_MODIFIED, first_tag.clone()),
+                "{}: a changed state keeps the list's ETag, since node-states serves states",
                 test_case.description
             );
 
@@ -254,7 +248,7 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
                         json!({"topic": "node_status:development", "version": 3, "previous_version": 2, "full": true}),
                         json!({"topic": format!("snapshot:{location}")}),
                     ],
-                    format!("\"{}:3\"", republished.snapshot_id),
+                    format!("\"{}\"", republished.snapshot_id),
                 ),
                 "{}: a new snapshot resets the list and tells clients to refetch the states",
                 test_case.description
@@ -523,6 +517,66 @@ fn given_builds_of_many_nodes_when_states_refresh_then_large_changes_ask_clients
                 "{}",
                 test_case.description
             );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_held_node_states_when_a_signal_names_their_target_then_only_watched_targets_stay_held() {
+    let test_cases = [
+        HeldTargetTestCase {
+            description: "a target nobody watches is dropped and read again on the next request",
+            watched: false,
+            expected_held_and_refreshed: (false, false),
+        },
+        HeldTargetTestCase {
+            description: "a watched target stays held and refreshes",
+            watched: true,
+            expected_held_and_refreshed: (true, true),
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(Backend::Sqlite).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = role_fixture(store).await.location_id;
+            let mut input = orders_snapshot(location, &["orders"]);
+            input.generation = 2;
+            publish_snapshot(store, &input).await.expect("orders");
+            let changes = tokio::sync::broadcast::channel(16).0;
+            let (cache, task) = start_node_states(store, &changes);
+            let task = tokio::spawn(task);
+            let scope = (location, "development");
+            let watch = test_case.watched.then(|| watch_target(&cache, scope));
+            current_view(&cache, scope, None).await.expect("first view");
+            let mut updates = cache.updates.subscribe();
+            changes
+                .send(ChangeMessage::Changed {
+                    location_id: location,
+                    target_hash: sha256_hex(b"development"),
+                    topic: ChangeTopic::NodeStatus,
+                })
+                .expect("signal");
+            let refreshed = tokio::time::timeout(Duration::from_secs(2), updates.recv())
+                .await
+                .is_ok();
+            let held = cache
+                .targets
+                .lock()
+                .expect("targets")
+                .contains_key(&(location, "development".to_owned()));
+            assert_eq!(
+                (held, refreshed),
+                test_case.expected_held_and_refreshed,
+                "{}",
+                test_case.description
+            );
+            drop(watch);
+            task.abort();
             close_test_store(fixture).await;
         });
     }

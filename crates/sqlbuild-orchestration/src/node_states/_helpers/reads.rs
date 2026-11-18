@@ -117,6 +117,7 @@ fn snapshot_catalog(snapshot_id: Uuid, nodes: BTreeMap<String, SnapshotNode>) ->
         snapshot_id: Some(snapshot_id),
         records,
         inputs,
+        body: Default::default(),
     }
 }
 

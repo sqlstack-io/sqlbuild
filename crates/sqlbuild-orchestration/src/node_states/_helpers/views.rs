@@ -11,25 +11,40 @@ use crate::api::models::ChangeNotice;
 use crate::node_states::_helpers::reads::read_target;
 use crate::node_states::constants::MAX_PUSHED_NODE_STATES;
 use crate::node_states::models::{
-    NodeState, NodeStateCache, NodeStatusUpdate, TargetCache, TargetView,
+    NodeState, NodeStateCache, NodeStatesWatch, NodeStatusUpdate, TargetCache, TargetView,
 };
 use crate::store::errors::ControlError;
 
 /// The target's cache entry, created empty on first use.
-pub(crate) fn target_cache(
+pub(crate) fn target_cache(cache: &NodeStateCache, scope: (Uuid, &str)) -> Arc<TargetCache> {
+    held_entry(cache, scope, false)
+}
+
+/// Watch the target's entry; counted under the targets lock, so a signal never drops an entry a stream holds.
+pub(crate) fn watch_target(cache: &NodeStateCache, scope: (Uuid, &str)) -> NodeStatesWatch {
+    NodeStatesWatch {
+        entry: held_entry(cache, scope, true),
+    }
+}
+
+fn held_entry(
     cache: &NodeStateCache,
     (location_id, target): (Uuid, &str),
+    watch: bool,
 ) -> Arc<TargetCache> {
     let mut targets = cache.targets.lock().unwrap_or_else(PoisonError::into_inner);
-    targets
+    let entry = targets
         .entry((location_id, target.to_owned()))
         .or_insert_with(|| {
             Arc::new(TargetCache {
                 target_hash: sha256_hex(target.as_bytes()),
                 ..TargetCache::default()
             })
-        })
-        .clone()
+        });
+    if watch {
+        entry.watchers.fetch_add(1, Ordering::SeqCst);
+    }
+    entry.clone()
 }
 
 pub(crate) fn held_view(entry: &TargetCache) -> Option<Arc<TargetView>> {
@@ -100,7 +115,6 @@ pub(crate) async fn refresh_view(
                 catalog,
                 states: Arc::new(states),
                 changed_build: changed_build.map(Arc::new),
-                nodes_body: Default::default(),
                 states_body: Default::default(),
             });
             *entry.view.write().unwrap_or_else(PoisonError::into_inner) = Some(view.clone());
