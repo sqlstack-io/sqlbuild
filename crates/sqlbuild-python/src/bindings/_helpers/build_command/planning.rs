@@ -17,7 +17,7 @@ use crate::bindings::_helpers::build_command::support::{
 };
 use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspection;
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
+use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::manifest::builder::build_manifest;
 use crate::bindings::_helpers::native_host::host;
@@ -123,20 +123,32 @@ pub(crate) fn compile_build_plan<'py>(context: &BuildContext<'py>) -> PyResult<B
         ],
     )?;
     let verbose: bool = native_field(&context.request, "verbose")?.is_truthy()?;
+    let options: Bound<'py, PyAny> = request_options(context)?;
+    let held: Option<Bound<'py, PyAny>> = held_compile(context, &options)?;
     with_verbose_inspection(py, verbose, || {
-        run_compile_pipeline(
-            py,
-            Some(keywords(
-                py,
-                &[
-                    ("discovered_inputs", context.get("discovered_inputs")?),
-                    ("adapter", context.get("adapter")?),
-                    ("options", request_options(context)?),
-                    ("hooks", hooks),
-                ],
-            )?),
+        planned_project(
+            (&context.get("discovered_inputs")?, &context.get("adapter")?),
+            (&options, hooks),
+            (held.as_ref(), None),
         )
     })
+}
+
+/// The compiled project a worker verified its run against, when compiling again could not differ: no run variables, SQL validation on and no dbt manifest to resolve references from.
+fn held_compile<'py>(
+    context: &BuildContext<'py>,
+    options: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let held: Bound<'py, PyAny> = native_field(&context.request, "compiled_project")?;
+    let project_config: Bound<'py, PyAny> =
+        native_field(&context.get("discovered_inputs")?, "project_config")?;
+    let dbt_manifest: Bound<'py, PyAny> =
+        native_field(&native_field(&project_config, "dbt")?, "target_path")?;
+    let reusable: bool = !held.is_none()
+        && !native_field(options, "cli_vars")?.is_truthy()?
+        && !native_field(options, "no_sql_validation")?.is_truthy()?
+        && dbt_manifest.is_none();
+    Ok(reusable.then_some(held))
 }
 
 /// Write the formatted plan to stdout, or stderr for debug and JSON runs.
