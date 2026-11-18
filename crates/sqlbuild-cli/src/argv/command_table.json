@@ -1192,6 +1192,65 @@
         "default": false,
         "help": "print the OpenAPI contract as JSON without opening a database",
         "group": 1
+       },
+       {
+        "kind": "parsers",
+        "dest": "server_command",
+        "nargs": "A...",
+        "required": false,
+        "group": 0,
+        "parsers": [
+         {
+          "name": "migrate",
+          "parser": {
+           "prog": "sqb server migrate",
+           "description": "Apply the control store's pending schema migrations and exit.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--dry-run"
+             ],
+             "dest": "control_dry_run",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "list the migrations that would run without changing the store",
+             "group": 1
+            }
+           ]
+          }
+         }
+        ],
+        "choices_help": [
+         {
+          "dest": "migrate",
+          "metavar": "migrate",
+          "help": "apply pending control-store migrations and exit"
+         }
+        ]
        }
       ]
      }

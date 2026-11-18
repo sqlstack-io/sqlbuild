@@ -5,7 +5,9 @@ use sqlbuild_orchestration::api::main::openapi_document::openapi_document;
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::command::decision::{flag, text};
 use crate::native_commands::_helpers::command::terminal::{finish_lost_stdout, write_output};
-use crate::native_commands::_helpers::location::execution::run_control_action;
+use crate::native_commands::_helpers::location::execution::{
+    run_control_action, run_store_migration,
+};
 use crate::native_commands::constants::{ADMIN_COMMAND, SCHEDULER_COMMAND, SERVER_COMMAND};
 
 pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
@@ -45,6 +47,9 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
             return Some(1);
         }
     };
+    if text(namespace, "server_command").as_deref() == Some("migrate") {
+        return Some(run_store_migration(namespace, &runtime));
+    }
     let admin = command == ADMIN_COMMAND;
     let role = if admin { "administration" } else { "service" };
     let result = runtime.block_on(run_control_action(namespace, &command));

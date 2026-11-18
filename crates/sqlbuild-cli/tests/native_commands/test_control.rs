@@ -1,7 +1,10 @@
 use std::process::Command;
 
 use crate::helpers::{api_ready, isolated_binary, start_control, wait_for_health};
-use crate::test_types::{CommandTestCase, OpenApiTestCase, ServiceTestCase, TriggerCursorTestCase};
+use crate::test_types::{
+    CommandTestCase, OpenApiTestCase, ServiceTestCase, StoreMigrationCommandTestCase,
+    TriggerCursorTestCase,
+};
 
 #[test]
 fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_python_and_database_access_are_not_required()
@@ -360,6 +363,56 @@ fn given_a_standalone_server_when_exporting_openapi_then_the_worker_contract_is_
             !directory.path().join(".sqlbuild").exists(),
             "{}",
             test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_control_store_when_running_server_migrate_then_dry_run_lists_and_migrate_applies() {
+    let test_cases = [
+        StoreMigrationCommandTestCase {
+            description: "dry run without a store creates nothing",
+            arguments: &["server", "migrate", "--dry-run"],
+            expected_stdout: "No control store at ./.sqlbuild/control.sqlite3: would create one.\n",
+            expected_store: false,
+        },
+        StoreMigrationCommandTestCase {
+            description: "migrate an empty store",
+            arguments: &["server", "migrate"],
+            expected_stdout: "The control store is empty: created schema version 1.\n",
+            expected_store: true,
+        },
+        StoreMigrationCommandTestCase {
+            description: "dry run on a current store",
+            arguments: &["server", "migrate", "--dry-run"],
+            expected_stdout: "The control store is at schema version 1: nothing to migrate.\n",
+            expected_store: true,
+        },
+    ];
+    let directory = tempfile::tempdir().expect("isolated CLI directory");
+    let binary = isolated_binary(directory.path());
+    for test_case in test_cases {
+        let output = Command::new(&binary)
+            .args(test_case.arguments)
+            .current_dir(directory.path())
+            .env("PATH", "")
+            .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
+            .output()
+            .expect("run sqb server migrate");
+        assert_eq!(
+            (
+                output.status.success(),
+                String::from_utf8_lossy(&output.stdout).into_owned(),
+                directory.path().join(".sqlbuild/control.sqlite3").exists(),
+            ),
+            (
+                true,
+                test_case.expected_stdout.to_owned(),
+                test_case.expected_store
+            ),
+            "{}: {}",
+            test_case.description,
+            String::from_utf8_lossy(&output.stderr)
         );
     }
 }
