@@ -2,13 +2,13 @@
 
 use crate::planner_migrations::_helpers::column::column_objects::model;
 use crate::planner_migrations::_helpers::column::column_objects::text;
+use crate::planner_migrations::_helpers::old_name::identity_index::IdentityIndex;
 use crate::planner_migrations::_helpers::old_name::old_name_objects::expires;
 use crate::planner_migrations::_helpers::old_name::old_name_objects::location;
 use crate::planner_migrations::_helpers::old_name::old_name_objects::relation;
 use crate::planner_migrations::_helpers::old_name::old_name_objects::retention;
 use crate::planner_migrations::_helpers::old_name::old_name_objects::stores_history;
 use crate::planner_migrations::_helpers::old_name::old_names::declared_column_aliases;
-use crate::planner_migrations::_helpers::old_name::old_names::old_name_view_skip_reason;
 use crate::planner_migrations::constants::PENDING_ARCHIVE;
 use crate::planner_migrations::constants::PENDING_VIEW;
 use crate::planner_migrations::models::OldNamePlanner;
@@ -16,9 +16,9 @@ use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyBool, PyList, PyTuple};
+use sqlbuild_analysis::planner_migrations::main::old_name_skip_reason::old_name_skip_reason;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
@@ -28,6 +28,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::planner_phases::main::object::object;
+use std::cell::OnceCell;
 
 impl<'py> OldNamePlanner<'py> {
     pub(super) fn new(
@@ -52,6 +53,51 @@ impl<'py> OldNamePlanner<'py> {
             retention: native_field(&config, "old_name_views")?,
             now: runtime_field(&runtime, |runtime| &runtime.invocation_time)?,
             runtime,
+            model_index: OnceCell::new(),
+            view_index: OnceCell::new(),
+            history_index: OnceCell::new(),
+        })
+    }
+
+    /// `cell`'s index, building it from `relations` the first time.
+    fn index<'a>(
+        cell: &'a OnceCell<IdentityIndex>,
+        relations: impl FnOnce() -> PyResult<Vec<Bound<'py, PyAny>>>,
+    ) -> PyResult<&'a IdentityIndex> {
+        if let Some(index) = cell.get() {
+            return Ok(index);
+        }
+        let built: IdentityIndex = IdentityIndex::of(&relations()?)?;
+        Ok(cell.get_or_init(|| built))
+    }
+
+    /// Model positions by destination relation.
+    fn model_index(&self) -> PyResult<&IdentityIndex> {
+        Self::index(&self.model_index, || {
+            self.models
+                .iter()
+                .map(|item| relation(&destination(item)?))
+                .collect()
+        })
+    }
+
+    /// Recorded view positions by old relation.
+    fn view_index(&self) -> PyResult<&IdentityIndex> {
+        Self::index(&self.view_index, || {
+            self.views
+                .try_iter()?
+                .map(|view| relation(&native_field(&view?, "old")?))
+                .collect()
+        })
+    }
+
+    /// History positions by their move's destination relation.
+    fn history_index(&self) -> PyResult<&IdentityIndex> {
+        Self::index(&self.history_index, || {
+            self.histories
+                .iter()
+                .map(|history| native_field(&native_field(history, "move")?, "destination"))
+                .collect()
         })
     }
 
@@ -61,14 +107,9 @@ impl<'py> OldNamePlanner<'py> {
         origin: Option<&Bound<'py, PyAny>>,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
         let mut newest: Option<(Bound<'py, PyTuple>, Bound<'py, PyAny>)> = None;
-        for history in &self.histories {
+        for position in self.history_index()?.matching(destination)? {
+            let history = &self.histories[position];
             let movement = native_field(history, "move")?;
-            if !native_field(&movement, "destination")?
-                .call_method1("matches", (destination,))?
-                .is_truthy()?
-            {
-                continue;
-            }
             if let Some(origin) = origin
                 && !native_field(&movement, "origin")?
                     .call_method1("matches", (origin,))?
@@ -145,30 +186,32 @@ impl<'py> OldNamePlanner<'py> {
         }
     }
 
+    /// Why no old-name view is kept for `origin`: a model reuses its name or a view already serves it.
     fn skip(
         &self,
         origin: &Bound<'py, PyAny>,
         tracked: Bound<'py, PyAny>,
         retention: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let py = self.runtime.py();
+        if retention.is_none() {
+            return object(py, old_name_skip_reason(false, None, false, None));
+        }
+        let old = relation(origin)?;
+        let reuser: Option<String> = match self.model_index()?.matching(&old)?.first() {
+            Some(position) => Some(name_object(&self.models[*position])?.extract()?),
+            None => None,
+        };
+        let compatibility_view: bool =
+            reuser.is_none() && !self.view_index()?.matching(&old)?.is_empty();
         object(
-            self.runtime.py(),
-            old_name_view_skip_reason(
-                self.runtime.py(),
-                Some(keywords(
-                    self.runtime.py(),
-                    &[
-                        ("origin", origin.clone()),
-                        ("origin_tracked", tracked),
-                        ("retention", retention.clone()),
-                        (
-                            "models",
-                            PyTuple::new(self.runtime.py(), &self.models)?.into_any(),
-                        ),
-                        ("views", self.views.clone()),
-                    ],
-                )?),
-            )?,
+            py,
+            old_name_skip_reason(
+                true,
+                reuser.as_deref(),
+                compatibility_view,
+                tracked.extract()?,
+            ),
         )
     }
 

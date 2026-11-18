@@ -7,6 +7,7 @@ use crate::planner_migrations::_helpers::discovery::state_inspection::pending;
 use crate::planner_migrations::_helpers::discovery::state_inspection::relation_key;
 use crate::planner_migrations::_helpers::discovery::state_inspection::schema_or_empty;
 use crate::planner_migrations::_helpers::discovery::state_inspection::tuple_of;
+use crate::planner_migrations::_helpers::old_name::identity_index::IdentityIndex;
 use crate::planner_warehouse::main::inspection::columns_for::columns_for;
 use crate::planner_warehouse::main::inspection::list_relations::list_relations;
 use crate::planner_warehouse::models::FingerprintRead;
@@ -41,6 +42,7 @@ use sqlbuild_python_front::state_rows::main::migrations::layout::layout;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_views::old_name_views;
 use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
 use sqlbuild_state::events::models::{EventRelation, FingerprintKey};
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -53,6 +55,12 @@ pub(crate) struct OldNamePlanner<'py> {
     pub columns: Bound<'py, PyAny>,
     pub retention: Bound<'py, PyAny>,
     pub now: Bound<'py, PyAny>,
+    /// `models` by destination relation, built on first use.
+    pub model_index: OnceCell<IdentityIndex>,
+    /// `views` by old relation, built on first use.
+    pub view_index: OnceCell<IdentityIndex>,
+    /// `histories` by their move's destination, built on first use.
+    pub history_index: OnceCell<IdentityIndex>,
 }
 
 #[derive(Debug)]
