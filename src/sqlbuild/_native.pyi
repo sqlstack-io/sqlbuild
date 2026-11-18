@@ -13538,8 +13538,14 @@ class PlannerInputError(ValueError):
     code: str
     message: str
     help: str | None
+    missing: tuple[str, ...] | None
     def __init__(
-        self, message: str, *, code: str | None = None, help: str | None = None
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        help: str | None = None,
+        missing: tuple[str, ...] | None = None,
     ) -> None: ...
 
 class FutureCursorSafetyError(PlannerInputError):

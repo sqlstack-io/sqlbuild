@@ -1,6 +1,6 @@
 //! Execute the prepared clone plan and propagate fingerprints.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -13,6 +13,7 @@ use crate::bindings::_helpers::clone::clone_command::Invocation;
 use crate::bindings::_helpers::clone::clone_progress::{
     CloneFingerprintReporter, CloneItemPrinter,
 };
+use sqlbuild_analysis::fingerprint_storage::constants::{NODE_TYPE_MODEL, NODE_TYPE_SEED};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -23,7 +24,10 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_front::native_host::main::append_replaced_consumption::append_replaced_consumption;
 use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
+use sqlbuild_python_planner::consumption::main::relation::relation;
+use sqlbuild_state::consumption::models::{NodeKey, RelationKey};
 
 const DESTINATION_ENTRY_GROUPS: [&str; 4] = [
     "destination_source_entries",
@@ -36,6 +40,13 @@ const ORIGIN_ENTRY_GROUPS: [&str; 3] = [
     "origin_model_entries",
     "origin_seed_entries",
 ];
+
+/// A clone item that finished cleanly.
+const SUCCESS_STATUS: &str = "success";
+/// Clone actions that replace the destination relation with the origin's data.
+const REPLACING_ACTIONS: [&str; 2] = ["cloned", "copied"];
+/// The materialization of a model the clone recreates as a view rather than replacing.
+const VIEW_MATERIALIZATION: &str = "view";
 
 /// The pipeline's plan entries of `groups`, in order.
 fn entries<'py>(pipeline: &Bound<'py, PyAny>, groups: &[&str]) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -310,6 +321,57 @@ fn copy_fingerprints<'py>(
     Ok(())
 }
 
+/// Mark each table and seed the clone replaced as having no completed consumption record, so `--changed` rebuilds it once.
+pub(crate) fn forget_replaced_consumption(
+    (adapter, connection): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    pipeline: &Bound<'_, PyAny>,
+    result: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let mut replaced_names: HashSet<String> = HashSet::new();
+    for item in native_field(result, "item_results")?.try_iter()? {
+        let item: Bound<'_, PyAny> = item?;
+        let status: String = native_field(&native_field(&item, "status")?, "value")?.extract()?;
+        let action: String = native_field(&native_field(&item, "action")?, "value")?.extract()?;
+        if status == SUCCESS_STATUS && REPLACING_ACTIONS.contains(&action.as_str()) {
+            replaced_names.insert(native_field(&item, "name")?.extract()?);
+        }
+    }
+    let mut replaced: Vec<(NodeKey, RelationKey)> = Vec::new();
+    for (group, kind) in [
+        ("destination_model_entries", NODE_TYPE_MODEL),
+        ("destination_seed_entries", NODE_TYPE_SEED),
+    ] {
+        for entry in native_field(pipeline, group)?.try_iter()? {
+            let entry: Bound<'_, PyAny> = entry?;
+            let name: String = native_field(&entry, "name")?.extract()?;
+            let destination: Bound<'_, PyAny> = native_field(&entry, "destination")?;
+            let view: bool = kind == NODE_TYPE_MODEL
+                && native_field(&native_field(&entry, "materialization_type")?, "value")?
+                    .extract::<String>()?
+                    == VIEW_MATERIALIZATION;
+            if view
+                || !replaced_names.contains(&name)
+                || native_field(&destination, "schema")?.is_none()
+            {
+                continue;
+            }
+            replaced.push((
+                NodeKey {
+                    kind: kind.to_owned(),
+                    name,
+                },
+                relation(&destination)?,
+            ));
+        }
+    }
+    let project: Bound<'_, PyAny> = native_field(pipeline, "destination_project")?;
+    append_replaced_consumption(
+        (adapter, connection),
+        &native_field(&project, "run_id")?.extract::<String>()?,
+        replaced,
+    )
+}
+
 /// Execute the clone, streaming items, then copy fingerprints; returns the result and elapsed seconds.
 pub(crate) fn execute_clone_plan<'py>(
     request: &Bound<'py, PyAny>,
@@ -351,6 +413,9 @@ pub(crate) fn execute_clone_plan<'py>(
     let closed: PyResult<Bound<'py, PyAny>> = event_writer.call_method0("close");
     let result: Bound<'py, PyAny> = executed?;
     closed?;
+    let marked: PyResult<()> =
+        forget_replaced_consumption((&invocation.adapter, connection), pipeline, &result);
     copy_fingerprints(invocation, (pipeline, connection), &result)?;
+    marked?;
     Ok((result, started.elapsed().as_secs_f64()))
 }

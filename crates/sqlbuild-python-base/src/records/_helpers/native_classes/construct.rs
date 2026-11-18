@@ -60,7 +60,17 @@ pub(crate) fn new_error(
 pub(crate) fn exception_from(
     class: PyResult<Bound<'_, PyAny>>,
     message: &str,
+    keywords: (Option<&str>, Option<&str>),
+) -> PyErr {
+    exception_with_fields(class, message, keywords, &[])
+}
+
+/// The exception `class` with `message`, the given `code` and `help`, and its declared `fields`, or the error raising it.
+pub(crate) fn exception_with_fields<'py>(
+    class: PyResult<Bound<'py, PyAny>>,
+    message: &str,
     (code, help): (Option<&str>, Option<&str>),
+    fields: &[(&str, Bound<'py, PyAny>)],
 ) -> PyErr {
     class
         .and_then(|class| {
@@ -70,6 +80,9 @@ pub(crate) fn exception_from(
             }
             if let Some(help) = help {
                 keywords.set_item("help", help)?;
+            }
+            for (name, value) in fields {
+                keywords.set_item(*name, value)?;
             }
             class.call((message,), Some(&keywords))
         })

@@ -1,4 +1,5 @@
 pub mod append_observations;
+pub mod append_replaced_consumption;
 pub mod execute;
 pub mod fixed_state_table_sql;
 pub mod integer_literal;

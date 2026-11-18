@@ -209,3 +209,8 @@ export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | '
 	if (next) return `job ${job} · next run ${formatIn(next, now)}`;
 	return live.some((t) => t.type === 'sensor') ? `job ${job} · when its sensor fires` : `job ${job}`;
 }
+
+/** The `sqb clone` commands a plan error offers for missing upstreams (S301), each ready to copy as is. */
+export function cloneCommands(error: string): { origin: string; command: string }[] {
+	return [...error.matchAll(/^\s*copy .+?:\s+(sqb clone --from (\S+) .+)$/gm)].map((match) => ({ origin: match[2], command: match[1].trim() }));
+}

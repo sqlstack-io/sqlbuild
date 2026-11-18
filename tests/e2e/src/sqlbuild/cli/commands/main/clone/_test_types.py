@@ -74,3 +74,52 @@ class CloneTimingsE2ETestCase:
 
     description: str
     expected_phases: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CloneChangedPlanE2ETestCase:
+    """Commands run after building both targets, and what `plan --changed` says after them."""
+
+    description: str
+    commands: tuple[tuple[str, ...], ...]
+    expected_fragments: tuple[str, ...]
+    unexpected_fragments: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class CloneMissingUpstreamE2ETestCase:
+    """A target missing a selected model's upstreams, and the clone command S301 prints for it."""
+
+    description: str
+    default_target: str
+    target_args: tuple[str, ...]
+    expected_clone_command: str
+
+
+@dataclass(frozen=True)
+class MissingUpstreamFixesE2ETestCase:
+    """Whether the planned target may be cloned into, and what S301 then offers."""
+
+    description: str
+    destination_allowed: bool
+    expected_fragments: tuple[str, ...]
+    unexpected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PartialDeferCloneE2ETestCase:
+    """A defer clone with one boundary missing in the origin, and what `plan --changed` says."""
+
+    description: str
+    dropped_origin_table: str
+    expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class UnwritableConsumptionDeferCloneE2ETestCase:
+    """A partly failed defer clone whose destination consumption table rejects writes."""
+
+    description: str
+    dropped_origin_table: str
+    before_clone: tuple[str, ...]
+    expected_fragments: tuple[str, ...]

@@ -87,6 +87,19 @@ pub struct AvailableUpstreams {
     pub deferred_relations: Option<HashSet<String>>,
 }
 
+/// What a missing-upstream message offers to fix the misses with, all from configuration.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MissingUpstreamFixes {
+    /// The active target, named as where the upstreams are missing.
+    pub target: Option<String>,
+    /// Targets the active target may clone from, to defer to or clone the upstreams from.
+    pub origins: Vec<String>,
+    /// The origins `--defer-to` accepts: project targets, offered only when this plan does not defer already.
+    pub deferrable: Vec<String>,
+    /// The clone command's `--to`, needed when the active target is not the default one.
+    pub clone_to: Option<String>,
+}
+
 /// One upstream dependency missing from both scope and warehouse, with its dependents.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MissingUpstream {

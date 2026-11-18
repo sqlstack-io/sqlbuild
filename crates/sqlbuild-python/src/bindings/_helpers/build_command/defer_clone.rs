@@ -19,6 +19,7 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::policies::build_command_error;
 use crate::bindings::_helpers::build_command::policies::enforce_model_execution_limit_binding;
+use crate::bindings::_helpers::clone::clone_execution::forget_replaced_consumption;
 use crate::bindings::_helpers::clone::clone_pipeline::run_clone_pipeline_with_options;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -440,6 +441,8 @@ fn clone_boundaries<'py>(
         ),
     )?;
     let result: Bound<'py, PyAny> = executed_clone(context, prephase, (&pipeline, connection))?;
+    let marked: PyResult<()> =
+        forget_replaced_consumption((&prephase.adapter, connection), &pipeline, &result);
     let failed: Vec<String> = failed_items(&result)?;
     if !failed.is_empty() {
         return Err(user_error(
@@ -455,7 +458,7 @@ fn clone_boundaries<'py>(
     call_with(
         &host_entry(py, ExecutorHost::CopyCloneFingerprints)?,
         &[
-            ("result", result),
+            ("result", result.clone()),
             (
                 "origin_model_entries",
                 native_field(&pipeline, "origin_model_entries")?,
@@ -481,7 +484,7 @@ fn clone_boundaries<'py>(
             ),
         ],
     )?;
-    Ok(())
+    marked
 }
 
 /// Clone the selected boundary relations from the origin before build planning.
