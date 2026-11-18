@@ -39,6 +39,7 @@ from sqlbuild.adapter.contract.exceptions import (
     UnsupportedTypedSqlRenderingError,
 )
 from sqlbuild.adapter.contract.main.column_name_key import column_name_key
+from sqlbuild.adapter.contract.main.estimates_one_at_a_time import estimates_one_at_a_time
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
 from sqlbuild.adapter.contract.main.unsupported_relation_usage import unsupported_relation_usage
@@ -1691,15 +1692,11 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
     ) -> tuple[RelationRowCountEstimate, ...]:
         """Metadata-only rows and bytes of `names` in one schema, one relation at a time."""
 
-        return tuple(
-            self.estimate_relation_row_count(
-                connection=connection,
-                database=database,
-                schema=schema,
-                name=name,
-                metadata_only=True,
-            )
-            for name in names
+        return estimates_one_at_a_time(
+            estimate=self.estimate_relation_row_count,
+            connection=connection,
+            location=(database, schema),
+            names=names,
         )
 
     def _build_row_diff_relation_ctes(

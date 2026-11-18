@@ -139,6 +139,7 @@ E2E_DUCKDB_BUILD_CORE_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_execution_limits.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_explicit_references.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_expression_sources.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_ignored_audit_failures.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_lifecycle_commands.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_manifest_artifact_gating.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_materialization_type_change.py \

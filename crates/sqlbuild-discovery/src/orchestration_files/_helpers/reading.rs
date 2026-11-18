@@ -125,12 +125,15 @@ fn schedule(text: &str, raw: Spanned<RawSchedule>) -> Result<ScheduleFile, FileE
 /// A retry key's value under its current name and under its deprecated name.
 type RetryValues = (Option<Spanned<i64>>, Option<Spanned<i64>>);
 
+/// A retry number with whether it was set, and the deprecation its name records.
+type RetryNumber<T> = (Option<(T, bool)>, Option<Deprecation>);
+
 /// One retry number within its name's range, and the deprecation a deprecated name records.
 fn retry_number<T: TryFrom<i64>>(
     text: &str,
     (table, keys, values): (&str, (&str, &str), RetryValues),
     ranges: ((i64, i64), (i64, i64)),
-) -> Result<(Option<(T, bool)>, Option<Deprecation>), FileError> {
+) -> Result<RetryNumber<T>, FileError> {
     let mut deprecation: Option<Deprecation> = None;
     let (key, value, range) = match values {
         (Some(_), Some(deprecated)) => {

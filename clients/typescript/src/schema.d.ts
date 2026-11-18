@@ -4161,10 +4161,7 @@ export interface components {
              * @description Milliseconds since the synchronization began.
              */
             elapsed_millis: number;
-            /**
-             * @description Failed reads in a row stopped the synchronization. It resumes after the next run, on
-             *     request or on a publication, and at `next_sync_at` when the report sets one.
-             */
+            /** @description Failed reads in a row stopped the sync until a run, a request, a publication or `next_sync_at`. */
             halted?: boolean;
             /**
              * Format: int64

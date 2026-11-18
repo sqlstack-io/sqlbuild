@@ -90,6 +90,13 @@ class DiffMixin(ABC):
         ...
 
     @abstractmethod
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Metadata-only estimates of `names` in one schema, in order, never scanning data."""
+        ...
+
+    @abstractmethod
     def sample_unequal_rows(
         self,
         *,

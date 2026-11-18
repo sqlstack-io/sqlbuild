@@ -55,6 +55,7 @@ from sqlbuild.adapter.contract.constants import (
     DIFF_RIGHT_SIDE,
 )
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
+from sqlbuild.adapter.contract.main.estimates_one_at_a_time import estimates_one_at_a_time
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
@@ -1550,6 +1551,18 @@ class SqliteAdapter(
             f"SELECT COUNT(*) FROM {quote_identifier(table_name)}"
         ).fetchone()
         return RelationRowCountEstimate(row_count=int(count[0]))
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Metadata-only estimates of `names` in one schema, one relation at a time."""
+
+        return estimates_one_at_a_time(
+            estimate=self.estimate_relation_row_count,
+            connection=connection,
+            location=(database, schema),
+            names=names,
+        )
 
     def diff_schema(
         self,

@@ -138,10 +138,9 @@ fn cached_json(json: CachedJson, headers: &HeaderMap) -> Result<Response, ApiErr
         headers
             .get_all(header::IF_NONE_MATCH)
             .iter()
-            .filter_map(header_text)
-            .flat_map(|value| value.split(','))
-            .map(|tag| tag.trim().trim_start_matches("W/"))
-            .any(|tag| tag == ANY_ETAG || etag.as_bytes() == tag.as_bytes())
+            .flat_map(|value| value.as_bytes().split(|byte| *byte == b','))
+            .map(weak_stripped)
+            .any(|tag| tag == ANY_ETAG.as_bytes() || etag.as_bytes() == tag)
     });
     let mut response = if unchanged {
         StatusCode::NOT_MODIFIED.into_response()
@@ -161,12 +160,13 @@ fn cached_json(json: CachedJson, headers: &HeaderMap) -> Result<Response, ApiErr
     Ok(response)
 }
 
-/// A request header's text; non-ASCII bytes cannot name an ETag this server issued.
-fn header_text(value: &HeaderValue) -> Option<&str> {
-    match value.to_str() {
-        Ok(text) => Some(text),
-        Err(header::ToStrError { .. }) => None,
+/// One listed entity tag without its surrounding spaces or weak `W/` marks; issued tags are ASCII.
+fn weak_stripped(mut tag: &[u8]) -> &[u8] {
+    tag = tag.trim_ascii();
+    while let Some(rest) = tag.strip_prefix(b"W/") {
+        tag = rest;
     }
+    tag
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs", operation_id = "listPersonNodeRuns",

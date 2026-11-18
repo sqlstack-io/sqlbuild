@@ -223,10 +223,10 @@ pub(crate) async fn member_reactions(
             })
             .collect();
         skipped.sort_unstable();
-        let outcome = skipped
-            .is_empty()
-            .then_some((NodeOutcome::Success, RunOutcome::Success))
-            .unwrap_or((NodeOutcome::Skipped, RunOutcome::Failed));
+        let outcome = [
+            (NodeOutcome::Skipped, RunOutcome::Failed),
+            (NodeOutcome::Success, RunOutcome::Success),
+        ][usize::from(skipped.is_empty())];
         finish(store, &claim, outcome).await;
         reactions.insert(
             claim.request.job_key.clone().expect("member"),
@@ -267,13 +267,16 @@ pub(crate) async fn member_reactions(
     reactions
 }
 
+/// The lease, pool limits and `(location, target)` a test claims runs with.
+type ClaimScope<'a> = (
+    &'a SchedulerLease,
+    (&'a BTreeMap<String, NonZeroU32>, (Uuid, &'a str)),
+);
+
 /// With a retry delay, nothing starts until the test moves the retry's `not_before` into the past.
 pub(crate) async fn wait_out_retry_delay(
     store: &ControlStore,
-    (lease, (limits, scope)): (
-        &SchedulerLease,
-        (&BTreeMap<String, NonZeroU32>, (Uuid, &str)),
-    ),
+    (lease, (limits, scope)): ClaimScope<'_>,
     (run_id, delay_seconds): (Uuid, u32),
     description: &str,
 ) {
