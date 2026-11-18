@@ -8,7 +8,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PySet, PyTuple};
 use sqlbuild_analysis::planner_migrations::main::{
     declared_column_aliases as aliases, old_name_claim_message as claim, old_name_schemas,
-    old_name_skip_reason,
 };
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -131,55 +130,4 @@ pub(crate) fn old_name_claim_errors<'py>(
         }
     }
     PyTuple::new(py, errors)
-}
-
-pub(crate) fn old_name_view_skip_reason<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Option<String>> {
-    let arguments = KeywordArguments::read(
-        py,
-        "old_name_view_skip_reason",
-        options,
-        (
-            &["origin", "origin_tracked", "retention", "models", "views"],
-            &[],
-        ),
-    )?;
-    let retained = !arguments.value("retention")?.is_none();
-    if !retained {
-        return Ok(old_name_skip_reason::old_name_skip_reason(
-            false, None, false, None,
-        ));
-    }
-    let old = relation(&arguments.value("origin")?)?;
-    let mut reuser: Option<String> = None;
-    for model in arguments.value("models")?.try_iter()? {
-        let model = model?;
-        if relation(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?)?
-            .call_method1("matches", (&old,))?
-            .is_truthy()?
-        {
-            reuser = Some(name_object(&model)?.extract()?);
-            break;
-        }
-    }
-    let mut compatibility_view = false;
-    if reuser.is_none() {
-        for view in arguments.value("views")?.try_iter()? {
-            if relation(&native_field(&view?, "old")?)?
-                .call_method1("matches", (&old,))?
-                .is_truthy()?
-            {
-                compatibility_view = true;
-                break;
-            }
-        }
-    }
-    Ok(old_name_skip_reason::old_name_skip_reason(
-        true,
-        reuser.as_deref(),
-        compatibility_view,
-        arguments.value("origin_tracked")?.extract()?,
-    ))
 }
