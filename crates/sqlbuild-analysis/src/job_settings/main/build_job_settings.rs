@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 
 use serde_json::Value as Json;
 
-use crate::job_settings::_helpers::scope::setting_scope;
 use crate::job_settings::constants::CONFLICT_HELP;
 use crate::job_settings::errors::JobSettingConflict;
+use crate::job_settings::main::setting_scope::setting_scope;
 use crate::job_settings::models::{DeclaredRun, SettingScope};
 
 fn settings_of<'a>(

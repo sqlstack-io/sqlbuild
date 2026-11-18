@@ -112,6 +112,8 @@ pub enum ConcurrencySource {
     Target(String),
     LocalSettings,
     ProjectSettings,
+    /// The named jobs' `concurrency` limits added together, when larger than the configured limit.
+    NamedJobs,
 }
 
 impl std::fmt::Display for ConcurrencySource {
@@ -121,6 +123,7 @@ impl std::fmt::Display for ConcurrencySource {
             Self::Target(name) => write!(formatter, "targets.{name}.concurrency"),
             Self::LocalSettings => formatter.write_str("sqlbuild_local.toml settings.concurrency"),
             Self::ProjectSettings => formatter.write_str("settings.concurrency"),
+            Self::NamedJobs => formatter.write_str("named jobs' concurrency"),
         }
     }
 }

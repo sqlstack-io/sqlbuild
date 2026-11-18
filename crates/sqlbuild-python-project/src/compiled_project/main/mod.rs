@@ -17,4 +17,5 @@ pub mod python_column_facts;
 pub mod reference_row_tuple;
 pub mod register_project;
 pub mod triggered_jobs;
+pub mod with_frozen_job;
 pub mod with_job_scope;

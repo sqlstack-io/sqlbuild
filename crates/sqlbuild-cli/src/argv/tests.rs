@@ -2,6 +2,8 @@
 mod given_setting_dests;
 #[path = "tests/helpers.rs"]
 mod helpers;
+#[path = "tests/test_job_run_arguments.rs"]
+mod job_run_arguments;
 #[path = "tests/test_parse_cli_arguments.rs"]
 mod parse_cli_arguments;
 #[path = "tests/test_parse_dbt_execution_arguments.rs"]

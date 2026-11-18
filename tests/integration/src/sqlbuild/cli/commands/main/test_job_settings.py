@@ -91,6 +91,10 @@ _PROJECT_FILES: dict[str, str] = {
         )
         for name in ("a", "b", "c", "d")
     },
+    "orchestration/jobs/wide_job.toml": (
+        'name = "wide_job"\ndescription = "Wide."\nselect = "customers"\n\n'
+        '[settings]\nconcurrency = 6\nvars = { amount = "5" }\n'
+    ),
     "orchestration/jobs/slow_job.toml": (
         'name = "slow_job"\ndescription = "Slow."\nselect = "slow_a slow_b"\n\n'
         "[settings]\nconcurrency = 1\n"
@@ -351,6 +355,41 @@ def test_given_a_job_concurrency_when_building_then_its_nodes_never_exceed_it(
 @pytest.mark.parametrize(
     "test_case",
     [
+        JobOutputTestCase(
+            description="a named job's concurrency above the configured limit raises the build's",
+            command_args=("build", "--select", "job:wide_job"),
+            expected_exit_code=0,
+            expected_present=("(concurrency: 6)",),
+            expected_absent=(),
+        ),
+        JobOutputTestCase(
+            description="the named jobs' limits add up",
+            command_args=("build", "--select", "job:wide_job", "job:orders_job"),
+            expected_exit_code=0,
+            expected_present=("(concurrency: 7)",),
+            expected_absent=(),
+        ),
+        JobOutputTestCase(
+            description="the run context says the named jobs set the limit",
+            command_args=("build", "--verbose", "--select", "job:wide_job", "+orders"),
+            expected_exit_code=0,
+            expected_present=("6 configured limit (named jobs' concurrency)",),
+            expected_absent=(),
+        ),
+        JobOutputTestCase(
+            description="a configured limit above the named jobs' stays the build's limit",
+            command_args=("build", "--verbose", "--select", "job:orders_job", "customers"),
+            expected_exit_code=0,
+            expected_present=("4 configured limit (settings.concurrency)",),
+            expected_absent=(),
+        ),
+        JobOutputTestCase(
+            description="an explicit --concurrency wins over the named jobs",
+            command_args=("build", "--select", "job:wide_job", "--concurrency", "2"),
+            expected_exit_code=0,
+            expected_present=("(concurrency: 2)",),
+            expected_absent=(),
+        ),
         JobOutputTestCase(
             description="a plan shows the job's full refresh",
             command_args=("plan", "--select", "job:events_job"),

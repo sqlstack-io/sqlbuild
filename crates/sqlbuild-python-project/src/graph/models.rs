@@ -52,6 +52,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::discovery::main::records::stored_node_sets::stored_node_sets;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -565,4 +566,13 @@ pub struct GraphViewMappings<'a, 'py> {
     pub downstream: &'a Bound<'py, PyAny>,
     pub tag_index: &'a Bound<'py, PyAny>,
     pub path_index: &'a Bound<'py, PyAny>,
+}
+
+/// A project graph with the jobs some selectors name attached as a build selects them, Python
+/// nodes included, and the project facts selectors resolve with.
+pub struct PythonAwareSelection<'g> {
+    pub(crate) graph: Cow<'g, ProjectGraph>,
+    pub(crate) sources: Vec<(String, Option<String>)>,
+    pub(crate) allow_warehouse_round_trips: bool,
+    pub(crate) nodes: PythonSelectionGraph,
 }

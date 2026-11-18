@@ -9,16 +9,18 @@ use crate::job_settings::_helpers::node_values::node_values;
 use crate::job_settings::_helpers::selection::node_jobs;
 use crate::job_settings::constants::JOB_LIMIT_SETTING;
 use crate::job_settings::errors::NodeJobSettingsError;
-use crate::job_settings::models::{DeclaredRun, NodeJobSettings};
+use crate::job_settings::models::{DeclaredRun, NodeJobSettings, TokenNodes};
 
 /// Each node's named jobs, the settings they give it, and their limits.
 pub fn node_job_settings(
     graph: &ProjectGraph,
     selection: (&[String], &[String]),
     declared: &BTreeMap<String, DeclaredRun>,
+    token_nodes: TokenNodes<'_>,
 ) -> Result<NodeJobSettings, NodeJobSettingsError> {
     let mut result = NodeJobSettings {
-        node_jobs: node_jobs(graph, selection, declared).map_err(NodeJobSettingsError::Selector)?,
+        node_jobs: node_jobs(graph, selection, declared, token_nodes)
+            .map_err(NodeJobSettingsError::Selector)?,
         ..NodeJobSettings::default()
     };
     for (key, jobs) in &result.node_jobs {

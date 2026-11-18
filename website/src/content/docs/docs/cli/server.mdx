@@ -720,6 +720,10 @@ warehouse_heavy = 1
 `max_workers`, write claims, `overlap` and pools are compared on
 [Concurrency](/docs/concepts/concurrency).
 
+A job's run builds `--select job:<name>`, as `sqb build --select job:<name>` would on the command
+line, so the job's `concurrency`, `full_refresh`, `run_tests` and `ignore_audit_failures` apply to
+its nodes the same way. A group runs each of its jobs as its own run.
+
 ## Run ad-hoc commands
 
 People with `run.adhoc` can run a `sqb` command on the current publication without declaring a

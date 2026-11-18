@@ -48,9 +48,13 @@ concurrency = 2
 `--concurrency` on the command line wins over all of them; see
 [Target concurrency](project-configuration.md#target-concurrency) for the full order.
 A job's `concurrency` limits how many of that job's nodes build at once in a build that names the
-job, within the build's own limit. When one job is at its limit, a ready node of another job starts
-instead. Microbatch sub-work counts against the job too. `--concurrency` on the command line turns
-the per-job limits off; see [Settings when a build names a job](orchestration.md#settings-when-a-build-names-a-job). The job's page shows the value its runs use on the target and where it came from.
+job. Without `--concurrency`, the build may run as many nodes at once as the larger of the
+configured limit and the named jobs' limits added together; jobs without a `concurrency` add
+nothing. With a project limit of 1 and a job limit of 4, the build runs up to 4 nodes at once; with
+a project limit of 16, the build allows 16 and the job's nodes still run at most 4 at once. When
+one job is at its limit, a ready node of another job starts instead. Microbatch sub-work counts
+against the job too. A server runs a job the same way. `--concurrency` on the command line sets
+the build's limit and turns the per-job limits off; see [Settings when a build names a job](orchestration.md#settings-when-a-build-names-a-job). The job's page shows the value its runs use on the target and where it came from.
 
 ## Runs at once on a server: `max_workers`
 

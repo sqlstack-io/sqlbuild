@@ -32,7 +32,7 @@ pub fn published_concurrency(
         Ok(keys.iter().any(|key| key == CONCURRENCY))
     };
     let source = match effective.source {
-        Layer::CommandLine => ConcurrencySource::Job,
+        Layer::CommandLine | Layer::NamedJobs => ConcurrencySource::Job,
         Layer::Target(_) => ConcurrencySource::Target,
         Layer::LocalSettings => ConcurrencySource::Local,
         Layer::ProjectSettings if project_sets()? => ConcurrencySource::Project,
