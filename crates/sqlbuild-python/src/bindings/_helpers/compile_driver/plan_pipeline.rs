@@ -1,6 +1,9 @@
 //! The compile-and-plan pipeline of execution commands: compile, rules gate, then planning.
 
 use crate::bindings::_helpers::native_host::live_reads::LiveReads;
+use crate::bindings::_helpers::native_host::synced_catalog::{
+    attach_synced_catalog, report_synced_catalog,
+};
 use crate::bindings::_helpers::planner_phases::timings::{
     COMPILING, CONNECTING, EVALUATING_RULES, timed,
 };
@@ -286,6 +289,7 @@ fn planned<'py>(
                 })?;
                 connection = Some(opened.clone());
                 let reads = LiveReads::handle(adapter, &opened, None)?;
+                attach_synced_catalog(adapter, (discovered, compiled, options))?;
                 (opened, reads)
             }
         };
@@ -309,6 +313,7 @@ fn planned<'py>(
         tracker.setattr("planning_seconds", planning_seconds)?;
     }
     let result: Bound<'py, PyAny> = result?;
+    report_synced_catalog(adapter)?;
     write_plan_capture(&native_field(&result, "plan_output")?)?;
     replaced(
         &result,

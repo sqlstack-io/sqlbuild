@@ -15,7 +15,7 @@ use crate::bindings::_helpers::planner_migrations::models::{
     ModelMigrationDiscovery, ModelMigrationPlanning, ModelMigrationRequest,
 };
 use crate::bindings::_helpers::planner_migrations::planning_origin::{
-    require_same_database, resolve_origin,
+    models_by_name, require_same_database, resolve_origin,
 };
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
@@ -88,13 +88,14 @@ pub(crate) fn plan_model_migrations<'py>(
         &runtime,
         Some(&native_field(&snapshot, "fingerprints")?),
     )?;
-    let discovery = discover((phase, fingerprints), &state, &schemas)?;
-    finish(phase, &state, &schemas, &discovery)
+    let models = models_by_name(&runtime)?;
+    let discovery = discover((phase, fingerprints), (&state, &models), &schemas)?;
+    finish(phase, (&state, &models), &schemas, &discovery)
 }
 
 fn discover<'py>(
     (phase, fingerprints): (&MigrationPhase<'py>, &Bound<'py, PyAny>),
-    state: &Bound<'py, PyAny>,
+    (state, models): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
     schemas: &Bound<'py, PyAny>,
 ) -> PyResult<ModelMigrationDiscovery<'py>> {
     let runtime = phase.runtime.clone();
@@ -116,7 +117,7 @@ fn discover<'py>(
     }
     let mut declarations: Vec<ModelMigrationDeclaration<'py>> = Vec::new();
     for request in &declared_requests {
-        let (origin_location, origin_model) = resolve_origin(request, &runtime, state)?;
+        let (origin_location, origin_model) = resolve_origin(request, (&runtime, models), state)?;
         declarations.push(ModelMigrationDeclaration {
             model_name: model_reads::name_object(&request.model)?,
             origin_location,
@@ -137,7 +138,7 @@ fn discover<'py>(
 
 fn finish<'py>(
     phase: &MigrationPhase<'py>,
-    state: &Bound<'py, PyAny>,
+    (state, models): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
     schemas: &Bound<'py, PyAny>,
     discovery: &ModelMigrationDiscovery<'py>,
 ) -> PyResult<ModelMigrationPlanning<'py>> {
@@ -151,7 +152,7 @@ fn finish<'py>(
         Bound<'py, PyAny>,
     )> = Vec::new();
     for request in &discovery.requests {
-        let (origin, origin_model) = resolve_origin(request, &runtime, state)?;
+        let (origin, origin_model) = resolve_origin(request, (&runtime, models), state)?;
         resolved.push((request, origin, origin_model));
     }
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();

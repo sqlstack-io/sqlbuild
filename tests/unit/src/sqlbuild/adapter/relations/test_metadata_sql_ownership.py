@@ -21,6 +21,7 @@ _ALLOWED_METADATA_SQL_MODULES: frozenset[str] = frozenset(
         "adapters/databricks/constants.py",
         "adapters/postgres/classes/postgres_adapter.py",
         "adapters/snowflake/_helpers/metadata_types.py",
+        "adapters/snowflake/_helpers/relation_changes.py",
         "adapters/snowflake/_helpers/show_metadata.py",
         "adapters/snowflake/classes/snowflake_adapter.py",
         "adapters/sqlserver/classes/sqlserver_adapter.py",

@@ -173,3 +173,16 @@ class UnlistedMigrationOriginTestCase:
     select: tuple[str, ...]
     expected_warnings: tuple[str, ...]
     expected_unlisted_reads: int
+
+
+@dataclass(frozen=True)
+class PlanFromTestCase:
+    """Where a target and the command ask a plan to read from, and what the plan reports."""
+
+    description: str
+    target_plan_from: str | None
+    requested: str | None
+    store: bool
+    expected_report: str
+    expected_absent: tuple[str, ...]
+    expected_live_listing: bool

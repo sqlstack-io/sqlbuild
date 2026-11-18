@@ -41,6 +41,28 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
             )),
         },
         ProjectFailureTestCase {
+            description: "a target may plan from its synced state",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[targets.dev]\nplan_from = 'synced_state'\n",
+            local: "[targets.dev]\nplan_from = 'live'\n",
+            expected_failure: None,
+        },
+        ProjectFailureTestCase {
+            description: "plan_from names only live or synced_state",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[targets.dev]\nplan_from = 'cache'\n",
+            local: "",
+            expected_failure: Some(ConfigFailure::plain(
+                "Expected 'plan_from' to be one of: live, synced_state",
+            )),
+        },
+        ProjectFailureTestCase {
+            description: "a local target's plan_from names only live or synced_state",
+            project: "name = 'orders'\nadapter = 'duckdb'\n",
+            local: "[targets.dev]\nplan_from = 'cache'\n",
+            expected_failure: Some(ConfigFailure::plain(
+                "Expected 'plan_from' to be one of: live, synced_state",
+            )),
+        },
+        ProjectFailureTestCase {
             description: "an unknown key suggests the nearest supported key",
             project: "name = 'orders'\nadapter = 'duckdb'\n[scopes]\nenforce_placment = true\n",
             local: "",

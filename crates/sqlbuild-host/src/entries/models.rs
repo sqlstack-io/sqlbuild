@@ -94,6 +94,7 @@ pub enum AdapterHost {
     ResolveRelationLocationQualifiedName,
     RunBoundedInspections,
     RunRecordedInspectionQuery,
+    SyncedCatalog,
     InspectionQueryRecord,
     StatementMetadataEffect,
     ConditionalResultNullability,

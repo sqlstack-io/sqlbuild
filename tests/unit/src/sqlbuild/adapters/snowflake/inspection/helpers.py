@@ -21,7 +21,10 @@ from typing import Any
 import duckdb
 import pyarrow
 
-from sqlbuild.adapter.contract.models import RelationInfo
+from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
+from sqlbuild.adapter.relations.classes.inspection_catalog import InspectionCatalog
+from sqlbuild.adapter.relations.classes.synced_catalog import SyncedCatalog
+from sqlbuild.adapter.relations.models import SyncedRelation
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_connection import _SnowflakeConnection
 
@@ -170,6 +173,7 @@ class FakeRelation:
     is_transient: bool = False
     columns: tuple[FakeColumn, ...] = (FakeColumn(name="ID", data_type="NUMBER"),)
     retention_time: int = 1
+    last_ddl: datetime = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @dataclass(frozen=True)
@@ -222,7 +226,8 @@ class RecordingSnowflakeWarehouse:
         self._database.execute(
             "CREATE TABLE fake_tables (table_catalog VARCHAR, table_schema VARCHAR, "
             "table_name VARCHAR, table_type VARCHAR, is_transient VARCHAR, "
-            "created TIMESTAMPTZ, last_altered TIMESTAMPTZ, retention_time INTEGER)"
+            "created TIMESTAMPTZ, last_altered TIMESTAMPTZ, last_ddl TIMESTAMPTZ, "
+            "retention_time INTEGER)"
         )
         self._database.execute(
             "CREATE TABLE fake_columns (table_catalog VARCHAR, table_schema VARCHAR, "
@@ -704,6 +709,7 @@ def _table_row(relation: FakeRelation) -> dict[str, object]:
         ],
         "created": _FIXED_CREATED_AT,
         "last_altered": _FIXED_CREATED_AT,
+        "last_ddl": relation.last_ddl,
         "retention_time": (relation.retention_time, None)[relation.table_type in _VIEW_TABLE_TYPES],
     }
 
@@ -1081,3 +1087,71 @@ def attempted_query_kinds(warehouse: RecordingSnowflakeWarehouse) -> tuple[str, 
         ).kind
         for sql in warehouse.attempted_sql
     )
+
+
+type ListedSchema = tuple[
+    list[str], dict[tuple[str | None, str | None, str], tuple[ColumnInfo, ...]]
+]
+
+
+def live_inspection_catalog(warehouse: RecordingSnowflakeWarehouse) -> InspectionCatalog:
+    """A fresh catalog over its own adapter, reading `warehouse` live."""
+
+    adapter: OfflineSnowflakeAdapter = OfflineSnowflakeAdapter(warehouse=warehouse)
+    return InspectionCatalog(adapter=adapter, connection=adapter.connect({}))
+
+
+def unavailable_relation_changes(**_: object) -> object:
+    """A synced state check whose warehouse read fails."""
+
+    raise RuntimeError("information schema unavailable")
+
+
+def listed_schema(*, catalog: InspectionCatalog, database: str, schema: str) -> ListedSchema:
+    """One schema's listing, in an order-independent form, and its relations' columns."""
+
+    relations: tuple[RelationInfo, ...] = catalog.list_relations(
+        database=database, schemas=(schema,)
+    )
+    return sorted_relation_reprs(relations), catalog.get_columns_for_relations(relations=relations)
+
+
+def synced_copy(
+    *, warehouse: RecordingSnowflakeWarehouse, database: str, schema: str, observed_at: datetime
+) -> SyncedCatalog:
+    """The copy a location synced: the live listing and columns, observed at `observed_at`."""
+
+    catalog: InspectionCatalog = live_inspection_catalog(warehouse)
+    relations: tuple[RelationInfo, ...] = catalog.list_relations(
+        database=database, schemas=(schema,)
+    )
+    columns: dict[tuple[str | None, str | None, str], tuple[ColumnInfo, ...]] = (
+        catalog.get_columns_for_relations(relations=relations)
+    )
+    return SyncedCatalog(
+        relations=tuple(
+            SyncedRelation(
+                database=database.upper(),
+                schema=schema.upper(),
+                name=relation.name,
+                columns=columns.get(relation.identity, ()),
+                observed_at=observed_at,
+            )
+            for relation in relations
+        )
+    )
+
+
+def relations_after_sync(
+    *,
+    relations: tuple[FakeRelation, ...],
+    changed: tuple[FakeRelation, ...],
+    dropped: tuple[str, ...],
+) -> tuple[FakeRelation, ...]:
+    """`relations` with `changed` replacing or joining them and `dropped` names removed."""
+
+    replaced: dict[str, FakeRelation] = {relation.name: relation for relation in relations}
+    replaced.update({relation.name: relation for relation in changed})
+    for name in dropped:
+        replaced.pop(name)
+    return tuple(replaced.values())

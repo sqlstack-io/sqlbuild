@@ -165,6 +165,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Adapter,
     },
     HostEntry {
+        name: "SyncedCatalog",
+        kind: HostKind::Class,
+        edge: HostEdge::Adapter,
+    },
+    HostEntry {
         name: "InspectionQueryRecord",
         kind: HostKind::Class,
         edge: HostEdge::Adapter,

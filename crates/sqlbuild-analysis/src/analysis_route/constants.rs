@@ -490,3 +490,5 @@ pub(crate) const CLICKHOUSE_DECIMAL_WIDTHS: [(&str, u32); 4] = [
     ("Decimal128", 38),
     ("Decimal256", 76),
 ];
+/// Snowflake's precision of a fixed-point type written without one.
+pub(crate) const SNOWFLAKE_DEFAULT_PRECISION: i64 = 38;

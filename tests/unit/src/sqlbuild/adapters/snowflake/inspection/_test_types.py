@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import FakeRelation
 
 
 @dataclass(frozen=True)
@@ -225,3 +229,24 @@ class PartedListingTestCase:
     relations_per_schema: int
     statement_latency_seconds: float
     expected_max_concurrent: int
+
+
+@dataclass(frozen=True)
+class SyncedCatalogTestCase:
+    """A warehouse that moved on after the synced copy, and what a plan from the copy reads."""
+
+    description: str
+    changed: tuple[FakeRelation, ...]
+    dropped: tuple[str, ...]
+    expected_query_kinds: tuple[str, ...]
+    expected_refreshed: int
+
+
+@dataclass(frozen=True)
+class SyncedFallbackTestCase:
+    """A plan from synced state that cannot use the copy for a schema, and reads it live."""
+
+    description: str
+    empty_copy: bool
+    failing_check: bool
+    expected_message: str
