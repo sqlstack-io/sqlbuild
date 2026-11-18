@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { copyText } from '$lib/browser/clipboard';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 
@@ -6,10 +7,14 @@
 	let { label, secret, ondismiss }: Props = $props();
 
 	let copied = $state(false);
+	// Copying can fail, for example where the browser blocks it; the secret is then selected to copy by hand.
+	let failed = $state(false);
+	let shown = $state<HTMLElement>();
 
 	async function copy() {
-		await navigator.clipboard.writeText(secret);
-		copied = true;
+		copied = await copyText(secret);
+		failed = !copied;
+		if (failed && shown) getSelection()?.selectAllChildren(shown);
 	}
 </script>
 
@@ -18,7 +23,8 @@
 	<div class="min-w-0 flex-1">
 		<div class="title">{label}</div>
 		<p>Copy it now: it's shown only this once and can't be retrieved later. If it's lost, rotate the token.</p>
-		<code>{secret}</code>
+		<code bind:this={shown}>{secret}</code>
+		{#if failed}<p class="manual" role="alert">Couldn't copy it here: it's selected, so copy it with Ctrl+C (⌘C on a Mac).</p>{/if}
 	</div>
 	<div class="actions">
 		<Button size="sm" onclick={copy}>{copied ? 'Copied' : 'Copy'}</Button>
@@ -54,6 +60,10 @@
 		overflow-wrap: anywhere;
 		font-family: var(--font-mono);
 		font-size: 12px;
+	}
+	.manual {
+		margin: 6px 0 0;
+		color: var(--sb-warning);
 	}
 	.actions {
 		display: flex;

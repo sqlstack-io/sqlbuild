@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.249.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.248.0...v0.249.0) (2026-11-18)
+
+
+### Features
+
+* **plan:** plan from synced state, depend on jobs or tags, and faster plans ([#1580](https://github.com/sqlstack-io/sqlbuild/issues/1580)) ([1fb37f7](https://github.com/sqlstack-io/sqlbuild/commit/1fb37f75ebf1967a11f2d55fef76dac0d6acee0a))
+
 ## [0.248.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.247.0...v0.248.0) (2026-11-18)
 
 

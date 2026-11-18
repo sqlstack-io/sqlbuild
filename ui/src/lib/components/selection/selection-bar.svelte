@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { copyText } from '$lib/browser/clipboard';
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import CopyIcon from '@lucide/svelte/icons/copy';
@@ -64,9 +65,8 @@
 	const blocked = $derived(!!problem || !selection.select.trim());
 
 	async function copy() {
-		await navigator.clipboard?.writeText(command).catch(() => undefined);
+		copied = await copyText(command);
 		selection.remember();
-		copied = true;
 		clearTimeout(copyTimer);
 		copyTimer = setTimeout(() => (copied = false), 1200);
 	}

@@ -175,7 +175,7 @@ pub(crate) fn pipeline_result<'py>(
     ];
     deferral_fields.extend(option_fields(
         options,
-        &["defer_sources_to", "source_deferral_enabled"],
+        &["defer_to", "defer_sources_to", "source_deferral_enabled"],
     )?);
     let deferral: Bound<'py, PyAny> =
         new_record_with(py, RecordId::DeferralInputs, &deferral_fields)?;

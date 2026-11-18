@@ -14,7 +14,7 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind,
     WarehouseHistoryPage, WarehouseStateLocation,
 };
-use uuid::Uuid;
+use uuid::{NoContext, Timestamp, Uuid};
 
 use crate::argv::models::Namespace;
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
@@ -421,13 +421,25 @@ impl LocationMetadataSync {
         self.reads_wake_compute
     }
 
+    /// A scan id timed by the server's clock: a synced plan trusts a record as of its scan's start, never after a read.
+    pub(crate) fn server_scan_id(&self) -> Uuid {
+        let now: DateTime<Utc> = Utc::now() + self.server_offset;
+        let seconds: u64 = u64::try_from(now.timestamp()).unwrap_or_default();
+        Uuid::new_v7(Timestamp::from_unix(
+            NoContext,
+            seconds,
+            now.timestamp_subsec_nanos(),
+        ))
+    }
+
     /// Start the sync `sync_due` asked for at server time `now`; a stopped sync restarts its pass with a fresh failure count.
     pub(crate) fn begin_sync(&mut self, now: DateTime<Utc>) {
+        self.server_offset = now - Utc::now();
+        self.scan_id = self.server_scan_id();
         if std::mem::take(&mut self.halted) {
             self.failed_reads = 0;
             self.index = 0;
             self.source_after = None;
-            self.scan_id = Uuid::now_v7();
             self.observed_since = None;
             self.watermark_loaded = false;
             self.statistics = None;
@@ -438,7 +450,6 @@ impl LocationMetadataSync {
             self.applied = false;
         }
         self.idle = false;
-        self.server_offset = now - Utc::now();
         self.progress = SyncProgress::new();
         self.cycle_started_at = Some(now);
         self.next_at = tokio::time::Instant::now();
@@ -467,7 +478,7 @@ impl LocationMetadataSync {
         if statistics {
             self.index -= 1;
             self.source_after = None;
-            self.scan_id = Uuid::now_v7();
+            self.scan_id = self.server_scan_id();
             self.observed_since = None;
             self.watermark_loaded = false;
         }

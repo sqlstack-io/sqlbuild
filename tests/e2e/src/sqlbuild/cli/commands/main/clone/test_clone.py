@@ -18,6 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clone._test_types import (
     CloneMissingUpstreamE2ETestCase,
     ClonePolicyErrorTestCase,
     ClonePythonFunctionE2ETestCase,
+    DeferToMissingUpstreamE2ETestCase,
     MissingUpstreamFixesE2ETestCase,
     PartialDeferCloneE2ETestCase,
     UnwritableConsumptionDeferCloneE2ETestCase,
@@ -29,6 +30,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clone.helpers import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     REPO_ROOT,
+    execute_duckdb,
     prepare_inline_project,
     query_duckdb,
     run_sqb,
@@ -43,6 +45,20 @@ _UPSTREAMS: tuple[str, ...] = (
     "returns",
     "shipments",
 )
+_DEFER_DATABASE: str = "warehouse.duckdb"
+_DEFER_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/deferred_reads"
+_DEFER_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "deferred_reads"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        f'[connection]\ndatabase = "{_DEFER_DATABASE}"\n\n'
+        '[targets.dev]\nschema = "dev"\n\n'
+        '[targets.prod]\nschema = "prod"\n'
+    ),
+    **{
+        str(path.relative_to(_DEFER_FIXTURE)): path.read_text(encoding="utf-8")
+        for path in sorted(_DEFER_FIXTURE.glob("models/*.sql"))
+    },
+}
 
 
 @pytest.mark.parametrize(
@@ -1147,3 +1163,60 @@ def test_given_unwritable_consumption_table_when_defer_clone_partly_fails_then_c
     output: str = cloned.stdout + cloned.stderr
     assert cloned.returncode == 1, output
     assert all(fragment in output for fragment in test_case.expected_fragments), output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DeferToMissingUpstreamE2ETestCase(
+            description="an aliased upstream built only in the active target is missing from prod",
+            upstream_sql="CREATE TABLE dev.orders_v2 AS SELECT 5 AS order_id;",
+            expected_exit_code=1,
+            expected_fragments=(
+                "error[S301]: 1 upstream model this build reads doesn't exist in target 'prod'\n"
+                "  orders\n\n  Build it too:  add + before your selection",
+            ),
+            report_sql=(
+                "SELECT count(*) FROM information_schema.tables "
+                "WHERE table_schema = 'dev' AND table_name = 'order_report'"
+            ),
+            expected_report_rows=[(0,)],
+        ),
+        DeferToMissingUpstreamE2ETestCase(
+            description="an aliased upstream built in prod is read from prod under its alias",
+            upstream_sql=(
+                "CREATE TABLE dev.orders_v2 AS SELECT 5 AS order_id;"
+                "CREATE TABLE prod.orders_v2 AS SELECT 7 AS order_id;"
+            ),
+            expected_exit_code=0,
+            expected_fragments=(),
+            report_sql="SELECT order_id FROM dev.order_report",
+            expected_report_rows=[(7,)],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_defer_to_when_an_upstream_is_missing_from_the_deferred_target_then_s301(
+    test_case: DeferToMissingUpstreamE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="deferred_reads", repo_files=_DEFER_PROJECT_FILES
+    )
+    database: Path = project_dir / _DEFER_DATABASE
+    execute_duckdb(
+        db_path=database, sql="CREATE SCHEMA dev; CREATE SCHEMA prod;" + test_case.upstream_sql
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", "--select", "order_report", "--defer-to", "prod"),
+        project_dir=project_dir,
+    )
+
+    output: str = result.stdout + result.stderr
+    assert result.returncode == test_case.expected_exit_code, output
+    assert all(fragment in output for fragment in test_case.expected_fragments), output
+    assert "sqb clone" not in output, output
+    assert query_duckdb(db_path=database, sql=test_case.report_sql) == (
+        test_case.expected_report_rows
+    )

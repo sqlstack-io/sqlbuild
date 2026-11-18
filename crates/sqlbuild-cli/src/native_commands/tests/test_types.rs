@@ -312,3 +312,12 @@ pub(crate) struct SkippedCountTestCase {
     pub(crate) later_read: Option<u64>,
     pub(crate) expected_mirrored: Option<u64>,
 }
+
+/// A scan whose location clock runs ten minutes ahead of the server's.
+pub(super) struct FastClockScanTestCase {
+    pub(super) description: &'static str,
+    /// Scans of the pass completed before the one whose id is checked.
+    pub(super) scans_completed: usize,
+    /// Whether a table altered a second after the page read is still described live.
+    pub(super) expected_described_live: bool,
+}

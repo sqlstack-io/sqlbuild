@@ -8,7 +8,7 @@ use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_warehouse::main::sources::check_selected_source_tables_exist::check_selected_source_tables_exist;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyString, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing_upstream_message;
 use sqlbuild_analysis::planner_identity::main::missing_upstreams::missing_upstreams;
 use sqlbuild_analysis::planner_identity::models::{
@@ -48,15 +48,10 @@ pub(crate) fn check_selected_scope_buildability<'py>(
     let names = |value: Bound<'py, PyAny>| -> PyResult<std::collections::HashSet<String>> {
         value.try_iter()?.map(|value| value?.extract()).collect()
     };
-    let deferred = native_field(deferral, "deferred_relations")?;
     let available = AvailableUpstreams {
         satisfied_keys,
         existing_relations: names(native_field(&snapshot, "existing_relations")?)?,
-        deferred_relations: if deferred.is_none() {
-            None
-        } else {
-            Some(names(deferred)?)
-        },
+        deferred_relations: deferred_model_names(deferral)?,
     };
     let selected: Vec<_> = scope.selected.iter().map(GraphKey::from).collect();
     let deps: std::collections::HashMap<GraphKey, Vec<GraphKey>> = scope
@@ -79,7 +74,7 @@ pub(crate) fn check_selected_scope_buildability<'py>(
         let message = missing_upstream_message(
             &missing,
             &origins,
-            &missing_upstream_fixes(runtime, &project, available.deferred_relations.is_some())?,
+            &missing_upstream_fixes(runtime, &project, deferred_to(deferral, &available)?)?,
         );
         let names = missing.iter().map(|entry| entry.key.name.as_str());
         return Err(new_error_with_fields(
@@ -97,14 +92,82 @@ pub(crate) fn check_selected_scope_buildability<'py>(
     )
 }
 
+/// The models and seeds whose deferred location, under an alias or a `migrate_from` origin, the deferred target lists.
+fn deferred_model_names(
+    deferral: &Bound<'_, PyAny>,
+) -> PyResult<Option<std::collections::HashSet<String>>> {
+    let relations = native_field(deferral, "deferred_relations")?;
+    let locations = native_field(deferral, "deferred_locations")?;
+    if relations.is_none() || locations.is_none() {
+        return Ok(None);
+    }
+    let mut listed: Vec<RelationPlace> = Vec::new();
+    for relation in relations.downcast::<PyDict>()?.values() {
+        listed.push(relation_place(&relation)?);
+    }
+    let mut names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (name, location) in locations.downcast::<PyDict>()? {
+        let place: RelationPlace = relation_place(&location)?;
+        if listed.iter().any(|relation| same_place(relation, &place)) {
+            names.insert(name.extract()?);
+        }
+    }
+    Ok(Some(names))
+}
+
+/// A relation's lowercased `(database, schema, name)`.
+type RelationPlace = (Option<String>, Option<String>, String);
+
+/// Where a listed relation or a deferred location is, lowercased.
+fn relation_place(relation: &Bound<'_, PyAny>) -> PyResult<RelationPlace> {
+    let lower = |field: &str| -> PyResult<Option<String>> {
+        Ok(native_field(relation, field)?
+            .extract::<Option<String>>()?
+            .map(|value| value.to_lowercase()))
+    };
+    Ok((
+        lower("database")?,
+        lower("schema")?,
+        native_field(relation, "name")?
+            .extract::<String>()?
+            .to_lowercase(),
+    ))
+}
+
+/// The same name, schema and database, where a part either side leaves to the connection's default matches any.
+fn same_place(listed: &RelationPlace, location: &RelationPlace) -> bool {
+    let part = |left: &Option<String>, right: &Option<String>| {
+        left.is_none() || right.is_none() || left == right
+    };
+    listed.2 == location.2 && part(&listed.1, &location.1) && part(&listed.0, &location.0)
+}
+
+/// The target this plan reads unselected models and seeds from, when it defers.
+fn deferred_to(
+    deferral: &Bound<'_, PyAny>,
+    available: &AvailableUpstreams,
+) -> PyResult<Option<String>> {
+    if available.deferred_relations.is_none() {
+        return Ok(None);
+    }
+    native_field(deferral, "defer_to")?.extract()
+}
+
 /// The active target, its clone or deferral origins, and the clone `--to` it needs (also when the default target is unknown).
 fn missing_upstream_fixes(
     runtime: &Bound<'_, PyAny>,
     project: &Bound<'_, PyAny>,
-    deferring: bool,
+    deferred_to: Option<String>,
 ) -> PyResult<MissingUpstreamFixes> {
-    let py: Python<'_> = runtime.py();
     let target: Option<String> = native_field(project, "effective_target_name")?.extract()?;
+    if deferred_to.is_some() {
+        return Ok(MissingUpstreamFixes {
+            target,
+            deferred_to,
+            ..MissingUpstreamFixes::default()
+        });
+    }
+    let py: Python<'_> = runtime.py();
     let configs = (
         runtime_field(runtime, |runtime| &runtime.project_config)?,
         runtime_field(runtime, |runtime| &runtime.local_config)?,
@@ -129,7 +192,7 @@ fn missing_upstream_fixes(
             for name in native_field(config, "targets")?.try_iter()? {
                 let name: String = name?.extract()?;
                 if name != active && allows(&name, "allow_as_clone_origin")? {
-                    if project_targets && !deferring {
+                    if project_targets {
                         deferrable.push(name.clone());
                     }
                     origins.insert(name);
@@ -143,6 +206,7 @@ fn missing_upstream_fixes(
             Err(_) => None,
         };
     Ok(MissingUpstreamFixes {
+        deferred_to: None,
         clone_to: (default.as_deref() != Some(active.as_str())).then(|| active.clone()),
         target,
         origins: origins.into_iter().collect(),
