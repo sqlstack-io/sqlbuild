@@ -1,7 +1,8 @@
 import { topFolder } from '$lib/lineage/catalog-graph';
 import { recentDeploys } from '$lib/build-area/overview-panels';
+import { withConditions } from '$lib/build-area/attention-conditions';
 import { checkCountsOf } from './http-catalog';
-import type { Acknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, GroupStatus, Overview, PlatformEvent, Run, SnapshotChange } from './types';
+import type { Acknowledgement, AttentionAcknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, GroupStatus, Overview, PlatformEvent, Run, SnapshotChange } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
 const MODEL_KINDS = new Set(['view', 'table', 'incremental']);
@@ -18,6 +19,8 @@ export type OverviewInputs = {
 	events: PlatformEvent[];
 	/** Problem runs marked handled, by run ID. */
 	acknowledgements: Map<string, Acknowledgement>;
+	/** Conditions' latest acknowledgements. */
+	conditions: AttentionAcknowledgement[];
 	now: number;
 };
 
@@ -65,7 +68,7 @@ export function groupStatusOf(nodes: CatalogNode[]): GroupStatus[] {
  * does not check source freshness, so late sources stay unknown. Groups are top-level folders, and
  * group status is null when the server reports no build state. There is no cost read, so the page hides cost.
  */
-export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, now }: OverviewInputs): Overview {
+export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now }: OverviewInputs): Overview {
 	const acknowledged = (r: Run) => acknowledgements.get(r.id) ?? null;
 	const topLevel = runs.filter((r) => !r.parentRunId);
 	const recent = topLevel.filter((r) => Date.parse(r.queuedAt) >= now - DAY);
@@ -103,7 +106,7 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 			stale: { nodes: staleNodes, changed: changed.length, behind: behind.length, sources: null },
 			cost: null
 		},
-		attention,
+		attention: withConditions(attention, conditions, now),
 		groups: nodes.some((n) => n.stale !== null) ? groupStatusOf(nodes) : null,
 		recentChanges: recentDeploys(changes),
 		latestRun: latest ? { id: latest.id, status: latest.status, endedAt: latest.endedAt } : null

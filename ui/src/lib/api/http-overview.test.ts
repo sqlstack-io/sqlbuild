@@ -52,6 +52,7 @@ describe('overview from live reads', () => {
 		changes: [change(1, [['added', 'model:orders'], ['added', 'seed:regions'], ['removed', 'model:old']]), change(24 * 8, [['added', 'model:totals']])],
 		events: [event('scheduler', true), event('cleared', false)],
 		acknowledgements: new Map([['orders-new', { by: 'ada', at: hoursAgo(1) }]]),
+		conditions: [],
 		now
 	});
 
@@ -95,12 +96,14 @@ describe('overview from live reads', () => {
 
 	it('counts each stale node once, and leaves late sources unknown', () => {
 		expect(overview.metrics.stale).toEqual({ nodes: 2, changed: 1, behind: 2, sources: null });
-		expect(overview.attention.find((i) => i.kind === 'stale_models')).toEqual({ kind: 'stale_models', changed: ['model:orders'], behind: ['model:orders', 'model:events'] });
+		expect(overview.attention.find((i) => i.kind === 'stale_models')).toMatchObject({ kind: 'stale_models', changed: ['model:orders'], behind: ['model:orders', 'model:events'] });
+		// An ongoing condition, which can be acknowledged until it changes; no acknowledgement is listed.
+		expect(overview.attention.find((i) => i.kind === 'stale_models')).toMatchObject({ condition: { key: 'stale_models', shape: { counts: { changed: 1, behind: 2 } }, acknowledged: null, lapsed: null } });
 	});
 
 	it('leaves parts without a server read empty instead of zero', () => {
 		expect(overview.metrics.cost).toBeNull();
-		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], acknowledgements: new Map(), now });
+		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], acknowledgements: new Map(), conditions: [], now });
 		expect(unknown.groups).toBeNull();
 	});
 });

@@ -5,6 +5,7 @@ import { LocalChangeBus, type ConnectionState } from '../signals';
 import { stateOf } from '../node-states';
 import type {
 	AdhocRunCheck,
+	ConditionShape,
 	SelectionEvaluation,
 	SelectionRequest,
 	SelectionVocabulary,
@@ -316,6 +317,11 @@ export class MockApiClient implements ApiClient {
 	async acknowledgeRun(scope: Scope, runId: string, acknowledged: boolean): Promise<void> {
 		this.#location(scope);
 		this.#operate.acknowledgeRun(runId, acknowledged, 'you');
+	}
+
+	async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean): Promise<void> {
+		this.#location(scope);
+		this.#operate.acknowledgeCondition(key, shape, acknowledged, 'you');
 	}
 
 	async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {

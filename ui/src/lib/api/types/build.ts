@@ -374,14 +374,37 @@ export type AttentionRun = Pick<Run, 'id' | 'jobKey' | 'kind' | 'status' | 'stat
 
 /** Who marked a problem run handled; everyone who can see the run sees it. */
 export type Acknowledgement = { by: string; at: Iso };
+/** What an ongoing condition looks like, compared with what it looked like when acknowledged; never message text. */
+export type ConditionShape = {
+	/** Counts that make it worse when they grow, such as changed and behind nodes. */
+	counts?: Record<string, number>;
+	/** Members that make it worse when a new one appears, such as `<source>:<status>`. */
+	members?: string[];
+	/** Severity, least first; a higher one is worse. */
+	severity?: number;
+	/** Which occurrence it is: a different one means it resolved and came back. */
+	occurrence?: string;
+};
+/** A condition's latest acknowledgement, as the server lists it; `until` is when it lapses even unchanged. */
+export type AttentionAcknowledgement = { key: string; shape: ConditionShape; by: string; at: Iso; until: Iso };
+/** An ongoing condition on the attention list, acknowledged until it changes. */
+export type AttentionCondition = {
+	/** Its kind and subject, stable while it lasts, such as `stale_sources`. */
+	key: string;
+	shape: ConditionShape;
+	/** Holds until the condition gets worse, resolves and comes back, or `until` passes. */
+	acknowledged: (Acknowledgement & { until: Iso }) | null;
+	/** Why an acknowledgement no longer holds, while the condition is back on the list. */
+	lapsed: { reason: string; by: string; at: Iso } | null;
+};
 export type AttentionItem =
 	| { kind: 'run_problem'; run: AttentionRun; acknowledged: Acknowledgement | null }
 	| { kind: 'run_unresponsive'; run: AttentionRun; lastHeartbeatAt: Iso | null; acknowledged: Acknowledgement | null }
-	| { kind: 'stale_models'; changed: string[]; behind: string[] }
-	| { kind: 'stale_sources'; sources: ({ key: string } & SourceFreshness)[] }
-	| { kind: 'platform_event'; event: PlatformEvent }
-	| { kind: 'queue_blocked'; runId: string; jobKey: string | null; queuedAt: Iso; waits: QueueWait[] }
-	| { kind: 'calendar_low'; triggerId: string; triggerName: string; detail: string };
+	| { kind: 'stale_models'; changed: string[]; behind: string[]; condition?: AttentionCondition }
+	| { kind: 'stale_sources'; sources: ({ key: string } & SourceFreshness)[]; condition?: AttentionCondition }
+	| { kind: 'platform_event'; event: PlatformEvent; condition?: AttentionCondition }
+	| { kind: 'queue_blocked'; runId: string; jobKey: string | null; queuedAt: Iso; waits: QueueWait[]; condition?: AttentionCondition }
+	| { kind: 'calendar_low'; triggerId: string; triggerName: string; detail: string; condition?: AttentionCondition };
 
 export type OverviewMetrics = {
 	models: { total: number; addedThisWeek: number; removedThisWeek: number };

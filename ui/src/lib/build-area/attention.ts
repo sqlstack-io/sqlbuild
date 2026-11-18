@@ -174,7 +174,8 @@ const waitRun = (wait: QueueWait): string | null => ('runId' in wait ? wait.runI
  */
 function causeOf(item: AttentionItem, items: AttentionItem[]): string | null {
 	if (item.kind === 'platform_event' && item.event.kind === 'tick_overdue') {
-		const events = items.flatMap((i) => (i.kind === 'platform_event' ? [i.event] : []));
+		// An acknowledged cause has left the list, so what follows from it stands on its own.
+		const events = items.flatMap((i) => (i.kind === 'platform_event' && !i.condition?.acknowledged ? [i.event] : []));
 		const location = events.find((e) => e.kind === 'location_broken' && e.locationId === item.event.locationId);
 		const scheduler = events.find((e) => e.kind === 'scheduler_no_leader');
 		const cause = location ?? scheduler;

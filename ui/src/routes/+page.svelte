@@ -22,10 +22,11 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { catalogNodes, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { folderCatalogHref, folderSelections } from '$lib/selection/folders';
-	import { formatAgo } from '$lib/format/time';
+	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
 	import type { AttentionItem } from '$lib/api';
+	import { acknowledgementOf } from '$lib/build-area/attention-conditions';
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
 	import { quietDeployLine, recentDeployRows, visibleFolders } from '$lib/build-area/overview-panels';
@@ -55,20 +56,29 @@
 		info: InfoIcon
 	};
 	const viewed = $derived(attentionViews(data?.attention ?? [], app.now, catalogNodes.view.changedBuild));
-	const acknowledgementOf = (item: AttentionItem) => ('acknowledged' in item ? item.acknowledged : null);
+	// A run is acknowledged for good; an ongoing condition until it changes (see attention-conditions).
+	const conditionFor = (item: AttentionItem) => ('condition' in item ? (item.condition ?? null) : null);
+	const ACK_HELP = {
+		run: 'Hide this from the attention list for everyone. It stays under Acknowledged, where anyone can undo it.',
+		condition: 'Hide this from the attention list for everyone, until it changes: it gets worse, resolves and comes back, or 24 hours pass. It stays under Acknowledged, where anyone can undo it.'
+	};
+	const canAck = (item: AttentionItem) => ('acknowledged' in item ? canAcknowledge : !!conditionFor(item) && canAcknowledgeConditions);
 	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
 	const issues = $derived(viewed.filter(({ item }) => !acknowledgementOf(item)));
 	const handled = $derived(viewed.filter(({ item }) => acknowledgementOf(item)));
 	let showHandled = $state(false);
 	let acknowledging = $state<string | null>(null);
 	let acknowledgeError = $state<string | null>(null);
-	async function acknowledge(runId: string, acknowledged: boolean) {
+	/** Acknowledges an item, or undoes that: a run by its ID, a condition as it looks now. */
+	async function acknowledge(item: AttentionItem, key: string, acknowledged: boolean) {
 		const scope = app.scope;
+		const condition = conditionFor(item);
 		if (!scope || acknowledging) return;
-		acknowledging = runId;
+		acknowledging = key;
 		acknowledgeError = null;
 		try {
-			await app.client.acknowledgeRun(scope, runId, acknowledged);
+			if ('acknowledged' in item) await app.client.acknowledgeRun(scope, item.run.id, acknowledged);
+			else if (condition) await app.client.acknowledgeCondition(scope, condition.key, condition.shape, acknowledged);
 			await overview.refresh();
 		} catch (error) {
 			acknowledgeError = error instanceof Error ? error.message : String(error);
@@ -98,6 +108,7 @@
 	const showGroups = $derived(!!data?.groups?.length);
 	const showTimeline = $derived(app.client.supports('timeline'));
 	const canAcknowledge = $derived(app.client.supports('acknowledgeRun'));
+	const canAcknowledgeConditions = $derived(app.client.supports('acknowledgeCondition'));
 	const FAILING_CHECKS_HREF = '/checks?outcome=failing';
 
 </script>
@@ -158,6 +169,10 @@
 								<div class="issue-copy">
 									<a class="issue-title" href={to(view.href)}>{view.title}</a>
 									<p class="issue-detail">{view.detail}</p>
+									{#if conditionFor(item)?.lapsed}
+										{@const lapsed = conditionFor(item)!.lapsed!}
+										<p class="lapsed" data-testid="attention-lapsed">Back on the list: {lapsed.reason} (acknowledged by {lapsed.by} {formatAgo(lapsed.at, app.now)}).</p>
+									{/if}
 									{#if view.consequences.length}
 										<ul class="consequences" aria-label="Caused by this">
 											{#each view.consequences as c, i (i)}<li><a href={to(c.href)}>{c.text}</a></li>{/each}
@@ -166,9 +181,10 @@
 								</div>
 								<small>{view.since}</small>
 								<span class="issue-ack">
-									{#if 'acknowledged' in item && canAcknowledge}
-										<Button variant="ghost" size="sm" title="Mark handled for everyone (audited)" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
-											<BellOffIcon />Acknowledge
+									{#if canAck(item)}
+										<!-- Short text, always visible, stronger while the row is hovered; the tooltip says what it does. -->
+										<Button variant="ghost" size="sm" class="ack" title={'acknowledged' in item ? ACK_HELP.run : ACK_HELP.condition} aria-label="Acknowledge" disabled={acknowledging === view.key} onclick={() => acknowledge(item, view.key, true)} data-testid="attention-ack">
+											<BellOffIcon />Ack
 										</Button>
 									{/if}
 								</span>
@@ -187,7 +203,7 @@
 				{/if}
 				{#if handled.length}
 					<div class="handled">
-						<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[34px] pr-3.5 pl-[17px] text-[12px]">Acknowledged · {handled.length}</DisclosureButton>
+						<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[34px] pr-3.5 pl-[17px] text-[12px]">Acknowledged ({handled.length})</DisclosureButton>
 						{#if showHandled}
 							<div class="handled-rows">
 							{#each handled as { item, view } (view.key)}
@@ -196,12 +212,12 @@
 									<span class="issue-icon info"><BellOffIcon size={13} /></span>
 									<div class="issue-copy">
 										<a class="issue-title" href={to(view.href)}>{view.title}</a>
-										<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)}` : ''}</p>
+										<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)} · ${ack.until ? `hidden until it changes, or until ${formatStamp(ack.until).slice(5, 16)}` : 'for good'}` : ''}</p>
 									</div>
 									<small>{view.since}</small>
 									<span class="issue-ack">
-										{#if 'acknowledged' in item && canAcknowledge}
-											<Button variant="ghost" size="sm" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, false)}>Undo</Button>
+										{#if canAck(item)}
+											<Button variant="ghost" size="sm" disabled={acknowledging === view.key} onclick={() => acknowledge(item, view.key, false)} data-testid="attention-undo">Undo</Button>
 										{/if}
 									</span>
 									<span class="issue-actions"><a href={to(view.href)}>{view.action} →</a></span>
@@ -344,6 +360,11 @@
 	.issue-actions { justify-content: flex-end; gap: 10px; }
 	.issue-actions a { color: var(--primary); font-weight: 500; white-space: nowrap; }
 	.handled { border-top: 1px solid var(--inner-line); }
+	.lapsed { margin: 4px 0 0; color: var(--sb-warning); font-size: 12px; }
+	/* Ack: muted text with a bell, always visible; on row hover it gains a border and full colour. */
+	.issue :global(.ack) { height: 24px; padding: 0 8px; border: 1px solid transparent; color: var(--muted-foreground); font-size: 12px; font-weight: 500; }
+	.issue:hover :global(.ack), .issue :global(.ack:focus-visible) { border-color: var(--border); background: var(--sb-hover); color: var(--foreground); }
+	.issue :global(.ack:hover) { border-color: var(--muted-foreground); }
 	.issue.muted .issue-title { color: var(--muted-foreground); font-weight: 500; }
 	.ack-error { margin: 0; padding: 8px 17px; border-top: 1px solid var(--inner-line); color: var(--sb-error); font-size: 12px; }
 	.issue-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 2px; }
