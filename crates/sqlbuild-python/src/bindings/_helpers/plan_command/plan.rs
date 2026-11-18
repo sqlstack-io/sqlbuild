@@ -67,7 +67,7 @@ const DEFAULT_SECTION_ENTRIES: i64 = 50;
 const ERROR_SEVERITY: &str = "error";
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 /// Request fields passed to the compile pipeline under the same name.
-const PIPELINE_FIELDS: [&str; 12] = [
+const PIPELINE_FIELDS: [&str; 13] = [
     "no_sql_validation",
     "no_cache",
     "verbose",
@@ -80,6 +80,7 @@ const PIPELINE_FIELDS: [&str; 12] = [
     "cli_vars",
     "max_microbatches",
     "selection_diagnostics",
+    "plan_from",
 ];
 
 fn flag(py: Python<'_>, value: bool) -> Bound<'_, PyAny> {

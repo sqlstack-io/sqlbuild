@@ -50,6 +50,18 @@ fn given_accepted_arguments_when_parsing_then_attributes_hold_the_parsed_values(
             expected_value: Value::Str("all".to_owned()),
         },
         ParsedValueTestCase {
+            description: "--plan-from names where a plan reads warehouse state",
+            argv: &["plan", "--plan-from", "synced_state"],
+            attribute: "plan_from",
+            expected_value: Value::Str("synced_state".to_owned()),
+        },
+        ParsedValueTestCase {
+            description: "an unset --plan-from leaves the source to the target",
+            argv: &["build"],
+            attribute: "plan_from",
+            expected_value: Value::None,
+        },
+        ParsedValueTestCase {
             description: "an unset concurrency stays None",
             argv: &["build"],
             attribute: "concurrency",
@@ -148,6 +160,12 @@ fn given_help_version_or_rejected_arguments_when_parsing_then_exits_after_writin
             argv: &["build", "--concurrency", "x1"],
             expected_exit: 2,
             expected_last_write: "sqb build: error[C900]: argument --concurrency: invalid int value: 'x1'\n\n",
+        },
+        ExitTestCase {
+            description: "--plan-from names only live or synced_state",
+            argv: &["build", "--plan-from", "cache"],
+            expected_exit: 2,
+            expected_last_write: "sqb build: error[C900]: argument --plan-from: invalid choice: 'cache' (choose from 'live', 'synced_state')\n\n",
         },
         ExitTestCase {
             description: "an ambiguous abbreviation lists its matches",
