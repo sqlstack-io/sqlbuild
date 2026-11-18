@@ -74,7 +74,10 @@ pub(crate) fn emptied(fields: &Map<String, Value>) -> Map<String, Value> {
 }
 
 /// The summary's warnings by template, and under `--changed` the node keys the run builds, which checks follow.
-pub(crate) fn summary_lists(plan: &PlanRows<'_>, summary: &mut Map<String, Value>) {
+pub(crate) fn summary_lists(
+    plan: &PlanRows<'_>,
+    mut summary: Map<String, Value>,
+) -> Map<String, Value> {
     let groups: Vec<Value> = warning_groups(&plan.rows(PlanPageSection::Warnings))
         .iter()
         .map(group_json)
@@ -93,6 +96,7 @@ pub(crate) fn summary_lists(plan: &PlanRows<'_>, summary: &mut Map<String, Value
             .collect();
         changed.insert(RUN_NODES_FIELD.to_owned(), Value::Array(nodes));
     }
+    summary
 }
 
 /// The rows whose name contains `name`, ignoring case; every row without a name.
@@ -152,7 +156,7 @@ pub(crate) fn page_extras(
         }
         names.insert(name.to_owned());
     }
-    if kind == "model" {
+    if model_rows(section) {
         extras.warnings = warnings_about(plan.document, &names)
             .into_iter()
             .cloned()

@@ -694,10 +694,12 @@ fn given_config_diffs_when_paged_whole_or_detached_then_short_ones_read_as_one_c
                 .find(|row| row["name"] == test_case.model)
                 .and_then(|row| row.get("config_change").cloned())
         };
-        let expected = test_case.expected_change.map(|change| json!(change));
         assert_eq!(
             (change(&whole), change(&detached)),
-            (expected.clone(), expected),
+            (
+                test_case.expected_change.map(|change| json!(change)),
+                test_case.expected_change.map(|change| json!(change)),
+            ),
             "{}: the same with the diff text in the document or kept apart",
             test_case.description
         );

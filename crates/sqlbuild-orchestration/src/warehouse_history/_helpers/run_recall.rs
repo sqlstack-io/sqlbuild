@@ -178,10 +178,8 @@ pub(crate) async fn ignored_audits_in(
     .await?;
     let mut failures: Vec<RunIgnoredAuditFailure> = Vec::new();
     for run in runs {
-        let member = run["run_id"]
-            .as_str()
-            .and_then(|text| Uuid::parse_str(text).ok())
-            .ok_or_else(|| ControlError::Schema("stored run ID is not a UUID".into()))?;
+        let member = Uuid::parse_str(run["run_id"].as_str().unwrap_or_default())
+            .map_err(|error| ControlError::Schema(format!("stored run ID: {error}")))?;
         let namespaces;
         (transaction, namespaces) = run_namespaces(transaction, member).await?;
         let scope = RunRecallScope {

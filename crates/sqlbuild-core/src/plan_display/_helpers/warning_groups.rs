@@ -53,7 +53,7 @@ fn subject(group: &WarningGroup<'_>) -> Value {
     let named: Option<HashSet<&str>> = group
         .warnings
         .iter()
-        .map(|warning| first_quoted(text(warning, "message")).filter(|name| !name.is_empty()))
+        .map(|warning| named(warning))
         .collect();
     match (noun, named) {
         (Some(noun), Some(named))
@@ -119,6 +119,11 @@ fn elide_generated(message: &str) -> String {
     }
     out.pop();
     out
+}
+
+/// The nonempty name a warning's message quotes first.
+fn named<'document>(warning: &'document Value) -> Option<&'document str> {
+    first_quoted(text(warning, "message")).filter(|name| !name.is_empty())
 }
 
 /// The text inside the message's first quoted span.

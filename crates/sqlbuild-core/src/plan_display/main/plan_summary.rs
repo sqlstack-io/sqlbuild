@@ -15,8 +15,7 @@ pub fn plan_summary(document: &Value) -> Value {
     };
     let plan = PlanRows::new(document);
     let (sections, pages) = section_counts(&plan);
-    let mut summary = emptied(fields);
-    summary_lists(&plan, &mut summary);
+    let mut summary = summary_lists(&plan, emptied(fields));
     summary.insert("sections".into(), Value::Array(sections));
     summary.insert("pages".into(), Value::Object(pages));
     Value::Object(summary)

@@ -81,15 +81,13 @@ pub(crate) async fn publish_audit_results(
         .iter()
         .enumerate()
         .map(|(index, (audit, ignored))| {
-            let mut payload = json!({"audit_name": audit, "audit_definition_name": "not_null",
-                "evaluation_mode": "violations", "outcome": if *ignored { "error" } else { "warn" },
-                "severity": if *ignored { "error" } else { "warn" }, "run_scope_phase": "model",
-                "attachment_kind": "column", "attached_target_kind": "model", "attached_target_name": "orders",
-                "attached_column_name": "order_id", "binding_key": format!("orders.{audit}"),
-                "violation_count": index + 2, "executed_sql": "select 1"});
-            if *ignored {
-                payload["ignored"] = json!(true);
-            }
+            let severity = ["warn", "error"][usize::from(*ignored)];
+            let payload = json!({"audit_name": audit, "audit_definition_name": "not_null",
+                "evaluation_mode": "violations", "outcome": severity, "severity": severity,
+                "run_scope_phase": "model", "attachment_kind": "column", "attached_target_kind": "model",
+                "attached_target_name": "orders", "attached_column_name": "order_id",
+                "binding_key": format!("orders.{audit}"), "violation_count": index + 2,
+                "executed_sql": "select 1", "ignored": ignored});
             RecallRecord {
                 table: Table::Events,
                 values: BTreeMap::from([

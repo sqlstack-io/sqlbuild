@@ -76,6 +76,8 @@ const SECTION_WORD: Partial<Record<PlanPageSection, string>> = {
 	source_loads: 'source loads'
 };
 const sectionWord = (section: PlanPageSection) => SECTION_WORD[section] ?? section.replace(/_/g, ' ');
+/** A count in a breakdown, such as "87 query" or "1 seed": seeds say one or many. */
+const counted = (n: number, word: string) => (word === 'seeds' ? plural(n, 'seed') : `${n.toLocaleString()} ${word}`);
 /** Sections whose rows are catalog models, so they link to the catalog. */
 const MODEL_ROWS = new Set<PlanPageSection>(['query_changed', 'function_changed', 'config_changed', 'schema_changed', 'first_run', 'renamed', 'routine_models', 'migrations', 'column_migrations', 'table_type_conversions', 'retention', 'held_back', 'unchanged']);
 /** A whole plan's full refresh, which plan-text sums by materialization rather than listing as a section of models. */
@@ -364,13 +366,13 @@ export function planGroups(plan: PlanDocument, refresh: (job: string) => string 
 		if (key === 'changed') for (const c of mine) kinds.set(CHANGE_KIND[c.section] ?? sectionWord(c.section), (kinds.get(CHANGE_KIND[c.section] ?? sectionWord(c.section)) ?? 0) + c.total);
 		const breakdown =
 			key === 'changed'
-				? [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n.toLocaleString()} ${k}`)
+				? [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n]) => counted(n, k))
 				: key === 'warnings'
 					? grouped.length && (whole || plan.warning_groups || loadedRows(plan, 'warnings') >= count)
 						? [plural(grouped.length, 'kind')]
 						: []
 					: mine.length > 1
-						? mine.map((c) => `${c.total.toLocaleString()} ${sectionWord(c.section)}`)
+						? mine.map((c) => counted(c.total, sectionWord(c.section)))
 						: [];
 		return [{ key, title: TITLES[key], count, subtitle: [...breakdown, ...notes].join(' · '), rows, pages, sections: mine.map((c) => c.section), ...(key === 'warnings' ? { warningGroups: grouped } : {}) }];
 	});

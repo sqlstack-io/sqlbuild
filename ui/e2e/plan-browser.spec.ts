@@ -74,8 +74,8 @@ test('a changed row shows its kind and line counts, and opens its diff a few lin
 	await expect(rows(page).locator('.detail', { hasText: 'config · full_refresh true → false' })).toHaveCount(4);
 	await expect(rows(page).locator('.detail', { hasText: 'config + query · cursor observed_at → event_date' })).toHaveCount(1);
 	if (shots) await page.screenshot({ path: `${shots}/plan-b-changed.png` });
-	// Rows carry counts, not diff text: only the small config changes shown inline have been read.
-	expect(await diffReads(page)).toHaveLength(5);
+	// Rows carry counts and the server's short config change, not diff text: nothing has been read.
+	expect(await diffReads(page)).toHaveLength(0);
 
 	const big = rows(page).filter({ hasText: 'query +71 −50' }).first();
 	const bigName = await big.locator('.name').innerText();
@@ -141,8 +141,8 @@ test('warnings with one message about different names read as one row, opened to
 	await select(page, 'warnings');
 	const groups = pane(page).locator('.warning-group');
 	await expect(groups).toHaveCount(2);
-	// Warnings group by message once read, so the pane reads them all (up to a cap) in large pages.
-	expect((await calls(page)).filter((c) => c.section === 'warnings')).toEqual([{ section: 'warnings', offset: 0, limit: 200 }]);
+	// The server groups them: the pane lists its groups, counted, and reads a group's warnings when it opens.
+	expect((await calls(page)).filter((c) => c.section === 'warnings')).toEqual([]);
 	await expect(groups.first().locator('.template')).toHaveText('Scenario … provides fixture for unknown model …');
 	await expect(groups.first()).toContainText('71 in 24 scenarios');
 	await groups.first().getByRole('button', { name: 'show', exact: true }).click();
@@ -151,6 +151,26 @@ test('warnings with one message about different names read as one row, opened to
 	await groups.first().getByRole('button', { name: 'show all 71' }).click();
 	await expect(groups.first().locator('li')).toHaveCount(71);
 	await expect(groups.first().getByRole('button', { name: 'show all 71' })).toHaveCount(0);
+	await groups.nth(1).getByRole('button', { name: 'show', exact: true }).click();
+	await expect(groups.nth(1).locator('li')).toHaveCount(3);
+	await expect(groups.nth(1).locator('li').first()).toContainText('requires source');
+	expect((await calls(page)).filter((c) => c.section === 'warnings')).toEqual([
+		{ section: 'warnings', offset: 0, limit: 20 },
+		{ section: 'warnings', offset: 20, limit: 51 },
+		{ section: 'warnings', offset: 71, limit: 3 }
+	]);
+});
+
+test('seeds sit with the models of the same reason: first runs, changes and unchanged', async ({ page }) => {
+	await openPlan(page, `/plan?mock&large&cmd=${encodeURIComponent('sqb build')}`);
+	await select(page, 'first_run');
+	await expect(pane(page).locator('.subtitle')).toHaveText('672 first run · 2 seeds');
+	await select(page, 'changed');
+	await expect(pane(page).locator('.subtitle')).toHaveText('87 query · 6 config · 1 function · 1 seed');
+	await select(page, 'unchanged');
+	await expect(pane(page).locator('.subtitle')).toHaveText('1,507 models · 12 functions · 7 seeds');
+	await expect(rows(page)).toHaveCount(50);
+	if (shots) await page.screenshot({ path: `${shots}/plan-b-seeds.png` });
 });
 
 test('a small plan reads as a short index', async ({ page }) => {
