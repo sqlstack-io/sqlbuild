@@ -10,6 +10,7 @@ use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT, SUPERSEDED_CHILD};
+use crate::runs::main::listings::run_invocations::run_invocations;
 use crate::runs::models::{
     RunErrorText, RunEventRecord, RunIgnoredAuditFailure, RunOutput, RunOutputLine,
     RunStatementRecord, RunStatementSql,
@@ -130,7 +131,7 @@ async fn run_recall_scope(
         other => serde_json::from_value(other.clone()),
     }
     .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let (transaction, namespaces) = run_namespaces(transaction, run_id).await?;
+    let (transaction, namespaces) = run_invocations(transaction, run_id).await?;
     Ok((
         transaction,
         Some(RunRecallScope {
@@ -138,28 +139,6 @@ async fn run_recall_scope(
             selection,
         }),
     ))
-}
-
-/// The run's scheduler invocation and, once claimed, its worker's.
-async fn run_namespaces(
-    transaction: ControlTransaction,
-    run_id: Uuid,
-) -> Result<(ControlTransaction, Vec<String>), ControlError> {
-    let scheduler = format!("scheduler/{run_id}");
-    let (transaction, claims) = query(
-        transaction,
-        "SELECT payload FROM recall_events WHERE invocation_id=$1 AND event_type='run_claimed' ORDER BY invocation_sequence DESC LIMIT 1",
-        vec![Parameter::Text(scheduler.clone())],
-    )
-    .await?;
-    let mut namespaces = vec![scheduler];
-    if let Some(claim_id) = claims
-        .first()
-        .and_then(|row| row["payload"]["claim"]["claim_id"].as_str())
-    {
-        namespaces.push(format!("worker/{claim_id}"));
-    }
-    Ok((transaction, namespaces))
 }
 
 /// The audit failures the run and its current group members let through, run by run in occurrence order.
@@ -181,7 +160,7 @@ pub(crate) async fn ignored_audits_in(
         let member = Uuid::parse_str(run["run_id"].as_str().unwrap_or_default())
             .map_err(|error| ControlError::Schema(format!("stored run ID: {error}")))?;
         let namespaces;
-        (transaction, namespaces) = run_namespaces(transaction, member).await?;
+        (transaction, namespaces) = run_invocations(transaction, member).await?;
         let scope = RunRecallScope {
             namespaces,
             selection: BTreeSet::new(),

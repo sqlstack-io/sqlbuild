@@ -122,7 +122,7 @@ fn elide_generated(message: &str) -> String {
 }
 
 /// The nonempty name a warning's message quotes first.
-fn named<'document>(warning: &'document Value) -> Option<&'document str> {
+fn named(warning: &Value) -> Option<&str> {
     first_quoted(text(warning, "message")).filter(|name| !name.is_empty())
 }
 

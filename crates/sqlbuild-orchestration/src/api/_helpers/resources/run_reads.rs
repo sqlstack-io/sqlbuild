@@ -11,13 +11,13 @@ use crate::api::models::{ReadQuery, ReadResource, RunRecallPath, RunRecallQuery}
 use crate::credentials::models::TokenIdentity;
 use crate::runs::main::listings::list_run_nodes::list_run_nodes;
 use crate::runs::main::listings::list_runs::list_runs;
+use crate::runs::main::listings::run_invocations::run_invocations;
 use crate::runs::models::{RunNodeRecord, RunRecord};
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::list_recall_invocations::list_recall_invocations;
-use crate::store::main::query::query;
 use crate::store::main::read_recall_view::read_recall_view;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::types::Row;
 
 #[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/runs", operation_id = "list_runs",
@@ -112,22 +112,10 @@ pub(crate) async fn recall(
     ))
 }
 
-/// Immutable claim evidence remains available after terminal publication removes liveness.
+/// The run's scheduler and worker invocations, read in their own transaction.
 async fn run_namespaces(store: &ControlStore, run_id: Uuid) -> Result<Vec<String>, ApiError> {
-    let scheduler = format!("scheduler/{run_id}");
-    let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, claims) = query(
-        transaction,
-        "SELECT payload FROM recall_events WHERE invocation_id=$1 AND event_type='run_claimed' ORDER BY invocation_sequence DESC LIMIT 1",
-        vec![Parameter::Text(scheduler.clone())],
-    ).await?;
+    let (transaction, namespaces) =
+        run_invocations(begin(store, TransactionMode::Read).await?, run_id).await?;
     commit(transaction).await?;
-    let mut namespaces = vec![scheduler];
-    if let Some(claim_id) = claims
-        .first()
-        .and_then(|row| row["payload"]["claim"]["claim_id"].as_str())
-    {
-        namespaces.push(format!("worker/{claim_id}"));
-    }
     Ok(namespaces)
 }
