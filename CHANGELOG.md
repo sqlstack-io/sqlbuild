@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.248.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.247.0...v0.248.0) (2026-11-18)
+
+
+### Features
+
+* **state:** record each build and seed run in _sqlbuild_runs ([#1579](https://github.com/sqlstack-io/sqlbuild/issues/1579)) ([41cf38f](https://github.com/sqlstack-io/sqlbuild/commit/41cf38fdb10715b7ec399521da86528132681adf))
+
 ## [0.247.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.246.0...v0.247.0) (2026-11-18)
 
 
