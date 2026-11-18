@@ -1,13 +1,14 @@
 //! Public records of native host.
 
 use crate::compiled_views::models::NativeCompiledModel;
+use crate::native_host::_helpers::run_writes::{
+    RowWrite, RunRow, ShareResult, warn_on_errors, write_shares,
+};
 use crate::native_host::_helpers::runs_state::CREATE_TABLE_METHOD;
-use crate::native_host::_helpers::runs_state::WAREHOUSE_USER_METHOD;
-use crate::native_host::_helpers::runs_state::row_cells;
 use crate::planner_scope::models::ScopeData;
 use pyo3::IntoPyObject;
 use pyo3::PyErr;
-use pyo3::exceptions::{PyException, PyKeyboardInterrupt};
+use pyo3::exceptions::PyKeyboardInterrupt;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
@@ -16,18 +17,13 @@ use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use sqlbuild_core::constants::RUNS_TABLE_NAME;
 use sqlbuild_orchestration::declarations::models::TriggerDefinition;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
-use sqlbuild_python_front::native_host::main::execute::execute;
-use sqlbuild_python_front::native_host::main::literal::literal;
 use sqlbuild_python_front::native_host::main::state_table_name::state_table_name;
 use sqlbuild_python_front::native_host::models::Location;
-use sqlbuild_state::runs::constants::{FINISHED_PHASE, RUN_COLUMN_TYPES, STARTED_PHASE};
+use sqlbuild_state::runs::constants::{FINISHED_PHASE, STARTED_PHASE};
 use sqlbuild_state::runs::main::run_status::run_status;
 use sqlbuild_state::runs::models::{RunEnding, RunNodeCounts};
-use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -175,59 +171,66 @@ pub struct RunCommandScope<'a> {
     pub sqlbuild_version: &'static str,
 }
 
-/// A build's two rows in its target's runs table; a failed write warns and never fails the build.
+/// The runs table in one schema the run writes to.
+#[derive(Debug)]
+pub struct RunTable {
+    pub location: Location,
+    pub table: String,
+}
+
+/// A run's two rows in the runs table of each schema it writes to; a failed write only warns.
 #[derive(Debug)]
 pub struct RunRecorder<'py> {
     adapter: Bound<'py, PyAny>,
     connection_config: Bound<'py, PyAny>,
-    location: Location,
-    table: String,
+    tables: Vec<RunTable>,
     identity: RunIdentity,
 }
 
 impl<'py> RunRecorder<'py> {
-    /// A recorder when the adapter keeps a runs table and the target has a schema; never connects.
+    /// A recorder when the adapter keeps a runs table and the run writes a schema; never connects.
     pub fn open(
         (adapter, connection_config): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-        (database, schema): (Option<String>, Option<String>),
+        locations: Vec<Location>,
         identity: RunIdentity,
     ) -> PyResult<Option<Self>> {
-        let Some(schema) = schema else {
-            return Ok(None);
-        };
         if !adapter.hasattr(CREATE_TABLE_METHOD)? {
             return Ok(None);
         }
-        let location = Location { database, schema };
-        let keywords = location.keywords(adapter.py());
-        let Some(table) = state_table_name(
-            &native_field(adapter, "render_qualified_name")?,
-            (&keywords[0].1, &keywords[1].1),
-            RUNS_TABLE_NAME,
-        )?
-        else {
+        let render_qualified_name: Bound<'py, PyAny> =
+            native_field(adapter, "render_qualified_name")?;
+        let mut tables: Vec<RunTable> = Vec::with_capacity(locations.len());
+        for location in locations {
+            let keywords = location.keywords(adapter.py());
+            if let Some(table) = state_table_name(
+                &render_qualified_name,
+                (&keywords[0].1, &keywords[1].1),
+                RUNS_TABLE_NAME,
+            )? {
+                tables.push(RunTable { location, table });
+            }
+        }
+        if tables.is_empty() {
             return Ok(None);
-        };
+        }
         Ok(Some(Self {
             adapter: adapter.clone(),
             connection_config: connection_config.clone(),
-            location,
-            table,
+            tables,
             identity,
         }))
     }
 
-    /// Set the table up once for the run and record that it started; only an interrupt escapes.
+    /// Set each schema's table up once for the run and record that it started; only an interrupt escapes.
     pub fn started(&self) -> PyResult<()> {
-        self.warn_on_error(STARTED_PHASE, self.write(STARTED_PHASE, None, true))
+        self.append_everywhere((STARTED_PHASE, None), RowWrite::SetUpFirst)
     }
 
     /// Record how the run ended and what its nodes did; only an interrupt escapes as an error.
     pub fn finished(&self, counts: &RunNodeCounts, ending: RunEnding) -> PyResult<()> {
-        let finish = (run_status(counts, ending), counts);
-        self.warn_on_error(
-            FINISHED_PHASE,
-            self.append_row(FINISHED_PHASE, Some(finish)),
+        self.append_everywhere(
+            (FINISHED_PHASE, Some((run_status(counts, ending), counts))),
+            RowWrite::InsertFirst,
         )
     }
 
@@ -241,98 +244,20 @@ impl<'py> RunRecorder<'py> {
         let _ = self.finished(&RunNodeCounts::default(), ending);
     }
 
-    /// Insert directly, as the started row set the table up, and set it up again only when that fails.
-    fn append_row(&self, phase: &str, finish: Option<(&str, &RunNodeCounts)>) -> PyResult<()> {
-        self.write(phase, finish, false).or_else(|error| {
-            if error.is_instance_of::<PyException>(self.adapter.py()) {
-                self.write(phase, finish, true)
-            } else {
-                Err(error)
-            }
-        })
-    }
-
-    /// Warn on a failed write and carry on; an interrupt is not a failed write, so it propagates.
-    fn warn_on_error(&self, phase: &str, written: PyResult<()>) -> PyResult<()> {
+    /// Append the row to every schema's table at once, then warn for each failed write.
+    ///
+    /// The first table is written on the calling thread, so an interrupt raised there stops the run
+    /// as it does for a single schema; an interrupt anywhere else escapes once every write is done.
+    fn append_everywhere(&self, row: RunRow<'_>, mode: RowWrite) -> PyResult<()> {
         let py: Python<'py> = self.adapter.py();
-        match written {
-            Err(error) if error.is_instance_of::<PyException>(py) => {
-                let _ = write_console(
-                    py,
-                    "stderr",
-                    &format!(
-                        "Warning: could not record that run {} {phase} in {RUNS_TABLE_NAME}: {error}\n",
-                        self.identity.run_id
-                    ),
-                );
-                Ok(())
-            }
-            written => written,
-        }
-    }
-
-    /// Connect for this row only, so loaders can still lock file warehouses during the build.
-    fn write(
-        &self,
-        phase: &str,
-        finish: Option<(&str, &RunNodeCounts)>,
-        ensure_table: bool,
-    ) -> PyResult<()> {
-        let connection: Bound<'py, PyAny> =
-            native_field(&self.adapter, "connect")?.call1((&self.connection_config,))?;
-        let written: PyResult<()> = self.append(&connection, (phase, finish), ensure_table);
-        let closed: PyResult<Bound<'py, PyAny>> =
-            native_field(&self.adapter, "close")?.call1((&connection,));
-        written?;
-        closed.map(|_| ())
-    }
-
-    fn append(
-        &self,
-        connection: &Bound<'py, PyAny>,
-        row: (&str, Option<(&str, &RunNodeCounts)>),
-        ensure_table: bool,
-    ) -> PyResult<()> {
-        let py: Python<'py> = self.adapter.py();
-        if ensure_table {
-            let keywords = self.location.keywords(py);
-            for statement in call_with(
-                &native_field(&self.adapter, "render_create_schema")?,
-                &keywords,
-            )?
-            .try_iter()?
-            {
-                execute(&self.adapter, connection, &statement?.extract::<String>()?)?;
-            }
-            let create: String = call_with(
-                &native_field(&self.adapter, CREATE_TABLE_METHOD)?,
-                &keywords,
-            )?
-            .extract()?;
-            if !create.is_empty() {
-                execute(&self.adapter, connection, &create)?;
-            }
-        }
-        let recorded_at: String = call_with(
-            &native_field(&self.adapter, "render_current_utc_timestamp")?,
-            &[],
-        )?
-        .extract()?;
-        let warehouse_user: String =
-            match call_with(&native_field(&self.adapter, WAREHOUSE_USER_METHOD)?, &[])?
-                .extract::<Option<String>>()?
-            {
-                Some(expression) => expression,
-                None => literal(py, None)?,
-            };
-        let columns: Vec<&str> = RUN_COLUMN_TYPES.iter().map(|(column, _)| *column).collect();
-        let cells: Vec<String> =
-            row_cells(py, &self.identity, row, (&warehouse_user, &recorded_at))?;
-        execute(
-            &self.adapter,
-            connection,
-            &values_insert_sql(&self.table, &columns, &[cells]),
-        )
-        .map(|_| ())
+        let shares: Vec<Vec<usize>> = (0..self.tables.len()).map(|index| vec![index]).collect();
+        let shared: Vec<ShareResult> = write_shares(
+            (&self.adapter, &self.connection_config),
+            (&self.tables, &self.identity),
+            &shares,
+            (row, mode),
+        );
+        warn_on_errors(py, (&self.tables, &self.identity), row.0, shared)?;
+        py.check_signals()
     }
 }

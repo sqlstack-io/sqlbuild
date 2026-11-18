@@ -347,18 +347,26 @@ After a successful build, SQLBuild writes version identities to `_sqlbuild_finge
 
 ## Run records
 
-Every build that runs nodes, and every `sqb seed`, appends a `started` row to `_sqlbuild_runs` in
-the target schema before its first node runs, and a `finished` row with its status and node counts
-when it ends. A run with only a `started` row was killed or crashed. A target whose schema is
-`preserve` has no schema of its own, so its runs are not recorded.
+Every build that runs nodes, and every `sqb seed`, appends a `started` row to `_sqlbuild_runs`
+before its first node runs, and a `finished` row with its status and node counts when it ends. It
+writes both rows to every schema the run writes to: the schemas of the models and seeds it builds,
+its SQL functions and the sources it loads, fixed from the plan before anything runs. The rows in each schema carry
+the same run ID, so a role that can build in a schema can also record the run there, with no other
+grants. A run never writes to a schema it doesn't otherwise write to, such as the target's default
+schema, and never creates a schema just for these rows. A run whose nodes write no relation, such as
+one that only runs Python tasks or checks, records nothing.
+
+A run's status is its `finished` row, in any of its schemas. A run with only `started` rows was
+killed or crashed. A synced code location merges the rows of every schema by run ID and shows runs
+it did not start.
 
 Each row records the command, its selection as typed, the jobs it names, the target, the
 warehouse user, the `sqb login` identity if you're signed in, the operating-system user, the
 machine name, the SQLBuild version and the Git commit. Of `--vars` it records only the names,
 never the values. Set `[settings] record_run_host = false` to leave out the machine name.
 
-Recording a run never fails the build: if a row can't be written, the build prints a warning and
-carries on.
+Recording a run never fails the build: if a row can't be written to a schema, the build prints a
+warning naming that schema's table and carries on, and the run's other schemas still record it.
 
 ## Runtime artifacts
 

@@ -38,6 +38,7 @@ use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_planner::observations::main::arm_source_capture::arm_source_capture;
 use sqlbuild_python_planner::observations::main::take_source_capture::take_source_capture;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
+use sqlbuild_python_project::native_host::main::build_write_locations::build_write_locations;
 use sqlbuild_python_project::native_host::main::run_recorder::run_recorder;
 use sqlbuild_python_project::native_host::models::RunRecorder;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
@@ -174,6 +175,7 @@ fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) 
             &context.invocation,
             &native_field(&pipeline, "project")?,
         ),
+        || build_write_locations(&native_field(&pipeline, "plan_output")?),
         context.worker.as_ref().map(|worker| worker.server_run()),
     )?;
     match execute_direct_build(context, &pipeline, providers) {

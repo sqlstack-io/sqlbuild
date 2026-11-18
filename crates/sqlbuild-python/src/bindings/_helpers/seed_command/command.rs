@@ -42,6 +42,7 @@ use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
 use sqlbuild_python_planner::planner_entries::main::plans::build_seed_command_plan::build_seed_command_plan;
 use sqlbuild_python_planner::planner_entries::main::plans::read_selected_seed_fingerprints::read_selected_seed_fingerprints;
 use sqlbuild_python_project::native_host::main::run_recorder::run_recorder;
+use sqlbuild_python_project::native_host::main::seed_write_locations::seed_write_locations;
 use sqlbuild_python_project::native_host::models::RunRecorder;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
@@ -486,6 +487,7 @@ pub(crate) fn run_seed<'py>(
     let recorder: Option<RunRecorder<'_>> = run_recorder(
         (SEED_COMMAND, env!("CARGO_PKG_VERSION")),
         (request, &invocation, &native_field(&pipeline, "project")?),
+        || seed_write_locations(&native_field(&pipeline, "plan_output")?),
         worker.as_ref().map(|worker| worker.server_run()),
     )?;
     let started: Instant = Instant::now();
