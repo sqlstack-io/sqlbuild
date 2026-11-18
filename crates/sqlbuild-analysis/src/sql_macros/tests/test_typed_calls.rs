@@ -196,6 +196,12 @@ fn given_typed_calls_when_building_the_analysis_text_then_each_call_with_returns
             .collect();
         let (typed, insertions) = typed_analysis_sql(test_case.sql, &calls, "duckdb");
         assert_eq!(typed, test_case.expected_sql, "{}", test_case.description);
+        let (remembered, _) = typed_analysis_sql(test_case.sql, &calls, "duckdb");
+        assert_eq!(
+            remembered, test_case.expected_sql,
+            "{}",
+            test_case.description
+        );
         let removed: String = {
             let mut text: String = String::new();
             let mut cursor: usize = 0;
