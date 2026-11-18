@@ -1,6 +1,8 @@
 //! Expression macro calls followed through the edits that move them, and their typed markers.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 
 use sqlquack_syntax::expressions::tree::constants::{
     TYPED_EXPRESSION_FUNCTION, TYPED_LIKE_EXPRESSION_FUNCTION,
@@ -12,8 +14,15 @@ use crate::analysis_route::models::AnalysisRoute;
 use crate::analysis_route::types::NativeDialect;
 use crate::compiled_project::models::SplicedSpan;
 use crate::sql_macros::_helpers::parsing::body::with_line_comment_closed;
-use crate::sql_macros::constants::NULL_KEYWORD;
+use crate::sql_macros::constants::{MARKER_MEMO_ENTRIES, NULL_KEYWORD};
 use crate::sql_macros::models::{TextSplice, TypedCall};
+
+/// The dialect, SQL and calls a parse-verified marker set was chosen for.
+type MarkerKey = (String, String, Vec<TypedCall>);
+
+/// Parse-verified marker sets, as a compile reads each analysis text twice and processes recompile.
+static MARKER_MEMO: LazyLock<Mutex<HashMap<MarkerKey, Vec<TypedCall>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// `calls` moved `offset` bytes later.
 pub(crate) fn shifted(calls: Vec<TypedCall>, offset: usize) -> impl Iterator<Item = TypedCall> {
@@ -176,8 +185,32 @@ pub(crate) fn markable_calls<'c>(
     let AnalysisRoute::Native(parse_dialect) = analysis_route(Some(dialect)) else {
         return Cow::Owned(Vec::new());
     };
+    let key: MarkerKey = (dialect.to_owned(), sql.to_owned(), calls.to_vec());
+    if let Some(kept) = marker_memo().get(&key) {
+        return Cow::Owned(kept.clone());
+    }
+    let kept: Vec<TypedCall> = parsed_markable_calls(sql, calls, (parse_dialect, marked));
+    let mut memo = marker_memo();
+    if memo.len() >= MARKER_MEMO_ENTRIES {
+        memo.clear();
+    }
+    memo.insert(key, kept.clone());
+    Cow::Owned(kept)
+}
+
+/// The process's parse-verified marker sets, locked.
+fn marker_memo() -> MutexGuard<'static, HashMap<MarkerKey, Vec<TypedCall>>> {
+    MARKER_MEMO.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The calls whose markers parse as typed expressions, checked by parsing the marked SQL.
+fn parsed_markable_calls(
+    sql: &str,
+    calls: &[TypedCall],
+    (parse_dialect, marked): (&'static dyn NativeDialect, usize),
+) -> Vec<TypedCall> {
     if lowered_markers(&typed_sql(sql, calls).0, parse_dialect) == Some(marked) {
-        return Cow::Borrowed(calls);
+        return calls.to_vec();
     }
     let mut kept: Vec<TypedCall> = Vec::with_capacity(calls.len());
     let mut kept_marked: usize = 0;
@@ -193,7 +226,7 @@ pub(crate) fn markable_calls<'c>(
             kept.pop();
         }
     }
-    Cow::Owned(kept)
+    kept
 }
 
 /// Whether `typed_sql` wraps `call` in a marker.

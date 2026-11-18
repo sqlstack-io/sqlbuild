@@ -145,3 +145,5 @@ pub(crate) const BIGQUERY_BIGNUMERIC_LIMITS: (u32, u32) = (38, 38);
 pub(crate) const BIGQUERY_BIG_DECIMAL_NAMES: [&str; 2] = ["BIGNUMERIC", "BIGDECIMAL"];
 /// How a relation function such as `__ref("orders")` starts.
 pub(crate) const RELATION_FUNCTION_PREFIX: &str = "__";
+/// Parse-verified marker sets a process keeps before starting over; each holds one model's SQL.
+pub(crate) const MARKER_MEMO_ENTRIES: usize = 8192;
