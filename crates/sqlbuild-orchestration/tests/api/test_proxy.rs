@@ -63,6 +63,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 .await
                 .expect("known person");
             let settings = TrustedProxyAuthentication {
+                allowed_hosts: Vec::new(),
                 origin: value("origin").into(),
                 trusted_peers: BTreeSet::from([test_case.trusted_peer.parse().expect("proxy IP")]),
                 identities: BTreeMap::from([
@@ -95,6 +96,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 store,
                 ApiAuthentication {
                     login: HumanLogin::TrustedProxy(TrustedProxyAuthentication {
+                        allowed_hosts: Vec::new(),
                         trusted_peers: BTreeSet::from([value("untrusted_peer")
                             .parse()
                             .expect("untrusted IP")]),

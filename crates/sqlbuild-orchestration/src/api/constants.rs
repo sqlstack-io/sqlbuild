@@ -42,6 +42,8 @@ pub(crate) const LOOPBACK_PROXY_PEERS: [std::net::IpAddr; 2] = [
     std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
     std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
 ];
+/// The `Host` names a proxy on the server's own host sends, with any port, besides the origin's.
+pub(crate) const PROXY_LOOPBACK_HOSTS: [&str; 3] = ["127.0.0.1", "localhost", "[::1]"];
 /// The longest proxy username, after trimming and lowercasing.
 pub(crate) const PROXY_USERNAME_CHARS: usize = 128;
 /// The longest display name or email address a proxy may report.

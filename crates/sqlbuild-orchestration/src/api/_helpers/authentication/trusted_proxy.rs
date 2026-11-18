@@ -16,7 +16,7 @@ use crate::api::_helpers::authentication::proxy_warnings::warn_plain_http_origin
 use crate::api::constants::HTTP_SCHEME;
 use crate::api::errors::ApiError;
 use crate::api::models::{
-    BrowserLoginMethod, BrowserOrigin, ProxyLogoutUrl, ProxyPeers, TrustedProxyAuthentication,
+    BrowserLoginMethod, BrowserOrigin, ProxyLogoutUrl, TrustedProxyAuthentication,
 };
 use crate::authorization::main::people::resolve_proxy_person::resolve_proxy_person;
 use crate::authorization::models::ProxyPerson;
@@ -45,12 +45,7 @@ pub(crate) fn router(
     if let Some(url) = settings.logout_url.clone() {
         routes = routes.layer(Extension(ProxyLogoutUrl(url)));
     }
-    Ok(routes
-        .layer(Extension(origin))
-        .layer(Extension(ProxyPeers(Arc::new(
-            settings.trusted_peers.clone(),
-        ))))
-        .layer(Extension(settings)))
+    Ok(routes.layer(Extension(origin)).layer(Extension(settings)))
 }
 
 /// Logs untrusted peers that send the username header before any check can refuse them.

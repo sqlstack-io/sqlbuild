@@ -35,6 +35,7 @@ pub(crate) async fn browser_sessions(
         store,
         ApiAuthentication {
             login: HumanLogin::TrustedProxy(TrustedProxyAuthentication {
+                allowed_hosts: Vec::new(),
                 origin: origin.into(),
                 trusted_peers: BTreeSet::from(["127.0.0.1".parse().expect("socket peer")]),
                 identities: BTreeMap::from([("orders-person".into(), person)]),

@@ -189,6 +189,18 @@ pub(crate) struct ProxyPeerTrustTestCase {
     pub(crate) expected_provisioned: bool,
 }
 
+/// One request from a trusted proxy peer, naming a person, under one `Host` and set of headers.
+pub(crate) struct ProxyHostTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) allowed_hosts: &'static [&'static str],
+    pub(crate) peer: &'static str,
+    pub(crate) request: (&'static str, &'static str),
+    pub(crate) headers: &'static [(&'static str, &'static str)],
+    pub(crate) username: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_provisioned: bool,
+}
+
 pub(crate) struct ProxyPeersDefaultTestCase {
     pub(crate) description: &'static str,
     pub(crate) configuration: serde_json::Value,
