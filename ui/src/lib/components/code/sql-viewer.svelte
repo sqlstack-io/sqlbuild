@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { copyText } from '$lib/browser/clipboard';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right';
 	import UnfoldVerticalIcon from '@lucide/svelte/icons/unfold-vertical';
@@ -117,8 +118,7 @@
 	}
 
 	async function copy() {
-		await navigator.clipboard?.writeText(mode === 'compiled' ? compiled : raw);
-		copied = true;
+		copied = await copyText(mode === 'compiled' ? compiled : raw);
 		setTimeout(() => (copied = false), 1200);
 	}
 </script>

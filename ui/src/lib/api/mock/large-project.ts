@@ -8,6 +8,7 @@ import type { PlanDocument, PlanPage, PlanResult } from '../types';
 import { largePlanDocument, planModelDiff, planPage, planSummary } from './large-plan';
 import { recordPlanDiff, recordPlanRows } from './plan-rows-log';
 import type { CatalogNode } from '../types';
+import { newRequestId } from '$lib/browser/request-id';
 
 const LAYERS = [['sources'], ['seeds', 'orders'], ['customers', 'inventory'], ['payments', 'shipping'], ['returns', 'pricing'], ['suppliers', 'regions'], ['finance', 'marketing']];
 const PER_SUBFOLDER = 15;
@@ -53,7 +54,7 @@ export function largeProject(client: ApiClient): ApiClient {
 					const result = await target.planBuild(...args);
 					if (!result.plan) return result;
 					const doc = largePlanDocument(args[1].some((t) => t === '--changed' || t.startsWith('--changed=')));
-					const requestId = crypto.randomUUID();
+					const requestId = newRequestId();
 					plans.set(requestId, doc);
 					return { plan: { ...planSummary(doc), timings: result.plan.timings }, error: null, requestId };
 				};
