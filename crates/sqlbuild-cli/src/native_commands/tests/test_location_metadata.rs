@@ -406,6 +406,29 @@ fn given_recorded_change_token_when_scanning_again_then_only_proven_unchanged_re
 }
 
 #[test]
+fn given_a_table_skipped_as_unchanged_when_reporting_health_then_its_last_mirrored_count_repeats() {
+    let mut state = metadata_sync((one_location(), 1), (3600, 0));
+    state.scan_token = Some("t1".into());
+    state.scan_delivered = true;
+    state.progress.scan_mirrored = Some(42);
+    let mut state = acknowledge_complete_pages(state, 1);
+    assert_eq!(
+        state.progress.scan_mirrored, None,
+        "the next table starts without a count"
+    );
+    state.index = 0;
+    state.skip_unchanged();
+    let health = metadata_health_of(&state, (Instant::now(), None, None), Utc::now());
+    let LocationHealth::WarehouseSync {
+        mirrored_records, ..
+    } = health
+    else {
+        panic!("not a warehouse sync report");
+    };
+    assert_eq!(mirrored_records, Some(42));
+}
+
+#[test]
 fn given_signals_during_a_sync_when_it_completes_then_exactly_one_follow_up_sync_runs() {
     let test_cases = [
         SyncCoalescingTestCase {

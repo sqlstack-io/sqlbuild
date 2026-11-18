@@ -671,6 +671,7 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
                     token,
                     reconciled: state.reconciling(),
                     delivered: state.scan_delivered || state.observed_since.is_some(),
+                    mirrored: state.progress.scan_mirrored,
                 };
                 state.change_tokens.insert(state.index, recorded);
             }

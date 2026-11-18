@@ -94,11 +94,11 @@ pub(crate) async fn sync_location_metadata(
             return Ok(Some(state));
         }
         if page.unchanged {
+            state.skip_unchanged();
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },
                 () = metadata_health(&state, (client, poll), (started, None)) => {},
             }
-            state.progress.scan_unchanged = true;
             return finish_metadata_page(next_scan(state)).await;
         }
         state = freeze_history_page(state, page, poll)?;
