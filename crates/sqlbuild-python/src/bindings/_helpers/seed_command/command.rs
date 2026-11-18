@@ -41,7 +41,6 @@ use sqlbuild_python_output::result_output::main::results::write_execution_json_o
 use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
 use sqlbuild_python_planner::planner_entries::main::plans::build_seed_command_plan::build_seed_command_plan;
 use sqlbuild_python_planner::planner_entries::main::plans::read_selected_seed_fingerprints::read_selected_seed_fingerprints;
-use sqlbuild_python_project::native_host::main::raised_ending::raised_ending;
 use sqlbuild_python_project::native_host::main::run_recorder::run_recorder;
 use sqlbuild_python_project::native_host::models::RunRecorder;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
@@ -489,9 +488,6 @@ pub(crate) fn run_seed<'py>(
         (request, &invocation, &native_field(&pipeline, "project")?),
         worker.as_ref().map(|worker| worker.server_run()),
     )?;
-    if let Some(recorder) = &recorder {
-        recorder.started()?;
-    }
     let started: Instant = Instant::now();
     let loaded: PyResult<Vec<Bound<'_, PyAny>>> =
         load_seeds(&invocation, &pipeline, (concurrency, worker));
@@ -499,7 +495,7 @@ pub(crate) fn run_seed<'py>(
         Ok(results) => results,
         Err(error) => {
             if let Some(recorder) = &recorder {
-                let _ = recorder.finished(&RunNodeCounts::default(), raised_ending(py, &error));
+                recorder.raised(&error);
             }
             return Err(error);
         }

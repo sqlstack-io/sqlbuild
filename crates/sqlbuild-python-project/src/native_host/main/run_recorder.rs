@@ -10,7 +10,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_state::runs::models::ServerRun;
 use std::path::PathBuf;
 
-/// One run's recorder for the CLI or a worker (which passes `server`); only an interrupt errors.
+/// A run's recorder with its started row written, for the CLI or a worker; only an interrupt errors.
 pub fn run_recorder<'py>(
     (command, sqlbuild_version): (&'static str, &'static str),
     (request, invocation, project): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -60,6 +60,10 @@ pub fn run_recorder<'py>(
                 &format!("Warning: this run is not recorded in {RUNS_TABLE_NAME}: {error}\n"),
             );
             Ok(None)
+        }
+        Ok(Some(recorder)) => {
+            recorder.started()?;
+            Ok(Some(recorder))
         }
         opened => opened,
     }

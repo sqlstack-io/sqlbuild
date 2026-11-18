@@ -6,7 +6,8 @@ use crate::native_host::_helpers::runs_state::WAREHOUSE_USER_METHOD;
 use crate::native_host::_helpers::runs_state::row_cells;
 use crate::planner_scope::models::ScopeData;
 use pyo3::IntoPyObject;
-use pyo3::exceptions::PyException;
+use pyo3::PyErr;
+use pyo3::exceptions::{PyException, PyKeyboardInterrupt};
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
@@ -228,6 +229,16 @@ impl<'py> RunRecorder<'py> {
             FINISHED_PHASE,
             self.append_row(FINISHED_PHASE, Some(finish)),
         )
+    }
+
+    /// Record a run that stopped on `error`: cancelled on an interrupt, else failed. Never errors.
+    pub fn raised(&self, error: &PyErr) {
+        let ending: RunEnding = if error.is_instance_of::<PyKeyboardInterrupt>(self.adapter.py()) {
+            RunEnding::Interrupted
+        } else {
+            RunEnding::Raised
+        };
+        let _ = self.finished(&RunNodeCounts::default(), ending);
     }
 
     /// Insert directly, and create the schema and table only when that fails, as on a first run.

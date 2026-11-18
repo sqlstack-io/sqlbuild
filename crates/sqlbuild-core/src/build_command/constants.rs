@@ -47,9 +47,12 @@ pub(crate) const C0_CONTROL_CODE_LIMIT: u32 = 0x20;
 pub(crate) const C1_CONTROL_CODE_START: u32 = 0x7f;
 pub(crate) const C1_CONTROL_CODE_LIMIT: u32 = 0xa0;
 
-pub(crate) const PYTHON_NODE_SUCCESS: &str = "success";
-pub(crate) const PYTHON_NODE_SKIPPED: &str = "skipped";
-pub(crate) const PYTHON_NODE_FAILED: &str = "failed";
+/// A Python node or check that succeeded, warnings included.
+pub const PYTHON_NODE_SUCCESS: &str = "success";
+/// A Python node or check that never ran.
+pub const PYTHON_NODE_SKIPPED: &str = "skipped";
+/// A Python node or check that failed, which fails the build.
+pub const PYTHON_NODE_FAILED: &str = "failed";
 pub(crate) const PYTHON_STATUS_OK: &str = "OK";
 pub(crate) const PYTHON_STATUS_SKIP: &str = "SKIP";
 pub(crate) const PYTHON_STATUS_FAIL: &str = "FAIL";

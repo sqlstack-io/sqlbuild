@@ -49,7 +49,6 @@ use sqlbuild_python_output::result_output::main::results::format_build_execution
 use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 
 const SUCCESS_STATUS: &str = "success";
-const SKIPPED_STATUS: &str = "skipped";
 const CHECK_KIND: &str = "check";
 const CHECK_WARNED: &str = "check warned";
 const PENDING_MESSAGE: &str = "Build cost collection has not completed.";
@@ -436,15 +435,11 @@ pub(crate) fn finished_run(
     for node in outcome.python_results.try_iter()? {
         let node: Bound<'_, PyAny> = node?;
         let status: String = native_field(&node, "status")?.str()?.extract()?;
-        counts = with_python_node(
-            counts,
-            &status,
-            native_field(&node, "warning_messages")?.len()?,
-        );
+        counts = counts.with_python_node(&status, native_field(&node, "warning_messages")?.len()?);
     }
     for check in check_results.try_iter()? {
         let check: PythonNodeText = check_node_text(&check_result_text(&check?)?);
-        counts = with_python_node(counts, &check.status, check.warnings.len());
+        counts = counts.with_python_node(&check.status, check.warnings.len());
     }
     let ending: RunEnding = if result.status != BuildStatus::Success && counts.failed == 0 {
         RunEnding::Raised
@@ -452,28 +447,6 @@ pub(crate) fn finished_run(
         RunEnding::Completed
     };
     Ok((counts, ending))
-}
-
-fn with_python_node(counts: RunNodeCounts, status: &str, warnings: usize) -> RunNodeCounts {
-    if python_node_failed(status) {
-        RunNodeCounts {
-            failed: counts.failed + 1,
-            ..counts
-        }
-    } else if status == SKIPPED_STATUS {
-        RunNodeCounts {
-            skipped: counts.skipped + 1,
-            ..counts
-        }
-    } else if status == SUCCESS_STATUS {
-        RunNodeCounts {
-            succeeded: counts.succeeded + 1,
-            warned: counts.warned + i64::try_from(warnings).unwrap_or(i64::MAX),
-            ..counts
-        }
-    } else {
-        counts
-    }
 }
 
 /// Persist and render a completed direct build and return its exit code.
