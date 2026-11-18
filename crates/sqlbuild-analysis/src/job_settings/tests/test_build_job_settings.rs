@@ -36,6 +36,15 @@ fn given_named_jobs_when_merging_build_settings_then_they_must_agree() {
             ),
         },
         BuildJobSettingsTestCase {
+            description: "a job: pattern names every job it matches",
+            select: &["job:crm_*"],
+            expected_named: vec!["crm_job", "crm_us_job"],
+            expected_settings: Err(
+                "jobs crm_job and crm_us_job set vars differently ({\"region\":\"eu\"} \
+                 and {\"region\":\"us\"}); a build applies vars to everything it runs",
+            ),
+        },
+        BuildJobSettingsTestCase {
             description: "a group's jobs without build-wide settings",
             select: &["job:daily_group"],
             expected_named: vec!["orders_job", "refunds_job"],
