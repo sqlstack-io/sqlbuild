@@ -2,12 +2,10 @@
 
 use std::collections::HashMap;
 
-use polyglot_sql::{
-    ComplexityGuardOptions, Dialect, DialectType, ParseOptions, ValidationOptions,
-    validate_with_dialect,
-};
+use polyglot_sql::{Dialect, DialectType, ParseOptions, ValidationOptions, validate_with_dialect};
 
-use crate::assembly::project::constants::{INVALID_SQL, MAX_FUNCTION_CALL_DEPTH};
+use crate::assembly::project::constants::INVALID_SQL;
+use crate::parse_guard::main::polyglot_complexity_guard::polyglot_complexity_guard;
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
 use crate::assembly::project::models::{SyntaxCheck, SyntaxFailure, SyntaxMode};
@@ -40,10 +38,7 @@ pub(crate) fn syntax_error(
     };
     let dialect_type: DialectType = parser_dialect(Some(dialect))
         .map_err(|unknown| SyntaxFailure::UnknownDialect(unknown.to_owned()))?;
-    let complexity_guard = ComplexityGuardOptions {
-        max_function_call_depth: Some(MAX_FUNCTION_CALL_DEPTH),
-        ..Default::default()
-    };
+    let complexity_guard = polyglot_complexity_guard();
     let polyglot: Dialect = Dialect::get(dialect_type);
     Ok(match mode {
         SyntaxMode::Validate => {

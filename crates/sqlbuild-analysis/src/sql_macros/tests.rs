@@ -1,5 +1,7 @@
 #[path = "tests/helpers.rs"]
 mod helpers;
+#[path = "tests/test_call_depth.rs"]
+mod test_call_depth;
 #[path = "tests/test_definitions.rs"]
 mod test_definitions;
 #[path = "tests/test_expansion.rs"]

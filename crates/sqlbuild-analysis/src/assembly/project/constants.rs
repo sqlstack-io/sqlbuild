@@ -16,7 +16,6 @@ pub(crate) const TEMPLATE_OPEN_TOKEN: &str = "${";
 pub(crate) const PYTHON_NONE: &str = "None";
 pub(crate) const PYTHON_TRUE: &str = "True";
 pub(crate) const PYTHON_FALSE: &str = "False";
-pub(crate) const MAX_FUNCTION_CALL_DEPTH: usize = 512;
 pub(crate) const MODEL_NAME_CONTEXT: &str = "model.name";
 pub(crate) const MODEL_DATABASE_CONTEXT: &str = "model.database";
 pub(crate) const MODEL_SCHEMA_CONTEXT: &str = "model.schema";
