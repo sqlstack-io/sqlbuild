@@ -274,6 +274,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAttentionAcknowledgements"];
+        put?: never;
+        post: operations["acknowledgeAttention"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/catalog": {
         parameters: {
             query?: never;
@@ -1630,6 +1646,39 @@ export interface components {
              */
             decision_id?: string | null;
             error: string;
+        };
+        /** @description A condition whose latest acknowledgement event marks it handled. */
+        AttentionAcknowledgement: {
+            /** Format: date-time */
+            acknowledged_at: string;
+            /** @description The person's name, or the audit actor when the person no longer exists. */
+            acknowledged_by: string;
+            key: string;
+            shape: Record<string, never>;
+            /**
+             * Format: date-time
+             * @description When the acknowledgement lapses even if the condition never changes.
+             */
+            until: string;
+        };
+        /**
+         * @description Marks an ongoing attention condition handled, as it looks now, or withdraws the mark; retried with
+         *     the same event ID it applies once.
+         */
+        AttentionAcknowledgementRequest: {
+            acknowledged: boolean;
+            /** Format: uuid */
+            event_id: string;
+            /**
+             * @description The condition: its kind and subject, stable while it lasts, such as `stale_sources` or
+             *     `event:tick_overdue:<schedule>`.
+             */
+            key: string;
+            /**
+             * @description What the condition looked like (counts, members, error codes), which later states are compared
+             *     with; a JSON object of at most 8 KiB. Never message text, which can hold relative times.
+             */
+            shape: Record<string, never>;
         };
         AuthenticationDenial: {
             error: string;
@@ -4888,6 +4937,95 @@ export interface operations {
                 };
             };
             /** @description The run is not in this location and target, or the event ID was reused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listAttentionAcknowledgements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conditions marked handled in the last two days, lapsed ones included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionAcknowledgement"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    acknowledgeAttention: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttentionAcknowledgementRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether the condition's acknowledgement changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description The key or shape is invalid, or the event ID was reused */
             400: {
                 headers: {
                     [name: string]: unknown;

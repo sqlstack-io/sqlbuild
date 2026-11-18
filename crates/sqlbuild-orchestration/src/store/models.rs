@@ -98,6 +98,8 @@ pub(crate) enum Change {
     Trigger(Uuid),
     Snapshot(Uuid, String),
     NodeStatus(Uuid, String),
+    /// An attention condition of a location's target was acknowledged or withdrawn.
+    Attention(Uuid, String),
     Credentials,
 }
 

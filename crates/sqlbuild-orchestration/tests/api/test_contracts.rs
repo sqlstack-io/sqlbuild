@@ -40,6 +40,8 @@ mod statistics_helpers;
 mod statistics_retention;
 #[path = "test_acknowledgements.rs"]
 mod test_acknowledgements;
+#[path = "test_attention_acknowledgements.rs"]
+mod test_attention_acknowledgements;
 #[path = "test_catalog_reads.rs"]
 mod test_catalog_reads;
 #[path = "test_changes.rs"]

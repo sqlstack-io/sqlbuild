@@ -43,12 +43,12 @@ pub(crate) async fn resolve_changes(
             continue;
         }
         let scope = match &change {
-            Change::Snapshot(location_id, target) | Change::NodeStatus(location_id, target) => {
-                ChangedScope {
-                    location_id: *location_id,
-                    target: target.clone(),
-                }
-            }
+            Change::Snapshot(location_id, target)
+            | Change::NodeStatus(location_id, target)
+            | Change::Attention(location_id, target) => ChangedScope {
+                location_id: *location_id,
+                target: target.clone(),
+            },
             Change::Run(id) | Change::Trigger(id) => {
                 let sql = if matches!(change, Change::Run(_)) {
                     "SELECT location_id, target FROM sqb_runs WHERE run_id=$1"
@@ -73,6 +73,8 @@ pub(crate) async fn resolve_changes(
             Change::Trigger(_) => vec![ChangeTopic::Ticks],
             Change::Snapshot(..) => vec![ChangeTopic::Snapshot, ChangeTopic::NodeStatus],
             Change::NodeStatus(..) => vec![ChangeTopic::NodeStatus],
+            // The Overview reads its attention list with the runs, so it reloads on their topic.
+            Change::Attention(..) => vec![ChangeTopic::Runs],
             Change::Credentials => continue,
         };
         for topic in topics {
