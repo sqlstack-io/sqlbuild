@@ -3,6 +3,7 @@
 use crate::attachments::main::argument_pairs::argument_pairs;
 use crate::attachments::main::config_argument_value::config_argument_value;
 use crate::authored_values::main::project_var_text::project_var_text;
+use crate::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use crate::discovery::main::project::each::each;
 use crate::discovery::models::NativeModelFile;
 use crate::model_config::_helpers::config::config_classes::built_config;
@@ -1356,7 +1357,17 @@ impl NativeModelValidator {
             })?
             .into_iter()
             .collect();
-        Self::new(names, custom_materializations, microbatch_concurrency)
+        let adapter: Option<String> = resolve_effective_adapter_name(
+            &native_field(&inputs, "project_config")?,
+            &native_field(&inputs, "local_config")?,
+        )?
+        .extract()?;
+        Self::new(
+            names,
+            custom_materializations,
+            microbatch_concurrency,
+            adapter,
+        )
     }
 
     /// The discovered model names references resolve against.
@@ -1365,10 +1376,12 @@ impl NativeModelValidator {
     }
 
     #[new]
+    #[pyo3(signature = (names, custom_materializations, microbatch_concurrency, adapter=None))]
     pub(crate) fn new(
         names: ResourceNames,
         custom_materializations: HashSet<String>,
         microbatch_concurrency: bool,
+        adapter: Option<String>,
     ) -> PyResult<Self> {
         let ResourceNames {
             models,
@@ -1386,6 +1399,7 @@ impl NativeModelValidator {
                 sources,
                 functions,
                 table_functions,
+                adapter,
             },
         })
     }

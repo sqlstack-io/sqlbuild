@@ -1,7 +1,8 @@
 //! Config keys and vocabularies the Python model validators accept.
 
 /// Built-in materializations that never name a custom materialization.
-pub const BUILTIN_MATERIALIZATIONS: [&str; 4] = ["view", "table", "incremental", "snapshot"];
+pub const BUILTIN_MATERIALIZATIONS: [&str; 5] =
+    ["view", "table", "incremental", "snapshot", "maintained"];
 /// Materializations that own a physical managed table.
 pub const TABLE_BACKED_MATERIALIZATIONS: [&str; 3] = ["table", "incremental", "snapshot"];
 /// Materializations that keep history across runs.
@@ -14,6 +15,33 @@ pub const TABLE_MATERIALIZATION: &str = "table";
 pub const INCREMENTAL_MATERIALIZATION: &str = "incremental";
 /// The snapshot materialization.
 pub const SNAPSHOT_MATERIALIZATION: &str = "snapshot";
+/// The materialization whose stored result the warehouse keeps fresh between builds.
+pub const MAINTAINED_MATERIALIZATION: &str = "maintained";
+/// Keys only a maintained model accepts.
+pub const MAINTAINED_ONLY_KEYS: [&str; 4] = [
+    "refresh",
+    "refresh_mode",
+    "refresh_warehouse",
+    "refresh_on_build",
+];
+/// The `refresh ( … )` forms any adapter accepts; each adapter accepts only its own.
+pub const MAINTAINED_REFRESH_FORMS: [&str; 1] = ["lag"];
+/// `refresh_mode` values.
+pub const MAINTAINED_REFRESH_MODES: [&str; 4] = ["incremental", "full", "auto", "adaptive"];
+/// Adapters that build maintained models, sorted.
+pub const MAINTAINED_ADAPTERS: [&str; 1] = ["snowflake"];
+/// The Snowflake adapter name.
+pub const SNOWFLAKE_ADAPTER: &str = "snowflake";
+/// The materialization name other warehouses use, which Snowflake builds as `maintained`.
+pub const MATERIALIZED_VIEW_MATERIALIZATION: &str = "materialized_view";
+/// Snowflake's smallest dynamic table target lag, in seconds.
+pub const SNOWFLAKE_MIN_LAG_SECONDS: u128 = 60;
+/// The code of a maintained model on an adapter that cannot build one.
+pub const MAINTAINED_ADAPTER_CODE: &str = "A013";
+/// The code of `materialized_view` on Snowflake, which builds `maintained` instead.
+pub const MATERIALIZED_VIEW_ADAPTER_CODE: &str = "A014";
+/// The code of a refresh form or value the adapter does not accept.
+pub const MAINTAINED_REFRESH_UNSUPPORTED_CODE: &str = "A015";
 
 /// `IncrementalStrategy` values.
 pub const INCREMENTAL_STRATEGIES: [&str; 3] = ["append", "delete_insert", "merge"];

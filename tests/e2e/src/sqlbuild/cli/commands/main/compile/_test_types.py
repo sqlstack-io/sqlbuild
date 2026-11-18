@@ -1461,3 +1461,14 @@ class JobGroupCyclesCase:
     description: str
     fixed_group_toml: str
     expected_messages: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class MaintainedCompileE2ETestCase:
+    """A project with maintained models, its exit code and text its compile output contains."""
+
+    description: str
+    adapter: str
+    daily_totals_header: str
+    expected_exit_code: int
+    expected_fragments: tuple[str, ...]

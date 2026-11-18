@@ -11,6 +11,7 @@ use crate::model_validation::_helpers::config::python_lower;
 use crate::model_validation::_helpers::config::{
     ConfigView, model_header_help, non_blank_string_check, one_of, sorted_values, text_if_string,
 };
+use crate::model_validation::_helpers::durations::parse_duration;
 use crate::model_validation::constants::{
     BUILTIN_MATERIALIZATIONS, CONTRACT_POLICIES, CUSTOM_MATERIALIZATION_DISALLOWED_KEYS,
     HISTORY_MATERIALIZATIONS, INCREMENTAL_MATERIALIZATION, INCREMENTAL_ONLY_KEYS,
@@ -26,6 +27,12 @@ use crate::model_validation::constants::{
     PHYSICAL_STORAGE_MATERIALIZATIONS, PRIMARY_KEY_KEY, TABLE_SETTINGS_KEY,
     UNSUPPORTED_ENGINE_PREFIXES,
 };
+use crate::model_validation::constants::{
+    MAINTAINED_ADAPTER_CODE, MAINTAINED_ADAPTERS, MAINTAINED_MATERIALIZATION, MAINTAINED_ONLY_KEYS,
+    MAINTAINED_REFRESH_FORMS, MAINTAINED_REFRESH_MODES, MAINTAINED_REFRESH_UNSUPPORTED_CODE,
+    MATERIALIZED_VIEW_ADAPTER_CODE, MATERIALIZED_VIEW_MATERIALIZATION, SNAPSHOT_DISALLOWED_KEYS,
+    SNOWFLAKE_ADAPTER, SNOWFLAKE_MIN_LAG_SECONDS,
+};
 use crate::model_validation::models::{
     ModelValidationFacts, ProjectValidationFacts, ValidationStop,
 };
@@ -36,6 +43,11 @@ const MIGRATE_FROM_KEY: &str = "migrate_from";
 /// The model key that marks a model whose downstream paths `sqb review` validates.
 const CRITICAL_KEY: &str = "critical";
 const MIGRATE_FORCE_KEY: &str = "migrate_force";
+const REFRESH_KEY: &str = "refresh";
+const LAG_FORM: &str = "lag";
+const REFRESH_MODE_KEY: &str = "refresh_mode";
+const REFRESH_WAREHOUSE_KEY: &str = "refresh_warehouse";
+const REFRESH_ON_BUILD_KEY: &str = "refresh_on_build";
 
 /// Check `validate_microbatch_project_capability`.
 pub(crate) fn check_project_capability<N: AuthoredNode>(
@@ -608,4 +620,137 @@ fn setting_name(name: &str) -> bool {
         && name
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || character == '_')
+}
+
+/// Check the refresh fields: only maintained models on an adapter that builds them take them.
+pub(crate) fn check_maintained<N: AuthoredNode>(
+    config: &ConfigView<'_, N>,
+    project: &ProjectValidationFacts,
+) -> Check {
+    let materialized: Option<String> = config.string("materialized")?;
+    let adapter: Option<&str> = project.adapter.as_deref();
+    if materialized.as_deref() == Some(MATERIALIZED_VIEW_MATERIALIZATION)
+        && adapter == Some(SNOWFLAKE_ADAPTER)
+        && !project
+            .custom_materializations
+            .contains(MATERIALIZED_VIEW_MATERIALIZATION)
+    {
+        return Err(coded(
+            config,
+            MATERIALIZED_VIEW_ADAPTER_CODE,
+            "Snowflake has no materialized_view materialization; use materialized maintained, \
+             which builds a dynamic table",
+        ));
+    }
+    if materialized.as_deref() != Some(MAINTAINED_MATERIALIZATION) {
+        return match config.first_present(&MAINTAINED_ONLY_KEYS) {
+            Some(key) => Err(config.error(format!("{key} is only valid for maintained models"))),
+            None => Ok(()),
+        };
+    }
+    if let Some(adapter) = adapter.filter(|adapter| !one_of(adapter, &MAINTAINED_ADAPTERS)) {
+        return Err(coded(
+            config,
+            MAINTAINED_ADAPTER_CODE,
+            format!(
+                "materialized maintained is not supported on the {adapter} adapter; adapters \
+                 that support it: {}",
+                MAINTAINED_ADAPTERS.join(", ")
+            ),
+        ));
+    }
+    if let Some(key) = config.first_present(&SNAPSHOT_DISALLOWED_KEYS) {
+        return Err(config.error(format!(
+            "{key} is not valid for maintained models: the warehouse refreshes them from the \
+             whole query"
+        )));
+    }
+    check_refresh(config, adapter)?;
+    if let Some(mode) = config.get(REFRESH_MODE_KEY) {
+        let text: Option<String> = text_if_string(mode);
+        if !text
+            .as_deref()
+            .is_some_and(|text| one_of(text, &MAINTAINED_REFRESH_MODES))
+        {
+            return Err(config.error(format!(
+                "{REFRESH_MODE_KEY} must be one of: {}; got '{}'",
+                sorted_values(&MAINTAINED_REFRESH_MODES),
+                text.unwrap_or_default()
+            )));
+        }
+    }
+    if config
+        .get(REFRESH_WAREHOUSE_KEY)
+        .is_some_and(|warehouse| !non_blank_string_check(warehouse))
+    {
+        return Err(config.error(format!(
+            "{REFRESH_WAREHOUSE_KEY} must be a non-empty warehouse name"
+        )));
+    }
+    match config.get(REFRESH_ON_BUILD_KEY).map(AuthoredNode::kind) {
+        None | Some(NodeKind::Bool(_)) => Ok(()),
+        Some(_) => Err(config.error(format!("{REFRESH_ON_BUILD_KEY} must be a boolean"))),
+    }
+}
+
+/// Check that `refresh` is a block with exactly one known form and a valid value.
+fn check_refresh<N: AuthoredNode>(config: &ConfigView<'_, N>, adapter: Option<&str>) -> Check {
+    let Some(refresh) = config.get(REFRESH_KEY) else {
+        return Ok(());
+    };
+    if refresh.kind() != NodeKind::Map {
+        return Err(config.error(format!(
+            "{REFRESH_KEY} must be a block such as refresh (lag 1h)"
+        )));
+    }
+    let block: Vec<(N, N)> = refresh.entries();
+    let forms: Vec<String> = block
+        .iter()
+        .map(|(name, _)| name.text().unwrap_or_default())
+        .collect();
+    let [(form, value)] = block.as_slice() else {
+        return Err(unknown_form(config, &forms));
+    };
+    if !MAINTAINED_REFRESH_FORMS
+        .iter()
+        .any(|known| form.is_text(known))
+    {
+        return Err(unknown_form(config, &forms));
+    }
+    let text: String = text_if_string(value).unwrap_or_default();
+    let Ok(Some(lag)) = parse_duration(&text) else {
+        return Err(not_fixed(config, &text));
+    };
+    if lag.total_months != 0 {
+        return Err(not_fixed(config, &text));
+    }
+    if adapter == Some(SNOWFLAKE_ADAPTER) && lag.fixed_seconds < SNOWFLAKE_MIN_LAG_SECONDS {
+        return Err(coded(
+            config,
+            MAINTAINED_REFRESH_UNSUPPORTED_CODE,
+            format!("{REFRESH_KEY} {LAG_FORM} on Snowflake must be at least 1m; got '{text}'"),
+        ));
+    }
+    Ok(())
+}
+
+fn not_fixed<N: AuthoredNode>(config: &ConfigView<'_, N>, text: &str) -> ValidationStop {
+    config.error(format!(
+        "{REFRESH_KEY} {LAG_FORM} must be a fixed duration such as 5m, 1h or 1d; got '{text}'"
+    ))
+}
+
+fn coded<N: AuthoredNode>(
+    config: &ConfigView<'_, N>,
+    code: &'static str,
+    text: impl std::fmt::Display,
+) -> ValidationStop {
+    ValidationStop::Error(config.config_error(text).with_code(code))
+}
+
+fn unknown_form<N: AuthoredNode>(config: &ConfigView<'_, N>, forms: &[String]) -> ValidationStop {
+    config.error(format!(
+        "{REFRESH_KEY} takes exactly one form, such as refresh (lag 1h); got: {}",
+        forms.join(", ")
+    ))
 }

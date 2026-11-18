@@ -4316,6 +4316,7 @@ class NativeModelValidator:
         names: tuple[set[str], set[str], set[str], set[str], set[str]],
         custom_materializations: set[str],
         microbatch_concurrency: bool,
+        adapter: str | None = None,
     ) -> None: ...
     @staticmethod
     def from_inputs(
