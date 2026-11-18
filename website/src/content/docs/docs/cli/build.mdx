@@ -330,7 +330,8 @@ After a successful build, SQLBuild writes version identities to `_sqlbuild_finge
 
 Every build that runs nodes, and every `sqb seed`, appends a `started` row to `_sqlbuild_runs` in
 the target schema before its first node runs, and a `finished` row with its status and node counts
-when it ends. A run with only a `started` row was killed or crashed.
+when it ends. A run with only a `started` row was killed or crashed. A target whose schema is
+`preserve` has no schema of its own, so its runs are not recorded.
 
 Each row records the command, its selection as typed, the jobs it names, the target, the
 warehouse user, the `sqb login` identity if you're signed in, the operating-system user, the

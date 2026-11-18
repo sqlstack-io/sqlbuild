@@ -217,9 +217,9 @@ impl<'py> RunRecorder<'py> {
         }))
     }
 
-    /// Record that the run started; only an interrupt, such as Ctrl+C, escapes as an error.
+    /// Set the table up once for the run and record that it started; only an interrupt escapes.
     pub fn started(&self) -> PyResult<()> {
-        self.warn_on_error(STARTED_PHASE, self.append_row(STARTED_PHASE, None))
+        self.warn_on_error(STARTED_PHASE, self.write(STARTED_PHASE, None, true))
     }
 
     /// Record how the run ended and what its nodes did; only an interrupt escapes as an error.
@@ -241,7 +241,7 @@ impl<'py> RunRecorder<'py> {
         let _ = self.finished(&RunNodeCounts::default(), ending);
     }
 
-    /// Insert directly, and create the schema and table only when that fails, as on a first run.
+    /// Insert directly, as the started row set the table up, and set it up again only when that fails.
     fn append_row(&self, phase: &str, finish: Option<(&str, &RunNodeCounts)>) -> PyResult<()> {
         self.write(phase, finish, false).or_else(|error| {
             if error.is_instance_of::<PyException>(self.adapter.py()) {
