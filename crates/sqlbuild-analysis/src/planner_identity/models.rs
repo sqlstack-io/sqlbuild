@@ -92,6 +92,8 @@ pub struct AvailableUpstreams {
 pub struct MissingUpstreamFixes {
     /// The active target, named as where the upstreams are missing.
     pub target: Option<String>,
+    /// The target a deferring plan reads unselected models and seeds from, named as where those are missing.
+    pub deferred_to: Option<String>,
     /// Targets the active target may clone from, to defer to or clone the upstreams from.
     pub origins: Vec<String>,
     /// The origins `--defer-to` accepts: project targets, offered only when this plan does not defer already.

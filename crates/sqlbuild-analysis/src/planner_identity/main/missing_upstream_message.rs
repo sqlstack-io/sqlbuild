@@ -2,7 +2,11 @@
 
 use std::collections::HashMap;
 
-use crate::planner_identity::constants::MISSING_MESSAGE_ITEM_LIMIT;
+use crate::planner_identity::_helpers::missing_lines::missing_lines;
+
+use crate::planner_identity::constants::{
+    MISSING_MESSAGE_ITEM_LIMIT, MODEL_RESOURCE, SEED_RESOURCE,
+};
 use crate::planner_identity::models::{GraphKey, MissingUpstream, MissingUpstreamFixes};
 
 /// Missing lineage upstreams with how to fix them and, when only an audit or hook read requires one, that read's origin.
@@ -11,8 +15,7 @@ pub fn missing_upstream_message(
     edge_origins: &HashMap<(GraphKey, GraphKey), String>,
     fixes: &MissingUpstreamFixes,
 ) -> String {
-    let mut lineage_missing: Vec<&str> = Vec::new();
-    let mut kinds: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    let mut lineage_missing: Vec<(&str, &str)> = Vec::new();
     let mut read_names: Vec<&str> = Vec::new();
     for entry in missing {
         let origins: Vec<&str> = entry
@@ -25,8 +28,7 @@ pub fn missing_upstream_message(
             })
             .collect();
         if origins.len() < entry.required_by.len() {
-            lineage_missing.push(entry.key.name.as_str());
-            kinds.insert(entry.key.kind.as_str());
+            lineage_missing.push((entry.key.name.as_str(), entry.key.kind.as_str()));
             continue;
         }
         for origin in origins {
@@ -39,46 +41,35 @@ pub fn missing_upstream_message(
     if lineage_missing.is_empty() {
         return format!("cannot build selected scope: {}", reads.unwrap_or_default());
     }
-    let mut text: String = lineage_text(&lineage_missing, &kinds, fixes);
+    let mut text: String = lineage_text(&lineage_missing, fixes);
     if let Some(reads) = reads {
         text.push_str(&format!("\n\n  Also, {reads}"));
     }
     text
 }
 
-/// The missing lineage upstreams, a few by name, then how to read, clone or build them.
-fn lineage_text(
-    names: &[&str],
-    kinds: &std::collections::BTreeSet<&str>,
-    fixes: &MissingUpstreamFixes,
-) -> String {
+/// Missing lineage upstreams per target looked in (deferred for models and seeds when deferring), then the fixes.
+fn lineage_text(missing: &[(&str, &str)], fixes: &MissingUpstreamFixes) -> String {
+    let names: Vec<&str> = missing.iter().map(|(name, _)| *name).collect();
     let one: bool = names.len() == 1;
-    let noun: String = match kinds.iter().collect::<Vec<_>>().as_slice() {
-        [kind] if one => (*kind).to_string(),
-        [kind] => format!("{kind}s"),
-        _ => "models and seeds".to_owned(),
+    let groups: Vec<Vec<String>> = match fixes.deferred_to.as_ref() {
+        Some(deferred_to) => {
+            let (deferred, active): (Vec<_>, Vec<_>) = missing
+                .iter()
+                .copied()
+                .partition(|(_, kind)| [MODEL_RESOURCE, SEED_RESOURCE].contains(kind));
+            [
+                (deferred, Some(deferred_to)),
+                (active, fixes.target.as_ref()),
+            ]
+            .into_iter()
+            .filter(|(group, _)| !group.is_empty())
+            .map(|(group, target)| missing_lines(&group, target))
+            .collect()
+        }
+        None => vec![missing_lines(missing, fixes.target.as_ref())],
     };
-    let place: String = fixes.target.as_ref().map_or_else(
-        || "the warehouse".to_owned(),
-        |target| format!("target '{target}'"),
-    );
-    let mut lines: Vec<String> = vec![format!(
-        "{} upstream {noun} this build reads {} exist in {place}",
-        names.len(),
-        if one { "doesn't" } else { "don't" }
-    )];
-    lines.extend(
-        names
-            .iter()
-            .take(MISSING_MESSAGE_ITEM_LIMIT)
-            .map(|name| format!("  {name}")),
-    );
-    if names.len() > MISSING_MESSAGE_ITEM_LIMIT {
-        lines.push(format!(
-            "  ... {} more (sqb plan --json lists all)",
-            names.len() - MISSING_MESSAGE_ITEM_LIMIT
-        ));
-    }
+    let mut lines: Vec<String> = groups.join(&String::new());
     lines.push(String::new());
     let (exists, them): (&str, &str) = if one {
         ("it exists", "it")

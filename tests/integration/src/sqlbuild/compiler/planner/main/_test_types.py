@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from sqlbuild._native import (
     BackfillAction,
@@ -172,7 +173,14 @@ class SourceTableProbeBudgetTestCase:
 class UnlistedMigrationOriginTestCase:
     description: str
     select: tuple[str, ...]
-    expected_warnings: tuple[str, ...]
+    expected_unlisted_reads: int
+
+
+@dataclass(frozen=True)
+class DeferredMissingOriginTestCase:
+    description: str
+    select: tuple[str, ...]
+    expected_missing: tuple[str, ...]
     expected_unlisted_reads: int
 
 
@@ -187,3 +195,13 @@ class PlanFromTestCase:
     expected_report: str
     expected_absent: tuple[str, ...]
     expected_live_listing: bool
+
+
+@dataclass(frozen=True)
+class SyncedScanTestCase:
+    """When a table's last DDL ran relative to the scan that last found its record unchanged."""
+
+    description: str
+    last_ddl_after_scan_start: timedelta
+    expected_live_describe: bool
+    location_clock_ahead: timedelta = timedelta()

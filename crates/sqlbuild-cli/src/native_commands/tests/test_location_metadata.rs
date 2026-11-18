@@ -14,6 +14,7 @@ use crate::native_commands::tests::helpers::{
     acknowledge_complete_pages, one_location, published_location,
 };
 use crate::native_commands::tests::test_types::BilledDeferralTestCase;
+use crate::native_commands::tests::test_types::FastClockScanTestCase;
 use crate::native_commands::tests::test_types::{
     FailedReadHealthTestCase, NewestVersionsTestCase, ReadFailureTestCase,
 };
@@ -24,7 +25,7 @@ use crate::native_commands::tests::test_types::{
 use crate::native_commands::tests::test_types::{
     RowsTextTestCase, ScanLineTestCase, SyncProgressTestCase, WakingIdleTestCase,
 };
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, WarehouseReadFailure, WarehouseSyncFailure,
@@ -1180,6 +1181,50 @@ fn given_a_published_location_when_its_sync_stops_before_any_page_succeeds_then_
             ),
             test_case.expected_outcome,
             "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_fast_location_clock_when_scanning_then_a_ddl_after_the_page_read_is_still_described_live()
+ {
+    let test_cases = [
+        FastClockScanTestCase {
+            description: "the first scan of a sync",
+            scans_completed: 0,
+            expected_described_live: true,
+        },
+        FastClockScanTestCase {
+            description: "a later scan of the same pass",
+            scans_completed: 1,
+            expected_described_live: true,
+        },
+    ];
+    // A synced plan reuses mirrored columns only when the last DDL ran this long before the scan began.
+    let ddl_clock_skew = chrono::Duration::minutes(5);
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.begin_sync(Utc::now() - chrono::Duration::minutes(10));
+        state = acknowledge_complete_pages(state, test_case.scans_completed);
+        let page_read_at: DateTime<Utc> = Utc::now() + state.server_offset;
+        let ddl_at: DateTime<Utc> = page_read_at + chrono::Duration::seconds(1);
+        let (seconds, nanos) = state
+            .scan_id
+            .get_timestamp()
+            .expect("a v7 scan id")
+            .to_unix();
+        let scan_started: DateTime<Utc> =
+            DateTime::from_timestamp(i64::try_from(seconds).expect("seconds"), nanos)
+                .expect("scan start");
+
+        assert_eq!(
+            (
+                scan_started <= page_read_at,
+                ddl_at > scan_started - ddl_clock_skew
+            ),
+            (true, test_case.expected_described_live),
+            "{}: the scan started at {scan_started}, the page was read at {page_read_at}",
             test_case.description
         );
     }

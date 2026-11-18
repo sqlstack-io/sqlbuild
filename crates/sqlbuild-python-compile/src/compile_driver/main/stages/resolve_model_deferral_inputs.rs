@@ -67,6 +67,7 @@ pub fn resolve_model_deferral_inputs<'py>(
         &[
             ("deferred_locations", locations.into_any()),
             ("deferred_relations", relations.into_any()),
+            ("defer_to", defer_to),
         ],
     )
 }

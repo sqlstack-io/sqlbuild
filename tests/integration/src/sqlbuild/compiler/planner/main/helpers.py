@@ -15,7 +15,7 @@ from pathlib import Path
 from tempfile import gettempdir
 from types import MappingProxyType
 from typing import Any, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlbuild._native import (
     CompiledFunction,
@@ -645,6 +645,17 @@ _LISTING_GUARDS: MappingProxyType[bool, Callable[[str | None], None]] = MappingP
 )
 
 
+def deferring_unlisted_adapter(
+    *, connection: Any, unlisted_database: str
+) -> UnlistedDatabaseDuckDbAdapter:
+    """An adapter over dev and prod schemas where only dev holds `order_ledger`."""
+
+    connection.execute("CREATE SCHEMA dev")
+    connection.execute("CREATE SCHEMA prod")
+    connection.execute("CREATE TABLE dev.order_ledger AS SELECT 1 AS order_id")
+    return UnlistedDatabaseDuckDbAdapter(connection=connection, unlisted_database=unlisted_database)
+
+
 def plan_deferred_project(
     *,
     project_dir: Path,
@@ -725,8 +736,14 @@ def write_synced_control_store(
     target: str,
     warehouse: RecordingSnowflakeWarehouse,
     schemas: tuple[str, ...],
+    observed_at: datetime | None = None,
+    scan_id: str | None = None,
+    received_at: datetime | None = None,
 ) -> None:
-    """A control store whose development location mirrored `schemas` of the warehouse just now."""
+    """A control store whose location mirrored `schemas` at `observed_at` (default: now).
+
+    `received_at` is when the store last received each record (default: `observed_at`).
+    """
 
     catalog: InspectionCatalog = live_inspection_catalog(warehouse)
     relations: tuple[RelationInfo, ...] = catalog.list_relations(
@@ -736,7 +753,9 @@ def write_synced_control_store(
         catalog.get_columns_for_relations(relations=relations)
     )
     location: str = str(uuid4())
-    observed: str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    observed_time: datetime = observed_at or datetime.now(UTC)
+    observed: str = observed_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    received: str = (received_at or observed_time).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     (project_dir / ".sqlbuild").mkdir(parents=True)
     with closing(sqlite3.connect(project_dir / ".sqlbuild/control.sqlite3")) as store:
         _ = store.execute(
@@ -745,29 +764,46 @@ def write_synced_control_store(
         )
         _ = store.execute(
             "CREATE TABLE sqb_warehouse_catalog (event_id TEXT, location_id TEXT, target TEXT, "
-            "state_database TEXT, state_schema TEXT, observed_at TEXT, record_json JSON)"
+            "state_database TEXT, state_schema TEXT, observed_at TEXT, record_json JSON, "
+            "scan_id TEXT, received_at TEXT)"
         )
         _ = store.execute(
             "INSERT INTO sqb_development_locations VALUES (?, ?, ?)",
             (str(project_dir), target, location),
         )
         _ = store.executemany(
-            "INSERT INTO sqb_warehouse_catalog VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO sqb_warehouse_catalog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 _mirrored_row(
                     relation=relation,
                     columns=columns.get(relation.identity, ()),
                     scope=(location, target, observed),
                 )
+                + (scan_id, received)
                 for relation in relations
             ],
         )
         store.commit()
 
 
+def uuid7_at(started: datetime) -> str:
+    """A UUIDv7, as a catalog scan's id, whose timestamp is `started`."""
+
+    milliseconds: int = int(started.timestamp() * 1000)
+    random: int = uuid4().int
+    value: int = (
+        milliseconds << 80
+        | 0x7 << 76
+        | (random & 0xFFF) << 64
+        | 0b10 << 62
+        | (random >> 12) & ((1 << 62) - 1)
+    )
+    return str(UUID(int=value))
+
+
 def _mirrored_row(
     *, relation: RelationInfo, columns: tuple[ColumnInfo, ...], scope: tuple[str, str, str]
-) -> tuple[str, ...]:
+) -> tuple[str | None, ...]:
     location, target, observed = scope
     record: dict[str, object] = {
         "state_database": "ANALYTICS",
