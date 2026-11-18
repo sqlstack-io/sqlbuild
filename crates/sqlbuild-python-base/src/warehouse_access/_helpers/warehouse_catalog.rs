@@ -106,7 +106,6 @@ pub(crate) fn read_catalog(
             next_after: None,
             change_token: None,
             unchanged: false,
-            wakes_compute: false,
         });
     }
     let keys = selected.iter().map(|(_, _, key)| key);
@@ -169,6 +168,5 @@ pub(crate) fn read_catalog(
         next_after,
         change_token: None,
         unchanged: false,
-        wakes_compute: false,
     })
 }

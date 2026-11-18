@@ -143,6 +143,11 @@ pub(crate) fn open_history_session<'py>(
     })
 }
 
+/// Whether `adapter`'s warehouse history reads start or wake billed compute, so an idle location defers interval syncs.
+pub(crate) fn history_reads_wake_compute(adapter: &Bound<'_, PyAny>) -> PyResult<bool> {
+    adapter.getattr("history_reads_wake_compute")?.extract()
+}
+
 pub(crate) fn close_history_session(
     session: HistorySession<'_>,
     stream: Option<HistoryStream<'_>>,
@@ -181,13 +186,7 @@ pub(crate) fn read_history<'py>(
             "metadata state schema must not be blank",
         ));
     }
-    let (mut page, stream) = read_page(py, (session, stream), request)?;
-    page.wakes_compute = session
-        .adapter
-        .getattr("history_reads_wake_compute")
-        .and_then(|value| value.extract::<bool>())
-        .unwrap_or(false);
-    Ok((page, stream))
+    read_page(py, (session, stream), request)
 }
 
 /// Any request but the open scan's next page discards that result before running other SQL.
@@ -376,7 +375,6 @@ fn read_page<'py>(
             next_after: None,
             change_token: None,
             unchanged: false,
-            wakes_compute: false,
         };
         return Ok((page, None));
     }
@@ -391,7 +389,6 @@ fn read_page<'py>(
             next_after: None,
             change_token,
             unchanged: true,
-            wakes_compute: false,
         };
         return Ok((page, None));
     }
@@ -685,7 +682,6 @@ fn stream_page<'py>(
         next_after,
         change_token: None,
         unchanged: false,
-        wakes_compute: false,
     };
     Ok((page, open))
 }

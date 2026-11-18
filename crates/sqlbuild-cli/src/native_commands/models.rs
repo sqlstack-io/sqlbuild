@@ -287,7 +287,7 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) page_seconds: u64,
     /// Progress of the current synchronization, for its per-table lines and summary.
     pub(crate) progress: SyncProgress,
-    /// The adapter's history reads start or wake billed compute, as the reader reports.
+    /// The adapter's history reads start or wake billed compute, as the publication's connection check reports.
     pub(crate) reads_wake_compute: bool,
     /// Someone set the safety interval, so it applies even where reads wake compute.
     pub(crate) safety_explicit: bool,

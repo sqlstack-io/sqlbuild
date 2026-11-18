@@ -1,13 +1,19 @@
+use crate::native_commands::_helpers::command::paths::location_watch;
 use crate::native_commands::_helpers::location::execution::metadata_sync;
 use crate::native_commands::_helpers::location::execution::{
     history_request, read_metadata_page, safety_sync_setting,
 };
+use crate::native_commands::_helpers::location::sync_outcomes::failed_read;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health_of, read_failure_line, rows_text, scan_line, sync_progress,
 };
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_SAFETY_SYNC_SECONDS};
+use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
-use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
+use crate::native_commands::tests::helpers::{
+    acknowledge_complete_pages, one_location, published_location,
+};
+use crate::native_commands::tests::test_types::BilledDeferralTestCase;
 use crate::native_commands::tests::test_types::{
     FailedReadHealthTestCase, NewestVersionsTestCase, ReadFailureTestCase,
 };
@@ -26,7 +32,7 @@ use sqlbuild_orchestration::platform::models::{
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseStateLocation,
+    StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseStateLocation,
 };
 use std::time::Duration;
 use tokio::time::Instant;
@@ -1058,6 +1064,121 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
                 next_sync_at.map(|at| (at - now).num_seconds()),
             ),
             test_case.expected_report,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_published_location_when_its_sync_ends_on_the_local_statistics_page_then_billed_reads_keep_deferring()
+ {
+    let test_cases = [
+        BilledDeferralTestCase {
+            description: "a billed warehouse keeps deferring the safety sync",
+            wakes_compute: true,
+            expected_outcome: (false, true, false),
+        },
+        BilledDeferralTestCase {
+            description: "metadata-only reads still run the safety sync",
+            wakes_compute: false,
+            expected_outcome: (false, false, true),
+        },
+    ];
+    for test_case in test_cases {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let ((options, script), (client, poll), mut state) =
+            published_location(directory.path(), test_case.wakes_compute);
+        state.index = WarehouseHistoryKind::ALL
+            .iter()
+            .position(|kind| *kind == WarehouseHistoryKind::Statistics)
+            .expect("kind is listed");
+        state.watermark_loaded = true;
+        state.statistics = Some(StatisticsRead {
+            location: one_location().remove(0),
+            names: Vec::new(),
+            next_after: None,
+        });
+        let watch = location_watch(directory.path());
+        let mut state = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(sync_location_metadata(
+                state,
+                (&options, &script, &watch),
+                (&client, &poll),
+                std::future::pending(),
+            ))
+            .expect("no control error")
+            .expect("not stopped");
+        state.cycle_started_at = Some(Utc::now());
+        state.safety_at = Instant::now() - Duration::from_secs(1);
+        assert_eq!(
+            (
+                state.halted,
+                state.defers_safety_sync(),
+                state.sync_due(None)
+            ),
+            test_case.expected_outcome,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_published_location_when_its_sync_stops_before_any_page_succeeds_then_billed_reads_keep_deferring()
+ {
+    let test_cases = [
+        BilledDeferralTestCase {
+            description: "a billed warehouse keeps deferring the safety sync",
+            wakes_compute: true,
+            expected_outcome: (true, true, false),
+        },
+        BilledDeferralTestCase {
+            description: "metadata-only reads still run the safety sync",
+            wakes_compute: false,
+            expected_outcome: (true, false, true),
+        },
+    ];
+    for test_case in test_cases {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let ((options, script), (client, poll), state) =
+            published_location(directory.path(), test_case.wakes_compute);
+        let mut state = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(async {
+                let mut state = state;
+                for _ in 0..METADATA_FAILURE_LIMIT {
+                    let (read, page) =
+                        read_metadata_page((&options, &script), state, std::future::pending())
+                            .await
+                            .expect("no control error")
+                            .expect("not stopped");
+                    state = failed_read(
+                        read,
+                        (&client, &poll),
+                        (Instant::now(), page.expect_err("every read fails")),
+                        std::future::pending(),
+                    )
+                    .await
+                    .expect("no control error")
+                    .expect("not stopped");
+                }
+                state
+            });
+        state.cycle_started_at = Some(Utc::now());
+        state.safety_at = Instant::now() - Duration::from_secs(1);
+        assert_eq!(
+            (
+                state.halted,
+                state.defers_safety_sync(),
+                state.sync_due(None)
+            ),
+            test_case.expected_outcome,
             "{}",
             test_case.description
         );

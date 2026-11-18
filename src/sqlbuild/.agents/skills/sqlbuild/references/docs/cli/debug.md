@@ -41,7 +41,7 @@ Providers:
 | Flag | Description |
 |------|-------------|
 | `--no-connection` | Skip the connection and query tests. Useful for validating config without warehouse access. |
-| `--json` | Output results as JSON instead of formatted text, with `missing_secrets` counting the unset provider secrets. |
+| `--json` | Output results as JSON instead of formatted text, with `missing_secrets` counting the unset provider secrets and `history_reads_wake_compute` saying whether reading warehouse history starts billed compute. |
 | `--verbose` | List every provider and secret setting, set or missing. |
 | `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 

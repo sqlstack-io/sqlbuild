@@ -710,9 +710,6 @@ pub struct WarehouseHistoryPage {
     /// The token still equals the request's: nothing was read and nothing is delivered.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unchanged: bool,
-    /// The adapter's history reads wake billed compute, so an idle location defers interval syncs.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub wakes_compute: bool,
 }
 
 /// A location runtime's failed history read: its redacted error, and whether a smaller page could succeed.

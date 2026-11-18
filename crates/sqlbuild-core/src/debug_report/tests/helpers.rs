@@ -6,6 +6,7 @@ pub(super) fn sample_report() -> DebugReport {
     DebugReport {
         local_files: vec!["/repo/warehouse.db".into()],
         missing_secrets: 0,
+        history_reads_wake_compute: false,
         runtime: vec![DebugLine::plain("sqlbuild version", "0.2.1")],
         configuration: vec![DebugLine::checked(
             "project file",

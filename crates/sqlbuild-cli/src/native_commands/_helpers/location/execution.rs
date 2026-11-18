@@ -939,19 +939,19 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
 }
 
-/// Check the connection after a publication: the first in a process is its startup check.
+/// Check the connection after a publication: the first in a process is its startup check; also returns whether history reads wake billed compute.
 pub(crate) async fn check_published_location(
     (options, script, connect): (&LocationServe, &Path, bool),
     ((bearer, session_id), generation, trigger): ((&str, Uuid), i64, ConnectionCheckTrigger),
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<Vec<PathBuf>>, ControlError> {
+) -> Result<Option<(Vec<PathBuf>, bool)>, ControlError> {
     drop(write_output(&[(
         Stream::Stderr,
         "Checking location connection with sqb debug...\n",
     )]));
     tokio::pin!(stopped);
     let started = Instant::now();
-    let Some((connected, missing, files)) =
+    let Some((connected, (missing, wakes_compute), files)) =
         check_location_connection((options, script, connect), stopped.as_mut()).await?
     else {
         return Ok(None);
@@ -990,14 +990,14 @@ pub(crate) async fn check_published_location(
             "Code location published; connection check failed; watching for changes.\n"
         },
     )]));
-    Ok(Some(files))
+    Ok(Some((files, wakes_compute)))
 }
 
-/// Capture the debug check's local file paths and missing secret count; under `sqb dev` it never connects, so nobody signs in twice.
+/// Capture the debug check's local file paths, missing secret count and whether history reads wake billed compute; under `sqb dev` it never connects, so nobody signs in twice.
 pub(crate) async fn check_location_connection(
     (options, script, connect): (&LocationServe, &Path, bool),
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(bool, u64, Vec<PathBuf>)>, ControlError> {
+) -> Result<Option<(bool, (u64, bool), Vec<PathBuf>)>, ControlError> {
     let mut command = location_child(options, script);
     command.args(["debug", "--target", &options.target, "--json"]);
     if !connect || options.dev_events {
@@ -1018,13 +1018,16 @@ pub(crate) async fn check_location_connection(
         },
         result = async { tokio::try_join!(child.wait(), stdout.read_to_end(&mut output)) } => result?.0.success(),
     };
-    let (files, missing): (Vec<String>, u64) = match serde_json::from_slice::<serde_json::Value>(
-        &output,
-    )
+    let (files, missing, wakes_compute): (Vec<String>, u64, bool) = match serde_json::from_slice::<
+        serde_json::Value,
+    >(&output)
     .and_then(|report| {
         Ok((
             serde_json::from_value(report["local_files"].clone())?,
             report["missing_secrets"].as_u64().unwrap_or_default(),
+            report["history_reads_wake_compute"]
+                .as_bool()
+                .unwrap_or_default(),
         ))
     }) {
         Ok(report) => report,
@@ -1033,12 +1036,12 @@ pub(crate) async fn check_location_connection(
                 Stream::Stderr,
                 "Location connection check did not produce a valid report; retaining the published snapshot.\n",
             )]));
-            return Ok(Some((false, 0, Vec::new())));
+            return Ok(Some((false, (0, false), Vec::new())));
         }
     };
     Ok(Some((
         connect && connected,
-        missing,
+        (missing, wakes_compute),
         location_database_files(&options.project_dir, files),
     )))
 }
@@ -1381,7 +1384,6 @@ pub(crate) async fn read_metadata_page(
             next_after: statistics.next_after.map(|id| vec![Some(id.to_string())]),
             change_token: None,
             unchanged: false,
-            wakes_compute: false,
         };
         return Ok(Some((state, Ok(page))));
     }
@@ -1630,7 +1632,7 @@ pub(crate) async fn settle_publication(
     (watch, metadata): (LocationWatch, Option<LocationMetadataSync>),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Settled>, ControlError> {
-    let (metadata, deferred) = if connect {
+    let (mut metadata, deferred) = if connect {
         let mut sync: LocationMetadataSync = metadata_sync(
             (locations, generation),
             (
@@ -1643,7 +1645,7 @@ pub(crate) async fn settle_publication(
     } else {
         (metadata, Some((locations, generation)))
     };
-    let Some(files) = check_published_location(
+    let Some((files, wakes_compute)) = check_published_location(
         (options, script, connect),
         ((bearer, session_id), generation, trigger),
         stopped,
@@ -1652,6 +1654,9 @@ pub(crate) async fn settle_publication(
     else {
         return Ok(None);
     };
+    if connect && let Some(sync) = metadata.as_mut() {
+        sync.reads_wake_compute = wakes_compute;
+    }
     let watch: LocationWatch = exclude_location_databases(&options.project_dir, files, watch);
     Ok(Some((watch, metadata, deferred)))
 }

@@ -20,7 +20,7 @@ use crate::native_commands::_helpers::location::sync_report::{metadata_health, r
 use crate::native_commands::models::{LocationMetadataSync, LocationServe, LocationWatch};
 
 /// One bounded source or mirror page leaves named work polling a turn between pages.
-pub(super) async fn sync_location_metadata(
+pub(crate) async fn sync_location_metadata(
     mut state: LocationMetadataSync,
     (options, script, watch): (&LocationServe, &Path, &LocationWatch),
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
@@ -77,10 +77,7 @@ pub(super) async fn sync_location_metadata(
         };
         state = read;
         let page = match page {
-            Ok(page) => {
-                state.reads_wake_compute = page.wakes_compute;
-                page
-            }
+            Ok(page) => page,
             Err(failure) => {
                 return failed_read(state, (client, poll), (started, failure), stopped.as_mut())
                     .await;

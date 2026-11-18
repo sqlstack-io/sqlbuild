@@ -45,6 +45,8 @@ pub struct DebugReport {
     pub missing_secrets: usize,
     /// Exact local database paths, not the shortened display values in connection lines.
     pub local_files: Vec<String>,
+    /// The adapter's warehouse history reads wake billed compute, so an idle location defers interval syncs.
+    pub history_reads_wake_compute: bool,
 }
 
 impl DebugReport {

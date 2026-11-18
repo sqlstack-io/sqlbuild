@@ -200,6 +200,14 @@ pub(crate) struct ReadFailureTestCase {
     pub(crate) expected_line: &'static str,
 }
 
+pub(super) struct BilledDeferralTestCase {
+    pub(super) description: &'static str,
+    /// What the publication's connection check reports for the adapter.
+    pub(super) wakes_compute: bool,
+    /// Whether the sync stopped, whether it defers safety syncs, and whether one is due once its interval passed.
+    pub(super) expected_outcome: (bool, bool, bool),
+}
+
 #[derive(Debug)]
 pub(super) struct SyncCompletionTestCase {
     pub(super) description: &'static str,
