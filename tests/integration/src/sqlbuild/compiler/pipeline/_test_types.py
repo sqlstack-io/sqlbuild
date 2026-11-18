@@ -421,3 +421,32 @@ class AdapterRecoveryCase:
         ("B002", "downstream"),
         ("B212", "upstream"),
     )
+
+
+@dataclass(frozen=True)
+class SetDependencyPlanTestCase:
+    """A task's `job(...)` or `tag(...)` dependency and the models planning its upstream selects."""
+
+    description: str
+    depends_on: str
+    expected_models: tuple[str, ...]
+    expected_sql_deps: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SetDependencyErrorTestCase:
+    """A `job(...)` or `tag(...)` dependency compile refuses, and what its error says."""
+
+    description: str
+    depends_on: str
+    job_files: tuple[tuple[str, str], ...]
+    expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class WaitChangeTestCase:
+    """A job selection edited after a build, and the wait changes the next plan lists."""
+
+    description: str
+    edited_select: str
+    expected_changes: tuple[str, ...]

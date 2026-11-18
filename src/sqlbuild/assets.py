@@ -12,6 +12,7 @@ from sqlbuild.python_nodes.main.read_asset_definition import read_asset_definiti
 from sqlbuild.python_nodes.models import (
     AssetDefinition,
     ColumnLineageRef,
+    NodeSetRef,
     RetryPolicy,
     SqlResourceRef,
 )
@@ -26,8 +27,9 @@ def asset(
     name: str | None = None,
     depends_on: Callable[..., object]
     | SqlResourceRef
-    | tuple[Callable[..., object] | SqlResourceRef, ...]
-    | list[Callable[..., object] | SqlResourceRef] = (),
+    | NodeSetRef
+    | tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...]
+    | list[Callable[..., object] | SqlResourceRef | NodeSetRef] = (),
     tags: Sequence[str] = (),
     group: str | None = None,
     description: str | None = None,

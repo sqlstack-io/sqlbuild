@@ -2,16 +2,17 @@
 
 from collections.abc import Callable
 
-from sqlbuild.python_nodes.models import SqlResourceRef
+from sqlbuild.python_nodes.models import NodeSetRef, SqlResourceRef
 
 
 def normalize_python_node_dependencies(
     value: Callable[..., object]
     | SqlResourceRef
-    | tuple[Callable[..., object] | SqlResourceRef, ...]
-    | list[Callable[..., object] | SqlResourceRef],
-) -> tuple[Callable[..., object] | SqlResourceRef, ...]:
-    if callable(value) or isinstance(value, SqlResourceRef):
+    | NodeSetRef
+    | tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...]
+    | list[Callable[..., object] | SqlResourceRef | NodeSetRef],
+) -> tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...]:
+    if callable(value) or isinstance(value, (SqlResourceRef, NodeSetRef)):
         return (value,)
     return tuple(value)
 

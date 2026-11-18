@@ -14,7 +14,7 @@ from sqlbuild._native import (
 )
 from sqlbuild.compiler.auditing.types import AuditSeverity
 from sqlbuild.python_nodes.constants import RELATION_RENDERER
-from sqlbuild.python_nodes.types import PythonCheckSeverity, SqlResourceRefKind
+from sqlbuild.python_nodes.types import NodeSetKind, PythonCheckSeverity, SqlResourceRefKind
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,21 @@ class SqlResourceRef:
         if renderer is None:
             return f'{self.kind.value}("{self.name}")'
         return renderer(self)
+
+
+@dataclass(frozen=True)
+class NodeSetRef:
+    """A dependency on a job's or tag's end nodes, resolved into node edges at compile."""
+
+    kind: NodeSetKind
+    name: str
+    exclude: str | None = None
+
+    def __str__(self) -> str:
+        """Render as the authoring call."""
+
+        exclude: str = "" if self.exclude is None else f', exclude="{self.exclude}"'
+        return f'{self.kind.value}("{self.name}"{exclude})'
 
 
 @dataclass(frozen=True)
@@ -126,7 +141,7 @@ class TaskDefinition:
     """Metadata attached to a decorated SQLBuild task function."""
 
     name: str
-    depends_on: tuple[Callable[..., object] | SqlResourceRef, ...] = ()
+    depends_on: tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...] = ()
     tags: tuple[str, ...] = ()
     group: str | None = None
     description: str | None = None
@@ -139,7 +154,7 @@ class AssetDefinition:
     """Metadata attached to a decorated SQLBuild asset function."""
 
     name: str
-    depends_on: tuple[Callable[..., object] | SqlResourceRef, ...] = ()
+    depends_on: tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...] = ()
     tags: tuple[str, ...] = ()
     group: str | None = None
     description: str | None = None
@@ -154,7 +169,7 @@ class CheckDefinition:
     """Metadata attached to a decorated SQLBuild check function."""
 
     name: str
-    depends_on: tuple[Callable[..., object] | SqlResourceRef, ...]
+    depends_on: tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...]
     severity: PythonCheckSeverity = PythonCheckSeverity.ERROR
     tags: tuple[str, ...] = ()
     group: str | None = None

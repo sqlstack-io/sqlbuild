@@ -377,6 +377,7 @@ pub(crate) fn discovery_session<'py>(
         py,
         NativeDiscoverySession {
             inner: DiscoverySession::new(project_root(project_dir)?, declaration_file_options()),
+            node_sets: std::sync::Mutex::new(None),
         },
     )?;
     memo.set_item(SESSION_MEMO_KEY, &created)?;
