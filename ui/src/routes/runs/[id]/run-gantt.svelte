@@ -55,8 +55,19 @@
 	const trackW = $derived(trackBaseW * zoom);
 	const pxPerSec = $derived(trackW / (total * 1.08));
 	const xOf = (sec: number) => sec * pxPerSec;
-	/** Past this share of the track a bar's duration reads on its left, inside the track. */
-	const FLIP_AT = 0.9;
+	/** A bar's duration reads on its right unless it would run past the row, which ends 24px past the
+	 * track and clips what overflows (`content-visibility`); then it reads on the bar's left if there is
+	 * more room there. */
+	let durCtx: CanvasRenderingContext2D | null = null;
+	function durFlips(text: string, start: number, end: number): boolean {
+		durCtx ??= document.createElement('canvas').getContext('2d');
+		if (!durCtx) return false;
+		durCtx.font = '11.5px "Inter Variable", sans-serif';
+		// Labels set tabular figures, which a canvas can't, so zeros stand in for the digits.
+		const width = Math.ceil(durCtx.measureText(text.replace(/[0-9]/g, '0')).width) + 1;
+		const right = trackW + 24 - xOf(end) - 8;
+		return width > right && xOf(start) - 8 > right;
+	}
 	const tickStep = $derived(stepFor(total, Math.max(4, Math.floor(trackW / 110))));
 	const axisTicks = $derived(ticksFor(total, tickStep));
 
@@ -198,7 +209,8 @@
 								<span class="note">{skipText(n)}</span>
 							{:else}
 								<span class="bar" class:live={n.status === 'running'} style:--s={s} style:--e={e} style:background={nodeStatusTone[n.status]}></span>
-								<span class="dur" style:--s={s} style:--e={e} class:flip={e / (total * 1.08) > FLIP_AT}>{formatSpan(e - s)}{n.status === 'running' ? ' so far' : ''}</span>
+								{@const dur = `${formatSpan(e - s)}${n.status === 'running' ? ' so far' : ''}`}
+								<span class="dur" style:--s={s} style:--e={e} class:flip={durFlips(dur, s, e)}>{dur}</span>
 							{/if}
 						</span>
 					</button>
