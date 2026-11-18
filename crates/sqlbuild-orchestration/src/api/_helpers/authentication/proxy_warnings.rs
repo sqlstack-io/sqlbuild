@@ -40,6 +40,7 @@ pub(crate) fn warn_refused_host(host: Option<&str>, peer: IpAddr) {
     eprintln!(
         "warning: refused a request from trusted proxy peer {peer} with Host {host}, which is not \
          a loopback name, the [trusted_proxy] origin's host or in [trusted_proxy] allowed_hosts; if \
-         your proxy keeps the browser's host name (ProxyPreserveHost On), add it to allowed_hosts"
+         your proxy keeps the browser's host name (ProxyPreserveHost On) or forwards to this \
+         server by another name or address, add it to allowed_hosts"
     );
 }
