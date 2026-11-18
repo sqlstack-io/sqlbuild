@@ -1,6 +1,6 @@
 //! Assemble model migration decisions from inspected warehouse facts.
 
-use sqlbuild_host::entries::models::ExecutorHost;
+use crate::planner_migrations::_helpers::planning::location_relation::location_relation;
 
 use crate::planner_migrations::_helpers::column::column_objects::lower;
 use crate::planner_migrations::_helpers::column::column_objects::model;
@@ -16,7 +16,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyBool;
 use sqlbuild_analysis::planner_migrations::main::model_decision::model_decision;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -27,7 +26,7 @@ use sqlbuild_python_front::state_rows::main::migrations::newest_move::newest_mov
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 pub(crate) fn relation<'py>(location: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?.call1((location,))
+    location_relation(location)
 }
 
 fn key(location: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
