@@ -92,7 +92,7 @@ test('a picker with thousands of options searches, windows and takes several val
 
 	await page.keyboard.press('Escape');
 	await expect(page.locator('.choice-panel')).toHaveCount(0);
-	expect(new URL(page.url()).searchParams.get('select')?.split(' ')).toEqual([ORIGINAL, ...titles.slice(0, 2)]);
+	await expect.poll(() => new URL(page.url()).searchParams.get('select')?.split(' ')).toEqual([ORIGINAL, ...titles.slice(0, 2)]);
 });
 
 test('a filter with few options has no search box and works from the keyboard', async ({ page }) => {
@@ -110,8 +110,12 @@ test('an old single-node link still filters to that node, and a second node join
 	await page.goto(`/checks?mock&node=${ORIGINAL}`);
 	await expect(page.locator(DATA_ROWS).first()).toBeVisible({ timeout: 20_000 });
 	await expect(page.locator('.selection-bar .sel-chip')).toHaveText([new RegExp(ORIGINAL)]);
-	const url = new URL(page.url());
-	expect([url.searchParams.get('select'), url.searchParams.get('node')]).toEqual([ORIGINAL, null]);
+	await expect
+		.poll(() => {
+			const url = new URL(page.url());
+			return [url.searchParams.get('select'), url.searchParams.get('node')];
+		})
+		.toEqual([ORIGINAL, null]);
 	await expect.poll(async () => (await nodeCells(page)).every((c) => onNode(c, ORIGINAL))).toBe(true);
 
 	// Tick a second node in the chip's picker: the list shows both.

@@ -44,7 +44,7 @@ test('a selection is typed, picked, widened, copied, narrowed and built', async 
 	const count = page.locator('.sb-count');
 	await expect(count).toHaveText(/^\d+ nodes?$/);
 	await expect(page.locator('.sb-msg')).toContainText('Reads as: nodes tagged finance and everything upstream of them');
-	expect(new URL(page.url()).searchParams.get('select')).toBe('+tag:finance');
+	await expect.poll(() => new URL(page.url()).searchParams.get('select')).toBe('+tag:finance');
 
 	await page.getByRole('button', { name: /Copy as/ }).click();
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('sqb build -s +tag:finance');
@@ -57,7 +57,7 @@ test('a selection is typed, picked, widened, copied, narrowed and built', async 
 	await expect(chips(page, 1)).toHaveText([/tag:revenue/]);
 	await expect(page.locator('.sb-msg')).toContainText('minus nodes tagged revenue');
 	await expect(count).toHaveText(/^\d+ nodes?$/);
-	expect(new URL(page.url()).searchParams.get('exclude')).toBe('tag:revenue');
+	await expect.poll(() => new URL(page.url()).searchParams.get('exclude')).toBe('tag:revenue');
 	await page.getByRole('button', { name: /Copy as/ }).click();
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('sqb build -s +tag:finance --exclude tag:revenue');
 
