@@ -436,6 +436,7 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
                 origins: vec!["prod".to_owned(), "staging".to_owned()],
                 deferrable: vec!["prod".to_owned()],
                 clone_to: Some("dev".to_owned()),
+                deferred_to: None,
             },
             expected_missing: ["a", "b", "c", "d", "e", "f"]
                 .map(model)
@@ -473,7 +474,8 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
             },
             origins: HashMap::new(),
             fixes: MissingUpstreamFixes {
-                target: Some("prod".to_owned()),
+                target: Some("dev".to_owned()),
+                deferred_to: Some("prod".to_owned()),
                 ..MissingUpstreamFixes::default()
             },
             expected_missing: vec![MissingUpstream {
@@ -485,6 +487,44 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
                 "  dev_only\n",
                 "\n",
                 "  Build it too:  add + before your selection",
+            ),
+        },
+        BuildabilityTestCase {
+            description: "deferring names the deferred target for models and the active one for functions",
+            selected: vec![model("report")],
+            upstream: HashMap::from([(
+                model("report"),
+                vec![model("dev_only"), key("udf", "parse_sku")],
+            )]),
+            available: AvailableUpstreams {
+                existing_relations: names(&["dev_only"]),
+                deferred_relations: Some(names(&["parse_sku"])),
+                ..AvailableUpstreams::default()
+            },
+            origins: HashMap::new(),
+            fixes: MissingUpstreamFixes {
+                target: Some("dev".to_owned()),
+                deferred_to: Some("prod".to_owned()),
+                ..MissingUpstreamFixes::default()
+            },
+            expected_missing: vec![
+                MissingUpstream {
+                    key: model("dev_only"),
+                    required_by: vec![model("report")],
+                },
+                MissingUpstream {
+                    key: key("udf", "parse_sku"),
+                    required_by: vec![model("report")],
+                },
+            ],
+            expected_message: concat!(
+                "1 upstream model this build reads doesn't exist in target 'prod'\n",
+                "  dev_only\n",
+                "\n",
+                "1 upstream udf this build reads doesn't exist in target 'dev'\n",
+                "  parse_sku\n",
+                "\n",
+                "  Build them too:  add + before your selection",
             ),
         },
         BuildabilityTestCase {

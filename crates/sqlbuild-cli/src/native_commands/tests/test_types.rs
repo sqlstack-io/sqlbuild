@@ -306,3 +306,12 @@ pub(super) struct ReplanTestCase {
     pub(super) syncs: Vec<(bool, bool)>,
     pub(super) expected_replans: Vec<bool>,
 }
+
+/// A scan whose location clock runs ten minutes ahead of the server's.
+pub(super) struct FastClockScanTestCase {
+    pub(super) description: &'static str,
+    /// Scans of the pass completed before the one whose id is checked.
+    pub(super) scans_completed: usize,
+    /// Whether a table altered a second after the page read is still described live.
+    pub(super) expected_described_live: bool,
+}
