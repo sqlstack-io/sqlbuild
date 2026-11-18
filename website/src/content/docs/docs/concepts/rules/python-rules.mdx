@@ -209,7 +209,8 @@ Providers importing `orchestration/` are reported by `SQBRPYTHON015` instead.
 
 ## Testing Python
 
-`sqb test` runs the pytest modules under `tests/python/` and `tests/providers/`; see
+`sqb test` runs the pytest modules under `tests/python/`, `tests/providers/` and
+`tests/orchestration/`; see
 [Python tests](/docs/cli/test#python-tests). `SQBRPYTHON021` keeps each test beside a mirror of the
 code it tests, and `SQBRPYTHON701` to `SQBRPYTHON724` keep tests table-driven:
 
@@ -263,7 +264,7 @@ def test_given_a_status_when_mapping_then_returns_its_label(test_case: RowMappin
 
 | Code | Finding | Fix |
 |---|---|---|
-| `SQBRPYTHON021` | A test module whose folder does not mirror one under `python/` or `providers/`, or a `test_<name>.py` with no `<name>.py` or `<name>/` package beside the code it tests | Move the test to the mirrored folder, or rename it for the module it tests |
+| `SQBRPYTHON021` | A test module whose folder does not mirror one under `python/`, `providers/` or `orchestration/`, or a `test_<name>.py` with no `<name>.py` or `<name>/` package beside the code it tests | Move the test to the mirrored folder, or rename it for the module it tests |
 | `SQBRPYTHON701` to `SQBRPYTHON711` | A test folder or module whose layout, imports, helpers, conditionals or test-case dataclasses break the pattern above | Follow the pattern above |
 | `SQBRPYTHON712` to `SQBRPYTHON724` | A test function or `pytest.mark.parametrize` that is not named `test_given_<state>_when_<action>_then_<outcome>`, or does not take dataclass cases through `test_case` with ids from each `description` | Follow the pattern above |
 
@@ -419,7 +420,7 @@ remediation.
 
 | Code | Name | Files | Default | Checks |
 |---|---|---|---|---|
-| `SQBRPYTHON021` | python-test-placement | `tests/` | yes | Python tests must mirror an existing module under `python/` or `providers/` |
+| `SQBRPYTHON021` | python-test-placement | `tests/` | yes | Python tests must mirror an existing module under `python/`, `providers/` or `orchestration/` |
 | `SQBRPYTHON701` | test-init-module-empty | `tests/` | yes | Test package `__init__.py` files must be empty or docstring-only |
 | `SQBRPYTHON702` | test-absolute-imports | `tests/` | yes | Tests must use absolute imports |
 | `SQBRPYTHON703` | test-no-top-level-helpers | `tests/` | yes | Test modules may contain only tests, imports, and declarations |

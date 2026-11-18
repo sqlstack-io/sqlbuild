@@ -13,23 +13,27 @@ use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_state::freshness::main::configuration_error::configuration_error;
 
 use crate::freshness::_helpers::exception_types::SourceFreshnessObservationError;
-use crate::freshness::_helpers::observation::{
-    observation_record, observation_source, observe_adapter_batch, observe_configured, strategy,
-    unknown,
-};
-use crate::freshness::_helpers::state_io::read_latest;
+use crate::freshness::_helpers::observation::observation_record;
+use crate::freshness::_helpers::observation::observation_source;
+use crate::freshness::_helpers::observation::observe_adapter_batch;
+use crate::freshness::_helpers::observation::observe_configured;
+use crate::freshness::_helpers::observation::strategy;
+use crate::freshness::_helpers::observation::unknown;
 use crate::freshness::_helpers::support::text;
 use crate::freshness::models::Observer;
-use crate::freshness::models::StateRead;
+use crate::planner_warehouse::main::reads::is_refused_access::is_refused_access;
+use crate::planner_warehouse::models::PlannerReads;
+use crate::planner_warehouse::models::Read;
+use crate::planner_warehouse::models::StateHistoryRead;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_base::warehouse_access::main::is_warehouse_access_refused::is_warehouse_access_refused;
 use sqlbuild_python_front::state_rows::main::event_rows::age_policy::age_policy;
 use sqlbuild_python_front::state_rows::main::event_rows::equivalent::equivalent;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
@@ -39,7 +43,7 @@ const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavai
 
 /// The message of an adapter, freshness observation or preview access error, if it is one.
 fn handled_message<'py>(py: Python<'py>, error: &PyErr) -> PyResult<Option<Bound<'py, PyAny>>> {
-    if is_warehouse_access_refused(py, error) {
+    if is_refused_access(py, error) {
         return Ok(Some(text(py, PREVIEW_MESSAGE)));
     }
     let value: Bound<'py, PyAny> = error.value(py).clone().into_any();
@@ -59,24 +63,27 @@ fn freshness_strategy_is_adapter(source: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// Latest previous records by identity across the state schemas, newest observation winning.
 fn previous_records<'py>(
     arguments: &KeywordArguments<'py>,
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    reads: &Bound<'py, PlannerReads>,
     source_names: Option<&[String]>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = adapter.py();
-    let read: StateRead<'py> = StateRead {
-        connection: connection.clone(),
-        execute: native_field(adapter, "execute")?,
-        render_qualified_name: arguments.value("render_qualified_name")?,
-        render_read_latest_sql: native_field(adapter, "render_read_latest_source_freshness_sql")?,
-    };
+    let py: Python<'py> = reads.py();
     let database: Bound<'py, PyAny> = arguments.value("state_database")?;
     let exists_by_schema: Bound<'py, PyAny> = arguments.value("state_table_exists_by_schema")?;
     let merged: Bound<'py, PyDict> = PyDict::new(py);
     for schema in arguments.value("state_schemas")?.try_iter()? {
         let schema: Bound<'py, PyAny> = schema?;
         let exists: bool = mapping_get_or(&exists_by_schema, &schema, false)?.is_truthy()?;
-        let previous: Bound<'py, PyAny> =
-            read_latest(&read, (&database, &schema), exists, source_names)?;
+        let Read::Known(previous) = reads.get().reads().state_history(
+            py,
+            StateHistoryRead::SourceFreshness {
+                location: (&database, &schema),
+                table_exists: exists,
+                source_names,
+            },
+        )?
+        else {
+            continue;
+        };
         for (identity, candidate) in native_field(&previous, "records")?
             .downcast::<PyDict>()?
             .iter()
@@ -123,7 +130,7 @@ fn adapter_batch<'py>(
     observer: &Observer<'py>,
     sources: &[Bound<'py, PyAny>],
 ) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = observer.adapter.py();
+    let py: Python<'py> = observer.reads.py();
     let error: PyErr = match observe_adapter_batch(observer, sources) {
         Ok(batch) => return Ok(batch),
         Err(error) => error,
@@ -156,8 +163,8 @@ pub(crate) fn build_direct_source_freshness_planning_result<'py>(
         options,
         (
             &[
-                "adapter",
-                "connection",
+                "dialect",
+                "reads",
                 "sources",
                 "state_database",
                 "state_schemas",
@@ -170,8 +177,8 @@ pub(crate) fn build_direct_source_freshness_planning_result<'py>(
         ),
     )?;
     let observer: Observer<'py> = Observer {
-        adapter: arguments.value("adapter")?,
-        connection: arguments.value("connection")?,
+        dialect: Dialect::passed(arguments.value("dialect")?)?,
+        reads: PlannerReads::passed(arguments.value("reads")?)?,
         observed_at: arguments.value("observed_at")?,
     };
     let run_id: Bound<'py, PyAny> = arguments.value("run_id")?;
@@ -190,11 +197,8 @@ pub(crate) fn build_direct_source_freshness_planning_result<'py>(
         } else {
             None
         };
-    let previous: Bound<'py, PyDict> = previous_records(
-        &arguments,
-        (&observer.adapter, &observer.connection),
-        source_names.as_deref(),
-    )?;
+    let previous: Bound<'py, PyDict> =
+        previous_records(&arguments, &observer.reads, source_names.as_deref())?;
     let unknown_sources: Bound<'py, PyDict> = PyDict::new(py);
     let observed_sources: Bound<'py, PyDict> = PyDict::new(py);
     let mut adapter_sources: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -203,7 +207,7 @@ pub(crate) fn build_direct_source_freshness_planning_result<'py>(
             continue;
         }
         let name: Bound<'py, PyAny> = native_field(source, "name")?;
-        let Some(observed) = observation_source(&observer.adapter, source)? else {
+        let Some(observed) = observation_source(&observer.dialect, source)? else {
             unknown_sources.set_item(
                 &name,
                 unknown(&name, ("NO_FRESHNESS_CONFIG", text(py, NO_CONFIG_MESSAGE)))?,

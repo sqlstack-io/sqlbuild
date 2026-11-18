@@ -18,6 +18,7 @@ export const RUN_STATUSES = [
 	'partial',
 	'failed',
 	'cancelled',
+	'skipped',
 	'presumed_failed'
 ] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
@@ -67,6 +68,8 @@ export type Run = {
 	/** Sensor run requests are de-duplicated by run key. */
 	runKey: string | null;
 	rerunOfRunId: string | null;
+	/** A group member's attempt once its group retried it, from 2; null for a first attempt and every other run. */
+	memberAttempt: number | null;
 	/** How a person narrowed this run of a job, as typed; null when it runs the whole job. */
 	narrowing: { select: string[]; exclude: string[] } | null;
 	/** The cursor window a backfill processes, inclusive; null for every other run. */
@@ -86,6 +89,8 @@ export type Run = {
 	endedAt: Iso | null;
 	nodeCounts: NodeCounts;
 	cost: RunCost | null;
+	/** Error-severity audit failures the run let through instead of stopping (`ignore_audit_failures`); a group sums its members'. */
+	ignoredAuditFailures: number;
 };
 
 export type RunListQuery = {
@@ -191,7 +196,8 @@ export type RunNodeStatus =
 	/** The run ended (lost worker, never started) before this node ran. */
 	| 'not_run';
 
-export type NodeKind = 'source' | 'loader' | 'seed' | 'view' | 'table' | 'incremental' | 'task';
+/** Graph node kinds: SQL models by materialization, sources and seeds, Python nodes (asset, loader, task) and functions (udf, table_fn). */
+export type NodeKind = 'source' | 'loader' | 'seed' | 'view' | 'table' | 'incremental' | 'task' | 'asset' | 'udf' | 'table_fn';
 
 export type SkippedBecauseOf = {
 	nodeKey: string;
@@ -258,7 +264,9 @@ export const SCHEDULER_FACTS = [
 	'launched',
 	'cancel_requested',
 	'presumed_failed',
-	'terminated'
+	'terminated',
+	'member_retrying',
+	'member_recovered'
 ] as const;
 export type SchedulerFact = (typeof SCHEDULER_FACTS)[number];
 
@@ -471,15 +479,16 @@ export type RunDetail = {
 /** Why the scheduler can't claim a queued run yet; a run in another location or target is never named (`runId` null). */
 export type QueueWait =
 	| { kind: 'write_claim'; runId: string | null; nodeKey: string; otherNodes: number }
-	/** Running runs hold slots of a concurrency limit this run takes; `elsewhere` counts holders in other locations or targets. */
-	| { kind: 'concurrency_limit'; limit: string; holders: string[]; elsewhere: number }
-	/** An earlier queued run takes the same limit, so it goes first. */
-	| { kind: 'earlier_run'; runId: string | null; limit: string }
+	/** Running runs of the same location and target hold the slots of a pool this run takes. */
+	| { kind: 'pool_full'; pool: string; holders: string[] }
+	/** An earlier queued run takes the same pool, so it goes first. */
+	| { kind: 'earlier_run'; runId: string | null; pool: string }
 	| { kind: 'job_running'; runId: string }
-	| { kind: 'upstream_job'; runId: string; jobKey: string }
+	/** `attempt` is set while the group retries that job: its attempt number, from 2. */
+	| { kind: 'upstream_job'; runId: string; jobKey: string; attempt: number | null }
 	/** A child run waits for its group run to start. */
 	| { kind: 'group_parent'; runId: string }
-	/** A retry of a failed run waits out the job's `on_failure` delay. */
+	/** A retry of a failed run waits out the job's `[retry]` delay. */
 	| { kind: 'retry_delay'; attempt: number; dueAt: Iso };
 
 export type QueueEntry = {
@@ -535,6 +544,62 @@ export type SnapshotNode = {
 	upstream: string[];
 };
 
+// ---- selections (the selection bar) ----
+
+/** A selection as typed: each text holds space-separated selectors, as `sqb build -s … --exclude …` takes them. */
+export type SelectionRequest = {
+	select: string;
+	exclude: string;
+	/** Sorted keys to skip. */
+	offset?: number;
+	/** Page size; the server defaults to 1,000 and allows up to 10,000. */
+	limit?: number;
+};
+
+/** The token a refused selection comes from: its field and its range there, in JavaScript string indexes. */
+export type SelectionLocation = { field: 'select' | 'exclude'; token: string; start: number; end: number };
+
+/** Why `sqb` refuses a selection; `code` is null when the selection as a whole is refused. */
+export type SelectionProblem = {
+	code: string | null;
+	message: string;
+	/** `sqb`'s own help line, such as "did you mean 'orders'?". */
+	help: string | null;
+	location: SelectionLocation | null;
+	/** Whole-token replacements, closest first. */
+	suggestions: string[];
+	/**
+	 * The comma part of the located token `sqb` refuses: its index among the token's parts, its selector
+	 * type (`null` for a bare name or name pattern) and its value without type prefix or `+` markers.
+	 * Null when the selection is refused as a whole or the part is a path between two nodes.
+	 */
+	refused: { part: number; type: string | null; value: string } | null;
+};
+
+/** What `sqb build --select … --exclude …` selects in the current publication: one page of keys and the total. */
+export type SelectionEvaluation = {
+	snapshotId: string | null;
+	count: number;
+	keys: string[];
+	nextOffset: number | null;
+	error: SelectionProblem | null;
+};
+
+/** One selector value and how many nodes it selects. */
+export type VocabularyEntry = { value: string; count: number };
+
+/** The values each selector type takes in the current publication, for autocomplete. */
+export type SelectionVocabulary = {
+	snapshotId: string | null;
+	tags: VocabularyEntry[];
+	/** Folders such as `models/staging`, counting the nodes below each at any depth. */
+	paths: VocabularyEntry[];
+	jobs: VocabularyEntry[];
+	sources: VocabularyEntry[];
+	seeds: VocabularyEntry[];
+	kinds: VocabularyEntry[];
+};
+
 // ---- ad-hoc runs (the plan page) ----
 
 export type LaunchVerb = 'build' | 'test' | 'seed' | 'audit' | 'freshness' | 'load';
@@ -583,7 +648,15 @@ export type PlanModel = {
 	/** Unified diff lines of the model's config since its last build. */
 	config_diff?: string[];
 	schema_findings?: { kind: string; column: string; expected_type: string | null; actual_type: string | null }[];
+	/** A paged row's diff counts in place of its diff text, which `planDiff` reads on demand. */
+	diff_stats?: { query?: PlanDiffStats; config?: PlanDiffStats };
 };
+
+/** A diff's changed lines; `whitespace_only` when they read the same with all whitespace taken out (a case change is a change). */
+export type PlanDiffStats = { added: number; removed: number; whitespace_only: boolean };
+
+/** One model's diff text, read on demand. */
+export type PlanDiff = { model: string; query_diff?: string[]; config_diff?: string[] };
 
 export type PlanWarning = { severity: string; message: string; model_name?: string; code?: string };
 
@@ -604,6 +677,61 @@ export type PlanDocument = {
 	synced_copy: PlanSyncedCopy | null;
 	/** What `--changed` runs, holds back and skips; `null` without `--changed`. */
 	changed: PlanChanged | null;
+	/** How long the location took to plan, step by step; absent for plans recorded without timings. */
+	timings?: PlanTimings | null;
+	/** Set when audit failures won't stop the build this plan previews; absent otherwise. */
+	ignore_audit_failures?: boolean;
+	/** A server summary's sections, by size; their rows load a page at a time. */
+	pages?: Partial<Record<PlanPageSection, number>>;
+	/** A server summary's nonempty sections in plan order, each with the notes its rows share most. */
+	sections?: PlanSectionCount[];
+	/** Rows of each paged section loaded so far, which is the offset of its next page. */
+	loaded?: Partial<Record<PlanPageSection, number>>;
+};
+
+/** Every plan section a server summary counts and pages, in plan order. */
+export type PlanPageSection =
+	| 'full_refresh'
+	| 'query_changed'
+	| 'function_changed'
+	| 'config_changed'
+	| 'schema_changed'
+	| 'first_run'
+	| 'renamed'
+	| 'routine_models'
+	| 'migrations'
+	| 'column_migrations'
+	| 'table_type_conversions'
+	| 'retention'
+	| 'loader_reloads'
+	| 'loader_loads'
+	| 'source_reloads'
+	| 'source_loads'
+	| 'changed_functions'
+	| 'functions'
+	| 'seeds'
+	| 'python_nodes'
+	| 'held_back'
+	| 'unchanged'
+	| 'warnings';
+
+/** A note rows of a section carry, such as `run_reason` "no completed record", and how many rows carry it. */
+export type PlanSectionNote = { kind: string; value: string | null; count: number };
+
+/** A section's size and its most frequent notes, so the page can say a note applies to all rows, or N of M. */
+export type PlanSectionCount = { section: PlanPageSection; total: number; notes: PlanSectionNote[] };
+
+/**
+ * One page of a plan section's rows matching a name filter: `total` matches of the section's `section_total`
+ * rows, and the `--changed` runs, warnings and cursor window starts of the page's models.
+ */
+export type PlanPage = {
+	total: number;
+	section_total: number;
+	rows: unknown[];
+	runs: PlanChanged['runs'];
+	warnings: PlanWarning[];
+	cursor_window_starts: Record<string, string>;
 };
 
 /** `sqb plan --changed`'s decision. Nodes are keys such as `model:orders`. */
@@ -618,6 +746,14 @@ export type PlanChanged = {
 	unchanged: string[];
 };
 
+/** How long one plan took: steps in pipeline order with `Other` last, and what it read. */
+export type PlanTimings = {
+	total_seconds: number;
+	steps: { name: string; seconds: number }[];
+	/** `synced_state` for a location preview over the synced warehouse state; `live` when it read the warehouse. */
+	planned_from: string;
+};
+
 /** The server's synced copy of warehouse metadata a location's plan preview planned from. */
 export type PlanSyncedCopy = {
 	/** When every table the preview reads last synced; `null` until all of them have. */
@@ -629,7 +765,7 @@ export type PlanSyncedCopy = {
 };
 
 /** The location's plan of a build command, or why it could not plan it. */
-export type PlanResult = { plan: PlanDocument; error: null } | { plan: null; error: string };
+export type PlanResult = { plan: PlanDocument; error: null; requestId?: string } | { plan: null; error: string };
 
 /** Cursor window for a launch, typed from the selected nodes' cursor type. */
 export type CursorWindow = {
@@ -653,7 +789,7 @@ export type RerunMode = 'all' | 'from_failure' | 'selected';
 
 /** What a schedule tick or sensor request does while a run of the job is active; people's runs always queue. */
 export type OverlapPolicy = 'queue' | 'skip';
-/** A failed or partial run reruns from failure up to `retries` times, `retryDelaySeconds` after the last ended. */
+/** A job's `[retry]`: a failed or partial run reruns from failure up to `retries` times (`attempts` is one more, counting the first run), `retryDelaySeconds` (`delay_seconds`) after the last ended. */
 export type OnFailure = { retries: number; retryDelaySeconds: number };
 export type JobKind = 'job' | 'group';
 
@@ -668,10 +804,19 @@ export type Job = {
 	/** Member jobs for groups; null when the server doesn't say. */
 	members: string[] | null;
 	nodeCount: number;
+	/** The nodes the job selects, by catalog key; a group's are its members' together. */
+	nodes: string[];
 	/** Null where the server doesn't report it (also `onFailure`, `priority`, `sourceFile`). */
 	overlap: OverlapPolicy | null;
 	onFailure: OnFailure | null;
-	concurrencyGroups: string[];
+	/** Each pool the job takes: its slots, the pool's limit and the other jobs and groups taking it, as published. */
+	pools: PoolUse[];
+	/** The job's own `concurrency` setting, models building at once in a run; null uses the project's or target's. */
+	concurrency: number | null;
+	/** What a run uses on the target and which layer set it; null for a snapshot published before it was recorded. */
+	resolvedConcurrency: ResolvedConcurrency | null;
+	/** The job's own `ignore_audit_failures` setting: failing audits don't stop its runs; null uses the target's, then the project's. */
+	ignoreAuditFailures: boolean | null;
 	priority: number | null;
 	owner: string | null;
 	sourceFile: string | null;
@@ -679,10 +824,32 @@ export type Job = {
 	lastRun: RunRef | null;
 };
 
-export type ConcurrencyGroup = {
-	key: string;
+/** A pool a job takes: `amount` of its `limit` slots, shared with the other jobs and groups taking it. */
+export type PoolUse = {
+	pool: string;
+	/** The slots the job asks for. */
+	amount: number;
+	/** The project's limit on the target. */
 	limit: number;
-	/** Active runs holding a slot. */
+	/** This server's `pool_caps` entry; null when it sets none. */
+	cap: number | null;
+	/** The limit on this server: `limit` lowered to `cap`. */
+	serverLimit: number;
+	/** `amount` is above `serverLimit`, so on this server the job takes the whole pool. */
+	clamped: boolean;
+	sharedWith: string[];
+};
+
+/** Models a run builds at once, and the layer that set it. */
+export type ResolvedConcurrency = { limit: number; source: 'job' | 'target' | 'local' | 'project' | 'default' };
+
+/** One reason a member waits: `fromNode` of `upstreamJob` feeds its `toNode`, directly or through nodes no member selects. */
+export type WaitReason = { upstreamJob: string; fromNode: string; toNode: string };
+
+export type PoolHolders = {
+	pool: string;
+	limit: number;
+	/** Active runs holding its slots. */
 	holders: string[];
 };
 
@@ -692,16 +859,18 @@ export type JobGroupMember = {
 	upstream: { jobKey: string; source: 'lineage' | null }[];
 	/** Position in the derived order; members in the same stage run side by side. */
 	stage: number;
+	/** Node-level reasons for its waits, as the snapshot records them; every member's is empty in a snapshot published before they were recorded. */
+	reasons: WaitReason[];
 };
 
 export type JobDetail = Job & {
-	/** Null where the server doesn't report it, as for `declaration`, `concurrency` and `targets`. */
+	/** Null where the server doesn't report it, as for `declaration`, `poolHolders` and `targets`. */
 	declaration: { sourceFile: string; line: number; code: string } | null;
 	exclude: string[];
 	/** Settings are CLI flags validated against the command table. */
 	settings: Record<string, string | boolean> | null;
 	resolvedNodes: string[];
-	concurrency: ConcurrencyGroup[] | null;
+	poolHolders: PoolHolders[] | null;
 	/** Null when the job applies to every target. */
 	targets: string[] | null;
 	groupMembers: JobGroupMember[] | null;

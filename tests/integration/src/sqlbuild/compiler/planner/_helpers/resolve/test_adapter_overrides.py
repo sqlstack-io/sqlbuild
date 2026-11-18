@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from sqlbuild._native import SourceColumnEntry, SourceEntry, resolve_source_references
+from sqlbuild._native import Dialect, SourceColumnEntry, SourceEntry, resolve_source_references
 from sqlbuild.adapter.contract.models import ColumnInfo
 from tests.integration.src.sqlbuild.compiler.planner._helpers.resolve._test_types import (
     AdapterOverrideTestCase,
@@ -45,7 +45,7 @@ def test_given_custom_adapter_when_resolving_source_then_executes_overridden_ren
         star_exclude_keyword="EXCLUDE",
         cursor_bounds=None,
         cursor_filter_inputs={},
-        adapter=ResolutionOverrideAdapter(),
+        dialect=Dialect(ResolutionOverrideAdapter()),
         cursor_type=None,
         lower_bound_inclusive=True,
     )

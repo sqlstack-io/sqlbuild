@@ -33,6 +33,8 @@ pub(crate) struct DevelopmentTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_status: crate::declarations::models::TriggerStatus,
+    /// The names of the first target's location and of a second target's location.
+    pub(crate) expected_names: [&'static str; 2],
 }
 
 pub(crate) struct OlderServerReportTestCase {
@@ -298,4 +300,57 @@ pub(crate) struct ProvidersTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_jobs: Vec<&'static str>,
+}
+
+pub(crate) struct NodeStatesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_listed: usize,
+}
+
+pub(crate) struct ChangedBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_before_plan: serde_json::Value,
+}
+
+pub(crate) struct PushedStatesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) built: usize,
+    pub(crate) expected_pushed: Option<usize>,
+}
+
+pub(crate) struct PoolCapHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) caps: &'static [(&'static str, u32)],
+    /// Each warning as `(job_key, pool, amount, cap, message)`; empty when no pool_capped observation is expected.
+    pub(crate) expected_warnings: &'static [(&'static str, &'static str, u32, u32, &'static str)],
+}
+
+pub(crate) struct StateHistoryRetentionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) configured: Option<u16>,
+    pub(crate) expected_versions: u16,
+}
+
+/// A SQLite store in one auto-vacuum mode whose pruning frees most of its pages.
+pub(crate) struct SqliteReclaimTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) auto_vacuum: &'static str,
+    pub(crate) expected_mode: i64,
+}
+
+pub(crate) struct PlanDiffTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The diff of a model the document left out, as it reads back.
+    pub(crate) expected_detached_diff: &'static [&'static str],
+}
+
+pub(crate) struct IngestionTurnTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) pages: usize,
+    pub(crate) relations_per_page: usize,
+    pub(crate) expected_writer_first: bool,
 }

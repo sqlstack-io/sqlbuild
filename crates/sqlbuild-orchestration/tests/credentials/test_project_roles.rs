@@ -19,7 +19,7 @@ use crate::credentials::tests::role_helpers::{
 use crate::credentials::tests::test_types::{ProjectRoleTestCase, RolesFileTestCase};
 use crate::declarations::models::TriggerChange;
 use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::{begin::begin, commit::commit, query::query};

@@ -218,6 +218,15 @@ fn given_plan_report_when_rendering_then_groups_models_by_reason() {
             expected_completion: "\u{2717} Plan failed with errors  1 selected",
         },
         PlanTextTestCase {
+            description: "a plan whose audit failures are ignored says so under its header",
+            report: PlanTextReport {
+                ignore_audit_failures: true,
+                ..plan_report(vec![table_model("orders", "no_change")])
+            },
+            expected_text: "Plan ready  1 selected\nAudit failures won't stop this build\n\nModels (1)\n\u{2514}\u{2500}\u{2500} orders               table",
+            expected_completion: "\u{2713} Plan complete  1 selected",
+        },
+        PlanTextTestCase {
             description: "every active model is a full refresh",
             report: plan_report(vec![
                 table_model("orders", "full_refresh"),

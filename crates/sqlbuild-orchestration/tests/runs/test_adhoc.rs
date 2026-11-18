@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
-use crate::runs::main::check_adhoc_run::check_adhoc_run;
-use crate::runs::main::request_person_run::request_person_run;
+use crate::runs::main::requests::check_adhoc_run::check_adhoc_run;
+use crate::runs::main::requests::request_person_run::request_person_run;
 use crate::runs::models::PersonRunRequest;
 use crate::runs::tests::helpers::{
     adhoc_check, adhoc_fixture, adhoc_launch, check_projection, json_column, launch_outcome, rows,

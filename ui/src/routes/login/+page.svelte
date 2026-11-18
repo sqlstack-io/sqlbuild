@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import logoForDark from '$website/src/assets/logo-dark.png';
 	import logoForLight from '$website/src/assets/logo-light.png';
 	import { page } from '$app/state';
@@ -53,6 +54,6 @@
 			<input class="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-[13px]" name="password" type="password" autocomplete="current-password" required bind:value={password} />
 		</label>
 		{#if problem}<p class="text-[12.5px]" style:color="var(--sb-error)" role="alert">{problem}</p>{/if}
-		<button class="bg-primary rounded-md px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-60" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+		<Button type="submit" variant="default" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
 	</form>
 </div>

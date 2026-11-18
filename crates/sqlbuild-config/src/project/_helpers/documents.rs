@@ -16,7 +16,7 @@ use crate::project::_helpers::keys::Place;
 use crate::project::_helpers::sections::{
     load_changes, load_constants, load_control, load_cost, load_cursors, load_dbt, load_diff,
     load_git, load_janitor, load_local_dbt, load_microbatches, load_migrations, load_policy_flag,
-    load_review, load_scenario, load_settings, load_snapshots, setting_overrides,
+    load_pools, load_review, load_scenario, load_settings, load_snapshots, setting_overrides,
 };
 use crate::project::_helpers::sinks::load_sinks;
 use crate::project::_helpers::targets::{
@@ -25,12 +25,12 @@ use crate::project::_helpers::targets::{
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
     ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, LEGACY_COLUMN_CONTRACT_MODE_KEY,
-    LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY,
+    LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, POOLS_KEY, QUERY_CHANGE_TRACKING_KEY,
     REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{
-    Built, ChangesConfig, ConfigFile, ConfigPaths, ControlConfig, ReviewConfig,
+    Built, ChangesConfig, ConfigFile, ConfigPaths, ControlConfig, PoolLimits, ReviewConfig,
 };
 use crate::project::types::{Entries, Fields, Loaded};
 use crate::recall::constants::RECALL_SECTION;
@@ -38,6 +38,7 @@ use crate::recall::main::recall_section::recall_section;
 use crate::toml::main::load_toml::load_toml;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_core::constants::SETTINGS_SECTION;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 const PROJECT_FILE: ConfigFile = ConfigFile::Project;
@@ -298,6 +299,7 @@ fn project_fields(payload: &Entries) -> Loaded<Fields> {
     load_review(get(payload, "review"), PROJECT_FILE)?;
     load_control(get(payload, "control"), PROJECT_FILE)?;
     load_changes(get(payload, "changes"), PROJECT_FILE)?;
+    pool_limits(payload)?;
     let mut fields = identity(payload)?;
     fields.extend(sections(payload)?);
     fields.push(("targets", targets(payload)?));
@@ -459,6 +461,67 @@ fn project_section<T>(
     let table = load_toml_mapping(paths, file)?;
     let payload = table.as_map().unwrap_or_default();
     Ok(load(get(payload, section), PROJECT_FILE)?)
+}
+
+/// `[pools]` and each target's limits; a target may only change the limit of a declared pool.
+fn pool_limits(payload: &Entries) -> Loaded<PoolLimits> {
+    let declared = load_pools(get(payload, POOLS_KEY), (POOLS_KEY, PROJECT_FILE))?;
+    let targets = coerce_mapping(
+        get(payload, "targets"),
+        Place {
+            file: PROJECT_FILE,
+            label: "targets",
+        },
+    )?;
+    let mut limits = PoolLimits {
+        declared,
+        targets: BTreeMap::new(),
+    };
+    for (key, value) in targets {
+        let name = crate::project::_helpers::fields::key_name(key);
+        let table = format!("targets.{name}");
+        let mapping = coerce_mapping(
+            Some(value),
+            Place {
+                file: PROJECT_FILE,
+                label: &table,
+            },
+        )?;
+        let label = format!("{table}.{POOLS_KEY}");
+        let overrides = load_pools(get(mapping, POOLS_KEY), (&label, PROJECT_FILE))?;
+        if let Some(pool) = overrides
+            .keys()
+            .find(|pool| !limits.declared.contains_key(*pool))
+        {
+            return Err(ConfigFailure::at(
+                PROJECT_FILE,
+                format!("{label}.{pool} changes a pool [{POOLS_KEY}] does not declare"),
+            )
+            .with_help(format!(
+                "declare it first, such as [{POOLS_KEY}] {pool} = 1"
+            )));
+        }
+        let mut effective = limits.declared.clone();
+        effective.extend(overrides);
+        limits.targets.insert(name.to_owned(), effective);
+    }
+    Ok(limits)
+}
+
+/// `[pools]` of `sqlbuild_project.toml` and every target's limits.
+pub(crate) fn pool_limits_config(paths: &ConfigPaths) -> Result<PoolLimits, LoadFailure> {
+    let file = resolve(paths, false)?;
+    let table = load_toml_mapping(paths, file)?;
+    Ok(pool_limits(table.as_map().unwrap_or_default())?)
+}
+
+/// The `[settings]` keys `sqlbuild_project.toml` sets, under their current names.
+pub(crate) fn project_setting_keys(paths: &ConfigPaths) -> Result<Vec<String>, LoadFailure> {
+    let file = resolve(paths, false)?;
+    let table = load_toml_mapping(paths, file)?;
+    let settings =
+        get(table.as_map().unwrap_or_default(), "settings").and_then(ConfigValue::as_map);
+    Ok(settings.map(setting_overrides).unwrap_or_default())
 }
 
 /// `[git] base_ref` of `sqlbuild_project.toml`.

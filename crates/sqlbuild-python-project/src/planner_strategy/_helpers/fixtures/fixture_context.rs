@@ -19,14 +19,17 @@ use crate::native_host::models::ModelHandle;
 use crate::planner_strategy::_helpers::fixtures::fixture_metadata::model_fixture_relation;
 use crate::planner_strategy::_helpers::fixtures::fixture_reads::lineage_reads;
 use crate::planner_strategy::_helpers::fixtures::fixture_types::projections;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::{columns, folded_name};
-use crate::planner_strategy::constants::{
-    MODEL_REFERENCE_KIND, SEED_REFERENCE_KIND, SOURCE_REFERENCE_KIND,
-};
-use crate::planner_strategy::models::{
-    FixtureReadCacheHost, FixtureRelation, ModelFixtureFacts, RelationFixturePlanningContext,
-};
-use crate::planner_strategy::types::{FixtureKey, FixtureRelationInput};
+use crate::planner_strategy::_helpers::fixtures::fixture_values::columns;
+use crate::planner_strategy::_helpers::fixtures::fixture_values::folded_name;
+use crate::planner_strategy::constants::MODEL_REFERENCE_KIND;
+use crate::planner_strategy::constants::SEED_REFERENCE_KIND;
+use crate::planner_strategy::constants::SOURCE_REFERENCE_KIND;
+use crate::planner_strategy::models::FixtureReadCacheHost;
+use crate::planner_strategy::models::FixtureRelation;
+use crate::planner_strategy::models::ModelFixtureFacts;
+use crate::planner_strategy::models::RelationFixturePlanningContext;
+use crate::planner_strategy::types::FixtureKey;
+use crate::planner_strategy::types::FixtureRelationInput;
 use crate::resource_views::main::resource_reads::name::name;
 use crate::resource_views::main::seed_reads::schema_entry::schema_entry;
 use crate::resource_views::main::source_reads::source_entry::source_entry;

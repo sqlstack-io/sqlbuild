@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::api::errors::ApiError;
 use crate::credentials::models::AuditContext;
 use crate::credentials::models::AuthenticatedPerson;
-use crate::snapshots::main::read_person_node_sql::read_person_node_sql;
+use crate::snapshots::main::reads::read_person_node_sql::read_person_node_sql;
 use crate::snapshots::models::NodeSql;
 use crate::store::models::ControlStore;
 

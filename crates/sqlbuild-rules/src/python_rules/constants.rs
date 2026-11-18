@@ -255,8 +255,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Tests,
         enabled_by_default: true,
         options: &[],
-        message: "Python tests must mirror an existing module under python/ or providers/",
-        remediation: "Move the test to tests/python/ or tests/providers/ at the path of the module it tests: tests/python/orders/storefront_import/test_main.py tests python/orders/storefront_import/main.py.",
+        message: "Python tests must mirror an existing module under python/, providers/ or orchestration/",
+        remediation: "Move the test to tests/python/, tests/providers/ or tests/orchestration/ at the path of the module it tests: tests/python/orders/storefront_import/test_main.py tests python/orders/storefront_import/main.py.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON022",

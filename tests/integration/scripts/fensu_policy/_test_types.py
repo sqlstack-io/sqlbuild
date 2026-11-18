@@ -18,3 +18,12 @@ class ObservationBoundaryTestCase:
     planner: str
     expected_returncode: int
     expected_faults: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PlannerReadsTestCase:
+    description: str
+    files: dict[str, str]
+    planner_paths: tuple[str, ...]
+    expected_returncode: int
+    expected_faults: tuple[str, ...]

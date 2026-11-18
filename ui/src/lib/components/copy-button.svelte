@@ -3,7 +3,8 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 
 	// Copies `value`; shows a tick for a moment. Stops click propagation so it works inside clickable rows.
-	let { value, label = 'Copy', text }: { value: string; label?: string; text?: string } = $props();
+	// `showValue` names the value in the tooltip and label; turn it off for long values such as SQL.
+	let { value, label = 'Copy', text, showValue = true }: { value: string; label?: string; text?: string; showValue?: boolean } = $props();
 
 	let copied = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -18,7 +19,7 @@
 	}
 </script>
 
-<button type="button" class="copy" class:text={!!text} onclick={copy} title={copied ? 'Copied' : `${label}: ${value}`} aria-label="{label} {value}">
+<button type="button" class="copy" class:text={!!text} onclick={copy} title={copied ? 'Copied' : showValue ? `${label}: ${value}` : label} aria-label={showValue ? `${label} ${value}` : label}>
 	{#if copied}<CheckIcon size={12} />{:else}<CopyIcon size={12} />{/if}{#if text}<span>{copied ? 'copied' : text}</span>{/if}
 </button>
 

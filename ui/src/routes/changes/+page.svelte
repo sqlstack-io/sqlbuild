@@ -1,11 +1,16 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
+	import { plural } from '$lib/format/plural';
+	import PageBody from '$lib/components/page-body.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import GitCommitIcon from '@lucide/svelte/icons/git-commit-horizontal';
 	import PackageIcon from '@lucide/svelte/icons/package';
 	import type { SnapshotChange } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -14,7 +19,9 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { changeOpLabel, changeOpTone, formatCredits } from '$lib/build-area/labels';
 	import { NODE_LIST_LIMIT, nodeChangeGroups, summarizeChange } from '$lib/build-area/changes';
-	import { nodeHref, orchestrationHref, percentChange } from './utils';
+	import { quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
+	import { shortRunId } from '$lib/operate/labels';
+	import { nodeHref, orchestrationHref, percentChange, shortRevision } from './utils';
 
 	type Area = 'all' | 'nodes' | 'orchestration' | 'roles' | 'environment';
 
@@ -39,6 +46,13 @@
 	);
 	/** Deploys, by snapshot, whose long node list is shown in full. */
 	let listed = $state<Record<string, boolean>>({});
+	/** Deploys that changed nothing are merged into one line per run of them, as on the overview. */
+	const rows = $derived(recentDeployRows(filtered));
+	/** Merged lines, by key, that are expanded; a search shows every match, so it expands them all. */
+	let openQuiet = $state<Record<string, boolean>>({});
+	const newest = $derived(all[0]?.snapshotId);
+	const hasBody = (c: SnapshotChange) =>
+		c.nodes.length > 0 || c.orchestration.length > 0 || c.roles.length > 0 || !!c.environment || !!c.costChanges?.length || c.followingRuns.length > 0;
 	const areaOptions: { value: Area; label: string }[] = [
 		{ value: 'all', label: 'All' },
 		{ value: 'nodes', label: 'Nodes' },
@@ -46,35 +60,37 @@
 		{ value: 'roles', label: 'Roles' },
 		{ value: 'environment', label: 'Environment' }
 	];
+	const byArea = $derived(countBy(all, (c) => areaOptions.filter((o) => hasArea(c, o.value)).map((o) => o.value)));
 </script>
 
 <AppTopbar title="Changes">
-	<Button variant="outline" size="sm" onclick={() => changes.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => changes.refresh()} />
 </AppTopbar>
 
 <ListToolbar loading={changes.data === undefined} bind:query placeholder="Search nodes, commits, authors" total="{filtered.length} of {all.length} deploys">
 	{#snippet filters()}
-		<SegmentedFilter loading={changes.data === undefined} bind:value={area} options={areaOptions.map((o) => ({ ...o, count: all.filter((c) => hasArea(c, o.value)).length }))} />
+		<SegmentedFilter loading={changes.data === undefined} bind:value={area} options={areaOptions.map((o) => ({ ...o, count: byArea.get(o.value) ?? 0 }))} />
 	{/snippet}
 </ListToolbar>
 
-<div class="feed sb-scroll">
-	{#if changes.error}<div class="msg err">Couldn't load the change feed: {changes.error}</div>{/if}
-	{#each filtered as c, i (c.snapshotId)}
-		<article class="deploy" id="gen-{c.generation}">
-			<header>
-				<span class="icon"><GitCommitIcon size={15} /></span>
-				<div class="title">
-					<strong title="Snapshot {c.snapshotId}, generation {c.generation}">Version {c.generation}</strong>
-					{#if c.gitRevision}<code title="Commit">{c.gitRevision}{c.gitDirty ? ' · with uncommitted changes' : ''}</code>{/if}
-					<span class="faint">{summarizeChange(c)}</span>
-				</div>
-				<div class="who">
-					{#if c.gitAuthor}<span>{c.gitAuthor}</span>{/if}
-					<span class="faint">{c.publishedBy ? `deployed by ${c.publishedBy.displayName} · ` : 'published '}<span title={formatStamp(c.publishedAt)}>{formatAgo(c.publishedAt, app.now)}</span></span>
-				</div>
-			</header>
+{#snippet deploy(c: SnapshotChange)}
+	<article class="deploy" id="gen-{c.generation}">
+		<header>
+			<span class="icon"><GitCommitIcon size={15} /></span>
+			<div class="title">
+				<strong title="Snapshot {c.snapshotId}, generation {c.generation}">Version {c.generation}</strong>
+				{#if c.gitRevision}<code title="Commit {c.gitRevision}">{shortRevision(c.gitRevision)}</code>{/if}
+				{#if c.gitDirty}<span class="faint">with uncommitted changes</span>{/if}
+				<span class="faint">{summarizeChange(c)}</span>
+				{#if !c.followingRuns.length}<span class="no-runs" title="No runs of this version yet">No runs</span>{/if}
+			</div>
+			<div class="who">
+				{#if c.gitAuthor}<span>{c.gitAuthor}</span>{/if}
+				<span class="faint">{c.publishedBy ? `deployed by ${c.publishedBy.displayName} · ` : 'published '}<span title={formatStamp(c.publishedAt)}>{formatAgo(c.publishedAt, app.now)}</span></span>
+			</div>
+		</header>
 
+		{#if hasBody(c)}
 			<div class="body">
 				{#if c.nodes.length}
 					{@const grouped = c.nodes.length > NODE_LIST_LIMIT && !listed[c.snapshotId] && !query.trim()}
@@ -87,14 +103,14 @@
 									<span>{g.count.toLocaleString('en')} {g.noun}</span>
 								</div>
 							{/each}
-							<button class="more" onclick={() => (listed[c.snapshotId] = true)}>Show all {c.nodes.length.toLocaleString('en')} nodes</button>
+							<Button variant="link" size="inline" class="mt-1" onclick={() => (listed[c.snapshotId] = true)}>Show all {c.nodes.length.toLocaleString('en')} nodes</Button>
 						{/if}
 						{#each grouped ? [] : c.nodes as n (n.key + n.op)}
 							{@const href = nodeHref(n, app.client.supports('getCatalogNode'))}
 							<div class="row">
 								<span class="op" style:--tone={changeOpTone[n.op]}>{changeOpLabel[n.op]}</span>
 								{#if href}<a class="key" {href}>{n.key}</a>{:else}<code class:gone={n.op === 'removed'}>{n.key}</code>{/if}
-								<span class="detail">{n.detail}{#if n.compiledOnly}<span class="tag">compiled only</span>{/if}</span>
+								<span class="detail">{n.detail}{#if n.compiledOnly}<span class="sb-tag ml-2">compiled only</span>{/if}</span>
 							</div>
 							{#each n.columns as col (col.name)}
 								<div class="row sub">
@@ -132,7 +148,7 @@
 								{:else if app.client.supports('getRole')}<a class="key" href={to(`/admin/roles/${encodeURIComponent(r.role)}`)}>{r.role}</a>
 								{:else}<code>{r.role}</code>{/if}
 								<span class="detail">
-									{#if r.coverage}<b>now covers {r.coverage.after} {r.coverage.after === 1 ? 'node' : 'nodes'}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
+									{#if r.coverage}<b>now covers {plural(r.coverage.after, 'node')}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
 								</span>
 							</div>
 						{/each}
@@ -157,44 +173,53 @@
 							{@const pct = percentChange(cc.before, cc.after)}
 							<div class="row">
 								<a class="key" href={to(`/jobs/${cc.jobKey}`)}>{cc.jobKey}</a>
-								<span class="detail">{formatCredits(cc.before)} → {formatCredits(cc.after)} per run <b class:up={pct > 0} class:down={pct < 0}>{pct > 0 ? '+' : ''}{pct}%</b> <span class="faint">over {cc.runsAfter} {cc.runsAfter === 1 ? 'run' : 'runs'} since revision {c.gitRevision}</span></span>
+								<span class="detail">{formatCredits(cc.before)} → {formatCredits(cc.after)} per run <b class:up={pct > 0} class:down={pct < 0}>{pct > 0 ? '+' : ''}{pct}%</b> <span class="faint">over {plural(cc.runsAfter, 'run')} since {c.gitRevision ? `revision ${shortRevision(c.gitRevision)}` : 'this deploy'}</span></span>
 							</div>
 						{/each}
 					</section>
 				{/if}
 
-				<section>
-					<h3>Runs that followed <span>{c.followingRuns.length}{i > 0 ? ' before the next deploy' : ''}</span></h3>
-					{#if c.followingRuns.length}
+				{#if c.followingRuns.length}
+					<section>
+						<h3>Runs that followed <span>{c.followingRuns.length}{c.snapshotId !== newest ? ' before the next deploy' : ''}</span></h3>
 						<div class="runs">
 							{#each c.followingRuns as r (r.id)}
-								<a class="run" href={to(`/runs/${r.id}`)} title="{runStatusLabel[r.status]} · {formatStamp(r.startedAt ?? r.queuedAt)}">
+								<a class="run" href={to(`/runs/${r.id}`)} title="{r.id} · {runStatusLabel[r.status]} · {formatStamp(r.startedAt ?? r.queuedAt)}">
 									<i style:background={runStatusTone[r.status]}></i>
-									<code>{r.id}</code>
-									<span class="faint">{r.jobKey ?? 'started by hand'} · {formatAgo(r.startedAt ?? r.queuedAt, app.now)}</span>
+									<code>{shortRunId(r.id)}</code>
+									<span class="faint">{r.jobKey ?? 'Manual'} · {formatAgo(r.startedAt ?? r.queuedAt, app.now)}</span>
 								</a>
 							{/each}
 						</div>
-					{:else}
-						<p class="faint">No runs of this version yet.</p>
-					{/if}
-				</section>
+					</section>
+				{/if}
 			</div>
-		</article>
+		{/if}
+	</article>
+{/snippet}
+
+<PageBody padding="18px 24px 48px">
+	{#if changes.error}<div class="msg err">Couldn't load the change feed: {changes.error}</div>{/if}
+	{#each rows as row (row.key)}
+		{#if row.kind === 'deploy'}
+			{@render deploy(row.change)}
+		{:else if query.trim()}
+			{#each row.changes as c (c.snapshotId)}{@render deploy(c)}{/each}
+		{:else}
+			{@const open = !!openQuiet[row.key]}
+			<div class="quiet"><DisclosureButton {open} onclick={() => (openQuiet[row.key] = !open)} class="w-full px-4 py-2 text-[12px]">{quietDeployLine(row, app.now)}</DisclosureButton></div>
+			{#if open}
+				{#each row.changes as c (c.snapshotId)}{@render deploy(c)}{/each}
+			{/if}
+		{/if}
 	{:else}
 		{#if changes.data === undefined && !changes.error}<div class="msg"><Loading lines={4} /></div>{:else}<div class="msg">{all.length ? 'No deploys match the filter.' : 'Nothing has been deployed to this location yet.'}</div>{/if}
 	{/each}
-</div>
+</PageBody>
 
 <style>
-	.feed {
-		min-height: 0;
-		flex: 1;
-		overflow-y: auto;
-		padding: 18px 24px 48px;
-	}
 	.deploy {
-		margin-bottom: 16px;
+		margin-bottom: 12px;
 		border: 1px solid var(--panel-border);
 		border-radius: 2px;
 		background: var(--card);
@@ -208,7 +233,9 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		padding: 12px 16px;
+		padding: 11px 16px;
+	}
+	header:not(:last-child) {
 		border-bottom: 1px solid var(--border);
 	}
 	.icon {
@@ -222,20 +249,48 @@
 	}
 	.title {
 		display: flex;
+		min-width: 0;
+		flex: 1 1 auto;
+		overflow-wrap: anywhere;
+		flex-wrap: wrap;
 		align-items: baseline;
-		gap: 10px;
+		gap: 4px 10px;
+		font-size: 12.5px;
+	}
+	.title strong {
 		font-size: 13px;
+		font-weight: 600;
+	}
+	.no-runs {
+		color: var(--sb-text-faint);
+		font-size: 12px;
+	}
+	/* A run of deploys that changed nothing, as one line; it expands to list them. */
+	.quiet {
+		margin-bottom: 12px;
+		border: 1px dashed var(--panel-border);
+		border-radius: 2px;
+	}
+	.quiet:hover {
+		background: var(--sb-hover);
 	}
 	.title code {
 		color: var(--primary);
 		font: 12px var(--font-mono);
 	}
+	/* Author and time wrap within the header rather than push it past the window's edge. */
 	.who {
 		display: flex;
+		min-width: 0;
+		max-width: 40%;
+		flex: 0 1 auto;
 		flex-direction: column;
 		align-items: flex-end;
 		margin-left: auto;
-		font-size: 12.5px;
+		overflow-wrap: anywhere;
+		text-align: right;
+		font-size: 12px;
+		line-height: 1.45;
 	}
 	.body {
 		padding: 4px 16px 12px;
@@ -244,47 +299,40 @@
 		margin-top: 12px;
 	}
 	h3 {
-		margin: 0 0 6px;
+		margin: 0 0 4px;
 		color: var(--sb-text-faint);
 		font-size: 12px;
 		font-weight: 500;
 	}
 	h3 span {
+		margin-left: 4px;
 		font-weight: 400;
+		font-variant-numeric: tabular-nums;
 	}
 	.row {
 		display: flex;
 		align-items: baseline;
 		gap: 10px;
-		padding: 4px 0;
+		padding: 3px 0;
 		font-size: 12.5px;
-	}
-	.more {
-		margin-top: 4px;
-		color: var(--primary);
-		font-size: 12.5px;
-	}
-	.more:hover {
-		text-decoration: underline;
 	}
 	.row.sub {
 		padding-left: 22px;
 	}
 	.op {
-		min-width: 64px;
+		flex: 0 0 64px;
 		color: var(--tone);
-		font-size: 11.5px;
+		font-size: 11px;
 		font-weight: 600;
 		text-transform: uppercase;
-		letter-spacing: 0.03em;
+		letter-spacing: 0.04em;
 	}
 	.op.small {
-		min-width: 64px;
 		font-weight: 500;
 		opacity: 0.85;
 	}
 	.kind {
-		min-width: 52px;
+		flex: 0 0 52px;
 		font-size: 12px;
 	}
 	.key {
@@ -314,14 +362,6 @@
 	.detail b.down {
 		color: var(--sb-success);
 	}
-	.tag {
-		margin-left: 8px;
-		padding: 0 6px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 11px;
-	}
 	.icon-inline {
 		color: var(--muted-foreground);
 	}
@@ -350,7 +390,7 @@
 	.msg {
 		padding: 14px 0;
 		color: var(--muted-foreground);
-		font-size: 13px;
+		font-size: 12.5px;
 	}
 	.err {
 		color: var(--sb-error);

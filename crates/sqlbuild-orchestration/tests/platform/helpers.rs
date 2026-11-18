@@ -8,8 +8,8 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 
 use crate::platform::models::{PlatformEvent, PlatformEventEnvelope};
-use crate::runs::main::claim_next_run::claim_next_run;
-use crate::runs::main::publish_run_recall::publish_run_recall;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
+use crate::runs::main::execution::publish_run_recall::publish_run_recall;
 use crate::runs::models::{RecallBatch, RecallRecord};
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;

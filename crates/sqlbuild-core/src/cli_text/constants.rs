@@ -84,6 +84,8 @@ pub(crate) const READ_SIDE_PHASE: &str = "read_side";
 pub(crate) const PYTHON_INGRESS_TITLE: &str = "Python ingress";
 pub(crate) const PYTHON_READ_SIDE_TITLE: &str = "Python read-side";
 pub(crate) const PLAN_READY_TITLE: &str = "Plan ready";
+/// The plan's first line after its header when audit failures hold nothing back.
+pub(crate) const IGNORED_AUDIT_FAILURES_NOTICE: &str = "Audit failures won't stop this build";
 pub(crate) const FOOTER_SUCCESS_LABELS: [&str; 5] =
     ["PASS", "OK", "SYNC_PASS", "REFRESH_PASS", "UNCHANGED"];
 pub(crate) const FOOTER_WARNING_LABELS: [&str; 3] = ["WARN", "TOLERATED", "UNKNOWN"];

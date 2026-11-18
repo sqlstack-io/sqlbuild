@@ -7,9 +7,8 @@ use pyo3::types::{PyDict, PyTuple};
 use crate::planner_phases::main::object::object;
 use crate::planner_strategy::main::count_chain_resolution::count_chain_resolution;
 use crate::sql_test_glue::_helpers::plan::plan_values::tuple;
-use crate::sql_test_glue::_helpers::plan::planning::{
-    ChainRequest, resolve_compiled_sql_test_chains,
-};
+use crate::sql_test_glue::_helpers::plan::planning::ChainRequest;
+use crate::sql_test_glue::_helpers::plan::planning::resolve_compiled_sql_test_chains;
 use crate::sql_test_glue::models::PlanRow;
 use crate::sql_test_glue::models::SqlTestPlanOptions;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

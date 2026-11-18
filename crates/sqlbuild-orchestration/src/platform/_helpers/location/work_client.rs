@@ -1,0 +1,193 @@
+//! The authenticated client verifies every leased request's location, target and instance.
+
+use uuid::Uuid;
+
+use crate::api::errors::ClientError;
+use crate::api::main::client_response::client_response;
+use crate::api::models::MutationResponse;
+use crate::node_states::models::ChangedBuildReport;
+use crate::platform::models::{
+    LocationHealthObservation, LocationHealthReport, LocationWorkClaim, LocationWorkClient,
+    LocationWorkPoll, LocationWorkResult,
+};
+use crate::warehouse_metadata::models::{
+    MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
+    WarehouseRetention, WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse,
+    WarehouseWatermarkRead,
+};
+
+impl LocationWorkClient {
+    pub async fn statistics_due(
+        &self,
+        target: &str,
+        request: &StatisticsDueRead,
+    ) -> Result<StatisticsRead, ClientError> {
+        self.post_metadata((target, Some("statistics-due")), request)
+            .await
+    }
+
+    pub async fn report_health(&self, report: &LocationHealthReport) -> Result<bool, ClientError> {
+        self.post_mutation(&["health"], report).await
+    }
+
+    /// The newest health observations of one target of this location, newest first.
+    pub async fn recent_health(
+        &self,
+        target: &str,
+    ) -> Result<Vec<LocationHealthObservation>, ClientError> {
+        let mut endpoint = self.connection.endpoint(&[
+            "api",
+            "locations",
+            &self.location_id.to_string(),
+            "health",
+        ])?;
+        endpoint.query_pairs_mut().append_pair("target", target);
+        client_response(self.connection.client.get(endpoint)).await
+    }
+
+    pub async fn metadata_watermark(
+        &self,
+        target: &str,
+        request: &WarehouseWatermarkRead,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ClientError> {
+        self.post_metadata((target, Some("watermark")), request)
+            .await
+    }
+
+    /// The server's state-history limit; `None` from a server too old to have one.
+    pub async fn metadata_retention(
+        &self,
+        target: &str,
+    ) -> Result<Option<WarehouseRetention>, ClientError> {
+        let location_id = self.location_id.to_string();
+        let endpoint = self.connection.endpoint(&[
+            "api",
+            "locations",
+            &location_id,
+            "targets",
+            target,
+            "metadata",
+            "retention",
+        ])?;
+        match client_response(self.connection.client.get(endpoint)).await {
+            Ok(retention) => Ok(Some(retention)),
+            Err(ClientError::Rejected(status))
+                if status == reqwest::StatusCode::NOT_FOUND
+                    || status == reqwest::StatusCode::METHOD_NOT_ALLOWED =>
+            {
+                Ok(None)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    pub async fn metadata_sync_due(
+        &self,
+        target: &str,
+        request: &WarehouseSyncDueRead,
+    ) -> Result<WarehouseSyncDue, ClientError> {
+        self.post_metadata((target, Some("sync-due")), request)
+            .await
+    }
+
+    /// The mirrored copy a plan preview plans from, so previewing never opens the warehouse.
+    pub async fn preview_copy(
+        &self,
+        target: &str,
+        request: &PreviewCopyRead,
+    ) -> Result<PreviewCopy, ClientError> {
+        self.post_metadata((target, Some("preview-copy")), request)
+            .await
+    }
+
+    /// Report what the default `sqb build --changed` runs, planned from the synced copy for `report.generation`.
+    pub async fn report_changed_build(
+        &self,
+        target: &str,
+        report: &ChangedBuildReport,
+    ) -> Result<bool, ClientError> {
+        self.post_mutation(&["targets", target, "changed-build"], report)
+            .await
+    }
+
+    /// Metadata shares the location's scoped pool, not the scheduler's execution authority.
+    pub async fn sync_metadata(
+        &self,
+        target: &str,
+        batch: &MetadataBatch,
+    ) -> Result<WarehouseSyncResponse, ClientError> {
+        self.post_metadata((target, None), batch).await
+    }
+
+    /// Post `body` to this location's `path`; whether the server applied it.
+    async fn post_mutation(
+        &self,
+        path: &[&str],
+        body: &impl serde::Serialize,
+    ) -> Result<bool, ClientError> {
+        let response: MutationResponse = self.post_location(path, body).await?;
+        Ok(response.applied)
+    }
+
+    async fn post_metadata<T: serde::de::DeserializeOwned>(
+        &self,
+        (target, read): (&str, Option<&str>),
+        body: &impl serde::Serialize,
+    ) -> Result<T, ClientError> {
+        let mut path = vec!["targets", target, "metadata"];
+        path.extend(read);
+        self.post_location(&path, body).await
+    }
+
+    /// Post `body` to this location's `path` and decode the reply.
+    async fn post_location<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &[&str],
+        body: &impl serde::Serialize,
+    ) -> Result<T, ClientError> {
+        let location_id = self.location_id.to_string();
+        let mut segments = vec!["api", "locations", &location_id];
+        segments.extend(path);
+        let endpoint = self.connection.endpoint(&segments)?;
+        client_response(self.connection.client.post(endpoint).json(body)).await
+    }
+
+    pub async fn poll(
+        &self,
+        poll: &LocationWorkPoll,
+    ) -> Result<Option<LocationWorkClaim>, ClientError> {
+        let claim: Option<LocationWorkClaim> = client_response(
+            self.connection
+                .client
+                .post(format!("{}poll", self.work_url))
+                .json(poll),
+        )
+        .await?;
+        if claim.as_ref().is_some_and(|claim| {
+            claim.request.location_id != self.location_id
+                || claim.request.target != poll.target
+                || claim.session_id != poll.session_id
+        }) {
+            return Err(ClientError::Configuration(
+                "work response does not match this location, target and instance",
+            ));
+        }
+        Ok(claim)
+    }
+
+    /// Retain the same request, claim and result when retrying an uncertain acknowledgement.
+    pub async fn complete(
+        &self,
+        request_id: Uuid,
+        result: &LocationWorkResult,
+    ) -> Result<bool, ClientError> {
+        let response: MutationResponse = client_response(
+            self.connection
+                .client
+                .post(format!("{}{request_id}", self.work_url))
+                .json(result),
+        )
+        .await?;
+        Ok(response.applied)
+    }
+}

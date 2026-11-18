@@ -52,5 +52,18 @@ healthcheck:
 A `falling_back` location still runs scheduled jobs from its last good snapshot. Restarting it
 does not fix the failed load; fix the project and deploy it again.
 
+Loading a project is a full compile, as [`sqb compile`](/docs/cli/compile) runs it, including the
+configured [Rules](/docs/concepts/rules). A Rule finding fails the load like any other compile
+error: nothing is published, and the location's output and its page in the UI show the findings:
+
+```text
+Compile failed: 1 rule finding
+models/orders.sql:2:8 [SQBRMODEL102] SELECT * is allowed only inside dependency import CTEs
+```
+
+Runs and plan previews on a published snapshot don't evaluate the Rules again; they passed when it
+loaded. After a SQLBuild upgrade that adds Rules to a family you select, a location keeps running
+its last good snapshot until the project passes them.
+
 A `missing_secrets` location publishes and runs jobs whose nodes have their secrets. Set the
 missing variables in its environment and restart it; `sqb debug` in the location lists them.

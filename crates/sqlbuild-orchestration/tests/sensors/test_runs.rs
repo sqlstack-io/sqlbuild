@@ -10,8 +10,8 @@ use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::TriggerChange;
-use crate::runs::main::list_runs::list_runs;
-use crate::runs::main::request_rerun::request_rerun;
+use crate::runs::main::listings::list_runs::list_runs;
+use crate::runs::main::requests::request_rerun::request_rerun;
 use crate::runs::models::{NodeOutcome, RerunRequest, RunKind, RunOrigin, RunOutcome};
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
 use crate::sensors::main::{
@@ -20,7 +20,7 @@ use crate::sensors::main::{
 };
 use crate::sensors::tests::helpers::{change, finish_claimed_run, finish_run, snapshot};
 use crate::sensors::tests::test_types::{SensorExecutionTestCase, SensorTestCase};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };

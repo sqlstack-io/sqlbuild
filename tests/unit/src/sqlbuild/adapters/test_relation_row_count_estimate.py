@@ -19,12 +19,14 @@ from tests.unit.src.sqlbuild.adapters._test_types import (
     BigQueryRowCountEstimateTestCase,
     DuckDbRowCountEstimateTestCase,
     RelationRowCountEstimateTestCase,
+    SchemaRowCountEstimatesTestCase,
 )
 from tests.unit.src.sqlbuild.adapters.helpers import (
     FakeBigQueryClient,
     FakeBigQueryConnection,
     FakeBigQueryTable,
     MetadataConnection,
+    estimate_pages,
     execute_through_cursor,
 )
 
@@ -440,3 +442,81 @@ def test_given_duckdb_relation_when_estimating_row_count_then_reads_catalog_size
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SchemaRowCountEstimatesTestCase(
+            description="snowflake lists the schema once for every page within a minute",
+            adapter=SnowflakeAdapter(),
+            metadata_rows=(("ORDERS", "TABLE", 5000, 65536), ("CUSTOMERS", "VIEW", 0, 0)),
+            metadata_columns=_SNOWFLAKE_SHOW_OBJECTS_COLUMNS,
+            pages=(("orders", "customers"), ("missing",)),
+            expected_estimates=(
+                (5000, None, 65536),
+                (None, "no row count (view)", None),
+                (None, "relation not found", None),
+            ),
+            expected_reads=1,
+            expected_sql_fragment="SHOW OBJECTS IN SCHEMA",
+        ),
+        SchemaRowCountEstimatesTestCase(
+            description="postgres reads each page with one catalog query",
+            adapter=PostgresAdapter(),
+            metadata_rows=(("orders", "r", 1234.0, 8192), ("customers", "v", -1.0, 0)),
+            pages=(("orders", "customers"), ("missing",)),
+            expected_estimates=(
+                (1234, None, 8192),
+                (None, "no table statistics (view or partitioned table)", None),
+                (None, "relation not found", None),
+            ),
+            expected_reads=2,
+            expected_sql_fragment="relation.relname IN ('orders', 'customers')",
+        ),
+        SchemaRowCountEstimatesTestCase(
+            description="clickhouse reads each page with one system.tables query",
+            adapter=ClickHouseAdapter(),
+            metadata_rows=(("orders", "MergeTree", 10, 100), ("customers", "View", None, None)),
+            pages=(("orders", "customers"), ("missing",)),
+            expected_estimates=(
+                (10, None, 100),
+                (None, "engine View does not report row counts", None),
+                (None, "relation not found", None),
+            ),
+            expected_reads=2,
+            expected_sql_fragment="name IN ('orders', 'customers')",
+        ),
+        SchemaRowCountEstimatesTestCase(
+            description="sql server reads each page with one catalog query",
+            adapter=SqlServerAdapter(),
+            metadata_rows=(("orders", "U ", 777), ("customers", "V ", None)),
+            pages=(("orders", "customers"), ("missing",)),
+            expected_estimates=(
+                (777, None, None),
+                (None, "no row count (view)", None),
+                (None, "relation not found", None),
+            ),
+            expected_reads=2,
+            expected_sql_fragment="objects.name IN (N'orders', N'customers')",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pages_of_names_when_estimating_schema_row_counts_then_no_read_is_per_relation(
+    test_case: SchemaRowCountEstimatesTestCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection: MetadataConnection = MetadataConnection(
+        test_case.metadata_rows, test_case.metadata_columns
+    )
+    monkeypatch.setattr(test_case.adapter, "execute", execute_through_cursor)
+
+    estimates: tuple[RelationRowCountEstimate, ...] = estimate_pages(
+        adapter=test_case.adapter, connection=connection, pages=test_case.pages
+    )
+
+    assert [
+        (estimate.row_count, estimate.detail, estimate.byte_count) for estimate in estimates
+    ] == list(test_case.expected_estimates), test_case.description
+    assert len(connection.executed) == test_case.expected_reads, connection.executed
+    assert test_case.expected_sql_fragment in connection.executed[0], connection.executed

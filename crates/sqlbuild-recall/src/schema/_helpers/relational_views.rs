@@ -186,7 +186,8 @@ fn audit_results(postgres: bool) -> String {
     sql_digest,
     {evidence_count} AS evidence_count,
     {evidence_truncated} AS evidence_truncated,
-    {sample_digest} AS sample_digest
+    {sample_digest} AS sample_digest,
+    COALESCE({ignored}, 0) AS ignored
 FROM recall_events
 WHERE event_type = 'audit_completed'",
         audit_name = field("audit_name", ""),
@@ -204,7 +205,8 @@ WHERE event_type = 'audit_completed'",
         execution_error = field("execution_error", ""),
         evidence_count = field("evidence_count", "::BIGINT"),
         evidence_truncated = field("evidence_truncated", "::BOOLEAN::INTEGER"),
-        sample_digest = field("sample_digest", "")
+        sample_digest = field("sample_digest", ""),
+        ignored = field("ignored", "::BOOLEAN::INTEGER")
     )
 }
 

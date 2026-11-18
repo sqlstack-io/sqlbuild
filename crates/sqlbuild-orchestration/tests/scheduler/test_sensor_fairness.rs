@@ -10,7 +10,7 @@ use crate::scheduler::models::SchedulerState;
 use crate::scheduler::tests::test_types::SensorFairnessTestCase;
 use crate::sensors::models::SensorEvaluationOutcome;
 use crate::sensors::tests::helpers::{evaluations, snapshot};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::migrate_store::migrate_store;

@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
 use crate::declarations::main::list_triggers::list_triggers;
-use crate::runs::main::claim_next_run::claim_next_run;
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::tests::claim_helpers::succeed;
 use crate::scheduler::main::list_ticks::list_ticks;
 use crate::scheduler::models::{TickDecision, TickOutcome};
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, evaluate_trigger};
 use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use serde_json::json;
 use uuid::Uuid;

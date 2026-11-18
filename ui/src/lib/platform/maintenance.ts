@@ -15,8 +15,8 @@ export function oldNameStatus(view: OldNameView, now: number): OldNameStatus {
 
 export const oldNameStatusLabel: Record<OldNameStatus, string> = {
 	pending: 'Being set up',
-	not_kept: 'Old name not kept',
-	live: 'Old name works',
+	not_kept: 'Not kept',
+	live: 'Live',
 	expired: 'Past its end date',
 	dropped: 'Old name removed'
 };
@@ -38,8 +38,8 @@ export const oldNameStepLabel: Record<OldNameEventType, string> = {
 
 export const decisionLabel: Record<MigrationDecision, string> = {
 	migrate: 'Data moved across',
-	redo: 'Rebuilt in the new place',
-	superseded_replace: 'Replaced (a newer move took over)',
+	redo: 'Rebuilt',
+	superseded_replace: 'Superseded',
 	forced_replace: 'Replaced on request',
 	renamed: 'Renamed in place'
 };

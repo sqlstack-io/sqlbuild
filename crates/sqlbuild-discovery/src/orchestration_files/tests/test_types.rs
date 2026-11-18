@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::orchestration_files::models::{
-    FilePosition, OnFailure, Overlap, Positioned, ScheduleFile,
+    FilePosition, GroupDependencies, Overlap, Positioned, RetryPolicy, ScheduleFile,
 };
 
 pub(super) struct JobReadTestCase {
@@ -11,7 +11,10 @@ pub(super) struct JobReadTestCase {
     pub(super) expected_select: Positioned<String>,
     pub(super) expected_exclude: Option<&'static str>,
     pub(super) expected_overlap: Overlap,
-    pub(super) expected_on_failure: Option<OnFailure>,
+    pub(super) expected_pools: &'static [(&'static str, u32)],
+    pub(super) expected_retry: Option<RetryPolicy>,
+    /// Each deprecation message with its line and column.
+    pub(super) expected_deprecations: Vec<(&'static str, FilePosition)>,
     pub(super) expected_schedule: Option<ScheduleFile>,
     pub(super) expected_cpus: Option<serde_json::Value>,
     pub(super) expected_settings: BTreeMap<String, serde_json::Value>,
@@ -44,4 +47,17 @@ pub(super) struct InventoryErrorTestCase {
     pub(super) files: Vec<(&'static str, &'static str)>,
     pub(super) expected_message: &'static str,
     pub(super) expected_help: Option<&'static str>,
+}
+
+pub(super) struct GroupDependenciesTestCase {
+    pub(super) description: &'static str,
+    pub(super) dependencies: &'static str,
+    pub(super) expected_dependencies: Result<GroupDependencies, (&'static str, FilePosition)>,
+}
+
+pub(super) struct PoolCheckTestCase {
+    pub(super) description: &'static str,
+    pub(super) files: Vec<(&'static str, &'static str)>,
+    pub(super) limits: sqlbuild_config::project::models::PoolLimits,
+    pub(super) expected_failure: Option<(&'static str, &'static str)>,
 }

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use chrono::{Duration, Utc};
 use serde_json::{Value, json};
-use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
+use sqlbuild_orchestration::snapshots::main::publication::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 use uuid::Uuid;
 

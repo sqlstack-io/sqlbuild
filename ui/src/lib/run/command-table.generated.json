@@ -42,6 +42,24 @@
 					"description": "Skip audits during the build"
 				},
 				{
+					"flag": "--ignore-audit-failures",
+					"aliases": [],
+					"type": "bool",
+					"choices": null,
+					"repeatable": false,
+					"requires": null,
+					"description": "Let builds go on past failing audits; the failures are still recorded, as ignored."
+				},
+				{
+					"flag": "--no-ignore-audit-failures",
+					"aliases": [],
+					"type": "bool",
+					"choices": null,
+					"repeatable": false,
+					"requires": null,
+					"description": "Let failing audits stop the build, even where a setting ignores them."
+				},
+				{
 					"flag": "--start-cursor",
 					"aliases": [],
 					"type": "string",

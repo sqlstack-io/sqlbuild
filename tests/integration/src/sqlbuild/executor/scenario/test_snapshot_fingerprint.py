@@ -9,6 +9,7 @@ import pytest
 from sqlbuild._native import (
     CompiledSqlScenario,
     CompilePipelineResult,
+    Dialect,
     ScenarioExecutionPlan,
     build_cli_scenario_plan,
 )
@@ -61,7 +62,7 @@ def test_given_capture_and_local_adapters_when_fingerprinting_snapshot_then_matc
         build_cli_scenario_plan(
             scenario=scenario,
             pipeline_result=pipeline,
-            adapter=adapter,
+            dialect=Dialect(adapter),
             project_name="shop",
             source_lexical_syntax=capture_adapter.sql_lexical_syntax,
         )

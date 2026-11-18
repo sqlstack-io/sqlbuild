@@ -16,9 +16,9 @@ use sqlbuild_core::panics::main::native_failure::native_failure;
 use sqlbuild_python_base::positional_record;
 
 use crate::analysis::models::ProjectCatalog;
-use crate::analysis_session::_helpers::nullability_rules::{
-    RuleFailure, nullability_callback, raised,
-};
+use crate::analysis_session::_helpers::nullability_rules::RuleFailure;
+use crate::analysis_session::_helpers::nullability_rules::nullability_callback;
+use crate::analysis_session::_helpers::nullability_rules::raised;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::types::CompilerDetach;
 

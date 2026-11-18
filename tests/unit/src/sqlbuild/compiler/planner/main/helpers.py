@@ -13,6 +13,7 @@ from sqlbuild._native import (
     CompiledResourceType,
     CompileModelConfig,
     DeferralInputs,
+    Dialect,
     Fingerprint,
     PlannerOverrides,
     PlannerPolicies,
@@ -25,6 +26,7 @@ from sqlbuild._native import (
     build_execution_plan,
     build_version_identity_metadata_json,
     compute_query_hash,
+    live_reads,
     write_fingerprint,
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
@@ -51,7 +53,11 @@ def build_execution_plan_from_kwargs(**kwargs: Any) -> PlanOutput:
     overrides: PlannerOverrides = PlannerOverrides(**grouped(PlannerOverrides))
     deferral: DeferralInputs = DeferralInputs(**grouped(DeferralInputs))
     policies: PlannerPolicies = PlannerPolicies(**grouped(PlannerPolicies))
+    adapter: Any = kwargs.pop("adapter")
+    connection: Any = kwargs.pop("connection")
     return build_execution_plan(
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection),
         selection=selection,
         overrides=overrides,
         deferral=deferral,

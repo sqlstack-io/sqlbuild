@@ -114,7 +114,8 @@ export function maxColumnCards(count: number): number {
 	return Math.max(8, Math.round(Math.sqrt(count * 3)));
 }
 
-type Item = { id: string; width: number; height: number };
+export type LayoutItem = { id: string; width: number; height: number };
+type Item = LayoutItem;
 type Rect = { x: number; y: number; width: number; height: number };
 
 /**
@@ -165,7 +166,7 @@ function wrapColumns(ids: string[], pairs: ReadonlyArray<readonly [string, strin
  * every column from the top: a column keeps dagre's order, and so its edge crossings. A graph that
  * didn't wrap keeps dagre's layout.
  */
-function layoutLayer(items: Item[], pairs: ReadonlyArray<readonly [string, string]>, nodesep: number): Map<string, Rect> {
+export function layoutLayer(items: Item[], pairs: ReadonlyArray<readonly [string, string]>, nodesep: number): Map<string, Rect> {
 	const g = new dagre.graphlib.Graph();
 	g.setGraph({ rankdir: 'LR', ranksep: 64, nodesep, marginx: 0, marginy: 0 });
 	g.setDefaultEdgeLabel(() => ({}));

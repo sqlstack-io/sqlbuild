@@ -2,14 +2,39 @@
 
 from __future__ import annotations
 
+import json
+import os
+import re
+import sqlite3
 import subprocess
+import sys
+import time
+from bisect import bisect_right
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
+from dataclasses import dataclass
+from itertools import accumulate
 from pathlib import Path
+from typing import Any
+from urllib.request import Request, urlopen
+from uuid import uuid4
 
 from tests.e2e.src.sqlbuild.cli.commands.main.lineage.helpers import DIAMOND_LAYERS
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    REPO_ROOT,
     execute_duckdb,
     prepare_inline_project,
     run_sqb,
+)
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    SnapshotApi,
+)
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
+    request_plan,
+)
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    location_process,
+    snapshot_api,
 )
 
 DIAMOND_DATABASE_FILE: str = "orders.duckdb"
@@ -216,3 +241,241 @@ def migrated_project(tmp_path: Path) -> Path:
     )
     assert migrated.returncode == 0, migrated.stdout + migrated.stderr
     return project_dir
+
+
+PLAN_TIMINGS_HEADER: str = "Plan timings"
+_TIMING_STEP_ROW: re.Pattern[str] = re.compile(r"^  (\S.*?)\s+(\d+\.\d)\s+\d+%$", re.MULTILINE)
+_TIMING_TOTAL_ROW: re.Pattern[str] = re.compile(r"^  Total\s+(\d+\.\d)$", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class PlanTimingTable:
+    """A `--timings` table: its header words, every row line, the parsed steps and the total."""
+
+    header: list[str]
+    row_count: int
+    steps: list[tuple[str, float]]
+    total_seconds: float
+
+
+def migrated_plan_output(tmp_path: Path, plan_args: tuple[str, ...]) -> str:
+    """`sqb plan` output over the migrated project; the plan must succeed."""
+
+    project_dir: Path = migrated_project(tmp_path)
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", *plan_args),
+        project_dir=project_dir,
+    )
+    output: str = result.stdout + result.stderr
+    assert result.returncode == 0, output
+    return output
+
+
+def plan_timing_table(output: str) -> PlanTimingTable:
+    """The `--timings` table at the end of `output`."""
+
+    table: str = output[output.index(PLAN_TIMINGS_HEADER) :].rstrip("\n")
+    lines: list[str] = table.splitlines()
+    total: re.Match[str] | None = _TIMING_TOTAL_ROW.search(table)
+    assert total is not None, output
+    return PlanTimingTable(
+        header=lines[0].split(),
+        row_count=len(lines) - 2,
+        steps=[(name, float(seconds)) for name, seconds in _TIMING_STEP_ROW.findall(table)],
+        total_seconds=float(total.group(1)),
+    )
+
+
+# ---- the DuckShop 10K plan preview guard ----
+
+DUCKSHOP_10K_TARGET: str = "dev"
+DUCKSHOP_10K_GENERATOR: Path = REPO_ROOT / "benchmarks" / "duckshop-10k"
+DUCKSHOP_10K_SETUP_SECONDS: int = 600
+PREVIEW_PUBLISHED: str = "Location snapshot published."
+PREVIEW_DONE: str = "Location work completed."
+_PAGE_RECORDS: int = 2000
+_PAGE_BYTES: int = 6 * 1024 * 1024
+_REQUIRED_SYNCS: tuple[str, ...] = ("catalog", "fingerprints", "consumption")
+
+
+@dataclass(frozen=True)
+class ServedLocation:
+    api: SnapshotApi
+    control: Path
+    log: Path
+    process: subprocess.Popen[bytes]
+    #: Seconds from starting the location until it published its compiled project.
+    published_seconds: float
+
+
+@contextmanager
+def served_duckshop_location(
+    directory: Path, project: Path, *, env: dict[str, str] | None = None
+) -> Iterator[ServedLocation]:
+    """A control server and `sqb location serve` of the project, once the location has published."""
+    directory.mkdir(parents=True)
+    with snapshot_api(
+        directory / "control",
+        server_arguments=("--password-origin", "https://control.example.com"),
+    ) as api:
+        log: Path = directory / "location.log"
+        started: float = time.monotonic()
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                DUCKSHOP_10K_TARGET,
+            ],
+            log,
+            directory / "location.stdout",
+            env=os.environ | (env or {}) | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as process:
+            control: Path = directory / "control/.sqlbuild/control.sqlite3"
+            publishing: ServedLocation = ServedLocation(api, control, log, process, 0.0)
+            published: float = wait_for_log_count(publishing, PREVIEW_PUBLISHED, 1, 900.0)
+            yield ServedLocation(api, control, log, process, published - started)
+
+
+def wait_for_log_count(served: ServedLocation, text: str, count: int, timeout: float) -> float:
+    """When the location log first holds `count` lines of `text`."""
+    deadline: float = time.monotonic() + timeout
+    while (content := served.log.read_text(errors="replace")).count(text) < count:
+        assert served.process.poll() is None, content[-4000:]
+        assert time.monotonic() < deadline, content[-4000:]
+        time.sleep(0.02)
+    return time.monotonic()
+
+
+def published_keys(control: Path) -> list[str]:
+    """Every node a `sqb build` of the published project runs, as the server freezes it."""
+    with closing(sqlite3.connect(control)) as database:
+        return [
+            row[0]
+            for row in database.execute(
+                "SELECT n.node_key FROM sqb_snapshot_nodes n JOIN sqb_current_snapshots c "
+                "ON c.snapshot_id=n.snapshot_id WHERE n.node_kind IN "
+                "('model','source','seed','udf','table_fn','task','asset','loader')"
+            )
+        ]
+
+
+def location_session(control: Path) -> tuple[str, int]:
+    """The serving location's session and its published generation, which metadata pages name."""
+    with closing(sqlite3.connect(control)) as database:
+        session: str = database.execute(
+            "SELECT instance_id FROM sqb_location_instances WHERE target=?", (DUCKSHOP_10K_TARGET,)
+        ).fetchone()[0]
+        generation: int = database.execute(
+            "SELECT s.generation FROM sqb_current_snapshots c JOIN sqb_snapshots s "
+            "ON s.snapshot_id=c.snapshot_id WHERE c.target=?",
+            (DUCKSHOP_10K_TARGET,),
+        ).fetchone()[0]
+    return str(session), int(generation)
+
+
+def _location_post(api: SnapshotApi, path: str, body: dict[str, Any]) -> None:
+    request: Request = Request(
+        f"{api.url}/api/locations/{api.location_id}{path}",
+        data=json.dumps(body).encode(),
+        headers={"Authorization": f"Bearer {api.bearer}", "Content-Type": "application/json"},
+    )
+    with urlopen(request, timeout=120) as response:
+        _ = response.read()
+
+
+def _pages(records: list[dict[str, Any]]) -> Iterator[list[dict[str, Any]]]:
+    """Pages of at most `_PAGE_RECORDS` records and `_PAGE_BYTES`, each holding at least one."""
+    sizes: list[int] = [len(json.dumps(record)) for record in records]
+    start: int = 0
+    while start < len(records):
+        totals: list[int] = list(accumulate(sizes[start : start + _PAGE_RECORDS]))
+        end: int = start + max(1, bisect_right(totals, _PAGE_BYTES))
+        yield records[start:end]
+        start = end
+
+
+def _namespace_order(item: Any) -> str:
+    """A stable order over state namespaces, whose database may be unset."""
+    return json.dumps(item, default=str)
+
+
+def mirror_synced_state(served: ServedLocation, batches: dict[str, list[dict[str, Any]]]) -> None:
+    """Deliver the synced state as a location's sync does: pages, complete scans, clean syncs."""
+    session, generation = location_session(served.control)
+    path: str = f"/targets/{DUCKSHOP_10K_TARGET}/metadata"
+
+    def page_of(kind: str, records: list[dict[str, Any]]) -> dict[str, Any]:
+        return {"kind": kind, "session_id": session, "generation": generation, "records": records}
+
+    namespaces: set[tuple[str | None, str]] = set()
+    for kind in ("fingerprints", "consumption", "observations"):
+        for page in _pages(batches[kind]):
+            _location_post(served.api, path, page_of(kind, page))
+            namespaces.update((record["state_database"], record["state_schema"]) for record in page)
+    by_namespace: dict[tuple[str | None, str], list[dict[str, Any]]] = {}
+    for record in batches["catalog"]:
+        by_namespace.setdefault((record["state_database"], record["state_schema"]), []).append(
+            record
+        )
+    for (database, schema), records in sorted(by_namespace.items(), key=_namespace_order):
+        scan: str = str(uuid4())
+        pages: list[list[dict[str, Any]]] = list(_pages(records))
+        for index, page in enumerate(pages):
+            body: dict[str, Any] = page_of("catalog", page)
+            body["scan"] = {
+                "scan_id": scan,
+                "location": {"database": database, "schema": schema},
+                "complete": index == len(pages) - 1,
+            }
+            _location_post(served.api, path, body)
+        namespaces.add((database, schema))
+    for database, schema in sorted(namespaces, key=_namespace_order):
+        for table in _REQUIRED_SYNCS:
+            _location_post(
+                served.api,
+                "/health",
+                {
+                    "event_id": str(uuid4()),
+                    "session_id": session,
+                    "target": DUCKSHOP_10K_TARGET,
+                    "health": {
+                        "kind": "warehouse_sync",
+                        "generation": generation,
+                        "location": {"database": database, "schema": schema},
+                        "table": table,
+                        "failure": None,
+                        "records_sent": 1,
+                        "elapsed_millis": 1,
+                    },
+                },
+            )
+
+
+def timed_plan(
+    served: ServedLocation, selection: list[str], settings: dict[str, Any]
+) -> tuple[float, dict[str, Any]]:
+    """A person's plan from the moment the server queues it until the location stored it."""
+    started: float = time.monotonic()
+    request_id: str = request_plan(served.control, selection, settings)
+    deadline: float = started + 600.0
+    result: str | None = None
+    while result is None:
+        assert served.process.poll() is None, served.log.read_text(errors="replace")[-4000:]
+        assert time.monotonic() < deadline, served.log.read_text(errors="replace")[-4000:]
+        time.sleep(0.02)
+        with closing(sqlite3.connect(served.control)) as database:
+            row: tuple[str | None] | None = database.execute(
+                "SELECT result_json FROM sqb_location_work WHERE request_id=?", (request_id,)
+            ).fetchone()
+        result = (row or (None,))[0]
+    elapsed: float = time.monotonic() - started
+    document: dict[str, Any] = json.loads(result)["outcome"]["document"]
+    return elapsed, document

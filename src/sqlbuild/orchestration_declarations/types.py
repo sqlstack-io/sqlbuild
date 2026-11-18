@@ -23,6 +23,7 @@ class RunEventKind(StrEnum):
     PARTIAL = "partial"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    SKIPPED = "skipped"
 
 
 class NodeEventKind(StrEnum):

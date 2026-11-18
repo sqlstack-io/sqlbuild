@@ -3,19 +3,7 @@
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 use sqlbuild_python_base::records::types::RecordId;
 
-pub(crate) const RELATIONS_MAIN_LIST: AdapterHost = AdapterHost::ListRelationsForInspection;
-
-pub(crate) const RELATIONS_MAIN_COLUMNS: AdapterHost = AdapterHost::GetColumnsForInspection;
-
-pub(crate) const ACTIVE_CATALOG: AdapterHost = AdapterHost::ActiveInspectionCatalog;
-
 pub const RUN_BOUNDED: AdapterHost = AdapterHost::RunBoundedInspections;
-
-pub(crate) const RECORD_QUERY: AdapterHost = AdapterHost::RecordInspectionQuery;
-
-pub(crate) const RUN_RECORDED_QUERY: AdapterHost = AdapterHost::RunRecordedInspectionQuery;
-
-pub(crate) const QUERY_RECORD: AdapterHost = AdapterHost::InspectionQueryRecord;
 
 pub(crate) const COLUMN_INFO: AdapterHost = AdapterHost::ColumnInfo;
 
@@ -51,3 +39,18 @@ pub(crate) const CURSOR_TYPE_INTEGER: &str = "integer";
 pub(crate) const MISSING_SOURCE_TABLE_CODE: &str = "S405";
 
 pub(crate) const WATERMARK_CONTRACT_CODE: &str = "S302";
+
+/// Why a plan preview leaves a source's freshness unknown; its plan lists freshness as unknown.
+pub const PREVIEW_MESSAGE: &str = "a plan preview does not observe source freshness";
+
+/// Items a preview always reports as known only once the run plans live.
+pub const PREVIEW_UNKNOWNS: [&str; 5] = [
+    "source freshness",
+    "retention",
+    "column rename support",
+    "sources outside mirrored schemas",
+    "recorded migrations",
+];
+
+/// What a preview's cursor reads leave to the run.
+pub const CURSOR_INPUTS: &str = "cursor inputs";

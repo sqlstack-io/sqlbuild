@@ -75,3 +75,10 @@ class AuditExecutionResult:
     execution_error: str | None = None
     audit_meta: Mapping[str, object] | None = None
     skip_reason: str | None = None
+    ignored: bool = False
+
+    @property
+    def blocks(self) -> bool:
+        """Whether this failure holds back what depends on it; an ignored failure holds nothing."""
+
+        return self.outcome == AuditOutcome.ERROR and not self.ignored

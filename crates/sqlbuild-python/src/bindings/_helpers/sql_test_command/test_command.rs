@@ -1,5 +1,6 @@
 //! `sqb test`: compile the selected SQL unit tests, inspect or run them, and report; locally, then run the Python tests.
 
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -25,23 +26,27 @@ use sqlbuild_host::models::{SqlTestExecutionResult, SqlTestOutcome};
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
-use crate::bindings::_helpers::change_selection::base_snapshot::{
-    BaseComparison, base_comparison, base_variant,
-};
-use crate::bindings::_helpers::change_selection::selection::{
-    ChangedProject, changed_project, tests_and_models, with_since_section,
-};
+use crate::bindings::_helpers::change_selection::base_snapshot::BaseComparison;
+use crate::bindings::_helpers::change_selection::base_snapshot::base_comparison;
+use crate::bindings::_helpers::change_selection::base_snapshot::base_variant;
+use crate::bindings::_helpers::change_selection::selection::ChangedProject;
+use crate::bindings::_helpers::change_selection::selection::changed_project;
+use crate::bindings::_helpers::change_selection::selection::tests_and_models;
+use crate::bindings::_helpers::change_selection::selection::with_since_section;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::statement_report::StatementReport;
-use crate::bindings::_helpers::sql_test_command::python_tests::{
-    PYTHON_TESTS_INPUT_CODE, names_python_node, python_test_modules, run_python_tests,
-    selected_python_tests, selective, with_python_section,
-};
-use crate::bindings::_helpers::sql_test_command::timeouts::{
-    RunTimeout, TimeoutKind, resolve_run_timeout,
-};
+use crate::bindings::_helpers::sql_test_command::python_tests::PYTHON_TESTS_INPUT_CODE;
+use crate::bindings::_helpers::sql_test_command::python_tests::names_python_node;
+use crate::bindings::_helpers::sql_test_command::python_tests::python_test_modules;
+use crate::bindings::_helpers::sql_test_command::python_tests::run_python_tests;
+use crate::bindings::_helpers::sql_test_command::python_tests::selected_python_tests;
+use crate::bindings::_helpers::sql_test_command::python_tests::selective;
+use crate::bindings::_helpers::sql_test_command::python_tests::with_python_section;
+use crate::bindings::_helpers::sql_test_command::timeouts::RunTimeout;
+use crate::bindings::_helpers::sql_test_command::timeouts::TimeoutKind;
+use crate::bindings::_helpers::sql_test_command::timeouts::resolve_run_timeout;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -372,7 +377,7 @@ fn compile_tests<'py>(
             py,
             &[
                 ("project", context.getattr("project")?),
-                ("adapter", adapter),
+                ("dialect", Dialect::of(&adapter)?.into_any()),
                 ("scope", context.getattr("scope")?),
                 ("relations", context.getattr("relations")?),
                 ("case_name", case_name.clone()),

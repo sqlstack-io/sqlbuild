@@ -8,7 +8,7 @@ use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::{change_trigger::change_trigger, list_triggers::list_triggers};
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::scheduler::_helpers::tick_retention::prune_ticks;
 use crate::scheduler::main::{
     _acquire_lease::acquire_lease, _evaluate_trigger::evaluate_trigger, list_ticks::list_ticks,
@@ -22,7 +22,7 @@ use crate::scheduler::tests::contracts::ticks::helpers::{
 use crate::scheduler::tests::contracts::ticks::test_types::{
     LatestCatchUpTestCase, TickRetentionTestCase,
 };
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;

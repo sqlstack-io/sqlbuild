@@ -13,11 +13,16 @@
 		Repeat,
 		Columns3,
 		Workflow,
+		Package,
+		TableProperties,
 		type Icon as IconType
 	} from '@lucide/svelte';
 	import { nodeFields } from '$lib/lineage/node-fields.svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
+	import CompactFace from '$lib/components/graph/compact-face.svelte';
+	import { fonts } from '$lib/components/graph/fonts.svelte';
+	import { fitStatus } from '$lib/lineage/status-line';
 
 	type AssetData = {
 		name: string;
@@ -39,7 +44,7 @@
 		columnCount?: number;
 	};
 
-	let { data, selected }: NodeProps = $props();
+	let { id, data, selected }: NodeProps = $props();
 	const d = $derived(data as AssetData);
 	const f = $derived(nodeFields.value);
 
@@ -76,12 +81,32 @@
 		delete_insert: Repeat,
 		microbatch: Layers,
 		task: Workflow,
+		asset: Package,
+		udf: FunctionSquare,
+		table_fn: TableProperties,
 		fn: FunctionSquare
 	};
 	const Glyph = $derived(icons[d.icon ?? ''] ?? Table2);
 	const tone = $derived(statusColor[d.status] ?? statusColor.none);
 	const kindShort = $derived(d.kind.split(' · ')[0]);
 	const when = $derived(d.lastBuiltAt ? (d.status === 'src' ? `loaded ${formatAgo(d.lastBuiltAt, app.now)}` : formatAgo(d.lastBuiltAt, app.now)) : '');
+
+	// Zoomed out, the card's state is its colour: a failure or a run first, then staleness, then the outcome.
+	const faceTone = $derived(
+		d.status === 'fail' || d.status === 'run' ? tone : d.stale === 'behind' ? 'var(--sb-behind)' : d.stale ? 'var(--sb-stale)' : tone
+	);
+	// The status line stays one line: worked out once per card, the drift chip and then the status word
+	// shorten when its parts don't fit; the time never does.
+	const fit = $derived(
+		(void fonts.ready,
+		fitStatus({
+			label: f.status ? statusLabel[d.status] : undefined,
+			when: f.lastBuilt && when ? when : undefined,
+			drift: d.stale ? staleLabel[d.stale] : undefined,
+			checks: f.checks && d.checks ? d.checks : undefined
+		}))
+	);
+	const showStatus = $derived(f.status || (f.checks && d.checks) || (f.lastBuilt && when) || d.stale);
 
 	const hasDetail = $derived(
 		!!(
@@ -109,15 +134,15 @@
 		</div>
 	{/if}
 
-	{#if f.status || (f.checks && d.checks) || (f.lastBuilt && when) || d.stale}
+	{#if showStatus}
 		<div class="status" style:--tone={tone}>
 			{#if f.status}
-				<i></i>
-				<span class="label">{statusLabel[d.status]}</span>
+				<i title={statusLabel[d.status]}></i>
+				{#if fit.label}<span class="label">{statusLabel[d.status]}</span>{/if}
 			{/if}
-			{#if f.lastBuilt && when}<span class="when" class:first={!f.status}>{when}</span>{/if}
+			{#if f.lastBuilt && when}<span class="when" class:first={!f.status || !fit.label}>{when}</span>{/if}
 			{#if d.stale}
-				<span class="drift {d.stale}" title={staleTitle[d.stale]}><GitCompareIcon size={10} strokeWidth={2} />{staleLabel[d.stale]}</span>
+				<span class="drift {d.stale}" title={staleTitle[d.stale]}><GitCompareIcon size={10} strokeWidth={2} />{#if fit.driftWord}{staleLabel[d.stale]}{/if}</span>
 			{/if}
 			{#if f.checks && d.checks}
 				<span class="checks" style:color={d.checksColor ?? 'var(--muted-foreground)'}>{d.checks}</span>
@@ -125,11 +150,13 @@
 		</div>
 	{/if}
 
+	<CompactFace {id} title={d.label ?? d.name} tone={faceTone} kind="asset" />
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
 
 <style>
 	.node {
+		position: relative;
 		width: 236px;
 		overflow: hidden;
 		border: 1px solid var(--node-border);
@@ -197,8 +224,8 @@
 		font-weight: 500;
 	}
 	.drift.behind {
-		background: color-mix(in srgb, var(--sb-warning) 14%, transparent);
-		color: var(--sb-warning);
+		background: color-mix(in srgb, var(--sb-behind) 12%, transparent);
+		color: var(--sb-behind);
 	}
 	.when.first::before {
 		content: none;
@@ -229,6 +256,12 @@
 		border-top: 1px solid var(--border);
 		background: color-mix(in srgb, var(--tone) 9%, var(--card));
 		font-size: 11px;
+		/* One line, whatever the parts: they are fitted to it (status-line.ts); none wraps or shrinks. */
+		white-space: nowrap;
+		overflow: hidden;
+	}
+	.status > :global(*) {
+		flex-shrink: 0;
 	}
 	.status i {
 		width: 7px;

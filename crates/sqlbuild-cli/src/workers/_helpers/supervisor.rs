@@ -7,10 +7,10 @@ use std::time::{Duration, Instant};
 use chrono::{TimeDelta, Utc};
 use sqlbuild_orchestration::credentials::main::tokens::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
-use sqlbuild_orchestration::runs::main::advance_groups::advance_groups;
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::observe_run::observe_run;
+use sqlbuild_orchestration::runs::main::execution::advance_groups::advance_groups;
+use sqlbuild_orchestration::runs::main::execution::change_run::change_run;
+use sqlbuild_orchestration::runs::main::execution::claim_next_run::claim_next_run;
+use sqlbuild_orchestration::runs::main::execution::observe_run::observe_run;
 use sqlbuild_orchestration::runs::models::{
     RunAuthority, RunChange, RunChangeRequest, RunClaim, RunDispatch, RunOutcome, RunStatus,
 };
@@ -46,7 +46,7 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
                     store,
                     lease,
                     (
-                        &self.configuration.concurrency_limits,
+                        scope.pool_caps,
                         RunDispatch {
                             scope: Some((scope.location_id, scope.target)),
                             eligible: Some(&eligible),
@@ -207,7 +207,7 @@ impl Workers {
                 let Some(claim) = claim_next_run(
                     store,
                     lease,
-                    &self.configuration.concurrency_limits,
+                    scope.pool_caps,
                     RunDispatch {
                         scope: Some((scope.location_id, scope.target)),
                         eligible: Some(&eligible),

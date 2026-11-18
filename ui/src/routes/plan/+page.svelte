@@ -1,5 +1,12 @@
 <script lang="ts">
+	import { noun, plural } from '$lib/format/plural';
+	import PageBody from '$lib/components/page-body.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { appPath, to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	// Every Run button opens this page with its command. A build is planned by the location (`sqb plan`)
 	// from the server's synced copy of the warehouse metadata; other verbs show the server's dry run.
 	// Nothing is queued until Run is pressed.
@@ -8,8 +15,12 @@
 	import { page } from '$app/state';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
-	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument, PlatformEvent } from '$lib/api';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import XIcon from '@lucide/svelte/icons/x';
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
+	import { mergePlanPage, type AdhocRunCheck, type AdhocRunRequest, type LaunchVerb, type PlanDocument, type PlanPageSection, type PlatformEvent } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import SyncingNote from '$lib/components/platform/syncing-note.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { kindLine } from '$lib/build-area/labels';
 	import { formatAgo } from '$lib/format/time';
@@ -17,16 +28,18 @@
 	import { VERBS } from '$lib/run/command-table';
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
-	import PlanReport from '$lib/run/plan-report.svelte';
+	import PlanBrowser from '$lib/run/plan-browser.svelte';
+	import PlanTimings from '$lib/run/plan-timings.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { builtModels, builtSeeds, changedModelKeys, cloneCommands, jobRefreshText } from '$lib/run/plan-text';
+	import { changedModelKeys, cloneCommands, jobRefreshText, loadedRows } from '$lib/run/plan-text';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 
 	const snapshotNodes = createResource((client, scope) => client.listSnapshotNodes(scope), ['snapshot']);
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs', 'node_status']);
+	const catalog = useCatalogNodes();
 	const checkList = createResource((client, scope) => client.listChecks(scope), ['checks']);
 	// A `--changed` plan names the job whose own run refreshes what it holds back, with that job's schedule.
 	const triggerList = createResource((client, scope) => client.listTriggers(scope), ['triggers']);
@@ -37,6 +50,8 @@
 	let cmdEl = $state<HTMLInputElement>();
 	/** The job this run belongs to; the command then only narrows it. */
 	let job = $state<string | null>(page.url.searchParams.get('job'));
+	/** The plan section shown, kept in the address with the command. */
+	let section = $state<string | null>(page.url.searchParams.get('section'));
 
 	const typed = $derived(parseCommand(cmd));
 	/** For a job run, an option still being typed is left out until it is finished. */
@@ -70,7 +85,7 @@
 
 	// The command stays in the address, so a plan can be shared or reopened.
 	$effect(() => {
-		const href = `/plan?cmd=${encodeURIComponent(cmd.trim())}${job ? `&job=${encodeURIComponent(job)}` : ''}`;
+		const href = `/plan?cmd=${encodeURIComponent(cmd.trim())}${job ? `&job=${encodeURIComponent(job)}` : ''}${section ? `&section=${encodeURIComponent(section)}` : ''}`;
 		const timer = setTimeout(() => {
 			if (appPath(page.url.pathname) === '/plan' && appPath(page.url.pathname) + page.url.search !== href) void goto(to(href), { replaceState: true, keepFocus: true, noScroll: true });
 		}, 400);
@@ -112,6 +127,8 @@
 
 	// ---- the location's plan of a build (one at a time; the latest command wins) ----
 	let plan = $state<PlanDocument | null>(null);
+	/** The server's plan request, which pages the plan's large sections. */
+	let planRequestId = $state<string | null>(null);
 	let plannedKey = $state('');
 	let planning = $state(false);
 	let planError = $state<{ key: string; message: string } | null>(null);
@@ -126,6 +143,7 @@
 				const result = await app.client.planBuild(scope, request.command);
 				if (result.plan) {
 					plan = result.plan;
+					planRequestId = result.requestId ?? null;
 					plannedKey = key;
 					planError = null;
 				} else planError = { key, message: result.error };
@@ -137,6 +155,28 @@
 		}, 400);
 		return () => clearTimeout(timer);
 	});
+	/** The next page of a large plan section, added to the plan shown. */
+	async function morePlan(paged: PlanPageSection, limit: number) {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		if (!scope || !plan || !requestId) return;
+		const page = await app.client.planRows(scope, requestId, paged, loadedRows(plan, paged), limit);
+		if (planRequestId === requestId && plan) plan = mergePlanPage(plan, paged, page);
+	}
+	/** A page of a plan section's rows whose name contains `name`, for the plan list's filter. */
+	async function findPlanRows(paged: PlanPageSection, offset: number, limit: number, name: string) {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		if (!scope || !requestId) throw new Error('The plan has expired; plan again.');
+		return app.client.planRows(scope, requestId, paged, offset, limit, name);
+	}
+	/** A model's diff in the plan, read when its row opens it; null when the server has none to give. */
+	async function planDiff(model: string) {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		if (!scope || !requestId) return null;
+		return app.client.planDiff(scope, requestId, model);
+	}
 	function replan() {
 		plannedKey = '';
 		planError = null;
@@ -147,17 +187,42 @@
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const picked = $derived(shown?.selection ?? []);
 	let view = $state<'plan' | 'graph' | 'checks'>('plan');
-	/** The recorded checks on the models and seeds the plan builds, which run after them. */
+	/**
+	 * The recorded checks on the models and seeds the command selects, which run after them. The
+	 * selection is the one the command resolves to, as the plan request froze it; the plan's summary
+	 * carries no list of the nodes it builds.
+	 */
 	const planChecks = $derived.by(() => {
 		if (!plan) return [];
-		const built = new Set([...builtModels(plan).map((m) => m.name), ...builtSeeds(plan).map((s) => s.name)]);
-		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && built.has(c.node.slice(c.node.indexOf(':') + 1)));
+		const selected = new Set(picked);
+		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && selected.has(c.node));
 	});
 	/** The tab shown: a replan with no checks leaves the Checks tab for the plan. */
 	const tab = $derived(view === 'checks' && !(shown?.verb === 'build' && planChecks.length) ? 'plan' : view);
 	/** A large selection draws only what the plan changes; the whole of it would be unreadable. */
 	const GRAPH_LIMIT = 150;
-	const graphKeys = $derived(picked.length > GRAPH_LIMIT && plan ? changedModelKeys(plan) : picked);
+	/** Sections of models the plan changes, read a page each for the graph of a large selection. */
+	const CHANGED_MODEL_SECTIONS: PlanPageSection[] = ['full_refresh', 'query_changed', 'function_changed', 'config_changed', 'schema_changed', 'first_run', 'renamed'];
+	let changedKeys = $state<{ requestId: string; keys: string[] } | null>(null);
+	$effect(() => {
+		const scope = app.scope;
+		const requestId = planRequestId;
+		const sections = plan?.sections;
+		if (view !== 'graph' || picked.length <= GRAPH_LIMIT || !scope || !requestId || !sections || changedKeys?.requestId === requestId) return;
+		changedKeys = { requestId, keys: [] };
+		(async () => {
+			const keys: string[] = [];
+			for (const s of sections.filter((c) => CHANGED_MODEL_SECTIONS.includes(c.section) && c.total)) {
+				if (keys.length >= GRAPH_LIMIT) break;
+				const page = await app.client.planRows(scope, requestId, s.section, 0, GRAPH_LIMIT - keys.length);
+				keys.push(...(page.rows as { name: string }[]).map((m) => `model:${m.name}`));
+			}
+			if (planRequestId === requestId) changedKeys = { requestId, keys };
+		})().catch(() => {});
+	});
+	/** The models the plan changes: read from the server a section at a time, or from a whole plan's rows. */
+	const planChanged = $derived(plan?.sections ? (changedKeys?.requestId === planRequestId ? changedKeys.keys : []) : plan ? changedModelKeys(plan) : []);
+	const graphKeys = $derived(picked.length > GRAPH_LIMIT && plan ? planChanged : picked);
 
 	// ---- autocomplete ----
 	let caret = $state(0);
@@ -247,7 +312,8 @@
 	);
 
 	/** The banner shows only problems that stop this run or touch what it builds; the rest stay on the Overview. */
-	const planRelations = $derived(new Set((plan?.models ?? []).flatMap((m) => [m.name, m.qualified_name?.split('.').at(-1)]).filter((n): n is string => !!n).map((n) => n.toLowerCase())));
+	// The command's selection names every relation the plan can build; the loaded rows add their warehouse names.
+	const planRelations = $derived(new Set([...(plan?.models ?? []).flatMap((m) => [m.name, m.qualified_name?.split('.').at(-1)]), ...picked.map((key) => key.slice(key.indexOf(':') + 1))].filter((n): n is string => !!n).map((n) => n.toLowerCase())));
 	function affectsPlan(event: PlatformEvent): boolean {
 		if (event.kind === 'scheduler_no_leader') return true;
 		if (event.locationId !== app.location?.id) return false;
@@ -274,23 +340,33 @@
 			launching = false;
 		}
 	}
+	const checkColumns: TableColumn[] = [
+		{ id: 'check', label: 'Check', minWidth: 200 },
+		{ id: 'node', label: 'Node', width: '30%' },
+		{ id: 'severity', label: 'Severity', width: '100px' },
+		{ id: 'last', label: 'Last result', width: '150px' }
+	];
+	const nodeColumns: TableColumn[] = [
+		{ id: 'node', label: 'Node', minWidth: 200 },
+		{ id: 'kind', label: 'Kind', width: '30%' },
+		{ id: 'built', label: 'Last built', width: '150px' }
+	];
 </script>
+
+<svelte:head><title>Plan · {cmd.trim() || 'sqb'}</title></svelte:head>
 
 <AppTopbar title="Plan" events={affectsPlan} />
 
 <div class="flex min-h-0 flex-1 flex-col">
+	<div class="px-4 pt-3 empty:hidden"><SyncingNote what="Plan previews" /></div>
 	<div class="cmd">
 		{#if job}
 			<span class="jobchip" data-testid="plan-job">
 				<span class="faint">Job</span><a href={to(`/jobs/${encodeURIComponent(job)}`)}>{job}</a>
-				<button onclick={detachJob} title="Run the command on its own, not as part of {job}" aria-label="Remove the job">×</button>
+				<Button variant="ghost" size="icon-xs" onclick={detachJob} title="Run the command on its own, not as part of {job}" aria-label="Remove the job"><XIcon /></Button>
 			</span>
 		{:else}
-			<div class="verbs" role="group" aria-label="Command">
-				{#each VERBS as v (v.name)}
-					<button class:on={verb === v.name} onclick={() => setVerb(v.name)} title={v.description}>{v.name}</button>
-				{/each}
-			</div>
+			<SegmentedFilter label="Command" value={verb} options={VERBS.map((v) => ({ value: v.name, label: v.name, title: v.description }))} onselect={setVerb} />
 		{/if}
 		<div class="line">
 			<span class="faint">$</span>
@@ -306,11 +382,12 @@
 				aria-label="Command"
 				placeholder={job ? 'sqb build --exclude orders' : 'sqb build --select +orders'}
 			/>
-			<button class="copy" onclick={() => insertFlag('--')} title="Add an option to the command">＋ Option</button>
-			<button class="copy" onclick={copy} title="Copy the command, to run it with sqb yourself"><CopyIcon size={12} /> {copied ? 'Copied' : 'Copy'}</button>
+			<Button variant="ghost" size="sm" onclick={() => insertFlag('--')} title="Add an option to the command"><PlusIcon />Option</Button>
+			<Button variant="ghost" size="sm" onclick={copy} title="Copy the command, to run it with sqb yourself"><CopyIcon />{copied ? 'Copied' : 'Copy'}</Button>
 			{#if acOpen && suggestions.length}
 				<div class="ac">
 					{#each suggestions as s, i (s.value)}
+						<!-- raw-button: an option in the command's autocomplete list -->
 						<button class:on={i === acIndex} onmouseenter={() => (acIndex = i)} onmousedown={(e) => (e.preventDefault(), pick(s))}>
 							<code>{s.label}</code><span>{s.hint}</span>
 						</button>
@@ -333,20 +410,20 @@
 
 	<div class="body">
 		<div class="stage">
-		<div class="main sb-scroll" class:stale={!!shown && (!!problem || !fresh || (planning && !!plan))}>
+		<PageBody class={!!shown && (!!problem || !fresh || (planning && !!plan)) ? 'plan-main stale' : 'plan-main'} padding="14px 24px" inner="flex min-h-full flex-col">
 			{#if shown?.verb}
 				<div class="summary">
 					{#if shown.verb !== 'build'}
-						<b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
+						<b>{picked.length}</b> {noun(picked.length, 'node')}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
 					{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code" title="Option">{value === true ? name : `${name}=${value}`}</span>{/each}
-					<div class="tabs" role="tablist">
-						<button role="tab" aria-selected={tab === 'plan'} onclick={() => (view = 'plan')}>{shown.verb === 'build' ? 'Plan' : 'Nodes'}</button>
-						<button role="tab" aria-selected={tab === 'graph'} onclick={() => (view = 'graph')}>Graph</button>
-						{#if shown.verb === 'build' && planChecks.length}<button role="tab" aria-selected={tab === 'checks'} onclick={() => (view = 'checks')}>Checks · {planChecks.length}</button>{/if}
+					{#if shown.verb === 'build' && plan?.ignore_audit_failures}<span class="audits-note" data-testid="plan-ignores-audit-failures" title="An error-severity audit that fails is recorded, and the build goes on">Audit failures won't stop this build</span>{/if}
+					<div class="tabs">
+						<SegmentedFilter label="View" value={tab} options={[{ value: 'plan' as const, label: shown.verb === 'build' ? 'Plan' : 'Nodes' }, { value: 'graph' as const, label: 'Graph' }, ...(shown.verb === 'build' && planChecks.length ? [{ value: 'checks' as const, label: 'Checks', count: planChecks.length }] : [])]} onselect={(v) => (view = v)} />
 					</div>
 					{#if shown.verb === 'build' && plan}
-						<button class="replan" onclick={replan} disabled={planning}><RotateCwIcon size={11} class={planning ? 'animate-spin' : ''} /> {planning ? 'Planning…' : 'Plan again'}</button>
+						{#if plan.timings}<span class="ml-auto"><PlanTimings {plan} timings={plan.timings} /></span>{/if}
+						<Button variant="ghost" size="sm" class={plan.timings ? '' : 'ml-auto'} onclick={replan} disabled={planning}><RotateCwIcon class={planning ? 'animate-spin' : ''} />{planning ? 'Planning…' : 'Plan again'}</Button>
 					{/if}
 				</div>
 			{/if}
@@ -358,36 +435,32 @@
 					<div class="graph"><ScopeGraph keys={graphKeys} catalog={catalog.data} onselect={() => {}} /></div>
 				{/if}
 			{:else if tab === 'checks' && shown?.verb === 'build' && plan}
-				<p class="faint graph-note">These checks run after the models they check, and a failing error check stops what depends on it.</p>
-				<table class="nodes">
-					<tbody>
-						{#each planChecks as c (c.id)}
-							<tr>
-								<td><a href={to(`/checks/${encodeURIComponent(c.id)}`)} class="mono">{c.name}</a></td>
-								<td class="faint mono">{c.node ? c.node.slice(c.node.indexOf(':') + 1) : ''}{c.column ? `.${c.column}` : ''}</td>
-								<td class="faint">{c.severity}</td>
-								<td class="right">{#if c.latest}<StatusLabel tone={checkOutcomeTone[c.latest.outcome]} label="last {checkOutcomeLabel[c.latest.outcome].toLowerCase()}" />{/if}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<p class="faint graph-note">{plural(planChecks.length, 'check')} <HelpTip text="Checks run after the models they check, and a failing error check stops what depends on it." /></p>
+				<DataTable class="static compact" embedded columns={checkColumns} rows={planChecks} key={(c) => c.id} empty="No checks in this plan.">
+					{#snippet row(c)}
+						<tr>
+							<td><a href={to(`/checks/${encodeURIComponent(c.id)}`)} class="mono">{c.name}</a></td>
+							<td class="faint mono">{c.node ? c.node.slice(c.node.indexOf(':') + 1) : ''}{c.column ? `.${c.column}` : ''}</td>
+							<td class="faint">{c.severity}</td>
+							<td>{#if c.latest}<StatusLabel tone={checkOutcomeTone[c.latest.outcome]} label="last {checkOutcomeLabel[c.latest.outcome].toLowerCase()}" />{/if}</td>
+						</tr>
+					{/snippet}
+				</DataTable>
 			{:else if shown?.verb === 'build' && plan}
-				<PlanReport {plan} {refresh} />
+				<PlanBrowser {plan} {refresh} {section} onselect={(key) => (section = key)} more={planRequestId ? morePlan : undefined} load={planRequestId ? findPlanRows : undefined} diff={planRequestId ? planDiff : undefined} />
 			{:else if shown?.verb && shown.verb !== 'build'}
-				<table class="nodes">
-					<tbody>
-						{#each picked as key (key)}
-							{@const node = byKey.get(key)}
-							<tr>
-								<td><a href={to(`/catalog/${key}`)} class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
-								<td class="faint">{node ? kindLine(node) : ''}</td>
-								<td class="faint right">{node?.lastBuild ? `built ${formatAgo(node.lastBuild.builtAt, app.now)}` : ''}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<DataTable class="static compact" embedded columns={nodeColumns} rows={picked} key={(key) => key} rowHeight={32} empty="No nodes selected.">
+					{#snippet row(key)}
+						{@const node = byKey.get(key)}
+						<tr>
+							<td><a href={to(`/catalog/${key}`)} class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
+							<td class="faint">{node ? kindLine(node) : ''}</td>
+							<td class="faint">{node?.lastBuild ? `built ${formatAgo(node.lastBuild.builtAt, app.now)}` : ''}</td>
+						</tr>
+					{/snippet}
+				</DataTable>
 			{/if}
-		</div>
+		</PageBody>
 
 		{#if waiting}
 			<div class="overlay" role="status" data-testid="plan-loading">
@@ -395,7 +468,6 @@
 					<RotateCwIcon size={16} class="animate-spin" />
 					<div>
 						<div>{waiting === 'plan' ? 'Planning on the location…' : 'Checking the command…'}</div>
-						<div class="faint">{waiting === 'plan' ? 'Reading the current warehouse state' : 'Resolving what it selects'}</div>
 					</div>
 				</div>
 			</div>
@@ -408,7 +480,7 @@
 		<div class="why">
 			{#if launchError}<span class="problem">{launchError}</span>{:else if !canLaunch && blockedReason && blockedReason !== problem}<span class="faint">{blockedReason}</span>{/if}
 		</div>
-		<GatedButton requires={job ? 'job.run' : 'run.adhoc'} variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
+		<GatedButton requires={job ? 'job.run' : 'run.adhoc'} variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	</div>
 </div>
 
@@ -435,33 +507,6 @@
 		font-family: var(--font-mono);
 		color: var(--foreground);
 	}
-	.jobchip button {
-		padding: 0 5px;
-		color: var(--muted-foreground);
-	}
-	.jobchip button:hover {
-		color: var(--foreground);
-	}
-	.verbs {
-		display: flex;
-		flex-shrink: 0;
-		overflow: hidden;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-	}
-	.verbs button {
-		padding: 4px 11px;
-		border-right: 1px solid var(--border);
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.verbs button:last-child {
-		border-right: 0;
-	}
-	.verbs button.on {
-		background: var(--sidebar-accent);
-		color: var(--foreground);
-	}
 	.line {
 		position: relative;
 		display: flex;
@@ -469,7 +514,7 @@
 		flex: 1;
 		align-items: center;
 		gap: 10px;
-		padding: 5px 10px;
+		padding: 1px 2px 1px 10px;
 		border: 1px solid var(--border);
 		border-radius: 2px;
 		background: var(--sb-inset);
@@ -485,16 +530,6 @@
 		font-family: var(--font-mono);
 		font-size: 12.5px;
 		outline: none;
-	}
-	.copy {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.copy:hover {
-		color: var(--foreground);
 	}
 	.ac {
 		position: absolute;
@@ -540,16 +575,10 @@
 		min-width: 0;
 		flex: 1;
 	}
-	.main {
-		display: flex;
-		min-width: 0;
-		flex: 1;
-		flex-direction: column;
-		overflow: auto;
-		padding: 14px 24px;
+	:global(.plan-main) {
 		transition: opacity 0.15s;
 	}
-	.main.stale {
+	:global(.plan-main.stale) {
 		opacity: 0.55;
 	}
 	.problem-bar {
@@ -584,17 +613,6 @@
 		box-shadow: var(--sb-elev);
 		font-size: 12.5px;
 	}
-	.replan {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		margin-left: auto;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.replan:hover:not(:disabled) {
-		color: var(--foreground);
-	}
 	.summary {
 		display: flex;
 		flex-wrap: wrap;
@@ -622,22 +640,10 @@
 		padding-top: 3px;
 	}
 	.tabs {
-		display: flex;
-		gap: 14px;
-		margin-left: 18px;
+		margin-left: 12px;
 	}
 	.tabs:first-child {
 		margin-left: 0;
-	}
-	.tabs button {
-		padding: 2px 0;
-		border-bottom: 1px solid transparent;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.tabs button[aria-selected='true'] {
-		border-bottom-color: var(--foreground);
-		color: var(--foreground);
 	}
 	.graph {
 		min-height: 320px;
@@ -647,19 +653,6 @@
 	}
 	.graph-note {
 		margin: 0 0 8px;
-	}
-	.nodes {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12.5px;
-	}
-	.nodes td {
-		padding: 5px 12px 5px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		white-space: nowrap;
-	}
-	.right {
-		text-align: right;
 	}
 	.foot {
 		display: flex;
@@ -689,8 +682,12 @@
 	a:hover {
 		color: var(--primary);
 	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
+	.audits-note {
+		padding: 1px 8px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--sb-warning) 13%, transparent);
+		color: color-mix(in srgb, var(--sb-warning) 75%, var(--foreground));
+		font-size: 12px;
+		white-space: nowrap;
 	}
 </style>

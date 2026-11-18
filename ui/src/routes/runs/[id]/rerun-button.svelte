@@ -2,23 +2,27 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import Button, { buttonVariants } from '$lib/components/ui/button/button.svelte';
+	import { cn } from '$lib/utils';
 	import type { RunDetailState } from './state.svelte';
 
 	let { view }: { view: RunDetailState } = $props();
 
 	const primary = $derived(view.primary);
+	// A split button: rerunning from the failure is the bar's solid primary action, any other rerun is outlined.
+	const variant = $derived(primary?.mode === 'from_failure' ? 'default' : 'outline');
 </script>
 
 {#if primary}
 	<div class="split">
 		<span title={primary.disabledReason ?? primary.help}>
-			<button class="main" class:accent={primary.mode === 'from_failure'} disabled={!!primary.disabledReason || view.busy !== null} aria-busy={view.busy === primary.mode} onclick={() => view.rerun(primary.mode)}>
-				<RotateCwIcon size={13} />{primary.label}
-			</button>
+			<Button {variant} class="rounded-r-none" disabled={!!primary.disabledReason || view.busy !== null} aria-busy={view.busy === primary.mode} onclick={() => view.rerun(primary.mode)}>
+				<RotateCwIcon />{primary.label}
+			</Button>
 		</span>
 		<DropdownMenu.Root>
-			<DropdownMenu.Trigger class="caret {primary.mode === 'from_failure' ? 'accent' : ''}" aria-label="More rerun options" disabled={view.busy !== null}>
-				<ChevronDownIcon size={14} />
+			<DropdownMenu.Trigger class={cn(buttonVariants({ variant, size: 'icon-bar' }), 'rounded-l-none', variant === 'default' ? 'border-l-primary-foreground/30' : 'border-l-0')} aria-label="More rerun options" disabled={view.busy !== null}>
+				<ChevronDownIcon />
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="end" class="w-80">
 				{#each view.choices as c (c.mode)}
@@ -38,43 +42,6 @@
 	.split {
 		display: inline-flex;
 		align-items: stretch;
-	}
-	.main,
-	.split :global(.caret) {
-		display: inline-flex;
-		height: 32px;
-		align-items: center;
-		gap: 6px;
-		padding: 0 12px;
-		border: 1px solid var(--border);
-		background: var(--background);
-		font-size: 13px;
-		font-weight: 500;
-	}
-	.main {
-		border-radius: 6px 0 0 6px;
-	}
-	.split :global(.caret) {
-		padding: 0 7px;
-		border-left: 0;
-		border-radius: 0 6px 6px 0;
-	}
-	.main.accent,
-	.split :global(.caret.accent) {
-		border-color: var(--primary);
-		background: var(--primary);
-		color: var(--primary-foreground);
-	}
-	.split :global(.caret.accent) {
-		border-left: 1px solid color-mix(in srgb, var(--primary-foreground) 30%, var(--primary));
-	}
-	.main:hover:not(:disabled),
-	.split :global(.caret:hover) {
-		filter: brightness(1.08);
-	}
-	.main:disabled,
-	.split :global(.caret:disabled) {
-		opacity: 0.5;
 	}
 	.item {
 		display: flex;

@@ -6,9 +6,8 @@ use crate::plan_output::main::resolve_bounded_cursor_override::resolve_bounded_c
 use crate::planner_entries::models::ModelPlanContext;
 use crate::planner_phases::main::inputs::class_field::class_field;
 use crate::planner_resolution::_helpers::cursor::cursor_bounds::compute_cursor_bounds;
-use crate::planner_resolution::_helpers::cursor::cursor_policies::{
-    future_cursor_config, start_cursor_config,
-};
+use crate::planner_resolution::_helpers::cursor::cursor_policies::future_cursor_config;
+use crate::planner_resolution::_helpers::cursor::cursor_policies::start_cursor_config;
 use crate::planner_resolution::_helpers::cursor::cursor_windows::cursor_inputs_without_rows;
 use crate::planner_resolution::_helpers::cursor::cursor_windows::empty_cursor_window;
 use crate::planner_resolution::_helpers::cursor::cursor_windows::empty_input_rebuild_refusal;

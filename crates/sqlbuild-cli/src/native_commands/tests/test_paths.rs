@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::native_commands::_helpers::paths::{pathlib_path, resolved_path};
+use crate::native_commands::_helpers::command::paths::{pathlib_path, resolved_path};
 use crate::native_commands::tests::test_types::{PathlibTestCase, ResolveTestCase};
 
 #[test]

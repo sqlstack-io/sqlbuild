@@ -1,7 +1,7 @@
 //! The keys job and job group files accept, and the bounds on their run controls.
 
 /// Top-level keys of a job file.
-pub const JOB_KEYS: [&str; 12] = [
+pub const JOB_KEYS: [&str; 13] = [
     "name",
     "description",
     "select",
@@ -9,30 +9,51 @@ pub const JOB_KEYS: [&str; 12] = [
     "targets",
     "owner",
     "overlap",
-    "concurrency_groups",
+    "pools",
     "schedule",
+    "retry",
     "on_failure",
     "resources",
     "settings",
 ];
 /// Top-level keys of a job group file.
-pub const GROUP_KEYS: [&str; 9] = [
+pub const GROUP_KEYS: [&str; 11] = [
     "name",
     "description",
     "jobs",
     "targets",
     "owner",
     "overlap",
-    "concurrency_groups",
+    "pools",
     "schedule",
+    "retry",
     "on_failure",
+    "dependencies",
 ];
-/// The fewest and most reruns `on_failure.retries` allows.
+/// The group table that sets how members wait for and react to the jobs they depend on.
+pub(crate) const DEPENDENCIES_KEY: &str = "dependencies";
+/// The `[dependencies]` setting for when a member starts, and its values.
+pub(crate) const WAIT_FOR_KEY: &str = "wait_for";
+pub(crate) const WAIT_FOR_VALUES: [&str; 2] = ["job", "node"];
+/// The `[dependencies]` setting for a failed dependency, and its values.
+pub(crate) const DEPENDENCY_FAILURE_KEY: &str = "on_failure";
+pub(crate) const DEPENDENCY_FAILURE_VALUES: [&str; 3] = ["partial", "skip", "run"];
+/// The fewest and most runs `retry.attempts` allows, the first run included.
+pub const ATTEMPTS_RANGE: (u8, u8) = (2, 11);
+/// The fewest and most reruns the deprecated `on_failure.retries` allows; `attempts` is one more.
 pub const RETRIES_RANGE: (u8, u8) = (1, 10);
-/// The shortest and longest `on_failure.retry_delay_seconds`, a day.
+/// The shortest and longest `retry.delay_seconds`, a day.
 pub const RETRY_DELAY_RANGE: (u32, u32) = (0, 86_400);
+/// The retry table, and the deprecated name it replaces.
+pub(crate) const RETRY_TABLE: (&str, &str) = ("retry", "on_failure");
+/// The retry count key, and the deprecated name it replaces.
+pub(crate) const RETRY_ATTEMPTS_KEY: (&str, &str) = ("attempts", "retries");
+/// The retry delay key, and the deprecated name it replaces.
+pub(crate) const RETRY_DELAY_KEY: (&str, &str) = ("delay_seconds", "retry_delay_seconds");
 /// The job setting that moved under `[settings]`.
 pub(crate) const CONCURRENCY_KEY: &str = "concurrency";
+/// The most slots a job or job group may take of one pool.
+pub(crate) const MAX_POOL_AMOUNT: i64 = 10_000;
 /// How close an unknown key must be to a known one to be suggested.
 pub(crate) const SUGGESTION_CUTOFF: f64 = 0.6;
 /// The folders below `orchestration/`, one per declaration kind.

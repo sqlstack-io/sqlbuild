@@ -37,6 +37,8 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -45,7 +47,8 @@ use sqlbuild_python_front::discovery::main::failures::microbatch_guidance::micro
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::project::functions::functions;
 use sqlbuild_python_project::planner_phases::main::object::object;
-use sqlbuild_python_project::planner_strategy::models::{CursorInputLookups, ModelEntryDecisions};
+use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
+use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
 use sqlbuild_python_project::semantic_shapes::main::source_binding_diagnostics::source_binding_diagnostics;
 
 const MICROBATCH_COMPLEXITY_CODE: &str = "MICROBATCH_CONCURRENCY_COMPLEXITY";
@@ -61,7 +64,7 @@ pub(crate) struct ContextReads<'py> {
 impl<'py> ContextReads<'py> {
     pub(crate) fn of(
         context: Bound<'py, PyAny>,
-        adapter: Bound<'py, PyAny>,
+        dialect: Bound<'py, Dialect>,
         external_resolver: Bound<'py, PyAny>,
     ) -> PyResult<Self> {
         let py = context.py();
@@ -77,7 +80,7 @@ impl<'py> ContextReads<'py> {
                 seed_locations: field(&fields.seed_locations),
                 runtime_cursor_producer_names: field(&fields.runtime_cursor_producer_names),
             },
-            resolution: Resolution::of_context(adapter, &context, external_resolver)?,
+            resolution: Resolution::of_context(dialect, &context, external_resolver)?,
             invocation_time: field(&fields.invocation_time),
             context,
         })
@@ -103,7 +106,7 @@ pub(crate) fn plan_model_from_change<'py>(
     let model = &request.model;
     let reads = request.context;
     let context = &reads.context;
-    let adapter = &reads.resolution.adapter;
+    let dialect = &reads.resolution.dialect;
     let py = model.py();
     let backfill = if request.full_refresh {
         native(
@@ -155,7 +158,7 @@ pub(crate) fn plan_model_from_change<'py>(
         Some(reads.lookups.functions_by_name.clone()),
     )?;
     let cursor_input_relations =
-        build_cursor_input_relations((model, adapter), &cursor_column, &reads.lookups)?.into_any();
+        build_cursor_input_relations((model, dialect), &cursor_column, &reads.lookups)?.into_any();
     let mut any_runtime_owned = false;
     for relation in cursor_input_relations.try_iter()? {
         if native_field(&relation?, "is_runtime_owned")?.is_truthy()? {
@@ -181,7 +184,7 @@ pub(crate) fn plan_model_from_change<'py>(
     let range = microbatch_range(model, &window)?;
     let (entry, entry_warnings) = assemble_model_plan_entry(&ModelEntryDecisions {
         model: model.clone(),
-        adapter: adapter.clone(),
+        dialect: dialect.clone(),
         snapshot: request.snapshot.clone(),
         change_result: request.change_result.clone(),
         action,
@@ -215,7 +218,7 @@ pub(crate) fn plan_model_from_change<'py>(
 /// The binding-diagnostic failure that stops planning, if any diagnostic is an error.
 fn check_binding_diagnostics<'py>(
     project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     relations: &Bound<'py, PyAny>,
     selected_keys: &Bound<'py, PyAny>,
 ) -> PyResult<()> {
@@ -244,7 +247,7 @@ fn check_binding_diagnostics<'py>(
                 ),
                 (
                     "profile",
-                    adapter.call_method0("expression_inference_profile")?,
+                    dialect.syntax("expression_inference_profile")?.call0()?,
                 ),
                 ("selected_keys", selected_keys.clone()),
             ],
@@ -297,7 +300,7 @@ fn names_of(entries: &[Bound<'_, PyAny>]) -> PyResult<String> {
 /// Concurrent microbatch configuration checks, and the warning concurrency complexity earns.
 fn check_microbatch_concurrency<'py>(
     project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     entries: &[Bound<'py, PyAny>],
     concurrency: i64,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -328,17 +331,18 @@ fn check_microbatch_concurrency<'py>(
         ));
     }
     if !configured.is_empty()
-        && !adapter
-            .call_method0("supports_concurrent_microbatch_dml")?
+        && !dialect
+            .syntax("supports_concurrent_microbatch_dml")?
+            .call0()?
             .is_truthy()?
     {
         return Err(error_of(
             py,
             ErrorId::CompileInput,
             &format!(
-                "adapter '{}' does not support concurrent microbatch delete/insert DML; set \
+                "dialect '{}' does not support concurrent microbatch delete/insert DML; set \
                  batch_concurrency = 1",
-                native_field(adapter, "adapter_name")?.str()?
+                dialect.syntax("adapter_name")?.str()?
             ),
             &[],
         ));
@@ -392,7 +396,7 @@ pub(crate) fn plan_entries<'py>(
 ) -> PyResult<ModelEntryResults<'py>> {
     let PlanEntriesRequest {
         project,
-        adapter,
+        dialect,
         scope,
         snapshot,
         relations,
@@ -411,7 +415,7 @@ pub(crate) fn plan_entries<'py>(
     let build = inputs.cast::<PlanEntryBuildInputs>()?.get();
     let relations_context = relations.cast::<PlannerRelationsContext>()?.get();
     let selected_keys = native_field(&scope, "selected_keys")?;
-    check_binding_diagnostics(&project, &adapter, &relations, &selected_keys)?;
+    check_binding_diagnostics(&project, &dialect, &relations, &selected_keys)?;
     let freshness_blocked = build.source_freshness_blocked_model_names.bind(py).clone();
     let external_blocked = build.external_blocked_model_names.bind(py).clone();
     let start_override = build.start_cursor_override.bind(py).clone();
@@ -452,7 +456,7 @@ pub(crate) fn plan_entries<'py>(
     .into_any();
     let reads = ContextReads::of(
         context,
-        adapter.clone(),
+        dialect.clone(),
         native_field(&project, "external_sql_reference_resolver")?,
     )?;
     let sql_analysis_enabled = native_field(&settings, "sql_analysis")?.is_truthy()?;
@@ -532,7 +536,7 @@ pub(crate) fn plan_entries<'py>(
             warnings.push(warning?);
         }
     }
-    if let Some(warning) = check_microbatch_concurrency(&project, &adapter, &entries, concurrency)?
+    if let Some(warning) = check_microbatch_concurrency(&project, &dialect, &entries, concurrency)?
     {
         warnings.push(warning);
     }

@@ -1,8 +1,11 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import { untrack, type Snippet } from 'svelte';
 	import type { TimelineBar, TimelineTickMarker } from '$lib/api';
@@ -154,6 +157,12 @@
 			.map((name) => ({ name }))
 	);
 
+	// The name column fits the longest job name, within limits; longer names truncate and show in full on hover.
+	// `--tl-gutter` is registered as a length (see the style block), so `ch` resolves once, at the job names'
+	// font size on `.tl`, and the header, rows and grid overlay all share the same pixel width.
+	const longestName = $derived(Math.max(0, ...(timeline.data?.jobKeys ?? []).map((j) => j.length)));
+	const gutter = $derived(`clamp(200px, calc(${longestName}ch + 52px), 380px)`);
+
 	const tone = (r: Bar) => (r.status === 'projected' ? 'transparent' : runStatusTone[r.status]);
 	const label = (r: Bar) => (r.status === 'projected' ? 'Scheduled' : runStatusLabel[r.status]);
 	const barClass = (r: Bar) => (r.status === 'projected' ? 'scheduled' : r.status === 'success' ? 'ok' : r.status);
@@ -168,7 +177,7 @@
 	}
 </script>
 
-<div class="tl" class:fill={scroll && maxHeight == null} style:--sticky-top="{stickyTop}px">
+<div class="tl" class:fill={scroll && maxHeight == null} style:--sticky-top="{stickyTop}px" style:--tl-gutter={gutter}>
 	<div class="tl-controls">
 		{#if showSearch}
 			<label class="tl-search">
@@ -176,15 +185,11 @@
 				<input bind:value={query} placeholder="Search jobs" />
 			</label>
 		{/if}
-		<div class="seg">
-			{#each Object.keys(WINDOWS) as w (w)}
-				<button class:on={windowKey === w} onclick={() => ((windowKey = w as WindowKey), (pan = 0))}>{w}</button>
-			{/each}
-		</div>
-		<div class="seg">
-			<button onclick={() => pan++} aria-label="Earlier"><ChevronLeftIcon size={14} /></button>
-			<button class:on={pan === 0} onclick={() => (pan = 0)}>Now</button>
-			<button onclick={() => (pan = Math.max(0, pan - 1))} disabled={pan === 0} aria-label="Later"><ChevronRightIcon size={14} /></button>
+		<SegmentedFilter label="Window" bind:value={windowKey} options={(Object.keys(WINDOWS) as WindowKey[]).map((w) => ({ value: w, label: w }))} onselect={() => (pan = 0)} />
+		<div class="flex items-center gap-0.5">
+			<Button variant="ghost" size="icon-sm" onclick={() => pan++} aria-label="Earlier" title="Earlier"><ChevronLeftIcon /></Button>
+			<Button variant="ghost" size="sm" aria-pressed={pan === 0} onclick={() => (pan = 0)}>Now</Button>
+			<Button variant="ghost" size="icon-sm" onclick={() => (pan = Math.max(0, pan - 1))} disabled={pan === 0} aria-label="Later" title="Later"><ChevronRightIcon /></Button>
 		</div>
 		{#if actions}<div class="tl-actions">{@render actions()}</div>{/if}
 	</div>
@@ -218,7 +223,7 @@
 			</div>
 			{#each jobs as job (job.name)}
 				<div class="row">
-					<a class="gutter job" href={to(`/jobs/${job.name}`)} title={job.name}>{job.name}</a>
+					<a class="gutter job" href={to(`/jobs/${job.name}`)} title="Open {job.name}"><PlayIcon class="job-icon" aria-hidden="true" /><span class="job-name">{job.name}</span></a>
 					<div class="track">
 						{#each runsByJob.get(job.name) ?? [] as r (r.key)}
 							{@const left = Math.max(0, pct(r.startMs))}
@@ -284,9 +289,17 @@
 {/if}
 
 <style>
+	/* A registered length computes to px where it is declared; unregistered, `ch` would resolve at each
+	   use site and the 12 px header, 12.5 px job names and the overlay would get different widths. */
+	@property --tl-gutter {
+		syntax: '<length>';
+		inherits: true;
+		initial-value: 200px;
+	}
 	.tl {
-		--gutter: 200px;
+		--tl-gutter: 200px;
 		display: flex;
+		font-size: 12.5px;
 		min-height: 0;
 		flex-direction: column;
 	}
@@ -320,37 +333,6 @@
 		color: var(--foreground);
 		font-size: 12.5px;
 	}
-	.seg {
-		display: flex;
-		gap: 2px;
-		padding: 2px;
-		border-radius: 2px;
-		background: var(--sb-hover);
-	}
-	.seg button {
-		display: inline-flex;
-		height: 24px;
-		min-width: 28px;
-		align-items: center;
-		justify-content: center;
-		padding: 0 8px;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.seg button:hover:not(:disabled) {
-		color: var(--foreground);
-	}
-	.seg button:disabled {
-		opacity: 0.4;
-	}
-	.seg button.on {
-		background: var(--card);
-		color: var(--foreground);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-	}
 	.tl-actions {
 		display: flex;
 		align-items: center;
@@ -375,8 +357,8 @@
 		background: var(--card);
 	}
 	.gutter {
-		width: var(--gutter);
-		flex: 0 0 var(--gutter);
+		width: var(--tl-gutter);
+		flex: 0 0 var(--tl-gutter);
 		border-right: 1px solid var(--border);
 	}
 	.tl-head .gutter {
@@ -453,7 +435,7 @@
 	.overlay {
 		position: absolute;
 		z-index: 0;
-		inset: 0 0 0 var(--gutter);
+		inset: 0 0 0 var(--tl-gutter);
 		pointer-events: none;
 	}
 	.gridline,
@@ -481,15 +463,33 @@
 	.job {
 		display: flex;
 		align-items: center;
+		gap: 8px;
 		overflow: hidden;
 		padding: 0 14px;
 		color: var(--foreground);
 		font-size: 12.5px;
-		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	.job :global(.job-icon) {
+		width: 13px;
+		height: 13px;
+		flex: none;
+		color: var(--muted-foreground);
+	}
+	.job-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 	.job:hover {
+		background: var(--sb-hover);
 		color: var(--primary);
+	}
+	.job:hover :global(.job-icon) {
+		color: var(--primary);
+	}
+	.job:hover .job-name {
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 	.track {
 		position: relative;

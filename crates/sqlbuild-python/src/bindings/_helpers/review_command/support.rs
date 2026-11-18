@@ -53,7 +53,7 @@ pub(crate) fn plan_error(py: Python<'_>, error: &ReviewPlanError) -> PyErr {
 }
 
 /// `name` of `value` as text, or `None` when it is absent or `None`.
-fn attribute(value: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {
+pub(crate) fn attribute(value: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {
     match value.getattr_opt(name)? {
         Some(item) if !item.is_none() => Ok(Some(item.str()?.extract()?)),
         Some(_) | None => Ok(None),

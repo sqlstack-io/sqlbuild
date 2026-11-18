@@ -13,10 +13,11 @@ use pyo3::{PyErr, pyfunction};
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::attachments::main::resolve_cursor_intrinsics::resolve_cursor_intrinsics;
 use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
@@ -41,7 +42,7 @@ pub(crate) fn resolve_model_sql_of<'py>(
         kwargs,
         (
             &[
-                "adapter",
+                "dialect",
                 "model",
                 "snapshot",
                 "context",
@@ -58,7 +59,7 @@ pub(crate) fn resolve_model_sql_of<'py>(
     )?;
     let context = args.value("context")?;
     let resolution = Resolution::of_context(
-        args.value("adapter")?,
+        Dialect::passed(args.value("dialect")?)?,
         &context,
         args.value("external_sql_reference_resolver")?,
     )?;
@@ -114,14 +115,14 @@ pub(crate) fn resolve_model_sql<'py>(
         let bounds = match bounds {
             bounds if !bounds.is_none() => bounds,
             _ if cause.is_none()
-                && resolution.adapter.is_instance_of::<SyncedCopyAdapter>()
+                && native_field(&request.snapshot, "cursor_inputs_at_run")?.is_truthy()?
                 && native_field(&roles, "watermark_inputs")?.is_truthy()? =>
             {
                 unbounded(py)?
             }
             _ => return Err(unresolved_bounds_error(py, &name, cause.as_deref())?),
         };
-        sql = intrinsic_bounds(&sql, &bounds, &cursor_type, &resolution.adapter)?;
+        sql = intrinsic_bounds(&sql, &bounds, &cursor_type, &resolution.dialect)?;
     }
     resolution.assert_resolved(&sql, &format!("Model '{name}'"))?;
     Ok(sql)
@@ -144,12 +145,12 @@ fn intrinsic_bounds<'py>(
     sql: &str,
     bounds: &Bound<'py, PyAny>,
     cursor_type: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
 ) -> PyResult<String> {
-    let py = adapter.py();
+    let py = dialect.py();
     let literal = |field: &str| -> PyResult<String> {
         call_with(
-            &native_field(adapter, "render_cursor_bound_literal")?,
+            &dialect.syntax("render_cursor_bound_literal")?,
             &[
                 (
                     "value",
@@ -182,13 +183,13 @@ fn unresolved_bounds_error(py: Python<'_>, name: &str, cause: Option<&str>) -> P
 }
 
 #[pyfunction]
-#[pyo3(signature = (*, model, adapter, context, external_sql_reference_resolver))]
+#[pyo3(signature = (*, model, dialect, context, external_sql_reference_resolver))]
 pub(crate) fn resolve_model_hook_entries<'py>(
     model: &Bound<'py, PyAny>,
-    adapter: Bound<'py, PyAny>,
+    dialect: Bound<'py, Dialect>,
     context: Bound<'py, PyAny>,
     external_sql_reference_resolver: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let resolution = Resolution::of_context(adapter, &context, external_sql_reference_resolver)?;
+    let resolution = Resolution::of_context(dialect, &context, external_sql_reference_resolver)?;
     model_hook_entries(model, &resolution)
 }

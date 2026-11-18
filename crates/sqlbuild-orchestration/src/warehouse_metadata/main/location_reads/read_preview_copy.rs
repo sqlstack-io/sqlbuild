@@ -1,4 +1,4 @@
-//! A plan preview plans from the mirror, so the copy carries only what its facade may answer.
+//! A plan preview plans from the mirror; a location holding the current mirror version reads no records.
 
 use uuid::Uuid;
 
@@ -8,7 +8,7 @@ use crate::store::models::ControlStore;
 use crate::warehouse_metadata::_helpers::ingestion::begin_ingestion;
 use crate::warehouse_metadata::_helpers::mirror_pages::{
     preview_consumption, preview_fingerprints, preview_latest_runs, preview_observations,
-    preview_relations, preview_synced_at,
+    preview_relations, preview_synced_at, preview_version,
 };
 use crate::warehouse_metadata::models::{PreviewCopy, PreviewCopyRead};
 
@@ -19,6 +19,25 @@ pub async fn read_preview_copy(
 ) -> Result<PreviewCopy, ControlError> {
     let transaction =
         begin_ingestion(store, scope, (request.session_id, request.generation)).await?;
+    let (transaction, version) = if request.versioned {
+        let (transaction, version) = preview_version(transaction, scope).await?;
+        (transaction, Some(version))
+    } else {
+        (transaction, None)
+    };
+    if version.is_some() && version == request.known_version {
+        commit(transaction).await?;
+        return Ok(PreviewCopy {
+            synced_at: None,
+            relations: Vec::new(),
+            fingerprints: Vec::new(),
+            latest_runs: Vec::new(),
+            observations: Vec::new(),
+            consumption: Vec::new(),
+            version,
+            unchanged: true,
+        });
+    }
     let (transaction, relations) = preview_relations(transaction, scope).await?;
     let (transaction, fingerprints) = preview_fingerprints(transaction, scope).await?;
     let (transaction, latest_runs) = preview_latest_runs(transaction, scope).await?;
@@ -37,5 +56,7 @@ pub async fn read_preview_copy(
         latest_runs,
         observations,
         consumption,
+        version,
+        unchanged: false,
     })
 }

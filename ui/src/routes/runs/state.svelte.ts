@@ -7,6 +7,7 @@ import { rerunHref } from '$lib/run/command';
 import { app } from '$lib/state/app.svelte';
 import type { BulkAction, DisplayRow, Freshness, ListParams } from './types';
 import { eligibleIds, readParams, toQuery, writeParams } from './utils';
+import { plural } from '$lib/format/plural';
 
 const PAGE = 50;
 /** Live signals refetch at most this often: the first immediately, then one trailing. */
@@ -257,8 +258,8 @@ export function createRunsState() {
 		const verb = 'Cancel requested for';
 		const ok = ids.length - failed.length;
 		result = failed.length
-			? { text: `${ok ? `${verb} ${ok} run${ok === 1 ? '' : 's'}. ` : ''}${failed.length} failed: ${message(firstError?.reason)}. The failed runs stay selected.`, failed: true }
-			: { text: `${verb} ${ok} run${ok === 1 ? '' : 's'}.`, failed: false };
+			? { text: `${ok ? `${verb} ${plural(ok, 'run')}. ` : ''}${failed.length} failed: ${message(firstError?.reason)}. The failed runs stay selected.`, failed: true }
+			: { text: `${verb} ${plural(ok, 'run')}.`, failed: false };
 		selected = new Set(failed);
 		busy = null;
 		refresh();
@@ -278,7 +279,7 @@ export function createRunsState() {
 			const res = await app.client.cancelMatchingRuns(scope, toQuery(params, Date.now()));
 			result = res.failed.length
 				? { text: `Cancel requested for ${res.done.length} runs; ${res.failed.length} failed: ${res.failed[0].error}`, failed: true }
-				: { text: `Cancel requested for ${res.done.length} run${res.done.length === 1 ? '' : 's'}.`, failed: false };
+				: { text: `Cancel requested for ${plural(res.done.length, 'run')}.`, failed: false };
 			selected = new Set(res.failed.map((f) => f.runId));
 		} catch (e) {
 			result = { text: message(e), failed: true };

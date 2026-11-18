@@ -7,8 +7,8 @@ use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
-    change_run::change_run, claim_next_run::claim_next_run, list_run_nodes::list_run_nodes,
-    list_runs::list_runs,
+    execution::change_run::change_run, execution::claim_next_run::claim_next_run,
+    listings::list_run_nodes::list_run_nodes, listings::list_runs::list_runs,
 };
 use crate::runs::models::{
     NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
@@ -16,7 +16,7 @@ use crate::runs::models::{
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::runs::tests::test_types::RunLifecycleTestCase;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;

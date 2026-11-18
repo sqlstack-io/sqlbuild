@@ -1,4 +1,8 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import StatusLabel from '$lib/components/list/status-label.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import type { TriggerDetail } from '$lib/api';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
@@ -7,7 +11,7 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { evaluationTone, shortRunId } from '$lib/operate/labels';
 
-	const outcomeText: Record<string, string> = { requested: 'checking…', completed: 'done', failed: 'failed', timed_out: 'took too long', abandoned: 'gave up' };
+	const outcomeText: Record<string, string> = { requested: 'Checking…', completed: 'Done', failed: 'Failed', timed_out: 'Timed out', abandoned: 'Abandoned' };
 
 	let { trigger }: { trigger: TriggerDetail } = $props();
 	const sensor = $derived(trigger.sensor!);
@@ -16,7 +20,6 @@
 	let reason = $state('');
 	let busy = $state(false);
 	let error = $state<string | null>(null);
-	let shown = $state(25);
 
 	async function resetCursor() {
 		const scope = app.scope;
@@ -35,20 +38,33 @@
 	}
 
 	const changed = $derived(sensor.lastEvaluatedFingerprint !== null && sensor.lastEvaluatedFingerprint !== sensor.currentFingerprint);
+	const evaluationColumns: TableColumn[] = [
+		{ id: 'when', label: 'When', width: '120px' },
+		{ id: 'result', label: 'Result', width: '160px' },
+		{ id: 'position', label: 'Position', width: '24%', title: 'Cursor before → after' },
+		{ id: 'runs', label: 'Runs started', width: '110px', align: 'right' },
+		{ id: 'detail', label: 'Detail', minWidth: 220, truncate: false }
+	];
+	const requestColumns: TableColumn[] = [
+		{ id: 'key', label: 'Run key', minWidth: 200 },
+		{ id: 'run', label: 'Run', width: '120px' },
+		{ id: 'status', label: 'Status', width: '140px' },
+		{ id: 'requested', label: 'Requested', width: '130px' }
+	];
 </script>
 
 <section>
-	<h3>When it starts a run</h3>
+	<h3>Condition</h3>
 	<p><code>{sensor.condition}</code></p>
 	{#each sensor.nodeConditions as c (c)}<p class="faint">and {c}</p>{/each}
-	<p class="faint">
-		{sensor.minimumIntervalSeconds ? `Checks at most every ${sensor.minimumIntervalSeconds}s` : 'Checks each time something relevant happens'}{sensor.timeoutSeconds ? ` · a check is stopped if it takes over ${sensor.timeoutSeconds}s` : ''}
+	<p class="faint" title={[sensor.minimumIntervalSeconds ? `Checks at most every ${sensor.minimumIntervalSeconds}s` : 'Checks each time something relevant happens', sensor.timeoutSeconds ? `a check is stopped if it takes over ${sensor.timeoutSeconds}s` : ''].filter(Boolean).join('; ')}>
+		{sensor.minimumIntervalSeconds ? `Min interval ${sensor.minimumIntervalSeconds}s` : 'On every event'}{sensor.timeoutSeconds ? ` · timeout ${sensor.timeoutSeconds}s` : ''}
 	</p>
 	{#if trigger.kind === 'platform_sensor'}
 		<p class="faint"><a href={to(`/locations/${app.locationId}#problems`)}>Problems it handled ↗</a></p>
 	{/if}
 	{#if changed}
-		<p class="warn" title="Fingerprint {sensor.lastEvaluatedFingerprint} → {sensor.currentFingerprint}">Its code changed since it last checked. The next check uses the new code.</p>
+		<p class="warn" title="The next check uses the new code. Fingerprint {sensor.lastEvaluatedFingerprint} → {sensor.currentFingerprint}">Code changed since last check</p>
 	{/if}
 </section>
 
@@ -59,15 +75,16 @@
 			<code>{sensor.cursor ?? '(the start: nothing handled yet)'}</code>
 			{#if sensor.cursorUpdatedAt}<span class="faint updated" title={formatStamp(sensor.cursorUpdatedAt)}>updated {formatAgo(sensor.cursorUpdatedAt, app.now)}</span>{/if}
 		{/if}
-		<GatedButton requires="sensor.reset_cursor" size="xs" disabled={sensor.cursorKnown && sensor.cursor === null} reason="It's already at the start" onclick={() => (confirmReset = !confirmReset)}>Start over</GatedButton>
+		<GatedButton requires="sensor.reset_cursor" size="sm" disabled={sensor.cursorKnown && sensor.cursor === null} reason="It's already at the start" onclick={() => (confirmReset = !confirmReset)}>Start over</GatedButton>
 	</div>
 	{#if confirmReset}
 		<div class="confirm">
-			<p>The next check looks at everything again from the start. Anything it already started a run for (same run key) doesn't start a second run.</p>
+			<!-- copy-allow: consequence of a reset -->
+			<p>Re-reads everything from the start. Runs with an existing run key aren't repeated.</p>
 			<input bind:value={reason} placeholder="Why? (saved in the history)" />
 			<div class="row">
 				<GatedButton requires="sensor.reset_cursor" variant="default" size="sm" {busy} onclick={resetCursor}>Start over</GatedButton>
-				<button class="ghost" onclick={() => (confirmReset = false)}>Cancel</button>
+				<Button variant="ghost" size="sm" onclick={() => (confirmReset = false)}>Cancel</Button>
 			</div>
 		</div>
 	{/if}
@@ -77,49 +94,40 @@
 {#if trigger.evaluations}
 <section>
 	<h3 title="Each time the sensor ran its check (an evaluation), newest first">Recent checks</h3>
-	<table>
-		<thead><tr><th>When</th><th>Result</th><th title="Cursor before → after">Position</th><th class="num">Runs started</th><th>Detail</th></tr></thead>
-		<tbody>
-			{#each trigger.evaluations.slice(0, shown) as e (e.id)}
+	<DataTable class="static compact" embedded columns={evaluationColumns} rows={trigger.evaluations} key={(e) => e.id} empty="It hasn't checked yet.">
+		{#snippet row(e)}
 				<tr>
 					<td class="nowrap" title={formatStamp(e.requestedAt)}>{formatAgo(e.requestedAt, app.now)}</td>
-					<td><span class="outcome" style:--c={evaluationTone[e.outcome]} title="{e.outcome} · {e.id}">{outcomeText[e.outcome] ?? e.outcome}</span></td>
+					<td title="{e.outcome} · {e.id}"><StatusLabel tone={evaluationTone[e.outcome]} label={outcomeText[e.outcome] ?? e.outcome} /></td>
 					<td class="mono faint">{e.cursorBefore ?? '∅'}{#if e.cursorAfter && e.cursorAfter !== e.cursorBefore} → {e.cursorAfter}{/if}</td>
 					<td class="num">{e.runRequests}</td>
 					<td class:err={!!e.error} class:faint={!e.error}>
 						{e.error ?? e.skipReason ?? ''}
-						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped while {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each} ran</span>{/if}
-						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="tag" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
+						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped · {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each}</span>{/if}
+						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="sb-tag ml-1.5" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
 					</td>
 				</tr>
-			{:else}
-				<tr><td colspan="5" class="empty">It hasn't checked yet.</td></tr>
-			{/each}
-		</tbody>
-	</table>
-	{#if trigger.evaluations.length > shown}<button class="more" onclick={() => (shown += 50)}>Show more</button>{/if}
+		{/snippet}
+	</DataTable>
 </section>
 {/if}
 
 {#if trigger.runRequests}
 <section>
-	<h3 title="Run requests by run key">Runs it started · {trigger.runRequests.length}</h3>
+	<h3 title="Run requests by run key">Runs · {trigger.runRequests.length}</h3>
 	{#if trigger.runRequests.length}
-		<table>
-			<thead><tr><th>Run key</th><th>Run</th><th>Status</th><th>Requested</th></tr></thead>
-			<tbody>
-				{#each trigger.runRequests as r (r.runKey)}
+		<DataTable class="static compact" embedded columns={requestColumns} rows={trigger.runRequests} key={(r) => r.runKey} empty="No runs requested yet.">
+			{#snippet row(r)}
 					<tr>
 						<td class="mono">{r.runKey}</td>
 						<td class="mono"><a href={to(`/runs/${r.runId}`)} title={r.runId}>{shortRunId(r.runId)}</a></td>
 						<td><i class="dot" style:background={runStatusTone[r.runStatus]}></i>{runStatusLabel[r.runStatus]}</td>
 						<td class="faint" title={formatStamp(r.requestedAt)}>{formatAgo(r.requestedAt, app.now)}</td>
 					</tr>
-				{/each}
-			</tbody>
-		</table>
+			{/snippet}
+		</DataTable>
 	{:else}
-		<p class="faint">{trigger.jobKey ? 'It hasn’t started any runs yet.' : 'This sensor only runs its own code; it doesn’t start runs.'}</p>
+		<p class="faint">{trigger.jobKey ? 'It hasn’t started any runs yet.' : 'No job'}</p>
 	{/if}
 </section>
 {/if}
@@ -186,45 +194,11 @@
 		display: flex;
 		gap: 8px;
 	}
-	.ghost {
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12.5px;
-	}
-	th {
-		padding: 6px 12px 6px 0;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		font-weight: 500;
-		text-align: left;
-	}
-	td {
-		padding: 6px 12px 6px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		vertical-align: top;
-	}
 	.num {
 		text-align: right;
 	}
 	.nowrap {
 		white-space: nowrap;
-	}
-	.outcome {
-		color: var(--c);
-		font-weight: 500;
-	}
-	.tag {
-		margin-left: 6px;
-		padding: 0 5px;
-		border-radius: 2px;
-		background: var(--sb-hover);
-		color: var(--sb-text-faint);
-		font-size: 11px;
 	}
 	.dot {
 		display: inline-block;
@@ -235,15 +209,5 @@
 	}
 	a {
 		color: var(--primary);
-	}
-	.empty {
-		padding: 24px;
-		color: var(--sb-text-faint);
-		text-align: center;
-	}
-	.more {
-		margin-top: 8px;
-		color: var(--primary);
-		font-size: 12px;
 	}
 </style>

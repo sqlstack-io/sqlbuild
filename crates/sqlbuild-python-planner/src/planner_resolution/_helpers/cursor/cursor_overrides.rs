@@ -1,7 +1,13 @@
 //! Selected-model inspection and untyped override conversion.
 
-use crate::planner_resolution::_helpers::references::values::{method, string};
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use crate::planner_resolution::_helpers::references::values::method;
+use crate::planner_resolution::_helpers::references::values::string;
+use pyo3::prelude::Bound;
+use pyo3::prelude::PyAny;
+use pyo3::prelude::PyAnyMethods;
+use pyo3::prelude::PyErr;
+use pyo3::prelude::PyResult;
+use pyo3::prelude::Python;
 use pyo3::pyfunction;
 use pyo3::types::PyDict;
 use sqlbuild_cursor::planner::main::override_kind::override_kind;

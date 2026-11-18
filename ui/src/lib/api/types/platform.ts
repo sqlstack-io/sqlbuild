@@ -132,8 +132,11 @@ export type ConnectionTest = {
 	outcome: TestOutcome;
 	at: Iso;
 	durationMs: number;
-	/** `publish` when the location ran it after publishing a snapshot. */
-	trigger: 'publish' | 'manual';
+	/**
+	 * `publish` when the location ran it after publishing a snapshot; `startup` when the location ran it on
+	 * starting (`sqb dev` or `sqb location serve`); `manual` for Test connection.
+	 */
+	trigger: 'publish' | 'startup' | 'manual';
 	by: Principal | null;
 	message: string;
 };
@@ -168,7 +171,12 @@ export type LocationDetail = {
 	/** Null when the server doesn't name it. */
 	warehouseConnection: string | null;
 	connectionTest: ConnectionTest | null;
+	/** Jobs and groups this server's pool caps make run alone in a pool: the server's own warning, not a check-in. */
+	poolCapWarnings: PoolCapWarning[];
 };
+
+/** A job or group asking a pool for more than this server's cap, so it takes the whole pool. */
+export type PoolCapWarning = { jobKey: string; kind: 'job' | 'group'; pool: string; amount: number; cap: number; message: string };
 
 export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
 	/** Null when the server can't report it to this person. */
@@ -215,15 +223,48 @@ export type SettingField = {
 	secretSource?: string;
 };
 
-/** A location target's warehouse connection as its checks and syncs report it; locations publish no connection settings. */
+/**
+ * How a location signs in to its warehouse, by name only; never the secret. Known names have labels;
+ * an unknown name is shown as it is.
+ */
+export type ConnectionAuthMethod = 'key_pair' | 'password' | 'oauth' | 'external_browser' | 'token' | 'none' | (string & {});
+
+/**
+ * The non-secret connection settings a location publishes with each snapshot. Visible to everyone who
+ * can view the location. Fields the adapter does not have are null.
+ */
+export type ConnectionDetails = {
+	/** e.g. `snowflake`, `postgres`, `duckdb`. */
+	adapter: string;
+	/** The account identifier, for adapters that have one. */
+	account: string | null;
+	/** The server host, or for a file database its path. */
+	host: string | null;
+	user: string | null;
+	role: string | null;
+	/** The compute warehouse, for adapters that have one. */
+	warehouse: string | null;
+	/** The database the target builds into by default. */
+	database: string | null;
+	authMethod: ConnectionAuthMethod | null;
+};
+
+/** A location target's warehouse connection as its checks and syncs report it. */
 export type WarehouseConnection = {
 	/** The location key, `location_id:target`. */
 	id: string;
 	location: string;
 	target: string;
+	/** Published connection settings; null until the location publishes them with a snapshot. */
+	details: ConnectionDetails | null;
 	/** Where SQLBuild's own tables are read back from; null before a sync reports it. */
 	stateLocation: { database: string | null; schema: string } | null;
+	/** The newest recorded connection check: on startup, after a deploy, or a manual test. */
 	lastTest: ConnectionTest | null;
+	/** When the next background state history sync is due; null while a sync runs or when not reported. */
+	nextSyncAt: Iso | null;
+	/** Failed reads in a row stopped the newest sync: it resumes at `nextSyncAt` when set, otherwise after the next run, a sync request or a deploy. */
+	halted: boolean;
 	/** The newest sync of each SQLBuild table, in table order. */
 	tables: WarehouseTableSync[];
 };
@@ -241,6 +282,8 @@ export type WarehouseTableSync = {
 	waiting: boolean;
 	/** The newest sync of the table that succeeded. */
 	lastSyncedAt: Iso | null;
+	/** Records the server mirrors of the table in total; null when not reported. */
+	mirroredTotal: number | null;
 };
 
 /** One setting a provider declares. Its value stays in the location's environment and never reaches the server. */
@@ -272,8 +315,12 @@ export type ProviderConnection = {
 	sourceFile: string;
 	settings: ProviderSetting[];
 	usedBy: ProviderConsumer[];
+	/** Keys of the snapshot nodes that run the provider's consumers, e.g. `source:orders`. */
+	nodes: string[];
 	/** Jobs whose selection includes a node that uses the provider. */
 	jobs: string[];
+	/** Each of those jobs with the provider's nodes it runs. */
+	jobNodes: Record<string, string[]>;
 };
 
 // ---- maintenance (synced warehouse state tables) ----

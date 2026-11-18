@@ -27,6 +27,7 @@ class MotherDuckAdapter(
     """MotherDuck adapter backed by DuckDB's MotherDuck connection support."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.MOTHERDUCK.value
+    history_reads_wake_compute: ClassVar[bool] = True
     sql_analysis_dialect_name: ClassVar[str | None] = "duckdb"
 
     def render_loader_rows_select(

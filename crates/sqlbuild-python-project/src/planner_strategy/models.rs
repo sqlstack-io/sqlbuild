@@ -11,6 +11,7 @@ use sqlbuild_analysis::planner_fixtures::models::{
     FixtureColumn, FixtureReadCache, FixtureTypeProjection,
 };
 use sqlbuild_analysis::required_columns::models::ColumnRead;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
@@ -71,7 +72,7 @@ pub(crate) struct ExpectedTypes<'a> {
 #[derive(Debug)]
 pub struct ModelEntryDecisions<'py> {
     pub model: Bound<'py, pyo3::types::PyAny>,
-    pub adapter: Bound<'py, pyo3::types::PyAny>,
+    pub dialect: Bound<'py, Dialect>,
     pub snapshot: Bound<'py, pyo3::types::PyAny>,
     pub change_result: Bound<'py, pyo3::types::PyAny>,
     pub action: Bound<'py, pyo3::types::PyAny>,
@@ -120,7 +121,7 @@ pub struct AuditPlanning<'py> {
     pub model_locations: Bound<'py, pyo3::types::PyAny>,
     pub seed_locations: Bound<'py, pyo3::types::PyAny>,
     pub source_map: Bound<'py, pyo3::types::PyAny>,
-    pub adapter: Bound<'py, pyo3::types::PyAny>,
+    pub dialect: Bound<'py, Dialect>,
     pub model_materializations: Bound<'py, pyo3::types::PyAny>,
     pub lineage: Py<NativeProjectGraph>,
 }

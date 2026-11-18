@@ -107,6 +107,8 @@ pub struct CommandFacts {
     pub scenario_snapshot_sync: bool,
     /// Whether `diff` compares raw queries rather than project models.
     pub raw_query_diff: bool,
+    /// Whether `--ignore-audit-failures` is combined with `--no-audits`, which leaves nothing to ignore.
+    pub ignores_failures_of_no_audits: bool,
 }
 
 /// Which invocation services run around a command.

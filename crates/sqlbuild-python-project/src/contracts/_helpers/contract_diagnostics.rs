@@ -19,9 +19,8 @@ use sqlbuild_sqltext::compiler::main::model_output_columns::model_output_columns
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::main::compiled_models::enum_columns::enum_columns;
 use crate::compiled_views::main::project::compiled_project_facts::compiled_project_facts;
-use crate::contracts::_helpers::model_contracts::{
-    DiagnosticRow, evaluate_project_model_contracts,
-};
+use crate::contracts::_helpers::model_contracts::DiagnosticRow;
+use crate::contracts::_helpers::model_contracts::evaluate_project_model_contracts;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

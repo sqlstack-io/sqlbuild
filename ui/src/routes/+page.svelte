@@ -1,30 +1,47 @@
 <script lang="ts">
+	import { plural, noun } from '$lib/format/plural';
+	import HelpTip from '$lib/components/help-tip.svelte';
+	import PageBody from '$lib/components/page-body.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
+	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import AlertCircleIcon from '@lucide/svelte/icons/circle-alert';
 	import HistoryIcon from '@lucide/svelte/icons/history';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { catalogNodes, useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { folderCatalogHref, folderSelections } from '$lib/selection/folders';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
 	import type { AttentionItem } from '$lib/api';
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
+	import { quietDeployLine, recentDeployRows, visibleFolders } from '$lib/build-area/overview-panels';
 	import { pagesBeyondTarget } from '$lib/nav';
 	import OverviewCost from './overview-cost.svelte';
 
-	const overview = createResource((client, scope) => client.overview(scope), ['runs', 'checks', 'node_status', 'snapshot', 'platform_events', 'triggers']);
+	const catalog = useCatalogNodes();
+	/** Each top-level folder as a selection, for the folder rows' links to the catalog. */
+	const folderSelection = $derived(folderSelections(catalog.data ?? []));
+	// Reads again when the shared listing changes, which node status changes update; until it is held
+	// the overview waits for it rather than listing every node a second time.
+	const overview = createResource((client, scope) => {
+		const nodes = catalog.data;
+		if (!nodes && !catalog.error) return new Promise<never>(() => {});
+		return client.overview(scope, nodes);
+	}, ['runs', 'checks', 'snapshot', 'platform_events', 'triggers']);
 	const data = $derived(overview.data ?? null);
 	// Null data means the person may view only part of the target, so the page offers others instead.
 	// A reload keeps the previous data, so only a settled, error-free null counts.
@@ -37,7 +54,7 @@
 		stale: HistoryIcon,
 		info: InfoIcon
 	};
-	const viewed = $derived(attentionViews(data?.attention ?? [], app.now));
+	const viewed = $derived(attentionViews(data?.attention ?? [], app.now, catalogNodes.view.changedBuild));
 	const acknowledgementOf = (item: AttentionItem) => ('acknowledged' in item ? item.acknowledged : null);
 	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
 	const issues = $derived(viewed.filter(({ item }) => !acknowledgementOf(item)));
@@ -63,7 +80,7 @@
 	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
 	const loaded = $derived(data !== null);
 	const healthTone = $derived(
-		!loaded ? 'var(--sb-text-faint)' : issues.some((i) => i.view.tone === 'error') ? 'var(--sb-error)' : issues.some((i) => i.view.tone === 'warning' || i.view.tone === 'stale') ? 'var(--sb-warning)' : 'var(--sb-success)'
+		!loaded ? 'var(--sb-text-faint)' : issues.some((i) => i.view.tone === 'error') ? 'var(--sb-error)' : issues.some((i) => i.view.tone === 'warning') ? 'var(--sb-warning)' : issues.some((i) => i.view.tone === 'stale') ? 'var(--sb-stale)' : 'var(--sb-success)'
 	);
 	const latest = $derived(data?.latestRun ?? null);
 	const latestText = $derived(latest ? `Last run ${runStatusLabel[latest.status].toLowerCase()} ${formatAgo(latest.endedAt, app.now)}` : 'No runs yet');
@@ -72,25 +89,32 @@
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	const costChange = $derived(m?.cost && m.cost.baseline ? Math.round(((m.cost.last24h - m.cost.baseline) / m.cost.baseline) * 100) : null);
 	const groups = $derived(data?.groups ?? []);
+	let showAllFolders = $state(false);
+	const folders = $derived(visibleFolders(groups, showAllFolders));
+	// Whether collapsing hides any folders; folders that need attention always show.
+	const collapsedHidden = $derived(visibleFolders(groups, false).hidden);
+	const deployRows = $derived(recentDeployRows(data?.recentChanges ?? []));
 	// Parts without a server read stay hidden rather than showing zeros, and wait for the read so they don't appear and vanish.
 	const showGroups = $derived(!!data?.groups?.length);
 	const showTimeline = $derived(app.client.supports('timeline'));
 	const canAcknowledge = $derived(app.client.supports('acknowledgeRun'));
+	const FAILING_CHECKS_HREF = '/checks?outcome=failing';
 
 </script>
 
 <!-- The alerts below list every platform problem, so the banner would only repeat them. -->
 <AppTopbar title="Overview" events={() => false}>
-	<Button variant="outline" size="sm" onclick={() => overview.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => overview.refresh()} />
 </AppTopbar>
 
 
-<div class="min-h-0 flex-1 overflow-y-auto px-5 pb-16 pt-[18px]">
+<!-- Padding sits on an inner box: sticky headers stick below a scroller's own padding, so rows would show through above them. -->
+<PageBody padding="18px 20px 64px">
 	{#if overview.error}<div class="error-note mb-[14px]">{overview.error}</div>{/if}
 	{#if partial}
 		<section class="surface-panel partial">
 			<h2>You can see only part of {app.location?.name} · {app.target?.name}</h2>
-			<p>The Overview sums up the whole target, so it needs view on every node in it. An administrator can give you view on the rest.</p>
+			<p>Needs view on every node in this target. Ask an administrator.</p>
 			{#if otherPages.length}
 				<p>Pages you can use:</p>
 				<ul>
@@ -119,8 +143,8 @@
 						<div class="health-facts">
 							<!-- The out-of-date alert below already counts these. -->
 							{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
-							{#if m.stale?.behind && !staleListed}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
-							{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
+							{#if m.stale?.behind && !staleListed}<span><i class="status-dot behind"></i><b>{m.stale.behind}</b> behind</span>{/if}
+							{#if m.checks.failing}<a class="fact-link" href={to(FAILING_CHECKS_HREF)}><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {noun(m.checks.failing, 'check')}</a>{/if}
 						</div>
 					{/if}
 					{#if latest}<a href={to(`/runs/${latest.id}`)}>View latest run →</a>{/if}
@@ -143,15 +167,17 @@
 								<small>{view.since}</small>
 								<span class="issue-ack">
 									{#if 'acknowledged' in item && canAcknowledge}
-										<button class="ack" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
-											<BellOffIcon size={13} />Acknowledge
-										</button>
+										<Button variant="ghost" size="sm" title="Mark handled for everyone (audited)" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
+											<BellOffIcon />Acknowledge
+										</Button>
 									{/if}
 								</span>
 								<span class="issue-actions">
 									{#if view.build}
 										{@const build = view.build}
-										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(build.href))}>{build.label}</GatedButton>
+										<GatedButton requires="run.adhoc" size="sm" variant={build.variant} hint={build.tooltip ?? undefined} onclick={() => goto(to(build.href))}
+											>{#if build.variant === 'stale'}<HammerIcon class="size-3.5" />{/if}<span>{build.label}{#if build.extra}<span class="label-extra">{build.extra}</span>{/if}</span></GatedButton
+										>
 									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>
@@ -161,9 +187,7 @@
 				{/if}
 				{#if handled.length}
 					<div class="handled">
-						<button class="handled-toggle" aria-expanded={showHandled} onclick={() => (showHandled = !showHandled)}>
-							<ChevronRightIcon size={13} class={showHandled ? 'open' : ''} />Acknowledged · {handled.length}
-						</button>
+						<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[34px] pr-3.5 pl-[17px] text-[12px]">Acknowledged · {handled.length}</DisclosureButton>
 						{#if showHandled}
 							<div class="handled-rows">
 							{#each handled as { item, view } (view.key)}
@@ -177,7 +201,7 @@
 									<small>{view.since}</small>
 									<span class="issue-ack">
 										{#if 'acknowledged' in item && canAcknowledge}
-											<button class="undo" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, false)}>Undo</button>
+											<Button variant="ghost" size="sm" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, false)}>Undo</Button>
 										{/if}
 									</span>
 									<span class="issue-actions"><a href={to(view.href)}>{view.action} →</a></span>
@@ -205,13 +229,13 @@
 					<div class="metric">
 						<span class="metric-label">Checks passing</span>
 						<div><strong>{m.checks.passing}</strong><small>of {m.checks.total}</small></div>
-						<span class:warning-note={m.checks.warning + m.checks.failing > 0}>{m.checks.failing} failing · {m.checks.warning} warning</span>
+						<span class:warning-note={m.checks.warning + m.checks.failing > 0}>{#if m.checks.failing}<a class="metric-link" href={to(FAILING_CHECKS_HREF)}>{m.checks.failing} failing</a>{:else}0 failing{/if} · {m.checks.warning} warning</span>
 					</div>
 					{#if m.stale}
 						<div class="metric">
 							<span class="metric-label">Stale</span>
 							<div><strong class="stale-value">{m.stale.nodes}</strong><small>nodes</small></div>
-							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late{/if}</span>
+							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {plural(m.stale.sources, 'source')} late{/if}</span>
 						</div>
 					{/if}
 					{#if m.cost}
@@ -224,28 +248,16 @@
 				{/if}
 			</section>
 
-			{#if showTimeline}
-				<section class="surface-panel flex min-w-0 flex-col">
-					<div class="panel-heading">
-						<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
-						<a href={to(`/runs?view=timeline`)}>Open full timeline →</a>
-					</div>
-					<RunTimeline scroll={false} stickyTop={0} />
-				</section>
-			{/if}
-
-			<OverviewCost />
-
 			<div class="lower-grid" class:single={!showGroups}>
 				{#if showGroups}<section class="surface-panel">
 					<div class="panel-heading">
-						<div><h2>Build status by folder</h2><span>Current, stale and failed nodes in each top-level folder</span></div>
+						<div><h2>Build status by folder</h2></div>
 						<a href={to(`/catalog`)}>Open catalog →</a>
 					</div>
 					<div class="groups">
 						<div class="group-row head"><span>Folder</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
-						{#each groups as g (g.group)}
-							<a class="group-row" href={to(`/catalog?group=${g.group}`)}>
+						{#each folders.rows as g (g.group)}
+							<a class="group-row" href={to(folderCatalogHref(folderSelection.get(g.group) ?? ''))} title="Open {g.group} in the catalog">
 								<span>{g.group}</span>
 								<span class="group-bar" title="{g.current} of {g.total} current">
 									<i class="fresh" style:width="{(g.current / g.total) * 100}%"></i>
@@ -254,21 +266,28 @@
 								</span>
 								<b>{g.current}/{g.total}</b>
 								<b class:stale-text={g.changed}>{g.changed || '—'}</b>
-								<b class:warn-text={g.behind}>{g.behind || '—'}</b>
+								<b class:behind-text={g.behind}>{g.behind || '—'}</b>
 								<b class:error-text={g.failed}>{g.failed || '—'}</b>
 							</a>
 						{:else}
-							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet. Deploy the project to see its models here.{/if}</div>
+							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet.{/if}</div>
 						{/each}
+						{#if collapsedHidden}
+							<Button variant="link" size="inline" class="mx-4 mt-1 self-start text-[12px]" aria-expanded={showAllFolders} onclick={() => (showAllFolders = !showAllFolders)}>{showAllFolders ? 'Show fewer' : `Show all ${groups.length} folders`}</Button>
+						{/if}
 					</div>
 				</section>{/if}
 				<section class="surface-panel">
 					<div class="panel-heading">
-						<div><h2>Recent changes</h2><span>Recent deploys</span></div>
+						<div><h2>Recent deploys</h2></div>
 						<a href={to(`/changes`)}>All changes →</a>
 					</div>
 					<div>
-						{#each data?.recentChanges ?? [] as c (c.snapshotId)}
+						{#each deployRows as row (row.key)}
+							{#if row.kind === 'quiet'}
+								<div class="change quiet">{quietDeployLine(row, app.now)}</div>
+							{:else}
+							{@const c = row.change}
 							<a class="change" href={to(`/changes#gen-${c.generation}`)}>
 								<span class="change-rev" title={c.gitRevision ? `Commit ${c.gitRevision}` : 'Published outside a git checkout'}><code>{c.gitRevision?.slice(0, 7) ?? '—'}</code><small>version {c.generation}</small></span>
 								<span class="change-copy">
@@ -277,15 +296,28 @@
 								</span>
 								<small>{c.gitAuthor ? `${c.gitAuthor} · ` : ''}{formatAgo(c.publishedAt, app.now)}</small>
 							</a>
+							{/if}
 						{:else}
 							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet.{/if}</div>
 						{/each}
 					</div>
 				</section>
 			</div>
+
+			{#if showTimeline}
+				<section class="surface-panel flex min-w-0 flex-col">
+					<div class="panel-heading">
+						<div><h2>Activity <HelpTip text="Past runs and the next scheduled times" /></h2><span>Past and upcoming</span></div>
+						<a href={to(`/runs?view=timeline`)}>Open full timeline →</a>
+					</div>
+					<RunTimeline scroll={false} stickyTop={0} />
+				</section>
+			{/if}
+
+			<OverviewCost />
 		</div>
 	{/if}
-</div>
+</PageBody>
 
 <style>
 	.health, .metric-strip, .surface-panel { box-shadow: var(--panel-shadow); border: 1px solid var(--panel-border); border-radius: 2px; background: var(--card); }
@@ -311,17 +343,8 @@
 	.issue-ack { justify-content: flex-end; }
 	.issue-actions { justify-content: flex-end; gap: 10px; }
 	.issue-actions a { color: var(--primary); font-weight: 500; white-space: nowrap; }
-	.ack { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 2px; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
-	.ack:hover:not(:disabled) { border-color: var(--border-strong); color: var(--foreground); }
-	.ack:disabled, .undo:disabled { opacity: 0.5; }
 	.handled { border-top: 1px solid var(--inner-line); }
-	.handled-toggle { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px 0 17px; color: var(--muted-foreground); font-size: 12px; }
-	.handled-toggle:hover { color: var(--foreground); }
-	.handled-toggle :global(svg) { transition: transform 120ms; }
-	.handled-toggle :global(svg.open) { transform: rotate(90deg); }
 	.issue.muted .issue-title { color: var(--muted-foreground); font-weight: 500; }
-	.undo { color: var(--muted-foreground); font-size: 12px; }
-	.undo:hover:not(:disabled) { color: var(--foreground); }
 	.ack-error { margin: 0; padding: 8px 17px; border-top: 1px solid var(--inner-line); color: var(--sb-error); font-size: 12px; }
 	.issue-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 2px; }
 	.issue-icon.error { color: var(--sb-error); background: color-mix(in srgb, var(--sb-error) 12%, transparent); }
@@ -330,6 +353,7 @@
 	.issue-icon.info { color: var(--muted-foreground); background: var(--sb-hover); }
 	.change { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--inner-line); }
 	.change:last-child { border-bottom: 0; }
+	.change.quiet { display: block; padding: 7px 14px 7px 96px; color: var(--sb-text-faint); font-size: 12px; }
 	.change:hover { background: var(--sb-hover); }
 	.change-rev code { display: block; color: var(--primary); font: 12px var(--font-mono); }
 	.change-rev small { color: var(--sb-text-faint); font-size: 11px; }
@@ -344,7 +368,8 @@
 	.health-copy strong { font-size: 13px; }
 	.health-copy span { margin-top: 2px; color: var(--muted-foreground); font-size: 12px; }
 	.health-facts { display: flex; gap: 20px; margin-left: 44px; color: var(--muted-foreground); font: 12px var(--font-sans); }
-	.health-facts span { display: flex; align-items: center; gap: 6px; }
+	.health-facts span, .health-facts .fact-link { display: flex; align-items: center; gap: 6px; }
+	.health-facts .fact-link:hover, .metric-link:hover { color: var(--foreground); text-decoration: underline; }
 	.health-facts b { color: var(--foreground); font-weight: 500; }
 	.health-head > a, .panel-heading > a { margin-left: auto; color: var(--primary); font: 500 12.5px var(--font-sans); white-space: nowrap; }
 	.metric-strip { display: grid; min-height: 98px; grid-template-columns: repeat(var(--metrics), minmax(0, 1fr)); overflow: hidden; }
@@ -358,7 +383,7 @@
 	.metric .success-note { color: var(--sb-success); }
 	.metric .warning-note { color: var(--sb-warning); }
 	.stale-value { color: var(--sb-stale); }
-	.lower-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr); gap: 14px; align-items: start; }
+	.lower-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr); gap: 14px; align-items: stretch; }
 	.lower-grid.single { grid-template-columns: 1fr; }
 	.panel-heading { display: flex; min-height: 53px; align-items: center; padding: 0 14px 0 16px; border-bottom: 1px solid var(--border); }
 	.panel-heading > div:first-child { margin-right: auto; }
@@ -368,6 +393,7 @@
 	.warning { background: var(--sb-warning); }
 	.error { background: var(--sb-error); }
 	.stale { background: var(--sb-stale); }
+	.behind { box-shadow: inset 0 0 0 1.5px var(--sb-stale); background: color-mix(in srgb, var(--sb-stale) 25%, transparent); }
 	.groups { padding: 6px 0 8px; }
 	.group-row { display: grid; grid-template-columns: 110px minmax(80px, 1fr) 60px 64px 56px 52px; align-items: center; gap: 12px; padding: 7px 16px; font-size: 12.5px; }
 	a.group-row:hover { background: var(--sb-hover); }
@@ -380,7 +406,7 @@
 	.stale-segment { background: var(--sb-stale); }
 	.fail-segment { background: var(--sb-error); }
 	.stale-text { color: var(--sb-stale) !important; }
-	.warn-text { color: var(--sb-warning) !important; }
+	.behind-text { color: var(--sb-behind) !important; }
 	.error-text { color: var(--sb-error) !important; }
 	.empty { padding: 18px 16px; color: var(--muted-foreground); font-size: 12.5px; }
 	.partial { max-width: 640px; padding: 18px 20px; font-size: 13px; }

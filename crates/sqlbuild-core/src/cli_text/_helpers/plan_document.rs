@@ -8,20 +8,25 @@ use crate::cli_text::_helpers::plan_sections::{
 };
 use crate::cli_text::_helpers::tree_rows::treeify;
 use crate::cli_text::constants::{
-    PLAN_READY_TITLE, PRE_SQL_INGRESS_PHASE, PYTHON_INGRESS_TITLE, PYTHON_READ_SIDE_TITLE,
-    READ_SIDE_PHASE,
+    IGNORED_AUDIT_FAILURES_NOTICE, PLAN_READY_TITLE, PRE_SQL_INGRESS_PHASE, PYTHON_INGRESS_TITLE,
+    PYTHON_READ_SIDE_TITLE, READ_SIDE_PHASE,
 };
 use crate::cli_text::models::{CliStyle, ModelPlanText, PlanTextReport};
 
 fn header_lines(report: &PlanTextReport, full_refresh: bool) -> Vec<String> {
-    if !report.include_header {
-        return Vec::new();
+    let style: CliStyle = CliStyle { use_color: true };
+    let mut lines: Vec<String> = Vec::new();
+    if report.include_header {
+        lines.push(surface_header(
+            style,
+            PLAN_READY_TITLE,
+            &ready_summary(report, full_refresh),
+        ));
     }
-    vec![surface_header(
-        CliStyle { use_color: true },
-        PLAN_READY_TITLE,
-        &ready_summary(report, full_refresh),
-    )]
+    if report.ignore_audit_failures {
+        lines.push(style.warning(IGNORED_AUDIT_FAILURES_NOTICE));
+    }
+    lines
 }
 
 /// Every active model is a full refresh: counts by materialization instead of detail.

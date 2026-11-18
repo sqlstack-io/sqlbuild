@@ -5,12 +5,13 @@ use crate::planner_migrations::_helpers::column::known_input_columns::KnownInput
 use crate::planner_migrations::models::{
     ColumnMigrationInputs, ColumnMigrationPlanning, MigrationPhase,
 };
-use crate::planner_phases::main::inputs::runtime_field::runtime_field;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PySet, PySetMethods};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
@@ -66,10 +67,10 @@ pub(crate) fn plan_column_migrations<'py>(
     let py = phase.runtime.py();
     let runtime = phase.runtime.clone();
     let snapshot = phase.snapshot.clone();
-    let adapter = runtime_field(&runtime, |runtime| &runtime.adapter)?;
-    let candidates = crate::planner_migrations::_helpers::column::column_candidates::candidates(
+    let dialect = runtime_dialect(&runtime)?;
+    let candidates = super::column_candidates::candidates(
         (phase, columns),
-        &adapter.call_method0("sql_analysis_dialect")?,
+        &dialect.syntax("sql_analysis_dialect")?.call0()?,
     )?;
     if candidates.is_empty() {
         return Ok(ColumnMigrationPlanning {
@@ -105,22 +106,15 @@ pub(crate) fn plan_column_migrations<'py>(
     let mut warnings: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut hints: Vec<Bound<'py, PyAny>> = Vec::new();
     for candidate in &candidates {
-        let decided = crate::planner_migrations::_helpers::column::column_entries::decide(
+        let decided = super::column_entries::decide(
             &runtime,
             candidate,
             &native_field(&state, "column_events")?,
             &inputs,
         )?;
         let physical = mapping_get(&columns.physical_relations, name_object(&candidate.model)?)?;
-        let checked = crate::planner_migrations::_helpers::column::column_entries::checked(
-            &runtime, candidate, decided, &physical,
-        )?;
-        for hint in crate::planner_migrations::_helpers::column::column_entries::hints(
-            candidate,
-            &checked.entries,
-        )?
-        .try_iter()?
-        {
+        let checked = super::column_entries::checked(&runtime, candidate, decided, &physical)?;
+        for hint in super::column_entries::hints(candidate, &checked.entries)?.try_iter()? {
             hints.push(hint?);
         }
         entries.extend(checked.entries);
@@ -132,23 +126,12 @@ pub(crate) fn plan_column_migrations<'py>(
         )?;
     for entry in &mut entries {
         *entry = replace(entry, &[("missing_origin_policy", policy.clone())])?;
-        if let Some(warning) =
-            crate::planner_migrations::_helpers::column::column_warnings::entry_warning(entry)?
-        {
+        if let Some(warning) = super::column_warnings::entry_warning(entry)? {
             warnings.push(warning);
         }
     }
-    let overlaid = crate::planner_migrations::_helpers::column::column_overlay::overlay(
-        &snapshot,
-        &candidates,
-        &entries,
-        &inputs,
-    )?;
-    let snapshot = crate::planner_migrations::_helpers::column::column_overlay::cursors(
-        (phase, columns),
-        overlaid,
-        &entries,
-    )?;
+    let overlaid = super::column_overlay::overlay(&snapshot, &candidates, &entries, &inputs)?;
+    let snapshot = super::column_overlay::cursors((phase, columns), overlaid, &entries)?;
     Ok(ColumnMigrationPlanning {
         snapshot,
         entries,

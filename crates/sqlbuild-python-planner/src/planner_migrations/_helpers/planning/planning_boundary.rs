@@ -2,7 +2,9 @@
 
 use crate::planner_migrations::_helpers::column::column_objects::native;
 use crate::planner_migrations::models::MigrationPhase;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
+use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::main::rebuilds::effective_target_config::effective_target_config;
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
 use crate::planner_warehouse::main::inspection::gather_redirected_cursor_snapshots::gather_redirected_cursor_snapshots;
@@ -68,14 +70,8 @@ pub(crate) fn redirected_cursor_snapshots<'py>(
             py,
             &[
                 ("project", project),
-                (
-                    "adapter",
-                    runtime_field(runtime, |runtime| &runtime.adapter)?,
-                ),
-                (
-                    "connection",
-                    runtime_field(runtime, |runtime| &runtime.connection)?,
-                ),
+                ("dialect", runtime_dialect(runtime)?.into_any()),
+                ("reads", runtime_reads(runtime)?.into_any()),
                 ("existing_relations", existing_relations),
                 ("target_relations", target_relations),
                 ("cursor_scope", cursor_scope),

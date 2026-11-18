@@ -10,11 +10,11 @@ use uuid::Uuid;
 use crate::api::errors::ApiError;
 use crate::api::models::{HeartbeatResponse, MutationResponse};
 use crate::credentials::models::{CredentialScope, TokenIdentity};
-use crate::runs::main::change_run::change_run;
-use crate::runs::main::heartbeat_run::heartbeat_run;
-use crate::runs::main::publish_run_output::publish_run_output;
-use crate::runs::main::publish_run_recall::publish_run_recall;
-use crate::runs::main::run_execution::run_execution;
+use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::execution::heartbeat_run::heartbeat_run;
+use crate::runs::main::execution::publish_run_output::publish_run_output;
+use crate::runs::main::execution::publish_run_recall::publish_run_recall;
+use crate::runs::main::execution::run_execution::run_execution;
 use crate::runs::models::{
     OutputPublication, RecallBatch, RunAuthority, RunChangeRequest, RunExecution,
 };

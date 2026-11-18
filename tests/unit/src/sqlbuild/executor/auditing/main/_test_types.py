@@ -54,3 +54,11 @@ class AuditInterruptCase:
     description: str
     error: BaseException
     expected_error_type: type[BaseException]
+
+
+@dataclass(frozen=True)
+class IgnoredFailureProjectionCase:
+    description: str
+    ignored: bool
+    expected_metadata_json: str | None
+    expected_payload_ignored: bool | None

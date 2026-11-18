@@ -2,6 +2,7 @@
 
 use crate::planner_strategy::main::complete_fixtures::complete_fixtures;
 use crate::planner_strategy::models::FixtureCompletion;
+use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::HashSet;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -39,9 +40,9 @@ pub(crate) fn complete_prepared<'py, 'a>(
         &sqlbuild_analysis::planner_fixtures::models::FixtureReadRequirements,
     ),
     expected: ExpectedTypes<'a>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
 ) -> PyResult<FixtureCompletion<'py, 'a>> {
-    let py = adapter.py();
+    let py = dialect.py();
     let python_keys: Vec<(FixtureKey, Bound<'py, PyAny>)> = prepared.keys.clone();
     let python_key = |key: &FixtureKey| -> Option<&Bound<'py, PyAny>> {
         python_keys
@@ -116,7 +117,7 @@ pub(crate) fn complete_prepared<'py, 'a>(
                 quoted_names: quoted_names(&prepared, original)?,
                 completed,
             },
-            adapter,
+            dialect,
         )?;
         prepared.sql.set_item(original, sql)?;
         completed_keys.insert(key.clone());
@@ -140,7 +141,7 @@ pub(crate) fn complete_prepared<'py, 'a>(
                 quoted_names: quoted_names(&prepared, original)?,
                 completed: Vec::new(),
             },
-            adapter,
+            dialect,
         )?;
         prepared.sql.set_item(original, sql)?;
     }
@@ -172,10 +173,10 @@ fn quoted_names<'py>(
 
 /// Complete one chain's fixture groups, building the planning context when none is given.
 #[pyfunction]
-#[pyo3(signature = (*, project, adapter, request, planning_context = None))]
+#[pyo3(signature = (*, project, dialect, request, planning_context = None))]
 pub(crate) fn build_relation_fixture_completion<'py>(
     project: &Bound<'py, PyAny>,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     request: (Vec<String>, Bound<'py, PyAny>),
     planning_context: Option<Bound<'py, RelationFixturePlanningContext>>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -188,7 +189,7 @@ pub(crate) fn build_relation_fixture_completion<'py>(
             &built
         }
     };
-    let completion = complete_fixtures(context, adapter, (&request.0, &request.1))?;
+    let completion = complete_fixtures(context, dialect, (&request.0, &request.1))?;
     let expected = PyDict::new(py);
     for (key, types) in &completion.expected_types.overlay {
         let columns = PyDict::new(py);

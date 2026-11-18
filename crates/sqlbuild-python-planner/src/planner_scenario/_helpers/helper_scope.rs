@@ -3,6 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::compiler::main::scenario_helper_scope::scenario_helper_scope as helper_scope;
 use sqlbuild_analysis::compiler::models::{ScenarioHelperScope, ScenarioScopeInput};
+use sqlbuild_python_base::native_host::types::Syntax;
 
 use crate::planner_scenario::_helpers::values::error;
 use crate::planner_scenario::constants::SCENARIO_PLAN_INTERNAL;
@@ -33,8 +34,10 @@ pub(crate) fn scenario_helper_scope(
         ctes.push((name, body));
     }
     let syntax: LexicalSyntaxInput = native_field(&context.syntax, "native_mapping")?.extract()?;
-    let dialect: Option<String> =
-        native_field(&context.adapter, "sql_analysis_dialect_name")?.extract()?;
+    let dialect: Option<String> = context
+        .dialect
+        .syntax("sql_analysis_dialect_name")?
+        .extract()?;
     helper_scope(&ScenarioScopeInput {
         ctes: &ctes,
         checks: &[],

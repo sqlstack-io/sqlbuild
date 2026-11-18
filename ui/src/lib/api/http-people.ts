@@ -76,6 +76,7 @@ export function toServerSettings(wire: Wire['ServerSettings']): ServerSettings {
 			{ name: 'Run logs', value: days(r.run_log_days), description: 'What finished runs logged. The runs themselves are kept.' },
 			{ name: 'Logged runs', value: String(r.run_logs_kept), description: 'Newest finished runs per location target that keep their logs.' },
 			{ name: 'Published versions', value: String(r.snapshots_kept), description: 'Kept for each location target; older versions are removed.' },
+			{ name: 'Builds and check results', value: String(r.state_history_versions), description: 'Newest builds of each node and results of each check copied from the warehouse.' },
 			{ name: 'Warehouse row counts', value: days(r.statistics_days), description: 'Row counts and sizes sampled from the warehouse.' },
 			{ name: 'Platform problems', value: days(r.platform_alert_days), description: 'Late schedules, failed launches and locations that stopped checking in.' },
 			{ name: 'Location check-ins', value: days(r.location_health_days), description: 'Health reports from location processes.' },

@@ -235,6 +235,7 @@ class BuildExecutionResult:
     skipped_count: int = 0
     warning_count: int = 0
     insufficient_count: int = 0
+    ignored_audit_failure_count: int = 0
     audit_result_projection_attempted_count: int = 0
     audit_result_projection_written_count: int = 0
     audit_result_projection_failed_count: int = 0

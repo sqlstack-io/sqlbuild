@@ -1,10 +1,11 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { openRow, to } from '$lib/paths';
 	import PuzzleIcon from '@lucide/svelte/icons/puzzle';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { usedBySummary } from './utils';
 
@@ -14,27 +15,23 @@
 	const all = $derived(providers.data ?? []);
 	const q = $derived(query.trim().toLowerCase());
 	const shown = $derived(all.filter((p) => !q || `${p.name} ${p.className} ${p.description}`.toLowerCase().includes(q)));
+	const tableColumns: TableColumn[] = [
+		{ id: 'provider', label: 'Provider', minWidth: 220 },
+		{ id: 'class', label: 'Class', width: '24%' },
+		{ id: 'used', label: 'Used by', width: '22%' },
+		{ id: 'file', label: 'Defined in', width: '22%' }
+	];
 </script>
 
 <AppTopbar title="Providers">
-	<Button variant="outline" size="sm" onclick={() => providers.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => providers.refresh()} />
 </AppTopbar>
 
 <ListToolbar loading={providers.data === undefined} bind:query placeholder="Search providers" total="{shown.length} of {all.length} providers">
 </ListToolbar>
 
-<div class="sb-list-wrap">
-	<table class="sb-list">
-		<thead>
-			<tr>
-				<th>Provider</th>
-				<th>Class</th>
-				<th>Used by</th>
-				<th>Defined in</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each shown as p (p.name)}
+<DataTable columns={tableColumns} rows={shown} key={(p) => p.name} resource={providers} empty={all.length ? 'No providers match the search.' : 'No providers.'}>
+	{#snippet row(p)}
 				<tr onclick={(e) => openRow(e, `/providers/${p.name}`)}>
 					<td>
 						<div class="cell-name">
@@ -49,12 +46,8 @@
 					<td class="muted">{usedBySummary(p)}</td>
 					<td class="muted"><code>{p.sourceFile}</code></td>
 				</tr>
-			{:else}
-				<LoadRow colspan={4} resource={providers} empty={all.length ? 'No providers match the search.' : 'This project declares no providers. Warehouse connections are under Connections.'} />
-			{/each}
-		</tbody>
-	</table>
-</div>
+	{/snippet}
+</DataTable>
 
 <style>
 </style>

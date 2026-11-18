@@ -39,6 +39,7 @@ from sqlbuild.adapter.contract.exceptions import (
     UnsupportedTypedSqlRenderingError,
 )
 from sqlbuild.adapter.contract.main.column_name_key import column_name_key
+from sqlbuild.adapter.contract.main.estimates_one_at_a_time import estimates_one_at_a_time
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
 from sqlbuild.adapter.contract.main.unsupported_relation_usage import unsupported_relation_usage
@@ -119,6 +120,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
     metadata_inspection_concurrency: ClassVar[int] = 1
     concurrent_ddl_limit: ClassVar[int] = 1
     supports_session_warehouse: ClassVar[bool] = False
+    history_reads_wake_compute: ClassVar[bool] = False
     state_timestamp_type: ClassVar[str | None] = None
     untyped_column_type: ClassVar[str | None] = None
     _snapshot_sql_dialect: ClassVar[SnapshotSqlDialect] = SnapshotSqlDialect(
@@ -1683,6 +1685,18 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         return RelationRowCountEstimate(
             row_count=None,
             detail=f"adapter '{self.adapter_name}' does not report row counts from metadata",
+        )
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Metadata-only rows and bytes of `names` in one schema, one relation at a time."""
+
+        return estimates_one_at_a_time(
+            estimate=self.estimate_relation_row_count,
+            connection=connection,
+            location=(database, schema),
+            names=names,
         )
 
     def _build_row_diff_relation_ctes(

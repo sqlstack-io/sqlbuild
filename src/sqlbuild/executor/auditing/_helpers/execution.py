@@ -281,6 +281,7 @@ def _base_result(
         sample_unit=audit.sample_unit,
         minimum_samples=audit.minimum_samples,
         thresholds=audit.thresholds,
+        ignored=audit.ignore_failure and outcome == AuditOutcome.ERROR,
     )
 
 

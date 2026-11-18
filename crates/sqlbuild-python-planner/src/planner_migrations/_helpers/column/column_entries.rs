@@ -1,14 +1,19 @@
 //! Materialize column decisions from native proofs and live evidence.
 
+use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
+use crate::planner_warehouse::models::{AdapterRead, Read};
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::planner_migrations::_helpers::column::column_candidates::declared_names;
-use crate::planner_migrations::_helpers::column::column_objects::{lower, model, replace};
+use crate::planner_migrations::_helpers::column::column_objects::lower;
+use crate::planner_migrations::_helpers::column::column_objects::model;
+use crate::planner_migrations::_helpers::column::column_objects::replace;
 use crate::planner_migrations::_helpers::column::columns::identical_renames;
 use crate::planner_migrations::_helpers::column::columns::rename_hints;
-use crate::planner_migrations::constants::{AUTOMATIC, DONE};
-use crate::planner_migrations::models::{CheckedColumns, ColumnCandidate};
-use crate::planner_phases::main::inputs::runtime_field::runtime_field;
+use crate::planner_migrations::constants::AUTOMATIC;
+use crate::planner_migrations::constants::DONE;
+use crate::planner_migrations::models::CheckedColumns;
+use crate::planner_migrations::models::ColumnCandidate;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PyTuple};
 use sqlbuild_analysis::planner_migrations::main::column_decision::column_decision;
@@ -177,19 +182,14 @@ pub(crate) fn checked<'py>(
     } else {
         native_field(&destination, "name")?
     };
-    let reason = call_with(
-        &native_field(
-            &native_field(runtime, "adapter")?,
-            "column_rename_unavailable_reason",
-        )?,
-        &[
-            (
-                "connection",
-                runtime_field(runtime, |runtime| &runtime.connection)?,
-            ),
-            ("destination", relation),
-        ],
-    )?;
+    let reason = match runtime_reads(runtime)?
+        .get()
+        .reads()
+        .adapter_read(runtime.py(), AdapterRead::ColumnRenameUnavailable(relation))?
+    {
+        Read::Known(reason) => reason,
+        Read::Unknown(_) => runtime.py().None().into_bound(runtime.py()),
+    };
     if reason.is_none() {
         return Ok(CheckedColumns {
             entries,

@@ -17,9 +17,8 @@ use sqlbuild_host::entries::models::ThirdPartyHost;
 
 use crate::bindings::_helpers::dbt_interop::profile::build_dbt_init_project_toml;
 use crate::bindings::_helpers::dbt_interop::profile::normalize_dbt_profile_connection;
-use crate::bindings::_helpers::dbt_interop::profile_load::{
-    load_dbt_project_metadata, load_selected_dbt_profile_output,
-};
+use crate::bindings::_helpers::dbt_interop::profile_load::load_dbt_project_metadata;
+use crate::bindings::_helpers::dbt_interop::profile_load::load_selected_dbt_profile_output;
 use crate::bindings::_helpers::dbt_interop::runner::launch_os_error;
 use sqlbuild_config::dbt_profile::models::DbtProjectMetadata;
 use sqlbuild_python_base::boundary::main::call_with::call_with;

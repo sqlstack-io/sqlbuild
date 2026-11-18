@@ -23,13 +23,13 @@ use crate::credentials::models::{
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
-use crate::platform::main::read_location_work::read_location_work;
+use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::LocationWork;
 use crate::runs::tests::helpers::{request as run_request, request_run};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
 use crate::store::models::TransactionMode;
@@ -93,8 +93,8 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             let mut input = snapshot(location);
             input.documents.get_mut("triggers").expect("triggers")["health_orders"]["when"] =
                 json!({"kind":"custom", "function":"orders_ready", "code_hash":"orders_v1"});
-            input.documents.get_mut("jobs").expect("jobs")["orders"]["concurrency_groups"] =
-                json!(["warehouse_heavy"]);
+            input.documents.get_mut("jobs").expect("jobs")["orders"]["pools"] =
+                json!({"warehouse_heavy": {"amount": 2, "limit": 3}});
             input.documents.insert(
                 "groups".into(),
                 json!({"nightly": {"description": "Nightly orders", "selection": ["orders"], "jobs": {"orders": []}}}),
@@ -418,10 +418,10 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         jobs.as_array().into_iter().flatten().cloned().collect();
                     let expected_jobs = [
                         json!({"job_key": "nightly", "kind": "group", "description": "Nightly orders",
-                            "selection": ["orders"], "concurrency_groups": [], "snapshot_id": published.snapshot_id,
+                            "selection": ["orders"], "pools": [], "concurrency": null, "resolved_concurrency": null, "snapshot_id": published.snapshot_id,
                             "select": null, "declared_at": null, "owner": null, "overlap": "queue", "on_failure": null}),
                         json!({"job_key": "orders", "kind": "job", "description": "Refresh orders",
-                            "selection": ["orders"], "concurrency_groups": ["warehouse_heavy"], "snapshot_id": published.snapshot_id,
+                            "selection": ["orders"], "pools": [{"pool": "warehouse_heavy", "amount": 2, "limit": 3, "cap": null, "server_limit": 3, "clamped": false, "shared_with": []}], "concurrency": null, "resolved_concurrency": null, "snapshot_id": published.snapshot_id,
                             "select": null, "declared_at": null, "owner": null, "overlap": "queue", "on_failure": null}),
                     ];
                     assert_eq!(

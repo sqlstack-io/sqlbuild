@@ -1,5 +1,5 @@
 use crate::dispatch::constants::{
-    CLONE_ROUTE, COMPILE_ROUTE, DBT_PLAN_ROUTE, FORMAT_ROUTE, REFACTOR_ROUTE,
+    BUILD_ROUTE, CLONE_ROUTE, COMPILE_ROUTE, DBT_PLAN_ROUTE, FORMAT_ROUTE, REFACTOR_ROUTE,
     SCENARIO_CAPTURE_ROUTE,
 };
 use crate::dispatch::main::command_dispatch::command_dispatch;
@@ -37,6 +37,20 @@ fn given_parsed_command_when_dispatching_then_selects_python_dispatcher_route() 
             expected_dispatch: Dispatch::Run(
                 &CLONE_ROUTE,
                 Some(failure("clone requires --from", "C406")),
+            ),
+        },
+        CommandDispatchTestCase {
+            description: "build --ignore-audit-failures with --no-audits fails",
+            facts: CommandFacts {
+                ignores_failures_of_no_audits: true,
+                ..facts("build", None)
+            },
+            expected_dispatch: Dispatch::Run(
+                &BUILD_ROUTE,
+                Some(failure(
+                    "--ignore-audit-failures cannot be combined with --no-audits: no audit runs, so there is no failure to ignore",
+                    "C419",
+                )),
             ),
         },
         CommandDispatchTestCase {

@@ -197,3 +197,22 @@ class AdapterCursorLiteralEscapingTestCase:
     adapter: StrictAdapter
     expected_literal: str
     expected_delete_bound: str
+
+
+@dataclass(frozen=True)
+class HistoryComputeTestCase:
+    description: str
+    adapter: type[BaseAdapter]
+    expected_wakes_compute: bool
+
+
+@dataclass(frozen=True)
+class SchemaRowCountEstimatesTestCase:
+    description: str
+    adapter: BaseAdapter
+    metadata_rows: tuple[tuple[object, ...], ...]
+    pages: tuple[tuple[str, ...], ...]
+    expected_estimates: tuple[tuple[int | None, str | None, int | None], ...]
+    expected_reads: int
+    expected_sql_fragment: str
+    metadata_columns: tuple[str, ...] = ()

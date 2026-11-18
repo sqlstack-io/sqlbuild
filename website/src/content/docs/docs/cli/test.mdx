@@ -82,9 +82,11 @@ Details:
 
 ## Python tests
 
-Python tests are pytest modules named `test_*.py` under `tests/python/` and `tests/providers/`. Each
-sits in the folder that mirrors the code it tests, so the tests of
-`python/orders/storefront_import/node.py` live in `tests/python/orders/storefront_import/`.
+Python tests are pytest modules named `test_*.py` under `tests/python/`, `tests/providers/` and
+`tests/orchestration/`. Each sits in the folder that mirrors the code it tests, so the tests of
+`python/orders/storefront_import/node.py` live in `tests/python/orders/storefront_import/`, and
+the tests of the sensor `orchestration/sensors/orders/restock.py` in
+`tests/orchestration/sensors/orders/test_restock.py`.
 
 | Command | SQL unit tests | Python tests |
 |---------|----------------|--------------|
@@ -95,7 +97,8 @@ sits in the folder that mirrors the code it tests, so the tests of
 | `sqb build` | Yes | Never |
 
 pytest runs from the project directory with the same Python as SQLBuild and with
-`--import-mode=importlib`, so tests import project code as `python.orders...` or `providers...`.
+`--import-mode=importlib`, so tests import project code as `python.orders...`, `providers...` or
+`orchestration.sensors...`.
 Its output appears after the SQL test summary, followed by `Python tests passed` or
 `Python tests failed`. `sqb test` exits non-zero when either kind fails.
 

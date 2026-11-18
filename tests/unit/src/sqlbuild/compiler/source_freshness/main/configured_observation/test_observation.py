@@ -6,12 +6,14 @@ from typing import Any
 import pytest
 
 from sqlbuild._native import (
+    Dialect,
     SourceEntry,
     SourceFreshnessConfig,
     SourceFreshnessObservation,
     SourceFreshnessObservationError,
     SourceFreshnessStrategy,
     SourceFreshnessValueKind,
+    live_reads,
     normalize_source_freshness_data_version,
     observe_configured_source_freshness,
 )
@@ -90,8 +92,8 @@ def test_given_source_freshness_config_when_observing_then_returns_data_version(
         for statement in test_case.setup_sql:
             adapter.execute(connection=connection, sql=statement)
         observation: SourceFreshnessObservation = observe_configured_source_freshness(
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             source=SourceEntry(
                 name=test_case.source_name,
                 table=test_case.table,
@@ -181,8 +183,8 @@ def test_given_invalid_source_freshness_result_when_observing_then_raises_clear_
             SourceFreshnessObservationError, match=test_case.expected_error_fragment
         ):
             observe_configured_source_freshness(
-                adapter=adapter,
-                connection=connection,
+                dialect=Dialect(adapter),
+                reads=live_reads(adapter=adapter, connection=connection),
                 source=source,
                 observed_at=datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
             )
@@ -222,8 +224,8 @@ def test_given_adapter_freshness_is_unsupported_when_observing_then_metadata_is_
             SourceFreshnessObservationError, match=test_case.expected_error_fragment
         ):
             observe_configured_source_freshness(
-                adapter=adapter,
-                connection=connection,
+                dialect=Dialect(adapter),
+                reads=live_reads(adapter=adapter, connection=connection),
                 source=source,
                 observed_at=datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
             )

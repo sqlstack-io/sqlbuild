@@ -7,7 +7,7 @@ use sqlbuild_state::consumption::main::replaced_append::replaced_append;
 use sqlbuild_state::consumption::models::{ConsumptionAppend, NodeKey, RelationKey};
 use uuid::Uuid;
 
-use crate::native_host::_helpers::consumption_state::{append, table_exists};
+use crate::native_host::_helpers::consumption_io::{append, table_exists};
 use crate::native_host::models::Location;
 
 /// Append a never-completed execution for each of `replaced` where its schema has a consumption table.

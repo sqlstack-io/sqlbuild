@@ -35,7 +35,7 @@ use sqlbuild_orchestration::runs::models::RunChange;
 use sqlbuild_orchestration::runs::models::RunCommand;
 use sqlbuild_orchestration::runs::models::RunExecution;
 use sqlbuild_orchestration::runs::models::RunOutcome;
-use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
+use sqlbuild_orchestration::snapshots::main::publication::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::worker::errors::WorkerError;
@@ -48,6 +48,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 use uuid::Uuid;
 
@@ -118,27 +119,29 @@ impl NativeOrchestrationSnapshot {
 #[derive(Debug)]
 pub struct WorkerBuild {
     pub worker: Py<NativeOrchestrationWorker>,
-    pub(crate) execution: RunExecution,
-    pub(crate) completed: Mutex<BTreeMap<String, NodeOutcome>>,
-    pub(crate) checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
+    execution: RunExecution,
+    completed: Mutex<BTreeMap<String, NodeOutcome>>,
+    checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
     /// The snapshot's audits and SQL tests, each with the node keys it checks.
-    pub(crate) attached: BTreeMap<String, Vec<String>>,
+    attached: BTreeMap<String, Vec<String>>,
     /// Each SQL test with every node a failure of it blocks in a build: its expected, assertion and reference models and the functions it checks.
-    pub(crate) blocked: BTreeMap<String, Vec<String>>,
+    blocked: BTreeMap<String, Vec<String>>,
     /// How many of each function's planned tests have still to report; a function is built before its tests run.
-    pub(crate) untested: Mutex<BTreeMap<String, usize>>,
+    untested: Mutex<BTreeMap<String, usize>>,
     /// A built function's result, held until its tests report so a failing one can fail it instead.
-    pub(crate) held: Mutex<BTreeMap<String, Completion>>,
+    held: Mutex<BTreeMap<String, Completion>>,
     /// Each snapshot node's direct upstream node keys, for naming what a skipped node waited on.
-    pub(crate) upstream: BTreeMap<String, Vec<String>>,
+    upstream: BTreeMap<String, Vec<String>>,
     /// The failed node each finished node traces back to: itself when it failed, its cause when skipped.
-    pub(crate) causes: Mutex<BTreeMap<String, String>>,
+    causes: Mutex<BTreeMap<String, String>>,
     /// The worst attached outcome of each node, for commands that only run tests or audits.
-    pub(crate) checked: Mutex<BTreeMap<String, NodeOutcome>>,
+    checked: Mutex<BTreeMap<String, NodeOutcome>>,
     /// Whether the command returned, having run every check it planned, rather than being refused or raising.
-    pub(crate) returned: AtomicBool,
+    returned: AtomicBool,
     /// Why the worker refused the run before executing anything, reported as the run's status reason.
-    pub(crate) refusal: Mutex<Option<String>>,
+    refusal: Mutex<Option<String>>,
+    /// Error-severity audit failures the build let through, reported before the run finishes.
+    ignored_audit_failures: AtomicU32,
 }
 
 impl WorkerBuild {
@@ -159,6 +162,7 @@ impl WorkerBuild {
             causes: Mutex::default(),
             checked: Mutex::default(),
             returned: AtomicBool::new(false),
+            ignored_audit_failures: AtomicU32::new(0),
             refusal: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
@@ -176,8 +180,16 @@ impl WorkerBuild {
         self.execution.claim.request.run_id
     }
 
+    /// The build let `count` error-severity audit failures through.
+    pub fn ignored_audit_failures(&self, count: i64) {
+        self.ignored_audit_failures.store(
+            u32::try_from(count.max(0)).unwrap_or(u32::MAX),
+            Ordering::SeqCst,
+        );
+    }
+
     /// Test and audit runs execute only attached checks, so their nodes take the checks' outcome.
-    pub(crate) fn checks_only(&self) -> bool {
+    fn checks_only(&self) -> bool {
         matches!(self.command(), RunCommand::Test | RunCommand::Audit)
     }
 
@@ -262,7 +274,7 @@ impl WorkerBuild {
     }
 
     /// Count each function's tests this build plans, so a built function waits only for tests that will report.
-    pub(crate) fn count_planned_tests(&self, plan: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn count_planned_tests(&self, plan: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut untested = self.untested.lock().map_err(|_| poisoned())?;
         for entry in field(plan, "test_entries")?.try_iter()? {
             let test = format!("{SQL_TEST_KEY_PREFIX}{}", field(&entry?, "name")?.str()?);
@@ -300,7 +312,7 @@ impl WorkerBuild {
     }
 
     /// A skip in a build names the failed node upstream of it; a test or audit run that raised skips what it never checked, with no cause.
-    pub(crate) fn complete(
+    fn complete(
         &self,
         py: Python<'_>,
         key: &str,
@@ -473,7 +485,7 @@ impl WorkerBuild {
     }
 
     /// The failed node nearest upstream of `key` in this run, or the cause a skipped one carries.
-    pub(crate) fn failed_upstream(&self, key: &str) -> PyResult<Option<String>> {
+    fn failed_upstream(&self, key: &str) -> PyResult<Option<String>> {
         let causes = self.causes.lock().map_err(|_| poisoned())?;
         let mut seen: BTreeSet<&str> = BTreeSet::from([key]);
         let mut pending: VecDeque<&str> = VecDeque::from([key]);
@@ -491,7 +503,7 @@ impl WorkerBuild {
     }
 
     /// A selected SQL test completes itself; a failing one, found by its compiled name such as `parent [case]`, fails the nodes it blocks; each test that reports releases a function waiting on its tests.
-    pub(crate) fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
         let py = result.py();
         let outcome: String = field(result, "outcome")?.str()?.extract()?;
         let passed = SqlTestOutcome::from_value(&outcome) == Some(SqlTestOutcome::Pass);
@@ -525,7 +537,7 @@ impl WorkerBuild {
     }
 
     /// Count `test` as reported for each function it checks, and publish a held function once none of its tests is left.
-    pub(crate) fn release_tested(&self, py: Python<'_>, test: &str) -> PyResult<()> {
+    fn release_tested(&self, py: Python<'_>, test: &str) -> PyResult<()> {
         let mut released: Vec<(String, Completion)> = Vec::new();
         {
             let mut untested = self.untested.lock().map_err(|_| poisoned())?;
@@ -549,12 +561,7 @@ impl WorkerBuild {
     }
 
     /// Publish a node's result, or hold a built function's while its tests have still to report.
-    pub(crate) fn complete_or_hold(
-        &self,
-        py: Python<'_>,
-        key: &str,
-        completion: Completion,
-    ) -> PyResult<()> {
+    fn complete_or_hold(&self, py: Python<'_>, key: &str, completion: Completion) -> PyResult<()> {
         let waiting = !self.checks_only()
             && matches!(completion.0, NodeOutcome::Success | NodeOutcome::Warn)
             && self
@@ -671,12 +678,7 @@ impl WorkerBuild {
         self.finish_check(result.py(), &key, outcome)
     }
 
-    pub(crate) fn finish_check(
-        &self,
-        py: Python<'_>,
-        key: &str,
-        outcome: NodeOutcome,
-    ) -> PyResult<()> {
+    fn finish_check(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
         self.worker.bind(py).get().change(
             py,
             &format!("check-finished/{key}"),
@@ -789,6 +791,14 @@ impl WorkerBuild {
             .map_err(|_| poisoned())?
             .clone()
             .unwrap_or_else(|| "worker executor completed and closed its connections".into());
+        let ignored: u32 = self.ignored_audit_failures.load(Ordering::SeqCst);
+        if ignored > 0 {
+            self.worker.bind(py).get().change(
+                py,
+                "worker-audit-failures-ignored",
+                RunChange::AuditFailuresIgnored { count: ignored },
+            )?;
+        }
         self.worker.bind(py).get().change(
             py,
             "worker-finished",

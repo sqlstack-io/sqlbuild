@@ -7,3 +7,4 @@ pub(crate) mod recall_schema;
 pub(crate) mod release_version;
 #[cfg(test)]
 pub(crate) mod statement_count;
+pub(crate) mod writer_gate;

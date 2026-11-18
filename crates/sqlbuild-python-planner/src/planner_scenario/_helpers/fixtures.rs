@@ -14,6 +14,7 @@ use sqlbuild_analysis::compiler::main::scenario_reader_ctes::scenario_reader_cte
 use sqlbuild_analysis::compiler::main::scenario_reader_sql::scenario_reader_sql;
 use sqlbuild_analysis::compiler::models::ScenarioHelperScope;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -171,7 +172,7 @@ pub(crate) fn build_scenario_fixture_plans<'py>(
                 "scenario",
                 "graph_plan",
                 "relation_plan",
-                "adapter",
+                "dialect",
                 "source_lexical_syntax",
             ],
             &["fixture_sql_overrides"],
@@ -179,7 +180,7 @@ pub(crate) fn build_scenario_fixture_plans<'py>(
     )?;
     let scenario = args.value("scenario")?;
     let context = SqlContext {
-        adapter: args.value("adapter")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
         relations: args.value("relation_plan")?,
         syntax: args.value("source_lexical_syntax")?,
         label: source_label(&scenario)?,

@@ -9,13 +9,23 @@ use sqlbuild_core::scenario_command::models::ScenarioNamespace;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::scenario_command::conversions::succeeded;
-use crate::bindings::_helpers::scenario_command::presentation::{
-    CompletionKind, RelayContext, SectionStatus, begin_section, connection_hooks, progress_relay,
-};
-use crate::bindings::_helpers::scenario_command::setup::{
-    CompileInputs, boolean, capture_limits, capture_settings, compile, flush, optional_text,
-    project_connection_config, selected_scenarios, text, write,
-};
+use crate::bindings::_helpers::scenario_command::presentation::CompletionKind;
+use crate::bindings::_helpers::scenario_command::presentation::RelayContext;
+use crate::bindings::_helpers::scenario_command::presentation::SectionStatus;
+use crate::bindings::_helpers::scenario_command::presentation::begin_section;
+use crate::bindings::_helpers::scenario_command::presentation::connection_hooks;
+use crate::bindings::_helpers::scenario_command::presentation::progress_relay;
+use crate::bindings::_helpers::scenario_command::setup::CompileInputs;
+use crate::bindings::_helpers::scenario_command::setup::boolean;
+use crate::bindings::_helpers::scenario_command::setup::capture_limits;
+use crate::bindings::_helpers::scenario_command::setup::capture_settings;
+use crate::bindings::_helpers::scenario_command::setup::compile;
+use crate::bindings::_helpers::scenario_command::setup::flush;
+use crate::bindings::_helpers::scenario_command::setup::optional_text;
+use crate::bindings::_helpers::scenario_command::setup::project_connection_config;
+use crate::bindings::_helpers::scenario_command::setup::selected_scenarios;
+use crate::bindings::_helpers::scenario_command::setup::text;
+use crate::bindings::_helpers::scenario_command::setup::write;
 use crate::bindings::_helpers::scenario_command::test_command::TestRun;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

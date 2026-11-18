@@ -11,12 +11,12 @@ use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 use crate::compiled_project::main::plain_value::plain_value;
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::models::NativeProjectView;
-use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::{
-    boundary_nodes, columns, metadata,
-};
-use crate::project_snapshot::_helpers::snapshot::snapshot_project::{
-    dependency_keys, destination, insert_node,
-};
+use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::boundary_nodes;
+use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::columns;
+use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::metadata;
+use crate::project_snapshot::_helpers::snapshot::snapshot_project::dependency_keys;
+use crate::project_snapshot::_helpers::snapshot::snapshot_project::destination;
+use crate::project_snapshot::_helpers::snapshot::snapshot_project::insert_node;
 use crate::resource_views::models::NativeCompiledFunction;
 
 pub(crate) fn resource_nodes(

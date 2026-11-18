@@ -16,18 +16,23 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::dev_events::main::compile_summary::compile_summary;
 use sqlbuild_orchestration::dev_events::main::emit_dev_steps::emit_dev_steps;
 use sqlbuild_orchestration::dev_events::models::{DevPhase, DevStepState};
+use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
-use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
+use crate::bindings::_helpers::location_command::constants::EXECUTE_ACTION;
+use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
+use crate::bindings::_helpers::location_command::load_rules::load_rules;
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
-use crate::bindings::_helpers::location_command::snapshot::{
-    build_orchestration_snapshot, orchestration_snapshot,
-};
-use crate::bindings::_helpers::location_command::worker::{blocked_nodes, execute_worker};
-use crate::bindings::_helpers::query_command::project::{
-    ProjectAdapter, ProjectInputs, project_adapter,
-};
+use crate::bindings::_helpers::location_command::snapshot::build_orchestration_snapshot;
+use crate::bindings::_helpers::location_command::snapshot::orchestration_snapshot;
+use crate::bindings::_helpers::location_command::snapshot_connection::add_connection;
+use crate::bindings::_helpers::location_command::types::HeldProject;
+use crate::bindings::_helpers::location_command::worker::blocked_nodes;
+use crate::bindings::_helpers::location_command::worker::execute_worker;
+use crate::bindings::_helpers::query_command::project::ProjectAdapter;
+use crate::bindings::_helpers::query_command::project::ProjectInputs;
+use crate::bindings::_helpers::query_command::project::project_adapter;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -122,11 +127,14 @@ fn metadata(
     })
 }
 
+/// A compiled snapshot, its blocked nodes and the compile's `CompiledProjectPhaseResult`.
+type CompiledSnapshot<'py> = (NativeOrchestrationSnapshot, NodeKeys, Bound<'py, PyAny>);
+
 fn compile_location<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
     input: &SnapshotInput,
-) -> PyResult<(NativeOrchestrationSnapshot, ProjectAdapter<'py>, NodeKeys)> {
+) -> PyResult<(CompiledSnapshot<'py>, ProjectAdapter<'py>)> {
     status(py, "Discovering location project...")?;
     steps(py, &[(DevPhase::Discover, DevStepState::Started)], None)?;
     let project = project_adapter(
@@ -140,11 +148,11 @@ fn compile_location<'py>(
         (DevPhase::Compile, DevStepState::Started),
     ];
     steps(py, &discovered, None)?;
-    let (snapshot, blocked) = compile_snapshot(py, arguments, (input, &project), None)?;
+    let compiled = compile_snapshot(py, arguments, (input, &project), None)?;
     status(py, "Location snapshot compiled.")?;
-    let compiled = [(DevPhase::Compile, DevStepState::Finished)];
-    steps(py, &compiled, Some(compile_summary(&snapshot.input)))?;
-    Ok((snapshot, project, blocked))
+    let finished = [(DevPhase::Compile, DevStepState::Finished)];
+    steps(py, &finished, Some(compile_summary(&compiled.0.input)))?;
+    Ok((compiled, project))
 }
 
 /// Compile the discovered project into a snapshot, with a run's variables when it carries them.
@@ -153,7 +161,7 @@ pub(super) fn compile_snapshot<'py>(
     arguments: &KeywordArguments<'py>,
     (input, project): (&SnapshotInput, &ProjectAdapter<'py>),
     vars: Option<&Bound<'py, PyAny>>,
-) -> PyResult<(NativeOrchestrationSnapshot, NodeKeys)> {
+) -> PyResult<CompiledSnapshot<'py>> {
     let ProjectAdapter {
         project_dir,
         discovered,
@@ -185,7 +193,8 @@ pub(super) fn compile_snapshot<'py>(
                 .is_some_and(|action| action == EXECUTE_ACTION),
         ),
     )?;
-    Ok((snapshot, blocked_nodes(&project)?))
+    let blocked = blocked_nodes(&project)?;
+    Ok((snapshot, blocked, compiled))
 }
 
 pub(super) fn location_arguments<'py>(
@@ -209,14 +218,17 @@ pub(super) fn location_arguments<'py>(
     )
 }
 
-pub(super) fn publish_location(
-    py: Python<'_>,
-    arguments: &KeywordArguments<'_>,
-) -> PyResult<(
+/// A published record, its earliest calendar refresh and the state locations its nodes write.
+pub(super) type Published = (
     SnapshotRecord,
     Option<DateTime<Utc>>,
     Vec<WarehouseStateLocation>,
-)> {
+);
+
+pub(super) fn publish_location<'py>(
+    py: Python<'py>,
+    arguments: &KeywordArguments<'py>,
+) -> PyResult<Result<(Published, HeldProject<'py>), LocationRuleFailure>> {
     if arguments
         .value("action")?
         .extract::<Option<String>>()?
@@ -238,7 +250,14 @@ pub(super) fn publish_location(
         .value("project_dir")?
         .extract::<std::path::PathBuf>()?;
     let input = metadata(py, arguments, &directory)?;
-    let (snapshot, _, _) = compile_location(py, arguments, &input)?;
+    let ((mut snapshot, _, compiled), project) = compile_location(py, arguments, &input)?;
+    if let Some(failure) = load_rules(py, arguments, (&project, &compiled))? {
+        return Ok(Err(failure));
+    }
+    snapshot.input = add_connection(
+        snapshot.input,
+        (&project, &arguments.value("selected_target")?),
+    )?;
     let locations: BTreeSet<_> = snapshot
         .input
         .nodes
@@ -277,8 +296,9 @@ pub(super) fn publish_location(
             &arguments.value("server_url")?.extract::<String>()?,
             &bearer,
         )?.map_err(|error| {
-            let message = if matches!(error, sqlbuild_orchestration::api::errors::ClientError::Transport(_)) {
-                format!("Publication outcome is unknown; generation {} may already be published. Check the current snapshot before retrying: {error}", input.generation)
+            let message = if let sqlbuild_orchestration::api::errors::ClientError::Transport(transport) = &error {
+                let cause = if transport.is_timeout() { " (the server did not answer in time)" } else { "" };
+                format!("Publication outcome is unknown; generation {} may already be published. Check the current snapshot before retrying: {error}{cause}", input.generation)
             } else {
                 error.to_string()
             };
@@ -286,7 +306,10 @@ pub(super) fn publish_location(
         })?;
     status(py, "Location snapshot published.")?;
     steps(py, &[(DevPhase::Publish, DevStepState::Finished)], None)?;
-    Ok((record, refresh_at, locations.into_iter().collect()))
+    Ok(Ok((
+        (record, refresh_at, locations.into_iter().collect()),
+        (project.discovered, compiled),
+    )))
 }
 
 /// One-shot publication and the supervisor's private stdio runtime share the same compiler path.
@@ -322,7 +345,7 @@ pub(crate) fn run_location<'py>(
             arguments.value("run_id")?.extract::<String>()?,
             arguments.value("claim_id")?.extract::<String>()?,
         );
-        let (snapshot, project, blocked) = compile_location(py, &arguments, &input)?;
+        let ((snapshot, blocked, _), project) = compile_location(py, &arguments, &input)?;
         return execute_worker(
             py,
             (&snapshot, project, blocked),
@@ -339,7 +362,12 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
-        let (record, _, _) = publish_location(py, &arguments)?;
+        let ((record, _, _), _) = publish_location(py, &arguments)?.map_err(|failure| {
+            PyValueError::new_err(format!(
+                "Compile failed: {} rule findings",
+                failure.finding_count
+            ))
+        })?;
         let output = serde_json::to_string(&record)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         write_console(py, "stdout", &format!("{output}\n")).map_err(|error| {

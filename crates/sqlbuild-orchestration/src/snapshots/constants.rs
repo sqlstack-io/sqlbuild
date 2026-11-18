@@ -6,8 +6,12 @@ pub(crate) const CONTENT_HASH_CHUNK: usize = 500;
 
 /// `{node_key: {column: {"expression_range": [start, end]}}}`; readers skip unknown column keys.
 pub(crate) const COLUMNS_DOCUMENT: &str = "columns";
+/// How long a publication waits for the server, which stores a large snapshot well past 30 s.
+pub(crate) const PUBLISH_TIMEOUT_SECONDS: u64 = 300;
+/// The target's non-secret connection settings, a `ConnectionDetails`.
+pub const CONNECTION_DOCUMENT: &str = "connection";
 /// Snapshot document kinds: per-snapshot metadata that never changes a node hash or node change.
-pub(crate) const SNAPSHOT_DOCUMENT_KINDS: [&str; 7] = [
+pub(crate) const SNAPSHOT_DOCUMENT_KINDS: [&str; 8] = [
     "jobs",
     "groups",
     "triggers",
@@ -15,6 +19,36 @@ pub(crate) const SNAPSHOT_DOCUMENT_KINDS: [&str; 7] = [
     "lineage",
     COLUMNS_DOCUMENT,
     "providers",
+    CONNECTION_DOCUMENT,
+];
+/// Connection keys that may name the signed-in user, in preference order.
+pub(crate) const USER_KEYS: [&str; 3] = ["user", "username", "login"];
+/// Connection keys that may name the server, in preference order.
+pub(crate) const HOST_KEYS: [&str; 3] = ["host", "server_hostname", "server"];
+/// Connection keys that may name the default database, in preference order.
+pub(crate) const DATABASE_KEYS: [&str; 4] = ["database", "dbname", "catalog", "project"];
+/// Adapters whose connection names a local database file, and the key that names it.
+pub(crate) const FILE_DATABASE_KEYS: [(&str, &str); 2] =
+    [("duckdb", "database"), ("sqlite", "path")];
+/// Snowflake `authenticator` values by the sign-in method they name; others are shown as they are.
+pub(crate) const AUTHENTICATOR_METHODS: [(&str, &str); 7] = [
+    ("snowflake", "password"),
+    ("snowflake_jwt", "key_pair"),
+    ("externalbrowser", "external_browser"),
+    ("oauth", "oauth"),
+    ("oauth_authorization_code", "oauth"),
+    ("oauth_client_credentials", "oauth"),
+    ("programmatic_access_token", "token"),
+];
+/// Keys whose presence names the sign-in method when no authenticator does, in preference order.
+pub(crate) const CREDENTIAL_KEY_METHODS: [(&str, &str); 7] = [
+    ("private_key", "key_pair"),
+    ("private_key_path", "key_pair"),
+    ("private_key_file", "key_pair"),
+    ("token", "token"),
+    ("access_token", "token"),
+    ("credentials_path", "service_account"),
+    ("password", "password"),
 ];
 
 /// Beyond the newest generations, any retained reference keeps a snapshot.

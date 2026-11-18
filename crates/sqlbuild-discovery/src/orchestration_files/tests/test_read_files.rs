@@ -1,13 +1,17 @@
 use std::collections::BTreeMap;
 
+use crate::orchestration_files::_helpers::read_group_file::read_group_file;
 use crate::orchestration_files::_helpers::read_job_file::read_job_file;
 use crate::orchestration_files::models::{
-    InitialStatus, OnFailure, Overlap, ScheduleFile, ScheduleSource,
+    DependencyFailure, DependencySettings, GroupDependencies, InitialStatus, Overlap, RetryPolicy,
+    ScheduleFile, ScheduleSource, WaitFor,
 };
 use crate::orchestration_files::tests::helpers::{at, group_members, written};
 use crate::orchestration_files::tests::test_types::{
-    FileErrorTestCase, GroupReadTestCase, JobReadTestCase,
+    FileErrorTestCase, GroupDependenciesTestCase, GroupReadTestCase, JobReadTestCase,
 };
+
+const DEPENDENCY_GROUP: &str = "name = \"nightly_job_group\"\ndescription = \"d\"\njobs = [\"orders_job\", \"partner_export_job\"]\n\n";
 
 const FULL_JOB: &str = r#"name = "orders_export_job"
 description = "Write the daily partner file."
@@ -16,7 +20,7 @@ exclude = "tag:slow"
 targets = ["production"]
 owner = "Orders team"
 overlap = "skip"
-concurrency_groups = ["warehouse"]
+pools = { warehouse = 2, supplier_api = 1 }
 schedule = { calendar = "trading_days_calendar", timezone = "Europe/London", default_status = "paused" }
 
 [on_failure]
@@ -41,10 +45,21 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_select: written("python/orders/partner_export", 3, 10),
             expected_exclude: Some("tag:slow"),
             expected_overlap: Overlap::Skip,
-            expected_on_failure: Some(OnFailure {
-                retries: 2,
-                retry_delay_seconds: 0,
+            expected_pools: &[("supplier_api", 1), ("warehouse", 2)],
+            expected_retry: Some(RetryPolicy {
+                attempts: 3,
+                delay_seconds: 0,
             }),
+            expected_deprecations: vec![
+                (
+                    "`[on_failure]` is deprecated; rename it to `[retry]`",
+                    at(11, 1),
+                ),
+                (
+                    "`retries` is deprecated; rename it to `attempts`",
+                    at(12, 11),
+                ),
+            ],
             expected_schedule: Some(ScheduleFile {
                 source: ScheduleSource::Calendar(written("trading_days_calendar", 9, 25)),
                 timezone: written("Europe/London", 9, 61),
@@ -64,7 +79,52 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_select: written("orders", 3, 10),
             expected_exclude: None,
             expected_overlap: Overlap::Queue,
-            expected_on_failure: None,
+            expected_pools: &[],
+            expected_retry: None,
+            expected_deprecations: Vec::new(),
+            expected_schedule: None,
+            expected_cpus: None,
+            expected_settings: BTreeMap::new(),
+        },
+        JobReadTestCase {
+            description: "a job with a retry table uses the current names",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\n\n[retry]\nattempts = 3\ndelay_seconds = 900\n",
+            expected_name: written("a_job", 1, 8),
+            expected_select: written("orders", 3, 10),
+            expected_exclude: None,
+            expected_overlap: Overlap::Queue,
+            expected_pools: &[],
+            expected_retry: Some(RetryPolicy {
+                attempts: 3,
+                delay_seconds: 900,
+            }),
+            expected_deprecations: Vec::new(),
+            expected_schedule: None,
+            expected_cpus: None,
+            expected_settings: BTreeMap::new(),
+        },
+        JobReadTestCase {
+            description: "a retry table may still use the deprecated key names",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { retries = 1, retry_delay_seconds = 60 }\n",
+            expected_name: written("a_job", 1, 8),
+            expected_select: written("orders", 3, 10),
+            expected_exclude: None,
+            expected_overlap: Overlap::Queue,
+            expected_pools: &[],
+            expected_retry: Some(RetryPolicy {
+                attempts: 2,
+                delay_seconds: 60,
+            }),
+            expected_deprecations: vec![
+                (
+                    "`retries` is deprecated; rename it to `attempts`",
+                    at(4, 21),
+                ),
+                (
+                    "`retry_delay_seconds` is deprecated; rename it to `delay_seconds`",
+                    at(4, 46),
+                ),
+            ],
             expected_schedule: None,
             expected_cpus: None,
             expected_settings: BTreeMap::new(),
@@ -94,7 +154,27 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             test_case.description
         );
         assert_eq!(
-            job.run.on_failure, test_case.expected_on_failure,
+            job.run
+                .pools
+                .iter()
+                .map(|(pool, amount)| (pool.as_str(), *amount))
+                .collect::<Vec<_>>(),
+            test_case.expected_pools,
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            job.run.retry, test_case.expected_retry,
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            job.run
+                .deprecations
+                .iter()
+                .map(|deprecation| (deprecation.message.as_str(), deprecation.position))
+                .collect::<Vec<_>>(),
+            test_case.expected_deprecations,
             "{}",
             test_case.description
         );
@@ -136,6 +216,20 @@ fn given_invalid_job_files_when_reading_then_reports_message_position_and_help()
             expected_help: Some("move it under [settings] as `concurrency = ...`"),
         },
         FileErrorTestCase {
+            description: "a pool amount of zero",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\npools = { supplier_api = 0 }\n",
+            expected_message: "pools.supplier_api must take a whole number of slots from 1 to 10000, such as supplier_api = 1",
+            expected_position: at(4, 26),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "a pool written as a list",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\npools = [\"supplier_api\"]\n",
+            expected_message: "invalid type: sequence, expected a map",
+            expected_position: at(4, 9),
+            expected_help: None,
+        },
+        FileErrorTestCase {
             description: "blank select",
             text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"  \"\n",
             expected_message: "select must not be blank",
@@ -153,14 +247,56 @@ fn given_invalid_job_files_when_reading_then_reports_message_position_and_help()
             description: "retries out of range",
             text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\non_failure = { retries = 0 }\n",
             expected_message: "on_failure retries must be a whole number from 1 to 10",
-            expected_position: at(4, 14),
+            expected_position: at(4, 26),
             expected_help: None,
         },
         FileErrorTestCase {
             description: "retry delay beyond a day",
             text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\non_failure = { retries = 1, retry_delay_seconds = 86401 }\n",
             expected_message: "on_failure retry_delay_seconds must be a whole number from 0 to 86400",
-            expected_position: at(4, 14),
+            expected_position: at(4, 51),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "attempts out of range",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\n[retry]\nattempts = 12\n",
+            expected_message: "retry attempts must be a whole number from 2 to 11",
+            expected_position: at(5, 12),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "a single attempt never retries",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\n[retry]\nattempts = 1\n",
+            expected_message: "retry attempts must be a whole number from 2 to 11",
+            expected_position: at(5, 12),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "retry without attempts",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { delay_seconds = 60 }\n",
+            expected_message: "retry needs `attempts`",
+            expected_position: at(4, 9),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "a key and its deprecated name together",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { attempts = 1, retries = 2 }\n",
+            expected_message: "retry sets both `attempts` and its deprecated name `retries`; keep only `attempts`",
+            expected_position: at(4, 35),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "the retry table and its deprecated name together",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { attempts = 1 }\non_failure = { retries = 2 }\n",
+            expected_message: "`[retry]` and its deprecated name `[on_failure]` are both set; keep only `[retry]`",
+            expected_position: at(5, 14),
+            expected_help: None,
+        },
+        FileErrorTestCase {
+            description: "unknown retry key",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { attempts = 1, delay = 5 }\n",
+            expected_message: "unknown field `delay`, expected one of `attempts`, `retries`, `delay_seconds`, `retry_delay_seconds`",
+            expected_position: at(4, 25),
             expected_help: None,
         },
         FileErrorTestCase {
@@ -218,6 +354,91 @@ fn given_group_files_when_reading_then_keeps_member_positions_and_refuses_repeat
         assert_eq!(
             group_members(test_case.text),
             test_case.expected_members,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_group_dependencies_when_reading_then_types_defaults_and_member_overrides() {
+    let test_cases = [
+        GroupDependenciesTestCase {
+            description: "no dependencies table keeps today's behaviour",
+            dependencies: "",
+            expected_dependencies: Ok(GroupDependencies::default()),
+        },
+        GroupDependenciesTestCase {
+            description: "defaults and a member override",
+            dependencies: "[dependencies]\nwait_for = \"job\"\non_failure = \"run\"\n\n[dependencies.partner_export_job]\non_failure = \"skip\"\n",
+            expected_dependencies: Ok(GroupDependencies {
+                defaults: DependencySettings {
+                    wait_for: Some(WaitFor::Job),
+                    on_failure: Some(DependencyFailure::Run),
+                },
+                members: [(
+                    "partner_export_job".to_owned(),
+                    DependencySettings {
+                        wait_for: None,
+                        on_failure: Some(DependencyFailure::Skip),
+                    },
+                )]
+                .into(),
+            }),
+        },
+        GroupDependenciesTestCase {
+            description: "partial is the explicit default",
+            dependencies: "dependencies = { on_failure = \"partial\" }\n",
+            expected_dependencies: Ok(GroupDependencies {
+                defaults: DependencySettings {
+                    wait_for: None,
+                    on_failure: Some(DependencyFailure::Partial),
+                },
+                members: [].into(),
+            }),
+        },
+        GroupDependenciesTestCase {
+            description: "an override must name a member",
+            dependencies: "[dependencies.inventory_job]\non_failure = \"skip\"\n",
+            expected_dependencies: Err((
+                "dependencies.inventory_job is neither `wait_for`, `on_failure` nor a job in `jobs`",
+                at(5, 15),
+            )),
+        },
+        GroupDependenciesTestCase {
+            description: "an unknown failure policy",
+            dependencies: "[dependencies]\non_failure = \"retry\"\n",
+            expected_dependencies: Err((
+                "on_failure must be one of \"partial\", \"skip\", \"run\"",
+                at(6, 14),
+            )),
+        },
+        GroupDependenciesTestCase {
+            description: "an unknown override key",
+            dependencies: "[dependencies.orders_job]\nretries = 2\n",
+            expected_dependencies: Err((
+                "unknown dependencies.orders_job key 'retries'; expected `wait_for` or `on_failure`",
+                at(6, 1),
+            )),
+        },
+        GroupDependenciesTestCase {
+            description: "waiting node by node is not available yet",
+            dependencies: "[dependencies]\nwait_for = \"node\"\n",
+            expected_dependencies: Err((
+                "wait_for = \"node\" is not supported yet; it is planned, so use \"job\" for now",
+                at(6, 12),
+            )),
+        },
+    ];
+    for test_case in test_cases {
+        let text = format!("{DEPENDENCY_GROUP}{}", test_case.dependencies);
+        assert_eq!(
+            read_group_file(&text)
+                .map(|group| group.dependencies)
+                .map_err(|error| (error.message, error.position)),
+            test_case
+                .expected_dependencies
+                .map_err(|(message, position)| (message.to_owned(), position)),
             "{}",
             test_case.description
         );

@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/cli/plan/
 - Usage
 - Flags
 - Output
+- Timings
 - Exit codes
 - Missing upstream dependencies
 - Missing source tables
@@ -35,6 +36,8 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--defer-to` | Resolve unselected model references against another target |
 | `--as` | Compile for another target and show its plan, including [model migration](../concepts/models/migrations.md) decisions, using the current connection. Inspection only. |
 | `--json` | Output the plan as JSON |
+| `--timings` | After the plan, print how long each planning step took; see [Timings](#timings) |
+| `--ignore-audit-failures`, `--no-ignore-audit-failures` | Plan the build `sqb build` would run with the same flag; a plan whose audit failures are ignored starts with `Audit failures won't stop this build`. See [Ignoring audit failures](../concepts/audits.md#ignoring-audit-failures) |
 | `--selection-diagnostics` | Warn when a selected model will build on changed upstream models that are not selected; see [Selection and staleness](../concepts/planning/selection-and-staleness.md) |
 | `--full-refresh` | Plan a full rebuild for selected models unless a model sets `full_refresh false`; `full_refresh true` forces a model without this flag |
 | `--changed` | Show what `sqb build --changed` would run, which nodes it holds back and why; takes `--changed=definition,source_data` and `--reach` like [`sqb build`](build.md#building-only-what-changed). In `--json`, the `changed` object lists `runs`, `held_back` and `unchanged` |
@@ -133,6 +136,26 @@ Column migrations (1)
 ```
 
 When a removed column and an added column look related but are not an exact rename, the schema diff shows a hint such as `similar to amount; if this is a rename, add revenue (migrate_from amount)` until the change is built.
+
+## Timings
+
+`--timings` prints how long each planning step took, in pipeline order, after the plan:
+
+```
+Plan timings                 seconds  share
+  Compiling the project          2.1    20%
+  Reading warehouse state        3.3    31%
+  Detecting changes              2.4    23%
+  Checking source freshness      0.2     2%
+  Building plan entries          1.6    15%
+  Preparing test fixtures        0.1     1%
+  Assembling the plan            0.4     4%
+  Writing the plan               0.3     3%
+  Other                          0.2     2%
+  Total                         10.6
+```
+
+`Reading build history` appears with `--changed`. `Preparing test fixtures` counts only the time the plan waits for them, because they are prepared alongside the other steps. `Other` is the time no step covers. A plan a location makes for the web UI records the same steps in its plan document.
 
 ## Exit codes
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import { to } from '$lib/paths';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
@@ -8,22 +9,39 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
 
+	import type { FolderBoxData } from './folder-graph';
+
+	type JobBoxData = { jobKey: string; nodeCount: number; drawnElsewhere: number; collapsed: boolean; ontoggle?: (jobKey: string) => void; lastRun?: RunRef | null };
+
+	// A job group's member box, or an open lineage folder, whose header closes it.
 	let { data }: NodeProps = $props();
-	const d = $derived(
-		data as { jobKey: string; nodeCount: number; drawnElsewhere: number; collapsed: boolean; ontoggle?: (jobKey: string) => void; lastRun?: RunRef | null }
-	);
+	const d = $derived(data as JobBoxData);
+	const folder = $derived('folder' in data ? (data as FolderBoxData) : null);
 </script>
 
-<div class="box" class:collapsed={d.collapsed}>
+<div class="box" class:collapsed={!folder && d.collapsed}>
 	<Handle type="target" position={Position.Left} class="box-handle" />
+	{#if folder}
+		<!-- Zoomed out, the header's target grows upward so it stays at least its height on screen. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<span class="head-hit nodrag" aria-hidden="true" onclick={() => folder.ontoggle?.(folder.folder)}></span>
+		<!-- raw-button: the header of a box on the lineage canvas, clickable as a whole to close it -->
+		<button class="head folder-head nodrag" title="Close {folder.folder}" aria-expanded="true" onclick={() => folder.ontoggle?.(folder.folder)}>
+			<ChevronDownIcon size={14} class="chevron" />
+			<span class="name" title={folder.folder}>{folder.label}</span>
+			<span class="faint">· {plural(folder.nodeCount, folder.noun ?? 'node')}{#if folder.stale} · <span class="stale">{folder.stale} stale</span>{/if}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>
+		</button>
+	{:else}
 	<div class="head">
 		{#if d.ontoggle}
+			<!-- raw-button: the expand control inside a box on the lineage canvas; it must not start a drag -->
 			<button class="toggle nodrag" aria-expanded={!d.collapsed} aria-label="{d.collapsed ? 'Expand' : 'Collapse'} {d.jobKey}" onclick={() => d.ontoggle?.(d.jobKey)}>
 				{#if d.collapsed}<ChevronRightIcon size={14} />{:else}<ChevronDownIcon size={14} />{/if}
 			</button>
 		{/if}
 		<a href={to(`/jobs/${d.jobKey}`)} class="name">{d.jobKey}</a>
-		<span class="faint" title={d.drawnElsewhere ? `${d.drawnElsewhere} of them ${d.drawnElsewhere === 1 ? 'is' : 'are'} drawn in a job that builds fewer nodes` : undefined}>{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>
+		<span class="faint" title={d.drawnElsewhere ? `${d.drawnElsewhere} also in a smaller job` : undefined}>{plural(d.nodeCount, 'node')}</span>
 		{#if d.lastRun}
 			<!-- The dot carries the status, so the header fits a box one card wide. -->
 			<a href={to(`/runs/${d.lastRun.id}`)} class="last" title="Last run of {d.jobKey}: {runStatusLabel[d.lastRun.status]}">
@@ -31,11 +49,13 @@
 			</a>
 		{/if}
 	</div>
+	{/if}
 	<Handle type="source" position={Position.Right} class="box-handle" />
 </div>
 
 <style>
 	.box {
+		position: relative;
 		width: 100%;
 		height: 100%;
 		border: 1px solid var(--border-strong);
@@ -70,6 +90,38 @@
 	.name {
 		font-family: var(--font-mono);
 		font-weight: 600;
+	}
+	.folder-head {
+		width: 100%;
+		gap: 6px;
+		padding-left: 8px;
+		cursor: pointer;
+		text-align: left;
+	}
+	.head-hit {
+		position: absolute;
+		top: calc(30px * (1 - var(--sb-unzoom, 1)));
+		right: 0;
+		left: 0;
+		height: calc(30px * (var(--sb-unzoom, 1) - 1));
+		cursor: pointer;
+	}
+	.folder-head:hover {
+		background: var(--sb-hover);
+	}
+	.folder-head .name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.folder-head :global(.chevron) {
+		flex: 0 0 auto;
+		color: var(--muted-foreground);
+	}
+	.stale {
+		color: var(--sb-stale);
+	}
+	.failed {
+		color: var(--sb-error);
 	}
 	.name:hover,
 	.last:hover {

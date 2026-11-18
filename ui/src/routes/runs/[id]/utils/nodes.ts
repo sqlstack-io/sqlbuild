@@ -16,9 +16,9 @@ export function groupNodes(nodes: readonly RunNode[]): NodeGroup[] {
 
 /** Why a node didn't run, in words. */
 export function notRunReason(n: RunNode): string | null {
-	if (n.status === 'pending') return 'not started yet';
-	if (n.status === 'cancelled') return 'stopped by the cancel';
-	if (n.status === 'not_run') return 'the run ended before it started';
+	if (n.status === 'pending') return 'Pending';
+	if (n.status === 'cancelled') return 'Cancelled';
+	if (n.status === 'not_run') return 'Not run';
 	return null;
 }
 

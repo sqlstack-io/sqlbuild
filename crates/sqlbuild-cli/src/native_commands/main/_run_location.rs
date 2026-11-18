@@ -5,7 +5,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use sqlbuild_cache::project_snapshot::models::PathStamp;
-use sqlbuild_orchestration::platform::main::connect_location_work::connect_location_work;
+use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::{LocationWorkClient, LocationWorkPoll};
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
@@ -14,23 +14,26 @@ use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::argv::models::Stream;
-use crate::native_commands::_helpers::execution::{
-    apply_dev_controls, compile_next_generation, finish_compile,
-};
-use crate::native_commands::_helpers::execution::{
-    dev_controls, location_clock, location_heartbeats, next_turn, shutdown_signal,
-};
-use crate::native_commands::_helpers::paths::{
+use crate::native_commands::_helpers::command::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
-use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::{
+    apply_dev_controls, compile_next_generation, finish_compile,
+};
+use crate::native_commands::_helpers::location::execution::{
+    dev_controls, location_clock, location_heartbeats, next_turn, shutdown_signal,
+};
+use crate::native_commands::_helpers::location::work::next_work_check;
+use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
+use crate::native_commands::main::_location_changed_build::report_changed_build;
 use crate::native_commands::main::_location_compiler::run_location_compiler;
 use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::main::_location_work::run_location_work;
 use crate::native_commands::models::{
-    DevControlState, LocationCompileRequest, LocationMetadataSync, LocationServe, LocationWatch,
+    DevControlState, LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
 };
-use crate::native_commands::types::CompileOutcome;
+use crate::native_commands::types::LoadOutcome;
 
 pub(super) async fn run_location(
     options: LocationServe,
@@ -62,7 +65,7 @@ async fn watch_location(
     script: &Path,
     (bearer, client, poll): (&str, &LocationWorkClient, &LocationWorkPoll),
     (requests, mut controls): (
-        mpsc::Sender<LocationCompileRequest>,
+        mpsc::Sender<LocationRuntimeRequest>,
         watch::Receiver<DevControlState>,
     ),
 ) -> Result<(), ControlError> {
@@ -70,7 +73,7 @@ async fn watch_location(
     let mut recompiles: u64 = 0;
     let mut compiled_inputs: Option<Vec<PathStamp>> = None;
     let mut deferred_sync: Option<(Vec<WarehouseStateLocation>, i64)> = None;
-    let mut work_at = Instant::now() + Duration::from_secs(2);
+    let mut work_at = Instant::now() + LOCATION_WORK_IDLE_POLL;
     let mut published_generation = None;
     let mut metadata = None;
     let mut clock = location_clock();
@@ -106,7 +109,7 @@ async fn watch_location(
         if !ready {
             let connected: bool = controls.borrow().warehouse == Some(true);
             let Some(idle) = poll_location(
-                (options, script, connected),
+                (options, script, (&requests, connected)),
                 (client, poll, published_generation),
                 (watch, work_at, metadata),
                 stopped.as_mut(),
@@ -128,16 +131,19 @@ async fn watch_location(
         else {
             return Ok(());
         };
-        let next_compile: Option<(CompileOutcome, i64)>;
+        let next_compile: Option<(LoadOutcome, i64)>;
         (next_compile, metadata, compiled_inputs) = next;
-        let Some((compiled, generation)) = next_compile else {
+        let Some((load, generation)) = next_compile else {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
             continue;
         };
-        published_generation = compiled.0.then_some(generation);
+        published_generation = match &load {
+            Ok(_) => Some(generation),
+            Err(_) => None,
+        };
         let Some(settled) = finish_compile(
             (options, script, (bearer, poll.session_id)),
-            (compiled, generation),
+            (load, generation),
             (watch, metadata, deferred_sync),
             (&mut controls, stopped.as_mut()),
         )
@@ -149,9 +155,13 @@ async fn watch_location(
     }
 }
 
-/// Named work and metadata share one idle turn without transferring interpreter ownership.
+/// Named work and metadata share one idle turn; what changed is planned after a sync completes.
 async fn poll_location(
-    (options, script, connected): (&LocationServe, &Path, bool),
+    (options, script, (runtime, connected)): (
+        &LocationServe,
+        &Path,
+        (&mpsc::Sender<LocationRuntimeRequest>, bool),
+    ),
     (client, poll, generation): (&LocationWorkClient, &LocationWorkPoll, Option<i64>),
     (mut watch, mut work_at, mut metadata): (LocationWatch, Instant, Option<LocationMetadataSync>),
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -159,8 +169,8 @@ async fn poll_location(
     tokio::pin!(stopped);
     if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
         if Instant::now() >= work_at {
-            let Some((files, sync)) = run_location_work(
-                (options, script, connected),
+            let Some(turn) = run_location_work(
+                (options, script, (runtime, connected)),
                 (client, poll, &watch),
                 generation,
                 stopped.as_mut(),
@@ -169,13 +179,16 @@ async fn poll_location(
             else {
                 return Ok(None);
             };
-            watch = exclude_location_databases(&options.project_dir, files, watch);
-            work_at = Instant::now() + Duration::from_secs(2);
-            if sync && let Some(state) = metadata.as_mut() {
+            work_at = next_work_check(&turn, Instant::now());
+            watch = exclude_location_databases(&options.project_dir, turn.files, watch);
+            if turn.sync
+                && let Some(state) = metadata.as_mut()
+            {
                 state.request_sync();
             }
         }
         if let Some(state) = metadata.take() {
+            let syncing = !state.idle;
             metadata = sync_location_metadata(
                 state,
                 (options, script, &watch),
@@ -183,8 +196,24 @@ async fn poll_location(
                 stopped.as_mut(),
             )
             .await?;
-            if metadata.is_none() {
+            let Some(state) = metadata.as_mut() else {
                 return Ok(None);
+            };
+            let unsynced: bool = state.locations.is_empty();
+            let completed: bool = syncing && state.idle && !state.halted;
+            if (completed || unsynced) && state.take_replan() {
+                let Some(reported) = report_changed_build(
+                    (options, runtime, &watch),
+                    (client, poll.session_id, state.generation),
+                    stopped.as_mut(),
+                )
+                .await?
+                else {
+                    return Ok(None);
+                };
+                if !unsynced {
+                    state.planned(reported);
+                }
             }
         }
     }

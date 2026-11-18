@@ -6,9 +6,11 @@
 import type {
 	CancelProgress,
 	CatchUpPolicy,
-	ConcurrencyGroup,
 	JobDetail,
 	LaunchVerb,
+	PoolHolders,
+	PoolUse,
+	ResolvedConcurrency,
 	Principal,
 	Run,
 	RunOrigin,
@@ -21,6 +23,7 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import { CI_ACCOUNT, DEMO_USER, OPS_USER, SCHEDULER, SENSOR_DAEMON } from './principals';
+import { BIG_GROUP, bigGroupFile, bigGroupSelect, bigGroupShape } from './big-group';
 import { resolveSelection, writeSetOf } from './operate-graph';
 import type { RunEnd, RunRecord, RunScript } from './run-detail';
 
@@ -35,11 +38,27 @@ export const SNAPSHOT_GENERATION = 42;
 type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 
 type JobDef = Known<
-	Omit<JobDetail, 'nodeCount' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'memberOf' | 'cursorType' | 'groupMembers'>,
+	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'pools' | 'concurrency' | 'resolvedConcurrency' | 'poolHolders' | 'memberOf' | 'cursorType' | 'groupMembers' | 'ignoreAuditFailures'>,
 	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
->;
+> & {
+	/** Each pool the job takes, with its amount. */
+	pools: Record<string, number>;
+	/** The job's own `ignore_audit_failures`, when it sets one. */
+	ignoreAuditFailures?: boolean;
+};
 
-export const CONCURRENCY_LIMITS: Record<string, number> = { warehouse_heavy: 1, 'target:prod': 4 };
+/** Each pool's limit in the mock project, and this mock server's `pool_caps`, which lower it. */
+export const POOL_LIMITS: Record<string, number> = { warehouse_heavy: 3, supplier_api: 2 };
+export const POOL_CAPS: Record<string, number> = { warehouse_heavy: 1 };
+/** A pool's limit on this server: the project's, lowered to the cap. */
+export const serverLimitOf = (pool: string) => Math.min(POOL_LIMITS[pool] ?? 1, POOL_CAPS[pool] ?? Infinity);
+
+/** Where each job's run concurrency comes from, when not its own setting: one of every layer. */
+const CONCURRENCY_FROM: Record<string, ResolvedConcurrency> = {
+	marts_only: { limit: 6, source: 'target' },
+	activity_microbatch: { limit: 2, source: 'local' },
+	load_sources: { limit: 4, source: 'default' }
+};
 
 const decl = (sourceFile: string, line: number, code: string) => ({ sourceFile, line, code });
 
@@ -53,7 +72,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: { retries: 1, retryDelaySeconds: 300 },
-		concurrencyGroups: [],
+		pools: { supplier_api: 1 },
 		priority: 5,
 		sourceFile: 'orchestration/jobs.py',
 		settings: {},
@@ -76,29 +95,31 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'core_build',
 		kind: 'job',
 		description: 'Staging and marts models',
-		select: 'group:staging group:marts',
+		select: 'path:models/staging path:models/marts',
 		exclude: [],
 		members: [],
 		overlap: 'skip',
 		onFailure: { retries: 2, retryDelaySeconds: 600 },
-		concurrencyGroups: ['warehouse_heavy'],
+		pools: { warehouse_heavy: 1 },
 		priority: 0,
 		sourceFile: 'orchestration/jobs.py',
 		settings: { '--concurrency': '8' },
 		targets: null,
 		owner: 'data-platform',
 		criticalNodes: ['fact_orders'],
+		ignoreAuditFailures: true,
 		declaration: decl(
 			'orchestration/jobs.py',
 			24,
 			`core_build = job(
     "core_build",
     description="Staging and marts models",
-    select=["group:staging", "group:marts"],
+    select=["path:models/staging", "path:models/marts"],
     overlap="skip",
     on_failure=on_failure(retries=2, retry_delay_seconds=600),
-    concurrency_groups=[warehouse_heavy],
+    pools={"warehouse_heavy": 1},
     settings={"--concurrency": 8},
+    ignore_audit_failures=True,
     owner="data-platform",
     schedule=schedule(cron="{cron:core_build}", timezone="UTC"),
 )`
@@ -108,12 +129,12 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'marts_only',
 		kind: 'job',
 		description: 'Marts models only, reading the current staging layer',
-		select: 'group:marts',
+		select: 'path:models/marts',
 		exclude: [],
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/jobs.py',
 		settings: {},
@@ -126,7 +147,7 @@ export const JOB_DEFS: JobDef[] = [
 			`marts_only = job(
     "marts_only",
     description="Marts models only, reading the current staging layer",
-    select="group:marts",
+    select="path:models/marts",
     targets=["prod", "staging"],
     owner="analytics",
 )`
@@ -136,12 +157,12 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'activity_microbatch',
 		kind: 'job',
 		description: 'Incremental activity models, four microbatches at a time',
-		select: 'group:activity',
+		select: 'path:models/activity',
 		exclude: [],
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/activity.py',
 		settings: { '--max-microbatches': '4' },
@@ -154,7 +175,7 @@ export const JOB_DEFS: JobDef[] = [
 			`activity_microbatch = job(
     "activity_microbatch",
     description="Incremental activity models, four microbatches at a time",
-    select="group:activity",
+    select="path:models/activity",
     settings={"--max-microbatches": 4},
     owner="analytics",
     schedule=schedule(cron="{cron:activity_microbatch}", timezone="UTC",
@@ -171,7 +192,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/finance.py',
 		settings: { '--fail-fast': true },
@@ -201,7 +222,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/finance.py',
 		settings: {},
@@ -223,12 +244,12 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'reporting_exports',
 		kind: 'job',
 		description: 'Reporting tables and the revenue export',
-		select: 'group:reporting group:exports',
+		select: 'path:models/reporting export_revenue_csv',
 		exclude: [],
 		members: [],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: ['warehouse_heavy'],
+		pools: { warehouse_heavy: 1, supplier_api: 1 },
 		priority: 10,
 		sourceFile: 'orchestration/reporting.py',
 		settings: {},
@@ -241,8 +262,8 @@ export const JOB_DEFS: JobDef[] = [
 			`reporting_exports = job(
     "reporting_exports",
     description="Reporting tables and the revenue export",
-    select=["group:reporting", "group:exports"],
-    concurrency_groups=[warehouse_heavy],
+    select=["path:models/reporting", "export_revenue_csv"],
+    pools={"warehouse_heavy": 1},
     priority=10,
     targets=["prod"],
 )`
@@ -257,7 +278,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: ['load_sources', 'core_build', 'activity_microbatch', 'reporting_exports'],
 		overlap: 'queue',
 		onFailure: null,
-		concurrencyGroups: [],
+		pools: {},
 		priority: 0,
 		sourceFile: 'orchestration/groups.py',
 		settings: {},
@@ -286,7 +307,7 @@ export const JOB_DEFS: JobDef[] = [
 		members: ['revenue_refresh', 'activity_microbatch', 'customer_segments'],
 		overlap: 'queue',
 		onFailure: { retries: 1, retryDelaySeconds: 900 },
-		concurrencyGroups: ['warehouse_heavy'],
+		pools: { warehouse_heavy: 3 },
 		priority: 20,
 		sourceFile: 'orchestration/groups.py',
 		settings: {},
@@ -302,13 +323,59 @@ export const JOB_DEFS: JobDef[] = [
     jobs=[revenue_refresh, activity_microbatch, customer_segments],
     on_failure=on_failure(retries=1, retry_delay_seconds=900),
     critical=["daily_revenue"],
-    concurrency_groups=[warehouse_heavy],
+    pools={"warehouse_heavy": 1},
     priority=20,
     targets=["prod"],
 )`
 		)
 	}
 ];
+
+// A large group of small jobs, to see how a big group draws (see big-group.ts).
+const BIG = bigGroupShape();
+JOB_DEFS.push(
+	...BIG.members.map(
+		(key): JobDef => ({
+			key,
+			kind: 'job',
+			description: `Warehouse step ${key.replace('_', ' ')}`,
+			select: bigGroupSelect(key),
+			exclude: [],
+			members: [],
+			overlap: 'queue',
+			onFailure: null,
+			pools: {},
+			priority: 0,
+			sourceFile: bigGroupFile(key),
+			settings: {},
+			targets: null,
+			owner: 'data-platform',
+			criticalNodes: [],
+			declaration: decl(bigGroupFile(key), 1, `${key} = job("${key}", select="${bigGroupSelect(key)}")`)
+		})
+	),
+	{
+		key: BIG_GROUP,
+		kind: 'group',
+		description: 'Every warehouse step, in stages',
+		select: null,
+		exclude: [],
+		members: BIG.members,
+		overlap: 'queue',
+		onFailure: null,
+		pools: {},
+		priority: 0,
+		sourceFile: 'orchestration/warehouse.py',
+		settings: {},
+		targets: null,
+		owner: 'data-platform',
+		criticalNodes: [],
+		declaration: decl('orchestration/warehouse.py', 60, `${BIG_GROUP} = job_group("${BIG_GROUP}", jobs=[...])`)
+	}
+);
+
+/** Waits a group declares instead of those its members' lineage gives: the big group's whole upstreams. */
+export const DECLARED_WAITS: Record<string, ReadonlyMap<string, string[]>> = { [BIG_GROUP]: BIG.waits };
 
 export function jobDef(key: string | null): JobDef | undefined {
 	return key ? JOB_DEFS.find((j) => j.key === key) : undefined;
@@ -326,8 +393,45 @@ export function jobNodes(key: string): string[] {
 	return writeSetOf(selectorTerms(job), job.exclude);
 }
 
-export function concurrencyGroupsOf(job: JobDef | undefined): ConcurrencyGroup[] {
-	return (job?.concurrencyGroups ?? []).map((key) => ({ key, limit: CONCURRENCY_LIMITS[key] ?? 1, holders: [] }));
+/** Each pool the job takes with its amount, limit and the other jobs taking it, as the server publishes them. */
+export function poolUsesOf(job: JobDef | undefined): PoolUse[] {
+	return Object.entries(job?.pools ?? {}).map(([pool, amount]) => ({
+		pool,
+		amount,
+		limit: POOL_LIMITS[pool] ?? 1,
+		cap: POOL_CAPS[pool] ?? null,
+		serverLimit: serverLimitOf(pool),
+		clamped: amount > serverLimitOf(pool),
+		sharedWith: JOB_DEFS.filter((other) => other.key !== job?.key && pool in other.pools).map((other) => other.key)
+	}));
+}
+
+export function poolHoldersOf(job: JobDef | undefined): PoolHolders[] {
+	return Object.keys(job?.pools ?? {}).map((pool) => ({ pool, limit: serverLimitOf(pool), holders: [] }));
+}
+
+/** What a run of the job uses: its own setting, else the layer the mock gives it, else the mock project's 4. */
+export function resolvedConcurrencyOf(job: JobDef | undefined): ResolvedConcurrency {
+	const own = runConcurrencyOf(job);
+	return own ? { limit: own, source: 'job' } : (CONCURRENCY_FROM[job?.key ?? ''] ?? { limit: 4, source: 'project' });
+}
+
+/** The jobs and groups asking a pool for more than this server allows, as the server's pool_capped warning names them. */
+export function poolCapWarnings(): { jobKey: string; kind: 'job' | 'group'; pool: string; amount: number; cap: number; message: string }[] {
+	return JOB_DEFS.flatMap((job) =>
+		Object.entries(job.pools)
+			.filter(([pool, amount]) => amount > serverLimitOf(pool))
+			.map(([pool, amount]) => {
+				const cap = serverLimitOf(pool);
+				return { jobKey: job.key, kind: job.kind, pool, amount, cap, message: `${job.kind} ${job.key} takes ${amount} of pool ${pool}; this server caps it at ${cap}, so it runs alone in that pool` };
+			})
+	);
+}
+
+/** The job's own `concurrency` setting, as the server reports it. */
+export function runConcurrencyOf(job: JobDef | undefined): number | null {
+	const value = Number(job?.settings?.concurrency ?? job?.settings?.['--concurrency']);
+	return Number.isInteger(value) && value > 0 ? value : null;
 }
 
 // ---- triggers ----
@@ -654,6 +758,8 @@ type Seed = {
 	image?: string;
 	generation?: number;
 	reason?: string;
+	/** Error-severity audit failures a successful run let through. */
+	ignored?: number;
 };
 
 function rng(seed: number) {
@@ -743,7 +849,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			lastHeartbeatAt: seed.lastHeartbeatAgoSec != null ? now - seed.lastHeartbeatAgoSec * 1000 : null,
 			imageId: seed.image ?? IMAGE_ID,
 			snapshotGeneration: seed.generation ?? SNAPSHOT_GENERATION,
-			concurrencyGroups: job?.concurrencyGroups ?? []
+			pools: job?.pools ?? {}
 		};
 		const run: Run = {
 			id: seed.id,
@@ -762,6 +868,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			tickScheduledFor: tick != null ? new Date(tick).toISOString() : null,
 			runKey: seed.runKey ?? null,
 			rerunOfRunId: seed.rerunOf ?? null,
+			memberAttempt: null,
 			narrowing: null,
 			window: null,
 			requestedBy: seed.by,
@@ -776,7 +883,8 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			startedAt: started != null ? new Date(started).toISOString() : null,
 			endedAt: ended ? new Date(ended).toISOString() : null,
 			nodeCounts: { success: 0, warn: 0, failed: 0, skipped: 0, running: 0, pending: 0 },
-			cost: null
+			cost: null,
+			ignoredAuditFailures: seed.ignored ?? 0
 		};
 		const rec = { run, script };
 		records.push(rec);
@@ -837,7 +945,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 		queuedAgo: at('core_build', 0, 0), startedAgo: at('core_build', 0, 10), durationMin: 6,
 		warn: ['stg_payments'], fail: ['dim_customers'], errors: { dim_customers: 'Numeric value out of range in lifetime_value' }
 	});
-	record({ id: 'run-2b70', origin: 'schedule', job: 'core_build', trigger: 'core_build', tick: 1, by: SCHEDULER, queuedAgo: at('core_build', 1, 0), startedAgo: at('core_build', 1, 9), durationMin: 7 });
+	record({ id: 'run-2b70', origin: 'schedule', job: 'core_build', trigger: 'core_build', tick: 1, by: SCHEDULER, queuedAgo: at('core_build', 1, 0), startedAgo: at('core_build', 1, 9), durationMin: 7, ignored: 2 });
 	record({ id: 'run-2b71', origin: 'sensor', job: 'reporting_exports', trigger: 'after_core_build', runKey: 'run-2b70', by: SENSOR_DAEMON, queuedAgo: at('core_build', 1, 9) - 7.2, startedAgo: at('core_build', 1, 9) - 7.4, durationMin: 3 });
 	record({ id: 'run-0c7d', origin: 'rerun', job: 'core_build', by: CI_ACCOUNT, rerunOf: 'run-2b70', queuedAgo: 600, startedAgo: 599.8, durationMin: 3, end: 'cancelled', cancel: { requestedAgoSec: 75, by: CI_ACCOUNT, sigtermAgoSec: 74, done: true }, reason: 'Cancelled by svc-ci' });
 	record({ id: 'run-91cd', origin: 'manual', job: 'marts_only', by: DEMO_USER, queuedAgo: 97, startedAgo: 96.8, durationMin: 5 });

@@ -37,7 +37,16 @@ pub fn command_dispatch(facts: &CommandFacts) -> Dispatch {
         "dag" => run(&DAG_ROUTE),
         "plan" => run(&PLAN_ROUTE),
         "dbt" => dbt_dispatch(subcommand),
-        "build" => run(&BUILD_ROUTE),
+        "build" => checked(
+            &BUILD_ROUTE,
+            facts.ignores_failures_of_no_audits.then(|| {
+                failure(
+                    "--ignore-audit-failures cannot be combined with --no-audits: no audit runs, so there is no failure to ignore",
+                    "C419",
+                    None,
+                )
+            }),
+        ),
         "freshness" => run(&FRESHNESS_ROUTE),
         "test" => run(&TEST_ROUTE),
         "check" => run(&CHECK_ROUTE),

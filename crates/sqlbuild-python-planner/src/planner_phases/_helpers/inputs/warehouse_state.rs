@@ -5,9 +5,12 @@ use crate::planner_entries::models::RelationsRequest;
 use crate::planner_migrations::main::plan_column_migrations::plan_column_migrations;
 use crate::planner_migrations::main::plan_model_migrations::plan_model_migrations;
 use crate::planner_migrations::main::plan_old_name_views::plan_old_name_views as plan_old_name_migration_views;
-use crate::planner_migrations::models::{ColumnMigrationInputs, MigrationPhase};
+use crate::planner_migrations::models::ColumnMigrationInputs;
+use crate::planner_migrations::models::MigrationPhase;
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
+use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
 use crate::planner_phases::models::{PlannerRuntime, PlannerWarehouseState};
 use crate::planner_warehouse::main::inspection::warehouse_snapshot::warehouse_snapshot;
@@ -80,7 +83,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
             ),
         ],
     )?;
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
+    let reads = runtime_reads(runtime)?;
     let stale_scope = scope_data(&class_field(scopes, |s: &PlannerScopeResolution| {
         &s.stale_warning_scope
     })?)?;
@@ -95,9 +98,8 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
     .into_any();
     let snapshot = warehouse_snapshot(&SnapshotRequest {
         project: project.clone(),
-        adapter: adapter.clone(),
-        connection: runtime_field(runtime, |runtime| &runtime.connection)?,
-        execute: native_field(&adapter, "execute")?,
+        dialect: runtime_dialect(runtime)?,
+        reads: reads.clone(),
         selected_keys: stale_keys,
         full_refresh: false,
         full_refresh_model_names: effectively_full_refreshed_model_names(&project, full_refresh)?,
@@ -121,8 +123,8 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
     fingerprints.call_method0("persist")?;
     let inspection_relations = planner_relations_context(RelationsRequest {
         project: project.clone(),
-        adapter: adapter.clone(),
-        connection: runtime_field(runtime, |runtime| &runtime.connection)?,
+        dialect: runtime_dialect(runtime)?,
+        reads: Some(reads),
         scope: class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?,
         deferral: deferral.clone(),
         project_config: config,

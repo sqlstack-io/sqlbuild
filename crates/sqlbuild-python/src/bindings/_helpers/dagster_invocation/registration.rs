@@ -3,7 +3,10 @@
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
 
-use crate::bindings::_helpers::dagster_invocation::{arguments, failures, results, translator};
+use crate::bindings::_helpers::dagster_invocation::arguments;
+use crate::bindings::_helpers::dagster_invocation::failures;
+use crate::bindings::_helpers::dagster_invocation::results;
+use crate::bindings::_helpers::dagster_invocation::translator;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(arguments::dagster_cli_arguments, module)?)?;

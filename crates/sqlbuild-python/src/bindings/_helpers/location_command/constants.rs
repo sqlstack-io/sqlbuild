@@ -34,3 +34,7 @@ pub(crate) const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];
 pub(crate) const SQL_TEST_NODE_KIND: &str = "sql_test";
 /// The setting-row field the published providers document leaves out: secret matching reads it, the UI does not.
 pub(crate) const SNAPSHOT_HIDDEN_SETTING: &str = "alias";
+/// The runtime request key of a plan preview: `{"plan": {"argv", "copy"}}`.
+pub(crate) const PLAN_REQUEST: &str = "plan";
+/// The code of a failed plan preview whose error names none.
+pub(crate) const PLAN_FAILED_CODE: &str = "plan_failed";

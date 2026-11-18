@@ -1,8 +1,8 @@
 //! Person control commands use the saved HTTPS session, never privileged database access.
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::text;
-use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::_helpers::command::decision::text;
+use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::main::_run_warehouse_sync::run_warehouse_sync;
 use crate::person_login::main::read_node_sql::read_node_sql;
 

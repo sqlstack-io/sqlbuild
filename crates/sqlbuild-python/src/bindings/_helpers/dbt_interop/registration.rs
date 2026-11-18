@@ -2,9 +2,13 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::dbt_interop::{
-    cli, execution, graph, manifest, orchestration, plan, profile,
-};
+use crate::bindings::_helpers::dbt_interop::cli;
+use crate::bindings::_helpers::dbt_interop::execution;
+use crate::bindings::_helpers::dbt_interop::graph;
+use crate::bindings::_helpers::dbt_interop::manifest;
+use crate::bindings::_helpers::dbt_interop::orchestration;
+use crate::bindings::_helpers::dbt_interop::plan;
+use crate::bindings::_helpers::dbt_interop::profile;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     cli::register(module)?;

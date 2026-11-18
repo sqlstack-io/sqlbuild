@@ -9,7 +9,7 @@ use crate::declarations::main::list_triggers::list_triggers;
 use crate::scheduler::main::{_acquire_lease::acquire_lease, _evaluate_trigger::evaluate_trigger};
 use crate::scheduler::tests::contracts::ticks::helpers::{set_trigger_state, snapshot, tick_times};
 use crate::scheduler::tests::contracts::ticks::test_types::FirstTickPrecisionTestCase;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;

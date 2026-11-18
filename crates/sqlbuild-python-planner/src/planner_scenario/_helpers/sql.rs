@@ -12,6 +12,7 @@ use sqlbuild_analysis::planner_scenario::{
     errors::MarkerError, main::replace_markers::replace_markers,
 };
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
@@ -24,7 +25,7 @@ pub(crate) fn resolve_sql(
     sql: &str,
     project_sources: bool,
 ) -> PyResult<String> {
-    let py = context.adapter.py();
+    let py = context.dialect.py();
     let syntax: LexicalSyntaxInput = native_field(&context.syntax, "native_mapping")?.extract()?;
     let mut result = sql.to_owned();
     for (kind, field) in [
@@ -47,7 +48,7 @@ pub(crate) fn resolve_sql(
         result = replace_markers(&result, kind, Some(syntax.clone().into()), |name, marker| {
             let target = mapping_get(&locations, name)?;
             let target = if target.is_none() {target} else if kind == crate::planner_scenario::constants::SOURCE_MARKER {
-                object(py, render_source_relation(&target, Some(&context.adapter.clone()).filter(|value| !value.is_none()))?)?
+                object(py, render_source_relation(&target, Some(context.dialect.as_any()))?)?
             } else {native_field(&target, "qualified_name")?};
             if target.is_none() {
                 let marker = string(py, marker).repr()?.to_str()?.to_owned();
@@ -131,7 +132,7 @@ pub(crate) fn resolve_scenario_check_sql(
             &[
                 "sql",
                 "relation_plan",
-                "adapter",
+                "dialect",
                 "source_label",
                 "source_lexical_syntax",
             ],
@@ -139,7 +140,7 @@ pub(crate) fn resolve_scenario_check_sql(
         ),
     )?;
     let context = SqlContext {
-        adapter: args.value("adapter")?,
+        dialect: Dialect::passed(args.value("dialect")?)?,
         relations: args.value("relation_plan")?,
         syntax: args.value("source_lexical_syntax")?,
         label: args.value("source_label")?.extract()?,

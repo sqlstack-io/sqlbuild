@@ -11,11 +11,11 @@ use tokio::task::JoinSet;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::{control_address, control_api_settings};
-use crate::native_commands::_helpers::execution::{
+use crate::native_commands::_helpers::command::decision::{control_address, control_api_settings};
+use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::{
     open_control_store, open_control_workers, start_platform_roles, supervise_control_roles,
 };
-use crate::native_commands::_helpers::terminal::write_output;
 use crate::server_config::main::read_server_config::read_server_config;
 use crate::workers::models::Workers;
 
@@ -33,7 +33,7 @@ pub(crate) async fn run_control(
 ) -> Result<(), ControlError> {
     let config = read_server_config(namespace)?;
     let address = control_address(namespace, standalone, &config.server)?;
-    let (authentication, facts) = control_api_settings(namespace, standalone, &config)?;
+    let (authentication, mut facts) = control_api_settings(namespace, standalone, &config)?;
     let store = open_control_store(namespace, Some(&config.server)).await?;
     let (workers, handoff) = open_control_workers(
         (&store, namespace),
@@ -41,6 +41,7 @@ pub(crate) async fn run_control(
         facts.scheduler,
     )
     .await?;
+    facts.pool_caps = workers.pool_caps();
     let (stop, shutdown) = watch::channel(false);
     let mut tasks = JoinSet::new();
     if let Some(address) = address {
@@ -72,6 +73,7 @@ pub(crate) async fn run_control(
                 statistics: facts.statistics,
                 snapshots: facts.snapshots,
                 run_logs: facts.run_logs,
+                state_history: facts.state_history,
             },
         )?;
     }

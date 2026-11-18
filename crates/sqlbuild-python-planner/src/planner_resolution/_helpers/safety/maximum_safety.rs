@@ -1,14 +1,22 @@
 //! Maximum automatic-start recovery and evidence boundary.
 
 use crate::planner_resolution::_helpers::cursor::cursor_bounds::apply_typed_cursor_replay_policy;
-use crate::planner_resolution::_helpers::cursor::cursor_bounds::{
-    optional_scalar, required_scalar, scalars,
-};
-use crate::planner_resolution::_helpers::cursor::cursor_safety::{
-    horizon, replace, safety_duration, safety_error, timestamp_bound, utc_clock,
-};
+use crate::planner_resolution::_helpers::cursor::cursor_bounds::optional_scalar;
+use crate::planner_resolution::_helpers::cursor::cursor_bounds::required_scalar;
+use crate::planner_resolution::_helpers::cursor::cursor_bounds::scalars;
+use crate::planner_resolution::_helpers::cursor::cursor_safety::horizon;
+use crate::planner_resolution::_helpers::cursor::cursor_safety::replace;
+use crate::planner_resolution::_helpers::cursor::cursor_safety::safety_duration;
+use crate::planner_resolution::_helpers::cursor::cursor_safety::safety_error;
+use crate::planner_resolution::_helpers::cursor::cursor_safety::timestamp_bound;
+use crate::planner_resolution::_helpers::cursor::cursor_safety::utc_clock;
 use crate::planner_resolution::_helpers::references::values::string;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::prelude::Bound;
+use pyo3::prelude::PyAny;
+use pyo3::prelude::PyAnyMethods;
+use pyo3::prelude::PyErr;
+use pyo3::prelude::PyResult;
+use pyo3::prelude::Python;
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObject, pyfunction};
 use sqlbuild_cursor::algebra::main::compare::compare;

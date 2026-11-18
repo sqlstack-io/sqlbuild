@@ -3,12 +3,16 @@
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
-use crate::platform::main::require_instance::require_instance;
+use crate::platform::main::installation::require_instance::require_instance;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Change, ControlStore, ControlTransaction, Parameter, TransactionMode};
-use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
-use crate::warehouse_metadata::models::{MetadataBatch, MetadataScan, WarehouseSyncResponse};
+use crate::warehouse_metadata::constants::{
+    IGNORED_KEY, MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
+};
+use crate::warehouse_metadata::models::{
+    MetadataBatch, MetadataScan, WarehouseHistoryKind, WarehouseSyncResponse,
+};
 
 pub(crate) async fn begin_ingestion(
     store: &ControlStore,
@@ -53,6 +57,27 @@ pub(crate) fn scoped_event_id(
     let identity = serde_json::to_vec(&(target, database, schema, table, source_event_id))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     Ok(Uuid::new_v5(&location_id, &identity))
+}
+
+/// Commit the records a page applied so far and open its next transaction behind the same fence.
+pub(crate) async fn next_ingestion_chunk(
+    mut transaction: ControlTransaction,
+    (store, location_id, target): (&ControlStore, Uuid, &str),
+    batch: &MetadataBatch,
+    applied: bool,
+) -> Result<ControlTransaction, ControlError> {
+    if applied {
+        transaction
+            .changes
+            .insert(Change::NodeStatus(location_id, target.into()));
+    }
+    commit(transaction).await?;
+    begin_ingestion(
+        store,
+        (location_id, target),
+        (batch.session_id, batch.generation),
+    )
+    .await
 }
 
 /// Delivered rows take the scan's id; a complete scan deletes every row it did not deliver.
@@ -128,9 +153,14 @@ pub(crate) fn validate_fields(
     invalid_scope: bool,
 ) -> Result<(), ControlError> {
     let kind = batch.kind.as_str().replace('_', " ");
-    if batch.generation < 1 || batch.records.len() > MAX_HISTORY_RECORDS || invalid_identity {
+    let most = if batch.kind == WarehouseHistoryKind::Statistics {
+        MAX_HISTORY_RECORDS
+    } else {
+        MAX_HISTORY_PAGE_RECORDS
+    };
+    if batch.generation < 1 || batch.records.len() > most || invalid_identity {
         return Err(ControlError::Invalid(format!(
-            "{kind} sync needs a positive generation, at most {MAX_HISTORY_RECORDS} records and nonempty state identities"
+            "{kind} sync needs a positive generation, at most {most} records and nonempty state identities"
         )));
     }
     if invalid_scope
@@ -144,4 +174,19 @@ pub(crate) fn validate_fields(
         )));
     }
     Ok(())
+}
+
+/// Whether an audit result's metadata marks it as a failure its build ignored.
+pub(crate) fn ignored_failure(metadata_json: Option<&str>) -> bool {
+    let Some(text) = metadata_json else {
+        return false;
+    };
+    match serde_json::from_str::<serde_json::Value>(text) {
+        Ok(metadata) => metadata
+            .get(IGNORED_KEY)
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        Err(error) if error.is_syntax() || error.is_eof() => false,
+        Err(_) => false,
+    }
 }

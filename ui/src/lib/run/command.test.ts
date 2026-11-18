@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SnapshotNode } from '$lib/api';
-import { commandTokens, jobBuildTokens, jobRunProblem, parseCommand, planHref, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow } from './command';
+import { changedBuildCounts, changedBuildLabel, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, planHref, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow } from './command';
 
 const node = (key: string, kind: SnapshotNode['kind'], path: string, tags: string[] = []): SnapshotNode => ({ key, kind, group: '', tags, path, cursor: null, upstream: [] });
 
@@ -86,5 +86,39 @@ describe('the plan page command line', () => {
 	it('opens a narrowed job run on the plan page with the job kept beside the command', () => {
 		expect(planHref([], 'build', { job: 'nightly', exclude: ['model:customers', 'seed:countries'] })).toBe(`/plan?cmd=${encodeURIComponent('sqb build --exclude customers seed:countries')}&job=nightly`);
 		expect(planHref(['model:orders'])).toBe(`/plan?cmd=${encodeURIComponent('sqb build --select orders')}`);
+	});
+});
+
+describe('changed build label', () => {
+	it('adds the downstream count in brackets, shorter in a top bar than in the banner', () => {
+		expect(changedBuildLabel(30, 65, 'bar')).toEqual({
+			label: 'Build 30 changed',
+			extra: ' (+65)',
+			tooltip: 'Plan a build of the 30 changed nodes and the 65 downstream nodes they reach. You review the plan before anything runs.'
+		});
+		expect(changedBuildLabel(30, 65, 'banner').extra).toBe(' (+65 downstream)');
+	});
+
+	it('drops the brackets when nothing downstream runs or the count is unknown', () => {
+		expect(changedBuildLabel(30, 0, 'banner')).toEqual({ label: 'Build 30 changed', extra: null, tooltip: 'Plan a build of the 30 changed nodes. You review the plan before anything runs.' });
+		expect(changedBuildLabel(1, null, 'bar')).toEqual({
+			label: 'Build 1 changed',
+			extra: null,
+			tooltip: 'Plan a build of the 1 changed node and the downstream nodes it reaches. You review the plan before anything runs.'
+		});
+	});
+});
+
+describe('changed build counts', () => {
+	it('shows the location\'s plan when it names a change, else the definition changes with the downstream unknown', () => {
+		expect(changedBuildCounts(4, { generation: 3, changed: ['model:orders', 'model:customers'], downstream: ['model:revenue'], failing: null })).toEqual({ changed: 2, downstream: 1, failing: null });
+		expect(changedBuildCounts(4, { generation: 3, changed: [], downstream: [], failing: null })).toEqual({ changed: 4, downstream: null, failing: null });
+		expect(changedBuildCounts(4, null)).toEqual({ changed: 4, downstream: null, failing: null });
+	});
+
+	it('shows no planned count while the location\'s plan is failing, and gives the reason as the tooltip', () => {
+		const counts = changedBuildCounts(4, { generation: 3, changed: [], downstream: [], failing: 'Model orders cannot plan a full rebuild' });
+		expect(counts).toEqual({ changed: 4, downstream: null, failing: 'Model orders cannot plan a full rebuild' });
+		expect(changedBuildLabel(counts.changed, counts.downstream, 'bar', counts.failing)).toEqual({ label: 'Build 4 changed', extra: null, tooltip: 'Plan failing: Model orders cannot plan a full rebuild' });
 	});
 });

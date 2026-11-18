@@ -62,7 +62,7 @@ def test_given_real_catalog_when_reading_pages_then_columns_and_physical_types_a
         )
     adapter.close(connection)
     before: str = hashlib.sha256((project / "warehouse.db").read_bytes()).hexdigest()
-    pages: list[dict[str, Any]] = warehouse_history_pages(project, "catalog")
+    pages: list[dict[str, Any]] = warehouse_history_pages(project, "catalog", limit=100)
     assert tuple(len(page["records"]) for page in pages) == (100, 7)
     records: list[dict[str, Any]] = []
     for page in pages:

@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::TriggerChange;
-use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::{NodeOutcome, RunOutcome};
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
 use crate::sensors::main::{
@@ -17,7 +17,7 @@ use crate::sensors::main::{
 };
 use crate::sensors::tests::helpers::{change, finish_run, snapshot};
 use crate::sensors::tests::test_types::SensorTestCase;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};

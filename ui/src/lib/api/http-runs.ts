@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanDocument, PlanResult, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -36,10 +36,67 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			table_type_conversions: list(document.table_type_conversions),
 			retention: list(document.retention),
 			synced_copy: document.synced_copy ?? null,
-			changed: document.changed ?? null
+			changed: document.changed ?? null,
+			...(document.ignore_audit_failures ? { ignore_audit_failures: true } : {}),
+			...(document.pages ? { pages: document.pages } : {}),
+			...(document.sections ? { sections: document.sections } : {})
 		},
 		error: null
 	};
+}
+
+/** The plan list a section's rows join: models for model sections, `changed` lists for held-back and unchanged nodes. */
+const SECTION_LIST: Record<PlanPageSection, keyof PlanDocument | 'held_back' | 'unchanged'> = {
+	full_refresh: 'models',
+	query_changed: 'models',
+	function_changed: 'models',
+	config_changed: 'models',
+	schema_changed: 'models',
+	first_run: 'models',
+	renamed: 'models',
+	routine_models: 'models',
+	migrations: 'migrations',
+	column_migrations: 'column_migrations',
+	table_type_conversions: 'table_type_conversions',
+	retention: 'retention',
+	loader_reloads: 'source_loads',
+	loader_loads: 'source_loads',
+	source_reloads: 'source_loads',
+	source_loads: 'source_loads',
+	changed_functions: 'functions',
+	functions: 'functions',
+	seeds: 'seeds',
+	python_nodes: 'python_nodes',
+	held_back: 'held_back',
+	unchanged: 'unchanged',
+	warnings: 'warnings'
+};
+
+/** A warning once, however many pages bring it. */
+const warningKey = (w: PlanWarning) => `${w.model_name ?? ''}\u0000${w.message}`;
+
+/**
+ * `plan` with one more page of a section: its rows join their list, with the `--changed` runs, warnings and
+ * cursor window starts of its models, and the section's loaded count moves on.
+ */
+export function mergePlanPage(plan: PlanDocument, section: PlanPageSection, page: PlanPage): PlanDocument {
+	const pages = { ...plan.pages, [section]: page.section_total ?? page.total };
+	const loaded = { ...plan.loaded, [section]: (plan.loaded?.[section] ?? 0) + page.rows.length };
+	const seen = new Set(plan.warnings.map(warningKey));
+	const extra = [...(page.warnings ?? []), ...(section === 'warnings' ? (page.rows as PlanWarning[]) : [])].filter((w) => !seen.has(warningKey(w)) && (seen.add(warningKey(w)), true));
+	const starts = page.cursor_window_starts ?? {};
+	const synced_copy = plan.synced_copy && Object.keys(starts).length ? { ...plan.synced_copy, cursor_window_starts: { ...plan.synced_copy.cursor_window_starts, ...starts } } : plan.synced_copy;
+	const runs = plan.changed && page.runs.length ? { ...plan.changed, runs: [...plan.changed.runs, ...page.runs] } : plan.changed;
+	const next: PlanDocument = { ...plan, pages, loaded, synced_copy, changed: runs, warnings: [...plan.warnings, ...extra] };
+	const list = SECTION_LIST[section];
+	if (list === 'warnings') return next;
+	if (list === 'held_back' || list === 'unchanged') {
+		if (!next.changed) return next;
+		return list === 'held_back'
+			? { ...next, changed: { ...next.changed, held_back: [...next.changed.held_back, ...(page.rows as PlanChanged['held_back'])] } }
+			: { ...next, changed: { ...next.changed, unchanged: [...next.changed.unchanged, ...(page.rows as string[])] } };
+	}
+	return { ...next, [list]: [...(next[list] as unknown[]), ...page.rows] };
 }
 
 /** The server's dry run of an ad-hoc command. */
@@ -97,6 +154,7 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		tickScheduledFor: null,
 		runKey: null,
 		rerunOfRunId: wire.rerun_of_run_id ?? null,
+		memberAttempt: wire.member_attempt ?? null,
 		narrowing: wire.narrowing ?? null,
 		window: wire.window ? { start: String(wire.window.start), end: String(wire.window.end) } : null,
 		requestedBy: requesterOf(wire),
@@ -111,7 +169,8 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		startedAt: wire.started_at ?? null,
 		endedAt: wire.ended_at ?? null,
 		nodeCounts: countsOf(wire),
-		cost: null
+		cost: null,
+		ignoredAuditFailures: wire.ignored_audit_failures ?? 0
 	};
 }
 
@@ -132,12 +191,12 @@ function toQueueWait(wait: Wire['QueueWait']): QueueWait {
 	switch (wait.kind) {
 		case 'write_claim':
 			return { kind: wait.kind, runId: wait.run_id ?? null, nodeKey: wait.node_key, otherNodes: wait.other_nodes };
-		case 'concurrency_limit':
-			return { kind: wait.kind, limit: wait.limit, holders: wait.holders, elsewhere: wait.elsewhere };
+		case 'pool_full':
+			return { kind: wait.kind, pool: wait.pool, holders: wait.holders };
 		case 'earlier_run':
-			return { kind: wait.kind, runId: wait.run_id ?? null, limit: wait.limit };
+			return { kind: wait.kind, runId: wait.run_id ?? null, pool: wait.pool };
 		case 'upstream_job':
-			return { kind: wait.kind, runId: wait.run_id, jobKey: wait.job_key };
+			return { kind: wait.kind, runId: wait.run_id, jobKey: wait.job_key, attempt: wait.attempt ?? null };
 		case 'job_running':
 		case 'group_parent':
 			return { kind: wait.kind, runId: wait.run_id };
@@ -365,7 +424,7 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 	const rows = wire.affected_rows ?? wire.row_count;
 	const failure = [wire.error_type, wire.error_code].filter(Boolean).join(': ');
 	const facts = [durationText(wire.duration_ms), rows === null || rows === undefined ? '' : `${rows} ${rows === 1 ? 'row' : 'rows'}`].filter(Boolean).join(' · ');
-	const message = type === 'requested' ? 'Requested' : type === 'cancel_requested' ? 'Cancel requested' : wire.event_type.endsWith('_failed') ? failure || facts || 'no error code recorded' : type === 'audit_completed' ? (wire.outcome ?? '') : facts;
+	const message = wire.message ? wire.message : type === 'requested' ? 'Requested' : type === 'cancel_requested' ? 'Cancel requested' : wire.event_type.endsWith('_failed') ? failure || facts || 'no error code recorded' : type === 'audit_completed' ? (wire.outcome ?? '') : facts;
 	return {
 		id: wire.event_id,
 		storageId: wire.storage_id,

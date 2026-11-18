@@ -31,7 +31,8 @@ export function toEvaluation(wire: Wire['CheckResult']): CheckEvaluation {
 		violationCount: wire.violation_count ?? null,
 		measuredValue: wire.measured_value == null ? null : Number(wire.measured_value),
 		evidenceCount: wire.evidence_count ?? null,
-		evidenceTruncated: wire.evidence_truncated === 'true'
+		evidenceTruncated: wire.evidence_truncated === 'true',
+		ignored: wire.ignored ?? false
 	};
 }
 

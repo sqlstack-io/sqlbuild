@@ -24,6 +24,8 @@ use crate::credentials::models::{
     Action, AuditContext, AuthenticatedPerson, CredentialScope, DefaultRole, SessionAccess,
     TokenIdentity,
 };
+use crate::node_states::main::watch_node_states::watch_node_states;
+use crate::node_states::models::NodeStateCache;
 use crate::store::errors::ControlError;
 use crate::store::main::listen_changes::listen_changes;
 use crate::store::main::{begin::begin, commit::commit};
@@ -32,12 +34,16 @@ use crate::store::models::{ChangeMessage, ChangeTopic, ControlStore, Transaction
 #[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/changes",
     params(("location_id" = Uuid, Path), ("target" = String, Path)),
     responses((status = 200, body = ChangeNotice, content_type = "text/event-stream",
-        description = "changed events: all, runs, run:<id>, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor."),
+        description = "changed events: all, runs, run:<id>, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. node_status carries version, previous_version and the changed states (empty when none changed), or full: refetch node states when full is set or previous_version is not the version held."),
         (status = 401, description = "Invalid credential"),
         (status = 403, description = "Location not authorized")), security(("bearer" = [])))]
 pub(crate) async fn subscribe(
     State(store): State<ControlStore>,
-    (Extension(identity), Extension(feed)): (Extension<TokenIdentity>, Extension<ChangeFeed>),
+    (Extension(identity), Extension(feed), Extension(cache)): (
+        Extension<TokenIdentity>,
+        Extension<ChangeFeed>,
+        Extension<NodeStateCache>,
+    ),
     Path((location_id, target)): Path<(Uuid, String)>,
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, ControlError>>>, ApiError> {
@@ -47,24 +53,19 @@ pub(crate) async fn subscribe(
     } else {
         ChangeSubscriber::Location(sensitive(bearer(&headers)?)?)
     };
-    Ok(stream_changes(
-        store,
-        feed,
-        subscriber,
-        (location_id, target),
-    ))
+    stream_changes((store, cache), feed, subscriber, (location_id, target)).await
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/changes",
     operation_id = "subscribeChanges",
     params(("location_id" = Uuid, Path), ("target" = String, Path)),
     responses((status = 200, body = ChangeNotice, content_type = "text/event-stream",
-        description = "changed events: all, runs, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor."),
+        description = "changed events: all, runs, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. node_status carries version, previous_version and the changed states (empty when none changed), or full: refetch node states when full is set or previous_version is not the version held."),
         (status = 401, description = "Session rejected or person disabled"),
         (status = 403, description = "View does not cover every node of this target")),
     security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn subscribe_person(
-    State(store): State<ControlStore>,
+    (State(store), Extension(cache)): (State<ControlStore>, Extension<NodeStateCache>),
     (Extension(default_role), Extension(feed)): (Extension<DefaultRole>, Extension<ChangeFeed>),
     (Extension(AuthenticatedPerson(principal_id, session_id)), Extension(context)): (
         Extension<AuthenticatedPerson>,
@@ -90,12 +91,7 @@ pub(crate) async fn subscribe_person(
         session,
         default_role,
     };
-    Ok(stream_changes(
-        store,
-        feed,
-        subscriber,
-        (location_id, target),
-    ))
+    stream_changes((store, cache), feed, subscriber, (location_id, target)).await
 }
 
 fn sensitive(value: &str) -> Result<HeaderValue, ControlError> {
@@ -105,24 +101,28 @@ fn sensitive(value: &str) -> Result<HeaderValue, ControlError> {
     Ok(value)
 }
 
-fn stream_changes(
-    store: ControlStore,
+/// Node states load before the first event, so every state change after the first refetch is pushed.
+async fn stream_changes(
+    (store, cache): (ControlStore, NodeStateCache),
     feed: ChangeFeed,
     subscriber: ChangeSubscriber,
     (location_id, target): (Uuid, String),
-) -> Sse<impl Stream<Item = Result<Event, ControlError>>> {
+) -> Result<Sse<impl Stream<Item = Result<Event, ControlError>>>, ApiError> {
+    let receiver = feed.sender.subscribe();
+    let updates = watch_node_states(&cache, (location_id, &target)).await?;
     let state = ChangeStream {
         store,
         subscriber,
         location_id,
         target_hash: sha256_hex(target.as_bytes()),
         target,
-        receiver: feed.sender.subscribe(),
+        receiver,
+        updates,
         stopped: feed.stopped,
         keepalive: tokio::time::interval(Duration::from_secs(15)),
         initial: true,
     };
-    Sse::new(stream::try_unfold(state, next_event))
+    Ok(Sse::new(stream::try_unfold(state, next_event)))
 }
 
 /// Whether the subscriber may still receive this stream, checked before every emission.
@@ -187,6 +187,18 @@ async fn next_event(
                     Err(broadcast::error::RecvError::Lagged(_)) => Some(ChangeMessage::Resync),
                     Err(broadcast::error::RecvError::Closed) => return Ok(None),
                 },
+                update = state.updates.recv() => match update {
+                    Ok(update) if update.location_id == state.location_id && update.target_hash == state.target_hash => {
+                        if !still_authorized(&state).await? {
+                            return Ok(None);
+                        }
+                        let event = Event::default().event("changed").data(&*update.data);
+                        return Ok(Some((event, state)));
+                    }
+                    Ok(_) => continue,
+                    Err(broadcast::error::RecvError::Lagged(_)) => Some(ChangeMessage::Resync),
+                    Err(broadcast::error::RecvError::Closed) => return Ok(None),
+                },
             }
         };
         let keepalive = message.is_none();
@@ -203,13 +215,13 @@ async fn next_event(
                 if person && matches!(topic, ChangeTopic::Run(_)) {
                     continue;
                 }
-                Some(match topic {
-                    ChangeTopic::Runs => "runs".into(),
-                    ChangeTopic::Run(id) => format!("run:{id}"),
-                    ChangeTopic::Ticks => "ticks".into(),
-                    ChangeTopic::Snapshot => format!("snapshot:{}", state.location_id),
-                    ChangeTopic::NodeStatus => format!("node_status:{}", state.target),
-                })
+                match topic {
+                    ChangeTopic::Runs => Some("runs".into()),
+                    ChangeTopic::Run(id) => Some(format!("run:{id}")),
+                    ChangeTopic::Ticks => Some("ticks".into()),
+                    ChangeTopic::Snapshot => Some(format!("snapshot:{}", state.location_id)),
+                    ChangeTopic::NodeStatus => continue,
+                }
             }
             Some(ChangeMessage::Resync) => Some("all".into()),
             Some(ChangeMessage::CredentialsChanged) | None => None,
@@ -220,7 +232,13 @@ async fn next_event(
         if let Some(topic) = topic {
             let event = Event::default()
                 .event("changed")
-                .json_data(ChangeNotice { topic })
+                .json_data(ChangeNotice {
+                    topic,
+                    version: None,
+                    previous_version: None,
+                    states: None,
+                    full: None,
+                })
                 .map_err(|error| ControlError::Invalid(error.to_string()))?;
             return Ok(Some((event, state)));
         }

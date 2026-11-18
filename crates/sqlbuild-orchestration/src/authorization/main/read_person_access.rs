@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::authorization::_helpers::person_grants::{allowed, person_role_rows};
 use crate::authorization::models::{LocationAccess, PersonAccess};
 use crate::credentials::models::{Action, DefaultRole};
-use crate::snapshots::main::read_snapshot_keys::read_snapshot_keys;
+use crate::snapshots::main::reads::read_snapshot_keys::read_snapshot_keys;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};

@@ -27,11 +27,51 @@ pub enum InitialStatus {
     Paused,
 }
 
-/// Reruns from failure, `retries` times, `retry_delay_seconds` apart.
+/// A `[retry]` table: run at most `attempts` times in all, each rerun from failure `delay_seconds` after the last.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct OnFailure {
-    pub retries: u8,
-    pub retry_delay_seconds: u32,
+pub struct RetryPolicy {
+    pub attempts: u8,
+    pub delay_seconds: u32,
+}
+
+/// A deprecated name a file still uses, where it is written and what replaces it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Deprecation {
+    pub message: String,
+    pub position: FilePosition,
+}
+
+/// When a group member starts: once the jobs it reads from end (`job`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WaitFor {
+    #[default]
+    Job,
+}
+
+/// What a group member does when a job it depends on failed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DependencyFailure {
+    /// Build what can still be built, skipping nodes downstream of the failure.
+    #[default]
+    Partial,
+    /// Do not run the member.
+    Skip,
+    /// Run every node regardless.
+    Run,
+}
+
+/// One level of a group's `[dependencies]`: the group default or one member's override.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DependencySettings {
+    pub wait_for: Option<WaitFor>,
+    pub on_failure: Option<DependencyFailure>,
+}
+
+/// A group's `[dependencies]` table: defaults, and per-member overrides keyed by job name.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GroupDependencies {
+    pub defaults: DependencySettings,
+    pub members: BTreeMap<String, DependencySettings>,
 }
 
 /// A 1-based line and column in a declaration file.
@@ -73,9 +113,13 @@ pub struct RunFile {
     pub targets: Vec<String>,
     pub owner: Option<String>,
     pub overlap: Overlap,
-    pub concurrency_groups: Vec<String>,
+    /// Each pool the run takes, with how many of its slots.
+    pub pools: BTreeMap<String, u32>,
     pub schedule: Option<ScheduleFile>,
-    pub on_failure: Option<OnFailure>,
+    /// `[retry]`, or the deprecated `[on_failure]` it replaces.
+    pub retry: Option<RetryPolicy>,
+    /// Deprecated names the file uses, in file order.
+    pub deprecations: Vec<Deprecation>,
 }
 
 /// One `orchestration/jobs/**.toml` file.
@@ -97,6 +141,8 @@ pub struct JobFile {
 pub struct GroupFile {
     pub run: RunFile,
     pub jobs: Vec<Positioned<String>>,
+    /// `[dependencies]`; every override names a job in `jobs`.
+    pub dependencies: GroupDependencies,
 }
 
 /// A calendar or sensor module and the declaration it makes.

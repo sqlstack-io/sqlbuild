@@ -3,7 +3,8 @@
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 
 use crate::bindings::_helpers::format_command::cache::FORMAT_RESULT_STORE_FILE_NAME;
-use crate::bindings::_helpers::format_command::{command, files};
+use crate::bindings::_helpers::format_command::command;
+use crate::bindings::_helpers::format_command::files;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     command::register(module)?;

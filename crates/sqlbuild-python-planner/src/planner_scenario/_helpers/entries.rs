@@ -11,6 +11,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyString;
 use pyo3::types::{PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::by_attribute::by_attribute;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -86,7 +87,7 @@ pub(crate) fn function_entry<'py>(
         Some(keywords(
             py,
             &[
-                ("adapter", context.adapter.clone()),
+                ("dialect", context.dialect.clone().into_any()),
                 ("function", function.clone()),
                 (
                     "model_locations",
@@ -104,7 +105,7 @@ pub(crate) fn function_entry<'py>(
                 ("source_warehouse_columns", warehouse_columns.clone()),
                 (
                     "star_exclude_keyword",
-                    context.adapter.call_method0("star_exclude_keyword")?,
+                    context.dialect.syntax("star_exclude_keyword")?.call0()?,
                 ),
             ],
         )?),

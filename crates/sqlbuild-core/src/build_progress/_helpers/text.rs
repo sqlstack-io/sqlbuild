@@ -6,6 +6,7 @@ use crate::build_progress::constants::{
     TIMEOUT_OUTCOME, WARN,
 };
 use crate::build_progress::models::SkipText;
+use crate::number_text::main::format_thousands::format_thousands;
 use crate::text::main::python_isspace::python_isspace;
 
 /// `f"{text:<width}"`: left-aligned, padded by character count.
@@ -23,23 +24,6 @@ pub(crate) fn pad_left(text: &str, width: usize) -> String {
 /// `text[:count]` by character.
 pub(crate) fn head(text: &str, count: usize) -> String {
     text.chars().take(count).collect()
-}
-
-/// `f"{value:,}"`: the integer with comma-separated thousands.
-pub(crate) fn group_thousands(value: i64) -> String {
-    let digits: String = value.unsigned_abs().to_string();
-    let mut grouped: String = String::new();
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(digit);
-    }
-    if value < 0 {
-        format!("-{grouped}")
-    } else {
-        grouped
-    }
 }
 
 /// The name cut to `width` characters with a trailing ellipsis.
@@ -149,5 +133,5 @@ pub(crate) fn abbreviated_rows(count: i64) -> String {
     if count >= ROW_COUNT_ABBREVIATION_THRESHOLD {
         return format!("{:.1}K {label}", count as f64 / ROW_COUNT_THOUSAND as f64);
     }
-    format!("{} {label}", group_thousands(count))
+    format!("{} {label}", format_thousands(i128::from(count)))
 }

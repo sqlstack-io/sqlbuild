@@ -11,6 +11,7 @@ use crate::store::main::{
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
+use crate::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use crate::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
@@ -60,7 +61,7 @@ pub(crate) async fn event_history(
         ),
         (
             "records",
-            json!(vec![record.clone(); 101]),
+            json!(vec![record.clone(); MAX_HISTORY_PAGE_RECORDS + 1]),
             StatusCode::BAD_REQUEST,
         ),
     ] {

@@ -127,6 +127,18 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_plans::read),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/summary",
+            get(crate::api::_helpers::resources::person_plans::summary),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/rows",
+            get(crate::api::_helpers::resources::person_plans::rows),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/diff",
+            get(crate::api::_helpers::resources::person_plans::diff),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs",
             get(crate::api::_helpers::resources::person_operations::recent_runs),
         )
@@ -142,6 +154,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/nodes",
             get(crate::api::_helpers::resources::person_reads::nodes),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/node-states",
+            get(crate::api::_helpers::resources::person_reads::node_states),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/jobs",
@@ -180,6 +196,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::health),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/mirrored-totals",
+            get(crate::api::_helpers::resources::person_reads::mirrored_totals),
+        )
+        .route(
             "/api/control/platform/problems",
             get(crate::api::_helpers::resources::person_reads::problems),
         )
@@ -190,6 +210,14 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/column-lineage",
             get(crate::api::_helpers::resources::person_operations::column_lineage),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/selection",
+            get(crate::api::_helpers::resources::person_selection::evaluate),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/selection/vocabulary",
+            get(crate::api::_helpers::resources::person_selection::vocabulary),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/catalog",

@@ -10,6 +10,8 @@ mod fingerprint_reads_helpers;
 pub(crate) mod helpers;
 #[path = "node_sql/helpers.rs"]
 mod node_sql_helpers;
+#[path = "node_states/helpers.rs"]
+mod node_states_helpers;
 #[path = "node_status/helpers.rs"]
 mod node_status_helpers;
 #[path = "oidc/helpers.rs"]
@@ -26,6 +28,8 @@ mod person_sessions_test_types;
 mod plans_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
+#[path = "state_history/helpers.rs"]
+mod state_history_helpers;
 #[path = "statistics/eligibility/helpers.rs"]
 mod statistics_eligibility;
 #[path = "statistics/helpers.rs"]
@@ -56,6 +60,8 @@ mod test_denials;
 mod test_development;
 #[path = "test_external_sessions.rs"]
 mod test_external_sessions;
+#[path = "test_ingestion_turns.rs"]
+mod test_ingestion_turns;
 #[path = "test_location_health.rs"]
 mod test_location_health;
 #[path = "test_location_work.rs"]
@@ -64,6 +70,8 @@ mod test_location_work;
 mod test_maintenance;
 #[path = "test_microbatch_coverage.rs"]
 mod test_microbatch_coverage;
+#[path = "test_node_states.rs"]
+mod test_node_states;
 #[path = "test_oidc.rs"]
 mod test_oidc;
 #[path = "test_oidc_groups.rs"]
@@ -92,6 +100,8 @@ mod test_resource_costs;
 mod test_run_ids;
 #[path = "test_server_errors.rs"]
 mod test_server_errors;
+#[path = "test_state_history_retention.rs"]
+mod test_state_history_retention;
 #[path = "test_statistics_recovery.rs"]
 mod test_statistics_recovery;
 #[path = "test_trigger_upcoming.rs"]

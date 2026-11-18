@@ -1,6 +1,7 @@
 <script lang="ts">
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
-	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { roleHref, scopeWords } from '$lib/platform/access';
@@ -12,6 +13,14 @@
 	const locations = $derived(app.bootstrap?.locations ?? []);
 	const mappings = $derived(rs.sso.data ?? []);
 	const unseen = $derived(mappings.filter((m) => m.membersSynced === 0));
+	const tableColumns: TableColumn[] = [
+		{ id: 'group', label: 'Group', minWidth: 180 },
+		{ id: 'role', label: 'Gets role', width: '160px' },
+		{ id: 'where', label: 'Where', width: '160px' },
+		{ id: 'members', label: 'Members seen', width: '120px', align: 'right' },
+		{ id: 'synced', label: 'Last synced', width: '130px' },
+		{ id: 'config', label: 'Configured in', width: '24%' }
+	];
 </script>
 
 <div class="px-6 pt-5 pb-8">
@@ -21,19 +30,8 @@
 			Check the group name matches your identity provider.
 		</p>
 	{/if}
-	<table class="sb-list static framed">
-		<thead>
-			<tr>
-				<th>Group</th>
-				<th>Gets role</th>
-				<th>Where</th>
-				<th class="num">Members seen</th>
-				<th>Last synced</th>
-				<th>Configured in</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each mappings as m (m.group + m.role)}
+	<DataTable class="static framed" embedded columns={tableColumns} rows={mappings} key={(m) => m.group + m.role} resource={rs.sso} empty="No SSO groups are mapped to roles.">
+		{#snippet row(m)}
 				<tr class:sb-row-off={m.membersSynced === 0}>
 					<td><code>{m.group}</code></td>
 					<td><a class="link" href={to(roleHref(m.role))}>{m.role}</a></td>
@@ -42,25 +40,16 @@
 					<td>{#if m.lastSyncedAt}<RelativeTime value={formatAgo(m.lastSyncedAt, app.now)} exact={formatStamp(m.lastSyncedAt)} />{:else}<span class="muted">Never</span>{/if}</td>
 					<td class="muted">Server config <code>{m.definedIn}</code></td>
 				</tr>
-			{:else}
-				<LoadRow colspan={6} resource={rs.sso} empty="No SSO groups are mapped to roles." />
-			{/each}
-		</tbody>
-	</table>
+		{/snippet}
+	</DataTable>
 </div>
 
 <style>
-	:global(.sb-list.static tbody tr) {
-		cursor: default;
-	}
 	.note {
 		max-width: 860px;
 		margin-bottom: 14px;
 		color: var(--sb-warning);
 		font-size: 12.5px;
-	}
-	.framed {
-		border-top: 1px solid var(--border);
 	}
 	code {
 		font-family: var(--font-mono);

@@ -6,7 +6,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
-use crate::runs::main::queue_run::queue_run;
+use crate::runs::main::requests::queue_run::queue_run;
 use crate::runs::models::RunRequest;
 use crate::snapshots::constants::SOURCE_KEY_PREFIX;
 use crate::store::errors::ControlError;

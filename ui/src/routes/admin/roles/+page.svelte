@@ -1,8 +1,9 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import NoAccess from '$lib/components/platform/no-access.svelte';
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -23,7 +24,7 @@
 </script>
 
 <AppTopbar title="Roles">
-	<Button variant="outline" size="sm" onclick={() => rs.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => rs.refresh()} />
 </AppTopbar>
 
 {#if !app.can('role.assign')}
@@ -36,12 +37,12 @@
 			...(app.client.supports('listSsoMappings') ? [{ value: 'sso' as const, label: 'SSO mappings', count: rs.sso.data?.length }] : [])
 		]}
 	/>
-	<div class="min-h-0 flex-1 overflow-auto">
+	<PageBody padding="0">
 		{#if tab === 'roles' || !app.client.supports('listSsoMappings')}
 			<RolesTab {rs} />
 		{:else}
 			<SsoTab {rs} />
 		{/if}
-	</div>
+	</PageBody>
 {/if}
 

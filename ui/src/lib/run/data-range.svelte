@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	// Which data a run processes: the latest, as a scheduled run does; a date range that incremental models
 	// reprocess (`--start-cursor-ts` / `--end-cursor-ts`), for jobs with a cursor; or everything, rebuilt from
 	// scratch (`--full-refresh`). The choice is the caller's; this only edits it.
@@ -31,6 +32,30 @@
 		return { type: 'timestamp', start: iso(new Date(today.getTime() - days * day)), end: iso(today) };
 	};
 	let custom = $state(false);
+	function pickData(choice: string) {
+		if (choice === 'latest') {
+			custom = false;
+			onchange(null);
+		} else if (choice === 'range') {
+			if (ranged) return;
+			if (cursorType === 'timestamp') onchange(presetWindow(7));
+			else {
+				custom = true;
+				onchange(null);
+			}
+		} else {
+			custom = false;
+			choose({ window: null, fullRefresh: true });
+		}
+	}
+	function pickPreset(key: string) {
+		const p = PRESETS.find((p) => p.key === key);
+		if (!p) custom = true;
+		else {
+			custom = false;
+			onchange(presetWindow(p.days));
+		}
+	}
 	const preset = $derived(
 		cursorType === 'timestamp' && window && !custom ? (PRESETS.find((p) => { const w = presetWindow(p.days); return w.start === window.start && w.end === window.end; })?.key ?? null) : null
 	);
@@ -52,28 +77,28 @@
 </script>
 
 <div class="range" title={canRewrite ? undefined : "Reprocessing past data or rebuilding from scratch needs the rewrite-history permission (run.rewrite_history)"}>
-	<div class="pills" role="group" aria-label="Data">
-		<button aria-pressed={!ranged && !fullRefresh} onclick={() => { custom = false; onchange(null); }}>Latest data</button>
-		{#if cursorType}
-			<button aria-pressed={ranged} disabled={!canRewrite} onclick={() => {
-				if (ranged) return;
-				if (cursorType === 'timestamp') onchange(presetWindow(7));
-				else { custom = true; onchange(null); }
-			}}>{cursorType === 'timestamp' ? 'Date range' : 'Cursor range'}</button>
-		{/if}
-		<button aria-pressed={fullRefresh} disabled={!canRewrite} onclick={() => { custom = false; choose({ window: null, fullRefresh: true }); }}>Full refresh</button>
-	</div>
+	<SegmentedFilter
+		label="Data"
+		value={fullRefresh ? 'full' : ranged ? 'range' : 'latest'}
+		options={[
+			{ value: 'latest', label: 'Latest data' },
+			...(cursorType ? [{ value: 'range', label: cursorType === 'timestamp' ? 'Date range' : 'Cursor range', disabled: !canRewrite }] : []),
+			{ value: 'full', label: 'Full refresh', disabled: !canRewrite }
+		]}
+		onselect={pickData}
+	/>
 	{#if fullRefresh}
-		<p class="note">Every model in this run is rebuilt from scratch, replacing all of its data. Recorded in the audit log.</p>
+		<!-- copy-allow: consequence warning -->
+		<p class="note">Rebuilds every model from scratch, replacing all data. Audited.</p>
 	{/if}
 		{#if ranged}
 			{#if cursorType === 'timestamp'}
-				<div class="pills" role="group" aria-label="Range">
-					{#each PRESETS as p (p.key)}
-						<button aria-pressed={preset === p.key} onclick={() => { custom = false; onchange(presetWindow(p.days)); }}>{p.label}</button>
-					{/each}
-					<button aria-pressed={!preset} onclick={() => (custom = true)}>Custom</button>
-				</div>
+				<SegmentedFilter
+					label="Range"
+					value={preset ?? 'custom'}
+					options={[...PRESETS.map((p) => ({ value: p.key as string, label: p.label })), { value: 'custom', label: 'Custom' }]}
+					onselect={pickPreset}
+				/>
 			{/if}
 			{#if !preset}
 				<div class="custom">
@@ -89,7 +114,8 @@
 					{/if}
 				</div>
 			{/if}
-			<p class="note">Incremental models reprocess this range, replacing what was built for it. Recorded in the audit log.</p>
+			<!-- copy-allow: consequence warning -->
+			<p class="note">Replaces data built for this range. Audited.</p>
 		{/if}
 </div>
 
@@ -99,29 +125,6 @@
 		flex-direction: column;
 		align-items: flex-start;
 		gap: 8px;
-	}
-	.pills {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-	}
-	.pills button {
-		padding: 2px 10px;
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.pills button[aria-pressed='true'] {
-		border-color: var(--border-strong);
-		background: var(--sidebar-accent);
-		color: var(--foreground);
-	}
-	.pills button:hover:not(:disabled) {
-		color: var(--foreground);
-	}
-	.pills button:disabled {
-		opacity: 0.5;
 	}
 	.custom {
 		display: flex;

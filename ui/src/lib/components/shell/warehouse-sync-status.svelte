@@ -8,8 +8,8 @@
 
 	const text = $derived.by(() => {
 		if (!sync) return '';
-		if (sync.lastError) return `Warehouse sync failing · last synced ${formatAgo(sync.lastSyncedAt, app.now)}`;
-		return sync.lastSyncedAt ? `Warehouse last synced ${formatAgo(sync.lastSyncedAt, app.now)}` : 'Warehouse not synced yet';
+		if (sync.lastError) return `Sync failing · ${formatAgo(sync.lastSyncedAt, app.now)}`;
+		return sync.lastSyncedAt ? `Synced ${formatAgo(sync.lastSyncedAt, app.now)}` : 'Not synced yet';
 	});
 
 	const title = $derived.by(() => {
@@ -20,7 +20,7 @@
 </script>
 
 <!-- Holds the usual text's width while loading, so the top bar doesn't shift when the report arrives. -->
-<span class="sync" class:failed={!!sync?.lastError} class:waiting={!sync} {title}>{sync ? text : 'Warehouse last synced just now'}</span>
+<span class="sync" class:failed={!!sync?.lastError} class:waiting={!sync} {title}>{sync ? text : 'Synced just now'}</span>
 
 <style>
 	.sync {

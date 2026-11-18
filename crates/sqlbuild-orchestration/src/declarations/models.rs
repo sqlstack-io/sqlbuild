@@ -1,9 +1,11 @@
 //! Resolved, serializable declarations; Python objects never enter scheduler state.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU32;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::sensors::models::SensorDefinition;
 
@@ -33,8 +35,12 @@ pub struct JobDefinition {
     pub selection: BTreeSet<String>,
     #[serde(default)]
     pub settings: BTreeMap<String, serde_json::Value>,
-    #[serde(default)]
-    pub concurrency_groups: BTreeSet<String>,
+    /// Each pool the job takes, with its amount and the pool's limit on the target.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub pools: BTreeMap<String, PoolSlots>,
+    /// Models a run builds at once on the target, and the layer that set it; absent from older snapshots.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_concurrency: Option<ResolvedConcurrency>,
     /// The selectors as written, for display; `selection` is what runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub select: Option<String>,
@@ -147,6 +153,113 @@ pub struct GroupDefinition {
     #[serde(flatten)]
     pub job: JobDefinition,
     pub jobs: BTreeMap<String, BTreeSet<String>>,
+    /// Each member's node-level reasons to wait for the members in `jobs`; members without one are left out.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub wait_reasons: BTreeMap<String, Vec<WaitReason>>,
+    /// Each member whose `[dependencies] on_failure` is not `partial`, with its policy.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub dependency_failure: BTreeMap<String, DependencyFailure>,
+}
+
+impl GroupDefinition {
+    /// What `member` does when a job it depends on failed.
+    #[must_use]
+    pub fn member_dependency_failure(&self, member: &str) -> DependencyFailure {
+        self.dependency_failure
+            .get(member)
+            .copied()
+            .unwrap_or_default()
+    }
+}
+
+/// One reason a member waits: `from_node` of `upstream_job` feeds its `to_node`, directly or through nodes no member selects.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WaitReason {
+    pub upstream_job: String,
+    pub from_node: String,
+    pub to_node: String,
+}
+
+/// The layer that set a run's concurrency.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConcurrencySource {
+    /// The job's own `[settings] concurrency`.
+    Job,
+    /// The target's `concurrency` in `[targets.<name>]`.
+    Target,
+    /// `[settings] concurrency` in the location's `sqlbuild_local.toml`.
+    Local,
+    /// `[settings] concurrency` in `sqlbuild_project.toml`.
+    Project,
+    /// SQLBuild's built-in default.
+    Default,
+}
+
+/// The models a run builds at once on its target, and the layer that set it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolvedConcurrency {
+    pub limit: u64,
+    pub source: ConcurrencySource,
+}
+
+/// How many slots of a pool a job takes, and the pool's limit on the job's target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PoolSlots {
+    #[schema(value_type = u32)]
+    pub amount: NonZeroU32,
+    #[schema(value_type = u32)]
+    pub limit: NonZeroU32,
+}
+
+/// A pool a job takes: its slots, the pool's limit, and the other jobs and groups taking it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PoolUse {
+    pub pool: String,
+    /// The slots the job asks for.
+    pub amount: u32,
+    /// The project's limit on the target.
+    pub limit: u32,
+    /// This server's `pool_caps` entry for the location and target; absent when it sets none.
+    pub cap: Option<u32>,
+    /// The limit on this server: the project's limit, lowered to the cap.
+    pub server_limit: u32,
+    /// The job asks for more slots than `server_limit`, so on this server it takes the whole pool.
+    pub clamped: bool,
+    pub shared_with: BTreeSet<String>,
+}
+
+/// Each launcher's `pool_caps` on this server, by location and target.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ServerPoolCaps {
+    pub launchers: BTreeMap<(Uuid, String), BTreeMap<String, NonZeroU32>>,
+}
+
+impl ServerPoolCaps {
+    /// The caps of the launcher serving `target` of `location_id`; none when no launcher here serves it.
+    #[must_use]
+    pub fn on(&self, (location_id, target): (Uuid, &str)) -> BTreeMap<String, NonZeroU32> {
+        self.launchers
+            .get(&(location_id, target.to_owned()))
+            .cloned()
+            .unwrap_or_default()
+    }
+}
+
+/// What a group member does when a job it depends on failed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DependencyFailure {
+    /// Build what can still be built, skipping nodes downstream of the failed ones.
+    #[default]
+    Partial,
+    /// Do not run the member: its nodes end skipped.
+    Skip,
+    /// Run every node regardless.
+    Run,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -204,7 +317,15 @@ pub struct JobRecord {
     pub kind: crate::runs::models::RunKind,
     pub description: String,
     pub selection: BTreeSet<String>,
-    pub concurrency_groups: BTreeSet<String>,
+    /// Each pool the job takes, by pool name.
+    pub pools: Vec<PoolUse>,
+    /// The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
+    pub concurrency: Option<u64>,
+    /// The job's own `ignore_audit_failures` setting; absent uses the target's, then the project's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ignore_audit_failures: Option<bool>,
+    /// The concurrency a run uses on the snapshot's target and where it came from; absent for older snapshots.
+    pub resolved_concurrency: Option<ResolvedConcurrency>,
     pub snapshot_id: uuid::Uuid,
     /// A job's selectors as written; absent for a group and for snapshots published before they were recorded.
     pub select: Option<String>,
@@ -231,7 +352,15 @@ pub struct JobDetailRecord {
     pub description: String,
     pub snapshot_id: uuid::Uuid,
     pub selection: BTreeSet<String>,
-    pub concurrency_groups: BTreeSet<String>,
+    /// Each pool the job takes, by pool name.
+    pub pools: Vec<PoolUse>,
+    /// The job's own `concurrency` setting, models building at once in a run; absent uses the project's.
+    pub concurrency: Option<u64>,
+    /// The job's own `ignore_audit_failures` setting; absent uses the target's, then the project's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ignore_audit_failures: Option<bool>,
+    /// The concurrency a run uses on the snapshot's target and where it came from; absent for older snapshots.
+    pub resolved_concurrency: Option<ResolvedConcurrency>,
     /// Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction.
     pub settings: BTreeMap<String, serde_json::Value>,
     /// A group's member jobs in run order; empty for a job.
@@ -249,7 +378,7 @@ pub struct JobDetailRecord {
     pub cursor_type: Option<String>,
     pub owner: Option<String>,
     pub overlap: Overlap,
-    /// A member job's own policy applies only when it runs alone; inside a group run the group's applies.
+    /// Also applies to the job inside a group run: the group retries it while the members that depend on it wait.
     pub on_failure: Option<OnFailure>,
 }
 
@@ -258,6 +387,8 @@ pub struct JobMember {
     pub job_key: String,
     /// Members this one waits for, from the lineage between their nodes.
     pub waits_for: BTreeSet<String>,
+    /// Node by node, why it waits for each of `waits_for`; a wait with none follows lineage through another member.
+    pub reasons: Vec<WaitReason>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -385,6 +516,9 @@ pub struct ProviderRecord {
     /// Jobs whose selection includes one of those nodes.
     #[serde(default)]
     pub jobs: Vec<String>,
+    /// Each of those jobs with the provider's nodes it selects, in node order.
+    #[serde(default)]
+    pub job_nodes: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 /// One declared setting field; its value stays in the location's environment.

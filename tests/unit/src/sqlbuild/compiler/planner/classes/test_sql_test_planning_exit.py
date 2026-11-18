@@ -60,7 +60,7 @@ _UNJOINED_PLANNING: str = dedent(
 
     native.start_sql_test_planning(
         project=SlowSqlTestsProject(),
-        adapter=None,
+        dialect=native.Dialect(DuckDbAdapter()),
         selected_keys=frozenset(),
         sql_test_selection=SqlTestSelection(),
         enabled=True,

@@ -1,5 +1,12 @@
 <script lang="ts">
+	import { noun, plural } from '$lib/format/plural';
+	import HelpTip from '$lib/components/help-tip.svelte';
+	import PageBody from '$lib/components/page-body.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	// Every rerun opens here first, like every Run button opens the plan page: it shows what the rerun repeats
 	// and nothing reruns until Run is pressed. A rerun repeats its run's frozen version and settings, so it is
 	// not planned against the current project.
@@ -17,6 +24,7 @@
 	import { rerunHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { runStatusLabel } from '$lib/status';
 	import { rerunChoices } from '../../runs/[id]/utils';
 
@@ -29,7 +37,7 @@
 	const remaining = $derived(runIds.filter((id) => !done.has(id)));
 
 	const details = createResource(async (client, scope) => (await Promise.all(runIds.map((id) => client.getRunDetail(scope, id)))).filter((d): d is RunDetail => !!d), runIds.map((id) => `run:${id}`));
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot']);
+	const catalog = useCatalogNodes();
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 
 	const can = (c: Capability) => app.can(c);
@@ -90,6 +98,16 @@
 	}
 
 	const what = (d: RunDetail) => d.run.jobKey ?? 'ad-hoc run';
+	const nodeColumns: TableColumn[] = [
+		{ id: 'node', label: 'Node', minWidth: 200 },
+		{ id: 'kind', label: 'Kind', width: '30%' },
+		{ id: 'last', label: 'Last time', width: '160px' }
+	];
+	const runColumns: TableColumn[] = [
+		{ id: 'run', label: 'Run', minWidth: 220 },
+		{ id: 'status', label: 'Ended', width: '200px' },
+		{ id: 'rerun', label: 'Reruns', width: '30%' }
+	];
 </script>
 
 <AppTopbar title="Plan" />
@@ -104,65 +122,59 @@
 				<span class="faint">Rerun</span><span>{remaining.length} runs</span>
 			{/if}
 		</span>
-		<div class="verbs" role="group" aria-label="What to rerun">
-			{#if single}
-				{#each choices as c (c.mode)}
-					<button class:on={mode === c.mode} disabled={!!c.disabledReason} title={c.disabledReason ?? c.help} onclick={() => choose(c.mode)}>{c.label}</button>
-				{/each}
-			{:else}
-				<button class:on={mode === 'all'} onclick={() => choose('all')}>Rerun all</button>
-				<button class:on={mode === 'from_failure'} onclick={() => choose('from_failure')}>Rerun from failure</button>
-			{/if}
-		</div>
-		<span class="faint note">Repeats each run's own version and settings, as frozen when it started</span>
+		<SegmentedFilter
+			label="What to rerun"
+			value={mode}
+			options={single
+				? choices.map((c) => ({ value: c.mode, label: c.label, title: c.disabledReason ?? c.help, disabled: !!c.disabledReason }))
+				: [
+						{ value: 'all' as RerunMode, label: 'Rerun all' },
+						{ value: 'from_failure' as RerunMode, label: 'Rerun from failure' }
+					]}
+			onselect={choose}
+		/>
+		<HelpTip text="Repeats each run's own version and settings, as frozen when it started" label="About rerunning" />
 	</div>
 
 	{#if loadError}<p class="problem-bar">{loadError}</p>{/if}
 
 	<div class="body">
-		<div class="main sb-scroll">
+		<PageBody padding="14px 24px" inner="flex min-h-full flex-col">
 			{#if !details.data}
 				<div class="loading" role="status"><RotateCwIcon size={14} class="animate-spin" /> Loading the run…</div>
 			{:else if single && first}
 				<div class="summary">
-					<b>{nodes.length}</b> node{nodes.length === 1 ? '' : 's'}<span>·</span>{runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)}
-					<div class="tabs" role="tablist">
-						<button role="tab" aria-selected={view === 'nodes'} onclick={() => (view = 'nodes')}>Nodes</button>
-						<button role="tab" aria-selected={view === 'graph'} onclick={() => (view = 'graph')}>Graph</button>
-					</div>
+					<b>{nodes.length}</b> {noun(nodes.length, 'node')}<span>·</span>{runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)}
+					<div class="tabs"><SegmentedFilter label="View" bind:value={view} options={[{ value: 'nodes', label: 'Nodes' }, { value: 'graph', label: 'Graph' }]} /></div>
 				</div>
 				{#if view === 'graph' && catalog.data}
 					{#if drawable.length}<div class="graph"><ScopeGraph keys={drawable} catalog={catalog.data} onselect={() => {}} /></div>{/if}
 				{:else}
-					<table class="nodes">
-						<tbody>
-							{#each nodes as key (key)}
-								{@const node = byKey.get(key)}
-								{@const outcome = first.nodes.find((n) => n.nodeKey === key)?.status}
-								<tr>
-									<td><a href={to(`/catalog/${key}`)} class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
-									<td class="faint">{node ? kindLine(node) : ''}</td>
-									<td class="faint right">{outcome ? `was ${outcome.replace('_', ' ')}` : ''}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
+					<DataTable class="static compact" embedded columns={nodeColumns} rows={nodes} key={(key) => key} rowHeight={32} empty="Nothing to rerun.">
+						{#snippet row(key)}
+							{@const node = byKey.get(key)}
+							{@const outcome = first.nodes.find((n) => n.nodeKey === key)?.status}
+							<tr>
+								<td><a href={to(`/catalog/${key}`)} class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
+								<td class="faint">{node ? kindLine(node) : ''}</td>
+								<td class="faint">{outcome ? `was ${outcome.replace('_', ' ')}` : ''}</td>
+							</tr>
+						{/snippet}
+					</DataTable>
 				{/if}
 			{:else}
 				<div class="summary"><b>{ready.length}</b> of {rows.length} runs<span>·</span><b>{ready.reduce((n, r) => n + r.nodes.length, 0)}</b> nodes</div>
-				<table class="nodes">
-					<tbody>
-						{#each rows as r (r.detail.run.id)}
-							<tr class:off={!!r.blocked || !r.nodes.length}>
-								<td><a href={to(`/runs/${r.detail.run.id}`)}>{what(r.detail)}</a> <span class="faint mono">{shortRunId(r.detail.run.id)}</span></td>
-								<td class="faint">{runStatusLabel[r.detail.run.status].toLowerCase()} {formatAgo(r.detail.run.endedAt, app.now)}</td>
-								<td class="faint right">{r.blocked ?? (r.nodes.length ? `${r.nodes.length} node${r.nodes.length === 1 ? '' : 's'}` : 'Nothing to rerun')}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<DataTable class="static compact" embedded columns={runColumns} rows={rows} key={(r) => r.detail.run.id} empty="No runs to rerun.">
+					{#snippet row(r)}
+						<tr class:off={!!r.blocked || !r.nodes.length}>
+							<td><a href={to(`/runs/${r.detail.run.id}`)}>{what(r.detail)}</a> <span class="faint mono">{shortRunId(r.detail.run.id)}</span></td>
+							<td class="faint">{runStatusLabel[r.detail.run.status].toLowerCase()} {formatAgo(r.detail.run.endedAt, app.now)}</td>
+							<td class="faint">{r.blocked ?? (r.nodes.length ? `${plural(r.nodes.length, 'node')}` : 'Nothing to rerun')}</td>
+						</tr>
+					{/snippet}
+				</DataTable>
 			{/if}
-		</div>
+		</PageBody>
 		<aside class="rail sb-scroll">
 			<h3>Permissions</h3>
 			{#each needs as action (action)}
@@ -178,7 +190,7 @@
 		<div class="why">
 			{#if launchError}<span class="problem">{launchError}</span>{:else if blockedReason}<span class="faint">{blockedReason}</span>{/if}
 		</div>
-		<GatedButton requires="run.rerun" variant={canRun ? 'default' : 'outline'} disabled={!canRun} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
+		<GatedButton requires="run.rerun" variant={canRun ? 'default' : 'outline'} disabled={!canRun} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	</div>
 </div>
 
@@ -205,34 +217,6 @@
 		font-family: var(--font-mono);
 		color: var(--foreground);
 	}
-	.verbs {
-		display: flex;
-		flex-shrink: 0;
-		overflow: hidden;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-	}
-	.verbs button {
-		padding: 4px 11px;
-		border-right: 1px solid var(--border);
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.verbs button:last-child {
-		border-right: 0;
-	}
-	.verbs button.on {
-		background: var(--sidebar-accent);
-		color: var(--foreground);
-	}
-	.verbs button:disabled {
-		opacity: 0.45;
-	}
-	.note {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
 	.problem-bar {
 		margin: 0;
 		padding: 7px 24px;
@@ -245,14 +229,6 @@
 		display: flex;
 		min-height: 0;
 		flex: 1;
-	}
-	.main {
-		display: flex;
-		min-width: 0;
-		flex: 1;
-		flex-direction: column;
-		overflow: auto;
-		padding: 14px 24px;
 	}
 	.loading {
 		display: flex;
@@ -278,19 +254,7 @@
 		color: var(--sb-text-faint);
 	}
 	.tabs {
-		display: flex;
-		gap: 14px;
-		margin-left: 18px;
-	}
-	.tabs button {
-		padding: 2px 0;
-		border-bottom: 1px solid transparent;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.tabs button[aria-selected='true'] {
-		border-bottom-color: var(--foreground);
-		color: var(--foreground);
+		margin-left: 12px;
 	}
 	.graph {
 		min-height: 320px;
@@ -298,21 +262,8 @@
 		border: 1px solid var(--border);
 		border-radius: 2px;
 	}
-	.nodes {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12.5px;
-	}
-	.nodes td {
-		padding: 5px 12px 5px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		white-space: nowrap;
-	}
-	.nodes tr.off {
+	tr.off {
 		opacity: 0.5;
-	}
-	.right {
-		text-align: right;
 	}
 	.rail {
 		width: 280px;

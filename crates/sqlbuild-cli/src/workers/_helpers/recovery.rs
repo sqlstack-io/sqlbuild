@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 use std::io::Write;
 
-use sqlbuild_orchestration::runs::main::list_run_claims::list_run_claims;
+use sqlbuild_orchestration::runs::main::listings::list_run_claims::list_run_claims;
 use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;
 use sqlbuild_orchestration::scheduler::models::SchedulerLease;
 use sqlbuild_orchestration::store::errors::ControlError;

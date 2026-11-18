@@ -11,8 +11,12 @@ export const runStatusTone: Record<RunStatus, string> = {
 	partial: 'color-mix(in srgb, var(--sb-error) 55%, var(--sb-warning))',
 	failed: 'var(--sb-error)',
 	cancelled: 'var(--sb-text-faint)',
+	skipped: 'var(--sb-text-faint)',
 	presumed_failed: 'var(--sb-error)'
 };
+
+/** A finished run that let error-severity audit failures through instead of failing: it reads as a success with a warning. */
+export const ignoresAuditFailures = (status: RunStatus, ignored: number) => (status === 'success' || status === 'warn') && ignored > 0;
 
 export const runStatusLabel: Record<RunStatus, string> = {
 	queued: 'Queued',
@@ -24,6 +28,7 @@ export const runStatusLabel: Record<RunStatus, string> = {
 	partial: 'Partial',
 	failed: 'Failed',
 	cancelled: 'Cancelled',
+	skipped: 'Skipped',
 	presumed_failed: 'Lost contact'
 };
 
@@ -38,6 +43,7 @@ export const runStatusHelp: Record<RunStatus, string> = {
 	partial: 'Some nodes failed or were skipped; the rest finished (partial)',
 	failed: 'Failed (failed)',
 	cancelled: 'Cancelled (cancelled)',
+	skipped: 'Its group did not run it because a job it depends on failed (skipped)',
 	presumed_failed: 'The run went silent and was marked failed; rerunning is safe (presumed_failed)'
 };
 

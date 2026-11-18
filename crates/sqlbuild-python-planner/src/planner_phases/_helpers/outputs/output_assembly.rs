@@ -8,6 +8,10 @@ use crate::planner_phases::_helpers::inputs::contexts::class_field;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
 use crate::planner_phases::_helpers::rebuilds::retention::{plan_retention, plan_table_types};
+use crate::planner_phases::constants::AUDIT_ENTRIES;
+use crate::planner_phases::constants::IGNORE_AUDIT_FAILURES;
+use crate::planner_phases::constants::IGNORE_FAILURE;
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::models::PlannerIdentityContext;
 use crate::planner_phases::models::{
     PlanOutputContext, PlanOutputFields, PlanWarningContext, PlannedModelEntries,
@@ -17,9 +21,11 @@ use crate::planner_warehouse::main::sources::source_freshness_unknown_warnings::
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::native_host::models::ModelLookup;
 use sqlbuild_python_project::planner_phases::main::native::native;
@@ -111,7 +117,7 @@ pub(crate) fn base_plan_output<'py>(
     let mut output = PlanOutputFields {
         fields: plan_output_fields(PlanOutputInputs {
             project: runtime_field(runtime, |runtime| &runtime.project)?,
-            adapter: runtime_field(runtime, |runtime| &runtime.adapter)?,
+            dialect: runtime_dialect(runtime)?,
             scope: execution_scope.clone(),
             snapshot: warehouse_field(warehouse, |warehouse| &warehouse.snapshot)?,
             relations: warehouse_field(warehouse, |warehouse| &warehouse.inspection_relations)?,
@@ -184,7 +190,9 @@ pub(crate) fn add_storage_policies<'py>(
                 &entries,
                 &ModelLookup::Native(scope_data(&scope)?),
                 &warehouse_field(warehouse, |warehouse| &warehouse.migration_fingerprints)?,
-                &native_field(runtime, "adapter")?.call_method0("sql_analysis_dialect")?,
+                &runtime_dialect(runtime)?
+                    .syntax("sql_analysis_dialect")?
+                    .call0()?,
             )?,
         )?;
     }
@@ -357,4 +365,29 @@ pub(crate) fn freshness_metadata<'py>(
     metadata.set_item("stale_model_names", propagated("stale_model_names")?)?;
     metadata.set_item("blocked_model_names", propagated("blocked_model_names")?)?;
     Ok(metadata.into_any())
+}
+
+/// Mark every planned audit's failure as one that holds nothing back, and the plan as saying so.
+pub(crate) fn ignoring_audit_failures<'py>(
+    py: Python<'py>,
+    output: PlanOutputFields<'py>,
+) -> PyResult<PlanOutputFields<'py>> {
+    let ignored = PyBool::new(py, true).to_owned().into_any();
+    let mut fields: Vec<(&'static str, Bound<'py, PyAny>)> = Vec::new();
+    for (name, value) in output.fields {
+        if name != AUDIT_ENTRIES {
+            fields.push((name, value));
+            continue;
+        }
+        let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
+        for entry in value.try_iter()? {
+            entries.push(replaced(&entry?, &[(IGNORE_FAILURE, ignored.clone())])?);
+        }
+        fields.push((name, PyTuple::new(py, entries)?.into_any()));
+    }
+    fields.push((IGNORE_AUDIT_FAILURES, ignored));
+    Ok(PlanOutputFields {
+        fields,
+        metadata: output.metadata,
+    })
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import type { Snippet } from 'svelte';
 
 	let {
@@ -12,10 +12,7 @@
 
 <section class="insp-sec" class:closed={!open}>
 	<div class="insp-sec-head">
-		<button class="toggle" onclick={() => (open = !open)} aria-expanded={open}>
-			<ChevronDownIcon size={14} />
-			<span>{title}</span>
-		</button>
+		<DisclosureButton tone="default" {open} onclick={() => (open = !open)} class="px-1.5 py-1 text-[12.5px] font-semibold">{title}</DisclosureButton>
 		{#if meta}<div class="meta">{@render meta()}</div>{/if}
 	</div>
 	{#if open}<div class="insp-sec-body">{@render children()}</div>{/if}
@@ -34,25 +31,6 @@
 	}
 	.insp-sec:not(.closed) .insp-sec-head {
 		border-bottom: 1px solid var(--border-subtle);
-	}
-	.toggle {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 4px 6px;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--foreground);
-		font-size: 12.5px;
-		font-weight: 600;
-	}
-	.toggle :global(svg) {
-		color: var(--muted-foreground);
-		transition: transform 0.15s;
-	}
-	.closed .toggle :global(svg) {
-		transform: rotate(-90deg);
 	}
 	.meta {
 		display: flex;

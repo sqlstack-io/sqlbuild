@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
+	import { cn } from '$lib/utils';
 	// A calendar beside the typed dates: pick the first and last day, both included. Dates are UTC days.
 	import { parseDate, type DateValue } from '@internationalized/date';
 	import { RangeCalendar } from 'bits-ui';
@@ -26,7 +28,7 @@
 </script>
 
 <Popover.Root bind:open>
-	<Popover.Trigger class="range-calendar-trigger" aria-label="Pick dates on a calendar" title="Pick dates on a calendar"><CalendarIcon size={13} /></Popover.Trigger>
+	<Popover.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), 'text-muted-foreground hover:text-foreground')} aria-label="Pick dates on a calendar" title="Pick dates on a calendar"><CalendarIcon /></Popover.Trigger>
 	<Popover.Content class="w-auto p-3" align="start">
 		<RangeCalendar.Root
 			class="calendar"
@@ -74,19 +76,6 @@
 </Popover.Root>
 
 <style>
-	:global(.range-calendar-trigger) {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 24px;
-		height: 22px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-	}
-	:global(.range-calendar-trigger:hover) {
-		color: var(--foreground);
-	}
 	:global(.calendar .header) {
 		display: flex;
 		align-items: center;

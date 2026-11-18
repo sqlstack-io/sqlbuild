@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::credentials::models::Action;
-use crate::runs::types::CommandPlanner;
+use crate::declarations::models::PoolSlots;
+use crate::runs::types::{CommandPlanner, PreparedPublication};
+use crate::snapshots::models::WriterNode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -108,6 +110,8 @@ pub enum RunStatus {
     Partial,
     Failed,
     Cancelled,
+    /// A group member the group did not run because a job it depends on failed.
+    Skipped,
 }
 
 impl RunStatus {
@@ -159,16 +163,21 @@ pub struct RunRequest {
     pub settings: BTreeMap<String, serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<RunWindow>,
-    pub concurrency_groups: BTreeSet<String>,
+    /// Each pool the run takes, its amount and the pool's limit frozen with it; the server's cap may lower the limit.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub pools: BTreeMap<String, PoolSlots>,
     /// The selectors a person narrowed a job run with; reruns copy it with the rest of the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub narrowing: Option<RunNarrowing>,
     /// Set on an automatic retry of a failed run, which is not claimed before `not_before`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<RunRetry>,
+    /// Which attempt of its member job a group child is, from the second on; the first leaves it unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_attempt: Option<u8>,
 }
 
-/// Which retry of the job's `on_failure` policy a run is, and when it may start.
+/// Which retry of the job's `[retry]` policy a run is, and when it may start.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunRetry {
@@ -275,6 +284,9 @@ pub struct RunRecord {
     pub cancel_requested_at: Option<DateTime<Utc>>,
     pub selection_json: BTreeSet<String>,
     pub node_counts_json: BTreeMap<String, i64>,
+    /// Error-severity audit failures the run let through; a group sums its members'.
+    #[serde(default)]
+    pub ignored_audit_failures: u32,
     pub last_event_storage_id: i64,
     /// How a person narrowed this run of a job, or the run it reruns, as typed; `None` when it runs the whole job.
     #[serde(
@@ -293,6 +305,13 @@ pub struct RunRecord {
     /// Set only when listing the queue: where the run stands and what it waits on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queue: Option<RunQueueState>,
+    /// Which attempt of its member job a group child is, once the group retried it; absent for a first attempt and for every other run.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_member_attempt"
+    )]
+    pub member_attempt: Option<u8>,
 }
 
 /// A queued run's place in claim order within its location and target, and what holds it back.
@@ -311,7 +330,13 @@ pub enum QueueWait {
     /// Its group run has not started yet, or is stopping.
     GroupParent { run_id: Uuid },
     /// A job this one runs after in the same group has not finished.
-    UpstreamJob { run_id: Uuid, job_key: String },
+    UpstreamJob {
+        run_id: Uuid,
+        job_key: String,
+        /// The upstream job's attempt when the group is retrying it; absent for its first attempt.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        attempt: Option<u8>,
+    },
     /// Another run of the same job is running.
     JobRunning { run_id: Uuid },
     /// Another run holds write claims on nodes this run writes.
@@ -320,14 +345,10 @@ pub enum QueueWait {
         node_key: String,
         other_nodes: u32,
     },
-    /// Running runs hold slots of a concurrency limit this run takes.
-    ConcurrencyLimit {
-        limit: String,
-        holders: Vec<Uuid>,
-        elsewhere: u32,
-    },
-    /// An earlier queued run takes the same concurrency limit, so it goes first.
-    EarlierRun { run_id: Option<Uuid>, limit: String },
+    /// Running runs of the same location and target hold the slots of a pool this run takes.
+    PoolFull { pool: String, holders: Vec<Uuid> },
+    /// An earlier queued run takes the same pool, so it goes first.
+    EarlierRun { run_id: Option<Uuid>, pool: String },
     /// An automatic retry waits out the job's retry delay.
     RetryDelay { attempt: u8, due_at: DateTime<Utc> },
 }
@@ -394,6 +415,9 @@ pub struct RunEventRecord {
     pub outcome: Option<String>,
     pub row_count: Option<i64>,
     pub affected_rows: Option<i64>,
+    /// A summary the scheduler writes for a group run's member events, such as a member retry; never error or SQL text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 /// Warehouse statement metadata of a run: kind, timing, counts and outcome, never the SQL text.
@@ -513,6 +537,8 @@ pub enum RunOutcome {
     Partial,
     Failed,
     Cancelled,
+    /// Only a group sets it, on a member it did not run because a job the member depends on failed.
+    Skipped,
 }
 
 impl RunOutcome {
@@ -524,6 +550,7 @@ impl RunOutcome {
             Self::Partial => "partial",
             Self::Failed => "failed",
             Self::Cancelled => "cancelled",
+            Self::Skipped => "skipped",
         }
     }
 }
@@ -581,6 +608,10 @@ pub enum RunChange {
         reason: String,
         exit_code: Option<i64>,
     },
+    /// How many error-severity audit failures a build let through; sent just before `Finished`.
+    AuditFailuresIgnored {
+        count: u32,
+    },
 }
 
 impl RunChange {
@@ -598,6 +629,7 @@ impl RunChange {
             Self::Recovered => "run_recovered",
             Self::CancelRequested { .. } => "run_cancel_requested",
             Self::Finished { .. } => "run_terminated",
+            Self::AuditFailuresIgnored { .. } => "run_audit_failures_ignored",
         }
     }
 
@@ -679,6 +711,8 @@ pub(crate) struct ChangingRun {
     pub(crate) worker_instance: Option<Uuid>,
     pub(crate) cancel_requested_at: Option<DateTime<Utc>>,
     pub(crate) node_counts_json: BTreeMap<String, i64>,
+    #[serde(default)]
+    pub(crate) ignored_audit_failures: i64,
 }
 
 /// Virtual parents and physical children use the same lifecycle evidence during group progress.
@@ -860,4 +894,160 @@ impl Default for RunLogRetention {
             count: crate::runs::constants::DEFAULT_RUN_LOG_RETENTION_COUNT,
         }
     }
+}
+
+/// Prepared publications by snapshot ID; snapshots never change, so an entry stays valid until evicted.
+#[derive(Debug)]
+pub struct PublicationCache {
+    pub(crate) slots: std::sync::Mutex<SnapshotSlots<CachedPublication>>,
+}
+
+impl PublicationCache {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            slots: std::sync::Mutex::new(SnapshotSlots::new()),
+        }
+    }
+}
+
+impl Default for PublicationCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Values built once per snapshot, least recently used first out within each location and target.
+#[derive(Debug)]
+pub(crate) struct SnapshotSlots<T> {
+    /// Counts lookups, so a larger `used` is more recent.
+    pub(crate) clock: u64,
+    pub(crate) slots: Vec<SnapshotSlot<T>>,
+}
+
+impl<T> SnapshotSlots<T> {
+    pub(crate) const fn new() -> Self {
+        Self {
+            clock: 0,
+            slots: Vec::new(),
+        }
+    }
+}
+
+/// One snapshot's value, built by the first request that needs it while later ones wait.
+#[derive(Debug)]
+pub(crate) struct SnapshotSlot<T> {
+    pub(crate) scope: (Uuid, String),
+    pub(crate) snapshot_id: Uuid,
+    pub(crate) used: u64,
+    pub(crate) cell: std::sync::Arc<tokio::sync::OnceCell<std::sync::Arc<T>>>,
+}
+
+/// What every plan of one publication shares: the planner's index, each node's write-set facts and every node key.
+#[derive(Debug)]
+pub(crate) struct CachedPublication {
+    pub(crate) prepared: std::sync::Arc<dyn PreparedPublication>,
+    pub(crate) writers: BTreeMap<String, WriterNode>,
+    pub(crate) node_keys: BTreeSet<String>,
+}
+
+/// A selection to evaluate, as typed: `select` and `exclude` each hold space-separated selectors, as `sqb build -s … --exclude …` takes them.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SelectionQuery {
+    #[serde(default)]
+    pub select: String,
+    #[serde(default)]
+    pub exclude: String,
+    /// How many sorted keys to skip.
+    pub offset: Option<u32>,
+    /// Page size; defaults to 1,000, clamped to 1..10,000.
+    pub limit: Option<u32>,
+}
+
+/// The nodes `sqb build --select … --exclude …` selects in the current publication, or why it refuses the selectors.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionEvaluation {
+    /// The publication evaluated; `None` before the first one.
+    pub snapshot_id: Option<Uuid>,
+    /// Every selected node, across all pages.
+    pub count: u64,
+    /// One page of the selected `kind:name` keys, sorted.
+    pub keys: Vec<String>,
+    /// The offset of the next page, when there is one.
+    pub next_offset: Option<u32>,
+    pub error: Option<SelectionProblem>,
+}
+
+/// Why `sqb` refuses a selection, where, and what might have been meant.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionProblem {
+    /// The selector error code, such as `S007`; `None` when the selection as a whole is refused.
+    pub code: Option<String>,
+    pub message: String,
+    /// `sqb`'s own help line, such as "did you mean 'orders'?".
+    pub help: Option<String>,
+    /// The selector token the error comes from, when one token causes it.
+    pub location: Option<SelectionLocation>,
+    /// Replacements for that whole token, closest first.
+    pub suggestions: Vec<String>,
+    /// The comma part of that token `sqb` refused, when it names one selector value.
+    pub refused: Option<SelectionRefusal>,
+}
+
+/// One refused comma part: its exact text and position in the token, its selector type and value.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionRefusal {
+    /// The part as typed, such as `+tag:finanse`.
+    pub part: String,
+    /// Which comma part of the token it is, from 0.
+    pub index: u32,
+    /// `tag`, `path`, `job`, `source`, `seed`, `kind`, `test`, `name`, `glob`, or a Python node type such as `task`.
+    #[serde(rename = "type")]
+    pub selector_type: String,
+    /// The value the part names, without its type prefix or `+` markers, such as `finanse`.
+    pub value: String,
+}
+
+/// One selector token in the request's `select` or `exclude` text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionLocation {
+    pub field: SelectionField,
+    pub token: String,
+    /// Where the token starts and ends in its field, in UTF-16 code units, as JavaScript indexes strings.
+    pub start: u32,
+    pub end: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectionField {
+    Select,
+    Exclude,
+}
+
+/// The values each selector type takes in the current publication, with how many nodes each one selects.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionVocabulary {
+    /// The publication described; `None` before the first one.
+    pub snapshot_id: Option<Uuid>,
+    /// `tag:` values: the SQL resources and Python nodes with each tag.
+    pub tags: Vec<VocabularyEntry>,
+    /// `path:` folders such as `models/staging`: the nodes below each, at any depth.
+    pub paths: Vec<VocabularyEntry>,
+    /// `job:` names: the nodes each job or job group selects.
+    pub jobs: Vec<VocabularyEntry>,
+    /// `source:` names, one node each.
+    pub sources: Vec<VocabularyEntry>,
+    /// `seed:` names, one node each.
+    pub seeds: Vec<VocabularyEntry>,
+    /// `kind:` values: the nodes of each kind.
+    pub kinds: Vec<VocabularyEntry>,
+}
+
+/// One selector value and the number of nodes it selects.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct VocabularyEntry {
+    pub value: String,
+    pub count: u64,
 }

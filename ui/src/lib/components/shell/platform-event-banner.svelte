@@ -6,6 +6,7 @@
 	import { formatAgo } from '$lib/format/time';
 	import { eventKindLabel, problemHref } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
+	import { plural } from '$lib/format/plural';
 
 	let { only = () => true }: { only?: (event: PlatformEvent) => boolean } = $props();
 
@@ -14,6 +15,8 @@
 		app.platformEvents.filter((e) => e.active && e.severity !== 'info' && only(e)).sort((a, b) => rank(b) - rank(a))
 	);
 	const critical = $derived(events.some((e) => e.severity === 'critical'));
+	/** The banner shows the worst few, so many open problems don't push the page out of the window. */
+	const SHOWN = 3;
 	/** Location problems link to the location's page if it exists, else the Locations list; server problems only to server status. */
 	function linkOf(event: PlatformEvent): { href: string; text: string } | null {
 		if (event.locationId) return { href: app.client.supports('getLocation') ? problemHref(event) : '/locations', text: 'View location →' };
@@ -27,7 +30,7 @@
 			{#if critical}<OctagonAlertIcon size={14} />{:else}<TriangleAlertIcon size={14} />{/if}
 		</span>
 		<ul>
-			{#each events as event (event.id)}
+			{#each events.slice(0, SHOWN) as event (event.id)}
 				{@const link = linkOf(event)}
 				<li>
 					<strong>{eventKindLabel[event.kind]}</strong>
@@ -36,6 +39,7 @@
 					{#if link}<a href={to(link.href)}>{link.text}</a>{/if}
 				</li>
 			{/each}
+			{#if events.length > SHOWN}<li><a href={to('/locations')}>{plural(events.length - SHOWN, 'more problem')} →</a></li>{/if}
 		</ul>
 	</div>
 {/if}

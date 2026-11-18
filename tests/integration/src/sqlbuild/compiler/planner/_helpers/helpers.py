@@ -19,6 +19,7 @@ from sqlbuild._native import (
     CompiledSource,
     CompileModelConfig,
     CompileSqlReference,
+    Dialect,
     DiscoveredSchemaFile,
     DiscoveredSeedFile,
     DiscoveredSourceFile,
@@ -30,6 +31,7 @@ from sqlbuild._native import (
     WarehouseSnapshot,
     compiled_model_record,
     gather_warehouse_snapshot,
+    live_reads,
     project_with,
 )
 from sqlbuild.adapter.contract.models import ColumnInfo
@@ -371,9 +373,8 @@ def gather_with_catalog(
     with open_inspection_catalog(adapter=adapter, connection=connection):
         return gather_warehouse_snapshot(
             project=project,
-            adapter=adapter,
-            connection=connection,
-            execute=execute,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection, execute=execute),
             on_progress=progress.append,
         )
 

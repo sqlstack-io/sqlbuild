@@ -4,8 +4,11 @@ use crate::planner_strategy::main::complete_empty_fixture_sql::complete_empty_fi
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_fixtures::main::empty_fixture_marker::empty_fixture_marker;
+use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_base::native_host::types::Syntax;
 
-use crate::planner_strategy::_helpers::fixtures::fixture_values::{diagnostic, label};
+use crate::planner_strategy::_helpers::fixtures::fixture_values::diagnostic;
+use crate::planner_strategy::_helpers::fixtures::fixture_values::label;
 use crate::planner_strategy::models::RelationFixturePlanningContext;
 use crate::planner_strategy::types::FixtureKey;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
@@ -24,7 +27,7 @@ pub(crate) struct PreparedFixtures<'py> {
 pub(crate) fn prepare<'py>(
     groups: &Bound<'py, PyAny>,
     context: &RelationFixturePlanningContext,
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
 ) -> PyResult<PreparedFixtures<'py>> {
     let py = groups.py();
     let inferences = context.fixture_inferences.bind(py);
@@ -47,7 +50,7 @@ pub(crate) fn prepare<'py>(
             let mut sql: String = sql.extract()?;
             if empty_fixture_marker(&sql).map_err(value_error)? {
                 let (empty_sql, error) =
-                    complete_empty_fixture_sql(&sql, context.relations.get(&fixture_key), adapter)?;
+                    complete_empty_fixture_sql(&sql, context.relations.get(&fixture_key), dialect)?;
                 if let Some(error) = error {
                     prepared
                         .diagnostics
@@ -62,7 +65,7 @@ pub(crate) fn prepare<'py>(
             kwargs.set_item("query_sql", &sql)?;
             kwargs.set_item(
                 "inference_profile",
-                adapter.call_method0("expression_inference_profile")?,
+                dialect.syntax("expression_inference_profile")?.call0()?,
             )?;
             let inference = inferences.call_method("infer", (), Some(&kwargs))?;
             if !inference.is_none() {

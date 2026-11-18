@@ -8,12 +8,13 @@ use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, BuiltinRole, RoleAssignmentRequest};
 use crate::credentials::tests::location_helpers::create_location;
+use crate::declarations::models::PoolSlots;
 use crate::runs::_helpers::requests::publication::publish_request;
 use crate::runs::models::{
     AdhocCheck, AdhocCheckRequest, AdhocRunRequest, RunCommand, RunKind, RunOrigin, RunRequest,
 };
 use crate::runs::tests::test_types::{AdhocCommandTestCase, AdhocPeople};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -31,7 +32,7 @@ use sqlbuild_recall::records::models::{
 };
 use uuid::Uuid;
 
-use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::models::RunClaim;
 use crate::runs::tests::claim_helpers::succeed;
 use crate::scheduler::models::SchedulerLease;
@@ -107,9 +108,10 @@ pub(crate) fn request(
         selection,
         settings: BTreeMap::new(),
         window: None,
-        concurrency_groups: BTreeSet::new(),
+        pools: BTreeMap::new(),
         narrowing: None,
         retry: None,
+        member_attempt: None,
     }
 }
 
@@ -431,4 +433,87 @@ pub(crate) async fn seed_logged_runs(
     for position in finished.len()..ended_hours_ago.len() {
         claim_logged_run(store, scope, &lease, position as u128 + 1).await;
     }
+}
+
+/// A published snapshot node of `kind` with only its `definition`.
+pub(crate) fn snapshot_node(kind: &str, definition: serde_json::Value) -> SnapshotNode {
+    SnapshotNode {
+        kind: kind.into(),
+        definition,
+        raw_sql: None,
+        compiled_sql: None,
+        python_source: None,
+    }
+}
+
+/// One slot of each pool, with a project limit of 100 above every test's server cap, so the caps govern.
+pub(crate) fn one_slot_each(pools: &[&str]) -> serde_json::Value {
+    let mut slots = serde_json::Map::new();
+    for pool in pools {
+        slots.insert(
+            (*pool).to_owned(),
+            serde_json::json!({"amount": 1, "limit": 100}),
+        );
+    }
+    serde_json::Value::Object(slots)
+}
+
+/// `amount` slots of a pool whose project limit is `limit`.
+pub(crate) fn pool_slots(amount: u32, limit: u32) -> PoolSlots {
+    PoolSlots {
+        amount: std::num::NonZeroU32::new(amount).expect("positive amount"),
+        limit: std::num::NonZeroU32::new(limit).expect("positive limit"),
+    }
+}
+
+/// IDs that differ by a case's small numbers, so cases read as `target 1, snapshot 2`.
+pub(crate) fn cache_id(number: u8) -> Uuid {
+    Uuid::from_u128(u128::from(number) + 1)
+}
+
+/// The cached value of `snapshot` in target `scope`, built as the snapshot's number, and whether this lookup built it.
+pub(crate) async fn cache_lookup(
+    slots: &std::sync::Mutex<crate::runs::models::SnapshotSlots<u8>>,
+    (scope, snapshot): (u8, u8),
+) -> (u8, bool) {
+    let built = std::cell::Cell::new(false);
+    let ((), value) = crate::runs::_helpers::lifecycle::publications::cached(
+        slots,
+        ((cache_id(scope), "development".into()), cache_id(snapshot)),
+        (),
+        |()| async {
+            built.set(true);
+            Ok(((), snapshot))
+        },
+    )
+    .await
+    .expect("cached value");
+    (*value, built.get())
+}
+
+/// A selection evaluation as `(count, page, next offset, refusal message)`.
+pub(crate) fn selection_outcome(
+    evaluation: &crate::runs::models::SelectionEvaluation,
+) -> (u64, Vec<String>, Option<u32>, Option<String>) {
+    (
+        evaluation.count,
+        evaluation.keys.clone(),
+        evaluation.next_offset,
+        evaluation
+            .error
+            .as_ref()
+            .map(|problem| problem.message.clone()),
+    )
+}
+
+/// An expected selection in [`selection_outcome`]'s owned form.
+pub(crate) fn owned_selection(
+    (count, keys, next, error): crate::runs::tests::test_types::ExpectedSelection,
+) -> (u64, Vec<String>, Option<u32>, Option<String>) {
+    (
+        count,
+        keys.iter().map(|key| (*key).to_owned()).collect(),
+        next,
+        error.map(str::to_owned),
+    )
 }

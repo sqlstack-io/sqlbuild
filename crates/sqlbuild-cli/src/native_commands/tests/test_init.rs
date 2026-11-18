@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::native_commands::_helpers::init::run_init;
+use crate::native_commands::_helpers::command::init::run_init;
 use crate::native_commands::models::InstalledPackage;
 use crate::native_commands::tests::helpers::write_tree;
 use crate::native_commands::tests::test_types::InitFailureTestCase;

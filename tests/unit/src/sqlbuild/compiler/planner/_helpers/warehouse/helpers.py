@@ -11,11 +11,13 @@ from sqlbuild._native import (
     CompiledProject,
     CompiledResourceType,
     CompiledSource,
+    Dialect,
     DiscoveredSourceFile,
     PlannerRelationsContext,
     PlannerScope,
     SourceEntry,
     check_selected_source_tables_exist,
+    live_reads,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.models import ColumnInfo
@@ -57,8 +59,8 @@ def check_one_source_table(
     )
     check_selected_source_tables_exist(
         project=cast(CompiledProject, SimpleNamespace(sources=(compiled_source,))),
-        adapter=adapter,
-        connection=connection,
+        dialect=Dialect(adapter),
+        reads=live_reads(adapter=adapter, connection=connection),
         scope=PlannerScope(
             upstream_deps={model_key: (source_key,)},
             downstream_deps={source_key: (model_key,)},

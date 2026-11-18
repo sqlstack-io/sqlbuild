@@ -1,12 +1,13 @@
 // Presentation of the overview's attention items. Pure; no side effects.
 
-import type { AttentionItem, QueueWait } from '$lib/api';
+import type { AttentionItem, ChangedBuild, QueueWait } from '$lib/api';
 import { describeWait, outcomeCounts } from '$lib/operate/labels';
 import { eventKindLabel, problemHref } from '$lib/platform/labels';
 import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
 import { shortName } from '$lib/build-area/labels';
-import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
+import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
+import { plural } from '$lib/format/plural';
 
 export type AttentionTone = 'error' | 'warning' | 'stale' | 'info';
 
@@ -23,18 +24,46 @@ export type AttentionView = {
 	href: string;
 	action: string;
 	consequences: Consequence[];
-	/** The one build an out-of-date alert offers: `sqb build --changed` when anything changed, else a rebuild of the nodes behind. */
-	build?: { label: string; href: string };
+	/**
+	 * The one build an out-of-date alert offers: `sqb build --changed` when anything changed, else a rebuild of the nodes behind.
+	 * Purple means "needs building": solid for changed nodes, outlined for nodes only behind.
+	 */
+	build?: { label: string; extra: string | null; tooltip: string | null; href: string; variant: 'stale' | 'stale-outline' };
 };
 
 /** A heartbeat gap shorter than this reads as a pause, not an outage: the run carries on when its worker reports again. */
 export const UNRESPONSIVE_OUTAGE_MS = 5 * 60_000;
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const minutes = (seconds: number | null) => (seconds === null ? '—' : seconds % 3600 === 0 ? `${seconds / 3600}h` : `${Math.round(seconds / 60)}m`);
 const waitText = (waits: QueueWait[]) => waits.map((w) => describeWait(w).map((p) => p.text).join('')).join(' · ');
 
-export function attentionView(item: AttentionItem, now: number): AttentionView {
+/** How many names the out-of-date sentence lists before "and N more". */
+export const STALE_NAMES_SHOWN = 3;
+
+/** "a", "a and b", "a, b and c". */
+const andList = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
+
+/**
+ * The out-of-date alert's sentence, e.g. "30 changed since their last build, and 82 more are behind an upstream
+ * rebuild. Including a, b, c and 109 more." A node both changed and behind counts once, as changed, so the two
+ * counts add up to the alert's total. Up to three names; a complete list follows a colon instead.
+ */
+export function staleSentence(changed: string[], behind: string[]): string {
+	const changedSet = new Set(changed);
+	const changedCount = changedSet.size;
+	const onlyBehind = new Set(behind.filter((key) => !changedSet.has(key))).size;
+	const all = [...new Set([...changed, ...behind])].map(shortName);
+	const behindText = (n: number, more: string) => `${n}${more} ${n === 1 ? 'is' : 'are'} behind an upstream rebuild`;
+	const counts = changedCount
+		? `${changedCount} changed since ${changedCount === 1 ? 'its' : 'their'} last build${onlyBehind ? `, and ${behindText(onlyBehind, ' more')}` : ''}`
+		: behindText(onlyBehind, '');
+	if (all.length === 0) return `${counts}.`;
+	if (all.length <= STALE_NAMES_SHOWN) return `${counts}: ${andList(all)}.`;
+	return `${counts}. Including ${all.slice(0, STALE_NAMES_SHOWN).join(', ')} and ${all.length - STALE_NAMES_SHOWN} more.`;
+}
+
+/** `changedBuild` is what the location planned `sqb build --changed` to run, when it has. */
+export function attentionView(item: AttentionItem, now: number, changedBuild: ChangedBuild | null = null): AttentionView {
 	switch (item.kind) {
 		case 'run_problem':
 			return {
@@ -67,25 +96,22 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 			};
 		}
 		case 'stale_models': {
-			const changed = new Set(item.changed);
-			const both = item.behind.filter((key) => changed.has(key)).length;
 			const all = [...new Set([...item.changed, ...item.behind])];
-			const only = item.behind.length - both;
-			const alsoBehind = both ? `, ${item.changed.length === 1 ? 'also' : `${both} of them also`} behind an upstream rebuild` : '';
-			const onlyBehind = only ? `${both ? `, and ${only} more` : ` and ${only}`} behind an upstream rebuild` : '';
-			const counts = item.changed.length
-				? `${item.changed.length} changed since ${item.changed.length === 1 ? 'its' : 'their'} last build${alsoBehind}${onlyBehind}`
-				: `${only} behind an upstream rebuild`;
 			return {
 				key: 'stale',
 				tone: 'stale',
 				title: `${plural(all.length, 'node')} out of date`,
-				detail: `${counts}: ${all.slice(0, 4).map(shortName).join(', ')}${all.length > 4 ? ` and ${all.length - 4} more` : ''}`,
+				detail: staleSentence(item.changed, item.behind),
 				since: '',
 				href: '/catalog?stale=1',
 				action: 'View in catalog',
 				consequences: [],
-				build: item.changed.length ? { label: 'Build what changed', href: CHANGED_PLAN_HREF } : { label: `Rebuild ${all.length}`, href: planHref(all) }
+				build: item.changed.length
+					? (() => {
+							const counts = changedBuildCounts(new Set(item.changed).size, changedBuild);
+							return { ...changedBuildLabel(counts.changed, counts.downstream, 'banner', counts.failing), href: CHANGED_PLAN_HREF, variant: 'stale' as const };
+						})()
+					: { label: `Rebuild ${all.length}`, extra: null, tooltip: null, href: planHref(all), variant: 'stale-outline' }
 			};
 		}
 		case 'stale_sources':
@@ -169,8 +195,8 @@ function consequenceOf(item: AttentionItem, view: AttentionView): Consequence {
 }
 
 /** The items as alerts, errors first: an item that follows from another alert's cause is listed under it, not on its own. */
-export function attentionViews(items: AttentionItem[], now: number): { item: AttentionItem; view: AttentionView }[] {
-	const viewed = items.map((item) => ({ item, view: attentionView(item, now) }));
+export function attentionViews(items: AttentionItem[], now: number, changedBuild: ChangedBuild | null = null): { item: AttentionItem; view: AttentionView }[] {
+	const viewed = items.map((item) => ({ item, view: attentionView(item, now, changedBuild) }));
 	const byKey = new Map(viewed.map((v) => [v.view.key, v]));
 	const shown = viewed.filter(({ item, view }) => {
 		const cause = byKey.get(causeOf(item, items) ?? '');

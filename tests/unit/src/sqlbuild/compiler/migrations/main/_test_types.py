@@ -117,3 +117,11 @@ class StoredColumnRowTestCase:
     description: str
     decisions: tuple[str, ...]
     expected_decisions: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NamedFingerprintTestCase:
+    description: str
+    model_name: str
+    """The `schema.name` the newest fingerprint built, when there is one."""
+    expected_targets: tuple[str, ...]

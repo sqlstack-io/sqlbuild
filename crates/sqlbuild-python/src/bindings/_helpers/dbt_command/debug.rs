@@ -4,7 +4,10 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_core::dbt_command::constants::NO_CONNECTION_OPTION;
 
 use crate::bindings::_helpers::dbt_command::auto_init::args_tuple;
-use crate::bindings::_helpers::dbt_command::support::{color_enabled, flag, status, stream};
+use crate::bindings::_helpers::dbt_command::support::color_enabled;
+use crate::bindings::_helpers::dbt_command::support::flag;
+use crate::bindings::_helpers::dbt_command::support::status;
+use crate::bindings::_helpers::dbt_command::support::stream;
 use crate::bindings::_helpers::dbt_interop::pipeline::debug_dbt_from_project;
 use crate::bindings::_helpers::debug_command::run_debug::run_debug_command;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

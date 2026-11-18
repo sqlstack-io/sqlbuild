@@ -1,5 +1,5 @@
 use crate::launcher::main::install_native_build_identity::install_native_build_identity;
-use crate::native_commands::_helpers::rules::run_rules;
+use crate::native_commands::_helpers::command::rules::run_rules;
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{RulesAction, RulesOptions};
 use crate::native_commands::tests::helpers::write_tree;

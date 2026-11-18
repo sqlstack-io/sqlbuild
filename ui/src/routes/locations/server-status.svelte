@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import ProblemList from '$lib/components/platform/problem-list.svelte';
 	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
@@ -48,9 +51,9 @@
 			<span class="sep">·</span>
 			<span class="item" title={sink.title}>Event forwarding <i style:background={sink.tone}></i><b>{sink.text}</b></span>
 		{/if}
-		{#if openServerProblems}<span class="sep">·</span><span class="warn">{openServerProblems} open server problem{openServerProblems === 1 ? '' : 's'}</span>{/if}
+		{#if openServerProblems}<span class="sep">·</span><span class="warn">{plural(openServerProblems, 'open server problem')}</span>{/if}
 	{/if}
-	<button class="toggle" onclick={() => (open = !open)} aria-expanded={open}>{open ? 'Hide details' : 'Details'}</button>
+	<Button variant="link" size="inline" class="ml-auto" onclick={() => (open = !open)} aria-expanded={open}>{open ? 'Hide details' : 'Details'}</Button>
 </section>
 
 {#if open && h}
@@ -67,7 +70,7 @@
 									<i style:background={replicaLive(i.lastSeenAt, app.now) ? 'var(--sb-success)' : 'var(--sb-error)'}></i>
 									<code>{i.instanceId}</code>
 									<span class="muted">
-										{!i.schedulerEnabled ? 'web and API only' : lease?.holder === i.instanceId ? 'running the scheduler' : 'standing by to take over'}
+										<span title={!i.schedulerEnabled ? 'Serves the web UI and API only' : lease?.holder === i.instanceId ? 'Running the scheduler' : 'Standing by to take over the scheduler'}>{!i.schedulerEnabled ? 'Web only' : lease?.holder === i.instanceId ? 'Scheduler' : 'Standby'}</span>
 									</span>
 									<span class="faint">seen {formatAgo(i.lastSeenAt, app.now)}</span>
 								</li>
@@ -82,24 +85,23 @@
 				{/if}
 				{#if h.heartbeat}
 					<div>
-						<h4>Heartbeat</h4>
+						<h4>Heartbeat <HelpTip text="The server sends a heartbeat event every {h.heartbeat.intervalSeconds}s. If it stops arriving where you forward events, the server is down." /></h4>
 						<p class:warn={late}>
 							{h.heartbeat.lastEmittedAt ? `Sent ${formatAgo(h.heartbeat.lastEmittedAt, app.now)}` : 'Never sent'}{late ? ' — late' : ''}
 						</p>
-						<p class="faint">The server sends a heartbeat event every {h.heartbeat.intervalSeconds}s. If it stops arriving where you forward events, the server is down.</p>
 					</div>
 				{/if}
 				{#if h.sink !== undefined}
 					<div>
 						<h4>Event forwarding</h4>
 						{#if h.sink}
-							<p>Sends problems as they happen to a {h.sink.kind} set in the server config (<code>{h.sink.destinationSource}</code>).</p>
+							<p title="Forwards problems as they happen; set in the server config">{h.sink.kind} · <code>{h.sink.destinationSource}</code></p>
 							<p class="faint">
 								{h.sink.eventKinds.length ? h.sink.eventKinds.join(', ') : 'Every kind of event'} · {h.sink.pendingEvents} waiting · last tried {formatAgo(h.sink.lastAttemptAt, app.now)}
 							</p>
 							{#if h.sink.lastError}<p class="err">{h.sink.lastError}</p>{/if}
 						{:else}
-							<p class="faint">Not set up. Sensors still see every problem; forwarding pushes them out without code.</p>
+							<p class="faint">Off <HelpTip text="Sensors still see every problem; forwarding pushes them out without code." /></p>
 						{/if}
 					</div>
 				{/if}
@@ -140,11 +142,6 @@
 	}
 	.sep {
 		color: var(--sb-text-faint);
-	}
-	.toggle {
-		margin-left: auto;
-		color: var(--primary);
-		font-size: 12.5px;
 	}
 	.details {
 		flex: 0 0 auto;

@@ -30,15 +30,28 @@ export const healthLabel: Record<LocationHealth, string> = {
 	degraded: 'Needs attention',
 	missing_secrets: 'Missing provider secrets',
 	falling_back: 'Running previous version',
+	broken: 'Broken'
+};
+
+/** What each health means, for tooltips. */
+export const healthHelp: Record<LocationHealth, string> = {
+	healthy: 'Loaded and starting scheduled runs',
+	degraded: 'Running, with open problems',
+	missing_secrets: 'A provider setting is missing from the location environment',
+	falling_back: 'The last deploy failed to load; the previous version keeps running',
 	broken: 'Not starting scheduled runs'
 };
+
+/** What a location does when a deploy fails to load, as a short fact; `brokenDeployPolicyHelp` explains it. */
+export const brokenDeployPolicyLabel = { fallback: 'Keep previous', hold: 'Hold runs' } as const;
+export const brokenDeployPolicyHelp = { fallback: 'Keep running the previous version', hold: 'Hold scheduled runs until a deploy works' } as const;
 
 /** A location's health in words, e.g. "Deploy failed — running previous version 17". */
 export function healthWords(location: Pick<LocationSummary, 'health' | 'failedDeploy' | 'brokenDeployPolicy' | 'snapshot'>): string {
 	const version = location.snapshot?.generation;
 	if (location.failedDeploy) {
-		if (location.brokenDeployPolicy === 'fallback') return `Deploy failed — running previous version${version != null ? ` ${version}` : ''}`;
-		return 'Deploy failed — scheduled runs wait until a deploy works';
+		if (location.brokenDeployPolicy === 'fallback') return `Deploy failed · on version${version != null ? ` ${version}` : ' before'}`;
+		return 'Deploy failed · runs held';
 	}
 	return location.health ? healthLabel[location.health] : 'Unknown';
 }
@@ -94,7 +107,7 @@ export const tokenLabel: Record<TokenState, string> = { active: 'Active', revoke
 
 export const accountSourceLabel: Record<AccountSource, string> = {
 	oidc: 'Single sign-on',
-	trusted_proxy: 'Company proxy sign-in',
+	trusted_proxy: 'Trusted proxy',
 	password: 'Password'
 };
 

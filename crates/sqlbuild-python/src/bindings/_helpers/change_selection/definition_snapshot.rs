@@ -18,9 +18,10 @@ use sqlbuild_analysis::definition_changes::main::sql_definition_digest::sql_defi
 use sqlbuild_analysis::definition_changes::main::sql_macro_definition_digest::sql_macro_definition_digest;
 use sqlbuild_analysis::definition_changes::models::{DefinitionSnapshot, NodeDefinition};
 
-use crate::bindings::_helpers::change_selection::fingerprints::{
-    Fingerprinting, directory_digest, file_digest, text_of,
-};
+use crate::bindings::_helpers::change_selection::fingerprints::Fingerprinting;
+use crate::bindings::_helpers::change_selection::fingerprints::directory_digest;
+use crate::bindings::_helpers::change_selection::fingerprints::file_digest;
+use crate::bindings::_helpers::change_selection::fingerprints::text_of;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_planner::planner_identity::main::function_local_hashes::function_local_hashes;
 use sqlbuild_python_planner::planner_identity::main::seed_identity::seed_identity;
@@ -62,7 +63,7 @@ const PROJECT_CONFIG_ELSEWHERE: [&str; 11] = [
 ];
 const LOCAL_CONFIG_ELSEWHERE: [&str; 4] = ["settings", "setting_overrides", "vars", "scenario"];
 /// Settings that tune how a run executes or validates, not what a node computes.
-const RUNTIME_SETTINGS: [&str; 10] = [
+const RUNTIME_SETTINGS: [&str; 11] = [
     "sql_analysis",
     "require_sql_analysis",
     "allow_warehouse_round_trips",
@@ -73,6 +74,7 @@ const RUNTIME_SETTINGS: [&str; 10] = [
     "scenario_timeout",
     "scenario_timeout_seconds",
     "delta_compile",
+    "ignore_audit_failures",
 ];
 const PYTHON_SUFFIX: &str = ".py";
 /// Discovered Python node collections, in `PYTHON_NODE_KINDS` order.

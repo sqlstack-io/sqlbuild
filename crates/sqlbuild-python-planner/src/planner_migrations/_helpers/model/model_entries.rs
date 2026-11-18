@@ -2,12 +2,16 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::planner_migrations::_helpers::column::column_objects::{lower, model, replace, text};
-use crate::planner_migrations::_helpers::model::model_handover::{
-    applies, empty_version, handover,
-};
+use crate::planner_migrations::_helpers::column::column_objects::lower;
+use crate::planner_migrations::_helpers::column::column_objects::model;
+use crate::planner_migrations::_helpers::column::column_objects::replace;
+use crate::planner_migrations::_helpers::column::column_objects::text;
+use crate::planner_migrations::_helpers::model::model_handover::applies;
+use crate::planner_migrations::_helpers::model::model_handover::empty_version;
+use crate::planner_migrations::_helpers::model::model_handover::handover;
 use crate::planner_migrations::_helpers::planning::compatibility::check_migration_compatibility;
-use crate::planner_migrations::models::{CompatibilityCheck, MigrationDecisionRequest};
+use crate::planner_migrations::models::CompatibilityCheck;
+use crate::planner_migrations::models::MigrationDecisionRequest;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyBool;
 use sqlbuild_analysis::planner_migrations::main::model_decision::model_decision;

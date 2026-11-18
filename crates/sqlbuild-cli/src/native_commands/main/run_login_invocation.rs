@@ -1,8 +1,8 @@
 //! Login resolves its native command options without project discovery or invocation capture.
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::{flag, text};
-use crate::native_commands::_helpers::terminal::{finish_lost_stdout, write_output};
+use crate::native_commands::_helpers::command::decision::{flag, text};
+use crate::native_commands::_helpers::command::terminal::{finish_lost_stdout, write_output};
 use crate::person_login::main::run_login::run_login;
 use crate::person_login::models::{LoginAction, LoginOptions};
 

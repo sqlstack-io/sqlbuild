@@ -2,6 +2,7 @@
 
 pub(crate) const NODE_PENDING: &str = "pending";
 pub(crate) const NODE_RUNNING: &str = "running";
+pub(crate) const NODE_FAILED: &str = "failed";
 
 pub(crate) const HEARTBEAT_TIMEOUT_SECONDS: i64 = 45;
 pub(crate) const MONITOR_BATCH_SIZE: usize = 100;
@@ -46,3 +47,17 @@ pub(crate) const LOAD_VERB: &str = "load";
 
 /// The ad-hoc setting that carries `--vars`.
 pub(crate) const VARS_SETTING: &str = "vars";
+
+/// Whether group child `r` was retried inside its group: a later attempt of the same member reruns it.
+pub(crate) const SUPERSEDED_CHILD: &str = "EXISTS(SELECT 1 FROM sqb_runs s WHERE s.parent_run_id=r.parent_run_id AND s.rerun_of_run_id=r.run_id)";
+/// The group run event recorded when a failed member is queued to run again.
+pub(crate) const MEMBER_RETRYING_EVENT: &str = "run_member_retrying";
+/// The group run event recorded when a retried member succeeds.
+pub(crate) const MEMBER_RECOVERED_EVENT: &str = "run_member_recovered";
+
+/// Prepared publications kept per location and target: the current snapshot and the one before it.
+pub(crate) const PUBLICATIONS_PER_TARGET: usize = 2;
+
+/// Selected keys per page of a selection evaluation, and the most a request may ask for.
+pub(crate) const SELECTION_PAGE_DEFAULT: u32 = 1_000;
+pub(crate) const SELECTION_PAGE_MAX: u32 = 10_000;

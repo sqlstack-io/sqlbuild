@@ -1,5 +1,6 @@
 pub mod callback_code_hash;
 pub mod declared_at;
+pub mod dependency_failures;
 pub mod environment_hash;
 pub mod imported_declarations;
 pub mod missing_secrets;

@@ -1635,6 +1635,59 @@ class PythonUpstreamResultE2ETestCase:
 
 
 @dataclass(frozen=True)
+class WarehouseRoundTripE2ETestCase:
+    """A build of orders -> score task -> partner loader -> source -> scored model."""
+
+    description: str
+    project_settings: str
+    task_body: str
+    expected_exit_code: int
+    expected_output_order: tuple[str, ...]
+    expected_output_fragments: tuple[str, ...]
+    expected_scored_rows: tuple[tuple[object, ...], ...] | None
+    expected_scored_table_exists: bool = True
+
+
+@dataclass(frozen=True)
+class ChangedRoundTripE2ETestCase:
+    """A second round-trip build with `build_flags`, after changing `orders` and `extra_files`."""
+
+    description: str
+    orders_sql: str
+    expected_output_fragments: tuple[str, ...]
+    expected_scored_rows: tuple[tuple[object, ...], ...]
+    build_flags: tuple[str, ...] = ("--changed",)
+    extra_files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class IgnoredAuditFailureE2ETestCase:
+    """One blocking path built with audit failures held back or ignored."""
+
+    description: str
+    project_files: dict[str, str]
+    seed_sql: str
+    settings_toml: str
+    build_args: tuple[str, ...]
+    expected_exit_code: int
+    expected_tables: dict[str, int]
+    expected_audit_results: tuple[tuple[str, str, bool], ...]
+    expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class IgnoredAuditFailureCommandE2ETestCase:
+    """A command whose output says whether audit failures are ignored, or refuses the flags."""
+
+    description: str
+    settings_toml: str
+    command: tuple[str, ...]
+    expected_exit_code: int
+    expected_fragments: tuple[str, ...]
+    expected_missing_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class PythonTargetConfigBuildE2ETestCase:
     """Test case for the active target's settings seen by Python nodes and loaders."""
 
@@ -1718,29 +1771,3 @@ class AdapterDefaultResultsFallbackE2ETestCase:
     kept_loader: str
     reading_task: str
     expected_payload_keys: tuple[str, str]
-
-
-@dataclass(frozen=True)
-class WarehouseRoundTripE2ETestCase:
-    """A build of orders -> score task -> partner loader -> source -> scored model."""
-
-    description: str
-    project_settings: str
-    task_body: str
-    expected_exit_code: int
-    expected_output_order: tuple[str, ...]
-    expected_output_fragments: tuple[str, ...]
-    expected_scored_rows: tuple[tuple[object, ...], ...] | None
-    expected_scored_table_exists: bool = True
-
-
-@dataclass(frozen=True)
-class ChangedRoundTripE2ETestCase:
-    """A second round-trip build with `build_flags`, after changing `orders` and `extra_files`."""
-
-    description: str
-    orders_sql: str
-    expected_output_fragments: tuple[str, ...]
-    expected_scored_rows: tuple[tuple[object, ...], ...]
-    build_flags: tuple[str, ...] = ("--changed",)
-    extra_files: dict[str, str] = field(default_factory=dict)

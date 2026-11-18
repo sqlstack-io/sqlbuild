@@ -1,10 +1,11 @@
 //! Public records of native host.
 
-use crate::native_host::_helpers::consumption_state::append;
-use crate::native_host::_helpers::consumption_state::ensure_table;
-use crate::native_host::_helpers::consumption_state::read_executions;
-use crate::native_host::_helpers::consumption_state::read_recent;
+use crate::native_host::_helpers::consumption_io::append;
+use crate::native_host::_helpers::consumption_io::ensure_table;
+use crate::native_host::_helpers::consumption_io::read_executions;
+use crate::native_host::_helpers::consumption_io::read_recent;
 use crate::native_host::_helpers::consumption_state::text;
+use crate::native_host::types::ConsumptionReads;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
@@ -13,9 +14,6 @@ use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
-use sqlbuild_state::consumption::constants::RECENT_EXECUTIONS;
-use sqlbuild_state::consumption::main::recent_executions::recent_executions;
 use sqlbuild_state::consumption::models::ConsumptionAppend;
 use sqlbuild_state::consumption::models::ConsumptionRow;
 use sqlbuild_state::consumption::models::RelationKey;
@@ -89,14 +87,6 @@ impl ConsumptionConnection {
         py: Python<'_>,
         location: &Location,
     ) -> PyResult<Vec<ConsumptionRow>> {
-        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
-            return Ok(recent_executions(
-                &copy
-                    .get()
-                    .consumption((location.database.as_deref(), &location.schema)),
-                RECENT_EXECUTIONS,
-            ));
-        }
         read_recent(self.adapter.bind(py), &self.connected(py)?, location)
     }
 
@@ -106,13 +96,6 @@ impl ConsumptionConnection {
         location: &Location,
         execution_ids: &[&str],
     ) -> PyResult<Vec<ConsumptionRow>> {
-        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
-            let mut rows: Vec<ConsumptionRow> = copy
-                .get()
-                .consumption((location.database.as_deref(), &location.schema));
-            rows.retain(|row| execution_ids.contains(&row.row.execution_id.as_str()));
-            return Ok(rows);
-        }
         read_executions(
             self.adapter.bind(py),
             &self.connected(py)?,
@@ -141,6 +124,21 @@ impl ConsumptionConnection {
             native_field(self.adapter.bind(py), "close")?.call1((connection.bind(py),))?;
         }
         Ok(())
+    }
+}
+
+impl ConsumptionReads for ConsumptionConnection {
+    fn read_recent(&self, py: Python<'_>, location: &Location) -> PyResult<Vec<ConsumptionRow>> {
+        ConsumptionConnection::read_recent(self, py, location)
+    }
+
+    fn read_executions(
+        &self,
+        py: Python<'_>,
+        location: &Location,
+        execution_ids: &[&str],
+    ) -> PyResult<Vec<ConsumptionRow>> {
+        ConsumptionConnection::read_executions(self, py, location, execution_ids)
     }
 }
 

@@ -1,7 +1,8 @@
-import type { Scope } from './types';
+import type { NodeStatusDelta, Scope } from './types';
 
-// "Changed" signals: payload-free notifications that something changed on the
-// server. Clients refetch through the normal endpoints when one arrives.
+// "Changed" signals: notifications that something changed on the server. Clients refetch
+// through the normal endpoints when one arrives; a `node_status` signal also carries the
+// node states that changed, so the node listing is updated in place instead.
 
 export type ChangedChannel =
 	/** Refetch everything: sent on connect and whenever notices may have been missed. */
@@ -17,7 +18,7 @@ export type ChangedChannel =
 	| `node_status:${string}`
 	| `warehouse_sync:${string}`;
 
-export type ChangedSignal = { channel: ChangedChannel; at: string };
+export type ChangedSignal = { channel: ChangedChannel; at: string; nodeStatus?: NodeStatusDelta };
 
 export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline';
 
@@ -57,8 +58,8 @@ export class LocalChangeBus implements ChangeSubscription {
 		// Every mock signal belongs to the one in-process store.
 	}
 
-	emit(channel: ChangedChannel): void {
-		const signal = { channel, at: new Date().toISOString() };
+	emit(channel: ChangedChannel, nodeStatus?: NodeStatusDelta): void {
+		const signal: ChangedSignal = { channel, at: new Date().toISOString(), ...(nodeStatus ? { nodeStatus } : {}) };
 		for (const handler of this.#handlers) handler(signal);
 	}
 

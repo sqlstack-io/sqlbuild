@@ -1,11 +1,12 @@
 //! The persistent line of one finished load, with its log blocks and error.
 
 use crate::cli_text::models::CliStyle;
-use crate::load_command::_helpers::padding::{group_thousands, pad_right};
+use crate::load_command::_helpers::padding::pad_right;
 use crate::load_command::constants::{
     KIND_WIDTH, LOG_CONTINUATION, LOG_LABEL, NAME_WIDTH, STATUS_WIDTH,
 };
 use crate::load_command::models::{LoadResultText, LoadStatus};
+use crate::number_text::main::format_thousands::format_thousands;
 use crate::text::main::python_splitlines::python_splitlines;
 
 fn log_block(message: &str, style: CliStyle) -> String {
@@ -41,7 +42,7 @@ pub fn render_load_result(
         pad_right(&result.resource_kind, KIND_WIDTH),
         pad_right(&result.source_name, NAME_WIDTH),
         pad_right(&status, STATUS_WIDTH),
-        group_thousands(result.rows_loaded)
+        format_thousands(i128::from(result.rows_loaded))
     );
     for message in &result.log_messages {
         text.push_str(&log_block(message, style));

@@ -46,12 +46,11 @@ executable = "/usr/local/bin/sqb"
 | Section | Keys |
 | --- | --- |
 | `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`) |
-| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`; see [Set retention](#set-retention) |
+| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`; see [Set retention](#set-retention) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
 | `[trusted_proxy]` | `origin`, `trusted_peers` and `identities` |
-| `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and an optional `run` table; see [Limit worker containers](#limit-worker-containers) |
-| `[[launchers.local]]` | `location`, `target`, `server_url`, `max_workers`, and absolute `project_dir` and `executable` paths |
-| `[launchers.concurrency_limits]` | The most runs at once for each job `concurrency_groups` name, such as `orders_pool = 2` |
+| `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
+| `[[launchers.local]]` | `location`, `target`, `server_url`, `max_workers`, absolute `project_dir` and `executable` paths, and an optional `pool_caps` table |
 
 - A flag overrides the same setting in the file: `sqb server --config server.toml --port 9000`
   listens on port 9000.
@@ -183,6 +182,7 @@ audit_days = 730
 snapshot_count = 20
 run_log_days = 7
 run_log_count = 100
+state_history_versions = 10
 ```
 
 | Data | `[retention]` key | Option | Default | Range |
@@ -192,6 +192,7 @@ run_log_count = 100
 | Published snapshots per location and target | `snapshot_count` | `--snapshot-retention-count` | `10` | `1`–`65535` |
 | Logs of finished runs | `run_log_days` | `--run-log-retention-days` | `14` | `1`–`65535` |
 | Finished runs per location and target that keep their logs | `run_log_count` | `--run-log-retention-count` | `200` | `1`–`65535` |
+| Builds and check results kept for each node | `state_history_versions` | `--state-history-retention-versions` | `5` on SQLite, `20` on PostgreSQL | `1`–`65535` |
 | Skipped and covered schedule ticks | None | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
@@ -218,6 +219,23 @@ is older than `run_log_days` or when more than `run_log_count` newer runs
 have finished in its location and target, whichever comes first. The run itself, its node results,
 and the run history the scheduler recorded stay, so run lists, node status and history are
 unchanged; only the run's log, statements and SQL are no longer shown. A running run keeps its log.
+
+Locations copy the builds and check results recorded in the warehouse's
+`_sqlbuild_fingerprints` and `_sqlbuild_audit_results` tables into the control database. The
+server keeps the newest `state_history_versions` builds of each node and results of each check,
+and always keeps the latest one:
+
+- A location's first read of a table, and its periodic full re-read, take only the newest
+  `state_history_versions` rows of each node or check from the warehouse.
+- Builds and results that arrive later are added, and older ones are deleted in small batches about
+  once a minute.
+- A SQLite control database gives the freed space back to the disk a little at a time, so the file
+  shrinks.
+
+The PostgreSQL default matches the janitor's
+[`direct_state_history_versions`](/docs/cli/janitor#state-history-pruning), so with the janitor
+running the server keeps what the warehouse keeps. [`sqb dev`](/docs/cli/dev/) has no
+`server.toml` and uses the SQLite default.
 
 The **Server** panel on the **Settings** page shows the control database's size on disk and both
 run log limits, and each `heartbeat` [platform event](#receive-platform-events) carries the size as
@@ -346,7 +364,7 @@ The location starts the sync within a few seconds, and the top bar shows when it
 | --- | --- | --- | --- |
 | `[control] server` | `SQLBUILD_CONTROL_SERVER` | none | HTTPS origin of the server, as `sqb login --server` takes it |
 | `[control] location` | `SQLBUILD_CONTROL_LOCATION` | none | Location name a signed-in `sqb build` asks to sync |
-| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"` | Longest a location waits between syncs; `"0"` or `"off"` turns it off |
+| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"`, or off on Databricks, ClickHouse and MotherDuck | Longest a location waits between syncs; `"0"` or `"off"` turns it off. See [warehouse cost](#warehouse-cost-of-an-always-on-location) |
 | none | `SQLBUILD_CONTROL_CA_CERT` | none | Extra trusted PEM CA certificate for the server |
 
 An environment variable overrides the project file. `sqb location serve --sync-at-least-every`
@@ -370,9 +388,9 @@ Details:
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
   or time retries a smaller page. Any other error, such as a missing permission or table, retries
   after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
-  the sync stops until you request one, the location publishes again, or the next safety sync is
-  due (`sync_at_least_every`). The safety sync tries once; another failure stops it until the
-  following one.
+  the sync stops until a run ends, you request one, the location publishes again, or the next safety
+  sync is due (`sync_at_least_every`). It then starts again from the first kind of history. A sync
+  resumed by a run or the safety sync tries once, and another failure stops it again.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 - When a state table holds two rows with the same ID, such as one check result written twice, the
   server keeps the row with the earlier time. Estimated query costs are the exception: when two
@@ -380,6 +398,66 @@ Details:
   later row, the one the warehouse treats as current. A server that kept a different row corrects it
   at the location's next full reread, which runs when the location starts and on the first sync at
   least 5 minutes after the previous full reread.
+
+### Warehouse cost of an always-on location
+
+A location syncs when it starts, after each run ends, when someone asks, and on the
+`sync_at_least_every` interval. Which reads need running compute depends on the adapter:
+
+| Adapter | Reads that need running compute | Interval sync while idle |
+| --- | --- | --- |
+| Snowflake | Reading a state table that changed since the last sync. Change checks, the catalog (`SHOW TABLES`, `SHOW VIEWS`, `SHOW COLUMNS`), statistics (one `SHOW OBJECTS` per schema) and existence checks run in cloud services | Every 30 minutes. A sync with nothing new resumes no warehouse; one after another writer changed a state table resumes it once |
+| BigQuery | None to resume, but every sync queries each state table and is billed for the bytes it reads | Every 30 minutes |
+| Databricks | Every read, including the catalog and existence checks, runs on the SQL warehouse | Off: a stopped warehouse would start each time |
+| ClickHouse | Every read is a query, which wakes an idle ClickHouse Cloud service | Off |
+| MotherDuck | Every read runs on MotherDuck compute | Off |
+| PostgreSQL, SQL Server | The server is always running; a serverless database that pauses when idle wakes on connection | Every 30 minutes; set `sync_at_least_every = "off"` for one that pauses |
+| DuckDB, SQLite | None; the location reads the file | Every 30 minutes |
+
+Where the interval is off, an idle location syncs only after a run ends or when someone asks, with
+**Sync now**, `sqb control sync` or a signed-in `sqb build`. A run has just used the warehouse, so
+the sync after it rarely resumes anything. Set `sync_at_least_every` to turn the interval back on.
+
+### Follow a sync
+
+The location prints a line as it finishes each of its 14 kinds of history, then a summary:
+
+```text
+Reading warehouse history for automatic synchronization...
+Warehouse history 1/14: fingerprints, 1,204 rows in 0.8 s
+Warehouse history 2/14: source freshness, unchanged in 0.1 s
+...
+Warehouse history synchronization completed: 14 kinds, 31,204 rows in 12.8 s.
+```
+
+A page holds up to 2,000 rows and ends early at 8 MiB, so wide rows make smaller pages. A failed
+read prints which kind failed, the page size and why, then what the location does next. A read that
+ran out of time or memory retries a smaller page; any other failure retries the same page after a
+wait that doubles each time, and the fifth in a row stops the sync:
+
+```text
+Warehouse history read failed for statistics (100-relation page): no reply within 130 s. Sync incomplete; retaining mirror and retrying a smaller page in 30 s.
+Warehouse history read failed for catalog (2000-row page): permission denied for table _sqlbuild_catalog. Sync incomplete; retaining mirror and retrying in 60 s.
+Warehouse history read failed for catalog (2000-row page): permission denied for table _sqlbuild_catalog. Synchronization stopped after 5 failed reads in a row; it resumes after the next run, on request or after a publish.
+```
+
+| Cause | Printed as |
+| --- | --- |
+| The location couldn't start its reader | `the metadata reader did not start:` and the error |
+| The warehouse refused the connection or the query | The warehouse's message |
+| No reply in time | `no reply within N s`: 120 s for a page, or 30 s plus 1 s per relation for a statistics page |
+
+The location's page shows a running sync, for example
+`syncing history 9/14 · catalog · 1,640 rows`, and the last full sync's kinds, rows and time.
+
+A location is ready as soon as it has compiled and published; nothing waits for the sync. Lineage,
+jobs, the catalog and code work at once. Plan previews, node history, check results and costs read
+the server's copy of the warehouse, so until the location's first sync completes they show
+**Syncing warehouse history** with its progress, and fill in when it does.
+
+The location's page shows a failing sync as **failing** with when it last synced; its tooltip lists
+each failing kind with the cause, the page size and the warehouse's message, shortened and with
+secrets removed. The Connections page shows a stopped sync as **stopped after failed reads**.
 
 ## Skip overlapping runs and retry failures
 
@@ -395,16 +473,16 @@ owner = "Orders team"
 overlap = "skip"
 schedule = { cron = "0 2 * * *", timezone = "UTC" }
 
-[on_failure]
-retries = 2
-retry_delay_seconds = 600
+[retry]
+attempts = 3
+delay_seconds = 600
 ```
 
 | Setting | Values | Default | Effect |
 | --- | --- | --- | --- |
 | `owner` | Any non-blank text | None | Shown on the job's page and in the job list |
 | `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
-| `on_failure` | `retries` from 1 to 10, `retry_delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or the retries run out |
+| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or has run `attempts` times in all |
 
 A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
 creates no run. A sensor check lists the requests it skipped the same way.
@@ -422,9 +500,16 @@ Details:
   paused, still queues.
 - A retry waits in the queue until its delay ends, and the run list shows it as a rerun of the run
   that failed. Cancelling a run stops its retries.
-- A group retries at group level, with the group's own `on_failure`: each retry is one rerun of the
-  group's failed and skipped nodes. A member job's `on_failure` applies only when that job runs on
-  its own.
+- A member job's `[retry]` also applies inside a group run. When the member fails, the group runs it
+  again after `delay_seconds`, inside the same group run, and the jobs that depend on it wait
+  instead of skipping. The group keeps its pool slots meanwhile.
+- A group's own `[retry]` is a final sweep: after the group run ends `failed` or `partial`, it
+  queues one new linked rerun of the group's failed and skipped nodes.
+- So a retry of a whole run, a job's or a group's, is a new linked run, and a retry of a member
+  stays inside its group run.
+- Sensors and alerts see a member's final attempt only. The group run's timeline shows each retry,
+  such as `orders_job failed, retrying in 15 min (attempt 2 of 3)`, the member's row shows its
+  attempt, and the run's header counts the members it retried.
 - An invalid value is a `D017` error at its line, such as
   ``orchestration/jobs/nightly_orders_job.toml:6:11: unknown variant `coalesce`, expected `queue` or `skip` ``.
 
@@ -479,6 +564,32 @@ cpus = 2
 - A job in a group uses its own `resources`. Local launchers ignore `resources`.
 - An invalid value fails publication with the job's name, such as
   `job nightly_orders_job resources: cpus must be a positive number`.
+
+## Cap pools
+
+A project declares each [pool](/docs/concepts/concurrency#jobs-sharing-something-else-pools)'s
+limit. To keep one launcher's runs below it, lower the limit with `pool_caps`:
+
+```toml
+[[launchers.local]]
+location = "orders"
+target = "production"
+server_url = "http://127.0.0.1:8000"
+max_workers = 4
+project_dir = "/srv/orders"
+executable = "/usr/local/bin/sqb"
+
+[launchers.local.pool_caps]
+warehouse_heavy = 1
+```
+
+- A cap lowers a limit and never raises it. A pool without a cap keeps the project's limit.
+- A job taking more slots than the cap takes the whole capped pool.
+- A cap applies to its launcher's location and target only.
+- A cap for a pool the project doesn't declare has no effect.
+
+`max_workers`, write claims, `overlap` and pools are compared on
+[Concurrency](/docs/concepts/concurrency).
 
 ## Run ad-hoc commands
 

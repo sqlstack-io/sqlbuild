@@ -1,5 +1,7 @@
 pub(crate) mod administrators;
+pub(crate) mod application;
 pub(crate) mod audit;
+pub(crate) mod changed_builds;
 pub(crate) mod changes;
 pub(crate) mod client;
 pub(crate) mod compression;
@@ -14,6 +16,7 @@ pub(crate) mod person_node_sql;
 pub(crate) mod person_operations;
 pub(crate) mod person_plans;
 pub(crate) mod person_reads;
+pub(crate) mod person_selection;
 pub(crate) mod plain_http;
 pub(crate) mod request_json;
 pub(crate) mod router;

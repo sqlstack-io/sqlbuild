@@ -39,8 +39,6 @@ pub(crate) struct Launchers {
     pub(super) local: Vec<LocalLauncher>,
     #[serde(default)]
     pub(super) docker: Vec<DockerLauncher>,
-    #[serde(default)]
-    pub(super) concurrency_limits: BTreeMap<String, NonZeroU32>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -49,6 +47,7 @@ pub(super) struct LauncherScope<'a> {
     pub(super) target: &'a str,
     pub(super) server_url: &'a str,
     pub(super) max_workers: NonZeroUsize,
+    pub(super) pool_caps: &'a BTreeMap<String, NonZeroU32>,
 }
 
 /// No executable, project path or API address is supplied by an untrusted run request.
@@ -64,6 +63,9 @@ pub(super) struct LocalLauncher {
     pub(super) max_workers: NonZeroUsize,
     pub(super) project_dir: PathBuf,
     pub(super) executable: PathBuf,
+    /// Lowers a project's pool limits for this location and target; never raises them.
+    #[serde(default)]
+    pub(super) pool_caps: BTreeMap<String, NonZeroU32>,
 }
 
 /// The installation chooses the daemon and location container; the snapshot pins the worker image.
@@ -82,6 +84,9 @@ pub(super) struct DockerLauncher {
     pub(super) executable: String,
     #[serde(default)]
     pub(super) run: RunDefaults,
+    /// Lowers a project's pool limits for this location and target; never raises them.
+    #[serde(default)]
+    pub(super) pool_caps: BTreeMap<String, NonZeroU32>,
 }
 
 /// Worker container limits for every run of a launcher; a job's `resources` override them up to `max_memory`.

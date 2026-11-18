@@ -2,11 +2,13 @@
 
 use crate::planner_entries::main::entries::default_microbatch_limit_action::default_microbatch_limit_action;
 use crate::planner_entries::main::entries::plan_entries::plan_entries;
-use crate::planner_entries::main::entries::planner_relations_context::planner_relations_context;
-use crate::planner_entries::models::{PlanEntriesRequest, PlanEntryBuildInputs, RelationsRequest};
+use crate::planner_entries::models::PlanEntriesRequest;
+use crate::planner_entries::models::PlanEntryBuildInputs;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
-use crate::planner_phases::models::{ChangeReconciliation, ModelEntryResults};
+use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
+use crate::planner_phases::models::ChangeReconciliation;
+use crate::planner_phases::models::ModelEntryResults;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyFrozenSet;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -47,30 +49,17 @@ fn planned_concurrency(
     .limit)
 }
 
-/// Model plan entries for the pruned execution scope, with the freshness and override inputs they need.
+/// Model plan entries for the execution scope over the relations its warehouse phase resolved.
 pub(crate) fn build_planner_entry_results<'py>(
     (runtime, warehouse): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    (overrides, deferral): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    overrides: &Bound<'py, PyAny>,
     (execution_scope, reconciliation): (&Bound<'py, PyAny>, &ChangeReconciliation<'py>),
     source_freshness: &Bound<'py, PyAny>,
 ) -> PyResult<ModelEntryResults<'py>> {
     let py = runtime.py();
     let project = runtime_field(runtime, |runtime| &runtime.project)?;
     let config = runtime_field(runtime, |runtime| &runtime.project_config)?;
-    let relations = planner_relations_context(RelationsRequest {
-        project: project.clone(),
-        adapter: runtime_field(runtime, |runtime| &runtime.adapter)?,
-        connection: runtime_field(runtime, |runtime| &runtime.connection)?,
-        scope: execution_scope.clone(),
-        deferral: deferral.clone(),
-        project_config: config.clone(),
-        local_config: runtime_field(runtime, |runtime| &runtime.local_config)?,
-        known_source_columns: native_field(
-            &native_field(warehouse, "inspection_relations")?,
-            "source_warehouse_columns",
-        )?,
-        relation_keys: py.None().into_bound(py),
-    })?;
+    let relations = native_field(warehouse, "inspection_relations")?;
     let propagation = native_field(source_freshness, "propagation")?;
     let blocked = if propagation.is_none() {
         PyFrozenSet::empty(py)?.into_any()
@@ -125,7 +114,7 @@ pub(crate) fn build_planner_entry_results<'py>(
     )?;
     plan_entries(PlanEntriesRequest {
         project,
-        adapter: runtime_field(runtime, |runtime| &runtime.adapter)?,
+        dialect: runtime_dialect(runtime)?,
         scope: execution_scope.clone(),
         snapshot: warehouse_field(warehouse, |warehouse| &warehouse.snapshot)?,
         relations,

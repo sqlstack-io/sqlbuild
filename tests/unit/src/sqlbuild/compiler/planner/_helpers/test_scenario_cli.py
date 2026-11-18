@@ -8,6 +8,7 @@ import pytest
 from sqlbuild._native import (
     CompiledSqlScenario,
     CompilePipelineResult,
+    Dialect,
     ScenarioArtifactName,
     ScenarioExecutionPlan,
     SqlLexicalSyntax,
@@ -52,7 +53,7 @@ def test_given_adapter_identifier_limit_when_building_cli_scenario_plan_then_use
     result: ScenarioExecutionPlan = build_cli_scenario_plan(
         scenario=scenario,
         pipeline_result=pipeline_result,
-        adapter=WideIdentifierPlannerTestAdapter(),
+        dialect=Dialect(WideIdentifierPlannerTestAdapter()),
         project_name="scenario_demo",
         source_lexical_syntax=SqlLexicalSyntax(),
     )

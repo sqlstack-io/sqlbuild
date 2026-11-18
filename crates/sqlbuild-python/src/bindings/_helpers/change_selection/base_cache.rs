@@ -8,9 +8,9 @@ use sqlbuild_analysis::definition_changes::main::definition_digest::definition_d
 use sqlbuild_rules::build_identity::main::native_build_identity::native_build_identity;
 
 use crate::bindings::_helpers::change_selection::base_compile::NOTES_EXTENSION;
-use crate::bindings::_helpers::change_selection::fingerprints::{
-    environment_digest_with, process_environment, referenced_environment,
-};
+use crate::bindings::_helpers::change_selection::fingerprints::environment_digest_with;
+use crate::bindings::_helpers::change_selection::fingerprints::process_environment;
+use crate::bindings::_helpers::change_selection::fingerprints::referenced_environment;
 
 /// Cached base snapshots kept per project; older ones are removed after each compile.
 const KEPT_SNAPSHOTS: usize = 8;

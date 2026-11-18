@@ -34,9 +34,10 @@ use sqlbuild_analysis::planner_changes::models::{
 };
 
 use crate::planner_changes::_helpers::renames::origin_names;
-use crate::planner_changes::_helpers::results::{
-    backfill_result, change_kind, replay_policy_error, schema_findings,
-};
+use crate::planner_changes::_helpers::results::backfill_result;
+use crate::planner_changes::_helpers::results::change_kind;
+use crate::planner_changes::_helpers::results::replay_policy_error;
+use crate::planner_changes::_helpers::results::schema_findings;
 use crate::planner_identity::main::compiled_function_fingerprint_sql::compiled_function_fingerprint_sql;
 use crate::planner_identity::main::function_local_hashes::function_local_hashes;
 use crate::planner_identity::main::model_declared_columns_hash::model_declared_columns_hash;
@@ -331,11 +332,13 @@ pub(crate) fn model_change<'py>(
     let mut query_changed: bool = false;
     if let (Some(hash), Some(recorded)) = (&compiled_query_hash, &recorded) {
         query_changed = origins.is_none() && definition_changed;
-        log_query_check(
-            (model, &model_name, &fingerprint),
-            hash,
-            (&recorded.definition_hash, query_changed),
-        )?;
+        if query_changed {
+            log_query_check(
+                (model, &model_name, &fingerprint),
+                hash,
+                &recorded.definition_hash,
+            )?;
+        }
     }
     let findings: Vec<SchemaFindingRow> =
         model_schema_findings(model, snapshot, &model_name, &dialect)?;
@@ -386,10 +389,11 @@ fn recorded_fingerprint(fingerprint: &Bound<'_, PyAny>) -> PyResult<Option<Recor
     }))
 }
 
+/// Log why a model's query counts as changed, with both SQL texts; unchanged models log nothing.
 fn log_query_check(
     (model, model_name, fingerprint): (&Bound<'_, PyAny>, &Bound<'_, PyAny>, &Bound<'_, PyAny>),
     compiled_query_hash: &str,
-    (definition_hash, query_changed): (&str, bool),
+    definition_hash: &str,
 ) -> PyResult<()> {
     let py: Python<'_> = model.py();
     let logger: Bound<'_, PyAny> =
@@ -403,22 +407,14 @@ fn log_query_check(
                 "message",
                 text(&format!(
                     "fingerprint comparison compiled_query_hash={compiled_query_hash} \
-                     fingerprint_definition_hash={definition_hash} query_changed={}",
-                    if query_changed { "True" } else { "False" }
+                     fingerprint_definition_hash={definition_hash} query_changed=True"
                 )),
             ),
             ("sqlbuild_subject", text("model")),
             ("sqlbuild_name", model_name.clone()),
             ("sqlbuild_event", text("query_change_check")),
             ("sqlbuild_phase", text("planner")),
-            (
-                "sqlbuild_status",
-                text(if query_changed {
-                    "changed"
-                } else {
-                    "unchanged"
-                }),
-            ),
+            ("sqlbuild_status", text("changed")),
         ],
     )?;
     let log_sql: Bound<'_, PyAny> = host_entry(py, ExecutorHost::LogSql)?;

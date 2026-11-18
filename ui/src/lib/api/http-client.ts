@@ -4,7 +4,7 @@ import { isActiveRun } from '$lib/status';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage } from './http-catalog';
+import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { manualConnectionTest, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
@@ -17,11 +17,12 @@ import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
 import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
+import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
-import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage } from './types/build';
+import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -66,6 +67,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getCheckSql',
 	'getCheckEvidence',
 	'listCatalogNodes',
+	'listNodeStates',
 	'getCatalogNode',
 	'getColumnLineage',
 	'listSnapshotChanges',
@@ -92,9 +94,13 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listProviders',
 	'serverSettings',
 	'listSnapshotNodes',
+	'evaluateSelection',
+	'selectionVocabulary',
 	'checkAdhocRun',
 	'launchAdhocRun',
-	'planBuild'
+	'planBuild',
+	'planRows',
+	'planDiff'
 ]);
 
 /** How often a connection test asks for the location's answer, and the longest it waits. */
@@ -103,6 +109,7 @@ const CONNECTION_TEST_WAIT_MS = 60_000;
 
 /** How often the plan page asks for the location's plan; the server expires a plan after ten minutes. */
 const PLAN_POLL_MS = 750;
+/** Rows of each paged plan section loaded with the summary, as many as the plan report shows before "Show more". */
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
 const AUDIT_PAGE = 100;
@@ -231,12 +238,13 @@ export class HttpChangeFeed implements ChangeSubscription {
 		};
 		source.addEventListener('changed', (event) => {
 			const notice = JSON.parse((event as MessageEvent<string>).data) as Wire['ChangeNotice'];
-			this.#emit(channelOf(notice.topic, scope));
+			const channel = channelOf(notice.topic, scope);
+			this.#emit(channel, channel.startsWith('node_status:') ? toNodeStatusDelta(notice) : null);
 		});
 	}
 
-	#emit(channel: ChangedChannel) {
-		const signal = { channel, at: new Date().toISOString() };
+	#emit(channel: ChangedChannel, nodeStatus: NodeStatusDelta | null = null) {
+		const signal: ChangedSignal = { channel, at: new Date().toISOString(), ...(nodeStatus ? { nodeStatus } : {}) };
 		for (const handler of this.#handlers) handler(signal);
 	}
 
@@ -280,6 +288,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 	const errorRefused = new Set<string>();
 	// Targets whose health the person may not read; each refusal is audited, so Connections asks once per page load.
 	const healthRefused = new Set<string>();
+	// The node listing per location with the server's ETag; the server answers a repeat with 304 until the snapshot or states change.
+	const listings = new Map<string, { etag: string; nodes: CatalogNode[] }>();
 	// Statistics samples per relation, oldest first, with the cursor after the newest; a refresh reads only newer samples.
 	const samples = new Map<string, { records: Wire['WarehouseStatisticsRecord'][]; after: Wire['WarehouseMirrorCursor'] }>();
 	async function relationStatistics(scope: Scope, relation: { database: string | null; schema: string; name: string }): Promise<Wire['WarehouseStatisticsRecord'][]> {
@@ -311,6 +321,29 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		samples.set(key, { records, after });
 		return records;
 	}
+	/** One page of a plan section, its rows found by `name` when given, under the plan's authorization. */
+	async function planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number, name?: string): Promise<PlanPage> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/rows', {
+			params: { path: { location_id: locationId, target, request_id: requestId }, query: { section, offset, limit, ...(name ? { name } : {}) } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		if (!data) throw new ApiError('The plan request disappeared', 404);
+		return data as unknown as PlanPage;
+	}
+	/** One planned model's diff text; null without one, or without view.sql on the target. */
+	async function planDiff(scope: Scope, requestId: string, model: string): Promise<PlanDiff | null> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/diff', {
+			params: { path: { location_id: locationId, target, request_id: requestId }, query: { model } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (response.status === 404) return null;
+		if (!response.ok || !data) throw new ApiError(errorText(error, response), response.status);
+		return { model: data.model, ...(data.query_diff ? { query_diff: data.query_diff } : {}), ...(data.config_diff ? { config_diff: data.config_diff } : {}) };
+	}
+
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: changes ?? new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -353,7 +386,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		listQueue: (scope: Scope): Promise<QueueEntry[]> => queueEntries(scope),
 		async navCounts(scope: Scope): Promise<NavCounts> {
 			// The nodes listing goes first: a person who can't list the whole target gets one audited refusal, not five.
-			const nodes = await implemented.listCatalogNodes(scope);
+			// A held listing has the count already; only a new snapshot changes it, and that reads the listing again.
+			const nodes = listings.get(scope.locationId)?.nodes ?? (await implemented.listCatalogNodes(scope));
 			const [checks, runs, triggers, events] = await Promise.all([implemented.listChecks(scope), listedRuns(scope), listedTriggers(scope), problems()]);
 			return {
 				catalogNodes: nodes.length,
@@ -497,16 +531,32 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		launchJob: (scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> => startJob(scope, key, options, false),
 		/** The server checks a full refresh against `run.rewrite_history` and refuses it with a window. */
 		launchJobFromScratch: (scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> => startJob(scope, key, options, true),
-		async listCatalogNodes(scope: Scope): Promise<CatalogNode[]> {
+		listCatalogNodes: (scope: Scope): Promise<CatalogNode[]> => shared(`nodes ${scope.locationId}`, () => catalogListing(scope)),
+		async listNodeStates(scope: Scope): Promise<NodeStates> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
-			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/nodes', { params: { path: { location_id: locationId, target } } });
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/node-states', { params: { path: { location_id: locationId, target } } });
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
-			return toCatalogNodes(data);
+			return toNodeStates(data);
 		},
 		async listSnapshotNodes(scope: Scope): Promise<SnapshotNode[]> {
 			const nodes = await implemented.listCatalogNodes(scope);
 			return nodes.map((n) => ({ key: n.key, kind: n.kind, group: n.group ?? '', tags: n.tags, path: n.path, cursor: null, upstream: n.upstream }));
+		},
+		async evaluateSelection(scope: Scope, request: SelectionRequest): Promise<SelectionEvaluation> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const query = { select: request.select, exclude: request.exclude, offset: request.offset, limit: request.limit };
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/selection', { params: { path: { location_id: locationId, target }, query } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toSelectionEvaluation(data);
+		},
+		async selectionVocabulary(scope: Scope): Promise<SelectionVocabulary> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/selection/vocabulary', { params: { path: { location_id: locationId, target } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toSelectionVocabulary(data);
 		},
 		async checkAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<AdhocRunCheck> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -525,7 +575,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
 		},
-		/** Queues the plan, then waits for the location's document; a plan the location could not make is a result, not a throw. */
+		/**
+		 * Queues the plan, then waits for the location's summary: changed models in full and the large sections counted.
+		 * The first page of each large section loads with it; a plan the location could not make is a result, not a throw.
+		 */
 		async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };
@@ -539,17 +592,25 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!asked.response.ok) throw new ApiError(errorText(asked.error, asked.response), asked.response.status);
 			for (;;) {
 				await new Promise((resolve) => setTimeout(resolve, PLAN_POLL_MS));
-				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}', {
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}/summary', {
 					params: { path: { ...path, request_id: requestId } }
 				});
 				if (response.status === 401) onUnauthorized();
 				if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 				if (!data) throw new ApiError('The plan request disappeared', 404);
-				const outcome = data.result_json?.outcome;
-				if (outcome) return planResultOf(outcome);
+				const outcome = data.outcome;
+				if (outcome) {
+					const result = planResultOf(outcome);
+					if (!result.plan) return result;
+					// The summary alone: the plan page loads a large section's rows a page at a time, when it is opened.
+					const plan = data.timings ? { ...result.plan, timings: data.timings } : result.plan;
+					return { plan, error: null, requestId };
+				}
 				if (Date.parse(data.expires_at) <= Date.now()) return { plan: null, error: 'The location did not plan the command in time; check that sqb location serve is running' };
 			}
 		},
+		planRows,
+		planDiff,
 		async listSnapshotChanges(scope: Scope, query: { limit?: number } = {}): Promise<SnapshotChange[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const [snapshots, runs] = await Promise.all([
@@ -683,10 +744,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const read = await Promise.all(
 				locations.map(async (location) => {
 					const { locationId, target } = parseLocationKey(location.id);
-					const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
-					if (response.status === 401) onUnauthorized();
+					const [[{ data, response }, snapshot], totals] = await Promise.all([
+						locationHealth(location.id),
+						http.GET('/api/control/locations/{location_id}/targets/{target}/mirrored-totals', { params: { path: { location_id: locationId, target } } })
+					]);
 					if (response.status === 403) healthRefused.add(location.id);
-					return data ? [toWarehouseConnection(location, data)] : [];
+					return data ? [toWarehouseConnection(location, data, snapshot, totals.data ?? null)] : [];
 				})
 			);
 			return read.flat();
@@ -734,8 +797,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		disableAccount: (name: string): Promise<Account> => changePerson(name, 'disable'),
 		enableAccount: (name: string): Promise<Account> => changePerson(name, 'enable'),
-		async getColumnLineage(scope: Scope, ref: string): Promise<ColumnLineage | null> {
-			const nodes = await implemented.listCatalogNodes(scope);
+		async getColumnLineage(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<ColumnLineage | null> {
+			const nodes = listing ?? (await implemented.listCatalogNodes(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -780,12 +843,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				microbatch: coverage?.data ? toMicrobatchCoverage(coverage.data) : null
 			});
 		},
-		async overview(scope: Scope): Promise<Overview | null> {
+		async overview(scope: Scope, listing?: CatalogNode[]): Promise<Overview | null> {
 			// A week of publications for the models metric; the server returns at most 100.
 			const reads = Promise.all([
 				recentRuns(scope),
 				implemented.listChecks(scope),
-				implemented.listCatalogNodes(scope),
+				listing ?? implemented.listCatalogNodes(scope),
 				implemented.listSnapshotChanges(scope, { limit: 100 }),
 				implemented.listPlatformEvents(),
 				acknowledgementsOf(scope)
@@ -893,6 +956,27 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		const started: Promise<T> = load().finally(() => inFlight.get(key) === started && inFlight.delete(key));
 		inFlight.set(key, started);
 		return started;
+	}
+
+	/** Sends the held listing's ETag, so an unchanged listing comes back as a 304 and is not sent or converted again. */
+	async function catalogListing(scope: Scope): Promise<CatalogNode[]> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const held = listings.get(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/nodes', {
+			params: { path: { location_id: locationId, target } },
+			headers: held ? { 'if-none-match': held.etag } : undefined
+		});
+		if (response.status === 401) onUnauthorized();
+		if (response.status === 304 && held) return held.nodes;
+		if (!data) {
+			if (isRefusalStatus(response.status)) listings.delete(scope.locationId);
+			throw new ApiError(errorText(error, response), response.status);
+		}
+		const nodes = toCatalogNodes(data);
+		const etag = response.headers.get('etag');
+		if (etag) listings.set(scope.locationId, { etag, nodes });
+		else listings.delete(scope.locationId);
+		return nodes;
 	}
 
 	const listedJobs = (scope: Scope) => shared(`jobs ${scope.locationId}`, () => fetchJobs(scope));
@@ -1173,6 +1257,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		}
 	}) as unknown as ApiClient;
 }
+
+const isRefusalStatus = (status: number) => status === 401 || status === 403 || status === 404;
 
 /** The server's message: a JSON error body's text, or a 4xx plain-text body such as a request the route couldn't read; never an HTML page. */
 function errorText(error: unknown, response: Response): string {

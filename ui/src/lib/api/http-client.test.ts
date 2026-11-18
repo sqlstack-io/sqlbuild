@@ -190,6 +190,78 @@ describe('HttpChangeFeed', () => {
 			'all'
 		]);
 	});
+
+	it('passes on the node states a node_status notice carries, and none for one without', () => {
+		const { changes } = feed(async () => true);
+		const signals: ChangedSignal[] = [];
+		changes.subscribe((signal) => signals.push(signal));
+		changes.follow(ORDERS);
+		const state = { last_build: { observed_at: '2026-01-02T00:00:00Z', run_id: 'r2', version_hash: 'h2' }, last_outcome: { at: '2026-01-02T00:00:00Z', status: 'failed' }, definition_changed: false, checks: { total: 1, passing: 0, warning: 0, failing: 1 } };
+		const send = (notice: unknown) => latest().listeners.get('changed')!(new MessageEvent('changed', { data: JSON.stringify(notice) }));
+		send({ topic: 'node_status:development', version: 8, previous_version: 7, states: { 'model:orders': state } });
+		send({ topic: 'node_status:development', version: 9, previous_version: 8, full: true });
+		send({ topic: 'node_status:development' });
+		expect(signals.map((s) => s.nodeStatus)).toEqual([
+			{
+				version: 8,
+				previousVersion: 7,
+				states: {
+					'model:orders': {
+						lastBuild: { fingerprintRunId: 'r2', runId: null, jobKey: null, builtAt: '2026-01-02T00:00:00Z', fingerprint: 'h2' },
+						lastOutcome: 'failed',
+						definitionChanged: false,
+						checks: { total: 1, passing: 0, warning: 0, failing: 1 }
+					}
+				}
+			},
+			{ version: 9, previousVersion: 8, full: true },
+			undefined
+		]);
+	});
+});
+
+describe('node listing and states', () => {
+	const record = { node_key: 'model:orders', name: 'orders', kind: 'model', materialization: 'table', snapshot_id: '0191f0cc-0000-0000-0000-000000000001', tags: [], dependencies: [], definition_changed: false, checks: { total: 0, passing: 0, warning: 0, failing: 0 } };
+
+	function server() {
+		const asked: (string | null)[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (path.endsWith('/node-states')) {
+					return Response.json({ snapshot_id: record.snapshot_id, version: 3, states: { 'model:orders': { ...record, definition_changed: false, last_outcome: { at: '2026-01-02T00:00:00Z', status: 'success' } } } });
+				}
+				const etag = request.headers.get('if-none-match');
+				asked.push(etag);
+				if (etag === '"s1:3"') return new Response(null, { status: 304, headers: { etag: '"s1:3"' } });
+				return Response.json([record], { headers: { etag: '"s1:3"' } });
+			})
+		);
+		return { asked, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('sends the held ETag and keeps the held listing on a 304', async () => {
+		const { asked, client } = server();
+		const first = await client.listCatalogNodes(ORDERS);
+		const again = await client.listCatalogNodes(ORDERS);
+		expect(asked).toEqual([null, '"s1:3"']);
+		expect(again).toBe(first);
+	});
+
+	it('shares one listing read between callers asking at once', async () => {
+		const { asked, client } = server();
+		const [a, b] = await Promise.all([client.listCatalogNodes(ORDERS), client.listCatalogNodes(ORDERS)]);
+		expect(asked).toEqual([null]);
+		expect(a).toBe(b);
+	});
+
+	it('reads every node state with its version', async () => {
+		const { client } = server();
+		const states = await client.listNodeStates(ORDERS);
+		expect(states.version).toBe(3);
+		expect(states.states['model:orders'].lastOutcome).toBe('success');
+	});
 });
 
 describe('feedAllowed', () => {

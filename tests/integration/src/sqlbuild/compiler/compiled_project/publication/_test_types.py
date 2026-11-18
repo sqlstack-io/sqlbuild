@@ -132,7 +132,7 @@ class WorkerExecutionTestCase:
     files_after_publication: dict[str, str] = field(default_factory=dict)
     store_setup: str = ""
     store_edit: Callable[[sqlite3.Connection], None] = lambda _: None
-    concurrency_limits: dict[str, int] = field(default_factory=dict)
+    pools: dict[str, int] = field(default_factory=dict)
     launcher: Literal["native", "uncooperative", "docker"] = "native"
     # A Docker launcher's [launchers.docker.run] settings and the worker HostConfig they produce.
     launcher_settings: dict[str, Any] = field(default_factory=dict)
@@ -217,6 +217,25 @@ class WarehouseHistoryTestCase:
     connection_key: str
     journal_modes: tuple[str, ...]
     append_fingerprints: Callable[..., None]
+
+
+@dataclass(frozen=True)
+class NewestVersionsTestCase:
+    description: str
+    adapter_name: str
+    connection_key: str
+    newest_versions: int | None
+    expected_runs: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class PageBytesTestCase:
+    description: str
+    adapter_name: str
+    connection_key: str
+    wide_rows: int
+    definition_bytes: int
+    expected_min_pages: int
 
 
 @dataclass(frozen=True)
@@ -505,3 +524,63 @@ class PlanPreviewTestCase:
     expected_window_models: tuple[str, ...]
     expected_unplanned_cursor_models: tuple[str, ...]
     expected_added_unknowns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class HeldPlanTestCase:
+    description: str
+    settings: tuple[dict[str, object], ...]
+    expected_runs: tuple[tuple[str, ...], ...]
+    expected_compiles: int
+    expected_held_plans: int
+
+
+@dataclass(frozen=True)
+class RulesAtLoadTestCase:
+    description: str
+    model_sql: str
+    expected_health: dict[str, Any] = field(default_factory=dict)
+    expected_terminal: str = ""
+    expected_rule_evaluations: int = 0
+
+
+@dataclass(frozen=True)
+class UnknownSourceAccessTestCase:
+    description: str
+    added_files: dict[str, str]
+    selection: list[str]
+    expected_unknown: str
+
+
+@dataclass(frozen=True)
+class SyncedFreshnessTestCase:
+    description: str
+    files: dict[str, str]
+    expected_absent: str
+    expected_line: str
+
+
+@dataclass(frozen=True)
+class FailedPlanTestCase:
+    description: str
+    files: dict[str, str]
+    edited_file: str
+    edit: tuple[str, str]
+    selection: list[str]
+    expected_code: str
+    expected_reason: str
+
+
+@dataclass(frozen=True)
+class ChangedBuildPublicationTestCase:
+    description: str
+    edit: tuple[str, str]
+    expected_published: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class ChangedBuildReplanTestCase:
+    description: str
+    edit: tuple[str, str]
+    expected_published: dict[str, list[str]]
+    expected_rebuilt: dict[str, list[str]]

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
 	import { compileRefs, highlightLines } from '$lib/sql/outline';
 
@@ -33,14 +35,12 @@
 	<div class="head">
 		<span class="file">{file}</span>
 		{#if language === 'sql'}
-			<div class="seg-group">
-				{#each [['raw', 'Raw'], ['compiled', 'Compiled']] as [m, label] (m)}
-					<button class:on={mode === m} onclick={() => (mode = m as 'raw' | 'compiled')}>{label}</button>
-				{/each}
+			<div class="ml-auto">
+				<SegmentedFilter label="SQL" bind:value={mode} options={[{ value: 'raw', label: 'Raw' }, { value: 'compiled', label: 'Compiled' }]} />
 			</div>
 		{/if}
 		{#if onOpen}
-			<button class="icon" class:ml-auto={language !== 'sql'} onclick={onOpen} title="Open full view" aria-label="Open full view"><Maximize2Icon size={13} /></button>
+			<Button variant="ghost" size="icon-sm" class={language !== 'sql' ? 'ml-auto' : ''} onclick={onOpen} title="Open full view" aria-label="Open full view"><Maximize2Icon /></Button>
 		{/if}
 	</div>
 	<div class="body">
@@ -49,7 +49,7 @@
 		{/each}
 	</div>
 	{#if lines.length > maxLines && onOpen}
-		<button class="more" onclick={onOpen}>Show all {lines.length} lines</button>
+		<div class="more"><Button variant="link" size="inline" class="text-[12px]" onclick={onOpen}>Show all {lines.length} lines</Button></div>
 	{/if}
 </div>
 
@@ -76,44 +76,6 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.seg-group {
-		display: flex;
-		gap: 2px;
-		margin-left: auto;
-		padding: 2px;
-		border-radius: 2px;
-		background: var(--sb-hover);
-	}
-	.seg-group button {
-		padding: 2px 8px;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.seg-group button.on {
-		background: var(--card);
-		color: var(--foreground);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-	}
-	.icon {
-		display: grid;
-		width: 26px;
-		height: 26px;
-		place-items: center;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-	}
-	.icon:hover {
-		background: var(--sb-hover);
-		color: var(--foreground);
-	}
-	.ml-auto {
-		margin-left: auto;
-	}
 	/* A preview is read at a glance, so long lines wrap; the full viewer scrolls. */
 	.body {
 		padding: 8px 0;
@@ -139,16 +101,11 @@
 		overflow-wrap: anywhere;
 	}
 	.more {
-		display: block;
-		width: 100%;
+		display: flex;
 		height: 32px;
-		border: 0;
+		align-items: center;
+		justify-content: center;
 		border-top: 1px solid var(--border);
 		background: var(--card);
-		color: var(--primary);
-		font-size: 12px;
-	}
-	.more:hover {
-		background: var(--sb-hover);
 	}
 </style>

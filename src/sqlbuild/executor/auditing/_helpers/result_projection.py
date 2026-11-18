@@ -23,7 +23,10 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.compiler.auditing.types import AuditEvaluationMode, ThresholdOperator
-from sqlbuild.executor.audit_results.constants import AUDIT_RESULT_SCHEMA_VERSION
+from sqlbuild.executor.audit_results.constants import (
+    AUDIT_RESULT_SCHEMA_VERSION,
+    IGNORED_FAILURE_METADATA_JSON,
+)
 from sqlbuild.executor.audit_results.exceptions import AuditResultStorageError
 from sqlbuild.executor.audit_results.main._write import write_audit_result_records
 from sqlbuild.executor.audit_results.models import (
@@ -363,7 +366,7 @@ def _build_record(  # noqa: PLR0913
         evidence_sql=result.evidence_sql,
         executed_sql=result.executed_sql,
         sql_digest=hashlib.sha256(result.executed_sql.encode("utf-8")).hexdigest(),
-        metadata_json=None,
+        metadata_json=IGNORED_FAILURE_METADATA_JSON if result.ignored else None,
         reused=False,
     )
 
@@ -398,6 +401,8 @@ def _publish_audit_completed(record: AuditResultRecord) -> None:
         "reused": False,
         "result_id": record.result_id,
     }
+    if record.metadata_json == IGNORED_FAILURE_METADATA_JSON:
+        payload["ignored"] = True
     optional: dict[str, JSONValue | None] = {
         "attached_target_kind": record.attached_target_kind,
         "attached_target_name": record.attached_target_name,

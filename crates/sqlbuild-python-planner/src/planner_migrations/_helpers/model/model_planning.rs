@@ -1,15 +1,18 @@
 //! Model migration orchestration over Python-owned live inspection.
 
 use crate::planner_changes::main::plan_reference_renames::plan_reference_renames;
-use crate::planner_migrations::_helpers::column::column_objects::{config, replace};
+use crate::planner_migrations::_helpers::column::column_objects::config;
+use crate::planner_migrations::_helpers::column::column_objects::replace;
 use crate::planner_migrations::_helpers::discovery::model_discovery::discover_model_migrations;
-use crate::planner_migrations::_helpers::planning::planning_origin::{
-    require_same_database, resolve_origin,
-};
-use crate::planner_migrations::models::{
-    DiscoveryRequest, MigrationDecisionRequest, MigrationPhase, ModelMigrationDeclaration,
-    ModelMigrationDiscovery, ModelMigrationPlanning, ModelMigrationRequest,
-};
+use crate::planner_migrations::_helpers::planning::planning_origin::require_same_database;
+use crate::planner_migrations::_helpers::planning::planning_origin::resolve_origin;
+use crate::planner_migrations::models::DiscoveryRequest;
+use crate::planner_migrations::models::MigrationDecisionRequest;
+use crate::planner_migrations::models::MigrationPhase;
+use crate::planner_migrations::models::ModelMigrationDeclaration;
+use crate::planner_migrations::models::ModelMigrationDiscovery;
+use crate::planner_migrations::models::ModelMigrationPlanning;
+use crate::planner_migrations::models::ModelMigrationRequest;
 use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyString, PyTuple};

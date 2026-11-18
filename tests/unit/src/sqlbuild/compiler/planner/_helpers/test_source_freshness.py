@@ -6,6 +6,7 @@ import pytest
 
 from sqlbuild._native import (
     CompiledProject,
+    Dialect,
     DirectSourceFreshnessPlanningResult,
     PlannerRelationsContext,
     PlannerScope,
@@ -14,6 +15,7 @@ from sqlbuild._native import (
     SourceFreshnessStrategy,
     SourceFreshnessValueKind,
     build_planner_source_freshness_result,
+    live_reads,
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from tests.unit.src.sqlbuild.compiler.planner._helpers._test_types import (
@@ -44,8 +46,8 @@ def test_given_source_deferral_context_when_building_source_freshness_then_uses_
                 effective_connection={},
                 effective_vars={},
             ),
-            adapter=adapter,
-            connection=connection,
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=connection),
             scope=PlannerScope(
                 upstream_deps={},
                 downstream_deps={},

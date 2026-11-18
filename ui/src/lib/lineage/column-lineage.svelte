@@ -1,13 +1,18 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
+	import SearchIcon from '@lucide/svelte/icons/search';
+	import XIcon from '@lucide/svelte/icons/x';
 	// Column-level lineage, dbt-style and scalable: a searchable list of the focal
 	// model's columns on the left; pick one and the graph on the right shows just
 	// THAT column's lineage chain (one small COL node per model it flows through,
 	// transform-lens tags on each hop). Bounded by a column's depth, not by the
 	// model's column count — so it scales to 100+ columns.
-	import '@xyflow/svelte/dist/style.css';
-	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
+	import type { Node, Edge } from '@xyflow/svelte';
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import { LABEL_MIN_ZOOM } from '$lib/lineage/fit';
 	import ColCellNode from '$lib/components/lineage/col-cell-node.svelte';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { layoutGraph } from '$lib/lineage/layout';
 	import { highlightSqlbuild } from '$lib/sql/highlight';
 	import { tick } from 'svelte';
@@ -268,10 +273,10 @@
 	<!-- left: searchable column list (resizable width) -->
 	<div class="relative flex shrink-0 flex-col border-r border-border" style:width="{listW}px">
 		<div class="border-b border-border p-3">
-			<div class="bg-secondary flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5">
-				<span class="text-[var(--sb-text-faint)] text-[11px]">⌕</span>
+			<div class="flex h-[30px] items-center gap-2 rounded-(--radius) border border-border bg-background pr-1 pl-2.5">
+				<SearchIcon size={13} class="shrink-0 text-[var(--sb-text-faint)]" />
 				<input bind:value={colQuery} placeholder="Search columns…" class="text-foreground placeholder:text-[var(--sb-text-faint)] w-full bg-transparent text-[12px] outline-none" />
-				{#if colQuery}<button class="text-[var(--sb-text-faint)] hover:text-foreground text-[11px]" onclick={() => (colQuery = '')}>✕</button>{/if}
+				{#if colQuery}<Button variant="ghost" size="icon-sm" class="size-6" onclick={() => (colQuery = '')} aria-label="Clear search"><XIcon /></Button>{/if}
 			</div>
 			<div class="text-[var(--sb-text-faint)] mt-2 px-0.5 text-[11.5px] font-medium">
 				{#if colQuery}{matchedColumns.length} of {totalColumns} columns{:else}{totalColumns} columns{/if}
@@ -281,6 +286,7 @@
 			{#each focalColumns as c (c.name)}
 				{@const cid = `${focal}.${c.name}`}
 				{@const lens = incomingLens.get(cid)}
+				<!-- raw-button: a row of the column list; it selects that column -->
 				<button
 					class="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px]"
 					style:background={selectedCol === cid ? 'color-mix(in srgb, var(--primary) 14%, transparent)' : 'transparent'}
@@ -322,7 +328,7 @@
 				{#each lenses as l (l)}
 					<span class="flex items-center gap-1.5 text-[12px]"><svg width="18" height="6" aria-hidden="true"><line x1="0" y1="3" x2="18" y2="3" style={lensStroke[l]} /></svg><span class="text-muted-foreground">{lensLabel[l]}</span></span>
 				{/each}
-				<button class="text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2 py-1 text-[11px]" onclick={resetLayout} title="Reset layout">⤢ Reset</button>
+				<Button size="sm" onclick={resetLayout} title="Reset layout"><RotateCcwIcon />Reset</Button>
 			</div>
 		</div>
 		<div class="flex min-h-0 flex-1">
@@ -350,11 +356,7 @@
 			}}
 		>
 			{#if selectedCol}
-				<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView fitViewOptions={{ padding: 0.12, maxZoom: 1, minZoom: 0.3 }} minZoom={0.1} nodesDraggable proOptions={{ hideAttribution: true }}>
-					<FlowController bind:fitView={fitFn} fitFloor={0.3} />
-					<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-					<Controls />
-				</SvelteFlow>
+				<GraphCanvas bind:nodes bind:edges bind:fit={fitFn} readable={false} fitOnInit {nodeTypes} fitViewOptions={{ padding: 0.12, maxZoom: 1, minZoom: LABEL_MIN_ZOOM }} nodesDraggable />
 
 			{:else}
 				<div class="text-[var(--sb-text-faint)] grid h-full place-items-center text-[12px]">Select a column to trace its lineage.</div>
@@ -365,11 +367,12 @@
 			<aside class="derivation sb-scroll">
 				<div class="dv-head">
 					<strong>How it's derived</strong>
-					<span>{hops.length - 1} {hops.length - 1 === 1 ? 'step' : 'steps'} from source</span>
+					<span>{plural(hops.length - 1, 'step')} from source</span>
 				</div>
 				<ol class="dv-steps">
 					{#each hops as st (st.cid)}
 						<li class:focal={st.depth === 0} class:active={activeStep === st.cid}>
+							<!-- raw-button: a step in the column's chain, clickable as a whole to pin it on the graph -->
 							<button onmouseenter={() => (hoverNode = st.cid)} onmouseleave={() => (hoverNode = null)} onclick={() => (pinnedNode = pinnedNode === st.cid ? null : st.cid)}>
 								<i></i>
 								<span class="dv-name" title="{st.model}.{st.col}"><span class="m">{st.model}.</span>{st.col}</span>
@@ -384,6 +387,7 @@
 					<ol class="dv-steps">
 						{#each uses as st (st.cid)}
 							<li class:active={activeStep === st.cid}>
+								<!-- raw-button: a step in the column's chain, clickable as a whole to pin it on the graph -->
 								<button onmouseenter={() => (hoverNode = st.cid)} onmouseleave={() => (hoverNode = null)} onclick={() => (pinnedNode = pinnedNode === st.cid ? null : st.cid)}>
 									<i></i>
 									<span class="dv-name" title="{st.model}.{st.col}"><span class="m">{st.model}.</span>{st.col}</span>

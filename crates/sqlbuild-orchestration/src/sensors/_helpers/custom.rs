@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use chrono::TimeDelta;
 use serde_json::json;
 
-use crate::platform::main::read_location_work::read_location_work;
+use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkRequest};
 use crate::sensors::_helpers::requests::queue_sensor_run;
 use crate::sensors::models::SensorRequests;

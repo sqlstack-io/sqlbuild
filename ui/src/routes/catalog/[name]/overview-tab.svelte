@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
 	import type { CatalogNodeDetail } from '$lib/api';
@@ -9,7 +11,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseLabel, shortName } from '$lib/build-area/labels';
+	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName } from '$lib/build-area/labels';
 	import { driftLabel, driftOf, type Tab } from './utils';
 
 	let { node, onTab, onSql }: { node: CatalogNodeDetail; onTab: (tab: Tab) => void; onSql: (mode: 'raw' | 'compiled' | 'drift') => void } = $props();
@@ -30,7 +32,7 @@
 			<section class="panel">
 				<div class="status-top">
 					<StatusLabel tone={freshnessTone} label={node.sourceFreshness ? `Freshness ${node.sourceFreshness.status}` : 'No freshness check'} />
-					{#if node.sourceFreshness}<span class="muted" title={formatStamp(node.sourceFreshness.loadedAt)}>newest data loaded {formatAgo(node.sourceFreshness.loadedAt, app.now)}</span>{/if}
+					{#if node.sourceFreshness}<span class="muted" title={formatStamp(node.sourceFreshness.loadedAt)}>Loaded {formatAgo(node.sourceFreshness.loadedAt, app.now)}</span>{/if}
 				</div>
 				{#if node.sourceFreshness}
 					<div class="stat-grid">
@@ -58,9 +60,10 @@
 					<div class="strip"><OutcomeStrip outcomes={node.recentOutcomes} tones={nodeOutcomeTone} caption="Last {node.recentOutcomes.length} builds" /></div>
 				{/if}
 				{#each node.stale as r, i (i)}
+					<!-- raw-button: a stale notice that is clickable as a whole, opening its lineage or drift -->
 					<button class="drift-hint {r.reason}" onclick={() => (r.reason === 'behind' ? onTab('lineage') : onSql('drift'))} disabled={r.reason !== 'behind' && !hasDrift}>
 						<GitCompareIcon size={14} />
-						<span><b>Stale · {staleReasonLabel(r)}</b> · {staleReasonDetail(r)}</span>
+						<span title={staleReasonDetail(r)}><b>Stale · {staleReasonLabel(r)}</b> · {r.reason === 'changed' ? r.detail : r.upstream.map(shortName).join(', ')}</span>
 						{#if r.reason === 'behind' || hasDrift}<em>{r.reason === 'behind' ? 'View lineage →' : 'View drift →'}</em>{/if}
 					</button>
 				{/each}
@@ -86,11 +89,11 @@
 
 		{#if node.checkResults.length}
 			<section class="section">
-				<div class="section-head"><h3>Checks</h3><button class="link" onclick={() => onTab('checks')}>{node.checks.passing} of {node.checks.total} passing →</button></div>
+				<div class="section-head"><h3>Checks</h3><Button variant="link" size="inline" class="ml-auto text-[12.5px]" onclick={() => onTab('checks')}>{node.checks.passing} of {node.checks.total} passing →</Button></div>
 				<div class="rows">
 					{#each node.checkResults as c (c.id)}
 						{@const o = c.latest?.outcome ?? 'skipped'}
-						<a class="row" href={to(`/checks/${c.id}`)}><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /><code>{c.name}</code><span class="muted ml-auto">{runScopePhaseLabel[c.runScopePhase]} · {c.severity}</span></a>
+						<a class="row" href={to(`/checks/${c.id}`)}><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /><code>{c.name}</code><span class="muted ml-auto" title={runScopePhaseHelp[c.runScopePhase]}>{runScopePhaseLabel[c.runScopePhase]} · {c.severity}</span></a>
 					{/each}
 				</div>
 			</section>
@@ -98,7 +101,7 @@
 
 		{#if node.columns.length}
 			<section class="section">
-				<div class="section-head"><h3>Columns</h3><button class="link" onclick={() => onTab('columns')}>All {node.columns.length} →</button></div>
+				<div class="section-head"><h3>Columns</h3><Button variant="link" size="inline" class="ml-auto text-[12.5px]" onclick={() => onTab('columns')}>All {node.columns.length} →</Button></div>
 				<div class="rows">
 					{#each node.columns.slice(0, 5) as c (c.name)}
 						<div class="row"><code>{c.name}</code><span class="muted">{c.description}</span><code class="muted ml-auto">{c.type}</code></div>
@@ -142,9 +145,9 @@
 			<section>
 				<h3>Jobs</h3>
 				{#each node.jobs as j (j.key)}
-					<a class="job-row" href={to(`/jobs/${j.key}`)}><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${j.triggerIds.length} ${j.triggerIds.length === 1 ? 'trigger' : 'triggers'}` : ' · manual'}</small></a>
+					<a class="job-row" href={to(`/jobs/${j.key}`)}><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${plural(j.triggerIds.length, 'trigger')}` : ' · manual'}</small></a>
 				{:else}
-					<p class="muted">No job selects this node.</p>
+					<p class="muted">No jobs.</p>
 				{/each}
 			</section>
 		{/if}
@@ -168,8 +171,6 @@
 	.section h3 span { color: var(--muted-foreground); font-weight: 400; }
 	.section-head { display: flex; align-items: baseline; margin-bottom: 8px; }
 	.section-head h3 { margin: 0; }
-	.section-head .link { margin-left: auto; font-size: 12.5px; }
-	.link { border: 0; background: transparent; color: var(--primary); }
 	.description { max-width: 88ch; margin: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
 	.rows { border: 1px solid var(--border); border-radius: 2px; }
 	.row { display: flex; align-items: center; gap: 14px; padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
@@ -195,7 +196,7 @@
 	.drift-hint:not(:disabled):hover { background: var(--sb-hover); }
 	.drift-hint :global(svg) { flex: 0 0 auto; color: var(--sb-stale); }
 	.drift-hint.changed_upstream { border-style: dashed; }
-	.drift-hint.behind { border-color: color-mix(in srgb, var(--sb-warning) 35%, var(--border)); }
-	.drift-hint.behind :global(svg) { color: var(--sb-warning); }
+	.drift-hint.behind { border-color: color-mix(in srgb, var(--sb-behind) 35%, var(--border)); }
+	.drift-hint.behind :global(svg) { color: var(--sb-behind); }
 	.drift-hint em { margin-left: auto; color: var(--primary); font-style: normal; white-space: nowrap; }
 </style>

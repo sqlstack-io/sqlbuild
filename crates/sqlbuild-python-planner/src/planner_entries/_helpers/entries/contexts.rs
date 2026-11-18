@@ -5,9 +5,9 @@ use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::pymethods;
 use pyo3::types::{PyDict, PyFrozenSet};
 
-use crate::planner_entries::models::{
-    ModelPlanContext, PlanEntryBuildInputs, PlannerRelationsContext,
-};
+use crate::planner_entries::models::ModelPlanContext;
+use crate::planner_entries::models::PlanEntryBuildInputs;
+use crate::planner_entries::models::PlannerRelationsContext;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 
 /// The argument `name`, or `default()` when it was not passed.

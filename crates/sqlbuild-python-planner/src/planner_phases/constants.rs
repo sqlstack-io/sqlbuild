@@ -62,3 +62,43 @@ pub const GETTERS: &[GetterEntry] = &[
         read: read_planner_warehouse_state,
     },
 ];
+/// A step's share of the plan's total time is shown as a percentage.
+pub const PERCENT: f64 = 100.0;
+/// Plan document timings are rounded to the millisecond.
+pub const MILLISECONDS: f64 = 1000.0;
+/// The planner policy, and the plan field, saying audit failures hold nothing back.
+pub const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
+/// The plan field holding the planned audits.
+pub const AUDIT_ENTRIES: &str = "audit_entries";
+/// An audit plan entry's field saying its failure holds nothing back.
+pub const IGNORE_FAILURE: &str = "ignore_failure";
+
+/// Compiling the project before planning; a location planning its published project skips it.
+pub const COMPILING: &str = "Compiling the project";
+
+/// The warehouse snapshot, model migrations and source relations, live or from a synced state.
+pub const READING_WAREHOUSE: &str = "Reading warehouse state";
+
+/// Model identities, buildability and the changes each selected node has.
+pub const DETECTING_CHANGES: &str = "Detecting changes";
+
+/// Observing selected sources' freshness and comparing it to recorded state.
+pub const SOURCE_FRESHNESS: &str = "Checking source freshness";
+
+/// Reconciling changes into actions and building each node's plan entry.
+pub const BUILDING_ENTRIES: &str = "Building plan entries";
+
+/// Waiting for SQL test planning, which runs alongside the other steps.
+pub const TEST_FIXTURES: &str = "Preparing test fixtures";
+
+/// Storage policies, warnings and metadata around the plan entries.
+pub const ASSEMBLING: &str = "Assembling the plan";
+
+/// `--changed`: reading recorded consumption to decide what runs.
+pub const BUILD_HISTORY: &str = "Reading build history";
+
+/// Rendering the plan as text or JSON.
+pub const WRITING: &str = "Writing the plan";
+
+/// Time inside the plan that no step covers.
+pub const OTHER: &str = "Other";

@@ -1,5 +1,10 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { goto } from '$app/navigation';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import type { CheckEvidence, CheckSql } from '$lib/api';
@@ -15,7 +20,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel, shortRunId, thresholdLabel } from '$lib/build-area/labels';
+	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel, shortRunId, thresholdLabel } from '$lib/build-area/labels';
 	import { errorMessage } from '$lib/platform/labels';
 	import { cellText, checkValue, kindLabel, outcomeOf } from '../utils';
 
@@ -63,11 +68,18 @@
 		}
 	}
 
+	const historyColumns = $derived<TableColumn[]>([
+		{ id: 'checked', label: 'Checked', width: '120px' },
+		{ id: 'outcome', label: 'Outcome', width: '130px' },
+		{ id: 'value', label: c?.evaluationMode === 'measurement' ? 'Measured' : 'Violations', width: '110px', align: 'right' },
+		{ id: 'run', label: 'Run', minWidth: 160 },
+		{ id: 'evidence', label: 'Evidence', width: '120px', truncate: false }
+	]);
 </script>
 
 <AppTopbar title="Checks">
 	{#if c && app.client.supports('launchAdhocRun')}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(c?.node ? [c.node] : [], 'audit')))}>▷ Run check</GatedButton>
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(c?.node ? [c.node] : [], 'audit')))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run check</GatedButton>
 	{/if}
 </AppTopbar>
 
@@ -78,26 +90,22 @@
 		<code class="title">{c?.name ?? id}</code>
 		{#if c}
 			<StatusLabel tone={checkOutcomeTone[outcome]} label={checkOutcomeLabel[outcome]} />
-			<span class="faint">{c.severity} severity · {runScopePhaseLabel[c.runScopePhase].toLowerCase()} · {evaluationModeLabel[c.evaluationMode].toLowerCase()}</span>
+			<span class="faint" title="{c.severity} severity · {runScopePhaseHelp[c.runScopePhase]} · {evaluationModeHelp[c.evaluationMode]}">{c.severity} · {runScopePhaseLabel[c.runScopePhase].toLowerCase()} · {evaluationModeLabel[c.evaluationMode].toLowerCase()}</span>
 		{/if}
 	</div>
 	{#if res.error}<div class="msg err">Couldn't load this check: {res.error}</div>{:else if res.data === null}<div class="msg">There's no check <code>{id}</code> in the version deployed to {app.location?.name}.</div>{/if}
 
 	{#if c}
 		<div class="flex min-h-0 flex-1">
-			<div class="main sb-scroll">
+			<PageBody padding="18px 24px">
 				{#if c.description}<p class="description">{c.description}</p>{/if}
-				<Panel title="Recent results" note="Last {c.history.length} times it ran">
+				<Panel title="Recent results" note="Last {c.history.length}">
 					<OutcomeStrip outcomes={[...c.history].reverse().map((e) => e.outcome)} tones={checkOutcomeTone} caption="Last {c.history.length} results" />
 				</Panel>
 
-				<Panel title="History" note="Read back from the warehouse, so results of builds from the command line show too">
-					<table class="sb-list">
-						<thead>
-							<tr><th>Checked</th><th>Outcome</th><th class="num">{c.evaluationMode === 'measurement' ? 'Measured' : 'Violations'}</th><th>Run</th><th>Evidence</th></tr>
-						</thead>
-						<tbody>
-							{#each c.history as e (e.id)}
+				<Panel title="History" help="Read back from the warehouse, so results of builds from the command line show too.">
+					<DataTable class="static" embedded columns={historyColumns} rows={c.history} key={(e) => e.id} empty="No results recorded yet.">
+						{#snippet row(e)}
 								<tr class:selected={evidenceFor === e.id}>
 									<td><span title={formatStamp(e.evaluatedAt)}>{formatAgo(e.evaluatedAt, app.now)}</span></td>
 									<td>
@@ -110,34 +118,28 @@
 									</td>
 									<td>
 										{#if e.evidenceCount}
-											<GatedButton requires="view.evidence" size="xs" busy={evidenceBusy === e.id} onclick={() => showEvidence(e.id)}>{e.evidenceCount}{e.evidenceTruncated ? '+' : ''} rows</GatedButton>
+											<GatedButton requires="view.evidence" size="sm" busy={evidenceBusy === e.id} onclick={() => showEvidence(e.id)}>{e.evidenceCount}{e.evidenceTruncated ? '+' : ''} rows</GatedButton>
 										{:else}<span class="faint">—</span>{/if}
 									</td>
 								</tr>
-							{/each}
-						</tbody>
-					</table>
+						{/snippet}
+					</DataTable>
 				</Panel>
 
 				{#if evidenceError}<div class="msg err">{evidenceError}</div>{/if}
 				{#if evidence}
-					<Panel title="Evidence" note="Sample rows stored with the result · this read is recorded in the audit log">
-						{#snippet actions()}<button class="link" onclick={() => { evidence = null; evidenceFor = null; }}>Close</button>{/snippet}
-						<table class="sb-list evidence">
-							<thead><tr>{#each evidence.columns as col (col)}<th>{col}</th>{/each}</tr></thead>
-							<tbody>
-								{#each evidence.rows as row, i (i)}
-									<tr>{#each row as v, j (j)}<td class="mono">{cellText(v)}</td>{/each}</tr>
-								{:else}
-									<tr><td colspan={evidence.columns.length || 1} class="faint">No rows were stored.</td></tr>
-								{/each}
-							</tbody>
-						</table>
-						{#if evidence.truncated}<p class="faint note">More rows matched than were stored.</p>{/if}
+					<Panel title="Evidence" note="Sample rows" audited>
+						{#snippet actions()}<Button variant="link" size="inline" onclick={() => { evidence = null; evidenceFor = null; }}>Close</Button>{/snippet}
+						<DataTable class="static evidence" embedded columns={evidence.columns.map((col, i) => ({ id: `${i}`, label: col, minWidth: 100 }))} rows={evidence.rows.map((cells, i) => ({ cells, i }))} key={(r) => r.i} empty="No rows were stored.">
+							{#snippet row(r)}
+								<tr>{#each r.cells as v, j (j)}<td class="mono">{cellText(v)}</td>{/each}</tr>
+							{/snippet}
+						</DataTable>
+						{#if evidence.truncated}<p class="faint note" title="More rows matched than were stored">Truncated</p>{/if}
 					</Panel>
 				{/if}
 
-				<Panel title="SQL that ran" note="The latest time · reading it is recorded in the audit log">
+				<Panel title="SQL that ran" note="Last run" audited>
 					{#if sql}
 						{#if sql.executionError}<div class="msg err">{sql.executionError}</div>{/if}
 						{#if sql.evidenceError}<div class="msg err">Evidence couldn't be collected: {sql.evidenceError}</div>{/if}
@@ -147,13 +149,13 @@
 							<p class="faint">No SQL was stored with the latest result.</p>
 						{/each}
 					{:else if !app.can('view.sql')}
-						<p class="faint locked"><LockIcon size={13} /> You don't have permission to see SQL (view.sql)</p>
+						<p class="faint locked"><LockIcon size={13} /> No access (view.sql)</p>
 					{:else}
-						<GatedButton requires="view.sql" size="xs" busy={sqlBusy} onclick={showSql}>Show SQL and errors</GatedButton>
+						<GatedButton requires="view.sql" size="sm" busy={sqlBusy} onclick={showSql} hint="Includes execution errors · viewing is audited">Show SQL</GatedButton>
 						{#if sqlError}<div class="msg err">{sqlError}</div>{/if}
 					{/if}
 				</Panel>
-			</div>
+			</PageBody>
 			<aside class="rail sb-scroll">
 				<h3>Definition</h3>
 				<KeyValues
@@ -162,8 +164,8 @@
 						{ label: 'Attached to', value: c.node ? `${c.node}${c.column ? `.${c.column}` : ''}` : attachmentLabel[c.attachment], mono: !!c.node },
 						{ label: 'Target type', value: attachmentLabel[c.attachment] },
 						{ label: 'Severity', value: c.severity },
-						{ label: 'Checks', value: runScopePhaseLabel[c.runScopePhase], title: c.runScopePhase },
-						{ label: 'Result type', value: evaluationModeLabel[c.evaluationMode], title: c.evaluationMode },
+						{ label: 'Scope', value: runScopePhaseLabel[c.runScopePhase], title: c.runScopePhase, help: runScopePhaseHelp[c.runScopePhase] },
+						{ label: 'Result type', value: evaluationModeLabel[c.evaluationMode], title: c.evaluationMode, help: evaluationModeHelp[c.evaluationMode] },
 						{ label: 'Thresholds', value: c.thresholds.length ? c.thresholds.map(thresholdLabel).join(' · ') : '—' }
 					]}
 				/>
@@ -214,12 +216,6 @@
 	.err {
 		color: var(--sb-error);
 	}
-	.main {
-		min-width: 0;
-		flex: 1;
-		overflow: auto;
-		padding: 18px 24px;
-	}
 	.description {
 		margin: 0 0 18px;
 		color: var(--muted-foreground);
@@ -248,10 +244,7 @@
 		font-size: 11.5px;
 	}
 	.link {
-		border: 0;
-		background: transparent;
 		color: var(--primary);
-		font-size: 12.5px;
 	}
 	tr.selected td {
 		background: var(--sb-hover);
@@ -266,7 +259,7 @@
 		margin-top: 8px;
 		font-size: 12px;
 	}
-	.evidence td {
+	:global(.evidence) td {
 		font-size: 12px;
 	}
 </style>

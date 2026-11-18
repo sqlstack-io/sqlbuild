@@ -8,7 +8,8 @@ use crate::bindings::_helpers::dbt_interop::execution::render_dbt_execution_summ
 use crate::bindings::_helpers::dbt_interop::pipeline_prologue::progress;
 use crate::bindings::_helpers::dbt_interop::plan::render_dbt_interop_plan;
 use crate::bindings::_helpers::dbt_interop::plan_output::build_sqlbuild_plan_output;
-use crate::bindings::_helpers::dbt_interop::plan_output::{connection_config, connection_hooks};
+use crate::bindings::_helpers::dbt_interop::plan_output::connection_config;
+use crate::bindings::_helpers::dbt_interop::plan_output::connection_hooks;
 use crate::bindings::_helpers::dbt_interop::runtime_execution::execute_dbt_commands;
 use crate::bindings::_helpers::dbt_interop::sqlbuild_work::execute_dbt_sqlbuild_work;
 use sqlbuild_python_base::boundary::main::keywords::keywords;

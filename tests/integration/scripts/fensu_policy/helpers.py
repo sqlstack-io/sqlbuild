@@ -28,8 +28,7 @@ def write_observation_project(
     )
     (crate / "src/lib.rs").write_text("mod observations;\nmod planner;\n")
     (crate / "src/observations/mod.rs").write_text(
-        "pub fn table() -> &'static str { OBSERVATIONS_TABLE_NAME }\n"
-        "pub struct SyncedCopyAdapter;\n"
+        "pub fn table() -> &'static str { OBSERVATIONS_TABLE_NAME }\npub struct SyncedReads;\n"
     )
     (crate / "src/planner.rs").write_text(planner)
     entries: str = ", ".join(f'"{path}=Writes observations."' for path in allowed)
@@ -38,6 +37,39 @@ def write_observation_project(
         'rule_modules = ["scripts.fensu_policy.rules.observation_boundary"]\n'
         f'select = ["{rule}"]\n\n'
         f"[targets.rust.rule_options.{rule}]\nallowed_paths = [{entries}]\n"
+    )
+
+
+def write_planner_project(
+    *, root: Path, planner_paths: tuple[str, ...], files: dict[str, str]
+) -> None:
+    """A crate of the given Rust `files`, with XSB080 covering `planner_paths`."""
+
+    repository: Path = Path(__file__).resolve().parents[4]
+    shutil.copytree(
+        repository / "scripts/fensu_policy",
+        root / "scripts/fensu_policy",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    (root / "scripts/__init__.py").write_text("")
+    (root / "Cargo.toml").write_text(
+        '[workspace]\nmembers = ["crates/sqlbuild-python"]\nresolver = "2"\n'
+    )
+    crate: Path = root / "crates/sqlbuild-python"
+    (crate / "src").mkdir(parents=True)
+    (crate / "Cargo.toml").write_text(
+        '[package]\nname = "sqlbuild-python"\nversion = "0.1.0"\nedition = "2021"\n'
+    )
+    modules: str = "".join(f"mod {Path(name).stem};\n" for name in files)
+    (crate / "src/lib.rs").write_text(modules)
+    for name, source in files.items():
+        (crate / "src" / name).write_text(source)
+    entries: str = ", ".join(f'"{path}=Plans through WarehouseReads."' for path in planner_paths)
+    (root / "fensu.toml").write_text(
+        '[targets.rust]\nanalyzer = "rust"\nroots = ["crates"]\n'
+        'rule_modules = ["scripts.fensu_policy.rules.planner_reads"]\n'
+        'select = ["XSB080"]\n\n'
+        f"[targets.rust.rule_options.XSB080]\nplanner_paths = [{entries}]\n"
     )
 
 

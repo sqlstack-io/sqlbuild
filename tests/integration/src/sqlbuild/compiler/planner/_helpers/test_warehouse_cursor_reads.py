@@ -9,10 +9,12 @@ from sqlbuild._native import (
     CompiledObjectKey,
     CompiledResourceType,
     CursorSnapshotScope,
+    Dialect,
     ModelCursorSnapshot,
     PlannerInputError,
     WarehouseSnapshot,
     gather_warehouse_snapshot,
+    live_reads,
 )
 from sqlbuild.adapter.relations.main.open_inspection_catalog import open_inspection_catalog
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
@@ -192,9 +194,14 @@ def test_given_failing_eligible_max_read_when_reading_in_parallel_then_plan_fail
                     "cursor_start_max_ahead": "1d",
                 },
             ),
-            adapter=adapter,
-            connection=connection,
-            execute=TrackingCursorExecute(failing_eligible_relations=frozenset({"marts.daily_2"})),
+            dialect=Dialect(adapter),
+            reads=live_reads(
+                adapter=adapter,
+                connection=connection,
+                execute=TrackingCursorExecute(
+                    failing_eligible_relations=frozenset({"marts.daily_2"})
+                ),
+            ),
             cursor_scope=CursorSnapshotScope(
                 model_keys=keys,
                 runtime_producer_keys=keys,

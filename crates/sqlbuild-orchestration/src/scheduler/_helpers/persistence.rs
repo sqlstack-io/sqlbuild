@@ -1,9 +1,9 @@
 //! Deterministic tick insertion gates all run facts; retries cannot queue a second run.
 
-use crate::runs::main::queue_run::queue_run;
+use crate::runs::main::requests::queue_run::queue_run;
 use crate::runs::models::{RunCommand, RunKind, RunOrigin, RunRequest};
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickDecision, TickPlan};
-use crate::snapshots::main::job_write_set::job_write_set;
+use crate::snapshots::main::write_sets::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{Change, ControlTransaction, Parameter};
@@ -67,9 +67,10 @@ pub(crate) async fn persist_ticks(
                 },
                 settings: trigger.job_json.settings.clone(),
                 window: None,
-                concurrency_groups: trigger.job_json.concurrency_groups.clone(),
+                pools: trigger.job_json.pools.clone(),
                 narrowing: None,
                 retry: None,
+                member_attempt: None,
             };
             transaction = queue_run(transaction, &request).await?;
         }

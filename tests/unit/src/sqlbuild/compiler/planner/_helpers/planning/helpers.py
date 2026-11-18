@@ -11,6 +11,7 @@ from sqlbuild._native import (
     CompiledRelationLocation,
     CompiledResourceType,
     CompileModelConfig,
+    Dialect,
     LocalConfig,
     PlannerRelationsContext,
     PlannerRuntime,
@@ -23,6 +24,7 @@ from sqlbuild._native import (
     TargetConfig,
     TimeTravelRetentionSource,
     WarehouseSnapshot,
+    live_reads,
 )
 from sqlbuild.adapter.contract.classes.retention_adapter import RetentionAdapterMixin
 from sqlbuild.adapter.contract.models import RelationInfo
@@ -84,8 +86,8 @@ def build_retention_planner_inputs(
     return (
         PlannerRuntime(
             project=project,
-            adapter=adapter,
-            connection=object(),
+            dialect=Dialect(adapter),
+            reads=live_reads(adapter=adapter, connection=object()),
             project_config=ProjectConfig(
                 name="test",
                 adapter=str(adapter.adapter_name),

@@ -4,8 +4,8 @@ import type { RunRow } from '$lib/api';
 import { formatAgo, formatStamp } from '$lib/format/time';
 import { formatSeconds, outcomeCounts, waitTechnical, waitText } from '$lib/operate/labels';
 import type { StatusLine } from '../types';
+import { plural } from '$lib/format/plural';
 
-const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
 
 export function statusLine(row: RunRow, now: number): StatusLine {
 	const { run, progress } = row;
@@ -15,7 +15,7 @@ export function statusLine(row: RunRow, now: number): StatusLine {
 	}
 	switch (run.status) {
 		case 'queued':
-			if (!row.waits.length) return { text: 'Starting on the next scheduler pass', tone: 'muted' };
+			if (!row.waits.length) return { text: 'Next pass', tone: 'muted', title: 'Nothing blocks it; starts on the next scheduler pass' };
 			return {
 				text: waitText(row.waits[0]) + (row.waits.length > 1 ? ` (+${row.waits.length - 1} more)` : ''),
 				tone: 'muted',
@@ -44,11 +44,13 @@ export function statusLine(row: RunRow, now: number): StatusLine {
 			return { text: outcomeCounts(run.nodeCounts) || 'Failed', tone: 'error', title: run.statusReason ?? undefined };
 		case 'presumed_failed':
 			return {
-				text: `Lost contact — marked failed after ${formatSeconds(row.lostContactLimitSeconds).replace(/m 00s$/, ' min')}`,
+				text: 'Lost contact',
 				tone: 'error',
-				title: run.statusReason ?? undefined
+				title: [`Marked failed after ${formatSeconds(row.lostContactLimitSeconds).replace(/m 00s$/, ' min')} without contact`, run.statusReason].filter(Boolean).join('. ')
 			};
 		case 'cancelled':
 			return { text: run.statusReason?.startsWith('Cancelled') ? run.statusReason : 'Cancelled', tone: 'muted' };
+		case 'skipped':
+			return { text: run.statusReason ? run.statusReason.charAt(0).toUpperCase() + run.statusReason.slice(1) : 'Skipped', tone: 'muted', title: 'Its group did not run it because a job it depends on failed' };
 	}
 }

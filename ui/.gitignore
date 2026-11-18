@@ -3,3 +3,5 @@ node_modules/
 build/
 .vite/
 vite.config.ts.timestamp-*
+test-results/
+playwright-report/

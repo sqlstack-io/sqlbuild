@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use crate::snapshots::_helpers::preparation::prepare_snapshot;
-use crate::snapshots::main::current_snapshot::current_snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::reads::current_snapshot::current_snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::open_store::open_store;

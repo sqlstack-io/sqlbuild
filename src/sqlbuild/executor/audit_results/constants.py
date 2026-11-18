@@ -97,3 +97,5 @@ AUDIT_RESULT_COLUMN_TYPES: dict[str, StateSqlValueType] = {
     COLUMN_MINIMUM_SAMPLES: StateSqlValueType.INTEGER,
     COLUMN_EVIDENCE_COUNT: StateSqlValueType.INTEGER,
 }
+
+IGNORED_FAILURE_METADATA_JSON: str = '{"ignored": true}'

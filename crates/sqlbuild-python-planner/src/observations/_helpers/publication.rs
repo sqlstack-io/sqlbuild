@@ -9,11 +9,12 @@ use sqlbuild_analysis::planner_warehouse::models::CursorTagRequest;
 use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 
 use crate::consumption::main::relation::relation;
+use crate::live_reads::main::bound_task::bound_task;
 use crate::planner_warehouse::constants::RUN_BOUNDED;
-use crate::planner_warehouse::main::inspection::adapter_cursor_sql::adapter_cursor_sql;
-use crate::planner_warehouse::main::inspection::bound_task::bound_task;
+use crate::planner_warehouse::main::inspection::dialect_cursor_sql::dialect_cursor_sql;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::native_host::main::append_observations::append_observations;
 use sqlbuild_python_front::native_host::models::Location;
@@ -73,7 +74,7 @@ pub(crate) fn cursor_reads(
         };
         reads.push(CursorRead {
             location: Location::of(&relation(&destination)?),
-            sql: adapter_cursor_sql(adapter, &query)?,
+            sql: dialect_cursor_sql(&Dialect::of(adapter)?, &query)?,
             cursor_type: query.cursor_type,
             model: name,
         });

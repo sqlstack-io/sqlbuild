@@ -11,8 +11,8 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::TriggerChange;
 use crate::runs::main::{
-    change_run::change_run, claim_next_run::claim_next_run, list_runs::list_runs,
-    request_job_run::request_job_run,
+    execution::change_run::change_run, execution::claim_next_run::claim_next_run,
+    listings::list_runs::list_runs, requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
@@ -24,7 +24,7 @@ use crate::sensors::main::{
 };
 use crate::sensors::tests::helpers::{change, finish_run, snapshot};
 use crate::sensors::tests::test_types::SensorTestCase;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;

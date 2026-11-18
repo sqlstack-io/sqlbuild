@@ -10,7 +10,8 @@ use sqlbuild_analysis::planner_strategy::main::cursor_type_warning::cursor_type_
 use sqlbuild_analysis::planner_strategy::models::CursorTypeCheck;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::planner_strategy::_helpers::values::{optional_string, plan_warning};
+use crate::planner_strategy::_helpers::values::optional_string;
+use crate::planner_strategy::_helpers::values::plan_warning;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;

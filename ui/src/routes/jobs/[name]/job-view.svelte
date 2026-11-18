@@ -1,5 +1,15 @@
 <script lang="ts">
+	import SelectionChips from '$lib/components/selection/selection-chips.svelte';
+	import { plural } from '$lib/format/plural';
+	import PageBody from '$lib/components/page-body.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import Loading from '$lib/components/loading.svelte';
+	import PlayIcon from '@lucide/svelte/icons/play';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
 	import { openRow, to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { Trigger } from '$lib/api';
@@ -8,12 +18,16 @@
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
-	import { kindLine } from '$lib/build-area/labels';
+	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
+	import { CONCURRENCY_DOCS, concurrencySource, formatCost, narrowingText, onFailureText, overlapHelp, overlapWhileRunning, poolText, shortRunId } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
+	import MemberGraph from '$lib/lineage/member-graph.svelte';
+	import { memberLinks, publishedLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
+	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import { formatMs } from '$lib/build-area/labels';
@@ -23,26 +37,24 @@
 	const job = createResource((client, scope) => client.getJob(scope, name), ['jobs', 'runs', 'snapshot']);
 	const jobRuns = createResource((client, scope) => client.listRuns(scope, { jobKey: name, limit: 50 }), ['runs']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs', 'warehouse']);
-	// Each member's nodes and last run, so a group's graph can box every member job around what it builds.
-	// Reading `job.data` here reloads it with the job; it stays null until the job has loaded.
-	const members = createResource(async (client, scope) => {
-		const detail = job.data;
-		if (!detail) return null;
-		const keys = detail.groupMembers?.map((m) => m.jobKey) ?? [];
-		if (!keys.length) return { nodes: new Map<string, string[]>(), lastRuns: new Map() };
+	const catalog = useCatalogNodes();
+	// A group's members as the jobs list reports them: node count and last run, for the member graph.
+	// Reading `job.data` here reloads it with the job; it stays null for a plain job or until the job has loaded.
+	const memberJobs = createResource(async (client, scope) => {
+		if (job.data?.kind !== 'group') return null;
 		const jobs = await client.listJobs(scope);
-		const details = await Promise.all(keys.map((k) => client.getJob(scope, k)));
-		return {
-			nodes: new Map(keys.map((k, i) => [k, details[i]?.resolvedNodes ?? []])),
-			lastRuns: new Map(jobs.map((j) => [j.key, j.lastRun]))
-		};
+		return new Map<string, MemberInfo>(jobs.map((j) => [j.key, { nodeCount: j.nodeCount, lastRun: j.lastRun, description: j.description, nodes: j.nodes, sourceFile: j.sourceFile }]));
 	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
+	// Why each member waits for another, node by node, from the catalog's lineage.
+	// Why members wait, node by node: as the server publishes it, or worked out from lineage for a
+	// snapshot that predates published reasons.
+	const published = $derived(def?.groupMembers ? publishedLinks(def.groupMembers) : null);
+	const links = $derived(published ?? (def?.groupMembers && memberJobs.data && catalog.data ? memberLinks(def.groupMembers, memberJobs.data, catalog.data) : new Map()));
 	const runs = $derived(jobRuns.data ?? []);
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
-		const showCost = $derived(runs.some((r) => r.cost !== null));
+	const showCost = $derived(runs.some((r) => r.cost !== null));
 	const canToggle = $derived(app.can('trigger.toggle'));
 	// A run is always reviewed on the plan page before it starts.
 	function run(keys: string[]) {
@@ -52,6 +64,21 @@
 	// Nodes picked in the graph, by catalog key. A job runs with or without them; a group's pick runs as an ad-hoc command.
 	let picked = $state<string[]>([]);
 	let graph = $state<{ clear: () => void }>();
+	// On a group's graph: the member job, or one of its nodes, selected.
+	let memberSelection = $state<MemberSelection | null>(null);
+	$effect(() => {
+		if (def?.kind === 'group') picked = memberSelection?.node ? [memberSelection.node] : [];
+	});
+	function clearSelection() {
+		graph?.clear();
+		memberSelection = null;
+	}
+	// A group's sidebar works as Lineage's: closed until something is selected, then as the person last left it.
+	const details = createDetailsPanel('job-group', () => !!memberSelection);
+	const railOpen = $derived(def?.kind !== 'group' || details.open);
+	const selectedMember = $derived(memberSelection && !memberSelection.node ? memberSelection.member : null);
+	const memberFacts = $derived(selectedMember ? (memberJobs.data?.get(selectedMember) ?? null) : null);
+	const memberWaits = $derived(selectedMember && def?.groupMembers ? waitReasons(selectedMember, def.groupMembers, links) : []);
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const pickedNodes = $derived(picked.map((k) => byKey.get(k)).filter((n) => !!n));
 	const canRunPicked = $derived(app.client.supports('launchAdhocRun'));
@@ -63,13 +90,11 @@
 		const took = finished.flatMap((r) => (r.startedAt && r.endedAt ? [Date.parse(r.endedAt) - Date.parse(r.startedAt)] : [])).sort((a, b) => a - b);
 		return took.length ? took[Math.floor(took.length / 2)] : null;
 	});
-	const hasSettings = $derived(!!def && (!!def.overlap || !!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length) || !!def.concurrency?.length || (def.concurrency === null && def.concurrencyGroups.length > 0)));
-	// A group draws each member job, in run order, as a box around the nodes it builds.
-	const boxes = $derived(
-		def?.kind === 'group'
-			? [...(def.groupMembers ?? [])].sort((a, b) => a.stage - b.stage).map((m) => ({ jobKey: m.jobKey, nodes: members.data?.nodes.get(m.jobKey) ?? [], lastRun: members.data?.lastRuns.get(m.jobKey) }))
-			: []
-	);
+	// Each pool the job takes, as published.
+	const pools = $derived(def?.pools ?? []);
+	/** Runs holding a pool's slots now, where the server reports them. */
+	const holdersOf = (pool: string) => def?.poolHolders?.find((g) => g.pool === pool)?.holders ?? [];
+	const hasSettings = $derived(!!def && (!!def.onFailure || !!def.ignoreAuditFailures || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length)));
 	let actionError = $state<string | null>(null);
 
 	async function toggleTrigger(t: Trigger) {
@@ -84,24 +109,35 @@
 	}
 
 	const targetBlocked = $derived(!!def?.targets && !def.targets.includes(app.target?.name ?? ''));
+	const runColumns = $derived<TableColumn[]>([
+		{ id: 'status', label: 'Status', width: '140px' },
+		{ id: 'run', label: 'Run', width: '150px' },
+		{ id: 'by', label: 'Started by', minWidth: 200 },
+		{ id: 'nodes', label: 'Nodes', width: '22%' },
+		{ id: 'took', label: 'Took', width: '90px' },
+		{ id: 'started', label: 'Started', width: '120px' },
+		{ id: 'who', label: 'Who', width: '140px' },
+		...(showCost ? [{ id: 'cost', label: 'Cost', width: '90px', align: 'right' as const }] : [])
+	]);
 </script>
 
 <AppTopbar title="Jobs">
 	{#if picked.length && def?.kind === 'job'}
-		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
-		<GatedButton requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}>▷ Run all but {picked.length}</GatedButton>
-		<GatedButton requires="job.run" variant="default" onclick={() => run(picked)}>▷ Run {picked.length} selected</GatedButton>
+		<Button variant="ghost" onclick={clearSelection}>Clear selection</Button>
+		<GatedButton size="bar" requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run all but {picked.length}</GatedButton>
+		<GatedButton size="bar" requires="job.run" variant="default" onclick={() => run(picked)}><PlayIcon class="size-3.5 fill-current stroke-none" />Run {picked.length} selected</GatedButton>
 	{:else if picked.length && canRunPicked}
-		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}>▷ Run {picked.length} selected</GatedButton>
+		<Button variant="ghost" onclick={clearSelection}>Clear selection</Button>
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run {picked.length} selected</GatedButton>
 	{:else}
 		<GatedButton
+			size="bar"
 			requires="job.run"
 			variant="default"
 			disabled={!def || targetBlocked}
 			reason={targetBlocked ? `This job only runs on ${def?.targets?.join(', ')}` : undefined}
 			onclick={() => run([])}
-		>▷ Run</GatedButton>
+		><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	{/if}
 </AppTopbar>
 
@@ -140,24 +176,73 @@
 	{#if actionError}<div class="msg err">{actionError}</div>{/if}
 
 	{#if def}
-		<nav class="tabs">
-			<button class:on={tab === 'overview'} onclick={() => (tab = 'overview')}>Overview</button>
-			<button class:on={tab === 'runs'} onclick={() => (tab = 'runs')}>Runs{runs.length ? ` · ${runs.length}` : ''}</button>
-			{#if def.declaration}<button class:on={tab === 'code'} onclick={() => (tab = 'code')}>Code</button>{/if}
-		</nav>
+		<PageTabs bind:value={tab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'runs', label: 'Runs', count: runs.length || undefined }, ...(def.declaration ? [{ value: 'code' as const, label: 'Code' }] : [])]} />
 
 		{#if tab === 'overview'}
 			<div class="flex min-h-0 flex-1">
 				<div class="canvas">
-					{#if catalog.data && (def.kind !== 'group' || members.data)}
-						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} {boxes} members={def.groupMembers ?? []} onselect={(keys) => (picked = keys)} />
+					{#if def.kind === 'group' && !def.groupMembers?.length}
+						<p class="faint graph-wait">{def.groupMembers ? 'This group has no member jobs.' : "The server doesn't report this group's member jobs."}</p>
+					{:else if def.kind === 'group' && !memberJobs.data}
+						<!-- Members are drawn once the jobs list says where each is declared, so the graph opens by folder rather than redrawing. -->
+						<div class="graph-wait">{#if memberJobs.error}<p class="msg err">Couldn't load the member jobs: {memberJobs.error}</p>{:else}<Loading />{/if}</div>
+					{:else if def.kind === 'group'}
+						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
+						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} bind:selection={memberSelection} details={{ open: details.open, toggle: details.toggle }} />
+					{:else if catalog.data}
+						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} onselect={(keys) => (picked = keys)} />
 					{:else}
-						{#if catalog.error ?? members.error}<p class="faint graph-wait">{catalog.error ?? members.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
+						{#if catalog.error}<p class="faint graph-wait">{catalog.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
 					{/if}
 				</div>
 
+				{#if railOpen}
 				<aside class="rail sb-scroll" class:sections={!pickedNodes.length}>
-					{#if pickedNodes.length === 1}
+					{#if selectedMember}
+						<InspectorHead title={selectedMember} href={to(`/jobs/${selectedMember}`)} linkLabel="Open job ↗" linkTitle="Open the page of {selectedMember}">
+							{#snippet meta()}
+								<span>Job in {name}</span>
+								{#if memberFacts?.nodeCount !== null && memberFacts?.nodeCount !== undefined}<span>{plural(memberFacts.nodeCount, 'node')}</span>{/if}
+							{/snippet}
+						</InspectorHead>
+						<InspectorSection title="Description">
+							{#if memberFacts?.description}<p class="about-text">{memberFacts.description}</p>{:else}<p class="faint">No description.</p>{/if}
+						</InspectorSection>
+						<InspectorSection title="Waits for">
+							{#if memberWaits.length}
+								{#each memberWaits as w (w.upstream)}
+									<div class="wait" class:implied={w.through !== undefined}>
+										{#if w.through !== undefined}<span class="faint">Also after</span>{/if}
+										<a class="mono" href={to(`/jobs/${w.upstream}`)}>{w.upstream}</a>
+										{#if w.through !== undefined}
+											{#if w.through}<span class="faint">(through <a class="mono" href={to(`/jobs/${w.through}`)}>{w.through}</a>)</span>{/if}
+										{:else if w.reasons.length}
+											<ul class="reasons">
+												{#each w.reasons as r (`${r.from}>${r.to}`)}
+													<li><a class="mono" href={to(`/catalog/${r.to}`)} title={r.to}>{shortName(r.to)}</a> reads <a class="mono" href={to(`/catalog/${r.from}`)} title={r.from}>{shortName(r.from)}</a></li>
+												{/each}
+												{#if w.more}<li class="faint">+{w.more} more</li>{/if}
+											</ul>
+										{:else}
+											<p class="faint">Runs after it; no lineage between their nodes explains the wait.</p>
+										{/if}
+									</div>
+								{/each}
+							{:else}
+								<p class="faint">Doesn't wait for another job in this group.</p>
+							{/if}
+						</InspectorSection>
+						<InspectorSection title="Last run">
+							{#if memberFacts?.lastRun}
+								{@const r = memberFacts.lastRun}
+								<dl>
+									<div><dt>Status</dt><dd><a href={to(`/runs/${r.id}`)}><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}{r.startedAt ? ` · ${formatAgo(r.startedAt, app.now)}` : ''}</a></dd></div>
+								</dl>
+							{:else}
+								<p class="faint">No runs yet.</p>
+							{/if}
+						</InspectorSection>
+					{:else if pickedNodes.length === 1}
 						{@const n = pickedNodes[0]}
 						<p class="label">{kindLine(n)}</p>
 						<h2 class="mono">{n.key}</h2>
@@ -174,9 +259,9 @@
 							{#each pickedNodes as n (n.key)}<li><a href={to(`/catalog/${n.key}`)} class="mono">{n.key}</a></li>{/each}
 						</ul>
 					{:else}
-						{#if def.description}<p class="about">{def.description}</p>{/if}
+						{#if def.description}<InspectorSection title="Description"><p class="about-text">{def.description}</p></InspectorSection>{/if}
 						<InspectorSection title="Recent runs">
-							{#snippet meta()}{#if runs.length}<button class="section-link" onclick={() => (tab = 'runs')}>All runs →</button>{/if}{/snippet}
+							{#snippet meta()}{#if runs.length}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (tab = 'runs')}>All runs →</Button>{/if}{/snippet}
 							{#if finished.length}
 								<OutcomeStrip outcomes={finished.map((r) => r.status)} tones={runStatusTone} caption="Last {finished.length} runs" />
 								<dl class="spaced">
@@ -201,12 +286,11 @@
 									{/each}
 								</dl>
 							{:else}
-								<p class="faint">Only when someone runs it.</p>
+								<p class="faint">Manual only</p>
 							{/if}
 						</InspectorSection>
 						<InspectorSection title="Definition">
-							{#if def.select}<p class="label">Selection</p><p class="code">{def.select}</p>{/if}
-							{#if def.exclude.length}<p class="label">Excludes</p><p class="code">{def.exclude.join(' ')}</p>{/if}
+							{#if def.select || def.exclude.length}<p class="label">Selection</p><div class="chips"><SelectionChips select={def.select ?? ''} exclude={def.exclude.join(' ')} /></div>{/if}
 							<dl>
 								{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
 								{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
@@ -215,67 +299,75 @@
 								{/if}
 							</dl>
 						</InspectorSection>
+						<!-- Concurrency as plain facts: models at once inside a run, write claims, overlap and pools. -->
+						<InspectorSection title="Concurrency">
+							{@const resolved = def.resolvedConcurrency}
+							<ul class="concurrency">
+								{#if resolved}
+									<li>Inside a run: {resolved.limit} at once <span class="muted">({concurrencySource(resolved.source, app.target?.name ?? null)})</span></li>
+								{/if}
+								<li>Never alongside runs writing the same tables <span class="muted">(automatic)</span></li>
+								{#if def.overlap}
+									<li title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">If triggered while running: {overlapWhileRunning[def.overlap]}</li>
+								{/if}
+								{#if !pools.length}
+									<li>Pools: none</li>
+								{:else}
+									{#each pools as use (use.pool)}
+										{@const text = poolText(use)}
+										{@const holders = holdersOf(use.pool)}
+										<li class="pool" class:clamped={text.clamped}>
+											<span
+												>{#if text.clamped}<TriangleAlertIcon size={12} class="inline-icon" />{/if}{text.text}{#if text.detail}&nbsp;<span class:muted={!text.clamped}>({text.detail})</span>{/if}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span
+											>
+											{#if holders.length}
+												<span class="muted">Running now: {#each holders as h, i (h)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}</span>
+											{/if}
+										</li>
+									{/each}
+								{/if}
+							</ul>
+							<a class="docs" href={CONCURRENCY_DOCS} target="_blank" rel="noreferrer">How concurrency works ↗</a>
+						</InspectorSection>
 						{#if hasSettings}
 							<InspectorSection title="Settings">
 								<dl>
-									{#if def.overlap}<div><dt>If already running</dt><dd title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">{overlapPlain[def.overlap]}</dd></div>{/if}
-									{#if def.onFailure}<div><dt>If it fails</dt><dd title="on_failure: retries = {def.onFailure.retries}, retry_delay = {def.onFailure.retryDelaySeconds}s{def.memberOf?.length ? '. Inside a group run, the group’s own policy applies' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
+									{#if def.onFailure}<div><dt>Retries</dt><dd title="[retry] attempts = {def.onFailure.retries + 1}, delay_seconds = {def.onFailure.retryDelaySeconds}{def.memberOf?.length ? '. Inside a group run, the group retries this job while the jobs that depend on it wait' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
 									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
 									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
 								</dl>
+								{#if def.ignoreAuditFailures}<p class="audits" data-testid="job-ignores-audit-failures" title="ignore_audit_failures = true: an error-severity audit that fails is recorded, and the run goes on">Audit failures don't stop runs</p>{/if}
 								{#if def.settings && Object.keys(def.settings).length}
 									<p class="label">Options</p>
 									{#each Object.entries(def.settings) as [flag, value] (flag)}
 										<p class="setting"><code>{flag}{value === true ? '' : ` ${value}`}</code></p>
 									{/each}
 								{/if}
-								{#if def.concurrency?.length}
-									<p class="label">Shared slots</p>
-									{#each def.concurrency as g (g.key)}
-										<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
-											<span>{g.holders.length} of {g.limit} {slotLabel(g.key)} in use</span>
-											{#each g.holders as h (h)}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}
-										</p>
-									{/each}
-								{:else if def.concurrency === null && def.concurrencyGroups.length}
-									<p class="label">Shared slots</p>
-									{#each def.concurrencyGroups as g (g)}<p class="setting" title="Concurrency group {g}">{slotLabel(g)}</p>{/each}
-								{/if}
 							</InspectorSection>
 						{/if}
 					{/if}
 				</aside>
-			</div>
-		{:else if tab === 'runs'}
-			<div class="main sb-scroll">
-				{#if runs.length}
-					<table class="runs">
-						<thead>
-							<tr><th>Status</th><th>Run</th><th>Started by</th><th>Nodes</th><th>Took</th><th>Started</th><th>Who</th>{#if showCost}<th class="num">Cost</th>{/if}</tr>
-						</thead>
-						<tbody>
-							{#each runs as r (r.id)}
-								<tr onclick={(e) => openRow(e, `/runs/${r.id}`)}>
-									<td><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
-									<td><a href={to(`/runs/${r.id}`)} class="mono" title={r.id}>{shortRunId(r.id)}</a>{#if r.narrowing}<span class="part" title="Ran part of the job: sqb build {narrowingText(r.narrowing)}">part</span>{/if}</td>
-									<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>
-									<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
-									<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
-									<td class="faint" title={formatStamp(r.queuedAt)}>{formatAgo(r.startedAt ?? r.queuedAt, app.now)}</td>
-									<td class="faint" title={r.requestedBy.name}>{r.requestedBy.displayName}</td>
-									{#if showCost}<td class="faint num" title={r.cost ? `Estimated warehouse cost: ${r.cost.source}` : 'No cost reported'}>{formatCost(r.cost)}</td>{/if}
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{:else}
-					{#if jobRuns.data === undefined && !jobRuns.error}<Loading />{:else}<p class="faint">No runs yet.</p>{/if}
 				{/if}
 			</div>
+		{:else if tab === 'runs'}
+			<DataTable columns={runColumns} rows={runs} key={(r) => r.id} resource={jobRuns} empty="No runs yet.">
+				{#snippet row(r)}
+					<tr onclick={(e) => openRow(e, `/runs/${r.id}`)}>
+						<td><i class="dot" style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
+						<td><a href={to(`/runs/${r.id}`)} class="mono" title={r.id}>{shortRunId(r.id)}</a>{#if r.narrowing}<span class="part" title="Ran part of the job: sqb build {narrowingText(r.narrowing)}">part</span>{/if}</td>
+						<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>
+						<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
+						<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
+						<td class="faint" title={formatStamp(r.queuedAt)}>{formatAgo(r.startedAt ?? r.queuedAt, app.now)}</td>
+						<td class="faint" title={r.requestedBy.name}>{r.requestedBy.displayName}</td>
+						{#if showCost}<td class="faint" title={r.cost ? `Estimated warehouse cost: ${r.cost.source}` : 'No cost reported'}>{formatCost(r.cost)}</td>{/if}
+					</tr>
+				{/snippet}
+			</DataTable>
 		{:else if def.declaration}
-			<div class="main sb-scroll">
+			<PageBody padding="12px 24px">
 				<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={200} />
-			</div>
+			</PageBody>
 		{/if}
 	{/if}
 </div>
@@ -316,12 +408,12 @@
 	}
 	.chip i,
 	dd i,
-	.runs td .part {
+	.part {
 		margin-left: 8px;
 		color: var(--muted-foreground);
 		font-size: 11.5px;
 	}
-	.runs td i {
+	i.dot {
 		display: inline-block;
 		width: 7px;
 		height: 7px;
@@ -330,29 +422,6 @@
 	}
 	.chip i {
 		margin-right: 0;
-	}
-	.tabs {
-		display: flex;
-		gap: 18px;
-		padding: 0 24px;
-		border-bottom: 1px solid var(--border);
-	}
-	.tabs button {
-		padding: 8px 0 7px;
-		border-bottom: 2px solid transparent;
-		color: var(--muted-foreground);
-		font-size: 13px;
-	}
-	.tabs button.on {
-		border-color: var(--primary);
-		color: var(--foreground);
-	}
-	.clear {
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
-	.clear:hover {
-		color: var(--foreground);
 	}
 	.faint {
 		color: var(--muted-foreground);
@@ -376,12 +445,6 @@
 		padding: 14px 24px;
 		background: var(--sb-inset);
 	}
-	.main {
-		min-width: 0;
-		flex: 1;
-		overflow: auto;
-		padding: 12px 24px;
-	}
 	.rail {
 		width: 320px;
 		flex-shrink: 0;
@@ -399,42 +462,34 @@
 	.rail.sections {
 		padding: 0;
 	}
-	.about {
-		padding: 16px 16px 14px;
-		border-bottom: 1px solid var(--border);
+	.about-text {
+		color: var(--muted-foreground);
+		font-size: 13px;
 		line-height: 1.5;
+	}
+	.wait + .wait {
+		margin-top: 10px;
+	}
+	.wait.implied + .wait.implied {
+		margin-top: 3px;
+	}
+	.reasons {
+		margin-top: 4px;
+		padding-left: 12px;
+		border-left: 1px solid var(--border);
+	}
+	.reasons li {
+		padding: 1px 0;
+		color: var(--muted-foreground);
+		font-size: 12px;
 	}
 	.spaced {
 		margin-top: 12px;
 	}
-	.code {
-		margin-bottom: 10px;
-		padding: 6px 8px;
-		border-radius: 4px;
-		background: var(--sb-inset);
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		overflow-wrap: anywhere;
-	}
-	.section-link {
-		color: var(--primary);
-		font-size: 12px;
+	.chips {
+		margin: 3px 0 10px;
 	}
 
-	.runs th {
-		padding: 6px 12px 6px 0;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		font-weight: 500;
-		text-align: left;
-	}
-	.runs thead tr {
-		cursor: default;
-	}
-	.runs thead tr:hover {
-		background: none;
-	}
 	.label {
 		color: var(--sb-text-faint);
 		font-size: 11.5px;
@@ -467,6 +522,48 @@
 	.picked li {
 		padding: 2px 0;
 	}
+	/* The Concurrency panel: one plain fact per line, where it came from quieter beside it. */
+	.concurrency {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: 12.5px;
+		line-height: 1.4;
+	}
+	.concurrency .muted {
+		color: var(--muted-foreground);
+	}
+	.concurrency .pool {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	/* A pool this server caps below what the job asks: it takes the whole pool, so it runs alone there. */
+	.concurrency .pool.clamped {
+		padding: 4px 8px;
+		border-left: 3px solid var(--sb-warning);
+		border-radius: 2px;
+		background: color-mix(in srgb, var(--sb-warning) 10%, transparent);
+		color: var(--sb-warning);
+	}
+	.concurrency .pool.clamped a {
+		color: inherit;
+		text-decoration: underline;
+	}
+	.concurrency :global(.inline-icon) {
+		display: inline;
+		margin-right: 4px;
+		vertical-align: -1px;
+	}
+	.docs {
+		display: inline-block;
+		margin-top: 10px;
+		color: var(--primary);
+		font-size: 12px;
+	}
 	code,
 	.mono {
 		font-family: var(--font-mono);
@@ -480,30 +577,12 @@
 		padding: 2px 0;
 		font-size: 12px;
 	}
-	.runs {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 12.5px;
-	}
-	.runs tr {
-		cursor: pointer;
-	}
-	.runs tr:hover {
-		background: var(--sb-hover);
-	}
-	.runs td {
-		padding: 7px 12px 7px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		white-space: nowrap;
-	}
-	.num {
-		text-align: right;
-	}
 	a:hover {
 		color: var(--primary);
 	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
+	.audits {
+		margin: 6px 0 0;
+		color: color-mix(in srgb, var(--sb-warning) 70%, var(--foreground));
+		font-size: 12px;
 	}
 </style>

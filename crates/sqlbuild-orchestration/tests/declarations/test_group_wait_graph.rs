@@ -41,7 +41,7 @@ fn given_group_members_and_node_lineage_when_deriving_waits_then_every_cycle_is_
             ],
             expected_edges: &[
                 ("customers_job", &["orders_job"]),
-                ("finance_job", &["customers_job", "orders_job"]),
+                ("finance_job", &["orders_job"]),
                 ("inventory_job", &["shipments_job"]),
                 ("orders_job", &["customers_job"]),
                 ("shipments_job", &["inventory_job"]),
@@ -109,7 +109,7 @@ fn given_a_large_group_on_a_long_chain_when_deriving_waits_then_one_cycle_is_rep
         members: 50,
         nodes_per_member: 200,
         expected_cycles: 1,
-        expected_waits: 49 + (1..50).sum::<usize>(),
+        expected_waits: 50,
         expected_limit: std::time::Duration::from_secs(2),
     }];
     for test_case in test_cases {

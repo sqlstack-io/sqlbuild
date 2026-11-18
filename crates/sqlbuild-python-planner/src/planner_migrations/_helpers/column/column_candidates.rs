@@ -1,8 +1,12 @@
 //! Gather live candidate evidence without changing adapter inspection ownership.
 
-use crate::planner_migrations::_helpers::column::column_objects::{config, definition_hash, lower};
+use crate::planner_migrations::_helpers::column::column_objects::config;
+use crate::planner_migrations::_helpers::column::column_objects::definition_hash;
+use crate::planner_migrations::_helpers::column::column_objects::lower;
 use crate::planner_migrations::_helpers::projections::query_shapes::parse_query_shape;
-use crate::planner_migrations::models::{ColumnCandidate, ColumnMigrationInputs, MigrationPhase};
+use crate::planner_migrations::models::ColumnCandidate;
+use crate::planner_migrations::models::ColumnMigrationInputs;
+use crate::planner_migrations::models::MigrationPhase;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;

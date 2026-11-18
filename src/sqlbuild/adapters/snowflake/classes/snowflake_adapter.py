@@ -6,6 +6,7 @@ import csv
 import json
 import logging
 import os
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import date, datetime
@@ -188,6 +189,8 @@ _EXACT_COLUMN_INSPECTION_LIMIT: int = 32
 _STATE_TABLE_RETENTION_ATTRIBUTE: str = "_state_table_retention_fallbacks_state"
 _METADATA_INSPECTION_CONCURRENCY: int = 8
 _SHOW_RESULT_LIMIT: int = 10_000
+_SCHEMA_OBJECTS_ATTRIBUTE: str = "_schema_objects_listings"
+_SCHEMA_OBJECTS_REUSE_SECONDS: float = 60.0
 _SHOW_OBJECT_RELATION_TYPES: dict[str, str] = {"TABLE": "base table", "VIEW": "view"}
 _COST_LOGIN_TIMEOUT_SECONDS: int = 5
 _COST_NETWORK_TIMEOUT_SECONDS: int = 15
@@ -3662,6 +3665,67 @@ class SnowflakeAdapter(
             byte_count=byte_count,
             byte_count_basis=basis if byte_count is not None else None,
         )
+
+    def estimate_relation_row_counts(
+        self,
+        *,
+        connection: _SnowflakeConnection,
+        database: str | None,
+        schema: str,
+        names: tuple[str, ...],
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Rows and bytes from one SHOW OBJECTS IN SCHEMA a minute, which needs no warehouse."""
+
+        objects: dict[str, dict[str, object]] = self._schema_objects(
+            connection=connection, database=database, schema=schema
+        )
+        estimates: list[RelationRowCountEstimate] = []
+        name: str
+        for name in names:
+            row: dict[str, object] | None = objects.get(self._information_schema_identifier(name))
+            if row is None:
+                estimates.append(
+                    RelationRowCountEstimate(row_count=None, detail="relation not found")
+                )
+                continue
+            is_table: bool = str(row.get("kind")) == SHOW_OBJECTS_TABLE_KIND
+            rows: object = row.get("rows") if is_table else None
+            byte_count: object = row.get("bytes") if is_table else None
+            estimates.append(
+                RelationRowCountEstimate(
+                    row_count=None if rows is None else int(cast(int, rows)),
+                    detail="no row count (view)" if rows is None else None,
+                    byte_count=None if byte_count is None else int(cast(int, byte_count)),
+                    byte_count_basis=None if byte_count is None else "show_objects_bytes",
+                )
+            )
+        return tuple(estimates)
+
+    def _schema_objects(
+        self, *, connection: _SnowflakeConnection, database: str | None, schema: str
+    ) -> dict[str, dict[str, object]]:
+        """One schema's SHOW OBJECTS rows by stored name, listed again after a minute."""
+
+        listings: dict[tuple[int, str | None, str], tuple[float, dict[str, dict[str, object]]]]
+        listings = getattr(self, _SCHEMA_OBJECTS_ATTRIBUTE, None) or {}
+        key: tuple[int, str | None, str] = (id(connection), database, schema)
+        now: float = time.monotonic()
+        cached: tuple[float, dict[str, dict[str, object]]] | None = listings.get(key)
+        if cached is not None and now - cached[0] < _SCHEMA_OBJECTS_REUSE_SECONDS:
+            return cached[1]
+        rows: list[dict[str, object]] = self._fetch_paged_show_rows(
+            connection=connection,
+            query="SHOW OBJECTS IN SCHEMA "
+            + self._show_schema_scope(connection=connection, database=database, schema=schema),
+            show_database=self._show_database(
+                connection=connection, database=database, schema=schema
+            ),
+            schema=schema,
+        )
+        objects: dict[str, dict[str, object]] = {str(row["name"]): row for row in rows}
+        listings[key] = (now, objects)
+        setattr(self, _SCHEMA_OBJECTS_ATTRIBUTE, listings)
+        return objects
 
     def _show_object_row_count(
         self, *, connection: Any, database: str | None, schema: str, name: str

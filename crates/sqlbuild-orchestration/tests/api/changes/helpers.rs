@@ -65,6 +65,13 @@ pub(crate) async fn opened(response: reqwest::Response) -> SseConnection {
 }
 
 pub(crate) async fn next_topic(stream: &mut SseConnection) -> Option<String> {
+    next_notice(stream)
+        .await
+        .map(|notice| notice["topic"].as_str().expect("topic").to_owned())
+}
+
+/// The next change event's data, such as a `node_status` event's version and states.
+pub(crate) async fn next_notice(stream: &mut SseConnection) -> Option<serde_json::Value> {
     tokio::time::timeout(Duration::from_secs(30), async {
         for _ in 0..4096 {
             for _ in 0..4096 {
@@ -77,9 +84,7 @@ pub(crate) async fn next_topic(stream: &mut SseConnection) -> Option<String> {
                     continue;
                 };
                 assert!(frame.lines().any(|line| line == "event: changed"));
-                let body: serde_json::Value =
-                    serde_json::from_str(data).expect("typed change notice");
-                return Some(body["topic"].as_str().expect("topic").to_owned());
+                return Some(serde_json::from_str(data).expect("typed change notice"));
             }
             let chunk = stream
                 .response

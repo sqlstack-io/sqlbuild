@@ -2,19 +2,36 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::runs::models::{CommandPlan, PlannerResource};
+use crate::runs::models::{
+    CommandPlan, PlannerResource, PublicationCache, SelectionProblem, SelectionVocabulary,
+};
 
 /// Each published job and job group's exact `kind:name` selection, by name.
 pub type PublishedJobs = BTreeMap<String, BTreeSet<String>>;
 
-/// Parse `command` with the CLI's grammar and resolve its selectors over a publication; pure and side-effect free.
+/// Index a publication once with the CLI's selector graph, then parse and resolve commands against it.
 pub trait CommandPlanner: Send + Sync {
-    /// The verb, exact node keys and validated settings, or why the command is refused; `job:` selects published jobs.
-    fn plan(
+    /// One publication's nodes and jobs, indexed for repeated planning; pure and side-effect free.
+    fn prepare(
         &self,
-        command: &[String],
-        publication: (&[PlannerResource], &PublishedJobs),
-    ) -> Result<CommandPlan, String>;
+        resources: Vec<PlannerResource>,
+        jobs: PublishedJobs,
+    ) -> std::sync::Arc<dyn PreparedPublication>;
+
+    /// The publications this planner has prepared, kept between requests because snapshots never change.
+    fn publications(&self) -> &PublicationCache;
+}
+
+/// One indexed publication: parse `command` with the CLI's grammar and resolve its selectors over it.
+pub trait PreparedPublication: std::fmt::Debug + Send + Sync {
+    /// The verb, exact node keys and validated settings, or why the command is refused; `job:` selects published jobs.
+    fn plan(&self, command: &[String]) -> Result<CommandPlan, String>;
+
+    /// The sorted keys `sqb build --select <select> --exclude <exclude>` selects, or why it refuses them; each text holds space-separated selectors.
+    fn evaluate(&self, select: &str, exclude: &str) -> Result<Vec<String>, Box<SelectionProblem>>;
+
+    /// Every value each selector type takes here, with its node count; `snapshot_id` is left for the caller.
+    fn vocabulary(&self) -> SelectionVocabulary;
 }
 
 /// Which runs of one location and target to list.

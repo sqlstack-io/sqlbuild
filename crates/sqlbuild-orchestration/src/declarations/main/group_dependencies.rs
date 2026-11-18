@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::declarations::_helpers::group_waits::upstream_keys;
 use crate::declarations::main::group_cycle_message::group_cycle_message;
 use crate::declarations::main::group_wait_graph::group_wait_graph;
 use crate::declarations::models::JobDefinition;
@@ -22,15 +23,10 @@ pub fn group_dependencies(
         .collect();
     let deps: BTreeMap<String, BTreeSet<String>> = input
         .nodes
-        .iter()
-        .map(|(key, node)| {
-            let upstream: BTreeSet<String> = node
-                .definition
-                .get("deps")
-                .and_then(serde_json::Value::as_array)
+        .keys()
+        .map(|key| {
+            let upstream: BTreeSet<String> = upstream_keys(input, key)
                 .into_iter()
-                .flatten()
-                .filter_map(serde_json::Value::as_str)
                 .map(str::to_owned)
                 .collect();
             (key.clone(), upstream)

@@ -32,15 +32,17 @@ use sqlbuild_python_front::render::models::ExpandedDeclarations;
 use sqlbuild_python_front::render::models::ExpansionOutput;
 use sqlbuild_python_front::render::types::SpanRow;
 use sqlbuild_python_front::sqltext::models::ScannedReference;
-use sqlbuild_python_project::compiled_project::constants::{CONTRACT_KEY, INCREMENTAL_MODE_KEY};
+use sqlbuild_python_project::compiled_project::constants::CONTRACT_KEY;
+use sqlbuild_python_project::compiled_project::constants::INCREMENTAL_MODE_KEY;
 use sqlbuild_python_project::compiled_project::main::config_values::config_values;
 use sqlbuild_python_project::compiled_project::main::declarations::declarations;
 use sqlbuild_python_project::compiled_project::main::materialization::materialization;
 use sqlbuild_python_project::compiled_project::models::DeclarationPy;
-use sqlbuild_python_project::compiled_views::models::{
-    InputProjections, ModelInputHandles, SchemaHandles,
-};
-use sqlbuild_python_project::compiled_views::types::{ModelInputRecord, SchemaRecord};
+use sqlbuild_python_project::compiled_views::models::InputProjections;
+use sqlbuild_python_project::compiled_views::models::ModelInputHandles;
+use sqlbuild_python_project::compiled_views::models::SchemaHandles;
+use sqlbuild_python_project::compiled_views::types::ModelInputRecord;
+use sqlbuild_python_project::compiled_views::types::SchemaRecord;
 
 const HEADER_KEYS_ATTRIBUTE: &str = "model_header_keys";
 const LAYER_SCHEMA_ATTRIBUTE: &str = "layer_schema";

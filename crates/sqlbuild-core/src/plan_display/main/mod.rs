@@ -1,4 +1,5 @@
 pub mod cursor_bound_display;
+pub mod detach_model_diffs;
 pub mod effective_microbatch_batch_size;
 pub mod effective_timestamp_grain;
 pub mod format_model_migrations;
@@ -10,3 +11,6 @@ pub mod model_execution_annotation;
 pub mod model_materialization_label;
 pub mod model_resource_type;
 pub mod old_name_rows;
+pub mod plan_model_diff;
+pub mod plan_section_page;
+pub mod plan_summary;

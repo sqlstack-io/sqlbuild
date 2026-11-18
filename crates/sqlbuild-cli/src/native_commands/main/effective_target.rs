@@ -10,7 +10,7 @@ use sqlbuild_config::project::main::load_project_config::load_project_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::models::Built;
 
-use crate::native_commands::_helpers::project_facts::object_field;
+use crate::native_commands::_helpers::command::project_facts::object_field;
 
 /// The effective target of `project_dir` with `selected` as `--target`, `None` when nothing selects one.
 pub fn effective_target(

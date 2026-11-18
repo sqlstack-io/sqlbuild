@@ -4,13 +4,19 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_python_planner::live_reads::models::LiveReads;
+use sqlbuild_python_planner::planner_phases::constants::COMPILING;
+use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
+use sqlbuild_python_planner::planner_warehouse::models::PlannerReads;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 use sqlbuild_rules::rule_results::main::format_skipped_models::format_skipped_models;
 
-use crate::bindings::_helpers::compile_driver::plan_result::{
-    PlanningInputs, connection_with_hooks, pipeline_result,
-};
+use crate::bindings::_helpers::compile_driver::plan_result::PlanningInputs;
+use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
+use crate::bindings::_helpers::compile_driver::plan_result::pipeline_result;
+use crate::bindings::_helpers::compile_driver::rules_at_load::rules_ran_at_load;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -53,36 +59,76 @@ pub(crate) fn run_compile_pipeline<'py>(
         options,
         (&["discovered_inputs", "adapter"], &["options", "hooks"]),
     )?;
-    let discovered: Bound<'py, PyAny> = arguments.value("discovered_inputs")?;
-    let adapter: Bound<'py, PyAny> = arguments.value("adapter")?;
-    let options: Bound<'py, PyAny> =
-        apply_unit_test_selectors(&arguments.value("options")?, &discovered)?;
-    let hooks: Bound<'py, PyAny> = arguments.value("hooks")?;
+    planned_project(
+        (
+            &arguments.value("discovered_inputs")?,
+            &arguments.value("adapter")?,
+        ),
+        (&arguments.value("options")?, arguments.value("hooks")?),
+        (None, None),
+    )
+}
+
+/// Compile unless `held` is compiled, gate on rules unless they ran at load, and plan.
+pub(crate) fn planned_project<'py>(
+    (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (options, hooks): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
+    (held, planned_through): (Option<&Bound<'py, PyAny>>, Option<&Bound<'py, PyAny>>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = discovered.py();
+    let options: Bound<'py, PyAny> = apply_unit_test_selectors(options, discovered)?;
     let hooks: Bound<'py, PyAny> = if hooks.is_none() {
-        host_entry(py, ExecutorHost::ConnectionHooks)?.call0()?
+        call_with(&host_entry(py, ExecutorHost::ConnectionHooks)?, &[])?
     } else {
         hooks
     };
     let on_progress: Bound<'py, PyAny> = native_field(&hooks, "on_progress")?;
     let expansion_reuse: Bound<'py, EarlySqlLint> =
         Bound::new(py, EarlySqlLint::new(false, false))?;
-    let on_inputs_ready: Bound<'py, PyAny> =
-        EarlySqlLint::inputs_ready_hook(&expansion_reuse, GENERIC_DIALECT, &adapter);
-    let compiled: Bound<'py, PyAny> = compiled_phase(
-        (&discovered, &adapter),
-        &options,
-        &on_progress,
-        Some(&on_inputs_ready),
-    )?;
-    let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
-    let graph: Bound<'py, PyAny> = project_graph(&project)?;
-    run_rules_gate(
-        (&discovered, &adapter, expansion_reuse.as_any()),
-        (&options, &on_progress),
-        (&project, &graph),
-    )?;
-    planned((&discovered, &adapter), (&options, &hooks), &compiled)
+    let compiled: Bound<'py, PyAny> = match held {
+        Some(held) => {
+            progress(
+                &on_progress,
+                "Planning from the published compiled project.",
+            )?;
+            let configured: Bound<'py, PyAny> = native_field(&options, "connection_config")?;
+            if configured.is_none() {
+                held.clone()
+            } else {
+                replaced(held, &[("connection_config", configured)])?
+            }
+        }
+        None => {
+            let on_inputs_ready: Bound<'py, PyAny> =
+                EarlySqlLint::inputs_ready_hook(&expansion_reuse, GENERIC_DIALECT, adapter);
+            timed(COMPILING, || {
+                compiled_phase(
+                    (discovered, adapter),
+                    &options,
+                    &on_progress,
+                    Some(&on_inputs_ready),
+                )
+            })?
+        }
+    };
+    if !rules_ran_at_load() {
+        let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
+        let graph: Bound<'py, PyAny> = project_graph(&project)?;
+        run_rules_gate(
+            (discovered, adapter, expansion_reuse.as_any()),
+            (&options, &on_progress),
+            (&project, &graph),
+        )?;
+    }
+    planned(
+        (discovered, adapter),
+        (&options, &hooks),
+        (&compiled, planned_through),
+    )
 }
+
+/// The failing findings' `RulesResult`, their rendered text and the default-rules notice.
+pub(crate) type RuleFailures<'py> = (Bound<'py, PyAny>, String, Option<String>);
 
 /// Run the configured rules and stop the command when any of them finds a fault.
 fn run_rules_gate<'py>(
@@ -94,6 +140,36 @@ fn run_rules_gate<'py>(
     (options, on_progress): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (project, graph): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<()> {
+    let Some((_, rendered, notice)) = configured_rule_failures(
+        (discovered, adapter, expansion_reuse),
+        (options, on_progress),
+        (project, graph),
+    )?
+    else {
+        return Ok(());
+    };
+    let notice: Vec<(&str, String)> = notice
+        .map(|notice| (DEFAULT_RULES_NOTICE_ATTR, notice))
+        .into_iter()
+        .collect();
+    Err(new_annotated_error(
+        discovered.py(),
+        ErrorId::Rules,
+        format!("configured compiler rules failed:\n{rendered}"),
+        &notice,
+    ))
+}
+
+/// Evaluate the configured rules; the failing findings, or `None` when none fails.
+pub(crate) fn configured_rule_failures<'py>(
+    (discovered, adapter, expansion_reuse): (
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+    ),
+    (options, on_progress): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (project, graph): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Option<RuleFailures<'py>>> {
     let py: Python<'py> = discovered.py();
     let rules_error: Bound<'py, PyAny> = error_class(py, ErrorId::Rules)?;
     let project_dir: Bound<'py, PyAny> = native_field(discovered, "project_dir")?;
@@ -156,7 +232,7 @@ fn run_rules_gate<'py>(
         }
     }
     if failing.is_empty() {
-        return Ok(());
+        return Ok(None);
     }
     let findings: Bound<'py, PyAny> = PyTuple::new(py, failing)?.into_any();
     let summary: Bound<'py, PyAny> = new_record_with(
@@ -182,24 +258,16 @@ fn run_rules_gate<'py>(
         .map(|finding| native_field(&finding?, "code")?.extract())
         .collect::<PyResult<_>>()?;
     let select_omitted: bool = native_field(&config, "select")?.is_none();
-    let notice: Vec<(&str, String)> =
-        default_rules_notice(select_omitted, codes.iter().map(String::as_str))
-            .map(|notice| (DEFAULT_RULES_NOTICE_ATTR, notice))
-            .into_iter()
-            .collect();
-    Err(new_annotated_error(
-        py,
-        ErrorId::Rules,
-        format!("configured compiler rules failed:\n{rendered}"),
-        &notice,
-    ))
+    let notice: Option<String> =
+        default_rules_notice(select_omitted, codes.iter().map(String::as_str));
+    Ok(Some((summary, rendered, notice)))
 }
 
 /// Open the planning connection, plan, and record the compile and planning times.
 fn planned<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    compiled: &Bound<'py, PyAny>,
+    (compiled, planned_through): (&Bound<'py, PyAny>, Option<&Bound<'py, PyAny>>),
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
     let tracker: Bound<'py, PyAny> = timing_tracker(py)?;
@@ -217,13 +285,31 @@ fn planned<'py>(
                         .node_locations(adapter)?;
                 Some((database.extract()?, schema.extract()?))
             };
-        let opened: Bound<'py, PyAny> = connection_with_hooks(adapter, &connection_config, hooks)?;
-        connection = Some(opened.clone());
+        let (opened, reads): (Bound<'py, PyAny>, Bound<'py, PlannerReads>) = match planned_through {
+            Some(through) => {
+                let on_start: Bound<'py, PyAny> = native_field(hooks, "on_connection_start")?;
+                if !on_start.is_none() {
+                    on_start.call1((1,))?;
+                }
+                (
+                    py.None().into_bound(py),
+                    PlannerReads::passed(through.clone())?,
+                )
+            }
+            None => {
+                let opened: Bound<'py, PyAny> =
+                    connection_with_hooks(adapter, &connection_config, hooks)?;
+                connection = Some(opened.clone());
+                let reads = LiveReads::new(adapter, &opened, None).handle(adapter.py())?;
+                (opened, reads)
+            }
+        };
         pipeline_result(
             &PlanningInputs {
                 discovered_inputs: discovered,
                 adapter,
                 connection: &opened,
+                reads: &reads,
                 node_results_location,
             },
             &project,

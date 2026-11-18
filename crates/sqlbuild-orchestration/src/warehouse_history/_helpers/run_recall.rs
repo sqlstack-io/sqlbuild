@@ -9,15 +9,16 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT};
 use crate::runs::models::{
     RunErrorText, RunEventRecord, RunOutput, RunOutputLine, RunStatementRecord, RunStatementSql,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
-use crate::store::main::query_records::query_records;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
+use crate::store::types::Row;
 
 /// The Recall invocations of one run and the nodes it selected.
 pub(crate) struct RunRecallScope {
@@ -156,17 +157,96 @@ pub(crate) async fn run_events_in(
     scope: &RunRecallScope,
     (after, limit): (i64, u32),
 ) -> Result<(ControlTransaction, Vec<RunEventRecord>), ControlError> {
+    recall_records(
+        transaction,
+        scope,
+        (
+            |filter: &str, next: usize| {
+                format!("SELECT storage_id, event_id, invocation_id, occurred_at, event_type, severity, producer, resource_id, \
+                 resource_kind, resource_name, resource_attempt_id, statement_id, error_type, error_code, duration_ms, outcome, \
+                 row_count, affected_rows, CASE WHEN event_type IN ('{MEMBER_RETRYING_EVENT}','{MEMBER_RECOVERED_EVENT}') \
+                 THEN payload END AS member_payload FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", next + 1)
+            },
+            vec![
+                Parameter::Integer(after),
+                Parameter::Integer(i64::from(limit.min(5000))),
+            ],
+        ),
+        |row: &mut Row| {
+            let payload = row.remove("member_payload").unwrap_or(Value::Null);
+            if let Some(message) = member_message(&payload)? {
+                row.insert("message".into(), Value::String(message));
+            }
+            Ok(())
+        },
+    )
+    .await
+}
+
+/// One recall read: `sql(filter, first extra parameter)` over the run's invocations, each row adjusted then decoded.
+async fn recall_records<T: serde::de::DeserializeOwned>(
+    transaction: ControlTransaction,
+    scope: &RunRecallScope,
+    (sql, extra): (impl FnOnce(&str, usize) -> String, Vec<Parameter>),
+    mut adjust: impl FnMut(&mut Row) -> Result<(), ControlError>,
+) -> Result<(ControlTransaction, Vec<T>), ControlError> {
     let (filter, mut parameters) = invocation_filter(scope, 1);
     let next = parameters.len() + 1;
-    parameters.extend([
-        Parameter::Integer(after),
-        Parameter::Integer(i64::from(limit.min(5000))),
-    ]);
-    query_records(transaction,
-        &format!("SELECT storage_id, event_id, invocation_id, occurred_at, event_type, severity, producer, resource_id, \
-         resource_kind, resource_name, resource_attempt_id, statement_id, error_type, error_code, duration_ms, outcome, \
-         row_count, affected_rows FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", next + 1),
-        parameters).await
+    parameters.extend(extra);
+    let (transaction, rows) = query(transaction, &sql(&filter, next), parameters).await?;
+    let records = rows
+        .into_iter()
+        .map(|mut row| {
+            adjust(&mut row)?;
+            decode_row(row)
+        })
+        .collect::<Result<_, _>>()?;
+    Ok((transaction, records))
+}
+
+/// The scheduler's summary of a member retry or recovery on its group run, from its own payload.
+fn member_message(payload: &Value) -> Result<Option<String>, ControlError> {
+    let payload: Value = match payload {
+        Value::String(text) => serde_json::from_str(text)
+            .map_err(|error| ControlError::Invalid(format!("member event payload: {error}")))?,
+        Value::Null => return Ok(None),
+        other => other.clone(),
+    };
+    Ok(member_summary(&payload))
+}
+
+/// The summary a member retry or recovery payload names, when it names a member.
+fn member_summary(payload: &Value) -> Option<String> {
+    let member = payload.get("member")?;
+    let job_key = member.get("job_key")?.as_str()?;
+    let attempt = member.get("attempt")?.as_u64()?;
+    let Some(attempts) = member.get("attempts").and_then(Value::as_u64) else {
+        return Some(format!("{job_key} succeeded on attempt {attempt}"));
+    };
+    let delay = member
+        .get("delay_seconds")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let when = if delay == 0 {
+        "now".to_owned()
+    } else {
+        format!("in {}", delay_text(delay))
+    };
+    Some(format!(
+        "{job_key} failed, retrying {when} (attempt {attempt} of {attempts})"
+    ))
+}
+
+/// A retry delay as people read it, such as `45 s`, `15 min` or `1 h 30 min`.
+fn delay_text(seconds: u64) -> String {
+    let (hours, minutes, rest) = (seconds / 3600, seconds % 3600 / 60, seconds % 60);
+    match (hours, minutes, rest) {
+        (0, 0, rest) => format!("{rest} s"),
+        (0, minutes, 0) => format!("{minutes} min"),
+        (0, minutes, rest) => format!("{minutes} min {rest} s"),
+        (hours, 0, _) => format!("{hours} h"),
+        (hours, minutes, _) => format!("{hours} h {minutes} min"),
+    }
 }
 
 pub(crate) async fn run_statements_in(
@@ -174,25 +254,26 @@ pub(crate) async fn run_statements_in(
     scope: &RunRecallScope,
     limit: u32,
 ) -> Result<(ControlTransaction, Vec<RunStatementRecord>), ControlError> {
-    let (filter, mut parameters) = invocation_filter(scope, 1);
-    let next = parameters.len() + 1;
-    parameters.push(Parameter::Integer(i64::from(limit.min(5000))));
-    let (transaction, rows) = query(transaction,
-        &format!("SELECT invocation_id, statement_id, resource_id, resource_name, resource_kind, intent, statement_kind, \
-         purpose, query_id, started_at, ended_at, outcome, error_type, error_code, duration_ms, row_count, affected_rows, \
-         sql_available, sql_unavailable_reason FROM statements WHERE {filter} ORDER BY started_at, statement_id LIMIT ${next}"),
-        parameters).await?;
-    let records = rows
-        .into_iter()
-        .map(|mut row| {
+    recall_records(
+        transaction,
+        scope,
+        (
+            |filter: &str, next: usize| {
+                format!("SELECT invocation_id, statement_id, resource_id, resource_name, resource_kind, intent, statement_kind, \
+                 purpose, query_id, started_at, ended_at, outcome, error_type, error_code, duration_ms, row_count, affected_rows, \
+                 sql_available, sql_unavailable_reason FROM statements WHERE {filter} ORDER BY started_at, statement_id LIMIT ${next}")
+            },
+            vec![Parameter::Integer(i64::from(limit.min(5000)))],
+        ),
+        |row: &mut Row| {
             let available = row
                 .get("sql_available")
                 .is_some_and(|value| value.as_bool().unwrap_or_else(|| value.as_i64() == Some(1)));
             row.insert("sql_available".into(), Value::Bool(available));
-            decode_row(row)
-        })
-        .collect::<Result<_, _>>()?;
-    Ok((transaction, records))
+            Ok(())
+        },
+    )
+    .await
 }
 
 /// One artifact reference names each digest per invocation, so a statement finds its SQL by digest.

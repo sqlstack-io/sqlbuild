@@ -3,9 +3,9 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::planner_phases::models::{
-    PlannerIdentityContext, PlannerRuntime, PlannerWarehouseState,
-};
+use crate::planner_phases::models::PlannerIdentityContext;
+use crate::planner_phases::models::PlannerRuntime;
+use crate::planner_phases::models::PlannerWarehouseState;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use sqlbuild_python_project::planner_scope::models::RetainedScope;
 
@@ -50,8 +50,8 @@ pub(crate) fn read_planner_runtime<'py>(
     };
     Some(match name {
         "project" => (&this.project).into_bound_py_any(py),
-        "adapter" => (&this.adapter).into_bound_py_any(py),
-        "connection" => (&this.connection).into_bound_py_any(py),
+        "dialect" => (&this.dialect).into_bound_py_any(py),
+        "reads" => (&this.reads).into_bound_py_any(py),
         "project_config" => (&this.project_config).into_bound_py_any(py),
         "local_config" => (&this.local_config).into_bound_py_any(py),
         "on_progress" => (&this.on_progress).into_bound_py_any(py),

@@ -587,12 +587,13 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
     "test_case",
     [
         WorkerExecutionTestCase(
-            description="opposing parent and independent child limits",
+            description="opposing parent and independent child limits, capped by the launcher",
             model_sql="SELECT 11 AS amount",
             warehouse_query="SELECT amount FROM orders UNION ALL SELECT amount FROM inventory ORDER BY amount",
             expected_status="success",
             expected_rows=[(11,), (23,)],
-            concurrency_limits={"orders_limit": 1, "inventory_limit": 1},
+            pools={"orders_limit": 2, "inventory_limit": 2},
+            launcher_settings={"pool_caps": {"orders_limit": 1, "inventory_limit": 1}},
             files={
                 "models/inventory.sql": (
                     "MODEL (description 'Inventory.', materialized table);\nSELECT 23 AS amount\n"
@@ -601,26 +602,26 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
                     'name = "orders_job"\n'
                     'description = "Build orders."\n'
                     'select = "orders"\n'
-                    'concurrency_groups = ["inventory_limit"]\n'
+                    "pools = { inventory_limit = 1 }\n"
                 ),
                 "orchestration/jobs/inventory_job.toml": (
                     'name = "inventory_job"\n'
                     'description = "Build inventory."\n'
                     'select = "inventory"\n'
-                    'concurrency_groups = ["orders_limit"]\n'
+                    "pools = { orders_limit = 1 }\n"
                 ),
                 "orchestration/job_groups/annual_orders_job_group.toml": (
                     'name = "annual_orders_job_group"\n'
                     'description = "Orders group."\n'
                     'jobs = ["orders_job"]\n'
-                    'concurrency_groups = ["orders_limit"]\n'
+                    "pools = { orders_limit = 1 }\n"
                     'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
                 "orchestration/job_groups/annual_inventory_job_group.toml": (
                     'name = "annual_inventory_job_group"\n'
                     'description = "Inventory group."\n'
                     'jobs = ["inventory_job"]\n'
-                    'concurrency_groups = ["inventory_limit"]\n'
+                    "pools = { inventory_limit = 1 }\n"
                     'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
@@ -647,10 +648,14 @@ def test_given_opposing_group_limits_when_scheduled_then_each_group_holds_every_
         )
         assert orders["status"] == inventory["status"] == "success", worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
-            assert control.execute(
-                "SELECT r.job_key, c.group_key, max(c.occupied) FROM test_slot_claims c "
-                "JOIN sqb_runs r ON r.run_id=c.run_id GROUP BY r.job_key, c.group_key ORDER BY r.job_key"
-            ).fetchall() == [
+            assert [
+                (job_key, group_key.rsplit("/", 1)[-1], occupied)
+                for job_key, group_key, occupied in control.execute(
+                    "SELECT r.job_key, c.group_key, max(c.occupied) FROM test_slot_claims c "
+                    "JOIN sqb_runs r ON r.run_id=c.run_id GROUP BY r.job_key, c.group_key "
+                    "ORDER BY r.job_key, c.group_key"
+                )
+            ] == [
                 ("annual_inventory_job_group", "inventory_limit", 1),
                 ("annual_inventory_job_group", "orders_limit", 1),
                 ("annual_orders_job_group", "inventory_limit", 1),

@@ -1,6 +1,6 @@
 //! One bounded platform page yields matched run requests and a storage-order cursor.
 
-use crate::platform::main::read_platform_events::read_platform_events;
+use crate::platform::main::installation::read_platform_events::read_platform_events;
 use crate::platform::models::PlatformEventKind;
 use crate::sensors::_helpers::requests::queue_sensor_run;
 use crate::sensors::models::SensorRequests;

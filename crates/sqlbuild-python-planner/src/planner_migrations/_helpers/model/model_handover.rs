@@ -1,6 +1,7 @@
 //! Adapt immutable migration fingerprints without changing their persisted representation.
 
-use crate::planner_migrations::_helpers::column::column_objects::{replace, text};
+use crate::planner_migrations::_helpers::column::column_objects::replace;
+use crate::planner_migrations::_helpers::column::column_objects::text;
 use crate::planner_migrations::constants::MIGRATION_MODEL_NAME_METADATA_KEY;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};

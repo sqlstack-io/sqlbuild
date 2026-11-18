@@ -1,13 +1,13 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use crate::platform::_helpers::retention::retain;
-use crate::platform::_helpers::watchdog::scan_health;
-use crate::platform::main::report_location_health::report_location_health;
-use crate::platform::main::run_maintenance::run_maintenance;
+use crate::platform::_helpers::maintenance::retention::retain;
+use crate::platform::_helpers::maintenance::watchdog::scan_health;
+use crate::platform::main::health::report_location_health::report_location_health;
+use crate::platform::main::installation::run_maintenance::run_maintenance;
 use crate::platform::models::{LocationHealth, LocationHealthReport, PlatformEvent};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::migrate_store::migrate_store;

@@ -50,12 +50,12 @@ exclude = "tag:deprecated"
 targets = ["production"]
 owner = "Orders team"
 overlap = "skip"
-concurrency_groups = ["warehouse_heavy"]
+pools = { warehouse_heavy = 1 }
 schedule = { cron = "0 2 * * *", timezone = "Europe/London" }
 
-[on_failure]
-retries = 2
-retry_delay_seconds = 600
+[retry]
+attempts = 3
+delay_seconds = 600
 
 [settings]
 concurrency = 4
@@ -75,10 +75,10 @@ cpus = 2
 | `targets` | No | The targets the job exists in; all targets when omitted |
 | `owner` | No | Shown on the job's page and in the job list |
 | `overlap` | No | `queue` (default) or `skip`; see [Skip overlapping runs](/docs/cli/server#skip-overlapping-runs-and-retry-failures) |
-| `concurrency_groups` | No | Server concurrency limits the job's runs share |
+| `pools` | No | Slots the job takes of each [pool](/docs/concepts/concurrency#jobs-sharing-something-else-pools), such as `{ warehouse_heavy = 1 }` |
 | `schedule` | No | When the server starts the job; see below |
-| `[on_failure]` | No | `retries` from 1 to 10, `retry_delay_seconds` from 0 to 86400 |
-| `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh` or `changed` |
+| `[retry]` | No | `attempts`, the most runs in all, from 2 to 11, and `delay_seconds` from 0 to 86400; see [Retry failures](/docs/cli/server#skip-overlapping-runs-and-retry-failures) |
+| `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh`, `changed` or `ignore_audit_failures` ([Ignoring audit failures](/docs/concepts/audits#ignoring-audit-failures)) |
 | `[resources]` | No | Docker worker limits; see [Limit worker containers](/docs/cli/server#limit-worker-containers) |
 
 A job's `[settings]` cannot set `select` or `exclude`: the job's own selection is the run's
@@ -91,7 +91,10 @@ reports a job or sensor `select` that names more than three nodes one by one; se
 ## Group jobs
 
 A job group runs its jobs as one run. A job waits for another job in the group when it reads a node
-that job builds. Jobs that wait on each other, directly or through other members, are a cycle, and
+that job builds, directly or through nodes no job in the group builds. It waits only for the
+nearest such jobs: what they read is their own wait, so a node further upstream, such as a function
+many jobs build, adds no more waits. A job never waits for the other jobs that build a node it
+builds itself. Jobs that wait on each other, directly or through other members, are a cycle, and
 `sqb compile` reports every cycle in the group as one `D017` error.
 
 ```toml
@@ -103,11 +106,53 @@ schedule = { cron = "0 3 * * *", timezone = "UTC" }
 ```
 
 A group takes `name`, `description` and `jobs`, and the same `targets`, `owner`, `overlap`,
-`concurrency_groups`, `schedule` and `[on_failure]` as a job. Its members are jobs, never other
+`pools`, `schedule` and `[retry]` as a job. Its members are jobs, never other
 groups.
+
+When a location publishes, it records why each member waits, node by node: a node of the earlier
+job feeds a node of the waiting job, directly or through nodes no member selects, such as a source
+between a loader job and the models that read it. The job's page shows these reasons.
 
 A job that reads a seed or a node that several members build waits for all of those members. Give
 seeds and shared nodes their own job, so the jobs that read them wait only for that job.
+
+### Choose what happens after a failure
+
+`[dependencies]` sets how a member reacts when a job it depends on fails:
+
+```toml
+# orchestration/job_groups/nightly_job_group.toml
+name = "nightly_job_group"
+description = "Orders, inventory and the partner export"
+jobs = ["orders_job", "inventory_job", "partner_export_job"]
+schedule = { cron = "0 21 * * *", timezone = "UTC" }
+
+[dependencies]
+wait_for = "job"
+on_failure = "partial"
+
+[dependencies.partner_export_job]
+on_failure = "skip"
+```
+
+| Setting | Value | Meaning |
+| --- | --- | --- |
+| `wait_for` | `job` (default) | A member starts once the jobs it reads from have finished |
+| `on_failure` | `partial` (default) | Build what can still be built; nodes downstream of a failed node are skipped |
+| | `skip` | Don't run the member; all its nodes end skipped and the member ends `skipped` |
+| | `run` | Run every node of the member regardless |
+
+- `[dependencies.<job>]` overrides the group's settings for one member, and must name a job in
+  `jobs`. Overrides live in the group file because a job can belong to several groups.
+- A skipped member raises no failure alert and fires `run_event` sensors with `kinds=["skipped"]`,
+  not `"failed"`. The jobs that depend on it react to it as they would to a failure, since what
+  they read was not built.
+- A member job's own `[retry]` runs it again inside the group run, and the jobs that depend on it
+  wait for its final attempt before `on_failure` applies. A group's `[retry]` reruns the whole
+  group's failures once the group run ends; see
+  [Retry failures](/docs/cli/server#skip-overlapping-runs-and-retry-failures).
+- `wait_for = "node"`, which will start each node as soon as the nodes it reads are built, is
+  planned but not available yet; `sqb compile` refuses it, so use `"job"` for now.
 
 ## Schedule a job
 
@@ -169,10 +214,17 @@ on_new_orders = sensor(
 | Condition | Starts a run for |
 | --- | --- |
 | `platform_event(kinds=[...])` | Server events, such as an overdue tick |
-| `run_event(job="...", kinds=[...])` | Outcomes of another job or group, optionally only when `executed_successfully` nodes ran and succeeded |
+| `run_event(job="...", kinds=[...])` | Outcomes of another job or group, including the job's runs inside groups, optionally only when `executed_successfully` nodes ran and succeeded |
 | `node_event(select="...", kinds=[...])` | Each success, failure or recovery of the selected nodes in any run |
 | `source_new_data(select="...")` | Each new version of the selected sources |
 | `source_stale(select="...", after_seconds=...)` | Each source version older than `after_seconds` |
+
+A `run_event` on a job also fires for that job's runs inside a job group. Each member of a group
+run ends with its own outcome as soon as it finishes, while the rest of the group may still be
+running, and `executed_successfully` checks that member's nodes. Moving a job into a group therefore
+keeps every sensor that watches it. A sensor on the group fires once, when the whole group run ends.
+`kinds` takes `success`, `warn`, `partial`, `failed`, `cancelled`, `skipped` (a member its group
+did not run) or `completed` for any of them.
 
 A sensor without `when` decorates a function that polls and returns `RunRequest(run_key=...)`
 values or a `SkipReason`. A sensor also takes `minimum_interval_seconds` (default 30),
@@ -216,6 +268,8 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | `declares a second sensor; each module declares exactly one` | Split the module |
 | `schedule cron: invalid cron expression: Pattern must have 5 fields when seconds are disallowed.` | Write a five-field cron, such as `0 2 * * *` |
 | `job nightly_orders_job resources: cpus must be a positive number` | Set `cpus` above zero |
+| `job 'nightly_orders_job' uses pool 'warehouse_hevy', which [pools] in sqlbuild_project.toml does not declare` | Fix the name, or declare the pool in [`[pools]`](/docs/concepts/project-configuration#pools) |
+| `job 'nightly_orders_job' takes 2 slots of pool 'supplier_api', more than its limit of 1 on target 'production'` | Take fewer slots, or raise the limit in `[targets.production.pools]` |
 | `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
 | `group dependencies contain a cycle in job group daily_orders_job_group: orders_marts_job waits for staging_orders_job (model:orders reads model:stg_orders); staging_orders_job waits for orders_marts_job (model:stg_orders reads seed:regions)` | Move each node to one job, and give seeds and nodes that several members read their own job that runs first |
 

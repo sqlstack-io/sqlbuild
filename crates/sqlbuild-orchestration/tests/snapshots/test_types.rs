@@ -27,3 +27,11 @@ pub(super) struct SnapshotRetentionTestCase {
     pub(super) backend: Backend,
     pub(super) expected_generations: &'static [i64],
 }
+
+#[derive(Debug)]
+pub(super) struct ConnectionDetailsTestCase {
+    pub(super) description: &'static str,
+    pub(super) adapter: &'static str,
+    pub(super) settings: serde_json::Value,
+    pub(super) expected_details: serde_json::Value,
+}

@@ -37,6 +37,8 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--target` | Build against a configured target instead of the active/default target |
 | `--no-tests` | Skip SQL unit tests; a build never runs [Python tests](/docs/cli/test#python-tests) |
 | `--no-audits` | Skip audits |
+| `--ignore-audit-failures` | Run every audit, but let failures through: staged tables are promoted, incremental batches applied and downstream nodes built. Failures are listed as ignored; see [Ignoring audit failures](/docs/concepts/audits#ignoring-audit-failures). Not allowed with `--no-audits` |
+| `--no-ignore-audit-failures` | Let audit failures block the build even where `ignore_audit_failures` is set |
 | `--no-python` | Skip read-side Python tasks and assets (loader-side Python still runs for selected sources) |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--no-cache` | Bypass the reusable compile-analysis cache for this invocation |

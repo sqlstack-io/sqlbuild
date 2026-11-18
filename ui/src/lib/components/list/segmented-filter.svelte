@@ -1,27 +1,38 @@
 <script lang="ts" generics="T extends string">
+	// The UI's one segmented control: a choice of one option out of a few, as filters, views or modes.
 	let {
 		value = $bindable(),
 		options,
-		loading = false
+		loading = false,
+		label,
+		onselect
 	}: {
 		value: T;
-		options: { value: T; label: string; count?: number }[];
+		options: { value: T; label: string; count?: number; title?: string; disabled?: boolean }[];
 		/** Nothing loaded yet: counts would read as zero, so they wait for the list. */
 		loading?: boolean;
+		/** Names the group for screen readers. */
+		label?: string;
+		/** Called with the option picked, for a choice that does more than set `value`. */
+		onselect?: (value: T) => void;
 	} = $props();
 </script>
 
-<div class="segmented-filter" role="tablist">
+<div class="segmented-filter" role="tablist" aria-label={label}>
 	{#each options as o (o.value)}
-		<button role="tab" aria-selected={value === o.value} class:on={value === o.value} onclick={() => (value = o.value)}>
+		<button role="tab" aria-selected={value === o.value} class:on={value === o.value} title={o.title} disabled={o.disabled} onclick={() => ((value = o.value), onselect?.(o.value))}>
 			{o.label}{#if o.count != null && loading}<span class="pending" aria-hidden="true"></span>{:else if o.count != null}<span>{o.count}</span>{/if}
 		</button>
 	{/each}
 </div>
 
 <style>
+	/* Its options wrap onto another row before the control would run past the toolbar. */
 	.segmented-filter {
 		display: flex;
+		width: fit-content;
+		max-width: 100%;
+		flex-wrap: wrap;
 		gap: 2px;
 		padding: 2px;
 		border-radius: 2px;
@@ -40,8 +51,11 @@
 		font-size: 12.5px;
 		white-space: nowrap;
 	}
-	.segmented-filter button:hover {
+	.segmented-filter button:hover:not(:disabled) {
 		color: var(--foreground);
+	}
+	.segmented-filter button:disabled {
+		opacity: 0.45;
 	}
 	.segmented-filter button.on {
 		background: var(--card);

@@ -1,9 +1,9 @@
 //! Selected-scope validation that external source tables exist in the warehouse.
 
-use crate::planner_warehouse::constants::{
-    MISSING_SOURCE_TABLE_CODE, RUN_BOUNDED, WILDCARD_TABLE_CHARACTER,
-};
-use pyo3::IntoPyObject;
+use crate::planner_warehouse::constants::MISSING_SOURCE_TABLE_CODE;
+use crate::planner_warehouse::constants::WILDCARD_TABLE_CHARACTER;
+use crate::planner_warehouse::models::PlannerReads;
+use crate::planner_warehouse::models::Read;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
@@ -13,17 +13,12 @@ use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_help::missing_source_tables_help;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_message::missing_source_tables_message;
 use sqlbuild_analysis::planner_warehouse::models::MissingSourceTable;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
-use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::discovery::main::project::yaml_entry_line::yaml_entry_line;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
-use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
@@ -73,10 +68,14 @@ fn external_table(entry: &Bound<'_, PyAny>) -> PyResult<bool> {
 }
 
 fn read_relation<'py>(
-    adapter: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
     entry: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    Ok(PyString::new(adapter.py(), &render_source_relation(entry, Some(adapter))?).into_any())
+    Ok(PyString::new(
+        dialect.py(),
+        &render_source_relation(entry, Some(dialect.as_any()))?,
+    )
+    .into_any())
 }
 
 fn declaration_location(source: &Bound<'_, PyAny>) -> PyResult<String> {
@@ -98,7 +97,7 @@ fn declaration_location(source: &Bound<'_, PyAny>) -> PyResult<String> {
 /// Raise S405 when a selected resource reads an external source table that does not exist.
 pub(crate) fn check_selected_source_tables_exist<'py>(
     project: &Bound<'py, PyAny>,
-    (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (dialect, reads): (&Bound<'py, Dialect>, &Bound<'py, PlannerReads>),
     scope: &Bound<'py, PyAny>,
     relations: &Bound<'py, PyAny>,
 ) -> PyResult<()> {
@@ -129,38 +128,21 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
         sorted.sort();
         unlisted.push((source, entry, sorted));
     }
-    if unlisted.is_empty() || adapter.is_instance_of::<SyncedCopyAdapter>() {
+    if unlisted.is_empty() {
         return Ok(());
     }
-    let probe = native_field(adapter, "probe_relation_read")?;
-    let mut tasks: Vec<_> = Vec::new();
-    for (_, entry, _) in &unlisted {
-        let fields = keywords(
-            py,
-            &[
-                ("connection", connection.clone()),
-                ("relation", read_relation(adapter, entry)?),
-            ],
-        )?;
-        tasks.push(imported(py, "functools", "partial")?.call((&probe,), Some(&fields))?);
-    }
-    let concurrency: i64 = imported(py, "builtins", "int")?
-        .call1((native_field(adapter, "metadata_inspection_concurrency")?,))?
-        .extract()?;
-    let probes = call_with(
-        &host_entry(py, RUN_BOUNDED)?,
-        &[
-            ("tasks", tuple(py, tasks)?),
-            (
-                "concurrency",
-                concurrency.max(1).into_pyobject(py)?.into_any(),
-            ),
-        ],
-    )?;
+    let relations = || -> PyResult<Vec<Bound<'py, PyAny>>> {
+        unlisted
+            .iter()
+            .map(|(_, entry, _)| read_relation(dialect, entry))
+            .collect()
+    };
+    let Read::Known(probes) = reads.get().reads().read_access(py, &relations)? else {
+        return Ok(());
+    };
     let mut missing: Vec<_> = Vec::new();
     let mut entries: Vec<_> = Vec::new();
-    for ((source, entry, read_by), probe) in unlisted.into_iter().zip(probes.try_iter()?) {
-        let probe = probe?;
+    for ((source, entry, read_by), probe) in unlisted.into_iter().zip(probes) {
         let status = native_field(&probe, "status")?;
         if status.eq("readable")? {
             continue;
@@ -187,7 +169,7 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
         return Ok(());
     }
     for (item, entry) in missing.iter_mut().zip(&entries).take(10) {
-        item.relation = read_relation(adapter, entry)?.str()?.extract()?;
+        item.relation = read_relation(dialect, entry)?.str()?.extract()?;
     }
     let message = missing_source_tables_message(&missing);
     let sources = PyDict::new(py);
@@ -224,16 +206,13 @@ pub(crate) fn check_selected_source_tables_exist_binding<'py>(
         py,
         "check_selected_source_tables_exist",
         options,
-        (
-            &["project", "adapter", "connection", "scope", "relations"],
-            &[],
-        ),
+        (&["project", "dialect", "reads", "scope", "relations"], &[]),
     )?;
     let project = &args.value("project")?;
-    let adapter = &args.value("adapter")?;
-    let connection = &args.value("connection")?;
+    let dialect = &Dialect::passed(args.value("dialect")?)?;
+    let reads = &PlannerReads::passed(args.value("reads")?)?;
     let scope = &args.value("scope")?;
     let relations = &args.value("relations")?;
 
-    check_selected_source_tables_exist(project, (adapter, connection), scope, relations)
+    check_selected_source_tables_exist(project, (dialect, reads), scope, relations)
 }

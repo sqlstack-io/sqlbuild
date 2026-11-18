@@ -6,7 +6,7 @@ use crate::authorization::_helpers::person_grants::{
     GrantDecision, decide_grant, person_role_rows,
 };
 use crate::credentials::models::{Action, DefaultRole, PermissionScope};
-use crate::snapshots::main::read_snapshot_keys::read_snapshot_keys;
+use crate::snapshots::main::reads::read_snapshot_keys::read_snapshot_keys;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};

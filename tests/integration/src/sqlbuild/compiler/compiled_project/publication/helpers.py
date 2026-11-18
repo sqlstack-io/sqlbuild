@@ -443,10 +443,11 @@ def warehouse_history_page(
     table: str,
     after: list[str | None] | None = None,
     observed_since: str | None = None,
+    **options: int | None,
 ) -> Any:
     """Exercise the real isolated reader without a server, state database or declaration import."""
     result: subprocess.CompletedProcess[str] = warehouse_history_read(
-        project, table, after, observed_since
+        project, table, after, observed_since, **options
     )
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
@@ -457,8 +458,14 @@ def warehouse_history_read(
     table: str,
     after: list[str | None] | None = None,
     observed_since: str | None = None,
+    **options: int | None,
 ) -> subprocess.CompletedProcess[str]:
     """One isolated reader exchange, with the reader's own report of a failed read."""
+    read: dict[str, Any] = {
+        "location": {"database": None, "schema": "main"},
+        "after": after,
+        "observed_since": observed_since,
+    } | options
     return subprocess.run(
         [
             str(Path(sys.executable).with_name("sqb")),
@@ -473,16 +480,7 @@ def warehouse_history_read(
             "--target",
             "development",
         ],
-        input=json.dumps(
-            {
-                table: {
-                    "location": {"database": None, "schema": "main"},
-                    "after": after,
-                    "observed_since": observed_since,
-                }
-            }
-        )
-        + "\n",
+        input=json.dumps({table: read}) + "\n",
         text=True,
         capture_output=True,
         timeout=20,
@@ -492,14 +490,16 @@ def warehouse_history_read(
 
 
 def warehouse_history_pages(
-    project: Path, table: str, observed_since: str | None = None
+    project: Path, table: str, observed_since: str | None = None, **options: int | None
 ) -> list[dict[str, Any]]:
     """Follow bounded source pages, including empty filtered pages with a continuation."""
     pages: list[dict[str, Any]] = []
     after: list[str | None] | None = None
     more: bool = True
     while more:
-        page: dict[str, Any] = warehouse_history_page(project, table, after, observed_since)
+        page: dict[str, Any] = warehouse_history_page(
+            project, table, after, observed_since, **options
+        )
         assert "failed" not in page, page
         pages.append(page)
         after = page["next_after"]
@@ -547,6 +547,18 @@ def wait_for_log(
         assert process.poll() is None, log.read_text()
         assert time.monotonic() < deadline, log.read_text()
         time.sleep(0.02)
+
+
+def wait_for_log_count(
+    process: subprocess.Popen[bytes], log: Path, text: str, count: int, *, timeout: float = 45
+) -> str:
+    """Wait until `text` has been logged `count` times; returns the log."""
+    deadline: float = time.monotonic() + timeout
+    while (logged := log.read_text()).count(text) < count:
+        assert process.poll() is None, logged
+        assert time.monotonic() < deadline, logged
+        time.sleep(0.05)
+    return logged
 
 
 def wait_for_development_ready(
@@ -602,7 +614,7 @@ def wait_for_idle_sync(process: subprocess.Popen[bytes], log: Path) -> None:
 
     deadline: float = time.monotonic() + 45
     text: str = log.read_text()
-    while text.rfind("synchronization completed.") < text.rfind("Reading warehouse history"):
+    while text.rfind("synchronization completed") < text.rfind("Reading warehouse history"):
         assert process.poll() is None, text
         assert time.monotonic() < deadline, text
         time.sleep(0.05)
@@ -652,7 +664,7 @@ def wait_for_warehouse_sync_health(
         health = report["report"]["health"]
         assert health["generation"] == 1
         assert health["location"] == {"database": None, "schema": "main"}
-        assert 0 <= health["records_sent"] <= 100
+        assert 0 <= health["records_sent"] <= 2000
         assert health["elapsed_millis"] > 0
         assert bool(health.get("error")) == (expected["failure"] == "read"), health
     return reports
@@ -667,6 +679,7 @@ def wait_for_location_health(
     *,
     minimum_reports: int = 1,
 ) -> dict[str, Any]:
+    """Wait for reports matching every field of `health`; fields it leaves out may differ."""
     deadline: float = time.monotonic() + 15 + 30 * (minimum_reports - 1)
     key: tuple[str, str] = (target, json.dumps(health, sort_keys=True))
     observations: dict[tuple[str, str], dict[str, dict[str, Any]]] = {}
@@ -675,13 +688,42 @@ def wait_for_location_health(
         assert time.monotonic() < deadline, log.read_text()
         for report in reversed(location_health_reports(api)):
             event_id: str = report["report"]["event_id"]
+            reported: dict[str, Any] = report["report"]["health"]
             observed_key: tuple[str, str] = (
                 report["report"]["target"],
-                json.dumps(report["report"]["health"], sort_keys=True),
+                json.dumps({name: reported.get(name) for name in health}, sort_keys=True),
             )
             observations.setdefault(observed_key, {})[event_id] = report
         time.sleep(0.02)
     return list(observations[key].values())[-1]
+
+
+def published_connection_health(
+    api: SnapshotApi,
+    expected: tuple[str, bool],
+    published: tuple[dict[str, Any], str],
+    process: subprocess.Popen[bytes],
+    log: Path,
+) -> dict[str, Any]:
+    """The timed connection check after a snapshot published, on a local DuckDB connection."""
+    target, healthy = expected
+    snapshot, trigger = published
+    health: dict[str, Any] = wait_for_location_health(
+        api,
+        target,
+        {
+            "kind": "connection",
+            "generation": snapshot["record"]["generation"],
+            "healthy": healthy,
+            "trigger": trigger,
+        },
+        process,
+        log,
+    )
+    assert isinstance(health["report"]["health"]["elapsed_millis"], int)
+    connection: dict[str, Any] = snapshot["documents"]["connection"]
+    assert (connection["adapter"], connection["auth_method"]) == ("duckdb", "none")
+    return health
 
 
 def wait_for_interpreter(process: subprocess.Popen[bytes], pidfile: Path, log: Path) -> int:
@@ -868,6 +910,8 @@ def scheduled_worker(
                 'name = "orders"\nadapter = "duckdb"\n'
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 '[targets.development]\nschema = "main"\n'
+                "[pools]\n"
+                + "".join(f"{name} = {limit}\n" for name, limit in test_case.pools.items())
             ),
             "models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n" + test_case.model_sql + "\n"
@@ -931,12 +975,7 @@ def scheduled_worker(
         )
         write_server_config(
             configuration,
-            {
-                "launchers": {
-                    deployment.kind: [launcher],
-                    "concurrency_limits": test_case.concurrency_limits,
-                }
-            },
+            {"launchers": {deployment.kind: [launcher]}},
         )
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:
@@ -1119,7 +1158,6 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
         "selection": selection,
         "write_set": selection,
         "settings": {"full_refresh": True},
-        "concurrency_groups": [],
     }
     with sqlite3.connect(directory / ".sqlbuild/control.sqlite3") as connection:
         _ = connection.execute(
@@ -1771,3 +1809,192 @@ def plan_from_copy(
     outcome: dict[str, Any] = result["result_json"]["outcome"]
     assert outcome["kind"] == "plan", outcome
     return refused, outcome["document"]
+
+
+def changed_build_and_plan_from_copy(
+    tmp_path: Path, project: Path, selection: list[str]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Serve `project` until its first sync completes.
+
+    Returns the changed build the location published after that sync and the location's
+    `--changed` plan of `selection` from the same synced copy.
+    """
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+    started: datetime = datetime.now(UTC)
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "development", 1, location, log)
+        synced: datetime = max(
+            datetime.fromisoformat(report["received_at"])
+            for report in wait_for_warehouse_sync_health(
+                api,
+                {"failure": None, "tables": ["catalog", "consumption", "fingerprints"]},
+                location,
+                log,
+                after=started,
+            )
+        )
+        deadline: float = time.monotonic() + 45
+        published: tuple[str, str] | None = None
+        while published is None or datetime.fromisoformat(published[0]) <= synced:
+            assert location.poll() is None, log.read_text()
+            assert time.monotonic() < deadline, log.read_text()
+            time.sleep(0.05)
+            with closing(sqlite3.connect(control)) as database:
+                published = database.execute(
+                    "SELECT reported_at, report_json FROM sqb_changed_builds"
+                ).fetchone()
+        request_id: str = request_plan(control, selection, {"changed": True})
+        result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
+    outcome: dict[str, Any] = result["result_json"]["outcome"]
+    assert outcome["kind"] == "plan", outcome
+    return json.loads(published[1]), outcome["document"]
+
+
+def plans_from_copy(
+    tmp_path: Path, project: Path, requests: list[tuple[list[str], dict[str, object]]]
+) -> list[dict[str, Any]]:
+    """Serve `project` until its first sync completes, then plan each request from the copy."""
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+    started: datetime = datetime.now(UTC)
+    documents: list[dict[str, Any]] = []
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "development", 1, location, log)
+        _ = wait_for_warehouse_sync_health(
+            api,
+            {"failure": None, "tables": ["catalog", "consumption", "fingerprints"]},
+            location,
+            log,
+            after=started,
+        )
+        for selection, settings in requests:
+            request_id: str = request_plan(control, selection, settings)
+            result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
+            outcome: dict[str, Any] = result["result_json"]["outcome"]
+            assert outcome["kind"] == "plan", outcome
+            documents.append(outcome["document"])
+    return documents
+
+
+def changed_runs(plan: dict[str, Any]) -> tuple[str, ...]:
+    """The nodes a changed plan runs."""
+    return tuple(run["node"] for run in plan["changed"]["runs"])
+
+
+def changed_build_report(plan: dict[str, Any]) -> dict[str, list[str]]:
+    """What a changed build of `plan` reports: the nodes it runs, split by why they run."""
+    runs: list[dict[str, Any]] = plan["changed"]["runs"]
+    changed: list[dict[str, Any]] = list(filter(lambda run: run["downstream_of"] is None, runs))
+    downstream: list[dict[str, Any]] = list(
+        filter(lambda run: run["downstream_of"] is not None, runs)
+    )
+    return {
+        "changed": [run["node"] for run in changed],
+        "downstream": [run["node"] for run in downstream],
+    }
+
+
+def failed_load(tmp_path: Path, project: Path) -> tuple[dict[str, Any], int, str]:
+    """Serve `project` until its first load fails: its health, snapshot API status and log."""
+    log: Path = tmp_path / "location.log"
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        report: dict[str, Any] = wait_for_location_health(
+            api, "development", {"kind": "compile_failed"}, location, log
+        )
+        with pytest.raises(HTTPError) as missing:
+            _ = current_snapshot(api, "development")
+    return report["report"]["health"], missing.value.code, log.read_text()
+
+
+def plan_before_sync(
+    tmp_path: Path, project: Path, settings: dict[str, object]
+) -> tuple[dict[str, Any], str]:
+    """Serve `project` until it publishes, then plan from its copy without waiting for a sync."""
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "dev",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "dev", 1, location, log)
+        request_id: str = request_plan(control, [], settings)
+        result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
+    return result["result_json"]["outcome"], log.read_text()

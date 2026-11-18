@@ -6,9 +6,10 @@ use pyo3::types::{PyBool, PyInt, PyString};
 use sqlbuild_core::lifecycle_events::main::validate_known_event::validate_known_event;
 use sqlbuild_core::lifecycle_events::models::KnownEventFacts;
 
-use crate::lifecycle_events::_helpers::payloads::{
-    PathSegment, frozen, object_entries, validation_error,
-};
+use crate::lifecycle_events::_helpers::payloads::PathSegment;
+use crate::lifecycle_events::_helpers::payloads::frozen;
+use crate::lifecycle_events::_helpers::payloads::object_entries;
+use crate::lifecycle_events::_helpers::payloads::validation_error;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 

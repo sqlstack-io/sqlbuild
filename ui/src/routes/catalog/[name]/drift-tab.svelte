@@ -10,10 +10,10 @@
 
 <div class="drift">
 	<div class="bar">
-		<span class="label">As built in this location</span>
+		<span class="label">Last build</span>
 		<BuildSource build={node.lastBuild} />
 		{#if node.lastBuild}<span class="fp" title="Fingerprint of the last build">last build <code>{node.lastBuild.fingerprint.slice(0, 12)}</code></span>{/if}
-		<span class="reasons"><StaleBadges reasons={node.stale.filter((r) => r.reason !== 'behind')} empty="Matches the last build" /></span>
+		<span class="reasons"><StaleBadges reasons={node.stale.filter((r) => r.reason !== 'behind')} empty="No drift" /></span>
 	</div>
 	<div class="viewer">{@render children()}</div>
 </div>

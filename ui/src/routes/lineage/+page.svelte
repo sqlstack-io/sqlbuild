@@ -1,33 +1,48 @@
 <script lang="ts">
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import GraphToolbar from '$lib/components/graph/graph-toolbar.svelte';
+	import { countBy } from '$lib/list/count-by';
+	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
+	import { createSelection } from '$lib/state/selection.svelte';
+	import { readSelectionParams } from '$lib/selection/command';
+	import { isKnownType } from '$lib/selection/syntax';
+	import { plural } from '$lib/format/plural';
 	import Loading from '$lib/components/loading.svelte';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import '@xyflow/svelte/dist/style.css';
-	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
+	import { type Node, type Edge } from '@xyflow/svelte';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FolderNode from '$lib/components/lineage/folder-node.svelte';
+	import StubNode from '$lib/components/lineage/stub-node.svelte';
+	import XIcon from '@lucide/svelte/icons/x';
 	import FolderIcon from '@lucide/svelte/icons/folder';
+	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import NodeFieldsPopover from '$lib/components/lineage/node-fields-popover.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import FocusIcon from '@lucide/svelte/icons/focus';
 	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
 	import PanelLeftIcon from '@lucide/svelte/icons/panel-left';
-	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
-	import SearchIcon from '@lucide/svelte/icons/search';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import { layoutGraph } from '$lib/lineage/layout';
 	import { nodeFields } from '$lib/lineage/node-fields.svelte';
-	import { neighbourEdgeIds, tracePath } from '$lib/lineage/trace';
+	import { tracePath } from '$lib/lineage/trace';
+	import { edgeStyle, edgesTouching } from '$lib/lineage/visible-edges';
+	import CountEdge from '$lib/lineage/count-edge.svelte';
 	import { outlineSql } from '$lib/sql/outline';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
 	import SqlViewer from '$lib/components/code/sql-viewer.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
+	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
+	import ViewSummaryPanel from '$lib/components/lineage/view-summary.svelte';
+	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
+	import { viewSummary } from '$lib/lineage/view-summary';
 	import { tick, untrack } from 'svelte';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
-	import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
+	import { READABLE_ZOOM, anchoredViewport, absolutePosition as positionOn } from '$lib/lineage/fit';
+	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
 	import { scaleGraph } from '$lib/mock/scale-graph';
 	import { layoutDag } from '$lib/lineage/graph-layout';
@@ -42,58 +57,116 @@
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { catalogNodes as sharedCatalog, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
-	import { GROUPED_ABOVE, catalogGraph, cardData, cardStatus, folderOf, groupedGraph, withFoldersOpen } from '$lib/lineage/catalog-graph';
+	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
+	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
+	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
+	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
+	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
 
 	let browserOpen = $state(false);
-	let inspectorOpen = $state(true);
+	// Closed until something is selected, then as the person last left it (remembered in this browser).
+	const details = createDetailsPanel('lineage', () => selectedNodes.length > 0);
+	const inspectorOpen = $derived(details.open);
 	let neighbourhoodOnly = $state(false);
-	let modelQuery = $state('');
 
-	const nodeTypes = { asset: AssetNode, folder: FolderNode };
+	const nodeTypes = { asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode, stub: StubNode };
+	const edgeTypes = { count: CountEdge };
 	// Automatic fits stop at a zoom where cards stay readable; the fit button and the wheel go further, to the whole graph.
-	const FIT_FLOOR = 0.3;
+	const FIT_FLOOR = READABLE_ZOOM;
 
 	// The graph is the catalog: every node in the current snapshot with its
 	// build state. Later refreshes update card data in place so positions,
 	// selection and focus survive.
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['runs', 'checks', 'snapshot', 'node_status']);
+	const catalog = useCatalogNodes();
 	const catalogByKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
-	const initialFocus = page.url.searchParams.get('select');
+	// `?focus=key` opens on one node. Older links put the node's key in `select`: a key such as
+	// `model:orders` is no selector, so it is read as the focus rather than as a selection.
+	const linked = readSelectionParams(page.url.searchParams);
+	const legacyFocus = /^[a-z_]+:\S+$/.test(linked.select) && !isKnownType(linked.select.slice(0, linked.select.indexOf(':'))) ? linked.select : null;
+	const initialFocus = page.url.searchParams.get('focus') ?? legacyFocus ?? (/^[^\s,~+*:/]+$/.test(linked.select) ? linked.select : null);
+	// The selection bar: what `sqb build -s … --exclude …` selects; the rest of the graph is dimmed.
+	const selection = createSelection({ url: true, initial: legacyFocus ? { ...linked, select: '' } : linked });
+	/** Node names for the selection bar, as a bare name selects them, with their folder. */
+	const selectionNames = $derived((catalog.data ?? []).map((n) => ({ value: shortName(n.key), hint: folderOf(n) })));
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
 	// The first graph is built a frame after the listing arrives, so the page and its loading state
 	// paint before the cards are created and laid out, which takes a moment on a large project.
 	let building = false;
+	let initialised = false;
 	let fitted = $state(false);
-	// A large project opens with each folder as one card; opening a folder draws its nodes.
+	// A large project opens with each folder as one card; opening a folder draws a box around what it
+	// holds. The side list shares the open folders.
 	let grouped = $state(false);
 	let expanded = $state<ReadonlySet<string>>(new Set());
-	const graphOf = (data: CatalogNode[]) => (grouped ? groupedGraph(data, expanded) : catalogGraph(data));
+	const tree = $derived<FolderTree>(folderTree(catalog.data ?? []));
+	// The side list's folder tree opens and closes on its own; its chevrons never change what is drawn.
+	let treeOpen = $state<ReadonlySet<string>>(new Set());
+	// Folders picked in the side list: the canvas draws only them, with stubs for lineage outside them.
+	// Kept in the URL so a reload or a shared link shows the same folders.
+	let selectedFolders = $state<string[]>([]);
+	// Nodes picked elsewhere, such as a provider's code from its Used by tab, drawn instead of folders.
+	// Also kept in the URL; picking folders replaces them.
+	let pickedNodes = $state<string[]>([]);
+	// "Show the N out of date" from the too-many card: only nodes that are out of date.
+	let staleOnly = $state(false);
+	// "Pick folders" highlights the side list until a folder is picked.
+	let pickHighlight = $state(false);
+	// Laying out thousands of cards in the browser would hang the page, so past the cap nothing is drawn.
+	let tooMany = $state(false);
+	let tooManyCount = $state(0);
+	const graphOf = (data: CatalogNode[]) =>
+		lineageGraph(data, { grouped, open: expanded, selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree: folderTree(data), onclose: closeFolder, onadd: addFolder });
+	/** Shows the graph, or the cap's message instead of a graph too large to lay out. */
+	function draw(graph: { nodes: Node[]; edges: Edge[] }, selected: ReadonlySet<string>) {
+		tooMany = tooManyToDraw(graph);
+		tooManyCount = graph.nodes.length;
+		if (tooMany) {
+			pendingCentre = null;
+			nodes = [];
+			edges = [];
+			// The side list can still open and close folders.
+			browserOpen = true;
+			return;
+		}
+		nodes = graph.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
+		edges = graph.edges;
+	}
 	$effect(() => {
 		const data = catalog.data;
 		if (!data || scaleMode) return;
 		untrack(() => {
-			if (!nodes.length) {
+			if (!initialised) {
 				if (building) return;
 				building = true;
 				requestAnimationFrame(() =>
 					setTimeout(() => {
 						building = false;
 						const latest = catalog.data;
-						if (!latest || nodes.length) return;
+						if (!latest || initialised) return;
+						initialised = true;
 						const focus = latest.find((n) => n.key === initialFocus) ?? null;
-						grouped = latest.length > GROUPED_ABOVE;
-						if (focus) expanded = withFoldersOpen(focus, expanded);
-						const graph = graphOf(latest);
-						nodes = graph.nodes.map((n) => (n.id === focus?.key ? { ...n, selected: true } : n));
-						edges = graph.edges;
+						const latestTree = folderTree(latest);
+						pickedNodes = parseNodes(page.url.searchParams.get(NODES_PARAM), new Set(latest.map((n) => n.key)));
+						selectedFolders = pickedNodes.length ? [] : parseFolders(page.url.searchParams.get(FOLDERS_PARAM), latestTree);
+						// The same rule at every scope: drawn by folder when the scope is large.
+						grouped = opensByFolder(shownNodes(latest, { selected: selectedFolders, picked: new Set(pickedNodes), tree: latestTree }).length);
+						if (selectedFolders.length) {
+							treeOpen = new Set(selectedFolders.flatMap((f) => foldersToOpen(latestTree, [f]).filter((open) => open !== f)));
+						}
+						if (focus) {
+							expanded = withFoldersOpen(latestTree, focus.key, expanded);
+							treeOpen = withFoldersOpen(latestTree, focus.key, treeOpen);
+						}
+						draw(graphOf(latest), new Set(focus ? [focus.key] : []));
 					})
 				);
 				return;
 			}
+			if (tooMany) return;
 			const fresh = new Map(graphOf(data).nodes.map((n) => [n.id, n.data]));
 			nodes = nodes.map((n) => {
 				const card = fresh.get(n.id);
@@ -103,22 +176,113 @@
 	});
 
 	/** Redraws the graph after folders open or close, keeping the selection; the layout effect then places it. */
-	function regroup(next: { grouped?: boolean; expanded?: ReadonlySet<string> }) {
+	// The view fits the graph only on first load, a scope or filter change, and the Fit button. Opening or
+	// closing a folder keeps the clicked box where it was on screen instead (`anchor`).
+	let pendingFit = true;
+	let anchor: { id: string; before: { x: number; y: number }; view: Viewport } | null = null;
+	function regroup(next: { grouped?: boolean; expanded?: ReadonlySet<string>; fit?: boolean }) {
+		if (next.fit) pendingFit = true;
 		const data = catalog.data;
 		if (!data) return;
 		grouped = next.grouped ?? grouped;
 		expanded = next.expanded ?? expanded;
 		const selected = new Set(nodes.filter((n) => n.selected).map((n) => n.id));
-		const graph = graphOf(data);
 		neighbourhoodOnly = false;
 		// The card under the pointer may be gone, and it never reports the pointer leaving.
 		hoveredId = null;
 		lastLayoutKey = '';
-		nodes = graph.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
-		edges = graph.edges;
+		draw(graphOf(data), selected);
 	}
-	function openFolder(group: string) {
-		regroup({ expanded: new Set([...expanded, group]) });
+	/** Opens or closes a folder in the graph and the side list; drawing every node leaves the graph as it is. */
+	function setOpen(next: ReadonlySet<string>) {
+		if (grouped) regroup({ expanded: next });
+		else expanded = next;
+	}
+	/** Keeps the clicked card or box, `from`, on screen where it is once it is redrawn as `to`. */
+	function anchorOn(from: string, to: string) {
+		const before = positionOn(nodes, from);
+		anchor = before ? { id: to, before, view: viewport } : null;
+	}
+	function openFolder(folder: string) {
+		anchorOn(folderCardId(folder), folderBoxId(folder));
+		setOpen(new Set([...expanded, folder]));
+	}
+	function closeFolder(folder: string) {
+		anchorOn(folderBoxId(folder), folderCardId(folder));
+		setOpen(withFolderClosed(expanded, folder));
+	}
+	/** Opens or closes a folder in the side list only. */
+	function toggleTreeFolder(folder: string) {
+		treeOpen = treeOpen.has(folder) ? withFolderClosed(treeOpen, folder) : new Set([...treeOpen, folder]);
+	}
+
+	/** Draws only the given folders, or every folder when empty, and keeps the choice in the URL. Picked nodes give way to folders. */
+	function setFolderSelection(next: string[]) {
+		selectedFolders = next;
+		pickedNodes = [];
+		pickHighlight = false;
+		expandNote = '';
+		const url = new URL(page.url);
+		const param = foldersParam(next);
+		if (param) url.searchParams.set(FOLDERS_PARAM, param);
+		else url.searchParams.delete(FOLDERS_PARAM);
+		url.searchParams.delete(NODES_PARAM);
+		if (url.search !== page.url.search) void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+		// A folder filter is the default view scoped to the folders: their subfolders start closed.
+		regroup({ grouped: scopeOpensByFolder(next), expanded: new Set(), fit: true });
+	}
+	/** Whether the scope draws by folder, as the default view decides for the whole project. */
+	function scopeOpensByFolder(selected: string[] = selectedFolders): boolean {
+		return opensByFolder(shownNodes(catalogNodes, { selected, picked: new Set(pickedNodes), staleOnly, tree }).length);
+	}
+	// "Expand all" opens every folder in the scope up to the drawing cap; this says where it stopped.
+	let expandNote = $state('');
+	function expandEverything() {
+		const result = expandAll(scopeTree(), expanded, pickedNodes.length ? [] : selectedFolders);
+		expandNote = result.complete ? '' : `Opened ${result.opened} of ${result.total} folders; opening more would draw over ${MAX_DRAWN.toLocaleString('en')} cards`;
+		regroup({ expanded: result.open });
+	}
+	function collapseEverything() {
+		expandNote = '';
+		regroup({ expanded: new Set() });
+	}
+	/** The folder tree of what the scope draws, as the graph builds it. */
+	function scopeTree(): FolderTree {
+		const shown = shownNodes(catalogNodes, { selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree });
+		return shown.length === catalogNodes.length ? tree : folderTree(shown);
+	}
+	/** Draws the picked nodes and keeps them in the URL. */
+	function setPickedNodes(next: string[]) {
+		pickedNodes = next;
+		const url = new URL(page.url);
+		url.searchParams.set(NODES_PARAM, next.join(','));
+		if (url.search !== page.url.search) void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+		regroup({ fit: true });
+	}
+	/** Adds a folder to what is drawn: a stub's click, Ctrl/⌘-click or a tree checkbox. With picked nodes, a stub adds its folder's nodes to them. */
+	function addFolder(folder: string) {
+		if (pickedNodes.length) {
+			const add = catalogNodes.filter((n) => inSelection(tree, n.key, [folder])).map((n) => n.key);
+			setPickedNodes([...new Set([...pickedNodes, ...add])]);
+			return;
+		}
+		setFolderSelection(withFolderAdded(selectedFolders, folder));
+	}
+	/** A click on a tree folder draws only it; Ctrl/⌘-click adds or removes it. */
+	function pickFolder(folder: string, event: MouseEvent) {
+		setFolderSelection(event.metaKey || event.ctrlKey ? withFolderToggled(selectedFolders, folder) : [folder]);
+	}
+	function clearSelection() {
+		staleOnly = false;
+		setFolderSelection([]);
+	}
+	function showOutOfDate() {
+		staleOnly = true;
+		regroup({ grouped: scopeOpensByFolder(), expanded: new Set(), fit: true });
+	}
+	function pickFolders() {
+		browserOpen = true;
+		pickHighlight = true;
 	}
 
 	// Scale testing: /lineage?models=2000 swaps in a synthetic warehouse-shaped graph.
@@ -247,14 +411,12 @@
 			return tracePath(selectedIds, edges);
 		}
 		if (hoveredId) {
-			return { nodes: new Set([hoveredId]), edges: neighbourEdgeIds(hoveredId, edges) };
+			// A hovered box lights the edges of everything inside it.
+			return { nodes: new Set([hoveredId]), edges: edgesTouching(hoveredId, edges, nodes) };
 		}
 		return null;
 	});
 
-	const EDGE_NEUTRAL = 'stroke: var(--sb-edge); stroke-width: 1.5;';
-	const EDGE_ON = 'stroke: var(--primary); stroke-width: 2;';
-	const EDGE_DIM = 'stroke: var(--sb-edge-dim); stroke-width: 1.2;';
 
 	// Apply highlight styling back into the bound arrays whenever the lit set
 	// changes. Guarded so it doesn't fight drag/selection (only touches style
@@ -263,7 +425,9 @@
 		const l = lit;
 		let edgesChanged = false;
 		const nextEdges = edges.map((e) => {
-			const style = !l ? EDGE_NEUTRAL : l.edges.has(e.id) ? EDGE_ON : EDGE_DIM;
+			// Thickness keeps saying how many node links an edge stands for, lit or dimmed.
+			const count = (e.data as { count?: number } | undefined)?.count ?? 1;
+			const style = edgeStyle(count, !l ? 'neutral' : l.edges.has(e.id) ? 'on' : 'dim');
 			const animated = !!l && l.edges.has(e.id) && selectedIds.size > 0;
 			if (e.style !== style || e.animated !== animated) edgesChanged = true;
 			return { ...e, style, animated };
@@ -273,7 +437,8 @@
 		let nodesChanged = false;
 		const filtering = filterActive;
 		const nextNodes = nodes.map((n) => {
-			const dimmed = (!!l && !l.nodes.has(n.id)) || (filtering && !matchesFilter(n));
+			// A box only frames its cards, which dim on their own.
+			const dimmed = n.type !== 'folderBox' && ((!!l && !l.nodes.has(n.id)) || (filtering && !matchesFilter(n)));
 			if (n.data.dimmed !== dimmed) nodesChanged = true;
 			return dimmed === n.data.dimmed ? n : { ...n, data: { ...n.data, dimmed } };
 		});
@@ -311,73 +476,113 @@
 	const hasDrift = $derived(hasSql && !!d?.builds.length);
 
 	// ---- toolbar filters: non-matching nodes are dimmed ----
-	let kindFilter = $state('');
-	let groupFilter = $state('');
-	let statusFilter = $state<'' | 'stale' | 'changed' | 'behind' | 'failed'>('');
-	const filterActive = $derived(!!(kindFilter || groupFilter || statusFilter));
+	type StatusFilter = 'stale' | 'changed' | 'behind' | 'failed';
+	// Kind and folder are part of the selection (`kind:`, `path:`); Status only changes the view.
+	let statusFilter = $state<StatusFilter[]>([]);
+	const filterActive = $derived(!!(statusFilter.length || selection.active));
 	function matchesFilter(n: Node): boolean {
 		if (n.type === 'folder') return catalogNodes.some((c) => `${folderOf(c)}/`.startsWith(`${n.data.group}/`) && matchesCatalog(c));
 		const c = catalogByKey.get(n.id);
 		return c ? matchesCatalog(c) : !filterActive;
 	}
 	function matchesCatalog(c: CatalogNode): boolean {
-		if (kindFilter && c.kind !== kindFilter) return false;
-		if (groupFilter && c.group !== groupFilter) return false;
-		return matchesFilterStatus(c, statusFilter);
+		if (!selection.has(c.key)) return false;
+		return !statusFilter.length || statusFilter.some((f) => matchesFilterStatus(c, f));
 	}
-	function matchesFilterStatus(c: CatalogNode, f: typeof statusFilter): boolean {
+	function matchesFilterStatus(c: CatalogNode, f: StatusFilter): boolean {
 		if (f === 'stale') return (c.stale?.length ?? 0) > 0;
 		if (f === 'changed') return !!c.stale?.some((r) => r.reason !== 'behind');
 		if (f === 'behind') return !!c.stale?.some((r) => r.reason === 'behind');
-		if (f === 'failed') return c.lastOutcome === 'failed';
-		return true;
+		return c.lastOutcome === 'failed';
 	}
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
 	/** Nodes whose own definition changed, which `sqb build --changed` starts from. */
 	const changedCount = $derived(catalogNodes.filter((c) => c.stale?.some((r) => r.reason === 'changed')).length);
-	const kindOptions = $derived(NODE_KINDS.filter((k) => catalogNodes.some((n) => n.kind === k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: catalogNodes.filter((n) => n.kind === k).length })));
-	const groupOptions = $derived([...new Set(catalogNodes.flatMap((n) => (n.group === null ? [] : [n.group])))].map((g) => ({ value: g, label: g, count: catalogNodes.filter((n) => n.group === g).length })));
-	const statusOptions = [
-		{ value: 'stale' as const, label: 'Stale' },
-		{ value: 'changed' as const, label: 'Stale · changed' },
-		{ value: 'behind' as const, label: 'Stale · behind' },
-		{ value: 'failed' as const, label: 'Last build failed' }
+	/** The location's plan of what changed when it has one, else the definition changes with the downstream count unknown. */
+	const changedCounts = $derived(changedBuildCounts(changedCount, sharedCatalog.view.changedBuild));
+	const changedLabel = $derived(changedBuildLabel(changedCounts.changed, changedCounts.downstream, 'bar', changedCounts.failing));
+	const outOfDateCount = $derived(catalogNodes.filter((c) => (c.stale?.length ?? 0) > 0).length);
+	/** The toolbar chip's text, e.g. "orders, inventory"; empty when every folder is drawn. */
+	const selectionLabel = $derived.by(() => {
+		if (pickedNodes.length) return plural(pickedNodes.length, 'picked node');
+		const parts = selectedFolders.length > 3 ? [...selectedFolders.slice(0, 3), `${selectedFolders.length - 3} more`] : [...selectedFolders];
+		if (staleOnly) parts.push(`${outOfDateCount.toLocaleString('en')} out of date`);
+		return parts.join(', ');
+	});
+	/** Whether a tree folder is drawn because a folder around it is selected. */
+	const inSelectedFolder = (folder: string) => selectedFolders.some((s) => folder.startsWith(`${s}/`));
+	const statusOptions: { value: StatusFilter; label: string }[] = [
+		{ value: 'stale', label: 'Stale' },
+		{ value: 'changed', label: 'Stale · changed' },
+		{ value: 'behind', label: 'Stale · behind' },
+		{ value: 'failed', label: 'Last build failed' }
 	];
+	const byStatus = $derived(countBy(catalogNodes, (c) => statusOptions.filter((o) => matchesFilterStatus(c, o.value)).map((o) => o.value)));
+	// The sidebar's summary with nothing selected: the nodes drawn, and what narrows or dims them.
+	const inView = $derived(viewSummary(shownNodes(catalogNodes, { selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree })));
+	const activeFilters = $derived(
+		[
+			pickedNodes.length ? plural(pickedNodes.length, 'picked node') : '',
+			!pickedNodes.length && selectedFolders.length ? `Folders: ${selectedFolders.join(', ')}` : '',
+			staleOnly ? 'Only nodes out of date' : '',
+			selection.active ? `Selection: ${selection.select || 'every node'}${selection.exclude ? ` except ${selection.exclude}` : ''} (others dimmed)` : '',
+			statusFilter.length ? `Status: ${statusFilter.map((f) => statusOptions.find((o) => o.value === f)?.label ?? f).join(', ')} (others dimmed)` : ''
+		].filter(Boolean)
+	);
 
-	const groupOf = (node: Pick<Node, 'id' | 'data'>) => {
-		const listed = catalogByKey.get(node.id);
-		return listed ? folderOf(listed) : String(node.data.group ?? (String(node.data.kind).startsWith('source') ? 'sources' : 'models'));
-	};
-	let collapsedGroups = $state<Set<string>>(new Set());
-	function toggleGroup(g: string) {
-		const next = new Set(collapsedGroups);
-		next.has(g) ? next.delete(g) : next.add(g);
-		collapsedGroups = next;
-	}
 	// The list names every node, including those inside closed folders.
 	const listNodes = $derived<Pick<Node, 'id' | 'data'>[]>(scaleMode ? nodes : catalogNodes.map((n) => ({ id: n.key, data: cardData(n) })));
 	const browserNodes = $derived(
 		[...listNodes]
-			.filter((node) => String(node.data.name ?? '').toLowerCase().includes(modelQuery.trim().toLowerCase()))
+			.filter((node) => selection.has(node.id))
 			.sort((left, right) => String(left.data.name).localeCompare(String(right.data.name)))
 	);
 
-	const browserGroups = $derived(
-		[...new Set(browserNodes.map(groupOf))]
-			.map((g) => ({ name: g, nodes: browserNodes.filter((n) => groupOf(n) === g) }))
-			.filter((g) => g.nodes.length)
-	);
+	// The side list is the folder tree, opened and closed together with the graph's folders; with a
+	// selection it lists the selected nodes flat, up to a limit, as a project can hold thousands.
+	const LIST_LIMIT = 500;
+	type BrowserRow =
+		| { type: 'folder'; id: string; label: string; depth: number; count: number; open: boolean }
+		| { type: 'node'; id: string; depth: number; node: Pick<Node, 'id' | 'data'> };
+	const folderCounts = $derived.by(() => {
+		const counts = new Map<string, number>();
+		const count = (id: string): number => {
+			const f = tree.folders.get(id)!;
+			const total = f.nodes.length + f.folders.reduce((sum, sub) => sum + count(sub), 0);
+			counts.set(id, total);
+			return total;
+		};
+		tree.roots.forEach(count);
+		return counts;
+	});
+	const browserRows = $derived.by<BrowserRow[]>(() => {
+		if (scaleMode || selection.active) return browserNodes.slice(0, LIST_LIMIT).map((node) => ({ type: 'node' as const, id: node.id, depth: 0, node }));
+		const rows: BrowserRow[] = [];
+		const visit = (id: string, depth: number) => {
+			const f = tree.folders.get(id)!;
+			const open = treeOpen.has(id);
+			rows.push({ type: 'folder', id, label: f.label, depth, count: folderCounts.get(id) ?? 0, open });
+			if (!open) return;
+			for (const sub of f.folders) visit(sub, depth + 1);
+			const listed = f.nodes.flatMap((key) => catalogByKey.get(key) ?? []).sort((a, b) => a.key.localeCompare(b.key));
+			for (const n of listed) rows.push({ type: 'node', id: n.key, depth: depth + 1, node: { id: n.key, data: cardData(n) } });
+		};
+		tree.roots.forEach((root) => visit(root, 0));
+		return rows;
+	});
 
 	// immediate upstream/downstream of the selected model (for the Lineage tab); with folders drawn,
 	// from the catalog, as an edge to a closed folder doesn't name the node it reaches
 	const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id;
+	// A narrowed graph leaves out neighbours and draws stubs in their place, so it lists from the catalog too.
+	const fromCatalog = $derived(grouped || selectedFolders.length > 0 || pickedNodes.length > 0 || staleOnly);
 	const upstream = $derived(
-		!primary ? [] : grouped ? (catalogByKey.get(primary.id)?.upstream ?? []) : edges.filter((e) => e.target === primary.id).map((e) => nameOf(e.source))
+		!primary ? [] : fromCatalog ? (catalogByKey.get(primary.id)?.upstream ?? []) : edges.filter((e) => e.target === primary.id).map((e) => nameOf(e.source))
 	);
 	const downstream = $derived(
 		!primary
 			? []
-			: grouped
+			: fromCatalog
 				? catalogNodes.filter((n) => n.upstream.includes(primary.id)).map((n) => n.key)
 				: edges.filter((e) => e.source === primary.id).map((e) => nameOf(e.target))
 	);
@@ -411,7 +616,54 @@
 		if (id) selectModel(id);
 	}
 
-	async function selectModel(id: string) {
+	/**
+	 * A node picked in the side list: drawn if it is outside what is shown, then selected and centred,
+	 * as Focus does. The node's own folder joins the selection; "out of date only" ends if it is current.
+	 */
+	async function revealNode(id: string) {
+		const listedNode = catalogByKey.get(id);
+		if (!scaleMode && listedNode) {
+			treeOpen = withFoldersOpen(tree, id, treeOpen);
+			const outsideFolders = selectedFolders.length > 0 && !inSelection(tree, id, selectedFolders);
+			const outsideStale = staleOnly && !listedNode.stale?.length;
+			if (outsideStale) staleOnly = false;
+			const own = tree.chains.get(id)?.at(-1);
+			if (pickedNodes.length && !pickedNodes.includes(id)) setPickedNodes([...pickedNodes, id]);
+			else if (outsideFolders && own) setFolderSelection(withFolderAdded(selectedFolders, own));
+			else if (outsideStale) regroup({ fit: true });
+		}
+		await selectModel(id, true);
+	}
+
+	/** Where a card sits on the canvas; a card inside a folder box is placed relative to the box. */
+	function absolutePosition(id: string): { x: number; y: number } | null {
+		let node = nodes.find((n) => n.id === id);
+		if (!node) return null;
+		let { x, y } = node.position;
+		while (node?.parentId) {
+			node = nodes.find((n) => n.id === node!.parentId);
+			if (node) {
+				x += node.position.x;
+				y += node.position.y;
+			}
+		}
+		return { x, y };
+	}
+	/** A node to centre on once the layout under way has placed it. */
+	let pendingCentre: string | null = null;
+	function centreOn(id: string): boolean {
+		const node = nodes.find((n) => n.id === id);
+		const at = absolutePosition(id);
+		if (!node || !at || !graphPanel || !setFlowViewport || !node.measured?.width) return false;
+		const { width, height } = graphPanel.getBoundingClientRect();
+		const zoom = Math.max(viewport.zoom, 0.75);
+		const w = node.measured.width;
+		const h = node.measured.height ?? 61;
+		setFlowViewport({ zoom, x: width / 2 - (at.x + w / 2) * zoom, y: height / 2 - (at.y + h / 2) * zoom });
+		return true;
+	}
+
+	async function selectModel(id: string, centre = false) {
 		neighbourhoodOnly = false;
 		if (scaleLayout) {
 			focusKeep = null;
@@ -421,11 +673,16 @@
 			return;
 		}
 		const listed = catalogByKey.get(id);
-		if (grouped && listed && !nodes.some((n) => n.id === id)) regroup({ expanded: withFoldersOpen(listed, expanded) });
+		if (grouped && listed && !nodes.some((n) => n.id === id)) regroup({ expanded: withFoldersOpen(tree, id, expanded) });
 		nodes = nodes.map((node) => ({ ...node, hidden: false, selected: node.id === id }));
 		edges = edges.map((edge) => ({ ...edge, hidden: false }));
 		await tick();
-		fitFlow?.({ duration: 220 });
+		if (!centre) {
+			fitFlow?.({ duration: 220 });
+			return;
+		}
+		// A redrawn graph is still to be laid out; the layout centres on the node once it has placed it.
+		if (lastLayoutKey === '' || !centreOn(id)) pendingCentre = id;
 	}
 
 	async function toggleNeighbourhood() {
@@ -486,7 +743,8 @@
 	let layoutKey = $derived(
 		JSON.stringify(nodeFields.value) +
 			'|' +
-			nodes.map((n) => `${n.id}:${Math.round(n.measured?.height ?? 0)}`).join(',')
+			// A box's size comes from the layout itself, so measuring it must not start another.
+			nodes.flatMap((n) => (n.type === 'folderBox' ? [] : [`${n.id}:${Math.round(n.measured?.height ?? 0)}`])).join(',')
 	);
 
 	let lastLayoutKey = '';
@@ -494,16 +752,29 @@
 	$effect(() => {
 		const key = layoutKey; // track only field state + measured heights
 		if (scaleMode || !nodes.length || key === lastLayoutKey) return;
-		const measured = nodes.every((n) => n.measured?.width && n.measured?.height);
+		const measured = nodes.every((n) => n.type === 'folderBox' || (n.measured?.width && n.measured?.height));
 		if (!measured) return;
 		lastLayoutKey = key;
 		const layoutStart = performance.now();
-		nodes = layoutGraph(nodes, edges);
+		nodes = layout(nodes, edges);
 		const w = window as unknown as { __sbLayouts?: number[] };
 		(w.__sbLayouts ??= []).push(performance.now() - layoutStart);
-		tick().then(() => fitFlow?.({ duration: 0 }));
+		tick().then(() => {
+			const centre = pendingCentre;
+			pendingCentre = null;
+			const held = anchor;
+			anchor = null;
+			const after = held && positionOn(nodes, held.id);
+			if (held && after && setFlowViewport && fitted) setFlowViewport(anchoredViewport(held.view, held.before, after));
+			else if (centre && centreOn(centre)) return;
+			else if (pendingFit || !fitted) {
+				pendingFit = false;
+				fitFlow?.({ duration: 0 });
+			}
+		});
 	});
 
+	const layout = (n: Node[], e: Edge[]) => (grouped ? layoutFolderGraph(n, e) : layoutGraph(n, e));
 	let fitFlow = $state<((opts?: { duration?: number }) => void) | undefined>();
 	// Side panels change the graph's width. The zoom stays where the person left it; the view only pans when
 	// the selected node would otherwise end up behind a panel.
@@ -542,7 +813,7 @@
 		if (grouped && expanded.size) regroup({ expanded: new Set() });
 		nodes = nodes.map((node) => ({ ...node, hidden: false }));
 		edges = edges.map((edge) => ({ ...edge, hidden: false }));
-		nodes = layoutGraph(nodes, edges);
+		nodes = layout(nodes, edges);
 		inspectorW = inspectorDefault();
 		await tick();
 		fitFlow?.();
@@ -550,10 +821,12 @@
 </script>
 
 <AppTopbar title="Lineage">
-	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => catalog.refresh()} />
 	{#if app.client.supports('launchAdhocRun')}
-		{#if changedCount}<GatedButton requires="run.adhoc" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build <span class="changed-count">{changedCount} changed</span></GatedButton>{/if}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
+		{#if changedCounts.changed}<GatedButton size="bar" requires="run.adhoc" variant="stale" hint={changedLabel.tooltip} onclick={() => goto(to(CHANGED_PLAN_HREF))}
+				><HammerIcon /><span>{changedLabel.label}{#if changedLabel.extra}<span class="label-extra">{changedLabel.extra}</span>{/if}</span></GatedButton
+			>{/if}
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}><PlayIcon class="size-3.5 fill-current stroke-none" />Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
 	{/if}
 </AppTopbar>
 
@@ -561,117 +834,100 @@
 <!-- filter toolbar -->
 <div class="lineage-page">
 	<section class="lineage-workbench">
-<div class="lineage-toolbar">
-	<button
-		class="icon-toggle"
-		class:active={browserOpen}
-		onclick={() => (browserOpen = !browserOpen)}
-		title={browserOpen ? 'Hide model list' : 'Show model list'}
-		aria-label="Toggle model list"
-	><PanelLeftIcon size={15} /></button>
-	<div class="search-wrap">
-		<label class="model-search">
-			<SearchIcon size={14} />
-			<input bind:value={modelQuery} placeholder="Search models" />
-		</label>
-		{#if modelQuery.trim() && !browserOpen}
-			<div class="search-results">
-				{#each browserNodes.slice(0, 8) as node (node.id)}
-					<button onclick={() => { selectModel(node.id); modelQuery = ''; }}>
-						<i class="browser-status {String(node.data.status)}"></i>
-						<span title={String(node.data.name)}>{node.data.label ?? node.data.name}</span>
-						<small>{String(node.data.kind).split(' · ')[0]}</small>
-					</button>
-				{:else}
-					<div class="browser-empty">No matching models</div>
-				{/each}
-			</div>
+<SelectionBar {selection} names={selectionNames} total={catalogNodes.length}>
+	{#snippet leading()}
+		<Button variant="ghost" size="icon-bar" aria-pressed={browserOpen} onclick={() => (browserOpen = !browserOpen)} title={browserOpen ? 'Hide model list' : 'Show model list'} aria-label="Toggle model list"><PanelLeftIcon /></Button>
+	{/snippet}
+	{#snippet view()}
+		{#if !scaleMode}<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />{/if}
+	{/snippet}
+</SelectionBar>
+<GraphToolbar
+	folders={scaleMode ? undefined : { on: grouped, toggle: () => regroup({ grouped: !grouped, expanded: new Set(), fit: true }) }}
+	expand={!scaleMode && grouped && !tooMany
+		? { all: expandEverything, collapse: collapseEverything, canCollapse: expanded.size > 0, allTitle: `Open every folder in view, up to ${MAX_DRAWN.toLocaleString('en')} cards`, collapseTitle: 'Close every folder in view', note: expandNote }
+		: undefined}
+	focus={{ on: neighbourhoodOnly, can: selectedNodes.length > 0, toggle: toggleNeighbourhood, title: 'Show only the selected model and its immediate dependencies' }}
+	onreset={resetLayout}
+	details={{ open: inspectorOpen, toggle: details.toggle }}
+>
+	{#snippet middle()}
+		{#if !scaleMode}
+			{#if selectionLabel}
+				<span class="selection-chip" title="Showing {selectionLabel}">
+					<span>Showing: {selectionLabel}</span>
+					<Button variant="ghost" size="icon-xs" class="rounded-full" onclick={clearSelection} aria-label="Show every folder" title="Show every folder"><XIcon /></Button>
+				</span>
+			{/if}
 		{/if}
-	</div>
-	{#if !scaleMode}
-		<div class="toolbar-group">
-			<ChoiceFilter label="Kind" bind:value={kindFilter} options={kindOptions} />
-			{#if groupOptions.length}<ChoiceFilter label="Group" bind:value={groupFilter} options={groupOptions} />{/if}
-			<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: catalogNodes.filter((c) => matchesFilterStatus(c, o.value)).length }))} />
+		<NodeFieldsPopover />
+	{/snippet}
+	{#snippet end()}
+		<div class="status-summary">
+			{#each [['ok', 'var(--sb-success)', 'last build succeeded'], ['warn', 'var(--sb-warning)', 'last build warned'], ['stale', 'var(--sb-stale)', 'stale'], ['fail', 'var(--sb-error)', 'last build failed']] as [st, c, label] (st)}
+				{@const n = scaleMode ? nodes.filter((x) => (st === 'stale' ? !!x.data.stale : x.data.status === st)).length : catalogNodes.filter((c) => (st === 'stale' ? !!c.stale?.length : cardStatus(c) === st)).length}
+				{#if n}<span title="{n} {label}"><i style:background={c}></i>{n}</span>{/if}
+			{/each}
 		</div>
-	{/if}
-	<span class="toolbar-sep"></span>
-	{#if !scaleMode}
-		<button
-			onclick={() => regroup({ grouped: !grouped, expanded: new Set() })}
-			class="toolbar-action"
-			class:focus-active={grouped}
-			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
-		>
-			<FolderIcon size={13} /> Folders
-		</button>
-	{/if}
-	<NodeFieldsPopover />
-	<button
-		onclick={toggleNeighbourhood}
-		class="toolbar-action"
-		class:focus-active={neighbourhoodOnly}
-		disabled={!neighbourhoodOnly && selectedNodes.length === 0}
-		title={!neighbourhoodOnly && selectedNodes.length === 0 ? 'Select a model to focus on it' : 'Show only the selected model and its immediate dependencies'}
-	>
-		<FocusIcon size={14} /> {neighbourhoodOnly ? 'Show all' : 'Focus'}
-	</button>
-	<button onclick={resetLayout} class="toolbar-action" title="Reset layout"><RotateCcwIcon size={13} /> Reset</button>
-	<div class="status-summary ml-auto">
-		{#each [['ok', 'var(--sb-success)', 'last build succeeded'], ['warn', 'var(--sb-warning)', 'last build warned'], ['stale', 'var(--sb-stale)', 'stale'], ['fail', 'var(--sb-error)', 'last build failed']] as [st, c, label] (st)}
-			{@const n = scaleMode ? nodes.filter((x) => (st === 'stale' ? !!x.data.stale : x.data.status === st)).length : catalogNodes.filter((c) => (st === 'stale' ? !!c.stale?.length : cardStatus(c) === st)).length}
-			{#if n}<span title="{n} {label}"><i style:background={c}></i>{n}</span>{/if}
-		{/each}
-	</div>
-	<button
-		class="icon-toggle"
-		class:active={inspectorOpen}
-		onclick={() => (inspectorOpen = !inspectorOpen)}
-		title={inspectorOpen ? 'Hide details' : 'Show details'}
-		aria-label="Toggle details"
-	><PanelRightIcon size={15} /></button>
-</div>
+	{/snippet}
+</GraphToolbar>
 
 <div class="lineage-stage relative flex min-h-0 flex-1">
 	{#if browserOpen}
-		<aside class="model-browser">
+		<aside class="model-browser" class:pick={pickHighlight}>
 			<div class="browser-heading">
-				<span>Models</span>
+				<span>Nodes</span>
 				<b>{browserNodes.length}</b>
 			</div>
 			<div class="browser-list sb-scroll">
-				{#each browserGroups as g (g.name)}
-					<button class="browser-group" onclick={() => toggleGroup(g.name)} aria-expanded={!collapsedGroups.has(g.name)}>
-						<ChevronRightIcon size={13} class={collapsedGroups.has(g.name) ? '' : 'rotate-90'} />
-						<span>{g.name}</span><b>{g.nodes.length}</b>
-					</button>
-					{#if !collapsedGroups.has(g.name)}
-						{#each g.nodes as node (node.id)}
-							<button
-								class="browser-row"
-								class:selected={selectedIds.has(node.id)}
-								onclick={() => selectModel(node.id)}
-								title={String(node.data.name)}
-							>
-								<i class="browser-status {String(node.data.status)}"></i>
-								<span><strong>{node.data.label ?? node.data.name}</strong></span>
-							</button>
-						{/each}
+				{#each browserRows as row (`${row.type}:${row.id}`)}
+					{#if row.type === 'folder'}
+						{@const picked = selectedFolders.includes(row.id)}
+						<div class="browser-group" class:picked class:shown={!picked && inSelectedFolder(row.id)} style:padding-left="{2 + row.depth * 14}px">
+							<!-- raw-button: the tree's expand control; it only opens or closes the folder -->
+							<button class="tree-chevron" onclick={() => toggleTreeFolder(row.id)} aria-expanded={row.open} aria-label="{row.open ? 'Collapse' : 'Expand'} {row.id}"><ChevronRightIcon size={13} class={row.open ? 'rotate-90' : ''} /></button>
+							<!-- raw-button: a folder's row in the tree, clickable as a whole to show that folder -->
+							<button class="tree-label" onclick={(event) => pickFolder(row.id, event)} title="Show only {row.id}; Ctrl/⌘-click to add it"><span>{row.label}</span><b>{row.count}</b></button>
+							<input type="checkbox" class="sb-check tree-check" checked={picked} onchange={() => setFolderSelection(withFolderToggled(selectedFolders, row.id))} aria-label="Add {row.id} to the folders shown" />
+						</div>
+					{:else}
+						<!-- raw-button: a node's row in the tree, clickable as a whole to select it -->
+						<button
+							class="browser-row"
+							style:padding-left="{24 + row.depth * 14}px"
+							class:selected={selectedIds.has(row.id)}
+							onclick={() => revealNode(row.id)}
+							title={String(row.node.data.name)}
+						>
+							<i class="browser-status {String(row.node.data.status)}"></i>
+							<span><strong>{row.node.data.label ?? row.node.data.name}</strong></span>
+						</button>
 					{/if}
 				{/each}
 				{#if browserNodes.length === 0}
-					<div class="browser-empty">No models match “{modelQuery}”.</div>
+					<div class="browser-empty">{selection.active ? 'No nodes in the selection.' : 'No nodes.'}</div>
+				{:else if selection.active && browserNodes.length > LIST_LIMIT}
+					<div class="browser-empty">First {LIST_LIMIT} of {browserNodes.length} matches</div>
 				{/if}
 			</div>
 		</aside>
 	{/if}
 	<!-- graph canvas -->
 	<div class="graph-panel sb-flow relative min-w-0 flex-1 overflow-hidden" style="background: var(--sb-inset)" bind:this={graphPanel}>
-		<SvelteFlow
+		<GraphCanvas
 			bind:nodes
 			bind:edges
+			bind:fit={fitFlow}
+			fitOnInit
+			bind:viewport
+			bind:setViewport={setFlowViewport}
+			bind:fitted
+			fitFloor={scaleMode ? undefined : FIT_FLOOR}
+			readable={!scaleMode}
+			controls={scaleMode ? 'full' : 'fit'}
+			showLock
 			{nodeTypes}
-			fitView
+			{edgeTypes}
 			fitViewOptions={{ padding: 0.08, maxZoom: 1, minZoom: scaleMode ? undefined : FIT_FLOOR, includeHiddenNodes: scaleMode }}
 			minZoom={scaleMode ? 0.02 : 0.05}
 			onlyRenderVisibleElements={scaleMode}
@@ -680,16 +936,23 @@
 			nodesDraggable
 			multiSelectionKey={['Shift', 'Meta', 'Control']}
 			selectionKey="Shift"
-			proOptions={{ hideAttribution: true }}
 			onnodeclick={({ node }) => node.type === 'folder' && openFolder(String(node.data.group))}
 			onnodepointerenter={({ node }) => (hoveredId = node.id)}
 			onnodepointerleave={() => (hoveredId = null)}
-		>
-			<FlowController bind:fitView={fitFlow} bind:viewport bind:setViewport={setFlowViewport} bind:fitted fitFloor={scaleMode ? undefined : FIT_FLOOR} />
-			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-			<Controls />
-		</SvelteFlow>
-		{#if !scaleMode && !fitted && !catalog.error && catalog.data?.length !== 0}
+		/>
+		{#if tooMany}
+			<div class="graph-too-many">
+				<div class="too-many-card" role="status">
+					<strong>Too many nodes to draw at once</strong>
+					<p>{tooManyCount.toLocaleString('en')} cards · limit {MAX_DRAWN.toLocaleString('en')}</p>
+					<div class="too-many-actions">
+						{#if !grouped}<Button variant="outline" size="bar" onclick={() => regroup({ grouped: true, expanded: new Set(), fit: true })}><FolderIcon size={13} />Show folders</Button>{/if}
+						{#if !staleOnly && outOfDateCount > 0 && outOfDateCount <= MAX_DRAWN}<Button variant="outline" size="bar" onclick={showOutOfDate}>Show the {outOfDateCount.toLocaleString('en')} out of date</Button>{/if}
+						<Button variant="outline" size="bar" onclick={pickFolders}>Pick folders</Button>
+					</div>
+				</div>
+			</div>
+		{:else if !scaleMode && !fitted && !catalog.error && catalog.data?.length !== 0}
 			<div class="graph-loading"><div><Loading lines={4} /></div></div>
 		{/if}
 		{#if scaleMode}
@@ -726,22 +989,18 @@
 					{selectedNodes.map((n) => n.data.name).slice(0, 3).join(', ')}{selectedNodes.length > 3 ? '…' : ''}
 				</div>
 			</div>
-		{:else}
-			<div class="inspector-head">
-				<div class="flex items-center gap-2">
-					<span class="truncate text-[15px] font-semibold" title={String(primary?.data.name ?? '')}>{primary?.data.label ?? primary?.data.name}</span>
-					{#if d}<a href={to(`/catalog/${primarySlug}`)} class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
-				</div>
-				<div class="inspector-meta">
+		{:else if primary}
+			<InspectorHead title={String(primary?.data.label ?? primary?.data.name ?? '')} hint={String(primary?.data.name ?? '')} href={d ? to(`/catalog/${primarySlug}`) : undefined} linkLabel="Catalog ↗" linkTitle="Open in Catalog">
+				{#snippet meta()}
 					<!-- From the selected card, so the header names the node at once, before its detail arrives. -->
 					<span>{primary?.data.kind}</span>
 					{#if primary?.data.group}<span>{primary.data.group}</span>{/if}
-				</div>
-			</div>
+				{/snippet}
+			</InspectorHead>
 		{/if}
 		<div class="insp-body">
 			{#if !scaleMode && !primary}
-				<InspectorSection title="Details"><p class="insp-description">Select a node to see its details.</p></InspectorSection>
+				<ViewSummaryPanel summary={inView} filters={activeFilters} />
 			{:else}
 			{#if scaleMode}
 				<InspectorSection title="Scale test">
@@ -800,6 +1059,7 @@
 						<div class="strip-wrap"><OutcomeStrip outcomes={d.recentOutcomes} tones={nodeOutcomeTone} caption="Last {d.recentOutcomes.length} builds" /></div>
 					{/if}
 					{#each d.stale as r, i (i)}
+						<!-- raw-button: a stale notice that is clickable as a whole, opening its drift -->
 						<button class="drift-hint {r.reason === 'changed_upstream' ? 'upstream' : r.reason}" onclick={() => (r.reason === 'behind' ? undefined : openSql('drift'))} disabled={r.reason === 'behind' || !hasDrift}>
 							<GitCompareIcon size={14} />
 							<span><b>Stale · {staleReasonLabel(r)}</b> · {staleReasonDetail(r)}</span>
@@ -823,7 +1083,7 @@
 
 			{#if d?.sql}
 				<InspectorSection title="SQL">
-					{#snippet meta()}<span>{sqlRaw.split('\n').length} lines</span><button class="section-link" onclick={() => openSql()}>Open →</button>{/snippet}
+					{#snippet meta()}<span>{sqlRaw.split('\n').length} lines</span><Button variant="link" size="inline" class="ml-auto text-[12px]" onclick={() => openSql()}>Open →</Button>{/snippet}
 					<CodePreview file="{shortName(d.key)}.sql" code={d.sql.raw} compiled={d.sql.compiled} bind:mode={sqlMode} maxLines={14} onOpen={() => openSql()} />
 				</InspectorSection>
 			{:else if d?.code}
@@ -838,7 +1098,7 @@
 					{#each d.checkResults as c (c.id)}
 						<a class="check-row" href={to(`/checks/${c.id}`)}>
 							<i style:background={checkOutcomeTone[c.latest?.outcome ?? 'skipped']}></i><code>{c.name}</code>
-							<span>{runScopePhaseLabel[c.runScopePhase]}</span>
+							<span title={runScopePhaseHelp[c.runScopePhase]}>{runScopePhaseLabel[c.runScopePhase]}</span>
 						</a>
 					{/each}
 				</InspectorSection>
@@ -861,12 +1121,12 @@
 					{#each d.runs.slice(0, 3) as run, i (i)}
 						<a class="mini-run" href={run.runId ? to(`/runs/${run.runId}`) : undefined}>
 							<i style:background={nodeOutcomeTone[run.outcome]}></i>
-							<span class="mini-run-main"><b>{nodeOutcomeLabel[run.outcome]}</b><span>{run.jobKey ?? (run.runId ? 'started by hand' : `from the command line · ${shortRunId(run.fingerprintRunId ?? '')}`)}</span></span>
+							<span class="mini-run-main"><b>{nodeOutcomeLabel[run.outcome]}</b><span>{run.jobKey ?? (run.runId ? 'Manual' : `CLI · ${shortRunId(run.fingerprintRunId ?? '')}`)}</span></span>
 							<span class="mini-run-meta">{formatMs(run.durationMs)} · {formatAgo(run.startedAt, app.now)}</span>
 							{#if run.message}<em>{run.message}</em>{/if}
 						</a>
 					{:else}
-						<span class="section-meta">No builds recorded in this location.</span>
+						<span class="section-meta">No builds yet.</span>
 					{/each}
 				</InspectorSection>
 			{/if}
@@ -879,12 +1139,14 @@
 					<div>
 						<div class="dep-head">Upstream</div>
 						{#each upstream as model (model)}
+							<!-- raw-button: a row of the dependency list, clickable as a whole to select that node -->
 							<button class="dependency-row" onclick={() => selectByName(String(model))}>{model}</button>
 						{:else}<span class="section-meta">None</span>{/each}
 					</div>
 					<div>
 						<div class="dep-head">Downstream</div>
 						{#each downstream as model (model)}
+							<!-- raw-button: a row of the dependency list, clickable as a whole to select that node -->
 							<button class="dependency-row" onclick={() => selectByName(String(model))}>{model}</button>
 						{:else}<span class="section-meta">None</span>{/each}
 					</div>
@@ -947,36 +1209,6 @@
 		flex: 1;
 		overflow: hidden;
 	}
-	.lineage-toolbar {
-		flex: 0 0 auto;
-		gap: 5px;
-		padding-top: 7px;
-		padding-bottom: 7px;
-	}
-	.model-search {
-		display: flex;
-		width: 230px;
-		height: 31px;
-		align-items: center;
-		gap: 7px;
-		padding: 0 10px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--background);
-		color: var(--sb-text-faint);
-	}
-	.model-search input {
-		min-width: 0;
-		flex: 1;
-		border: 0;
-		outline: 0;
-		background: transparent;
-		color: var(--foreground);
-		font-size: 12px;
-	}
-	.model-search input::placeholder {
-		color: var(--sb-text-faint);
-	}
 	.panel-toggle {
 		display: flex;
 		height: 31px;
@@ -993,14 +1225,12 @@
 		background: var(--sb-hover);
 		color: var(--foreground);
 	}
-	.panel-toggle.active,
-	.focus-active {
+	.panel-toggle.active {
 		border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
 		background: var(--sidebar-accent);
 		color: var(--primary);
 	}
-	.toolbar-filter,
-	.toolbar-action {
+	.toolbar-filter {
 		display: flex;
 		height: 29px;
 		align-items: center;
@@ -1012,14 +1242,9 @@
 		color: var(--muted-foreground);
 		font-size: 12px;
 	}
-	.toolbar-filter:hover,
-	.toolbar-action:hover {
+	.toolbar-filter:hover {
 		background: var(--sb-hover);
 		color: var(--foreground);
-	}
-	.changed-count {
-		color: var(--sb-stale);
-		font-weight: 500;
 	}
 	.status-summary {
 		display: flex;
@@ -1119,30 +1344,21 @@
 	.graph-loading > div {
 		width: 240px;
 	}
+	.graph-too-many {
+		position: absolute;
+		inset: 0;
+		z-index: 5;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 24px;
+		background: var(--sb-inset);
+		color: var(--muted-foreground);
+		font-size: 13px;
+		text-align: center;
+	}
 	.inspector-panel {
 		height: 100%;
-	}
-	/* thin styled scrollbars */
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
-	}
-	.sb-scroll::-webkit-scrollbar {
-		width: 9px;
-		height: 9px;
-	}
-	.sb-scroll::-webkit-scrollbar-track {
-		background: transparent;
-	}
-	.sb-scroll::-webkit-scrollbar-thumb {
-		background: var(--border-strong);
-		border-radius: 2px;
-		border: 2px solid transparent;
-		background-clip: content-box;
-	}
-	.sb-scroll::-webkit-scrollbar-thumb:hover {
-		background: var(--muted-foreground);
-		background-clip: content-box;
 	}
 	/* inspector resize handle */
 	.sb-inspector-handle::after {
@@ -1192,106 +1408,18 @@
 		--sb-edge-dim: color-mix(in srgb, var(--foreground) 9%, transparent);
 		font-family: var(--font-sans);
 	}
-	.lineage-toolbar {
-		display: flex;
-		height: 46px;
-		flex: 0 0 46px;
-		align-items: center;
-		gap: 4px;
-		padding: 0 10px;
-		border-bottom: 1px solid var(--border);
-		background: var(--card);
-	}
-	.icon-toggle {
-		display: grid;
-		width: 30px;
+	/* Toolbar buttons match the top bar's: 30 px high, 13 px medium text, 14 px icons. */
+	.toolbar-filter {
 		height: 30px;
-		place-items: center;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--muted-foreground);
-	}
-	.icon-toggle:hover {
-		background: var(--sb-hover);
-		color: var(--foreground);
-	}
-	.icon-toggle.active {
-		background: var(--sb-hover);
-		color: var(--foreground);
-	}
-	.search-wrap {
-		position: relative;
-		margin: 0 6px 0 2px;
-	}
-	.model-search {
-		width: 260px;
-		height: 30px;
-		border-radius: 2px;
-		background: var(--background);
-	}
-	.model-search input {
-		font-size: 12.5px;
-	}
-	.search-results {
-		position: absolute;
-		z-index: 40;
-		top: calc(100% + 4px);
-		left: 0;
-		width: 320px;
-		padding: 4px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--popover, var(--card));
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-	}
-	.search-results button {
-		display: flex;
-		width: 100%;
-		align-items: center;
-		gap: 8px;
-		padding: 6px 8px;
-		border: 0;
-		border-radius: 2px;
-		background: transparent;
-		color: var(--foreground);
-		font-size: 12.5px;
-		text-align: left;
-	}
-	.search-results button:hover {
-		background: var(--sb-hover);
-	}
-	.search-results small {
-		margin-left: auto;
-		color: var(--sb-text-faint);
-		font-size: 11px;
-	}
-	.toolbar-group {
-		display: flex;
-		gap: 2px;
-	}
-	.toolbar-sep {
-		width: 1px;
-		height: 18px;
-		margin: 0 6px;
-		background: var(--border);
-	}
-	.toolbar-filter,
-	.toolbar-action {
-		height: 30px;
-		gap: 5px;
+		gap: 6px;
 		padding: 0 9px;
 		border: 0;
 		border-radius: 2px;
-		font-size: 12.5px;
+		font-size: 13px;
+		font-weight: 500;
 	}
 	.toolbar-filter :global(svg) {
 		color: var(--sb-text-faint);
-	}
-	.focus-active {
-		border: 0;
-		background: var(--sb-hover);
-		color: var(--foreground);
 	}
 	.status-summary {
 		gap: 14px;
@@ -1318,36 +1446,6 @@
 	}
 	.browser-row strong {
 		font: 500 12.5px var(--font-sans);
-	}
-	.inspector-head {
-		padding: 14px 16px 12px;
-		border-bottom: 1px solid var(--border);
-	}
-	.inspector-meta span + span::before {
-		content: '·';
-		margin-right: 12px;
-		color: var(--sb-text-faint);
-	}
-	.inspector-meta {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 4px 12px;
-		margin-top: 6px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.head-link {
-		flex: 0 0 auto;
-		padding: 3px 8px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.head-link:hover {
-		background: var(--sb-hover);
-		color: var(--foreground);
 	}
 	.check-row {
 		display: flex;
@@ -1595,21 +1693,111 @@
 		display: flex;
 		width: 100%;
 		align-items: center;
-		gap: 6px;
+		gap: 2px;
 		margin-top: 6px;
-		padding: 5px 6px;
-		border: 0;
+		padding: 1px 6px 1px 2px;
 		border-radius: 2px;
-		background: transparent;
 		color: var(--muted-foreground);
 		font-size: 12px;
 		font-weight: 600;
 		text-transform: capitalize;
 	}
+	.browser-group.picked {
+		background: var(--sidebar-accent);
+		color: var(--primary);
+	}
+	.browser-group.shown {
+		color: var(--foreground);
+	}
+	.tree-chevron {
+		display: grid;
+		width: 20px;
+		height: 22px;
+		flex: 0 0 20px;
+		place-items: center;
+		border-radius: 2px;
+	}
+	.tree-chevron:hover {
+		background: var(--sb-hover);
+	}
+	.tree-label {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		align-items: center;
+		gap: 6px;
+		padding: 4px 0;
+		text-align: left;
+		text-transform: inherit;
+	}
+	/* The checkbox adds a folder to the selection; it shows on hover, and stays while checked. */
+	.tree-check {
+		flex: 0 0 auto;
+		margin-left: 6px;
+		opacity: 0;
+	}
+	.browser-group:hover .tree-check,
+	.tree-check:checked,
+	.tree-check:focus-visible {
+		opacity: 1;
+	}
+	.model-browser.pick {
+		box-shadow: inset 0 0 0 2px var(--primary);
+		animation: pick-pulse 1.2s ease-in-out 2;
+	}
+	@keyframes pick-pulse {
+		50% {
+			box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent);
+		}
+	}
+	.selection-chip {
+		display: inline-flex;
+		max-width: 280px;
+		height: 25px;
+		align-items: center;
+		gap: 4px;
+		padding: 0 4px 0 9px;
+		border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+		border-radius: 13px;
+		background: var(--sidebar-accent);
+		color: var(--primary);
+		font-size: 12px;
+	}
+	.selection-chip > span {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.too-many-card {
+		max-width: 420px;
+		padding: 20px 22px;
+		border: 1px solid var(--border);
+		border-radius: 2px;
+		background: var(--card);
+		box-shadow: var(--sb-elev);
+		color: var(--muted-foreground);
+	}
+	.too-many-card strong {
+		display: block;
+		color: var(--foreground);
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.too-many-card p {
+		margin: 6px 0 14px;
+		font-size: 12.5px;
+	}
+	.too-many-actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 8px;
+	}
 	.browser-group:first-child {
 		margin-top: 0;
 	}
-	.browser-group:hover {
+	.browser-group:not(.picked):hover {
 		background: var(--sb-hover);
 		color: var(--foreground);
 	}
@@ -1620,9 +1808,11 @@
 	.browser-group :global(svg) {
 		transition: transform 0.15s;
 	}
-	.browser-group + .browser-row,
-	.browser-row {
-		padding-left: 24px;
+	.browser-group span {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.drift-hint {
 		display: flex;
@@ -1649,10 +1839,10 @@
 		border-style: dashed;
 	}
 	.drift-hint.behind {
-		border-color: color-mix(in srgb, var(--sb-warning) 35%, var(--border));
+		border-color: color-mix(in srgb, var(--sb-behind) 35%, var(--border));
 	}
 	.drift-hint.behind :global(svg) {
-		color: var(--sb-warning);
+		color: var(--sb-behind);
 	}
 	.drift-hint:disabled {
 		cursor: default;
@@ -1707,14 +1897,5 @@
 		color: var(--primary);
 		font-style: normal;
 		white-space: nowrap;
-	}
-	.toolbar-action:disabled {
-		opacity: 0.45;
-		pointer-events: none;
-	}
-	@media (max-width: 1450px) {
-		.model-search {
-			width: 200px;
-		}
 	}
 </style>

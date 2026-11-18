@@ -42,6 +42,7 @@ pub mod load_command;
 pub mod migration_values;
 pub mod models;
 pub mod nested_progress;
+pub mod number_text;
 pub mod panics;
 pub mod plan_display;
 pub mod posix_path;

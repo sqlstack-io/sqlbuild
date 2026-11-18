@@ -2,8 +2,9 @@
 // terminal read the same: work that runs first, one section per change reason with each model's detail,
 // then the routine models, functions, seeds and warnings.
 
-import type { PlanChanged, PlanDocument, PlanModel, PlanWarning, Trigger } from '$lib/api';
+import type { PlanChanged, PlanDocument, PlanModel, PlanPageSection, PlanWarning, Trigger } from '$lib/api';
 import { formatIn } from '$lib/format/time';
+import { plural } from '$lib/format/plural';
 
 export type PlanEntry = {
 	name: string;
@@ -13,16 +14,25 @@ export type PlanEntry = {
 	detail: string[];
 	queryDiff?: string[];
 	configDiff?: string[];
+	/** A server page's diff counts, in place of the diff text, which is read on demand. */
+	diffStats?: PlanModel['diff_stats'];
 	schema?: { sign: '+' | '-' | '~'; text: string }[];
 	/** The plan's warnings about this model, such as the CLI's forward-only replay warning, shown with it. */
 	warnings?: PlanWarning[];
 };
 
-/** `collapsed` sections show one line, such as "4 unchanged, skipped by --changed", until opened. */
-export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolean; collapsed?: boolean };
+/**
+ * `collapsed` sections show one line, such as "4 unchanged, skipped by --changed", until opened. A `page`d section
+ * holds the rows loaded so far of its `total`; the rest load from the server's plan a page at a time.
+ */
+/** `section` is the server's section the rows are; `page` and `total` are set when its rows come a page at a time. */
+export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolean; collapsed?: boolean; section?: PlanPageSection; page?: PlanPageSection; total?: number };
+
+/** The section's size: its paged total, or the rows it holds. */
+export const sectionSize = (s: PlanSection) => s.total ?? s.entries.length;
 
 /** The change reasons that get their own section, in the CLI's order. */
-const REASON_GROUPS: [string, string][] = [
+const REASON_GROUPS: [PlanPageSection, string][] = [
 	['full_refresh', 'Full refresh'],
 	['query_changed', 'Query changed'],
 	['function_changed', 'Function changed'],
@@ -41,9 +51,22 @@ export function builtModels(plan: PlanDocument): PlanModel[] {
 	return plan.models.filter((m) => m.action !== 'skip' && runsUnderChanged(plan, `model:${m.name}`));
 }
 
+/** Rows of a paged section the plan holds so far, which is the offset of its next page. */
+export function loadedRows(plan: PlanDocument, section: PlanPageSection): number {
+	return plan.loaded?.[section] ?? 0;
+}
+
+/** The names of every model the run builds, including routine ones a server summary has not loaded yet. */
+
+/** Each plan's `--changed` run nodes as a set, worked out once per plan: a large plan has thousands. */
+const runNodes = new WeakMap<PlanChanged, Set<string>>();
+
 /** Without `--changed` every planned node runs; with it, only those its decision runs. */
 function runsUnderChanged(plan: PlanDocument, key: string): boolean {
-	return !plan.changed || plan.changed.runs.some((r) => r.node === key);
+	if (!plan.changed) return true;
+	let nodes = runNodes.get(plan.changed);
+	if (!nodes) runNodes.set(plan.changed, (nodes = new Set(plan.changed.runs.map((r) => r.node))));
+	return nodes.has(key);
 }
 
 /** The seeds the run loads or reports on: under `--changed`, only those it runs. */
@@ -102,6 +125,7 @@ function changedEntry(m: PlanModel, reason: string, windowStart?: string): PlanE
 		],
 		queryDiff: m.query_diff,
 		configDiff: m.config_diff,
+		diffStats: m.diff_stats,
 		schema: m.schema_findings?.map((f) => {
 			const kind = SCHEMA_SIGNS[f.kind] ?? { sign: '~' as const, label: f.kind };
 			const types = f.kind === 'column_type_changed' ? `  ${f.expected_type ?? 'None'} → ${f.actual_type ?? 'None'}` : f.expected_type ? `  ${f.expected_type}` : '';
@@ -113,47 +137,48 @@ function changedEntry(m: PlanModel, reason: string, windowStart?: string): PlanE
 /** Whether the plan reads as one full refresh: every model being built is one, as in the CLI. */
 export function isFullRefresh(plan: PlanDocument): boolean {
 	const active = builtModels(plan);
-	return active.length > 0 && active.every((m) => m.reason === 'full_refresh');
+	return active.length > 0 && !plan.pages?.routine_models && active.every((m) => m.reason === 'full_refresh');
 }
 
 /** The plan's sections in the order `sqb plan` prints them. Skipped models are left out, as there. */
 export function planSections(plan: PlanDocument): PlanSection[] {
 	const active = builtModels(plan);
 	const sections: PlanSection[] = [];
-	const add = (title: string, entries: PlanEntry[], changed = false) => {
-		if (entries.length) sections.push({ title, entries, changed });
+	const add = (title: string, entries: PlanEntry[], changed = false, page?: PlanPageSection) => {
+		const total = page && plan.pages?.[page];
+		if (entries.length || total) sections.push({ title, entries, changed, ...(page ? { section: page } : {}), ...(page && total !== undefined ? { page, total } : {}) });
 	};
 	// Work that runs before any model builds comes first, as in the CLI.
-	add('Migrations', plan.migrations.map((r) => ({ name: r.model, value: [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · '), detail: [] })), true);
-	add('Column migrations', plan.column_migrations.map((r) => ({ name: r.model, value: `${r.origin_column} → ${r.destination_column} · ${r.decision}`, detail: [] })), true);
-	add('Table type changes', plan.table_type_conversions.map((r) => ({ name: r.model, value: [r.actual_type, r.desired_type].filter(Boolean).join(' → '), detail: [] })), true);
-	add('Retention', plan.retention.map((r) => ({ name: r.model, value: r.action ?? '', detail: [] })), true);
+	add('Migrations', plan.migrations.map((r) => ({ name: r.model, value: [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · '), detail: [] })), true, 'migrations');
+	add('Column migrations', plan.column_migrations.map((r) => ({ name: r.model, value: `${r.origin_column} → ${r.destination_column} · ${r.decision}`, detail: [] })), true, 'column_migrations');
+	add('Table type changes', plan.table_type_conversions.map((r) => ({ name: r.model, value: [r.actual_type, r.desired_type].filter(Boolean).join(' → '), detail: [] })), true, 'table_type_conversions');
+	add('Retention', plan.retention.map((r) => ({ name: r.model, value: r.action ?? '', detail: [] })), true, 'retention');
 	for (const kind of ['loader', 'source'] as const) {
 		const loads = plan.source_loads.filter((s) => s.kind === kind);
 		const label = kind === 'loader' ? 'Loaders' : 'Sources';
-		add(`${label} to reload`, loads.filter((s) => s.is_reload).map((s) => ({ name: s.name, value: s.write_strategy ?? '', detail: [] })));
-		add(`${label} to load`, loads.filter((s) => !s.is_reload).map((s) => ({ name: s.name, value: s.write_strategy ?? '', detail: s.cursor_column ? [`cursor: ${s.cursor_column}`] : [] })));
+		add(`${label} to reload`, loads.filter((s) => s.is_reload).map((s) => ({ name: s.name, value: s.write_strategy ?? '', detail: [] })), false, `${kind}_reloads`);
+		add(`${label} to load`, loads.filter((s) => !s.is_reload).map((s) => ({ name: s.name, value: s.write_strategy ?? '', detail: s.cursor_column ? [`cursor: ${s.cursor_column}`] : [] })), false, `${kind}_loads`);
 	}
 	const functionEntry = (f: PlanDocument['functions'][number]) => ({ name: f.name, value: f.language, detail: [] });
-	add('Changed functions', plan.functions.filter((f) => f.reason && f.reason !== 'no_change').map(functionEntry), true);
+	add('Changed functions', plan.functions.filter((f) => f.reason && f.reason !== 'no_change').map(functionEntry), true, 'changed_functions');
 	if (isFullRefresh(plan)) {
 		const counts = new Map<string, number>();
 		for (const m of active) counts.set(m.materialization_type, (counts.get(m.materialization_type) ?? 0) + 1);
-		add('Full refresh', [...counts].map(([kind, n]) => ({ name: kind, value: `${n} ${n === 1 ? 'model' : 'models'}`, detail: [] })), true);
+		add('Full refresh', [...counts].map(([kind, n]) => ({ name: kind, value: `${plural(n, 'model')}`, detail: [] })), true);
 	} else {
 		const starts = plan.synced_copy?.cursor_window_starts ?? {};
-		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason, starts[m.name])), true);
+		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason, starts[m.name])), true, reason);
 		// Under --changed a routine model runs because something it reads changed, or for its own reason, such as no completed record.
 		const why = changedRuns(plan);
 		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => {
 			const run = why.get(m.name);
 			return { name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(run ? [run.downstream_of ? `reads ${keyName(run.downstream_of)}` : run.reason] : [])] };
-		}));
+		}), false, 'routine_models');
 	}
-	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry));
+	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry), false, 'functions');
 	const seedLabel: Record<string, string> = { first_run: 'first_run', config_changed: 'seed_changed', no_change: 'current' };
-	add('Seeds', builtSeeds(plan).map((s) => ({ name: s.name, value: seedLabel[s.reason] ?? '', detail: [] })));
-	add('Python', plan.python_nodes.map((p) => ({ name: p.name, value: `${p.kind} · ${p.identity_status}`, detail: [] })));
+	add('Seeds', builtSeeds(plan).map((s) => ({ name: s.name, value: seedLabel[s.reason] ?? '', detail: [] })), false, 'seeds');
+	add('Python', plan.python_nodes.map((p) => ({ name: p.name, value: `${p.kind} · ${p.identity_status}`, detail: [] })), false, 'python_nodes');
 	// A planner warning names its model in `model_name`, or opens its message with it as the CLI prints it; it shows once, with the first entry for that model.
 	const claimed = new Set<PlanWarning>();
 	for (const entry of sections.filter((s) => s.changed).flatMap((s) => s.entries)) {
@@ -188,11 +213,12 @@ export function changedModelKeys(plan: PlanDocument): string[] {
 }
 
 /** The Held back and Unchanged sections of a `--changed` plan; `refresh` words what refreshes a job's nodes. */
-export function changedSections(changed: PlanChanged, refresh: (job: string) => string): PlanSection[] {
+export function changedSections(changed: PlanChanged, refresh: (job: string) => string, pages: PlanDocument['pages'] = {}): PlanSection[] {
 	const sections: PlanSection[] = [];
+	const paged = (page: 'held_back' | 'unchanged') => (pages?.[page] !== undefined ? { page, total: pages[page] } : {});
 	const held = changed.held_back.map((h) => ({ name: keyName(h.node), value: 'refreshed_by' in h ? h.refreshed_by.map(refresh).join(' · ') : `reads ${keyName(h.reads)}, which is held back`, detail: [] }));
-	if (held.length) sections.push({ title: 'Held back', entries: held, changed: false });
-	if (changed.unchanged.length) sections.push({ title: 'Unchanged', entries: changed.unchanged.map((key) => ({ name: keyName(key), value: 'skipped by --changed', detail: [] })), changed: false, collapsed: true });
+	if (held.length || pages?.held_back) sections.push({ title: 'Held back', entries: held, changed: false, section: 'held_back', ...paged('held_back') });
+	if (changed.unchanged.length || pages?.unchanged) sections.push({ title: 'Unchanged', section: 'unchanged', entries: changed.unchanged.map((key) => ({ name: keyName(key), value: 'skipped by --changed', detail: [] })), changed: false, collapsed: true, ...paged('unchanged') });
 	return sections;
 }
 
@@ -204,10 +230,10 @@ export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | '
 	const mine = triggers.filter((t) => t.jobKey === job);
 	const live = mine.filter((t) => t.state === 'running');
 	if (mine.length && !live.length) return `job ${job} is paused`;
-	if (schedulerStopped && live.length) return `job ${job} · can’t start until the scheduler is running again`;
+	if (schedulerStopped && live.length) return `job ${job} · scheduler stopped`;
 	const next = live.flatMap((t) => (t.nextDueAt ? [t.nextDueAt] : [])).sort()[0];
 	if (next) return `job ${job} · next run ${formatIn(next, now)}`;
-	return live.some((t) => t.type === 'sensor') ? `job ${job} · when its sensor fires` : `job ${job}`;
+	return live.some((t) => t.type === 'sensor') ? `job ${job} · on sensor` : `job ${job}`;
 }
 
 /** The `sqb clone` commands a plan error offers for missing upstreams (S301), each ready to copy as is. */

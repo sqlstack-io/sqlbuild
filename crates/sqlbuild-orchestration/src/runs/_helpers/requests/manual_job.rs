@@ -14,7 +14,7 @@ use crate::runs::_helpers::requests::publication::{
 };
 use crate::runs::_helpers::requests::run_id::refuse_derived_run_id;
 use crate::runs::constants::MANUAL_JOB_AUDIT_TAG;
-use crate::runs::main::frozen_job_request::frozen_job_request;
+use crate::runs::main::requests::frozen_job_request::frozen_job_request;
 use crate::runs::models::{JobRunRequest, RunWindow};
 use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;

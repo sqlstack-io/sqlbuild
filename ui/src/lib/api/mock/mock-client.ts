@@ -1,9 +1,17 @@
+import { recordPlanRows } from './plan-rows-log';
 import type { ApiClient } from '../client';
 import { ApiError } from '../client';
 import { LocalChangeBus, type ConnectionState } from '../signals';
+import { stateOf } from '../node-states';
 import type {
 	AdhocRunCheck,
+	SelectionEvaluation,
+	SelectionRequest,
+	SelectionVocabulary,
 	PlanResult,
+	PlanPage,
+	PlanDiff,
+	PlanPageSection,
 	AdhocRunRequest,
 	Bootstrap,
 	BuiltInRole,
@@ -26,6 +34,8 @@ import type {
 	RunCostRow,
 	CostSummary,
 	NodeBuildCost,
+	NodeState,
+	NodeStates,
 	Scope,
 	Snapshot,
 	SnapshotNode,
@@ -66,6 +76,9 @@ export class MockApiClient implements ApiClient {
 	readonly #syncs = new Map<string, WarehouseSync>();
 	readonly #platform: MockPlatformApi;
 	readonly #build: MockBuild;
+	/** Node states as last read or announced, by location, so a finished run announces only what changed. */
+	readonly #nodeStates = new Map<string, { version: number; states: Record<string, NodeState> }>();
+	#announcing: Promise<void> = Promise.resolve();
 
 	constructor(options: MockOptions = {}) {
 		this.#options = {
@@ -105,6 +118,26 @@ export class MockApiClient implements ApiClient {
 			platform: this.#platform,
 			platformEvents: () => this.#platformEvents()
 		});
+		// As the server does: when runs or checks change, the node states that changed go out on `node_status`.
+		this.changes.subscribe((signal) => {
+			if (signal.channel === 'runs' || signal.channel === 'checks') this.#announcing = this.#announcing.then(() => this.#announceNodeStates());
+		});
+	}
+
+	async #currentStates(scope: Scope): Promise<Record<string, NodeState>> {
+		const nodes = await this.#build.listCatalogNodes(scope);
+		return Object.fromEntries(nodes.map((n) => [n.key, stateOf(n)]));
+	}
+
+	async #announceNodeStates(): Promise<void> {
+		for (const [locationId, held] of this.#nodeStates) {
+			const current = await this.#currentStates({ locationId });
+			const changed = Object.fromEntries(Object.entries(current).filter(([key, state]) => JSON.stringify(held.states[key]) !== JSON.stringify(state)));
+			if (!Object.keys(changed).length) continue;
+			const previousVersion = held.version;
+			this.#nodeStates.set(locationId, { version: previousVersion + 1, states: current });
+			this.changes.emit(`node_status:${locationId}`, { version: previousVersion + 1, previousVersion, states: changed });
+		}
 	}
 
 	async bootstrap(): Promise<Bootstrap> {
@@ -136,11 +169,25 @@ export class MockApiClient implements ApiClient {
 
 	overview(...args: Parameters<ApiClient['overview']>) {
 		this.#location(args[0]);
-		return this.#build.overview(...args);
+		return this.#build.overview(args[0]);
 	}
 	listCatalogNodes(...args: Parameters<ApiClient['listCatalogNodes']>) {
 		this.#location(args[0]);
 		return this.#build.listCatalogNodes(...args);
+	}
+	/** The first read starts the location's versions; later runs announce changes against it. */
+	async listNodeStates(scope: Scope): Promise<NodeStates> {
+		const location = this.#location(scope);
+		await this.#announcing;
+		const states = await this.#currentStates(scope);
+		const held = this.#nodeStates.get(scope.locationId);
+		const version = held && JSON.stringify(held.states) === JSON.stringify(states) ? held.version : (held?.version ?? 0) + 1;
+		this.#nodeStates.set(scope.locationId, { version, states });
+		// The demo's location plans what changed: each changed node, and every node reading one of them.
+		const nodes = await this.#build.listCatalogNodes(scope);
+		const changed = nodes.filter((n) => states[n.key]?.definitionChanged).map((n) => n.key);
+		const downstream = nodes.filter((n) => !changed.includes(n.key) && n.upstream.some((u) => changed.includes(u))).map((n) => n.key);
+		return { snapshotId: location.snapshot?.id ?? 'unpublished', version, states, changedBuild: { generation: 1, changed, downstream, failing: null } };
 	}
 	getCatalogNode(...args: Parameters<ApiClient['getCatalogNode']>) {
 		this.#location(args[0]);
@@ -148,7 +195,7 @@ export class MockApiClient implements ApiClient {
 	}
 	getColumnLineage(...args: Parameters<ApiClient['getColumnLineage']>) {
 		this.#location(args[0]);
-		return this.#build.getColumnLineage(...args);
+		return this.#build.getColumnLineage(args[0], args[1]);
 	}
 	listChecks(...args: Parameters<ApiClient['listChecks']>) {
 		this.#location(args[0]);
@@ -281,6 +328,16 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.listSnapshotNodes(scope);
 	}
 
+	async evaluateSelection(scope: Scope, request: SelectionRequest): Promise<SelectionEvaluation> {
+		this.#location(scope);
+		return this.#operate.evaluateSelection(scope, request);
+	}
+
+	async selectionVocabulary(scope: Scope): Promise<SelectionVocabulary> {
+		this.#location(scope);
+		return this.#operate.selectionVocabulary(scope);
+	}
+
 	async checkAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<AdhocRunCheck> {
 		this.#location(scope);
 		return this.#operate.checkAdhocRun(scope, request);
@@ -298,6 +355,22 @@ export class MockApiClient implements ApiClient {
 			? new Map((await this.#build.listCatalogNodes(scope)).filter((n) => n.stale?.some((r) => r.reason === 'changed')).map((n) => [n.key, 'definition changed']))
 			: null;
 		return this.#operate.planBuild(scope, command, changed);
+	}
+
+	/** The mock plans whole documents, so no section is paged; `?large` serves a paged plan (large-project.ts). */
+	async planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number): Promise<PlanPage> {
+		this.#location(scope);
+		recordPlanRows(section, offset, limit);
+		void requestId;
+		return { total: 0, section_total: 0, rows: [], runs: [], warnings: [], cursor_window_starts: {} };
+	}
+
+	/** The mock's plans carry their diffs whole, so none is read apart. */
+	async planDiff(scope: Scope, requestId: string, model: string): Promise<PlanDiff | null> {
+		this.#location(scope);
+		void requestId;
+		void model;
+		return null;
 	}
 
 	async listJobs(scope: Scope): Promise<Job[]> {

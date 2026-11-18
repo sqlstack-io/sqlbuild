@@ -1,10 +1,10 @@
 //! Build scenario relation locations through adapter qualification callbacks.
 
 use crate::planner_scenario::_helpers::values::error;
-use crate::planner_scenario::constants::{REF, SOURCE};
-use crate::planner_scenario::constants::{
-    SCENARIO_PLAN_INTERNAL, SCENARIO_PLAN_MISSING_RELATION_TARGET,
-};
+use crate::planner_scenario::constants::REF;
+use crate::planner_scenario::constants::SCENARIO_PLAN_INTERNAL;
+use crate::planner_scenario::constants::SCENARIO_PLAN_MISSING_RELATION_TARGET;
+use crate::planner_scenario::constants::SOURCE;
 use crate::planner_scenario::models::ScenarioRelations;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods};
