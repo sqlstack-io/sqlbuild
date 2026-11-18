@@ -192,7 +192,11 @@ pub(crate) const MODEL_HEADER_KEYS: [&str; 74] = [
 pub(crate) const POOLS_KEY: &str = "pools";
 /// The highest limit a pool may declare.
 pub(crate) const MAX_POOL_LIMIT: i64 = 10_000;
-pub(crate) const TARGET_KEYS: [&str; 23] = [
+/// Where a target's plans read warehouse state: live, or a synced copy checked first.
+pub(crate) const PLAN_FROM_KEY: &str = "plan_from";
+/// What `plan_from` may name; `live` is the default.
+pub(crate) const PLAN_FROM_SOURCES: [&str; 2] = ["live", "synced_state"];
+pub(crate) const TARGET_KEYS: [&str; 24] = [
     "connection",
     "catalog_connection",
     "vars",
@@ -216,6 +220,7 @@ pub(crate) const TARGET_KEYS: [&str; 23] = [
     "concurrency",
     POOLS_KEY,
     IGNORE_AUDIT_FAILURES_KEY,
+    PLAN_FROM_KEY,
 ];
 pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
 pub(crate) const CHANGES_KEYS: [&str; 2] = ["counts", "reach"];

@@ -62,6 +62,7 @@ fn request_options<'py>(context: &BuildContext<'py>) -> PyResult<Bound<'py, PyAn
             ("selected_target", field("selected_target")?),
             ("defer_to", field("defer_to")?),
             ("defer_sources_to", field("defer_sources_to")?),
+            ("plan_from", field("plan_from")?),
             ("cursor_overrides", field("cursor_overrides")?),
             ("select", field("select")?),
             ("exclude", field("exclude")?),

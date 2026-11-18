@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any, cast
 
 from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
@@ -14,19 +15,28 @@ from sqlbuild.adapter.relations._helpers.relation_metadata_context import (
 )
 from sqlbuild.adapter.relations.classes.relation_metadata_cache import RelationMetadataCache
 from sqlbuild.adapter.relations.classes.remembered_flight import RememberedFlight
+from sqlbuild.adapter.relations.classes.synced_catalog import (
+    SyncedCatalog,
+)
 from sqlbuild.adapter.relations.constants import (
     INSPECTION_DESCRIBED_NAME_LIMIT,
     INSPECTION_IN_LIST_LIMIT,
     SCHEMA_LISTING_MAX_AGE_SECONDS,
+    SYNCED_CATALOG_ATTRIBUTE,
+    SYNCED_REFRESH_LIMIT,
 )
 from sqlbuild.adapter.relations.main.run_bounded_inspections import run_bounded_inspections
 from sqlbuild.adapter.relations.models import (
     InspectionQueryRecord,
+    ListedRelation,
+    RelationChange,
     SchemaColumnListing,
     SchemaRelationListing,
+    SeededSchema,
 )
 from sqlbuild.adapter.relations.types import (
     PartedRelationListingReader,
+    RelationChangeReader,
     RelationListingScoper,
     SchemaScopedMetadataReader,
     ViewDefinitionBatchReader,
@@ -56,6 +66,8 @@ class InspectionCatalog:
         self._relation_requests: dict[_RelationRequestKey, tuple[RelationInfo, ...]] = {}
         self._relation_columns: dict[_RelationIdentity, tuple[ColumnInfo, ...] | None] = {}
         self._view_definitions: dict[_RelationIdentity, str | None] = {}
+        synced: object = getattr(adapter, SYNCED_CATALOG_ATTRIBUTE, None)
+        self._synced: SyncedCatalog | None = synced if isinstance(synced, SyncedCatalog) else None
 
     def remember[ValueT](self, *, key: tuple[str, ...], compute: Callable[[], ValueT]) -> ValueT:
         """Compute one adapter-owned metadata fact at most once; concurrent callers share it."""
@@ -144,6 +156,8 @@ class InspectionCatalog:
             key: _SchemaKey = self._schema_key(database=database, schema=schema)
             if key not in self._relation_listings:
                 missing.setdefault(key, (database, schema))
+        for key in self._seed_synced(reader=reader, missing=missing):
+            del missing[key]
         listings: list[SchemaRelationListing | None]
         if isinstance(reader, PartedRelationListingReader) and (
             current_relation_metadata_cache(adapter=self.adapter) is None
@@ -166,6 +180,87 @@ class InspectionCatalog:
         for missing_key, listing in zip(missing, listings, strict=True):
             if listing is not None:
                 self._relation_listings[missing_key] = listing
+
+    def _seed_synced(
+        self,
+        *,
+        reader: SchemaScopedMetadataReader,
+        missing: dict[_SchemaKey, tuple[str | None, str]],
+    ) -> tuple[_SchemaKey, ...]:
+        """List the synced copy's schemas with one check per database, columns from the copy."""
+
+        synced: SyncedCatalog | None = self._synced
+        if synced is None or not isinstance(self.adapter, RelationChangeReader):
+            return ()
+        by_database: dict[str | None, list[tuple[_SchemaKey, str]]] = {}
+        key: _SchemaKey
+        database: str | None
+        schema: str
+        for key, (database, schema) in missing.items():
+            if synced.covers(database=database, schema=schema):
+                by_database.setdefault(database, []).append((key, schema))
+        seeded: list[_SchemaKey] = []
+        scoped: list[tuple[_SchemaKey, str]]
+        for database, scoped in by_database.items():
+            started: float = time.monotonic()
+            try:
+                changes: dict[str, tuple[RelationChange, ...]] = self.adapter.read_relation_changes(
+                    connection=self.connection,
+                    database=database,
+                    schemas=tuple(schema for _, schema in scoped),
+                )
+            except Exception as error:
+                synced.record_failure(reason=f"the synced state check failed ({error})")
+                self._synced = None
+                return tuple(seeded)
+            for key, schema in scoped:
+                listed: tuple[RelationChange, ...] = changes.get(
+                    reader.metadata_name_key(schema), ()
+                )
+                if not listed:
+                    continue
+                seed: SeededSchema = synced.seed(database=database, schema=schema, changes=listed)
+                self._relation_listings[key] = replace(seed.relations, database=database)
+                if len(seed.stale) <= SYNCED_REFRESH_LIMIT:
+                    try:
+                        columns: dict[str, tuple[ColumnInfo, ...]] = self._refreshed_columns(
+                            reader=reader, seed=seed
+                        )
+                    except Exception as error:
+                        del self._relation_listings[key]
+                        synced.record_failure(reason=f"the synced state refresh failed ({error})")
+                        self._synced = None
+                        return tuple(seeded)
+                    self._column_listings[key] = SchemaColumnListing(
+                        database=database, schema=schema, columns_by_stored_name=columns
+                    )
+                seeded.append(key)
+                synced.record_check(
+                    seconds=time.monotonic() - started,
+                    relations=len(seed.relations.entries),
+                    refreshed=len(seed.stale),
+                )
+        return tuple(seeded)
+
+    def _refreshed_columns(
+        self, *, reader: SchemaScopedMetadataReader, seed: SeededSchema
+    ) -> dict[str, tuple[ColumnInfo, ...]]:
+        """The synced columns, each relation whose definition changed since then read afresh."""
+
+        fresh: list[tuple[ColumnInfo, ...] | None] = run_bounded_inspections(
+            tasks=tuple(
+                self._bind_relation_columns(reader=reader, relation=stale.relation)
+                for stale in seed.stale
+            ),
+            concurrency=self._concurrency,
+        )
+        columns: dict[str, tuple[ColumnInfo, ...]] = dict(seed.columns)
+        stale: ListedRelation
+        read: tuple[ColumnInfo, ...] | None
+        for stale, read in zip(seed.stale, fresh, strict=True):
+            if read is not None:
+                columns[stale.stored_name] = read
+        return columns
 
     def _read_parted_listings(
         self,

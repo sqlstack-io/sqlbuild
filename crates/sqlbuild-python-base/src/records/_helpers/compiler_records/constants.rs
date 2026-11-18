@@ -407,6 +407,7 @@ const R_COMPILE_PIPELINE_OPTIONS: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::SqlTestSelection),
         ),
         FieldSpec::new("source_lexical_syntax", FieldDefault::None),
+        FieldSpec::new("plan_from", FieldDefault::None),
     ],
 };
 const R_PYTHON_PLAN_ENTRY: RecordSpec = RecordSpec {

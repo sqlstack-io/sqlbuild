@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
 
@@ -13,6 +14,15 @@ class ListedRelation:
 
     stored_name: str
     relation: RelationInfo
+
+
+@dataclass(frozen=True)
+class RelationChange:
+    """One listed relation and when its data and its definition last changed, as UTC."""
+
+    listed: ListedRelation
+    last_altered: datetime | None
+    last_ddl: datetime | None
 
 
 @dataclass(frozen=True)
@@ -61,3 +71,23 @@ class RunSchemaListing:
     global_version: int
     name_versions: dict[str, int]
     expires_at: float | None = None
+
+
+@dataclass(frozen=True)
+class SyncedRelation:
+    """One mirrored relation: its columns and when the catalog scan observed them."""
+
+    database: str | None
+    schema: str
+    name: str
+    columns: tuple[ColumnInfo, ...]
+    observed_at: datetime
+
+
+@dataclass(frozen=True)
+class SeededSchema:
+    """One checked schema's listing, its columns, and the relations whose columns are stale."""
+
+    relations: SchemaRelationListing
+    columns: dict[str, tuple[ColumnInfo, ...]]
+    stale: tuple[ListedRelation, ...]
