@@ -35,6 +35,7 @@ from sqlbuild._native import (
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import ColumnInfo
+from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.auditing.types import (
     AuditAttachmentKind,
     AuditOutcome,
@@ -455,3 +456,47 @@ def describe_lifecycle_events(events: list[LifecycleEvent]) -> list[str]:
         f"kind={event.payload.get('statement_kind')} resource={event.resource_id}"
         for event in events
     ]
+
+
+class RecordingDuckDbAdapter(DuckDbAdapter):
+    """A real DuckDB adapter that records every statement it executes."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.statements: list[str] = []
+        self._statements_lock: threading.Lock = threading.Lock()
+
+    def execute(self, *, connection: Any, sql: str, **kwargs: Any) -> Any:
+        with self._statements_lock:
+            self.statements.append(sql)
+        return super().execute(connection=connection, sql=sql, **kwargs)
+
+
+def build_tracked_seed_plan(*, seed_names: tuple[str, ...], seed_dir: Path) -> PlanOutput:
+    """Build a seed plan on schema main whose seeds carry identity, with their CSV files."""
+
+    _ = [
+        (seed_dir / f"{name}.csv").write_text("id,name\n1,Liege\n", encoding="utf-8")
+        for name in seed_names
+    ]
+    return PlanOutput(
+        seed_entries=tuple(
+            SeedPlanEntry(
+                key=CompiledObjectKey(resource_type=CompiledResourceType.SEED, name=name),
+                name=name,
+                destination=CompiledRelationLocation(
+                    database=None, schema="main", name=name, qualified_name=f"main.{name}"
+                ),
+                file_path=seed_dir / f"{name}.csv",
+                columns=(
+                    ColumnInfo(name="id", type="INTEGER"),
+                    ColumnInfo(name="name", type="VARCHAR"),
+                ),
+                csv_settings=DEFAULT_SEED_CSV_SETTINGS,
+                fingerprint_definition=f"seed {name}",
+                fingerprint_version_hash=f"version-{name}",
+                fingerprint_metadata_json="{}",
+            )
+            for name in seed_names
+        ),
+    )

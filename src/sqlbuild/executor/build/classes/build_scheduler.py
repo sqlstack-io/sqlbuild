@@ -1031,6 +1031,7 @@ class BuildScheduler:
                 run_id=self._run_id,
                 query_change_tracking=self._query_change_tracking,
                 schema_prepared=self._schema_prepared,
+                fingerprint_writes=self._fingerprint_writes,
             )
         if result.status == ExecutionStatus.SUCCESS:
             result = self._with_seed_audits(key=key, result=result, connection=connection)

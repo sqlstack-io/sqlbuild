@@ -16,6 +16,7 @@ from sqlbuild.executor.build.models import SeedExecutionResult
 from sqlbuild.executor.pipeline.main.raise_warehouse_connection_failure import (
     raise_warehouse_connection_failure,
 )
+from sqlbuild.executor.run.classes.fingerprint_writes import FingerprintWrites
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.executor.seed.main._execute import execute_seed
 from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback
@@ -64,6 +65,7 @@ def run_seed_pipeline(
     indexed_entry: tuple[int, SeedPlanEntry]
     for indexed_entry in enumerate(seed_entries):
         pending.put(indexed_entry)
+    fingerprint_writes: FingerprintWrites = FingerprintWrites()
     try:
         with ThreadPoolExecutor(max_workers=effective_concurrency) as pool:
             futures: tuple[Future[tuple[tuple[int, SeedExecutionResult], ...]], ...] = tuple(
@@ -73,6 +75,7 @@ def run_seed_pipeline(
                         copy_context().run,
                         _run_seed_worker,
                         pending=pending,
+                        fingerprint_writes=fingerprint_writes,
                         adapter=adapter,
                         connection=connections[worker_index],
                         run_id=run_id,
@@ -101,6 +104,7 @@ def run_seed_pipeline(
 def _run_seed_worker(
     *,
     pending: queue.SimpleQueue[tuple[int, SeedPlanEntry]],
+    fingerprint_writes: FingerprintWrites,
     adapter: BaseAdapter,
     connection: Any,
     run_id: str,
@@ -130,6 +134,7 @@ def _run_seed_worker(
                 statement_recorder=StatementRecorder(),
                 run_id=run_id,
                 query_change_tracking=query_change_tracking,
+                fingerprint_writes=fingerprint_writes,
             )
             if result.status == ExecutionStatus.FAILED:
                 lifecycle.failed(error_code=result.error_code)
