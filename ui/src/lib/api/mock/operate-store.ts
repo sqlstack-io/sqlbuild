@@ -132,6 +132,8 @@ export type OperateContext = {
 	/** Name of the location's one target. */
 	target: (scope: Scope) => string;
 	reply: <T>(value: T) => Promise<T>;
+	/** Runs stay where they are instead of advancing every 1.5 s, so counted work is the same on every run. */
+	still?: boolean;
 };
 
 /** The end-to-end tests' stand-in for a plan recorded without timings: `window.__sqbPlanWithoutTimings`. */
@@ -166,7 +168,7 @@ export class MockOperate {
 		this.#fx = createOperateFixtures(now);
 		this.#records = this.#fx.records;
 		for (const rec of this.#records) this.#settle(rec, now);
-		if (typeof window !== 'undefined') setInterval(() => this.#advance(), 1500);
+		if (typeof window !== 'undefined' && !ctx.still) setInterval(() => this.#advance(), 1500);
 	}
 
 	// ---- reads: runs ----

@@ -1434,6 +1434,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Layout test (every page with awkward mock data at 1440 and 1920 px)
         run: npx playwright test --project=layout
+      - name: Work budgets (layouts, restyles, DOM changes and reads per interaction, counted)
+        run: npx playwright test --project=budgets
 
   ui_timings:
     # The timing guards in ui/e2e/perf.spec.ts, with the CPU slowed 6x. They go red over budget and

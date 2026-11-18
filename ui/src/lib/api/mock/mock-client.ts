@@ -57,6 +57,8 @@ export type MockOptions = {
 	role?: BuiltInRole;
 	/** `default` shows three warnings; `none` is all clear; `all` adds critical events. */
 	events?: 'default' | 'none' | 'all';
+	/** Runs never advance on their own (`?still`), for the browser suite's work budgets. */
+	still?: boolean;
 	/** Simulated request latency in milliseconds. */
 	latencyMs?: number;
 	/** Simulated state of the live-signal connection. */
@@ -86,7 +88,8 @@ export class MockApiClient implements ApiClient {
 			role: options.role ?? 'admin',
 			events: options.events ?? 'default',
 			latencyMs: options.latencyMs ?? 120,
-			connection: options.connection ?? 'live'
+			connection: options.connection ?? 'live',
+			still: options.still ?? false
 		};
 		this.changes.setState(this.#options.connection);
 		this.#fixtures = createFixtures(this.#createdAt);
@@ -97,7 +100,8 @@ export class MockApiClient implements ApiClient {
 			user: () => DEMO_USER,
 			adapter: (scope) => this.#location(scope).target.adapter ?? 'duckdb',
 			target: (scope) => this.#location(scope).target.name,
-			reply: (value) => this.#reply(value)
+			reply: (value) => this.#reply(value),
+			still: this.#options.still
 		});
 		this.#platform = new MockPlatformApi({
 			now: this.#createdAt,
