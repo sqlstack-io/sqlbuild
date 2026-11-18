@@ -697,6 +697,35 @@ def test_given_model_identity_metadata_when_detecting_changes_then_uses_aligned_
             expected_config_changed=True,
             expected_backfill=BackfillResult(action=BackfillAction.FORWARD_ONLY),
         ),
+        DetectFunctionCallerChangeTestCase(
+            description="a maintained model's refresh_mode change is a config change",
+            metadata_case=build_function_caller_metadata_case(
+                config_values={"materialized": "maintained", "refresh_mode": "full"},
+                function_local_hashes={},
+                previous_function_hashes={},
+                previous_config_values={
+                    "materialized": "maintained",
+                    "refresh_mode": "incremental",
+                },
+            ),
+            query_change_tracking=True,
+            expected_changed_functions=(),
+            expected_config_changed=True,
+            expected_backfill=BackfillResult(action=BackfillAction.FORWARD_ONLY),
+        ),
+        DetectFunctionCallerChangeTestCase(
+            description="a maintained model's lag change is altered in place, not a config change",
+            metadata_case=build_function_caller_metadata_case(
+                config_values={"materialized": "maintained", "refresh": {"lag": "5m"}},
+                function_local_hashes={},
+                previous_function_hashes={},
+                previous_config_values={"materialized": "maintained", "refresh": {"lag": "1h"}},
+            ),
+            query_change_tracking=True,
+            expected_changed_functions=(),
+            expected_config_changed=False,
+            expected_backfill=BackfillResult(action=BackfillAction.FORWARD_ONLY),
+        ),
     ],
     ids=lambda case: case.description,
 )
