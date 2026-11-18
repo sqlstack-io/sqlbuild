@@ -20,12 +20,17 @@ from sqlbuild.adapters.postgres.classes.postgres_adapter import PostgresAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
+    AddedColumnsCase,
     NativeCatalogCase,
     PhysicalEvidenceCase,
     ValidationCacheCase,
 )
 
 _DECLARED_ORDERS: tuple[tuple[str, str], ...] = (("order_id", "INTEGER"), ("status", "VARCHAR"))
+_CUSTOMERS_MODEL: tuple[str, str] = (
+    "customers",
+    "SELECT 1 AS customer_id, 'Ada' AS customer_name",
+)
 
 
 @pytest.mark.parametrize(
@@ -209,11 +214,19 @@ def test_given_case_sensitive_snowflake_when_rebinding_listed_columns_then_unquo
             expected_rebinding=False,
         ),
         PhysicalEvidenceCase(
-            "Snowflake new listed column",
+            "Snowflake new listed column an explicit reader cannot see",
             SnowflakeAdapter,
             "snowflake",
             (*_DECLARED_ORDERS, ("region", "VARCHAR")),
+            expected_rebinding=False,
+        ),
+        PhysicalEvidenceCase(
+            "Snowflake declared column missing from the listing",
+            SnowflakeAdapter,
+            "snowflake",
+            (("order_id", "INTEGER"), ("region", "VARCHAR")),
             expected_rebinding=True,
+            expected_codes=("B002",),
         ),
         PhysicalEvidenceCase(
             "Snowflake lowercase stored name rejects unquoted reader",
@@ -298,6 +311,105 @@ def test_given_case_sensitive_dialect_when_listed_columns_bind_as_declared_then_
     )
     assert (rebinding > 0) is test_case.expected_rebinding
     assert tuple(item.code for item in diagnostics) == test_case.expected_codes
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AddedColumnsCase(
+            "a star reader is analysed again",
+            (("report", 'SELECT * FROM __source("orders")'),),
+            expected_reanalysed=1,
+        ),
+        AddedColumnsCase(
+            "an explicit reader of the source alone keeps its analysis",
+            (("report", 'SELECT order_id, status FROM __source("orders")'),),
+            expected_reanalysed=0,
+        ),
+        AddedColumnsCase(
+            "an unqualified name in a join with the source is analysed again",
+            (
+                _CUSTOMERS_MODEL,
+                (
+                    "report",
+                    'SELECT order_id, customer_name FROM __source("orders") AS o '
+                    'JOIN __ref("customers") AS c ON o.order_id = c.customer_id',
+                ),
+            ),
+            expected_reanalysed=1,
+        ),
+        AddedColumnsCase(
+            "qualified names in a join with the source keep their analysis",
+            (
+                _CUSTOMERS_MODEL,
+                (
+                    "report",
+                    'SELECT o.order_id, c.customer_name FROM __source("orders") AS o '
+                    'JOIN __ref("customers") AS c ON o.order_id = c.customer_id',
+                ),
+            ),
+            expected_reanalysed=0,
+        ),
+        AddedColumnsCase(
+            "an explicit reader of a star reader keeps its analysis",
+            (
+                ("staged", 'SELECT * FROM __source("orders")'),
+                ("report", 'SELECT order_id FROM __ref("staged")'),
+            ),
+            expected_reanalysed=1,
+        ),
+        AddedColumnsCase(
+            "a star reader of a star reader is analysed again",
+            (
+                ("staged", 'SELECT * FROM __source("orders")'),
+                ("report", 'SELECT * FROM __ref("staged")'),
+            ),
+            expected_reanalysed=2,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_source_gaining_columns_when_rebinding_then_reanalyses_models_they_can_change(
+    test_case: AddedColumnsCase, tmp_path: Path
+) -> None:
+    (tmp_path / "sqlbuild_project.toml").write_text(
+        'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n'
+    )
+    (tmp_path / "models").mkdir()
+    (tmp_path / "sources").mkdir()
+    (tmp_path / "sources/orders.yml").write_text(
+        "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n"
+        "    contract: enforced\n    columns:\n"
+        + "".join(
+            f"      - name: {name}\n        type: {kind}\n" for name, kind in _DECLARED_ORDERS
+        )
+    )
+    for name, sql in test_case.models:
+        (tmp_path / f"models/{name}.sql").write_text(
+            f"MODEL (description 'Test model {name}.', database warehouse, schema analytics);\n"
+            + sql
+        )
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discover_project_inputs(project_dir=tmp_path), adapter=SnowflakeAdapter()
+    )
+    _ = sql_analysis_models.compile_stage_work_info(reset=True)
+
+    diagnostics: tuple[CompilerDiagnostic, ...] = source_binding_diagnostics(
+        project=project,
+        columns={
+            "orders": tuple(
+                ColumnInfo(name, kind) for name, kind in (*_DECLARED_ORDERS, ("region", "VARCHAR"))
+            )
+        },
+        profile=ExpressionInferenceProfile(sql_analysis_dialect="snowflake"),
+        selected_keys=frozenset(model.key for model in project.models),
+    )
+
+    assert (
+        sql_analysis_models.compile_stage_work_info().get("source_rebinding_analyses", 0)
+        == test_case.expected_reanalysed
+    )
+    assert diagnostics == ()
 
 
 @pytest.mark.parametrize(
