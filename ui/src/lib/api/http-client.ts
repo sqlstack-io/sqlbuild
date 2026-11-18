@@ -23,6 +23,7 @@ import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEven
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import { newRequestId } from '$lib/browser/request-id';
 
 type Wire = components['schemas'];
 
@@ -364,7 +365,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const { rows } = runRowPageOver([await listedRuns(scope)], scope.locationId, { ...query, cursor: null, limit: RUN_WINDOW });
 			const result: BulkRunResult = { done: [], failed: [] };
 			for (const { run } of rows.filter((row) => isActiveRun(row.run.status) && !row.cancelRequestedAt)) {
-				const body = { run_id: run.id, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
+				const body = { run_id: run.id, event_id: newRequestId(), reason: 'Cancelled from the web UI' };
 				const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
 				if (response.status === 401) onUnauthorized();
 				if (response.ok) result.done.push(run.id);
@@ -483,7 +484,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			return { nodeKey: data.node_key, errorCode: data.error_code ?? null, message: data.message ?? null, file: data.path ?? null };
 		},
 		async cancelRun(scope: Scope, runId: string): Promise<Run> {
-			const body = { run_id: runId, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
+			const body = { run_id: runId, event_id: newRequestId(), reason: 'Cancelled from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
 			forgetPending();
 			if (response.status === 401) onUnauthorized();
@@ -492,7 +493,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async rerunSelectedNodes(scope: Scope, runId: string, nodes: string[]): Promise<Run> {
 			const source = await requireRun(scope, runId);
-			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: false, nodes, priority: source.priority, reason: 'Rerun selected nodes from the web UI' };
+			const body = { run_id: newRequestId(), source_run_id: runId, from_failure: false, nodes, priority: source.priority, reason: 'Rerun selected nodes from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/rerun', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
 			forgetPending();
 			if (response.status === 401) onUnauthorized();
@@ -502,7 +503,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		async acknowledgeRun(scope: Scope, runId: string, acknowledged: boolean): Promise<void> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/acknowledgements', {
-				body: { event_id: crypto.randomUUID(), run_id: runId, acknowledged },
+				body: { event_id: newRequestId(), run_id: runId, acknowledged },
 				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
 			});
 			if (response.status === 401) onUnauthorized();
@@ -510,7 +511,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 			const source = await requireRun(scope, runId);
-			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
+			const body = { run_id: newRequestId(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/rerun', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
 			forgetPending();
 			if (response.status === 401) onUnauthorized();
@@ -576,7 +577,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
-			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, command: request.command, priority: request.priority, reason: 'Started from the web UI' };
+			const body = { run_id: newRequestId(), location_id: locationId, target, command: request.command, priority: request.priority, reason: 'Started from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/adhoc', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
 			forgetPending();
 			if (response.status === 401) onUnauthorized();
@@ -590,7 +591,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };
-			const requestId = crypto.randomUUID();
+			const requestId = newRequestId();
 			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/plans', {
 				body: { request_id: requestId, command },
 				params: { path, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
@@ -662,7 +663,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		async requestWarehouseSync(scope: Scope): Promise<void> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/warehouse-syncs', {
-				body: { request_id: crypto.randomUUID(), reason: 'Requested from the web UI' },
+				body: { request_id: newRequestId(), reason: 'Requested from the web UI' },
 				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
 			});
 			if (response.status === 401) onUnauthorized();
@@ -672,7 +673,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		async testConnection(scope: Scope): Promise<ConnectionTest> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };
-			const requestId = crypto.randomUUID();
+			const requestId = newRequestId();
 			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/connection-tests', {
 				body: { request_id: requestId, reason: 'Tested from the web UI' },
 				params: { path, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
@@ -1149,7 +1150,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 
 	/** Records an operator change; the server takes the actor from the session and needs a reason. */
 	async function changeTrigger(triggerId: string, change: Wire['TriggerChange'], reason?: string | null) {
-		const body = { trigger_id: triggerId, event_id: crypto.randomUUID(), actor: '', reason: reason?.trim() || 'Changed from the web UI', change };
+		const body = { trigger_id: triggerId, event_id: newRequestId(), actor: '', reason: reason?.trim() || 'Changed from the web UI', change };
 		const { error, response } = await http.POST('/api/control/triggers', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
 		forgetPending();
 		if (response.status === 401) onUnauthorized();
@@ -1223,7 +1224,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		const narrowed = !!(options?.select?.length || options?.exclude?.length);
 		const reason = fullRefresh ? 'Full refresh started from the web UI' : window ? 'Backfill started from the web UI' : narrowed ? 'Part of the job started from the web UI' : 'Started from the web UI';
 		const body = {
-			run_id: crypto.randomUUID(),
+			run_id: newRequestId(),
 			location_id: locationId,
 			target,
 			job_key: key,
