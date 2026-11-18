@@ -7,6 +7,7 @@ pub mod format_plan_json;
 pub mod future_cursor_safety;
 pub mod inclusive_cursor_end;
 pub mod items;
+pub mod job_warehouses;
 pub mod maximum_start_safety;
 pub mod optional_facts;
 pub mod register_display;

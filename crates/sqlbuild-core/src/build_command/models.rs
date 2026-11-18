@@ -184,6 +184,8 @@ pub struct RunContextFacts {
     pub full_refresh: bool,
     /// The named jobs whose own models the build rebuilds from scratch.
     pub full_refresh_jobs: Vec<String>,
+    /// Each named job whose nodes run on its own warehouse, and that warehouse.
+    pub job_warehouses: Vec<(String, String)>,
     pub selected_count: usize,
     pub total_count: usize,
     /// Valid ISO `start_date` and `end_date` variables.

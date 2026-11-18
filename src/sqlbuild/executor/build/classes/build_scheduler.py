@@ -115,6 +115,11 @@ from sqlbuild.executor.run.models import (
 )
 from sqlbuild.executor.run.types import MicrobatchBatchExecutor
 from sqlbuild.executor.scheduling.classes.recovering_connection_pool import RecoveringConnectionPool
+from sqlbuild.executor.scheduling.classes.session_warehouses import (
+    SessionWarehouses,
+    configured_warehouse,
+    with_session_warehouse,
+)
 from sqlbuild.executor.scheduling.main._run_worker import run_worker_with_completion
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.executor.seed.constants import SEED_ENTRY_MISSING_CODE
@@ -243,6 +248,12 @@ class BuildScheduler:
         )
         self._max_concurrency: int = len(connections)
         self._init_job_limits(runtime)
+        self._node_warehouses: Mapping[CompiledObjectKey, str] = runtime.node_warehouses
+        self._session_warehouses: SessionWarehouses | None = (
+            SessionWarehouses(adapter=adapter, home=configured_warehouse(connection_config))
+            if runtime.node_warehouses
+            else None
+        )
         self._blocked_keys: set[CompiledObjectKey] = set()
         self._unbuilt_keys: set[CompiledObjectKey] = set(initial_state.initial_failed_keys)
         self._completed_keys: set[CompiledObjectKey] = set(initial_state.precompleted_keys)
@@ -306,6 +317,8 @@ class BuildScheduler:
             else:
                 self._run_concurrent()
         finally:
+            if self._session_warehouses is not None:
+                self._session_warehouses.restore()
             self._close_replacement_connections()
 
         enforce_execution_deadline()
@@ -679,6 +692,11 @@ class BuildScheduler:
                 ledger_path=(self._runtime_dir / "executions" / self._run_id / "statements.jsonl"),
                 on_statement_complete=self._on_statement_complete,
             ):
+                failure: ModelExecutionResult | None = self._enter_node_warehouse(
+                    key=key, connection=connection
+                )
+                if failure is not None:
+                    return failure
                 return self._execute_model_node(
                     key=key,
                     connection=connection,
@@ -686,6 +704,7 @@ class BuildScheduler:
                         self._run_microbatch_subwork(
                             pool=pool,
                             jobs=self._node_jobs.get(key, ()),
+                            warehouse=self._node_warehouses.get(key),
                             coordinator_connection=connection,
                             batches=batches,
                             concurrency=concurrency,
@@ -702,6 +721,7 @@ class BuildScheduler:
         *,
         pool: ThreadPoolExecutor,
         jobs: tuple[str, ...],
+        warehouse: str | None = None,
         coordinator_connection: Any,
         batches: tuple[BatchWindow, ...],
         concurrency: int,
@@ -725,6 +745,7 @@ class BuildScheduler:
                         copy_context().run,
                         self._run_microbatch_batch_worker,
                         jobs=jobs,
+                        warehouse=warehouse,
                         batch=batch,
                         execute=execute,
                     ),
@@ -794,11 +815,14 @@ class BuildScheduler:
         self,
         *,
         jobs: tuple[str, ...],
+        warehouse: str | None = None,
         batch: BatchWindow,
         execute: MicrobatchBatchExecutor,
     ) -> MicrobatchPhaseOutcome:
         connection: Any = self._connection_pool.get()
         try:
+            if self._session_warehouses is not None:
+                self._session_warehouses.use(connection=connection, warehouse=warehouse)
             return execute(batch, connection)
         finally:
             try:
@@ -1029,6 +1053,11 @@ class BuildScheduler:
     ):
         """Execute a single node. Runs in a worker thread (or scheduler thread for serial)."""
 
+        failure: ModelExecutionResult | None = self._enter_node_warehouse(
+            key=key, connection=connection
+        )
+        if failure is not None:
+            return failure
         if key.resource_type == CompiledResourceType.SEED:
             return self._execute_seed_node(key=key, connection=connection)
         if key.resource_type == CompiledResourceType.SOURCE:
@@ -1046,6 +1075,29 @@ class BuildScheduler:
             error_message=f"unknown executable resource type '{key.resource_type}'",
         )
 
+    def _enter_node_warehouse(
+        self, *, key: CompiledObjectKey, connection: Any
+    ) -> ModelExecutionResult | None:
+        """Put `connection` on the node's job warehouse, or the build's; the failure if not."""
+
+        if self._session_warehouses is None:
+            return None
+        warehouse: str | None = self._node_warehouses.get(key)
+        try:
+            self._session_warehouses.use(connection=connection, warehouse=warehouse)
+        except Exception as error:  # noqa: BLE001 - the node fails with the reason
+            return ModelExecutionResult(
+                model_name=key.name,
+                status=ExecutionStatus.FAILED,
+                error_code=BUILD_WORKER_FAILED_CODE,
+                error_message=(
+                    f"cannot run on warehouse {warehouse}: {error}"
+                    if warehouse is not None
+                    else f"cannot return to the build's warehouse: {error}"
+                ),
+            )
+        return None
+
     def _execute_source_node(
         self, *, key: CompiledObjectKey, connection: Any
     ) -> LoadExecutionResult:
@@ -1061,7 +1113,9 @@ class BuildScheduler:
             loader_functions_by_name=self._loader_functions_by_name,
             loader_ref_entries=self._loader_ref_entries,
             adapter=self._adapter,
-            connection_config=self._connection_config,
+            connection_config=with_session_warehouse(
+                self._connection_config, self._node_warehouses.get(key)
+            ),
             connection=connection,
             runtime=self._runtime,
             callbacks=self._callbacks,

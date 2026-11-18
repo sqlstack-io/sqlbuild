@@ -2345,6 +2345,16 @@ class BaseAdapter(RetentionAdapterMixin, RunsTableMixin, StrictAdapter):
             render_framework_type=self.render_framework_type,
         )
 
+    def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
+        """Run the session's next statements on `warehouse`, where the adapter has one."""
+
+        raise NotImplementedError(f"{type(self).__name__} has no session warehouse to select")
+
+    def current_session_warehouse(self, *, connection: Any) -> str | None:
+        """The warehouse the session runs on, as an identifier `use_session_warehouse` accepts."""
+
+        return None
+
     def render_create_consumption_index_sqls(
         self,
         *,

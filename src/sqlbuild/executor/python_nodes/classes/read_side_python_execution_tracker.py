@@ -13,6 +13,7 @@ from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
 from sqlbuild.executor.python_nodes._helpers.ingress_execution import _to_executable_python_node
+from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
 from sqlbuild.executor.python_nodes._helpers.read_side_execution import (
     _sql_result_failed,
     _sql_result_name,
@@ -151,7 +152,9 @@ class ReadSidePythonExecutionTracker:
         return True
 
     def _execute_python_node(self, node: DiscoveredPythonNode) -> None:
-        runtime: PythonNodeRuntime = replace(self._runtime, result_store=self._result_store)
+        runtime: PythonNodeRuntime = node_runtime(
+            replace(self._runtime, result_store=self._result_store), node.name
+        )
         _ = run_ready_python_node(
             node=_to_executable_python_node(node),
             upstream_results=tuple(

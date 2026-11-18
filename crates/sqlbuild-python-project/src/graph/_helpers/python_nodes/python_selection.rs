@@ -4,6 +4,7 @@ use crate::graph::main::python_nodes::python_node_names::python_node_names;
 use sqlbuild_python_base::positional_record;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
@@ -190,6 +191,31 @@ impl<'g> PythonAwareSelection<'g> {
     /// The graph with the needed jobs attached.
     pub fn graph(&self) -> &ProjectGraph {
         &self.graph
+    }
+
+    /// The SQL keys and Python node `(kind, name)` keys `select` minus `exclude` resolve to.
+    pub fn resolve_keys(
+        &self,
+        select: &[String],
+        exclude: &[String],
+    ) -> Result<BTreeSet<ObjectKey>, SelectorError> {
+        let RunSelection {
+            sql_keys,
+            python_node_names,
+        } = self.resolve(select, exclude)?;
+        let kinds: BTreeMap<&str, &str> = self
+            .nodes
+            .nodes
+            .iter()
+            .map(|node| (node.name.as_str(), node.kind.as_str()))
+            .collect();
+        let mut keys: BTreeSet<ObjectKey> = sql_keys.into_iter().collect();
+        for name in python_node_names {
+            if let Some(kind) = kinds.get(name.as_str()) {
+                keys.insert(((*kind).to_owned(), name));
+            }
+        }
+        Ok(keys)
     }
 
     /// The SQL keys and Python node names `select` minus `exclude` resolve to.

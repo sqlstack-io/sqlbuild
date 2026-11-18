@@ -7,6 +7,7 @@ pub mod graph_with_jobs;
 pub mod install;
 pub mod job_declarations;
 pub mod job_names;
+pub mod job_scope_project_dir;
 pub mod materialization;
 pub mod model_facts;
 pub mod named_jobs;

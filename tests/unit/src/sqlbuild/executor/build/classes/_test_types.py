@@ -68,3 +68,21 @@ class SubworkerReservationTestCase:
     max_concurrency: int
     expected_demand: int
     expected_reservations: tuple[bool, ...]
+
+
+@dataclass(frozen=True)
+class SubworkerWarehouseTestCase:
+    """A microbatch sub-worker taking a pooled connection a previous node may have moved."""
+
+    description: str
+    coordinator_warehouse: str | None
+    earlier_warehouse: str | None
+    expected_statements: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NodeWarehouseFailureTestCase:
+    description: str
+    node_warehouse: str | None
+    failing: str
+    expected_message: str

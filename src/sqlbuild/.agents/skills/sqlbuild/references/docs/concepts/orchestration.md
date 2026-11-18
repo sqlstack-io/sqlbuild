@@ -110,7 +110,7 @@ Naming a group names each of its jobs. The first value set wins:
 4. The project's setting
 
 A command-line flag replaces the job's setting rather than merging with it: `--vars` replaces the
-job's whole `vars`. An option that rules another out counts as setting both, so `--reload` wins
+job's whole `vars`, and `--warehouse` puts every node on its warehouse. An option that rules another out counts as setting both, so `--reload` wins
 over a job's `load_sources = false`. Any `--concurrency` sets the build's limit and turns off the
 per-job limits. The job's settings are added before a `--` on the command line, so selectors after
 it still name jobs. `--no-job-settings` leaves out every job's settings.
@@ -123,6 +123,7 @@ nodes differently:
 | `full_refresh` | The job's incremental models, rebuilt from scratch |
 | `run_tests` | The SQL unit tests of the job's models |
 | `ignore_audit_failures` | The audits of the job's nodes |
+| `warehouse` | The Snowflake warehouse the job's nodes run on, Python nodes included; see [A job's own warehouse](adapters/snowflake.md#a-jobs-own-warehouse) |
 | `concurrency` | How many of the job's nodes build at once, and a node in two named jobs fits within both. The build's own limit becomes the larger of the configured limit and the named jobs' limits added together |
 | `[retry]` | The job's nodes |
 

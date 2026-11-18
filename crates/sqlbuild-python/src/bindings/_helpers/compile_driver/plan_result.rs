@@ -238,6 +238,9 @@ pub(crate) fn pipeline_result<'py>(
                 job_settings.job_limits(&plan_output, &native_field(options, "concurrency")?)?;
             job_fields.push(("job_limits", limits.into_any()));
             job_fields.push(("node_jobs", node_jobs.into_any()));
+            let (nodes, python) = job_settings.node_warehouses(&plan_output)?;
+            job_fields.push(("node_warehouses", nodes.into_any()));
+            job_fields.push(("python_node_warehouses", python.into_any()));
             plan_output
         }
         None => plan_output,

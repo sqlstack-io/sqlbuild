@@ -2,10 +2,11 @@ use crate::command_connection::errors::CommandConnectionError;
 use crate::command_connection::main::authored_warehouse::authored_warehouse;
 use crate::command_connection::main::check_cli_warehouse::check_cli_warehouse;
 use crate::command_connection::main::check_expanded_warehouse::check_expanded_warehouse;
+use crate::command_connection::main::check_job_warehouse::check_job_warehouse;
 use crate::command_connection::main::snowflake_key_warning::snowflake_key_warning;
 use crate::command_connection::tests::helpers::message;
 use crate::command_connection::tests::test_types::{
-    CliWarehouseTestCase, ExpandedWarehouseTestCase, SnowflakeKeyTestCase,
+    CliWarehouseTestCase, ExpandedWarehouseTestCase, JobWarehouseTestCase, SnowflakeKeyTestCase,
 };
 
 #[test]
@@ -133,5 +134,45 @@ fn given_connection_keys_when_warning_then_only_duckdb_snowflake_keys_are_listed
             "{}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_a_job_warehouse_when_checking_then_it_names_the_job_and_follows_identifier_rules() {
+    let test_cases = [
+        JobWarehouseTestCase {
+            description: "unquoted identifier",
+            value: Some("ORDERS_WH"),
+            expected_result: Ok("ORDERS_WH"),
+        },
+        JobWarehouseTestCase {
+            description: "blank value",
+            value: Some(" "),
+            expected_result: Err("job orders_job sets an empty warehouse name"),
+        },
+        JobWarehouseTestCase {
+            description: "not an identifier",
+            value: Some("bad wh"),
+            expected_result: Err(
+                "job orders_job sets warehouse 'bad wh', which is not a valid Snowflake warehouse identifier",
+            ),
+        },
+        JobWarehouseTestCase {
+            description: "not text",
+            value: None,
+            expected_result: Err("job orders_job sets a warehouse that is not text"),
+        },
+    ];
+
+    for test_case in test_cases {
+        let result = check_job_warehouse("orders_job", test_case.value);
+        let shown: Result<&str, Option<String>> = match &result {
+            Ok(name) => Ok(name.as_str()),
+            Err(error) => Err(Some(error.message().to_owned())),
+        };
+        let expected: Result<&str, Option<String>> = test_case
+            .expected_result
+            .map_err(|text| Some(text.to_owned()));
+        assert_eq!(shown, expected, "{}", test_case.description);
     }
 }

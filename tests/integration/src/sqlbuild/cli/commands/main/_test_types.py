@@ -1518,3 +1518,23 @@ class JobOutputTestCase:
     expected_present: tuple[str, ...]
     expected_absent: tuple[str, ...]
     extra_files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class JobWarehouseSwitchTestCase:
+    """A build naming jobs, and the warehouses its connections switch to after connecting."""
+
+    description: str
+    argv: tuple[str, ...]
+    expected_connect_warehouses: frozenset[str]
+    expected_switches: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class JobWarehouseOutputTestCase:
+    """A command naming jobs with warehouses, its exit code and what its output says."""
+
+    description: str
+    argv: tuple[str, ...]
+    expected_exit_code: int
+    expected_fragment: str

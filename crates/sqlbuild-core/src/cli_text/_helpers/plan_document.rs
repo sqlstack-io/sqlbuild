@@ -37,6 +37,9 @@ fn header_lines(report: &PlanTextReport, full_refresh: bool) -> Vec<String> {
             job_list(&report.ignore_audit_failure_jobs)
         )));
     }
+    for (job, warehouse) in &report.job_warehouses {
+        lines.push(format!("Nodes of job {job} run on warehouse {warehouse}"));
+    }
     lines
 }
 

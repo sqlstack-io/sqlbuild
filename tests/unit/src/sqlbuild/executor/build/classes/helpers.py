@@ -47,6 +47,8 @@ def _bare_scheduler(
     scheduler._microbatch_coordinator_demand = 0
     scheduler._microbatch_subworkers = 0
     scheduler._completion_queue = Queue()
+    scheduler._session_warehouses = None
+    scheduler._node_warehouses = {}
     scheduler._init_job_limits(
         BuildRuntimeParams(
             run_id="run",

@@ -44,6 +44,12 @@ fn given_named_jobs_when_merging_build_settings_then_they_must_agree() {
             ),
         },
         BuildJobSettingsTestCase {
+            description: "jobs on different warehouses build together: warehouse is per node",
+            select: &["job:orders_wh_job job:refunds_wh_job"],
+            expected_named: vec!["orders_wh_job", "refunds_wh_job"],
+            expected_settings: Ok(BTreeMap::new()),
+        },
+        BuildJobSettingsTestCase {
             description: "a group's jobs without build-wide settings",
             select: &["job:daily_group"],
             expected_named: vec!["orders_job", "refunds_job"],

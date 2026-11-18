@@ -34,7 +34,9 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
-use sqlbuild_python_project::compiled_project::constants::JOB_IGNORED_AUDIT_FAILURES_KEY;
+use sqlbuild_python_project::compiled_project::constants::{
+    JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
+};
 
 const SKIP_ACTION: &str = "skip";
 const QUERY_CHANGED: &str = "query_changed";
@@ -388,6 +390,18 @@ fn provider_usages(
 }
 
 /// `str(item)` of a metadata tuple or list, else nothing.
+/// The plan metadata's named jobs and the warehouses their nodes run on.
+pub(crate) fn job_warehouses(metadata: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
+    let value: Bound<'_, PyAny> = mapping_get(metadata, JOB_WAREHOUSES_KEY)?;
+    let Ok(warehouses) = value.cast::<PyDict>() else {
+        return Ok(Vec::new());
+    };
+    warehouses
+        .iter()
+        .map(|(job, warehouse)| Ok((job.extract()?, warehouse.extract()?)))
+        .collect()
+}
+
 fn metadata_names(value: Option<Bound<'_, PyAny>>) -> PyResult<Vec<String>> {
     match value {
         Some(value) if value.is_instance_of::<PyTuple>() || value.is_instance_of::<PyList>() => {
@@ -532,5 +546,6 @@ pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextRepor
             &metadata,
             JOB_IGNORED_AUDIT_FAILURES_KEY,
         )?))?,
+        job_warehouses: job_warehouses(&metadata)?,
     })
 }

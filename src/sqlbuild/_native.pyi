@@ -15298,6 +15298,8 @@ class CompilePipelineResult(NativeRecord):
     python_plan_entries: tuple[PythonPlanEntry, ...]
     job_limits: dict[str, int]
     node_jobs: dict[CompiledObjectKey, tuple[str, ...]]
+    node_warehouses: dict[CompiledObjectKey, str]
+    python_node_warehouses: dict[str, str]
     compile_seconds: float | None
     planning_seconds: float | None
     def __init__(
@@ -15309,6 +15311,8 @@ class CompilePipelineResult(NativeRecord):
         python_plan_entries: tuple[PythonPlanEntry, ...] = ...,
         job_limits: dict[str, int] = ...,
         node_jobs: dict[CompiledObjectKey, tuple[str, ...]] = ...,
+        node_warehouses: dict[CompiledObjectKey, str] = ...,
+        python_node_warehouses: dict[str, str] = ...,
         compile_seconds: float | None = ...,
         planning_seconds: float | None = ...,
     ) -> None: ...
