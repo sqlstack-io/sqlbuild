@@ -114,13 +114,17 @@ pub(crate) fn plan_audit_of<'py>(
                 })),
             )?,
         },
+        None,
     )
 }
 
 /// One audit's plan entry, rendered against the planning relations.
+///
+/// `outside_lineage` is whether the audit reads outside its target's lineage, when already known.
 pub(crate) fn plan_audit<'py>(
     audit: &Bound<'py, PyAny>,
     request: &AuditPlanning<'py>,
+    outside_lineage: Option<bool>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = audit.py();
     let audit = audit.clone();
@@ -215,9 +219,15 @@ pub(crate) fn plan_audit<'py>(
         ("attached_target_name", target),
         (
             "reads_outside_target_lineage",
-            PyBool::new(py, outside_target_lineage(&audit, lineage.graph())?)
-                .to_owned()
-                .into_any(),
+            PyBool::new(
+                py,
+                match outside_lineage {
+                    Some(outside) => outside,
+                    None => outside_target_lineage(&audit, lineage.graph())?,
+                },
+            )
+            .to_owned()
+            .into_any(),
         ),
     ] {
         values.set_item(field, value)?;
