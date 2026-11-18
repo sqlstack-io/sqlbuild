@@ -1,4 +1,4 @@
-//! A person lists the current nodes with view on all of them, served from the held view and tagged with its snapshot and version.
+//! A person lists the current nodes with view on all of them, without their states, served from the held view and tagged with its snapshot.
 
 use uuid::Uuid;
 

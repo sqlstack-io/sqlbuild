@@ -528,12 +528,20 @@ fn given_held_node_states_when_a_signal_names_their_target_then_only_watched_tar
         HeldTargetTestCase {
             description: "a target nobody watches is dropped and read again on the next request",
             watched: false,
+            pending: false,
             expected_held_and_refreshed: (false, false),
         },
         HeldTargetTestCase {
             description: "a watched target stays held and refreshes",
             watched: true,
+            pending: false,
             expected_held_and_refreshed: (true, true),
+        },
+        HeldTargetTestCase {
+            description: "an unwatched target with a refresh pending stays held until it finishes",
+            watched: false,
+            pending: true,
+            expected_held_and_refreshed: (true, false),
         },
     ];
     for test_case in test_cases {
@@ -553,6 +561,9 @@ fn given_held_node_states_when_a_signal_names_their_target_then_only_watched_tar
             let scope = (location, "development");
             let watch = test_case.watched.then(|| watch_target(&cache, scope));
             current_view(&cache, scope, None).await.expect("first view");
+            target_cache(&cache, scope)
+                .scheduled
+                .store(test_case.pending, std::sync::atomic::Ordering::SeqCst);
             let mut updates = cache.updates.subscribe();
             changes
                 .send(ChangeMessage::Changed {

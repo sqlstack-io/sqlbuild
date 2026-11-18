@@ -985,7 +985,7 @@ pub struct WarehouseRetention {
     pub state_history_versions: u16,
 }
 
-/// A current snapshot node's declared metadata and latest build, without SQL, source or config.
+/// A current snapshot node's declared metadata and latest build, which the node listing leaves to node-states.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CatalogNodeRecord {
     pub node_key: String,

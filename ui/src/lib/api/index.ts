@@ -9,7 +9,7 @@ import { to } from '$lib/paths';
 import type { BuiltInRole } from './types';
 
 export type { ApiClient } from './client';
-export { ApiError, isRefusal } from './client';
+export { ApiError, isRefusal, isUnsupported } from './client';
 export * from './types';
 export * from './signals';
 export { mergePlanPage } from './http-runs';

@@ -2,7 +2,8 @@ import createFetch from 'openapi-fetch';
 import { shortName } from '$lib/build-area/labels';
 import { isActiveRun } from '$lib/status';
 import type { components, paths } from '$control/schema.d.ts';
-import { ApiError, type ApiClient } from './client';
+import { ApiError, isUnsupported, type ApiClient } from './client';
+import { applyNodeStates } from './node-states';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
@@ -290,7 +291,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 	const errorRefused = new Set<string>();
 	// Targets whose health the person may not read; each refusal is audited, so Connections asks once per page load.
 	const healthRefused = new Set<string>();
-	// The node listing per location with the server's ETag; the server answers a repeat with 304 until the snapshot or states change.
+	// The node listing per location with the server's ETag; the server answers a repeat with 304 until the snapshot changes.
 	const listings = new Map<string, { etag: string; nodes: CatalogNode[] }>();
 	// Statistics samples per relation, oldest first, with the cursor after the newest; a refresh reads only newer samples.
 	const samples = new Map<string, { records: Wire['WarehouseStatisticsRecord'][]; after: Wire['WarehouseMirrorCursor'] }>();
@@ -806,7 +807,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		disableAccount: (name: string): Promise<Account> => changePerson(name, 'disable'),
 		enableAccount: (name: string): Promise<Account> => changePerson(name, 'enable'),
 		async getColumnLineage(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<ColumnLineage | null> {
-			const nodes = listing ?? (await implemented.listCatalogNodes(scope));
+			const nodes = listing ?? (await listingWithStates(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -818,7 +819,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			return toColumnLineage(data, nodes);
 		},
 		async getCatalogNode(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null> {
-			const nodes = listing ?? (await implemented.listCatalogNodes(scope));
+			const nodes = listing ?? (await listingWithStates(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -856,7 +857,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const reads = Promise.all([
 				recentRuns(scope),
 				implemented.listChecks(scope),
-				listing ?? implemented.listCatalogNodes(scope),
+				listing ?? listingWithStates(scope),
 				implemented.listSnapshotChanges(scope, { limit: 100 }),
 				implemented.listPlatformEvents(),
 				acknowledgementsOf(scope)
@@ -964,6 +965,18 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		const started: Promise<T> = load().finally(() => inFlight.get(key) === started && inFlight.delete(key));
 		inFlight.set(key, started);
 		return started;
+	}
+
+	/** The listing with its node states, for reads not given the catalog feed's nodes; a recording without the states read lists them itself. */
+	async function listingWithStates(scope: Scope): Promise<CatalogNode[]> {
+		const [nodes, states] = await Promise.all([
+			implemented.listCatalogNodes(scope),
+			implemented.listNodeStates(scope).catch((reason: unknown) => {
+				if (isUnsupported(reason)) return null;
+				throw reason;
+			})
+		]);
+		return states ? applyNodeStates(nodes, states.states) : nodes;
 	}
 
 	/** Sends the held listing's ETag, so an unchanged listing comes back as a 304 and is not sent or converted again. */

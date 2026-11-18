@@ -1683,7 +1683,7 @@ export interface components {
             run_id?: string | null;
             status: string;
         };
-        /** @description A current snapshot node's declared metadata and latest build, without SQL, source or config. */
+        /** @description A current snapshot node's declared metadata and latest build, which the node listing leaves to node-states. */
         CatalogNodeRecord: {
             /** @description The checks on the node by their newest result. */
             checks: components["schemas"]["CatalogNodeChecks"];
