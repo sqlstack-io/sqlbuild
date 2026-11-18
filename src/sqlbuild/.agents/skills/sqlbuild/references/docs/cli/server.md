@@ -281,6 +281,10 @@ acknowledgement, so the condition shows again if it comes back. The audit log re
 withdrawal as automatic. Acknowledgements are audit records, so `audit_days` also limits how long
 one without a time limit lasts.
 
+The Overview withdraws an acknowledgement of nodes out of date only once the target's warehouse sync
+has reported and settled. On a target without sync history, or where you may not read its sync
+status, it isn't withdrawn automatically and lapses only after `attention_snooze`.
+
 ## Back up the control database
 
 With no `SQLBUILD_CONTROL_DATABASE_URL`, the server keeps its control database in one SQLite file.
@@ -343,6 +347,12 @@ server can't read what they wrote.
 ```text
 the control server is older than this worker and refused its run report; upgrade the server before its workers
 ```
+
+Some releases add an index to the control database, which the server builds when it starts. On
+PostgreSQL that build holds a lock on its table, so on a large table writes wait for it: the index
+on acknowledgements in the audit log, for example, delays sign-ins until it is built. Upgrade when
+few people are signed in, or create the index yourself first with `CREATE INDEX CONCURRENTLY` and the
+definition in the release notes; the server then finds it already there.
 
 ## Set retention
 

@@ -387,6 +387,16 @@ pub(crate) struct NamedWithdrawalTestCase {
     pub(crate) expected_standing_after_stale: &'static str,
 }
 
+pub(crate) struct ListingPlanTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// How the backend shows a plan.
+    pub(crate) explain: &'static str,
+    pub(crate) expected_index: &'static str,
+    /// Plan lines that would mean the whole audit log is read.
+    pub(crate) expected_full_scans: &'static [&'static str],
+}
+
 pub(crate) struct ProvidersTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

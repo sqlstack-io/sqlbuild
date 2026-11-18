@@ -5,12 +5,26 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::acknowledgements::models::{AcknowledgementListing, LatestAcknowledgement};
+use crate::acknowledgements::models::{
+    AcknowledgementEvents, AcknowledgementListing, LatestAcknowledgement,
+};
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
+
+/// A target's acknowledgement events since `$1` with the actor's name, by subquery so the index serves it.
+pub(crate) fn listing_sql(events: &AcknowledgementEvents) -> String {
+    format!(
+        "SELECT a.event_id, a.action, \
+         COALESCE((SELECT p.name FROM sqb_principals p WHERE 'principal:' || CAST(p.principal_id AS TEXT)=a.actor), a.actor) AS actor, \
+         a.occurred_at, a.scope_json FROM sqb_security_audit a \
+         WHERE a.action IN ('{}', '{}') AND a.occurred_at >= $1 \
+         AND a.scope_json ->> 'location_id'=$2 AND a.scope_json ->> 'target'=$3 ORDER BY a.storage_id",
+        events.acknowledged, events.withdrawn
+    )
+}
 
 /// Subjects whose latest event in the window acknowledges them, for a person who can list the runs.
 pub(crate) async fn latest_acknowledgements(
@@ -35,13 +49,7 @@ pub(crate) async fn latest_acknowledgements(
     let since = window.map_or(DateTime::UNIX_EPOCH, |window| transaction.now - window);
     let (transaction, rows) = query(
         transaction,
-        &format!(
-            "SELECT a.event_id, a.action, COALESCE(p.name, a.actor) AS actor, a.occurred_at, a.scope_json \
-             FROM sqb_security_audit a LEFT JOIN sqb_principals p ON 'principal:' || CAST(p.principal_id AS TEXT)=a.actor \
-             WHERE a.action IN ('{}', '{}') AND a.occurred_at >= $1 \
-             AND a.scope_json ->> 'location_id'=$2 AND a.scope_json ->> 'target'=$3 ORDER BY a.storage_id",
-            events.acknowledged, events.withdrawn
-        ),
+        &listing_sql(events),
         vec![
             Parameter::Time(since),
             Parameter::Text(location_id.to_string()),

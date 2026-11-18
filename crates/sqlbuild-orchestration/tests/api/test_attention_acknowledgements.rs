@@ -3,6 +3,8 @@
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use crate::acknowledgements::_helpers::latest_events::listing_sql;
+use crate::acknowledgements::constants::ATTENTION_EVENTS;
 use crate::acknowledgements::models::AttentionSnooze;
 use crate::api::models::ServerFacts;
 use crate::api::models::{ApiAuthentication, HumanLogin};
@@ -10,11 +12,13 @@ use crate::api::tests::denials_helpers::person_send;
 use crate::api::tests::helpers::{start_api_with_authentication, start_api_with_facts, stop_api};
 use crate::api::tests::test_types::{
     AttentionAcknowledgementTestCase, AttentionSnoozeTestCase, AutomaticWithdrawalTestCase,
-    NamedWithdrawalTestCase, SnoozeParseTestCase,
+    ListingPlanTestCase, NamedWithdrawalTestCase, SnoozeParseTestCase,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::role_helpers::role_fixture;
 use crate::store::main::migrate_store::migrate_store;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -575,6 +579,93 @@ fn given_a_withdrawal_naming_an_acknowledgement_when_a_newer_one_stands_then_it_
                 test_case.expected_standing_after_stale
             );
             stop_api(api).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_large_audit_log_when_listing_condition_acknowledgements_then_the_attention_index_serves_the_read()
+ {
+    let test_cases = [
+        ListingPlanTestCase {
+            description: "SQLite",
+            backend: Backend::Sqlite,
+            explain: "EXPLAIN QUERY PLAN ",
+            expected_index: "sqb_security_audit_attention",
+            expected_full_scans: &["SCAN a", "SCAN sqb_security_audit"],
+        },
+        ListingPlanTestCase {
+            description: "PostgreSQL",
+            backend: Backend::Postgres,
+            explain: "EXPLAIN ",
+            expected_index: "sqb_security_audit_attention",
+            expected_full_scans: &["Seq Scan on sqb_security_audit"],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
+            let location = Uuid::now_v7();
+            for index in 0..2_000_i64 {
+                let action =
+                    ["run.requested", ATTENTION_EVENTS.acknowledged][usize::from(index % 400 == 0)];
+                (transaction, _) = query(
+                    transaction,
+                    "INSERT INTO sqb_security_audit (event_id, occurred_at, actor, action, granting_role, request_id, ip_address, scope_json, before_json, after_json, storage_id) \
+                     VALUES ($1, $2, 'principal:someone', $3, 'admin', $4, NULL, $5, $6, $6, $7)",
+                    vec![
+                        Parameter::Id(Uuid::now_v7()),
+                        Parameter::Time(chrono::Utc::now()),
+                        Parameter::Text(action.into()),
+                        Parameter::Id(Uuid::now_v7()),
+                        Parameter::Json(json!({"location_id": location, "target": "development", "key": "stale_models", "shape": {}})),
+                        Parameter::Json(json!({})),
+                        Parameter::Integer(index + 1),
+                    ],
+                )
+                .await
+                .expect("audit event");
+            }
+            (transaction, _) = query(transaction, "ANALYZE", vec![])
+                .await
+                .expect("statistics");
+            let (transaction, plan) = query(
+                transaction,
+                &format!("{}{}", test_case.explain, listing_sql(&ATTENTION_EVENTS)),
+                vec![
+                    Parameter::Time(chrono::DateTime::UNIX_EPOCH),
+                    Parameter::Text(location.to_string()),
+                    Parameter::Text("development".into()),
+                ],
+            )
+            .await
+            .expect("plan");
+            commit(transaction).await.expect("commit");
+            let plan: Vec<String> = plan
+                .iter()
+                .filter_map(|row| row.get("detail").or_else(|| row.get("QUERY PLAN")))
+                .filter_map(|line| line.as_str().map(str::to_owned))
+                .collect();
+            let text = plan.join("\n");
+            assert_eq!(
+                (
+                    text.contains(test_case.expected_index),
+                    test_case
+                        .expected_full_scans
+                        .iter()
+                        .filter(|scan| text.contains(*scan))
+                        .count()
+                ),
+                (true, 0),
+                "{}: {text}",
+                test_case.description
+            );
             close_test_store(fixture).await;
         });
     }

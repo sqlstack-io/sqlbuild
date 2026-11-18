@@ -42,7 +42,10 @@ const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export class FakeControl {
 	readonly targets: Record<TargetName, TargetState>;
 	readonly writes: Write[] = [];
+	/** Overview reads per target, counted by their acknowledgement listing: begun, and answered. */
+	readonly reads: Record<TargetName, { started: number; answered: number }> = { shop: { started: 0, answered: 0 }, returns: { started: 0, answered: 0 } };
 	#notices: string[] = [];
+	#states: Record<TargetName, { seen: string; version: number }> = { shop: { seen: '', version: 0 }, returns: { seen: '', version: 0 } };
 	#lease = new Date(Date.now() - 60_000).toISOString();
 
 	constructor(overrides: Partial<Record<TargetName, Partial<TargetState>>> = {}) {
@@ -88,10 +91,11 @@ export class FakeControl {
 			});
 		}
 		if (path === '/api/control/platform/problems') {
-			const leader = Object.values(this.targets).every((t) => t.schedulerLeader);
+			// Answered as things stood when the request arrived, however long the reply takes.
+			const answer = { scheduler_leader: Object.values(this.targets).every((t) => t.schedulerLeader), scheduler_lease_expires_at: this.#lease, broken_locations: [], overdue_ticks: [], low_calendars: [] };
 			const delay = Math.max(...Object.values(this.targets).map((t) => t.readDelayMs));
 			if (delay) await later(delay);
-			return json(route, { scheduler_leader: leader, scheduler_lease_expires_at: this.#lease, broken_locations: [], overdue_ticks: [], low_calendars: [] });
+			return json(route, answer);
 		}
 		const scoped = /^\/api\/control\/locations\/([^/]+)\/targets\/dev\/(.+)$/.exec(path);
 		const name = scoped && (Object.keys(LOCATIONS) as TargetName[]).find((n) => LOCATIONS[n] === scoped[1]);
@@ -108,18 +112,31 @@ export class FakeControl {
 			return json(route, this.#health(target));
 		}
 		if (rest === 'nodes') return json(route, MODELS.map((m) => ({ ...this.#node(target, m), node_key: `model:${m}`, kind: 'model', name: m, path: `models/shop/${m}.sql`, materialization: 'table', description: null, tags: [], dependencies: [], relation: { database: null, schema: 'dev', name: m }, column_count: 3, snapshot_id: SNAPSHOT })));
-		if (rest === 'node-states') return json(route, { snapshot_id: SNAPSHOT, version: 1, states: Object.fromEntries(MODELS.map((m) => [`model:${m}`, this.#node(target, m)])) });
+		if (rest === 'node-states') {
+			// A new version whenever the states differ, as the server numbers them, so the page takes them.
+			const states = Object.fromEntries(MODELS.map((m) => [`model:${m}`, this.#node(target, m)]));
+			const seen = JSON.stringify(states);
+			if (seen !== this.#states[name].seen) this.#states[name] = { seen, version: this.#states[name].version + 1 };
+			return json(route, { snapshot_id: SNAPSHOT, version: this.#states[name].version, states });
+		}
 		if (rest.startsWith('snapshots')) return json(route, [{ snapshot_id: SNAPSHOT, generation: 1, git_revision: null, git_dirty: false, git_author: null, environment_hash: 'e'.repeat(64), sqb_version: '0.0.0', published_at: '2026-11-01T00:00:00Z', changes: [], connection: null }]);
 		if (rest === 'jobs' || rest === 'triggers' || rest === 'checks' || rest === 'acknowledgements') return json(route, []);
 		if (rest.startsWith('cost')) return json(route, { since: '2026-11-01T00:00:00Z', credits: 0, usd: null, runs: 0, incomplete_runs: 0, by_job: [], by_warehouse_size: [], by_node: [] });
-		// The Overview's own reads: slowed or refused as the test asks.
+		// The Overview's own reads: answered as things stood when the request arrived, then slowed or
+		// refused as the test asks.
+		const reading = rest === 'attention-acknowledgements';
+		if (reading) this.reads[name].started += 1;
+		const failed = target.failReads;
+		const answer = rest.startsWith('runs')
+			? target.failedRun ? [this.#failedRun(name)] : []
+			: reading
+				? { snooze_seconds: 86_400, acknowledgements: target.acks.map((a) => ({ ...a, acknowledged_by: 'tester', until: new Date(Date.parse(a.acknowledged_at) + 86_400_000).toISOString() })) }
+				: null;
 		if (target.readDelayMs) await later(target.readDelayMs);
-		if (target.failReads) return json(route, { error: 'the control store is unavailable' }, 500);
-		if (rest.startsWith('runs')) return json(route, target.failedRun ? [this.#failedRun(name)] : []);
-		if (rest === 'attention-acknowledgements') {
-			return json(route, { snooze_seconds: 86_400, acknowledgements: target.acks.map((a) => ({ ...a, acknowledged_by: 'tester', until: new Date(Date.parse(a.acknowledged_at) + 86_400_000).toISOString() })) });
-		}
-		return json(route, { error: 'not found' }, 404);
+		const reply = failed ? json(route, { error: 'the control store is unavailable' }, 500) : answer === null ? json(route, { error: 'not found' }, 404) : json(route, answer);
+		await reply;
+		if (reading) this.reads[name].answered += 1;
+		return;
 	}
 
 	#write(route: Route, name: TargetName, rest: string, body: Record<string, unknown>) {
