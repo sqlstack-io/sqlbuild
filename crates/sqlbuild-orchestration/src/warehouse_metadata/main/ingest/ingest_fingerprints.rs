@@ -43,7 +43,7 @@ pub async fn ingest_fingerprints(
     commit_ingestion(
         transaction,
         ("sqb_warehouse_fingerprints", location_id, target),
-        (batch.scan.as_ref(), &keys),
+        (batch.scan.as_ref(), &keys, batch.last_page),
         applied,
     )
     .await

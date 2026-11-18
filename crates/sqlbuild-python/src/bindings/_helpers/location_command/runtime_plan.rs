@@ -48,12 +48,12 @@ fn requested_state(
     let text: String = std::fs::read_to_string(path)?;
     let copy: PreviewCopy = serde_json::from_str(&text)
         .map_err(|error| PyValueError::new_err(format!("invalid synced copy: {error}")))?;
-    let version: Option<String> = copy.version.clone();
+    let version: String = copy.version.clone();
     let state: Arc<WarehouseState> = Arc::new(warehouse_state(preview_state_parts(
         copy,
         request["consumption"].as_bool().unwrap_or(false),
     )));
-    *held = version.map(|version| HeldState {
+    *held = Some(HeldState {
         version,
         state: Arc::clone(&state),
     });

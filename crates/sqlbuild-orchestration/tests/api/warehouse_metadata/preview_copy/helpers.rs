@@ -159,7 +159,6 @@ pub(crate) async fn preview_copy_scope(
         session_id: preview_session,
         generation: 1,
         consumption: false,
-        versioned: false,
         known_version: None,
     };
     let copy = || async {
@@ -193,25 +192,25 @@ pub(crate) async fn preview_copy_scope(
         )
     };
     let unsynced = copy().await;
-    let older_location: Value = client
+    let plain: Value = client
         .post(format!("{metadata}/preview-copy"))
         .bearer_auth(bearer)
         .json(&json!({"session_id": preview_session, "generation": 1}))
         .send()
         .await
-        .expect("copy for an older location")
+        .expect("copy without consumption or a held version")
         .json()
         .await
         .expect("copy body");
     assert!(
         unsynced.consumption.is_empty()
-            && ["consumption", "version", "unchanged"]
+            && ["consumption", "unchanged"]
                 .iter()
-                .all(|field| older_location.get(field).is_none()),
-        "a read that asks for neither consumption nor versions never carries the fields, which older locations reject"
+                .all(|field| plain.get(field).is_none())
+            && plain["version"] == json!(unsynced.version),
+        "a read without consumption or a held version carries neither, and always names its version"
     );
     let versioned = |known_version: Option<String>| PreviewCopyRead {
-        versioned: true,
         known_version,
         ..read.clone()
     };
@@ -220,12 +219,12 @@ pub(crate) async fn preview_copy_scope(
         .await
         .expect("versioned copy");
     let held = outbound
-        .preview_copy("preview", &versioned(current.version.clone()))
+        .preview_copy("preview", &versioned(Some(current.version.clone())))
         .await
         .expect("copy at the held version");
     assert_eq!(
         (
-            current.version.is_some() && !current.unchanged,
+            !current.version.is_empty() && !current.unchanged,
             ours(&current) == ours(&unsynced),
             held.unchanged,
             held.version == current.version,
@@ -248,7 +247,7 @@ pub(crate) async fn preview_copy_scope(
     )
     .await;
     let changed = outbound
-        .preview_copy("preview", &versioned(current.version.clone()))
+        .preview_copy("preview", &versioned(Some(current.version.clone())))
         .await
         .expect("copy after a mirrored write");
     assert_eq!(
@@ -264,7 +263,7 @@ pub(crate) async fn preview_copy_scope(
         ),
         "a mirrored write moves the version, so the held copy is read again"
     );
-    let before_sync: Option<String> = changed.version.clone();
+    let before_sync: String = changed.version.clone();
     let with_consumption = outbound
         .preview_copy(
             "preview",
@@ -327,7 +326,7 @@ pub(crate) async fn preview_copy_scope(
     );
     assert_ne!(
         outbound
-            .preview_copy("preview", &versioned(before_sync.clone()))
+            .preview_copy("preview", &versioned(Some(before_sync.clone())))
             .await
             .expect("copy after a clean sync")
             .version,
@@ -394,7 +393,6 @@ pub(crate) async fn preview_copy_scope(
                 session_id,
                 generation: 1,
                 consumption: false,
-                versioned: false,
                 known_version: None,
             },
         )

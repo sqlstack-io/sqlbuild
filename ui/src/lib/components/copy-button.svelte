@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { copyText } from '$lib/browser/clipboard';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 
@@ -12,8 +13,7 @@
 	async function copy(e: MouseEvent) {
 		e.stopPropagation();
 		e.preventDefault();
-		await navigator.clipboard?.writeText(value).catch(() => undefined);
-		copied = true;
+		copied = await copyText(value);
 		clearTimeout(timer);
 		timer = setTimeout(() => (copied = false), 1200);
 	}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { copyText } from '$lib/browser/clipboard';
 	import { noun, plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
@@ -314,8 +315,7 @@
 	let copied = $state(false);
 	async function copy() {
 		const command = job ? `sqb ${request.command.join(' ')}` : cmd.trim();
-		await navigator.clipboard.writeText(`${command} --target ${app.target?.name ?? ''}`);
-		copied = true;
+		copied = await copyText(`${command} --target ${app.target?.name ?? ''}`);
 		setTimeout(() => (copied = false), 1500);
 	}
 

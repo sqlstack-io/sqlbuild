@@ -188,7 +188,7 @@ pub(crate) struct NewestVersionsTestCase {
     pub(crate) description: &'static str,
     pub(crate) kind: WarehouseHistoryKind,
     pub(crate) incremental: bool,
-    pub(crate) server_limit: Option<u16>,
+    pub(crate) server_limit: u16,
     pub(crate) expected_newest_versions: Option<u16>,
 }
 
@@ -216,7 +216,6 @@ pub(super) struct SyncCompletionTestCase {
     pub(super) failure: Option<sqlbuild_orchestration::platform::models::WarehouseSyncFailure>,
     pub(super) safety_seconds: u64,
     pub(super) reads_wake_compute: bool,
-    pub(super) safety_explicit: bool,
     pub(super) expected_next_in_seconds: Option<i64>,
 }
 
@@ -288,7 +287,6 @@ pub(crate) struct SyncProgressTestCase {
 pub(crate) struct WakingIdleTestCase {
     pub(crate) description: &'static str,
     pub(crate) wakes: bool,
-    pub(crate) explicit: bool,
     pub(crate) run_ended: bool,
     pub(crate) requested: bool,
     pub(crate) expected_due: bool,
@@ -305,4 +303,21 @@ pub(super) struct ReplanTestCase {
     pub(super) description: &'static str,
     pub(super) syncs: Vec<(bool, bool)>,
     pub(super) expected_replans: Vec<bool>,
+}
+
+pub(crate) struct SkippedCountTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) locations: usize,
+    /// The count a read of the same kind in the first location reports after the skipped one's read.
+    pub(crate) later_read: Option<u64>,
+    pub(crate) expected_mirrored: Option<u64>,
+}
+
+/// A scan whose location clock runs ten minutes ahead of the server's.
+pub(super) struct FastClockScanTestCase {
+    pub(super) description: &'static str,
+    /// Scans of the pass completed before the one whose id is checked.
+    pub(super) scans_completed: usize,
+    /// Whether a table altered a second after the page read is still described live.
+    pub(super) expected_described_live: bool,
 }

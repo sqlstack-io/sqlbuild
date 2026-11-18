@@ -530,22 +530,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/control/locations/{location_id}/targets/{target}/mirrored-totals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["readPersonMirroredTotals"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/control/locations/{location_id}/targets/{target}/node-states": {
         parameters: {
             query?: never;
@@ -1234,23 +1218,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/locations/{location_id}/targets/{target}/metadata/retention": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** How much state history a full read delivers; older servers answer 404 and the location reads it all. */
-        get: operations["read_metadata_retention"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/locations/{location_id}/targets/{target}/metadata/statistics-due": {
         parameters: {
             query?: never;
@@ -1765,7 +1732,7 @@ export interface components {
         ChangedBuildReport: {
             changed: string[];
             downstream: string[];
-            /** @description Why the plan failed, sent with empty lists; only newer servers accept it. */
+            /** @description Why the plan failed, sent with empty lists. */
             failing?: string | null;
             /** Format: int64 */
             generation: number;
@@ -2221,6 +2188,11 @@ export interface components {
             kind: "warehouse_sync";
             location: components["schemas"]["WarehouseStateLocation"];
             /**
+             * Format: int64
+             * @description On the report of a table's last delivered page, the records the server then mirrored of that table across the target's state locations.
+             */
+            mirrored_records?: number | null;
+            /**
              * Format: date-time
              * @description On the report that completes or stops a sync, when the next safety sync is due unless a run ends first; absent otherwise, where no timed sync follows, and from older locations.
              */
@@ -2421,6 +2393,8 @@ export interface components {
             /** Format: int64 */
             generation: number;
             kind: components["schemas"]["WarehouseHistoryKind"];
+            /** @description The table's read ends with this page, so the reply counts the records mirrored of it. */
+            last_page?: boolean;
             records: Record<string, never>[];
             scan?: null | components["schemas"]["MetadataScan"];
             /** Format: uuid */
@@ -2451,12 +2425,6 @@ export interface components {
             model: string;
             physical_generation_id: string;
             target_name: string;
-        };
-        /** @description How many records the server holds for one mirrored state table of a target. */
-        MirroredTotal: {
-            /** Format: int64 */
-            records: number;
-            table: components["schemas"]["WarehouseHistoryKind"];
         };
         MutationResponse: {
             applied: boolean;
@@ -2955,12 +2923,12 @@ export interface components {
             synced_at?: string | null;
             /** @description Set when the mirror is still at the read's known version: the records are left out. */
             unchanged?: boolean;
-            /** @description The mirror version these records were read at; sent only to a versioned read. */
-            version?: string | null;
+            /** @description The mirror version these records were read at. */
+            version: string;
         };
         /** @description A location asks for the mirrored copy a plan preview plans from, as its fenced reader. */
         PreviewCopyRead: {
-            /** @description Whether the copy carries consumption history; sent only when set, as older servers reject it. */
+            /** @description Whether the copy carries consumption history. */
             consumption?: boolean;
             /** Format: int64 */
             generation: number;
@@ -2968,8 +2936,6 @@ export interface components {
             known_version?: string | null;
             /** Format: uuid */
             session_id: string;
-            /** @description Whether the location holds copies by mirror version; sent only when set, as older servers reject it. */
-            versioned?: boolean;
         };
         /** @description The newest successful build of a node, which a `cursor_max` observation must come from. */
         PreviewLatestRun: {
@@ -4103,9 +4069,6 @@ export interface components {
         /** @description What went wrong reading one page, without the warehouse's message, which may name hosts or users. */
         WarehouseReadFailure: {
             /** @enum {string} */
-            kind: "reader_start";
-        } | {
-            /** @enum {string} */
             kind: "read_error";
         } | {
             /** @enum {string} */
@@ -4150,11 +4113,6 @@ export interface components {
             warehouse_size: string;
             warehouse_type?: string | null;
         };
-        /** @description The newest versions per node or check a full read of state history needs to deliver. */
-        WarehouseRetention: {
-            /** Format: int32 */
-            state_history_versions: number;
-        };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
             database?: string | null;
@@ -4180,6 +4138,11 @@ export interface components {
             now: string;
             /** Format: date-time */
             runs_ended_at?: string | null;
+            /**
+             * Format: int32
+             * @description The newest versions per node or check a full read of state history needs to deliver.
+             */
+            state_history_versions: number;
         };
         /** @description A registered reader asks whether a run ended since its last synchronization began. */
         WarehouseSyncDueRead: {
@@ -4222,6 +4185,11 @@ export interface components {
         };
         WarehouseSyncResponse: {
             applied: boolean;
+            /**
+             * Format: int64
+             * @description Records the server mirrors of this table for the target, counted after a read's last page.
+             */
+            mirrored_records?: number | null;
         };
         /** @description Derive progress from committed mirror rows, scoped to the active physical reader. */
         WarehouseWatermarkRead: {
@@ -5567,44 +5535,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["MicrobatchCoverage"];
-                };
-            };
-            /** @description Session rejected */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
-    readPersonMirroredTotals: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Records the server mirrors of each state table of this target, in sync order */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MirroredTotal"][];
                 };
             };
             /** @description Session rejected */
@@ -7592,42 +7522,6 @@ export interface operations {
             };
             /** @description Reader generation fenced */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    read_metadata_retention: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseRetention"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };

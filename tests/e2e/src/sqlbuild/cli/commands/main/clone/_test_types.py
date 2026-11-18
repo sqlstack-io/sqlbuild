@@ -123,3 +123,15 @@ class UnwritableConsumptionDeferCloneE2ETestCase:
     dropped_origin_table: str
     before_clone: tuple[str, ...]
     expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DeferToMissingUpstreamE2ETestCase:
+    """Where an unselected upstream was built, and how a build deferring to prod plans it."""
+
+    description: str
+    upstream_sql: str
+    expected_exit_code: int
+    expected_fragments: tuple[str, ...]
+    report_sql: str
+    expected_report_rows: list[tuple[int, ...]]

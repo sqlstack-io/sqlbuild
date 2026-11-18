@@ -20,7 +20,6 @@ fn given_a_sync_page_report_when_it_completes_the_sync_then_it_names_the_next_sa
             failure: None,
             safety_seconds: 1800,
             reads_wake_compute: false,
-            safety_explicit: false,
             expected_next_in_seconds: Some(1800),
         },
         SyncCompletionTestCase {
@@ -30,7 +29,6 @@ fn given_a_sync_page_report_when_it_completes_the_sync_then_it_names_the_next_sa
             failure: None,
             safety_seconds: 1800,
             reads_wake_compute: false,
-            safety_explicit: false,
             expected_next_in_seconds: None,
         },
         SyncCompletionTestCase {
@@ -40,7 +38,6 @@ fn given_a_sync_page_report_when_it_completes_the_sync_then_it_names_the_next_sa
             failure: None,
             safety_seconds: 1800,
             reads_wake_compute: false,
-            safety_explicit: false,
             expected_next_in_seconds: None,
         },
         SyncCompletionTestCase {
@@ -50,7 +47,6 @@ fn given_a_sync_page_report_when_it_completes_the_sync_then_it_names_the_next_sa
             failure: Some(WarehouseSyncFailure::Delivery),
             safety_seconds: 1800,
             reads_wake_compute: false,
-            safety_explicit: false,
             expected_next_in_seconds: None,
         },
         SyncCompletionTestCase {
@@ -60,35 +56,22 @@ fn given_a_sync_page_report_when_it_completes_the_sync_then_it_names_the_next_sa
             failure: None,
             safety_seconds: 0,
             reads_wake_compute: false,
-            safety_explicit: false,
             expected_next_in_seconds: None,
         },
         SyncCompletionTestCase {
-            description: "where reads wake compute the default interval names no next sync",
+            description: "where reads wake compute no next sync is named, whatever the interval",
             acknowledged_scans: last,
             more_pages: false,
             failure: None,
             safety_seconds: 1800,
             reads_wake_compute: true,
-            safety_explicit: false,
             expected_next_in_seconds: None,
-        },
-        SyncCompletionTestCase {
-            description: "where reads wake compute an interval someone set still names the next sync",
-            acknowledged_scans: last,
-            more_pages: false,
-            failure: None,
-            safety_seconds: 1800,
-            reads_wake_compute: true,
-            safety_explicit: true,
-            expected_next_in_seconds: Some(1800),
         },
     ];
     let now = Utc::now();
     for test_case in test_cases {
         let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
         state.reads_wake_compute = test_case.reads_wake_compute;
-        state.safety_explicit = test_case.safety_explicit;
         state.begin_sync(now);
         state = acknowledge_complete_pages(state, test_case.acknowledged_scans);
         state.pending = Some(LocationMetadataPage {
@@ -98,6 +81,7 @@ fn given_a_sync_page_report_when_it_completes_the_sync_then_it_names_the_next_sa
                 generation: 1,
                 records: Vec::new(),
                 scan: None,
+                last_page: false,
             },
             next_source_after: test_case.more_pages.then(|| vec![Some("orders".into())]),
         });

@@ -85,6 +85,9 @@ pub enum LocationHealth {
         /// On the report that completes or stops a sync, when the next safety sync is due unless a run ends first; absent otherwise, where no timed sync follows, and from older locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         next_sync_at: Option<DateTime<Utc>>,
+        /// On the report of a table's last delivered page, the records the server then mirrored of that table across the target's state locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mirrored_records: Option<u64>,
     },
 }
 
@@ -610,19 +613,10 @@ pub struct WarehouseSyncProgress {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WarehouseReadFailure {
-    /// The metadata reader process did not start.
-    ReaderStart {},
-    /// The reader could not connect to the warehouse, or the read raised an error.
+    /// The reader did not start or connect to the warehouse, or the read raised an error.
     ReadError {},
     /// The reader did not answer within this many seconds.
     TimedOut { seconds: u64 },
-}
-
-/// How many records the server holds for one mirrored state table of a target.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct MirroredTotal {
-    pub table: WarehouseHistoryKind,
-    pub records: u64,
 }
 
 /// Configured rules that failed a location's load: how many findings, and the first of them.

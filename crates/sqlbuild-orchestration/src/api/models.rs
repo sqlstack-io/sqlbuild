@@ -51,7 +51,6 @@ use crate::api::_helpers::resources::{
     person_reads::sensor_state,
     person_reads::snapshots,
     person_reads::health,
-    person_reads::mirrored_totals,
     person_reads::problems,
     person_reads::platform_events,
     person_operations::catalog,
@@ -112,7 +111,6 @@ use crate::api::_helpers::resources::{
     warehouse_metadata::preview_copy,
     changed_builds::report,
     warehouse_metadata::statistics_due,
-    warehouse_metadata::retention,
     warehouse_metadata::sync_due,
     warehouse_metadata::watermark
 ))]

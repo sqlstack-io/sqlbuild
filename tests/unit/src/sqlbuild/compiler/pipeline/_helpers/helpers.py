@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from sqlbuild._native import (
     CompileModelConfig,
     Fingerprint,
 )
+from sqlbuild.adapter.contract.models import RelationInfo
 from sqlbuild.compiler.compile.types import (
     CompiledModelView,
     CompiledProjectView,
@@ -83,3 +85,37 @@ def build_previous_python_identity_map(
         )
     }
     return ({}, identity_map)[previous_version_hash is not None]
+
+
+@dataclass
+class ListingAdapter:
+    """An adapter double that lists its relations per database and records each listing."""
+
+    relations: tuple[RelationInfo, ...]
+    listed: list[tuple[str | None, tuple[str, ...]]] = field(default_factory=list)
+
+    def list_relations(
+        self, *, connection: object, database: str | None, schemas: tuple[str, ...]
+    ) -> tuple[RelationInfo, ...]:
+        """The relations of `schemas` in `database`."""
+
+        self.listed.append((database, schemas))
+        return tuple(
+            filter(
+                lambda relation: relation.database == database and relation.schema in schemas,
+                self.relations,
+            )
+        )
+
+
+def deferred_location(*, database: str | None, schema: str, name: str) -> CompiledRelationLocation:
+    """One deferred relation location."""
+
+    return CompiledRelationLocation(
+        database=database,
+        schema=schema,
+        name=name,
+        qualified_name=f"{database}.{schema}.{name}",
+        logical_schema=schema,
+        logical_database=database,
+    )
