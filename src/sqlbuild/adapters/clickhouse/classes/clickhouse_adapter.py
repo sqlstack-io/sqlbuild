@@ -708,6 +708,9 @@ class ClickHouseAdapter(
     def render_current_utc_timestamp(self) -> str:
         return "now64(6, 'UTC')"
 
+    def render_current_warehouse_user(self) -> str | None:
+        return "currentUser()"
+
     def normalize_row_diff_numeric_type(self, column_type: str) -> str | None:
         return normalize_numeric_family(type_sql=canonical_type(column_type), dialect=None)
 
@@ -1968,6 +1971,11 @@ class ClickHouseAdapter(
     def render_create_observations_table_sql(self, *, database: str | None, schema: str) -> str:
         return _state_table_ddl(
             super().render_create_observations_table_sql(database=database, schema=schema)
+        )
+
+    def render_create_runs_table_sql(self, *, database: str | None, schema: str) -> str:
+        return _state_table_ddl(
+            super().render_create_runs_table_sql(database=database, schema=schema)
         )
 
     def render_create_node_result_table_sql(self, *, database: str | None, schema: str) -> str:

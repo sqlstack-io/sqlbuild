@@ -117,12 +117,24 @@ pub(crate) fn triggered_jobs(
         .collect())
 }
 
+/// The jobs `selectors` name, as `job:<name>` or a bare job name, each once in the order named; none outside a command.
+pub(crate) fn named_jobs(py: Python<'_>, selectors: &[String]) -> PyResult<Vec<String>> {
+    Ok(job_catalog(py)?
+        .map(|(catalog, _)| ordered_jobs(selectors, &catalog))
+        .unwrap_or_default())
+}
+
 /// The jobs `selectors` name, as `job:<name>` or as a bare job name.
 fn selected_jobs(
     selectors: &[String],
     catalog: &BTreeMap<String, JobSelection>,
 ) -> BTreeSet<String> {
-    let mut jobs: BTreeSet<String> = BTreeSet::new();
+    ordered_jobs(selectors, catalog).into_iter().collect()
+}
+
+/// The jobs `selectors` name, each once in the order first named.
+fn ordered_jobs(selectors: &[String], catalog: &BTreeMap<String, JobSelection>) -> Vec<String> {
+    let mut jobs: Vec<String> = Vec::new();
     let parts = selectors
         .iter()
         .flat_map(|selector| selector.split(char::is_whitespace))
@@ -131,8 +143,11 @@ fn selected_jobs(
         let Ok(ParsedSelector::Kind { kind, value, .. }) = parse_selector(part) else {
             continue;
         };
-        if JOB_SELECTOR_KINDS.contains(&kind.as_str()) && catalog.contains_key(&value) {
-            jobs.insert(value);
+        if JOB_SELECTOR_KINDS.contains(&kind.as_str())
+            && catalog.contains_key(&value)
+            && !jobs.contains(&value)
+        {
+            jobs.push(value);
         }
     }
     jobs

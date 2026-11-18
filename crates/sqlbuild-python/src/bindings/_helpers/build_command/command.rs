@@ -7,6 +7,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cli::person_login::main::sync_after_build::sync_after_build;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
+use sqlbuild_state::runs::constants::BUILD_COMMAND;
+use sqlbuild_state::runs::models::{RunEnding, RunNodeCounts};
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::build_command::completion::{
@@ -28,6 +30,9 @@ use crate::bindings::_helpers::discovery::provider_secrets::{
 };
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::runs_state::{
+    RunRecorder, build_node_counts, raised_ending, run_recorder,
+};
 use crate::bindings::_helpers::observations::source_capture::{
     arm_source_capture, take_source_capture,
 };
@@ -140,14 +145,37 @@ fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) 
         return Ok(0);
     }
     let started_at: Bound<'_, PyAny> = record_pending_cost(context, &pipeline)?;
-    match execute_direct_build(context, &pipeline, providers) {
-        Ok((preparation, outcome, checks)) => complete_direct_build(
-            context,
-            &pipeline,
-            (&preparation, &outcome, &checks),
-            &started_at,
+    let recorder: Option<RunRecorder<'_>> = run_recorder(
+        BUILD_COMMAND,
+        (
+            &context.request,
+            &context.invocation,
+            &native_field(&pipeline, "project")?,
         ),
+        context.worker.as_ref().map(|worker| worker.server_run()),
+    );
+    if let Some(recorder) = &recorder {
+        recorder.started();
+    }
+    match execute_direct_build(context, &pipeline, providers) {
+        Ok((preparation, outcome, checks)) => {
+            if let Some(recorder) = &recorder {
+                recorder.finished(&build_node_counts(&outcome.result), RunEnding::Completed);
+            }
+            complete_direct_build(
+                context,
+                &pipeline,
+                (&preparation, &outcome, &checks),
+                &started_at,
+            )
+        }
         Err(error) => {
+            if let Some(recorder) = &recorder {
+                recorder.finished(
+                    &RunNodeCounts::default(),
+                    raised_ending(context.py(), &error),
+                );
+            }
             finalize_exceptional_cost(context, &pipeline, (&started_at, &error));
             Err(error)
         }

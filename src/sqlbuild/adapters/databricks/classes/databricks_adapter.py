@@ -814,6 +814,9 @@ class DatabricksAdapter(
     def render_current_utc_timestamp(self) -> str:
         return "current_timestamp()"
 
+    def render_current_warehouse_user(self) -> str | None:
+        return "current_user()"
+
     def sql_analysis_dialect(self) -> str | None:
         """Return the SQL analysis dialect name for this adapter, if any."""
 

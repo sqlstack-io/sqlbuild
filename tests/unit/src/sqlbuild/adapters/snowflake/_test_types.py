@@ -447,3 +447,9 @@ class SnowflakeKeyedDeleteInsertFailureTestCase:
     description: str
     failing_keyword: str
     expected_prefixes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SnowflakeWarehouseUserTestCase:
+    description: str
+    expected_expression: str

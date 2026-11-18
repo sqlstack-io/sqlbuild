@@ -12,8 +12,12 @@ use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_host::models::SqlTestOutcome;
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::{
-    NodeOutcome, RunChange, RunCommand, RunExecution, RunOutcome,
+    NodeOutcome, RunChange, RunCommand, RunExecution, RunOrigin, RunOutcome,
 };
+use sqlbuild_state::runs::constants::{
+    FIRST_ATTEMPT, SYSTEM_RETRY_USER, SYSTEM_SCHEDULE_USER, SYSTEM_SENSOR_USER,
+};
+use sqlbuild_state::runs::models::ServerRun;
 
 use crate::bindings::_helpers::compiled_project::constants::{
     NO_CHANGE_REASON, SKIP_ACTION, SQL_TEST_KEY_PREFIX,
@@ -94,6 +98,29 @@ impl WorkerBuild {
     /// The server run this build executes.
     pub(crate) fn run_id(&self) -> uuid::Uuid {
         self.execution.claim.request.run_id
+    }
+
+    /// What the runs table records of the server run this build executes.
+    pub(crate) fn server_run(&self) -> ServerRun {
+        let request = &self.execution.claim.request;
+        let retry_of_run_id: Option<String> = request
+            .retry
+            .and(request.rerun_of_run_id)
+            .map(|run_id| run_id.to_string());
+        let sqlbuild_user: String = match (request.origin, request.retry) {
+            (_, Some(_)) => SYSTEM_RETRY_USER.to_owned(),
+            (RunOrigin::Schedule, None) => SYSTEM_SCHEDULE_USER.to_owned(),
+            (RunOrigin::Sensor, None) => SYSTEM_SENSOR_USER.to_owned(),
+            _ => request.requested_by.clone(),
+        };
+        ServerRun {
+            orchestration_run_id: request.run_id.to_string(),
+            sqlbuild_user,
+            attempt: request
+                .retry
+                .map_or(FIRST_ATTEMPT, |retry| i64::from(retry.attempt) + 1),
+            retry_of_run_id,
+        }
     }
 
     /// Keep the build's cost finalization to collect after the run's outcome is published.

@@ -15,7 +15,7 @@ use crate::project::_helpers::values::{int_below, python_equal};
 use crate::project::constants::{
     ALLOW_MISSING_SECRETS_KEY, ALLOW_WAREHOUSE_ROUND_TRIPS_KEY, DEFAULT_TEST_TIMEOUT,
     DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE,
-    IGNORE_AUDIT_FAILURES_KEY, SCENARIO_TIMEOUT_KEY, TEST_TIMEOUT_KEY,
+    IGNORE_AUDIT_FAILURES_KEY, RECORD_RUN_HOST_KEY, SCENARIO_TIMEOUT_KEY, TEST_TIMEOUT_KEY,
     UNIT_TEST_MAX_REAL_MODELS_KEY,
 };
 use crate::project::constants::{
@@ -302,6 +302,14 @@ pub(crate) fn load_settings(payload: Option<&ConfigValue>, file: ConfigFile) -> 
                 mapping,
                 IGNORE_AUDIT_FAILURES_KEY,
                 false,
+            )?)),
+        ),
+        (
+            RECORD_RUN_HOST_KEY,
+            Built::Value(ConfigValue::Bool(optional_bool(
+                mapping,
+                RECORD_RUN_HOST_KEY,
+                true,
             )?)),
         ),
     ];

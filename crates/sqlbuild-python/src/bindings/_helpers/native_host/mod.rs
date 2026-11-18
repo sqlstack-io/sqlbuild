@@ -22,6 +22,7 @@ pub(crate) mod provider_settings;
 pub(crate) mod registration;
 pub(crate) mod resource_costs_state;
 pub(crate) mod results;
+pub(crate) mod runs_state;
 pub(crate) mod sqlite_connection;
 pub(crate) mod state_column_evolution;
 pub(crate) mod synced_catalog;
