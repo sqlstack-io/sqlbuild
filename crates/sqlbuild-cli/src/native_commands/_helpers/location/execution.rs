@@ -745,7 +745,7 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
     state.progress.scan_unchanged = false;
     state.progress.scan_started = Instant::now();
     state.index += 1;
-    state.scan_id = Uuid::now_v7();
+    state.scan_id = state.server_scan_id();
     state.observed_since = None;
     state.watermark_loaded = false;
     state.limit = MAX_HISTORY_PAGE_RECORDS;

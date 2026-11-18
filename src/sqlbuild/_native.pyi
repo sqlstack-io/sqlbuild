@@ -3708,6 +3708,12 @@ def build_deferred_locations(
     default_database: str | None,
     render_qualified_name: Callable[..., str | None],
 ) -> dict[str, CompiledRelationLocation]: ...
+def gather_deferred_relations(
+    *,
+    adapter: BaseAdapter,
+    connection: object,
+    deferred_locations: Mapping[str, CompiledRelationLocation],
+) -> dict[str, RelationInfo]: ...
 def build_python_relation_targets(
     *,
     adapter: BaseAdapter,
@@ -10515,12 +10521,14 @@ class DeferralInputs(NativeRecord):
 
     deferred_locations: dict[str, CompiledRelationLocation] | None
     deferred_relations: dict[str, RelationInfo] | None
+    defer_to: str | None
     defer_sources_to: str | None
     source_deferral_enabled: bool
     def __init__(
         self,
         deferred_locations: dict[str, CompiledRelationLocation] | None = ...,
         deferred_relations: dict[str, RelationInfo] | None = ...,
+        defer_to: str | None = ...,
         defer_sources_to: str | None = ...,
         source_deferral_enabled: bool = ...,
     ) -> None: ...
