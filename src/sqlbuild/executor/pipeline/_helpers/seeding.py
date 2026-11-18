@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import queue
 import time
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -59,6 +60,10 @@ def run_seed_pipeline(
     if on_connection_complete is not None:
         on_connection_complete(effective_concurrency, elapsed_seconds=time.monotonic() - start)
 
+    pending: queue.SimpleQueue[tuple[int, SeedPlanEntry]] = queue.SimpleQueue()
+    indexed_entry: tuple[int, SeedPlanEntry]
+    for indexed_entry in enumerate(seed_entries):
+        pending.put(indexed_entry)
     try:
         with ThreadPoolExecutor(max_workers=effective_concurrency) as pool:
             futures: tuple[Future[tuple[tuple[int, SeedExecutionResult], ...]], ...] = tuple(
@@ -67,9 +72,7 @@ def run_seed_pipeline(
                     pool.submit(
                         copy_context().run,
                         _run_seed_worker,
-                        worker_index=worker_index,
-                        effective_concurrency=effective_concurrency,
-                        seed_entries=seed_entries,
+                        pending=pending,
                         adapter=adapter,
                         connection=connections[worker_index],
                         run_id=run_id,
@@ -97,21 +100,23 @@ def run_seed_pipeline(
 
 def _run_seed_worker(
     *,
-    worker_index: int,
-    effective_concurrency: int,
-    seed_entries: tuple[SeedPlanEntry, ...],
+    pending: queue.SimpleQueue[tuple[int, SeedPlanEntry]],
     adapter: BaseAdapter,
     connection: Any,
     run_id: str,
     query_change_tracking: bool,
     on_seed_complete: Callable[[SeedExecutionResult], None] | None,
 ) -> tuple[tuple[int, SeedExecutionResult], ...]:
+    """Load seeds from the shared queue until it is empty, so a slow seed holds up only itself."""
+
     indexed_results: list[tuple[int, SeedExecutionResult]] = []
     seed_index: int
     entry: SeedPlanEntry
-    for seed_index, entry in enumerate(seed_entries):
-        if seed_index % effective_concurrency != worker_index:
-            continue
+    while True:
+        try:
+            seed_index, entry = pending.get_nowait()
+        except queue.Empty:
+            break
         with ResourceAttemptLifecycle(
             resource_id=f"seed:{entry.name}",
             resource_kind="seed",

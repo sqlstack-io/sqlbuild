@@ -186,6 +186,40 @@ class SeedPipelineTestAdapter(BaseAdapter):
         self.loads.append((destination, connection))
 
 
+def _no_signal() -> None:
+    """The slow seed signals nothing when it finishes."""
+
+
+class SlowSeedPipelineAdapter(SeedPipelineTestAdapter):
+    """Adapter whose slow seed finishes only after every other seed has loaded."""
+
+    def __init__(self, *, slow_target: str, other_count: int) -> None:
+        super().__init__(barrier_targets=(slow_target,))
+        self.slow_target: str = slow_target
+        self.other_count: int = other_count
+        self.others_done: threading.Semaphore = threading.Semaphore(0)
+        self.order: list[str] = []
+
+    def load_seed(
+        self,
+        connection: Any,
+        *,
+        destination: str,
+        file_path: Path,
+        columns: tuple[ColumnInfo, ...],
+        csv_settings: SeedCsvSettings = DEFAULT_SEED_CSV_SETTINGS,
+        replace: bool = True,
+        infer_types: bool = False,
+        statement_recorder: StatementRecorder,
+    ) -> None:
+        del connection, file_path, columns, csv_settings, replace, infer_types, statement_recorder
+        waits: int = self.other_count * (destination == self.slow_target)
+        released: bool = all(self.others_done.acquire(timeout=5) for _ in range(waits))
+        self.order.append(destination + " timed out" * (not released))
+        finish: dict[bool, Callable[[], None]] = {True: _no_signal, False: self.others_done.release}
+        finish[destination == self.slow_target]()
+
+
 class ScenarioPipelinePlanBuilder:
     """Callable plan builder that can fail for one configured scenario."""
 

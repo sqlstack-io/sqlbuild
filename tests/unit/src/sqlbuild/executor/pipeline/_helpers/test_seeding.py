@@ -20,9 +20,11 @@ from sqlbuild.observability import (
 from tests.unit.src.sqlbuild.executor.pipeline._helpers._test_types import (
     SeedPipelineConcurrencyTestCase,
     SeedPipelineLifecycleTestCase,
+    SeedPipelineQueueTestCase,
 )
 from tests.unit.src.sqlbuild.executor.pipeline._helpers.helpers import (
     SeedPipelineTestAdapter,
+    SlowSeedPipelineAdapter,
     build_seed_plan,
 )
 
@@ -166,3 +168,34 @@ def test_given_seed_executor_raises_when_running_worker_then_attempt_fails_once_
     assert tuple(event.event_type for event in resource_events) == test_case.expected_terminal_types
     assert {event.resource_id for event in resource_events} == test_case.expected_resource_ids
     assert callbacks == []
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SeedPipelineQueueTestCase(
+            description="seeds behind a slow one load on the free connection meanwhile",
+            seed_names=("seed_slow", "seed_b", "seed_c", "seed_d"),
+            slow_seed="seed_slow",
+            max_concurrency=2,
+            expected_load_order=("seed_b", "seed_c", "seed_d", "seed_slow"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_slow_seed_when_running_seed_pipeline_then_other_seeds_take_the_free_connection(
+    test_case: SeedPipelineQueueTestCase,
+) -> None:
+    adapter: SlowSeedPipelineAdapter = SlowSeedPipelineAdapter(
+        slow_target=test_case.slow_seed, other_count=len(test_case.seed_names) - 1
+    )
+
+    results: tuple[SeedExecutionResult, ...] = run_seed_pipeline(
+        plan=build_seed_plan(seed_names=test_case.seed_names),
+        connection_config={},
+        adapter=adapter,
+        max_concurrency=test_case.max_concurrency,
+    )
+
+    assert tuple(adapter.order) == test_case.expected_load_order, test_case.description
+    assert tuple(result.seed_name for result in results) == test_case.seed_names

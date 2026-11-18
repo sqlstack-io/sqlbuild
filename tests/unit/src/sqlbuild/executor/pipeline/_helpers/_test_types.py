@@ -140,6 +140,17 @@ class ScenarioPlanningLifecycleTestCase:
 
 
 @dataclass(frozen=True)
+class SeedPipelineQueueTestCase:
+    """Seeds behind a slow one: which load before it finishes."""
+
+    description: str
+    seed_names: tuple[str, ...]
+    slow_seed: str
+    max_concurrency: int
+    expected_load_order: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class SeedPipelineConcurrencyTestCase:
     """One seed pipeline concurrency orchestration case."""
 
