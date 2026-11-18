@@ -8,7 +8,7 @@ use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_warehouse::main::sources::check_selected_source_tables_exist::check_selected_source_tables_exist;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyString, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing_upstream_message;
 use sqlbuild_analysis::planner_identity::main::missing_upstreams::missing_upstreams;
 use sqlbuild_analysis::planner_identity::models::{
@@ -48,15 +48,10 @@ pub(crate) fn check_selected_scope_buildability<'py>(
     let names = |value: Bound<'py, PyAny>| -> PyResult<std::collections::HashSet<String>> {
         value.try_iter()?.map(|value| value?.extract()).collect()
     };
-    let deferred = native_field(deferral, "deferred_relations")?;
     let available = AvailableUpstreams {
         satisfied_keys,
         existing_relations: names(native_field(&snapshot, "existing_relations")?)?,
-        deferred_relations: if deferred.is_none() {
-            None
-        } else {
-            Some(names(deferred)?)
-        },
+        deferred_relations: deferred_model_names(deferral)?,
     };
     let selected: Vec<_> = scope.selected.iter().map(GraphKey::from).collect();
     let deps: std::collections::HashMap<GraphKey, Vec<GraphKey>> = scope
@@ -95,6 +90,33 @@ pub(crate) fn check_selected_scope_buildability<'py>(
         &selected_scope,
         &warehouse_field(warehouse, |warehouse| &warehouse.inspection_relations)?,
     )
+}
+
+/// The models and seeds whose deferred location, under an alias or a `migrate_from` origin, the deferred target lists.
+fn deferred_model_names(
+    deferral: &Bound<'_, PyAny>,
+) -> PyResult<Option<std::collections::HashSet<String>>> {
+    let relations = native_field(deferral, "deferred_relations")?;
+    let locations = native_field(deferral, "deferred_locations")?;
+    if relations.is_none() || locations.is_none() {
+        return Ok(None);
+    }
+    let mut listed: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for relation in relations.downcast::<PyDict>()?.values() {
+        listed.insert(
+            native_field(&relation, "name")?
+                .extract::<String>()?
+                .to_lowercase(),
+        );
+    }
+    let mut names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (name, location) in locations.downcast::<PyDict>()? {
+        let relation: String = native_field(&location, "name")?.extract()?;
+        if listed.contains(&relation.to_lowercase()) {
+            names.insert(name.extract()?);
+        }
+    }
+    Ok(Some(names))
 }
 
 /// The target this plan reads unselected models and seeds from, when it defers.

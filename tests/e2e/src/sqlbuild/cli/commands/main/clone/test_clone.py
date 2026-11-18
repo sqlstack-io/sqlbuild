@@ -46,6 +46,7 @@ _UPSTREAMS: tuple[str, ...] = (
     "shipments",
 )
 _DEFER_DATABASE: str = "warehouse.duckdb"
+_DEFER_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/deferred_reads"
 _DEFER_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "deferred_reads"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
@@ -53,13 +54,10 @@ _DEFER_PROJECT_FILES: dict[str, str] = {
         '[targets.dev]\nschema = "dev"\n\n'
         '[targets.prod]\nschema = "prod"\n'
     ),
-    "models/orders.sql": (
-        'MODEL (description "Test model orders.", materialized table);\n\nSELECT 1 AS order_id\n'
-    ),
-    "models/order_report.sql": (
-        'MODEL (description "Test model order_report.", materialized table);\n\n'
-        'SELECT order_id FROM __ref("orders")\n'
-    ),
+    **{
+        str(path.relative_to(_DEFER_FIXTURE)): path.read_text(encoding="utf-8")
+        for path in sorted(_DEFER_FIXTURE.glob("models/*.sql"))
+    },
 }
 
 
@@ -1171,8 +1169,8 @@ def test_given_unwritable_consumption_table_when_defer_clone_partly_fails_then_c
     "test_case",
     [
         DeferToMissingUpstreamE2ETestCase(
-            description="an upstream built only in the active target is missing from prod",
-            upstream_sql="CREATE TABLE dev.orders AS SELECT 5 AS order_id;",
+            description="an aliased upstream built only in the active target is missing from prod",
+            upstream_sql="CREATE TABLE dev.orders_v2 AS SELECT 5 AS order_id;",
             expected_exit_code=1,
             expected_fragments=(
                 "error[S301]: 1 upstream model this build reads doesn't exist in target 'prod'\n"
@@ -1185,10 +1183,10 @@ def test_given_unwritable_consumption_table_when_defer_clone_partly_fails_then_c
             expected_report_rows=[(0,)],
         ),
         DeferToMissingUpstreamE2ETestCase(
-            description="an upstream built in prod is read from prod",
+            description="an aliased upstream built in prod is read from prod under its alias",
             upstream_sql=(
-                "CREATE TABLE dev.orders AS SELECT 5 AS order_id;"
-                "CREATE TABLE prod.orders AS SELECT 7 AS order_id;"
+                "CREATE TABLE dev.orders_v2 AS SELECT 5 AS order_id;"
+                "CREATE TABLE prod.orders_v2 AS SELECT 7 AS order_id;"
             ),
             expected_exit_code=0,
             expected_fragments=(),
