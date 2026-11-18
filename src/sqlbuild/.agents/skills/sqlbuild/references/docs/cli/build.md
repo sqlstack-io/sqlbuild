@@ -349,15 +349,17 @@ After a successful build, SQLBuild writes version identities to `_sqlbuild_finge
 Every build that runs nodes, and every `sqb seed`, appends a `started` row to `_sqlbuild_runs`
 before its first node runs, and a `finished` row with its status and node counts when it ends. It
 writes both rows to every schema the run writes to: the schemas of the models and seeds it builds,
-its SQL functions and the sources it loads, fixed from the plan before anything runs. The rows in each schema carry
-the same run ID, so a role that can build in a schema can also record the run there, with no other
-grants. A run never writes to a schema it doesn't otherwise write to, such as the target's default
-schema, and never creates a schema just for these rows. A run whose nodes write no relation, such as
-one that only runs Python tasks or checks, records nothing.
+its SQL functions and the sources it loads, fixed from the plan before anything runs. The rows in
+each schema carry the same run ID, so a role that can build in a schema can also record the run
+there, with no other grants. A run that writes to any schema never writes these rows anywhere
+else, such as the target's default schema.
+
+A run whose nodes write no relation, such as one that only runs Python tasks or checks, has no
+schema of its own. It records in the target's default schema instead, where audit results go.
 
 A run's status is its `finished` row, in any of its schemas. A run with only `started` rows was
-killed or crashed. A synced code location merges the rows of every schema by run ID and shows runs
-it did not start.
+killed or crashed. A synced code location will merge the rows of every schema by run ID and show
+runs it did not start.
 
 Each row records the command, its selection as typed, the jobs it names, the target, the
 warehouse user, the `sqb login` identity if you're signed in, the operating-system user, the

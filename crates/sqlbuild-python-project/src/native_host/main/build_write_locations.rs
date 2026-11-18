@@ -1,14 +1,17 @@
 //! The schemas a build writes, which each record its run.
 
-use crate::native_host::_helpers::run_locations::written_schema;
+use crate::native_host::_helpers::run_locations::{run_locations, written_schema};
 use crate::native_host::constants::SKIP_ACTION;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::native_host::models::Location;
 use std::collections::BTreeSet;
 
-/// The schemas a build writes: its models' and seeds' that run, its functions' and its loaded sources'.
-pub fn build_write_locations(plan: &Bound<'_, PyAny>) -> PyResult<Vec<Location>> {
+/// Where a build records: its models' and seeds' schemas that run, its functions', its sources'.
+pub fn build_write_locations(
+    plan: &Bound<'_, PyAny>,
+    project: &Bound<'_, PyAny>,
+) -> PyResult<Vec<Location>> {
     let mut schemas: BTreeSet<Location> = BTreeSet::new();
     for entries in ["model_entries", "seed_entries"] {
         for entry in native_field(plan, entries)?.try_iter()? {
@@ -30,5 +33,5 @@ pub fn build_write_locations(plan: &Bound<'_, PyAny>) -> PyResult<Vec<Location>>
             schemas.extend(written_schema(&source)?);
         }
     }
-    Ok(schemas.into_iter().collect())
+    run_locations(schemas, (plan, project))
 }

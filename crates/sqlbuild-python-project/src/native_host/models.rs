@@ -5,6 +5,7 @@ use crate::native_host::_helpers::run_writes::{
     RowWrite, RunRow, ShareResult, warn_on_errors, write_shares,
 };
 use crate::native_host::_helpers::runs_state::CREATE_TABLE_METHOD;
+use crate::native_host::constants::MAX_RUN_RECORD_CONNECTIONS;
 use crate::planner_scope::models::ScopeData;
 use pyo3::IntoPyObject;
 use pyo3::PyErr;
@@ -244,20 +245,22 @@ impl<'py> RunRecorder<'py> {
         let _ = self.finished(&RunNodeCounts::default(), ending);
     }
 
-    /// Append the row to every schema's table at once, then warn for each failed write.
+    /// Append the row to every schema's table over a few connections, then warn for each failure.
     ///
-    /// The first table is written on the calling thread, so an interrupt raised there stops the run
-    /// as it does for a single schema; an interrupt anywhere else escapes once every write is done.
+    /// An interrupt, raised in a writer or while waiting for them, escapes once every write is done.
     fn append_everywhere(&self, row: RunRow<'_>, mode: RowWrite) -> PyResult<()> {
         let py: Python<'py> = self.adapter.py();
-        let shares: Vec<Vec<usize>> = (0..self.tables.len()).map(|index| vec![index]).collect();
-        let shared: Vec<ShareResult> = write_shares(
+        let connections: usize = self.tables.len().min(MAX_RUN_RECORD_CONNECTIONS);
+        let shares: Vec<Vec<usize>> = (0..connections)
+            .map(|first| (first..self.tables.len()).step_by(connections).collect())
+            .collect();
+        let (shared, signal): (Vec<ShareResult>, Option<PyErr>) = write_shares(
             (&self.adapter, &self.connection_config),
             (&self.tables, &self.identity),
             &shares,
             (row, mode),
         );
         warn_on_errors(py, (&self.tables, &self.identity), row.0, shared)?;
-        py.check_signals()
+        signal.map_or(Ok(()), Err)
     }
 }
