@@ -77,6 +77,9 @@ pub(crate) fn chunked(writes: &[(OutputStream, Vec<u8>)]) -> Vec<[Option<RecallV
         .collect()
 }
 
+/// A retention window the fixed fixture timestamps never age out of, so maintenance prunes nothing.
+const RETENTION_DAYS: u32 = 36_500;
+
 /// A session configuration writing invocation `invocation_id` to `path`.
 pub(crate) fn config(path: PathBuf, invocation_id: &str) -> SessionConfig {
     SessionConfig {
@@ -87,7 +90,7 @@ pub(crate) fn config(path: PathBuf, invocation_id: &str) -> SessionConfig {
             pid: Some(42),
             ..InvocationContext::default()
         },
-        retention_days: 30,
+        retention_days: RETENTION_DAYS,
         shutdown_timeout: Duration::from_secs(5),
         diagnostics_min_severity: "info".to_owned(),
         max_output_bytes: None,
