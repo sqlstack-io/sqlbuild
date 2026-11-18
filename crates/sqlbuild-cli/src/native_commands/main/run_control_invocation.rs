@@ -4,10 +4,9 @@ use sqlbuild_orchestration::api::main::openapi_document::openapi_document;
 
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::command::decision::{flag, text};
+use crate::native_commands::_helpers::command::store_migration::run_store_migration;
 use crate::native_commands::_helpers::command::terminal::{finish_lost_stdout, write_output};
-use crate::native_commands::_helpers::location::execution::{
-    run_control_action, run_store_migration,
-};
+use crate::native_commands::_helpers::location::execution::run_control_action;
 use crate::native_commands::constants::{ADMIN_COMMAND, SCHEDULER_COMMAND, SERVER_COMMAND};
 
 pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
