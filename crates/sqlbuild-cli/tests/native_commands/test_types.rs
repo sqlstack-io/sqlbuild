@@ -81,3 +81,11 @@ pub(crate) struct LocationHealthTestCase {
     pub(crate) expected_state: &'static str,
     pub(crate) expected_exit: i32,
 }
+
+pub(crate) struct StoreMigrationCommandTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) arguments: &'static [&'static str],
+    pub(crate) expected_stdout: &'static str,
+    /// Whether the SQLite store file exists after the command.
+    pub(crate) expected_store: bool,
+}

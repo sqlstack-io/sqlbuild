@@ -70,6 +70,8 @@ pub(crate) enum TargetRow {
 pub(crate) enum TransactionMode {
     Read,
     Write,
+    /// A write with SQLite foreign keys off, so a migration can rebuild a referenced table; it checks them before commit.
+    Migrate,
 }
 
 /// An owned transaction; abandoning it rolls back, including when an async task is cancelled.
