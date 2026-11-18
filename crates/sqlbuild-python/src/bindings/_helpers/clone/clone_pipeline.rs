@@ -163,11 +163,12 @@ pub(crate) fn timed_clone_pipeline<'py>(
                 ("dialect", Dialect::of(&pipeline.adapter)?.into_any()),
                 (
                     "reads",
-                    LiveReads::handle(
+                    LiveReads::new(
                         &pipeline.adapter,
                         &native_field(&pipeline.connection, "handle")?,
                         None,
-                    )?
+                    )
+                    .handle(pipeline.adapter.py())?
                     .into_any(),
                 ),
                 ("origin_project", origin_project.clone()),

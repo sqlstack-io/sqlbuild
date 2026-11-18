@@ -54,6 +54,7 @@ from sqlbuild.adapter.contract.exceptions import (
     AdapterUserError,
     UnsupportedTypedSqlRenderingError,
 )
+from sqlbuild.adapter.contract.main.estimates_by_name import estimates_by_name
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
@@ -1427,8 +1428,7 @@ class SqlServerAdapter(
                 "GROUP BY objects.name, objects.type"
             ),
         ).fetchall()
-        by_name: dict[str, tuple[Any, ...]] = {str(row[0]): tuple(row[1:]) for row in rows}
-        return tuple(_row_count_estimate(by_name.get(name)) for name in names)
+        return estimates_by_name(rows=rows, names=names, estimate=_row_count_estimate)
 
     def inspect_row_diff_coverage(
         self,

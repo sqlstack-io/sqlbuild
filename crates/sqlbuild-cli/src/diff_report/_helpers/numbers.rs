@@ -1,20 +1,10 @@
 //! Python's `{:,}` and `{:.2%}` number formats.
 
+use sqlbuild_core::number_text::main::format_thousands::format_thousands;
+
 /// An integer with comma thousands separators.
 pub(crate) fn grouped(value: i64) -> String {
-    let digits: String = value.unsigned_abs().to_string();
-    let mut result: String = String::new();
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            result.push(',');
-        }
-        result.push(digit);
-    }
-    if value < 0 {
-        format!("-{result}")
-    } else {
-        result
-    }
+    format_thousands(i128::from(value))
 }
 
 /// A ratio as a percentage with two decimals.

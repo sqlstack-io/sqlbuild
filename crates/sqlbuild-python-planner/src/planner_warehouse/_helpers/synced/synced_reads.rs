@@ -1,5 +1,6 @@
 //! Warehouse reads answered from synced state, refusing what it cannot answer.
 
+use crate::planner_strategy::main::model_entries::column_info::column_info;
 use crate::planner_warehouse::_helpers::synced::exception_types::WarehouseAccessRefusedError;
 use chrono::SecondsFormat;
 use pyo3::IntoPyObject;
@@ -44,17 +45,20 @@ pub(crate) fn relation_columns<'py>(
     py: Python<'py>,
     relation: &StateRelation,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let column_info: Bound<'py, PyAny> = host_entry(py, AdapterHost::ColumnInfo)?;
-    let mut columns: Vec<Bound<'py, PyAny>> = Vec::with_capacity(relation.columns.len());
-    for column in &relation.columns {
-        columns.push(call_with(
-            &column_info,
-            &[
-                ("name", PyString::new(py, &column.name).into_any()),
-                ("type", PyString::new(py, &column.data_type).into_any()),
-            ],
-        )?);
-    }
+    let class: Bound<'py, PyAny> = host_entry(py, AdapterHost::ColumnInfo)?;
+    let columns: Vec<Bound<'py, PyAny>> = relation
+        .columns
+        .iter()
+        .map(|column| {
+            column_info(
+                &class,
+                (
+                    PyString::new(py, &column.name).into_any(),
+                    PyString::new(py, &column.data_type).into_any(),
+                ),
+            )
+        })
+        .collect::<PyResult<_>>()?;
     PyTuple::new(py, columns)
 }
 

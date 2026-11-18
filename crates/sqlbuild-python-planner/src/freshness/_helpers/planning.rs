@@ -24,6 +24,7 @@ use crate::freshness::models::Observer;
 use crate::planner_warehouse::main::reads::is_refused_access::is_refused_access;
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::Read;
+use crate::planner_warehouse::models::StateHistoryRead;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::models::Dialect;
@@ -72,10 +73,13 @@ fn previous_records<'py>(
     for schema in arguments.value("state_schemas")?.try_iter()? {
         let schema: Bound<'py, PyAny> = schema?;
         let exists: bool = mapping_get_or(&exists_by_schema, &schema, false)?.is_truthy()?;
-        let Read::Known(previous) = reads.get().reads().source_freshness_state(
+        let Read::Known(previous) = reads.get().reads().state_history(
             py,
-            (&database, &schema),
-            (exists, source_names),
+            StateHistoryRead::SourceFreshness {
+                location: (&database, &schema),
+                table_exists: exists,
+                source_names,
+            },
         )?
         else {
             continue;

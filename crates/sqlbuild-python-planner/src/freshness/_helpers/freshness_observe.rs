@@ -6,7 +6,7 @@ use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::{PyException, PyValueError};
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString};
 use sqlbuild_core::freshness_text::main::freshness_json::freshness_json;
@@ -44,12 +44,15 @@ fn optional_text(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {
     Ok(Some(value.str()?.extract()?))
 }
 
-/// `str(exc)` of an `Exception`, or the error itself for anything else.
-fn exception_message(py: Python<'_>, error: PyErr) -> PyResult<String> {
-    if !error.is_instance_of::<PyException>(py) {
-        return Err(error);
+/// `result`, with an `Exception` caught as its `str(exc)`; anything else still raises.
+fn caught<T>(py: Python<'_>, result: PyResult<T>) -> PyResult<Result<T, String>> {
+    match result {
+        Ok(value) => Ok(Ok(value)),
+        Err(error) if error.is_instance_of::<PyException>(py) => {
+            Ok(Err(error.value(py).str()?.extract()?))
+        }
+        Err(error) => Err(error),
     }
-    error.value(py).str()?.extract()
 }
 
 fn target_result(
@@ -140,18 +143,6 @@ fn observed_result(
     Ok(result)
 }
 
-/// Adapter-strategy observations in one batch, or the message of the batch failure.
-fn adapter_batch<'py>(
-    observer: &Observer<'py>,
-    sources: &[Bound<'py, PyAny>],
-) -> PyResult<Result<Bound<'py, PyAny>, String>> {
-    let py: Python<'py> = observer.reads.py();
-    match observe_adapter_batch(observer, sources) {
-        Ok(batch) => Ok(Ok(batch)),
-        Err(error) => Ok(Err(exception_message(py, error)?)),
-    }
-}
-
 /// One adapter-strategy source's observation, or its unknown or error result.
 fn adapter_observation<'py>(
     batch: &Result<Bound<'py, PyAny>, String>,
@@ -199,13 +190,12 @@ fn configured_observation<'py>(
     observer: &Observer<'py>,
     (name, source): (&str, &Bound<'py, PyAny>),
 ) -> PyResult<Result<Bound<'py, PyAny>, FreshnessSourceResult>> {
-    let py: Python<'py> = source.py();
-    match observe_configured(observer, source) {
+    match caught(source.py(), observe_configured(observer, source))? {
         Ok(observation) => Ok(Ok(observation)),
-        Err(error) => Ok(Err(target_result(
+        Err(message) => Ok(Err(target_result(
             source,
             (name, FreshnessStatus::Error),
-            Some(exception_message(py, error)?),
+            Some(message),
         )?)),
     }
 }
@@ -240,7 +230,10 @@ fn observe_sources(
             }
         }
     }
-    let batch = adapter_batch(observer, &adapter_sources)?;
+    let batch = caught(
+        observer.reads.py(),
+        observe_adapter_batch(observer, &adapter_sources),
+    )?;
     for (name, source) in &observed {
         let observation = if strategy(source)?.as_deref() == Some(ADAPTER_STRATEGY) {
             adapter_observation(&batch, (name, source))?
@@ -321,7 +314,8 @@ pub(crate) fn observe_source_freshness_json(
     let adapter: Bound<'_, PyAny> = arguments.value("adapter")?;
     let observer: Observer<'_> = Observer {
         dialect: Dialect::of(&adapter)?,
-        reads: LiveReads::handle(&adapter, &arguments.value("connection")?, None)?,
+        reads: LiveReads::new(&adapter, &arguments.value("connection")?, None)
+            .handle(adapter.py())?,
         observed_at: arguments.value("observed_at")?,
     };
     let previous: Bound<'_, PyAny> = arguments.value("previous_records")?;

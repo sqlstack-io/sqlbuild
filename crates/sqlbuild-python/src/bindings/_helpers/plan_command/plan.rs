@@ -386,11 +386,12 @@ fn changed_decision(
     let py = request.py();
     let reads: Bound<'_, PlannerReads> = match &invocation.preview {
         Some(preview) => preview.reads.clone(),
-        None => LiveReads::handle(
+        None => LiveReads::new(
             &native_field(&invocation.context, "adapter")?,
             &py.None().into_bound(py),
             Some(&native_field(&invocation.context, "connection_config")?),
-        )?,
+        )
+        .handle(py)?,
     };
     let changed = preview_changed(plan, reads.get().reads(), (policy, full_refresh));
     reads.get().reads().close_consumption(py)?;

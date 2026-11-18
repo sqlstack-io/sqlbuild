@@ -92,27 +92,46 @@ pub(crate) fn table_exists(
     call_with(&native_field(adapter, "get_columns")?, &keywords)?.is_truthy()
 }
 
+/// The consumption table of `location` when `wanted` and the warehouse lists it.
+fn readable_table(
+    (adapter, connection): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    location: &Location,
+    wanted: bool,
+) -> PyResult<Option<String>> {
+    let Some(table) = table_of(adapter, location)? else {
+        return Ok(None);
+    };
+    if !wanted || !table_exists(adapter, connection, location)? {
+        return Ok(None);
+    }
+    Ok(Some(table))
+}
+
+/// The consumption rows `sql` reads.
+fn fetched_rows(
+    (adapter, connection): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    sql: &str,
+) -> PyResult<Vec<ConsumptionRow>> {
+    let result: Bound<'_, PyAny> = execute(adapter, connection, sql)?;
+    call_with(&native_field(&result, "fetchall")?, &[])?
+        .try_iter()?
+        .map(|row| read_row(&row?))
+        .collect()
+}
+
 /// Rows of the newest executions per relation in `location`; none when the table is missing.
 pub(crate) fn read_recent(
     adapter: &Bound<'_, PyAny>,
     connection: &Bound<'_, PyAny>,
     location: &Location,
 ) -> PyResult<Vec<ConsumptionRow>> {
-    let Some(table) = table_of(adapter, location)? else {
-        return Ok(Vec::new());
-    };
-    if !table_exists(adapter, connection, location)? {
-        return Ok(Vec::new());
+    match readable_table((adapter, connection), location, true)? {
+        Some(table) => fetched_rows(
+            (adapter, connection),
+            &recent_executions_sql(&table, RECENT_EXECUTIONS),
+        ),
+        None => Ok(Vec::new()),
     }
-    let result: Bound<'_, PyAny> = execute(
-        adapter,
-        connection,
-        &recent_executions_sql(&table, RECENT_EXECUTIONS),
-    )?;
-    call_with(&native_field(&result, "fetchall")?, &[])?
-        .try_iter()?
-        .map(|row| read_row(&row?))
-        .collect()
 }
 
 /// Rows of the named executions in `location`, read in batches; none when the table is missing.
@@ -122,19 +141,16 @@ pub(crate) fn read_executions(
     location: &Location,
     execution_ids: &[&str],
 ) -> PyResult<Vec<ConsumptionRow>> {
-    let Some(table) = table_of(adapter, location)? else {
+    let Some(table) = readable_table((adapter, connection), location, !execution_ids.is_empty())?
+    else {
         return Ok(Vec::new());
     };
-    if execution_ids.is_empty() || !table_exists(adapter, connection, location)? {
-        return Ok(Vec::new());
-    }
     let mut rows: Vec<ConsumptionRow> = Vec::new();
     for batch in execution_ids.chunks(EXECUTION_ID_BATCH) {
-        let result: Bound<'_, PyAny> =
-            execute(adapter, connection, &executions_by_id_sql(&table, batch))?;
-        for row in call_with(&native_field(&result, "fetchall")?, &[])?.try_iter()? {
-            rows.push(read_row(&row?)?);
-        }
+        rows.extend(fetched_rows(
+            (adapter, connection),
+            &executions_by_id_sql(&table, batch),
+        )?);
     }
     Ok(rows)
 }

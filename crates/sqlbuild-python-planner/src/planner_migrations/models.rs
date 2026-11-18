@@ -12,6 +12,7 @@ use crate::planner_warehouse::main::inspection::list_relations::list_relations;
 use crate::planner_warehouse::models::FingerprintRead;
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::Read;
+use crate::planner_warehouse::models::StateHistoryRead;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAnyMethods;
 use pyo3::prelude::PyRef;
@@ -242,10 +243,12 @@ impl MigrationStateInspection {
         schemas: Vec<Bound<'py, PyAny>>,
         names: Bound<'py, PyAny>,
     ) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
-        match self.reads.get().reads().migration_state_tables(
+        match self.reads.get().reads().state_history(
             py,
-            self.database.bind(py),
-            (PyTuple::new(py, schemas)?.into_any(), names),
+            StateHistoryRead::MigrationTables {
+                database: self.database.bind(py),
+                filter: (PyTuple::new(py, schemas)?.into_any(), names),
+            },
         )? {
             Read::Known(listed) => Ok(Some(listed.try_iter()?.collect::<PyResult<_>>()?)),
             Read::Unknown(_) => Ok(None),
@@ -404,18 +407,20 @@ impl MigrationStateInspection {
                 let this: PyRef<'_, Self> = slf.borrow();
                 (this.reads(py), this.database.bind(py).clone())
             };
-            let Read::Known(events) = reads.get().reads().recorded_migrations(
+            let Read::Known(events) = reads.get().reads().state_history(
                 py,
-                &layout(COLUMN_KIND)?,
-                (database, schema),
-                None,
+                StateHistoryRead::MigrationEvents {
+                    layout: &layout(COLUMN_KIND)?,
+                    location: (database, schema),
+                    stored: None,
+                },
             )?
             else {
                 return Ok(());
             };
             slf.borrow_mut()
                 .column_events
-                .extend(events.iter().map(Bound::unbind));
+                .extend(events.downcast::<PyTuple>()?.iter().map(Bound::unbind));
         }
         Ok(())
     }
@@ -457,26 +462,34 @@ impl MigrationStateInspection {
             else {
                 return Ok(());
             };
-            let Read::Known(facts) = reads.recorded_migrations(
+            let Read::Known(facts) = reads.state_history(
                 py,
-                &layout(OLD_NAME_KIND)?,
-                (database.clone(), schema.clone()),
-                Some(&stored),
+                StateHistoryRead::MigrationEvents {
+                    layout: &layout(OLD_NAME_KIND)?,
+                    location: (database.clone(), schema.clone()),
+                    stored: Some(&stored),
+                },
             )?
             else {
                 return Ok(());
             };
             slf.borrow_mut()
                 .old_name_facts
-                .extend(facts.iter().map(Bound::unbind));
-            let Read::Known(moves) =
-                reads.recorded_migrations(py, &layout(MODEL_KIND)?, (database, schema), None)?
+                .extend(facts.downcast::<PyTuple>()?.iter().map(Bound::unbind));
+            let Read::Known(moves) = reads.state_history(
+                py,
+                StateHistoryRead::MigrationEvents {
+                    layout: &layout(MODEL_KIND)?,
+                    location: (database, schema),
+                    stored: None,
+                },
+            )?
             else {
                 return Ok(());
             };
             slf.borrow_mut()
                 .old_name_moves
-                .extend(moves.iter().map(Bound::unbind));
+                .extend(moves.downcast::<PyTuple>()?.iter().map(Bound::unbind));
         }
         Ok(())
     }
@@ -500,18 +513,20 @@ impl MigrationStateInspection {
                 let this: PyRef<'_, Self> = slf.borrow();
                 (this.reads(py), this.database.bind(py).clone())
             };
-            let Read::Known(events) = reads.get().reads().recorded_migrations(
+            let Read::Known(events) = reads.get().reads().state_history(
                 py,
-                &layout(MODEL_KIND)?,
-                (database, schema),
-                None,
+                StateHistoryRead::MigrationEvents {
+                    layout: &layout(MODEL_KIND)?,
+                    location: (database, schema),
+                    stored: None,
+                },
             )?
             else {
                 return Ok(());
             };
             slf.borrow_mut()
                 .events
-                .extend(events.iter().map(Bound::unbind));
+                .extend(events.downcast::<PyTuple>()?.iter().map(Bound::unbind));
         }
         Ok(())
     }

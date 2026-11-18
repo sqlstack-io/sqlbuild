@@ -13,7 +13,9 @@ use crate::live_reads::constants::RELATIONS_MAIN_COLUMNS;
 use crate::live_reads::constants::RELATIONS_MAIN_LIST;
 use crate::live_reads::main::bound_task::bound_task;
 use crate::observations::main::capture_source_columns::capture_source_columns;
-use crate::planner_warehouse::models::{EligibleCursorQuery, FingerprintRead, PlannerReads, Read};
+use crate::planner_warehouse::models::{
+    AdapterRead, EligibleCursorQuery, FingerprintRead, PlannerReads, Read, StateHistoryRead,
+};
 use crate::planner_warehouse::types::CursorProgress;
 use crate::planner_warehouse::types::WarehouseReads;
 use pyo3::IntoPyObject;
@@ -26,6 +28,7 @@ use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use pyo3::types::PyBool;
 use pyo3::types::PyTuple;
+use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -36,7 +39,6 @@ use sqlbuild_python_front::native_host::models::ConsumptionConnection;
 use sqlbuild_python_front::native_host::models::Location;
 use sqlbuild_python_front::state_rows::main::migrations::read_events::read_events;
 use sqlbuild_python_front::state_rows::main::migrations::stored_old_name_columns::stored_old_name_columns;
-use sqlbuild_python_front::state_rows::models::EventTableLayout;
 use sqlbuild_python_front::state_rows::models::StateAccess;
 use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use sqlbuild_state::consumption::models::ConsumptionRow;
@@ -54,7 +56,7 @@ pub struct LiveReads {
 
 impl LiveReads {
     /// Reads through `connection`; consumption history connects with `connection_config` when given.
-    pub(crate) fn new(
+    pub fn new(
         adapter: &Bound<'_, PyAny>,
         connection: &Bound<'_, PyAny>,
         connection_config: Option<&Bound<'_, PyAny>>,
@@ -69,16 +71,39 @@ impl LiveReads {
         }
     }
 
-    /// Live reads as the handle a plan holds.
-    pub fn handle<'py>(
-        adapter: &Bound<'py, PyAny>,
-        connection: &Bound<'py, PyAny>,
-        connection_config: Option<&Bound<'py, PyAny>>,
-    ) -> PyResult<Bound<'py, PlannerReads>> {
-        Bound::new(
-            adapter.py(),
-            PlannerReads::new(Arc::new(Self::new(adapter, connection, connection_config))),
-        )
+    /// These reads as the handle a plan holds.
+    pub fn handle(self, py: Python<'_>) -> PyResult<Bound<'_, PlannerReads>> {
+        Bound::new(py, PlannerReads::new(Arc::new(self)))
+    }
+
+    /// Call a host entry with this adapter and connection, plus `arguments`.
+    fn host_call<'py>(
+        &self,
+        py: Python<'py>,
+        entry: AdapterHost,
+        arguments: Vec<(&str, Bound<'py, PyAny>)>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let mut keywords = vec![
+            ("adapter", self.adapter(py).clone()),
+            ("connection", self.connection(py)),
+        ];
+        keywords.extend(arguments);
+        call_with(&host_entry(py, entry)?, &keywords)
+    }
+
+    /// Call an adapter method on this connection, plus `arguments`; the warehouse answers it.
+    fn known_call<'py>(
+        &self,
+        py: Python<'py>,
+        method: &str,
+        arguments: Vec<(&str, Bound<'py, PyAny>)>,
+    ) -> PyResult<Read<Bound<'py, PyAny>>> {
+        let mut keywords = vec![("connection", self.connection(py))];
+        keywords.extend(arguments);
+        Ok(Read::Known(call_with(
+            &self.method(py, method)?,
+            &keywords,
+        )?))
     }
 
     fn adapter<'py>(&self, py: Python<'py>) -> &Bound<'py, PyAny> {
@@ -100,13 +125,7 @@ impl LiveReads {
 
     /// The inspection catalog open for this connection, or `None`.
     fn active_catalog<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        call_with(
-            &host_entry(py, ACTIVE_CATALOG)?,
-            &[
-                ("adapter", self.adapter(py).clone()),
-                ("connection", self.connection(py)),
-            ],
-        )
+        self.host_call(py, ACTIVE_CATALOG, Vec::new())
     }
 
     fn state_access<'py>(&self, py: Python<'py>) -> PyResult<StateAccess<'py>> {
@@ -131,11 +150,10 @@ impl WarehouseReads for LiveReads {
         database: &Bound<'py, PyAny>,
         (schemas, names): (Bound<'py, PyAny>, Bound<'py, PyAny>),
     ) -> PyResult<Bound<'py, PyAny>> {
-        call_with(
-            &host_entry(py, RELATIONS_MAIN_LIST)?,
-            &[
-                ("adapter", self.adapter(py).clone()),
-                ("connection", self.connection(py)),
+        self.host_call(
+            py,
+            RELATIONS_MAIN_LIST,
+            vec![
                 ("database", database.clone()),
                 ("schemas", schemas),
                 ("names", names),
@@ -148,14 +166,7 @@ impl WarehouseReads for LiveReads {
         py: Python<'py>,
         relations: Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        call_with(
-            &host_entry(py, RELATIONS_MAIN_COLUMNS)?,
-            &[
-                ("adapter", self.adapter(py).clone()),
-                ("connection", self.connection(py)),
-                ("relations", relations),
-            ],
-        )
+        self.host_call(py, RELATIONS_MAIN_COLUMNS, vec![("relations", relations)])
     }
 
     fn fingerprints<'py>(
@@ -200,13 +211,7 @@ impl WarehouseReads for LiveReads {
         py: Python<'py>,
         plan: &mut dyn FnMut() -> PyResult<Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let catalog: Bound<'py, PyAny> = call_with(
-            &host_entry(py, INSPECTION_CATALOG)?,
-            &[
-                ("adapter", self.adapter(py).clone()),
-                ("connection", self.connection(py)),
-            ],
-        )?;
+        let catalog: Bound<'py, PyAny> = self.host_call(py, INSPECTION_CATALOG, Vec::new())?;
         within(&catalog, |_| plan())
     }
 
@@ -352,66 +357,61 @@ impl WarehouseReads for LiveReads {
         )?))
     }
 
-    fn source_freshness_state<'py>(
+    fn state_history<'py>(
         &self,
         py: Python<'py>,
-        location: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-        (table_exists, source_names): (bool, Option<&[String]>),
+        read: StateHistoryRead<'_, 'py>,
     ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        let read: StateRead<'py> = StateRead {
-            connection: self.connection(py),
-            execute: self.method(py, "execute")?,
-            render_qualified_name: self.method(py, "render_qualified_name")?,
-            render_read_latest_sql: self.method(py, "render_read_latest_source_freshness_sql")?,
+        Ok(Read::Known(match read {
+            StateHistoryRead::SourceFreshness {
+                location,
+                table_exists,
+                source_names,
+            } => {
+                let read: StateRead<'py> = StateRead {
+                    connection: self.connection(py),
+                    execute: self.method(py, "execute")?,
+                    render_qualified_name: self.method(py, "render_qualified_name")?,
+                    render_read_latest_sql: self
+                        .method(py, "render_read_latest_source_freshness_sql")?,
+                };
+                read_latest(&read, location, table_exists, source_names)?
+            }
+            StateHistoryRead::MigrationTables { database, filter } => {
+                self.relations(py, database, filter)?
+            }
+            StateHistoryRead::MigrationEvents {
+                layout,
+                location,
+                stored,
+            } => read_events(&self.state_access(py)?, layout, location, stored)?.into_any(),
+        }))
+    }
+
+    fn adapter_read<'py>(
+        &self,
+        py: Python<'py>,
+        read: AdapterRead<'py>,
+    ) -> PyResult<Read<Bound<'py, PyAny>>> {
+        let (method, arguments) = match read {
+            AdapterRead::TableFreshness(requests) => (
+                "get_tables_freshness_metadata",
+                vec![("requests", requests)],
+            ),
+            AdapterRead::SingleTableFreshness([database, schema, name]) => (
+                "get_table_freshness_metadata",
+                vec![("database", database), ("schema", schema), ("name", name)],
+            ),
+            AdapterRead::FreshnessQuery(sql) => (
+                "query",
+                vec![("sql", sql), ("limit", py.None().into_bound(py))],
+            ),
+            AdapterRead::ColumnRenameUnavailable(destination) => (
+                "column_rename_unavailable_reason",
+                vec![("destination", destination)],
+            ),
         };
-        Ok(Read::Known(read_latest(
-            &read,
-            location,
-            table_exists,
-            source_names,
-        )?))
-    }
-
-    fn table_freshness<'py>(
-        &self,
-        py: Python<'py>,
-        requests: Bound<'py, PyAny>,
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(Read::Known(call_with(
-            &self.method(py, "get_tables_freshness_metadata")?,
-            &[("connection", self.connection(py)), ("requests", requests)],
-        )?))
-    }
-
-    fn single_table_freshness<'py>(
-        &self,
-        py: Python<'py>,
-        [database, schema, name]: [Bound<'py, PyAny>; 3],
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(Read::Known(call_with(
-            &self.method(py, "get_table_freshness_metadata")?,
-            &[
-                ("connection", self.connection(py)),
-                ("database", database),
-                ("schema", schema),
-                ("name", name),
-            ],
-        )?))
-    }
-
-    fn freshness_query<'py>(
-        &self,
-        py: Python<'py>,
-        sql: Bound<'py, PyAny>,
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(Read::Known(call_with(
-            &self.method(py, "query")?,
-            &[
-                ("connection", self.connection(py)),
-                ("sql", sql),
-                ("limit", py.None().into_bound(py)),
-            ],
-        )?))
+        self.known_call(py, method, arguments)
     }
 
     fn table_types(&self) -> Read<()> {
@@ -422,44 +422,6 @@ impl WarehouseReads for LiveReads {
         Ok(Read::Known(imported(py, "functools", "partial")?.call(
             (self.method(py, "inspect_retention")?,),
             Some(&keywords(py, &[("connection", self.connection(py))])?),
-        )?))
-    }
-
-    fn column_rename_unavailable<'py>(
-        &self,
-        py: Python<'py>,
-        destination: Bound<'py, PyAny>,
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(Read::Known(call_with(
-            &self.method(py, "column_rename_unavailable_reason")?,
-            &[
-                ("connection", self.connection(py)),
-                ("destination", destination),
-            ],
-        )?))
-    }
-
-    fn migration_state_tables<'py>(
-        &self,
-        py: Python<'py>,
-        database: &Bound<'py, PyAny>,
-        filter: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(Read::Known(self.relations(py, database, filter)?))
-    }
-
-    fn recorded_migrations<'py>(
-        &self,
-        py: Python<'py>,
-        layout: &EventTableLayout,
-        location: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-        stored: Option<&[String]>,
-    ) -> PyResult<Read<Bound<'py, PyTuple>>> {
-        Ok(Read::Known(read_events(
-            &self.state_access(py)?,
-            layout,
-            location,
-            stored,
         )?))
     }
 

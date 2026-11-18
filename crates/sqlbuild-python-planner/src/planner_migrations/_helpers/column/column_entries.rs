@@ -1,7 +1,7 @@
 //! Materialize column decisions from native proofs and live evidence.
 
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
-use crate::planner_warehouse::models::Read;
+use crate::planner_warehouse::models::{AdapterRead, Read};
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::planner_migrations::_helpers::column::column_candidates::declared_names;
@@ -185,7 +185,7 @@ pub(crate) fn checked<'py>(
     let reason = match runtime_reads(runtime)?
         .get()
         .reads()
-        .column_rename_unavailable(runtime.py(), relation)?
+        .adapter_read(runtime.py(), AdapterRead::ColumnRenameUnavailable(relation))?
     {
         Read::Known(reason) => reason,
         Read::Unknown(_) => runtime.py().None().into_bound(runtime.py()),

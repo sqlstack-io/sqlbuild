@@ -373,6 +373,39 @@ pub enum Read<T> {
     Unknown(Cow<'static, str>),
 }
 
+/// A read the warehouse adapter answers in one call.
+pub enum AdapterRead<'py> {
+    /// Each table freshness request's metadata, keyed by request.
+    TableFreshness(Bound<'py, PyAny>),
+    /// One table's `[database, schema, name]` freshness metadata.
+    SingleTableFreshness([Bound<'py, PyAny>; 3]),
+    /// The rows of one source freshness query.
+    FreshnessQuery(Bound<'py, PyAny>),
+    /// Why a destination cannot rename columns, `None` when it can.
+    ColumnRenameUnavailable(Bound<'py, PyAny>),
+}
+
+/// A read of what the warehouse state tables recorded.
+pub enum StateHistoryRead<'a, 'py> {
+    /// The latest recorded source freshness of `(database, schema)`, as a latest-records read.
+    SourceFreshness {
+        location: (&'a Bound<'py, PyAny>, &'a Bound<'py, PyAny>),
+        table_exists: bool,
+        source_names: Option<&'a [String]>,
+    },
+    /// The migration state tables of `schemas` in `database`, narrowed to `names`.
+    MigrationTables {
+        database: &'a Bound<'py, PyAny>,
+        filter: (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    },
+    /// The recorded migration events of one state table in `(database, schema)`, as a tuple.
+    MigrationEvents {
+        layout: &'a EventTableLayout,
+        location: (Bound<'py, PyAny>, Bound<'py, PyAny>),
+        stored: Option<&'a [String]>,
+    },
+}
+
 /// Where to read the newest fingerprints of one state location, narrowed as a filtered read is.
 #[derive(Debug)]
 pub struct FingerprintRead<'a> {
@@ -677,20 +710,35 @@ impl WarehouseReads for SyncedReads {
         Ok(unknown(self, "read access to these sources"))
     }
 
-    fn source_freshness_state<'py>(
+    fn state_history<'py>(
         &self,
         _py: Python<'py>,
-        _location: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-        _read: (bool, Option<&[String]>),
+        read: StateHistoryRead<'_, 'py>,
     ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(unknown(self, "source freshness"))
+        Ok(unknown(
+            self,
+            match read {
+                StateHistoryRead::SourceFreshness { .. } => "source freshness",
+                StateHistoryRead::MigrationTables { .. }
+                | StateHistoryRead::MigrationEvents { .. } => "recorded migrations",
+            },
+        ))
     }
 
-    fn table_freshness<'py>(
+    fn adapter_read<'py>(
         &self,
         py: Python<'py>,
-        requests: Bound<'py, PyAny>,
+        read: AdapterRead<'py>,
     ) -> PyResult<Read<Bound<'py, PyAny>>> {
+        let requests: Bound<'py, PyAny> = match read {
+            AdapterRead::TableFreshness(requests) => requests,
+            AdapterRead::SingleTableFreshness(_) | AdapterRead::FreshnessQuery(_) => {
+                return Ok(unknown(self, "source freshness"));
+            }
+            AdapterRead::ColumnRenameUnavailable(_) => {
+                return Ok(unknown(self, "column rename support"));
+            }
+        };
         let unavailable =
             host_entry(py, AdapterHost::TableFreshnessMetadata)?.getattr("unavailable")?;
         let outcome = call_with(
@@ -704,55 +752,12 @@ impl WarehouseReads for SyncedReads {
         Ok(Read::Known(metadata.into_any()))
     }
 
-    fn single_table_freshness<'py>(
-        &self,
-        _py: Python<'py>,
-        _table: [Bound<'py, PyAny>; 3],
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(unknown(self, "source freshness"))
-    }
-
-    fn freshness_query<'py>(
-        &self,
-        _py: Python<'py>,
-        _sql: Bound<'py, PyAny>,
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(unknown(self, "source freshness"))
-    }
-
     fn table_types(&self) -> Read<()> {
         unknown(self, "table types")
     }
 
     fn retention<'py>(&self, _py: Python<'py>) -> PyResult<Read<Bound<'py, PyAny>>> {
         Ok(unknown(self, "retention"))
-    }
-
-    fn column_rename_unavailable<'py>(
-        &self,
-        _py: Python<'py>,
-        _destination: Bound<'py, PyAny>,
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(unknown(self, "column rename support"))
-    }
-
-    fn migration_state_tables<'py>(
-        &self,
-        _py: Python<'py>,
-        _database: &Bound<'py, PyAny>,
-        _filter: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-    ) -> PyResult<Read<Bound<'py, PyAny>>> {
-        Ok(unknown(self, "recorded migrations"))
-    }
-
-    fn recorded_migrations<'py>(
-        &self,
-        _py: Python<'py>,
-        _layout: &EventTableLayout,
-        _location: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-        _stored: Option<&[String]>,
-    ) -> PyResult<Read<Bound<'py, PyTuple>>> {
-        Ok(unknown(self, "recorded migrations"))
     }
 
     fn old_name_view_columns<'py>(

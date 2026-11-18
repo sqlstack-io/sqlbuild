@@ -4,7 +4,7 @@ use crate::freshness::main::presumed_utc_datetime::presumed_utc_datetime;
 use crate::freshness::models::Observer;
 use crate::planner_warehouse::main::reads::refused_access::refused_access;
 use crate::planner_warehouse::models::PlannerReads;
-use crate::planner_warehouse::models::Read;
+use crate::planner_warehouse::models::{AdapterRead, Read};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
@@ -243,7 +243,12 @@ fn single_data_version<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = source_name.py();
     let name: String = source_name.str()?.extract()?;
-    let result: Bound<'py, PyAny> = match observer.reads.get().reads().freshness_query(py, sql) {
+    let result: Bound<'py, PyAny> = match observer
+        .reads
+        .get()
+        .reads()
+        .adapter_read(py, AdapterRead::FreshnessQuery(sql))
+    {
         Ok(Read::Known(result)) => result,
         Ok(Read::Unknown(_)) => {
             return Err(refused_access(&format!("freshness query of source {name}")));
@@ -386,13 +391,13 @@ fn observe_adapter_source<'py>(
     if let Some(message) = unsupported_message(&observer.dialect, source)? {
         return Err(observation_error(py, &message));
     }
-    let metadata: Bound<'py, PyAny> = match observer.reads.get().reads().single_table_freshness(
+    let metadata: Bound<'py, PyAny> = match observer.reads.get().reads().adapter_read(
         py,
-        [
+        AdapterRead::SingleTableFreshness([
             native_field(source, "database")?,
             native_field(source, "schema")?,
             native_field(source, "table")?,
-        ],
+        ]),
     )? {
         Read::Known(metadata) => metadata,
         Read::Unknown(_) => {
@@ -484,7 +489,7 @@ fn observe_adapter_batch_inner<'py>(
         .reads
         .get()
         .reads()
-        .table_freshness(py, unique_requests)?
+        .adapter_read(py, AdapterRead::TableFreshness(unique_requests))?
     {
         Read::Known(metadata) => metadata,
         Read::Unknown(item) => return Err(refused_access(&item)),

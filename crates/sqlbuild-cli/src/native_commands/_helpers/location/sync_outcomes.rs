@@ -18,6 +18,7 @@ use crate::native_commands::_helpers::location::execution::{
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_failure_line, report_metadata_health,
 };
+use crate::native_commands::_helpers::location::work::refuse_rejected_sign_in;
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
 use crate::native_commands::models::{LocationMetadataSync, ReadFailure};
 
@@ -26,11 +27,7 @@ pub(crate) fn retry_metadata(
     mut state: LocationMetadataSync,
     error: ClientError,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
-    if matches!(error, ClientError::Configuration(_))
-        || matches!(error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
-    {
-        return Err(ControlError::Invalid(error.to_string()));
-    }
+    refuse_rejected_sign_in(&error)?;
     state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
     state.reader = None;
     location_warning(

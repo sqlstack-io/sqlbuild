@@ -300,7 +300,7 @@ fn planned<'py>(
                 let opened: Bound<'py, PyAny> =
                     connection_with_hooks(adapter, &connection_config, hooks)?;
                 connection = Some(opened.clone());
-                let reads = LiveReads::handle(adapter, &opened, None)?;
+                let reads = LiveReads::new(adapter, &opened, None).handle(adapter.py())?;
                 (opened, reads)
             }
         };

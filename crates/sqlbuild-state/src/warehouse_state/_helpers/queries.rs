@@ -1,7 +1,6 @@
 //! What a plan asks of the warehouse state, each answered from an index.
 
-use std::collections::{BTreeMap, HashMap};
-use std::mem::size_of;
+use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
@@ -13,9 +12,8 @@ use crate::consumption::models::{
 use crate::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 use crate::warehouse_state::_helpers::indexes::folded;
 use crate::warehouse_state::models::{
-    DescribedColumns, InvalidObservation, RelationFilter, StateColumn, StateConsumption,
-    StateFingerprint, StateLatestRun, StateLocation, StateObservation, StateRelation,
-    WarehouseState, WarehouseStateParts,
+    DescribedColumns, InvalidObservation, RelationFilter, StateConsumption, StateFingerprint,
+    StateLocation, StateRelation, WarehouseState, WarehouseStateParts,
 };
 
 fn same(left: &str, right: &str) -> bool {
@@ -38,120 +36,6 @@ fn any_same(wanted: Option<&[String]>, value: &str) -> bool {
 /// Whether a listing hides the relation: state tables are planner inputs, not relations, except fingerprints.
 fn hidden(relation: &StateRelation) -> bool {
     STATE_TABLE_NAMES.contains(&relation.name.as_str()) && relation.name != FINGERPRINT_TABLE_NAME
-}
-
-fn text_bytes(value: &str) -> usize {
-    value.len()
-}
-
-fn optional_bytes(value: Option<&String>) -> usize {
-    value.map_or(0, |value| value.len())
-}
-
-fn location_bytes(location: &StateLocation) -> usize {
-    optional_bytes(location.database.as_ref()) + text_bytes(&location.schema)
-}
-
-fn consumption_bytes(row: &StateConsumption) -> usize {
-    location_bytes(&row.location)
-        + [
-            &row.execution_id,
-            &row.phase,
-            &row.run_id,
-            &row.node_type,
-            &row.node_name,
-            &row.target_database,
-            &row.target_schema,
-            &row.target_name,
-            &row.version_hash,
-            &row.input_kind,
-            &row.input_name,
-            &row.input_version,
-        ]
-        .into_iter()
-        .map(Option::as_ref)
-        .map(optional_bytes)
-        .sum::<usize>()
-}
-
-fn fingerprint_bytes(fingerprint: &StateFingerprint) -> usize {
-    location_bytes(&fingerprint.location)
-        + [
-            &fingerprint.node_type,
-            &fingerprint.node_name,
-            &fingerprint.run_id,
-            &fingerprint.definition_hash,
-            &fingerprint.version_hash,
-            &fingerprint.schema_fingerprint,
-            &fingerprint.definition,
-            &fingerprint.metadata_json,
-        ]
-        .into_iter()
-        .map(|value| text_bytes(value))
-        .sum::<usize>()
-        + [
-            &fingerprint.target_database,
-            &fingerprint.target_schema,
-            &fingerprint.target_name,
-        ]
-        .into_iter()
-        .map(Option::as_ref)
-        .map(optional_bytes)
-        .sum::<usize>()
-}
-
-fn entry_size(key_bytes: usize, positions: &[usize]) -> usize {
-    size_of::<String>()
-        + size_of::<Vec<usize>>()
-        + size_of::<u64>()
-        + key_bytes
-        + size_of_val(positions)
-}
-
-fn index_size(index: &HashMap<String, Vec<usize>>) -> usize {
-    index
-        .iter()
-        .map(|(key, positions)| entry_size(key.len(), positions))
-        .sum()
-}
-
-fn column_size(column: &StateColumn) -> usize {
-    size_of_val(column) + column.name.len() + column.data_type.len()
-}
-
-fn relation_size(relation: &StateRelation) -> usize {
-    size_of_val(relation)
-        + optional_bytes(relation.database.as_ref())
-        + relation.schema.len()
-        + relation.name.len()
-        + relation.relation_type.len()
-        + relation.columns.iter().map(column_size).sum::<usize>()
-}
-
-fn fingerprint_size(fingerprint: &StateFingerprint) -> usize {
-    size_of_val(fingerprint) + fingerprint_bytes(fingerprint)
-}
-
-fn run_size(run: &StateLatestRun) -> usize {
-    size_of_val(run)
-        + location_bytes(&run.location)
-        + run.node_type.len()
-        + run.node_name.len()
-        + run.run_id.len()
-}
-
-fn observation_size(observation: &StateObservation) -> usize {
-    size_of_val(observation)
-        + location_bytes(&observation.location)
-        + observation.kind.len()
-        + observation.node.len()
-        + optional_bytes(observation.cursor_type.as_ref())
-        + observation.value.len()
-        + observation.run_id.len()
-}
-
-fn consumption_size(row: &StateConsumption) -> usize {
-    size_of_val(row) + consumption_bytes(row)
 }
 
 /// A stored consumption row as `--changed` reads it; a missing text column reads as empty.
@@ -330,44 +214,5 @@ impl WarehouseState {
             })
             .map(consumption_row)
             .collect()
-    }
-
-    /// An estimate of the heap the facts and indexes hold, in bytes.
-    pub fn memory_bytes(&self) -> usize {
-        let parts: &WarehouseStateParts = &self.parts;
-        let facts: usize = parts.relations.iter().map(relation_size).sum::<usize>()
-            + parts
-                .fingerprints
-                .iter()
-                .map(fingerprint_size)
-                .sum::<usize>()
-            + parts.latest_runs.iter().map(run_size).sum::<usize>()
-            + parts
-                .observations
-                .iter()
-                .map(observation_size)
-                .sum::<usize>()
-            + parts
-                .consumption
-                .iter()
-                .map(consumption_size)
-                .sum::<usize>();
-        let indexes: usize = [
-            &self.relations_by_name,
-            &self.fingerprints_by_schema,
-            &self.latest_model_runs,
-            &self.consumption_by_schema,
-        ]
-        .into_iter()
-        .map(index_size)
-        .sum::<usize>()
-            + self
-                .observations_by_node
-                .iter()
-                .map(|((kind, node), positions)| {
-                    entry_size(kind.len() + node.len() + size_of::<String>(), positions)
-                })
-                .sum::<usize>();
-        facts + indexes
     }
 }

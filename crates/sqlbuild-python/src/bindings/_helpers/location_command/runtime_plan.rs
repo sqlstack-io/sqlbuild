@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
 use pyo3::PyErr;
-use pyo3::exceptions::{PyBaseException, PyException, PyValueError};
+use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyList, PyString};
 use serde_json::{Value, json};
@@ -18,6 +18,7 @@ use crate::bindings::_helpers::location_command::constants::PLAN_FAILED_CODE;
 use crate::bindings::_helpers::location_command::types::HeldProject;
 use crate::bindings::_helpers::plan_command::plan::PlanProject;
 use crate::bindings::_helpers::plan_command::plan::location_plan;
+use crate::bindings::_helpers::review_command::support::attribute;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 
@@ -112,16 +113,8 @@ pub(super) fn runtime_plan<'py>(
 fn failure(py: Python<'_>, error: &PyErr) -> PyResult<Value> {
     let value = error.value(py);
     Ok(json!({
-        "code": error_text(value, "code")?.unwrap_or_else(|| PLAN_FAILED_CODE.to_owned()),
-        "message": error_text(value, "message")?.unwrap_or(value.str()?.to_string()),
-        "help": error_text(value, "help")?,
+        "code": attribute(value.as_any(), "code")?.unwrap_or_else(|| PLAN_FAILED_CODE.to_owned()),
+        "message": attribute(value.as_any(), "message")?.unwrap_or(value.str()?.to_string()),
+        "help": attribute(value.as_any(), "help")?,
     }))
-}
-
-/// An error attribute as text; `None` when the error has no such attribute or it is `None`.
-fn error_text(value: &Bound<'_, PyBaseException>, name: &str) -> PyResult<Option<String>> {
-    match value.getattr_opt(name)? {
-        Some(part) if !part.is_none() => Ok(Some(part.str()?.to_string())),
-        _ => Ok(None),
-    }
 }

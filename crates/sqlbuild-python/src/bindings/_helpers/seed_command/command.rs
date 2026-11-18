@@ -270,7 +270,8 @@ fn compile_seeds<'py>(
         )?;
         let connection: Bound<'py, PyAny> =
             connection_with_hooks(&adapter, &connection_config, &hooks)?;
-        let read: PyResult<Bound<'py, PyAny>> = LiveReads::handle(&adapter, &connection, None)
+        let read: PyResult<Bound<'py, PyAny>> = LiveReads::new(&adapter, &connection, None)
+            .handle(adapter.py())
             .and_then(|reads| {
                 read_selected_seed_fingerprints(&reads, &PyTuple::new(py, &selected)?.into_any())
             })

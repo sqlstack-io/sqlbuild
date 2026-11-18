@@ -225,12 +225,14 @@ fn audit_fact<V>(audit: &AuditExecutionResult<V>) -> String {
 fn audit_facts(results: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     results
         .try_iter()?
-        .map(|result| {
-            let result: Bound<'_, PyAny> = result?;
-            if native_field(&result, "ignored")?.is_truthy()? {
-                return Ok(IGNORED_AUDIT_FAILURE.to_owned());
-            }
-            native_field(&result, "outcome")?.str()?.extract()
-        })
+        .map(|result| audit_result_fact(&result?))
         .collect()
+}
+
+/// A Python audit result's outcome as [`audit_fact`] counts it.
+fn audit_result_fact(result: &Bound<'_, PyAny>) -> PyResult<String> {
+    if native_field(result, "ignored")?.is_truthy()? {
+        return Ok(IGNORED_AUDIT_FAILURE.to_owned());
+    }
+    native_field(result, "outcome")?.str()?.extract()
 }

@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
-// The UI's browser suite: layout checks against the mock client with awkward data. CI builds the UI
-// (`npm run build`) and runs `npm run test:e2e`; it is not part of `npm test`.
+// The UI's browser suite against the mock client with awkward data; it is not part of `npm test`.
+// CI builds the UI (`npm run build`) and runs the layout project as a required step and the perf
+// project in its own job, which reports its timings but does not block merges.
 export default defineConfig({
 	testDir: './e2e',
 	timeout: 120_000,

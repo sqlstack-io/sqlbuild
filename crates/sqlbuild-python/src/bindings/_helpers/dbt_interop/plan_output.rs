@@ -215,7 +215,9 @@ pub(crate) fn build_sqlbuild_plan_output<'py>(
                     ("dialect", Dialect::of(&adapter)?.into_any()),
                     (
                         "reads",
-                        LiveReads::handle(&adapter, &connection, None)?.into_any(),
+                        LiveReads::new(&adapter, &connection, None)
+                            .handle(adapter.py())?
+                            .into_any(),
                     ),
                     ("selection", selection),
                     ("overrides", overrides),

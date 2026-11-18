@@ -1,5 +1,6 @@
 //! Assemble model plan dataclasses from resolved plan decisions and authored model config.
 
+use crate::planner_strategy::main::model_entries::column_info::column_info;
 use crate::planner_strategy::main::values::input_error::input_error;
 use crate::planner_strategy::main::values::text::text;
 use pyo3::IntoPyObject;
@@ -107,14 +108,6 @@ fn none(py: Python<'_>) -> Bound<'_, PyAny> {
 
 fn or_none<'py>(py: Python<'py>, value: Option<Bound<'py, PyAny>>) -> Bound<'py, PyAny> {
     value.unwrap_or_else(|| none(py))
-}
-
-/// `ColumnInfo(name=..., type=...)`.
-fn column_info<'py>(
-    class: &Bound<'py, PyAny>,
-    (name, column_type): (Bound<'py, PyAny>, Bound<'py, PyAny>),
-) -> PyResult<Bound<'py, PyAny>> {
-    call_with(class, &[("name", name), ("type", column_type)])
 }
 
 /// Declared schema columns as `ColumnInfo`: typed columns only, or every column with an empty default type.

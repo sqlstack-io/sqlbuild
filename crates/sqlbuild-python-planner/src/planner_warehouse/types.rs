@@ -1,12 +1,12 @@
 //! The warehouse reads planning consults, as traits.
 
+use crate::planner_warehouse::models::AdapterRead;
 use crate::planner_warehouse::models::EligibleCursorQuery;
 use crate::planner_warehouse::models::FingerprintRead;
 use crate::planner_warehouse::models::Read;
+use crate::planner_warehouse::models::StateHistoryRead;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
-use pyo3::types::PyTuple;
 use sqlbuild_python_front::native_host::models::Location;
-use sqlbuild_python_front::state_rows::models::EventTableLayout;
 use sqlbuild_state::consumption::models::ConsumptionRow;
 
 /// Progress of the cursor bound statements a plan runs.
@@ -104,33 +104,18 @@ pub trait WarehouseReads: Send + Sync + std::fmt::Debug {
         relations: &dyn Fn() -> PyResult<Vec<Bound<'py, PyAny>>>,
     ) -> PyResult<Read<Vec<Bound<'py, PyAny>>>>;
 
-    /// The latest recorded source freshness of `(database, schema)`, as a latest-records read.
-    fn source_freshness_state<'py>(
+    /// What the warehouse state tables recorded for `read`.
+    fn state_history<'py>(
         &self,
         py: Python<'py>,
-        location: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-        read: (bool, Option<&[String]>),
+        read: StateHistoryRead<'_, 'py>,
     ) -> PyResult<Read<Bound<'py, PyAny>>>;
 
-    /// Each table freshness request's metadata, keyed by request.
-    fn table_freshness<'py>(
+    /// What the warehouse adapter answers to `read` in one call.
+    fn adapter_read<'py>(
         &self,
         py: Python<'py>,
-        requests: Bound<'py, PyAny>,
-    ) -> PyResult<Read<Bound<'py, PyAny>>>;
-
-    /// One table's freshness metadata.
-    fn single_table_freshness<'py>(
-        &self,
-        py: Python<'py>,
-        table: [Bound<'py, PyAny>; 3],
-    ) -> PyResult<Read<Bound<'py, PyAny>>>;
-
-    /// The rows of one source freshness query.
-    fn freshness_query<'py>(
-        &self,
-        py: Python<'py>,
-        sql: Bound<'py, PyAny>,
+        read: AdapterRead<'py>,
     ) -> PyResult<Read<Bound<'py, PyAny>>>;
 
     /// Whether listed relations carry their table type.
@@ -138,30 +123,6 @@ pub trait WarehouseReads: Send + Sync + std::fmt::Debug {
 
     /// The callable that reads one retention request's state.
     fn retention<'py>(&self, py: Python<'py>) -> PyResult<Read<Bound<'py, PyAny>>>;
-
-    /// Why `destination` cannot rename columns, `None` when it can.
-    fn column_rename_unavailable<'py>(
-        &self,
-        py: Python<'py>,
-        destination: Bound<'py, PyAny>,
-    ) -> PyResult<Read<Bound<'py, PyAny>>>;
-
-    /// The migration state tables of `schemas` in `database`, narrowed to `names`.
-    fn migration_state_tables<'py>(
-        &self,
-        py: Python<'py>,
-        database: &Bound<'py, PyAny>,
-        filter: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-    ) -> PyResult<Read<Bound<'py, PyAny>>>;
-
-    /// The recorded migration events of one state table in `(database, schema)`.
-    fn recorded_migrations<'py>(
-        &self,
-        py: Python<'py>,
-        layout: &EventTableLayout,
-        location: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-        stored: Option<&[String]>,
-    ) -> PyResult<Read<Bound<'py, PyTuple>>>;
 
     /// The stored columns of the old-name view table in `(database, schema)`.
     fn old_name_view_columns<'py>(

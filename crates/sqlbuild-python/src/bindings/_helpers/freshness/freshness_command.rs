@@ -236,7 +236,7 @@ fn observe(
             .call_method1("now", (imported(py, "datetime", "UTC")?,))?;
         let observer: Observer<'_> = Observer {
             dialect: Dialect::of(adapter)?,
-            reads: LiveReads::handle(adapter, &connection, None)?,
+            reads: LiveReads::new(adapter, &connection, None).handle(adapter.py())?,
             observed_at,
         };
         let state: PreviousState<'_> = PreviousState { by_identity };

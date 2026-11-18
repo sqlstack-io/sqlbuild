@@ -27,15 +27,7 @@ impl LocationWorkClient {
     }
 
     pub async fn report_health(&self, report: &LocationHealthReport) -> Result<bool, ClientError> {
-        let endpoint = self.connection.endpoint(&[
-            "api",
-            "locations",
-            &self.location_id.to_string(),
-            "health",
-        ])?;
-        let response: MutationResponse =
-            client_response(self.connection.client.post(endpoint).json(report)).await?;
-        Ok(response.applied)
+        self.post_mutation(&["health"], report).await
     }
 
     /// The newest health observations of one target of this location, newest first.
@@ -114,18 +106,8 @@ impl LocationWorkClient {
         target: &str,
         report: &ChangedBuildReport,
     ) -> Result<bool, ClientError> {
-        let location_id = self.location_id.to_string();
-        let endpoint = self.connection.endpoint(&[
-            "api",
-            "locations",
-            &location_id,
-            "targets",
-            target,
-            "changed-build",
-        ])?;
-        let response: MutationResponse =
-            client_response(self.connection.client.post(endpoint).json(report)).await?;
-        Ok(response.applied)
+        self.post_mutation(&["targets", target, "changed-build"], report)
+            .await
     }
 
     /// Metadata shares the location's scoped pool, not the scheduler's execution authority.
@@ -137,21 +119,35 @@ impl LocationWorkClient {
         self.post_metadata((target, None), batch).await
     }
 
+    /// Post `body` to this location's `path`; whether the server applied it.
+    async fn post_mutation(
+        &self,
+        path: &[&str],
+        body: &impl serde::Serialize,
+    ) -> Result<bool, ClientError> {
+        let response: MutationResponse = self.post_location(path, body).await?;
+        Ok(response.applied)
+    }
+
     async fn post_metadata<T: serde::de::DeserializeOwned>(
         &self,
         (target, read): (&str, Option<&str>),
         body: &impl serde::Serialize,
     ) -> Result<T, ClientError> {
+        let mut path = vec!["targets", target, "metadata"];
+        path.extend(read);
+        self.post_location(&path, body).await
+    }
+
+    /// Post `body` to this location's `path` and decode the reply.
+    async fn post_location<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &[&str],
+        body: &impl serde::Serialize,
+    ) -> Result<T, ClientError> {
         let location_id = self.location_id.to_string();
-        let mut segments = vec![
-            "api",
-            "locations",
-            &location_id,
-            "targets",
-            target,
-            "metadata",
-        ];
-        segments.extend(read);
+        let mut segments = vec!["api", "locations", &location_id];
+        segments.extend(path);
         let endpoint = self.connection.endpoint(&segments)?;
         client_response(self.connection.client.post(endpoint).json(body)).await
     }

@@ -51,6 +51,7 @@ from sqlbuild.adapter.contract.constants import (
     QUALIFIED_NAME_SEPARATOR,
 )
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
+from sqlbuild.adapter.contract.main.estimates_by_name import estimates_by_name
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
@@ -2445,19 +2446,19 @@ class PostgresAdapter(
         if not names:
             return ()
         listed: str = ", ".join(_quote_sql_string(name) for name in names)
-        rows: list[tuple[Any, ...]] = self.execute(
-            connection=connection,
-            sql=(
-                "SELECT relation.relname, relation.relkind, relation.reltuples, "
-                "pg_relation_size(relation.oid) FROM pg_class AS relation "
-                "JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace "
-                f"WHERE namespace.nspname = {_quote_sql_string(schema)} "
-                f"AND relation.relname IN ({listed})"
-            ),
-        ).fetchall()
-        by_name: dict[str, tuple[Any, ...]] = {str(row[0]): tuple(row[1:]) for row in rows}
-        return tuple(
-            self._row_count_estimate(row=by_name.get(name), metadata_only=True) for name in names
+        return estimates_by_name(
+            rows=self.execute(
+                connection=connection,
+                sql=(
+                    "SELECT relation.relname, relation.relkind, relation.reltuples, "
+                    "pg_relation_size(relation.oid) FROM pg_class AS relation "
+                    "JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace "
+                    f"WHERE namespace.nspname = {_quote_sql_string(schema)} "
+                    f"AND relation.relname IN ({listed})"
+                ),
+            ).fetchall(),
+            names=names,
+            estimate=lambda row: self._row_count_estimate(row=row, metadata_only=True),
         )
 
     @staticmethod

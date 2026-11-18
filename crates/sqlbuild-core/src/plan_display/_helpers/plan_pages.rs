@@ -106,6 +106,13 @@ impl<'document> PlanRows<'document> {
             .unwrap_or_default()
     }
 
+    /// The rows of the document's `field` list that `keep` accepts, in order.
+    fn kept(&self, field: &str, keep: impl Fn(&Value) -> bool) -> Vec<&'document Value> {
+        let mut rows: Vec<&'document Value> = self.list(field);
+        rows.retain(|row| keep(row));
+        rows
+    }
+
     fn changed_list(&self, field: &str) -> Vec<&'document Value> {
         self.document
             .get("changed")
@@ -121,48 +128,29 @@ impl<'document> PlanRows<'document> {
     }
 
     fn models(&self, section: PlanPageSection) -> Vec<&'document Value> {
-        let mut rows: Vec<&Value> = Vec::new();
-        for model in self.list("models") {
-            if text(model, "action") != SKIP_ACTION
+        self.kept("models", |model| {
+            text(model, "action") != SKIP_ACTION
                 && self.runs_node(&node_key("model", model))
                 && model_section(model) == section
-            {
-                rows.push(model);
-            }
-        }
-        rows
+        })
     }
 
     fn loads(&self, kind: &str, reload: bool) -> Vec<&'document Value> {
-        let mut rows: Vec<&Value> = Vec::new();
-        for load in self.list("source_loads") {
+        self.kept("source_loads", |load| {
             let reloads = load.get("is_reload").and_then(Value::as_bool) == Some(true);
-            if text(load, "kind") == kind && reloads == reload {
-                rows.push(load);
-            }
-        }
-        rows
+            text(load, "kind") == kind && reloads == reload
+        })
     }
 
     fn functions(&self, changed: bool) -> Vec<&'document Value> {
-        let mut rows: Vec<&Value> = Vec::new();
-        for function in self.list("functions") {
+        self.kept("functions", |function| {
             let reason = text(function, "reason");
-            if (!reason.is_empty() && reason != NO_CHANGE_REASON) == changed {
-                rows.push(function);
-            }
-        }
-        rows
+            (!reason.is_empty() && reason != NO_CHANGE_REASON) == changed
+        })
     }
 
     fn seeds(&self) -> Vec<&'document Value> {
-        let mut rows: Vec<&Value> = Vec::new();
-        for seed in self.list("seeds") {
-            if self.runs_node(&node_key("seed", seed)) {
-                rows.push(seed);
-            }
-        }
-        rows
+        self.kept("seeds", |seed| self.runs_node(&node_key("seed", seed)))
     }
 
     /// The `--changed` run of a model or seed row.
@@ -237,34 +225,27 @@ impl<'document> PlanRows<'document> {
 
 /// A model row's changed functions, and whether its query diff changes only whitespace.
 fn model_notes(row: &Value) -> Vec<Note> {
-    let mut notes: Vec<Note> = Vec::new();
-    for function in row
-        .get("changed_functions")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-    {
-        notes.push(("changed_function", Some(function.to_owned())));
-    }
+    let mut notes: Vec<Note> = listed_notes(row, ("changed_functions", "changed_function"));
     if query_stats(row).is_some_and(|stats| stats.whitespace_only) {
         notes.push(("query_whitespace_only", None));
     }
     notes
 }
 
-/// What refreshes a held-back node: the jobs it waits for, or the held-back node it reads.
-fn held_back_notes(row: &Value) -> Vec<Note> {
-    let mut notes: Vec<Note> = Vec::new();
-    for job in row
-        .get("refreshed_by")
+/// One `note` per text in the row's `field` array.
+fn listed_notes(row: &Value, (field, note): (&str, &'static str)) -> Vec<Note> {
+    row.get(field)
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .filter_map(Value::as_str)
-    {
-        notes.push(("refreshed_by", Some(job.to_owned())));
-    }
+        .map(|item| (note, Some(item.to_owned())))
+        .collect()
+}
+
+/// What refreshes a held-back node: the jobs it waits for, or the held-back node it reads.
+fn held_back_notes(row: &Value) -> Vec<Note> {
+    let mut notes: Vec<Note> = listed_notes(row, ("refreshed_by", "refreshed_by"));
     if let Some(node) = row.get("reads").and_then(Value::as_str) {
         notes.push(("reads_held_back", Some(key_name(node).to_owned())));
     }

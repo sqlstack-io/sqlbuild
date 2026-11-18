@@ -5,12 +5,12 @@ use crate::build_progress::_helpers::rows::{
     TopLevelRow, event_blocks, prefix_width, top_level_line,
 };
 use crate::build_progress::_helpers::text::{
-    counter_text, execution_status_display, format_duration, group_thousands, skip_detail,
-    truncate_name,
+    counter_text, execution_status_display, format_duration, skip_detail, truncate_name,
 };
 use crate::build_progress::constants::{FAILED, SKIPPED};
 use crate::build_progress::models::{ErrorText, ProgressLayout, ResourceResult};
 use crate::cli_text::models::CliStyle;
+use crate::number_text::main::format_thousands::format_thousands;
 
 /// The row at `counter`, its log and SQL blocks, and its inline error.
 #[must_use]
@@ -51,7 +51,7 @@ pub fn render_resource_result(
             let detail: String = if load.status == SKIPPED {
                 skip_detail(&load.skip)
             } else {
-                format!("  rows={}", group_thousands(load.rows_loaded))
+                format!("  rows={}", format_thousands(i128::from(load.rows_loaded)))
             };
             let mut text: String = top_level_line(
                 &TopLevelRow {

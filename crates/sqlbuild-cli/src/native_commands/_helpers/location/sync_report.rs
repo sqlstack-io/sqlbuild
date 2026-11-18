@@ -1,6 +1,7 @@
 //! What a location's warehouse sync reports: its progress lines, health reports and page sizes.
 
 use chrono::{DateTime, Utc};
+use sqlbuild_core::number_text::main::format_thousands::format_thousands;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
     WarehouseSyncFailure, WarehouseSyncProgress,
@@ -61,15 +62,11 @@ pub(crate) fn sync_progress(state: &LocationMetadataSync, clean: bool) -> Wareho
 
 /// A row count with thousands separators, e.g. `31,204 rows`.
 pub(crate) fn rows_text(rows: u64) -> String {
-    let digits = rows.to_string();
-    let mut grouped = String::new();
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(digit);
-    }
-    format!("{grouped} {}", if rows == 1 { "row" } else { "rows" })
+    format!(
+        "{} {}",
+        format_thousands(i128::from(rows)),
+        if rows == 1 { "row" } else { "rows" }
+    )
 }
 
 /// When the next safety sync is due once this report's page completes the sync; `None` without a timed one.

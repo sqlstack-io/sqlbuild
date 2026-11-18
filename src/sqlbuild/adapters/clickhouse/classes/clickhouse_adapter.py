@@ -39,6 +39,7 @@ from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecord
 from sqlbuild.adapter.contract.classes.unkeyed_diff import UnkeyedDiffMixin
 from sqlbuild.adapter.contract.constants import DIFF_LEFT_SIDE, DIFF_RIGHT_SIDE
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
+from sqlbuild.adapter.contract.main.estimates_by_name import estimates_by_name
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
@@ -505,15 +506,15 @@ class ClickHouseAdapter(
         del database
         if not names:
             return ()
-        rows: list[Any] = self.execute(
-            connection=connection,
-            sql="SELECT name, engine, total_rows, total_bytes FROM system.tables WHERE "
-            + _database_filter(schema)
-            + f" AND name IN ({', '.join(quote_string(name) for name in names)})",
-        ).fetchall()
-        by_name: dict[str, tuple[Any, ...]] = {str(row[0]): tuple(row[1:]) for row in rows}
-        return tuple(
-            _row_count_estimate(row=by_name.get(name), metadata_only=True) for name in names
+        return estimates_by_name(
+            rows=self.execute(
+                connection=connection,
+                sql="SELECT name, engine, total_rows, total_bytes FROM system.tables WHERE "
+                + _database_filter(schema)
+                + f" AND name IN ({', '.join(quote_string(name) for name in names)})",
+            ).fetchall(),
+            names=names,
+            estimate=lambda row: _row_count_estimate(row=row, metadata_only=True),
         )
 
     def read_view_definition(

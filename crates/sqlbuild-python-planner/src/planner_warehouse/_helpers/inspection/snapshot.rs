@@ -8,11 +8,11 @@ use crate::planner_warehouse::constants::{
 use crate::planner_warehouse::models::FingerprintRead;
 use crate::planner_warehouse::models::PlannerReads;
 use crate::planner_warehouse::models::SnapshotRequest;
+use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
-use pyo3::IntoPyObjectExt;
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_MODEL;
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_SEED;
 use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;

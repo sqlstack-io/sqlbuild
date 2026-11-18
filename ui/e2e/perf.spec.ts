@@ -28,7 +28,9 @@ test('Checks opens again quickly from the sidebar with thousands of checks', asy
 	await settle(page);
 	// The first visit loads the list; the second took 12–19 s on a large project when filter options
 	// were counted by filtering the whole list once per option.
-	expect(await openChecks(), 'ms for the second visit to Checks to settle').toBeLessThan(2000);
+	const second = await openChecks();
+	console.info(`Checks, second visit: ${second} ms`);
+	expect(second, 'ms for the second visit to Checks to settle').toBeLessThan(2000);
 });
 
 // Panning and zooming a graph on a slow computer (the CPU slowed 6×): every gesture runs as a
