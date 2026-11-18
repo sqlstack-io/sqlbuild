@@ -81,7 +81,7 @@ fn marker_call<'source>(identifier: &Identifier, map: &SourceMap<'source>) -> Op
 
 fn literal_type(literal: &Literal) -> &'static str {
     match literal {
-        Literal::String(_) => "string",
+        Literal::String(_) | Literal::JoinedString(_, _) => "string",
         Literal::Number(_) => "number",
         Literal::HexString(_) => "hex_string",
         Literal::HexNumber(_) => "hex_number",
