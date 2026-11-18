@@ -100,8 +100,8 @@ selection.
 
 ### Settings when a build names a job
 
-A build or plan whose selection names a job, as `job:nightly_orders_job` or the bare name, takes the
-job's `[settings]`. Selecting the same nodes some other way, such as by tag, takes none of them.
+A build or plan whose selection names a job, as `job:nightly_orders_job`, the bare name or a
+`job:` pattern such as `job:nightly_*`, takes the job's `[settings]`. Selecting the same nodes some other way, such as by tag, takes none of them.
 Naming a group names each of its jobs. The first value set wins:
 
 1. A flag on the command line, such as `--vars` or `--concurrency`
