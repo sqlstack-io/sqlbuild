@@ -1,0 +1,255 @@
+"""Every build records its start and end in the target's runs table, and a failed write never fails it."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from sqlbuild._native import run_cli as main
+from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
+    KilledRunRecordTestCase,
+    RunRecordFailureTestCase,
+    RunRecordTestCase,
+    SeedRunRecordTestCase,
+)
+from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
+    RUN_RECORD_COLUMNS,
+    built_tables,
+    prepare_warehouse,
+    run_rows,
+    write_run_record_project,
+)
+
+_SUCCEEDED_TWO: str = '{"succeeded":2,"warned":0,"failed":0,"skipped":0,"not_started":0}'
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RunRecordTestCase(
+            description="a job build records its selection, the job and only the names of its vars",
+            build_args=(
+                "--select",
+                "job:nightly_job",
+                "--vars",
+                '{"api_token": "s3cret-value", "batch": 2}',
+            ),
+            expected_exit_code=0,
+            expected_rows=[
+                (
+                    "started",
+                    "build",
+                    '["job:nightly_job"]',
+                    '["nightly_job"]',
+                    '["api_token","batch"]',
+                    None,
+                    None,
+                ),
+                (
+                    "finished",
+                    "build",
+                    '["job:nightly_job"]',
+                    '["nightly_job"]',
+                    '["api_token","batch"]',
+                    "succeeded",
+                    _SUCCEEDED_TWO,
+                ),
+            ],
+        ),
+        RunRecordTestCase(
+            description="a bare job name counts as a named job",
+            build_args=("--select", "nightly_job"),
+            expected_exit_code=0,
+            expected_rows=[
+                ("started", "build", '["nightly_job"]', '["nightly_job"]', "[]", None, None),
+                (
+                    "finished",
+                    "build",
+                    '["nightly_job"]',
+                    '["nightly_job"]',
+                    "[]",
+                    "succeeded",
+                    _SUCCEEDED_TWO,
+                ),
+            ],
+        ),
+        RunRecordTestCase(
+            description="a failing model beside successes finishes partial",
+            build_args=("--select", "stg_orders", "broken_orders"),
+            expected_exit_code=1,
+            expected_rows=[
+                ("started", "build", '["stg_orders","broken_orders"]', "[]", "[]", None, None),
+                (
+                    "finished",
+                    "build",
+                    '["stg_orders","broken_orders"]',
+                    "[]",
+                    "[]",
+                    "partial",
+                    '{"succeeded":1,"warned":0,"failed":1,"skipped":0,"not_started":0}',
+                ),
+            ],
+        ),
+        RunRecordTestCase(
+            description="a project that turns off the host leaves it out",
+            build_args=("--select", "stg_orders"),
+            expected_exit_code=0,
+            expected_rows=[
+                ("started", "build", '["stg_orders"]', "[]", "[]", None, None),
+                (
+                    "finished",
+                    "build",
+                    '["stg_orders"]',
+                    "[]",
+                    "[]",
+                    "succeeded",
+                    '{"succeeded":1,"warned":0,"failed":0,"skipped":0,"not_started":0}',
+                ),
+            ],
+            settings="\n[settings]\nrecord_run_host = false\n",
+            expected_host_recorded=False,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_build_when_it_runs_then_it_records_its_start_and_end(
+    test_case: RunRecordTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_run_record_project(project_dir=tmp_path, settings=test_case.settings)
+
+    exit_code: int = main(
+        ["--project-dir", str(tmp_path), "--no-color", "build", "--no-tests", *test_case.build_args]
+    )
+    captured: str = "".join(capsys.readouterr())
+
+    assert exit_code == test_case.expected_exit_code, captured
+    assert run_rows(project_dir=tmp_path, columns=RUN_RECORD_COLUMNS) == test_case.expected_rows
+    identities: list[tuple[object, ...]] = run_rows(
+        project_dir=tmp_path,
+        columns="run_id, attempt, retry_of_run_id, orchestration_run_id, target_name, "
+        "warehouse_user, os_user IS NOT NULL, host IS NOT NULL, sqlbuild_version IS NOT NULL",
+    )
+    assert len({identity[0] for identity in identities}) == 1
+    assert {identity[1:] for identity in identities} == {
+        (1, None, None, "dev", None, True, test_case.expected_host_recorded, True)
+    }
+    assert "s3cret-value" not in str(run_rows(project_dir=tmp_path, columns="*"))
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SeedRunRecordTestCase(
+            description="a seed run records its start and end like a build",
+            expected_rows=[
+                ("started", "seed", "[]", "[]", "[]", None, None),
+                (
+                    "finished",
+                    "seed",
+                    "[]",
+                    "[]",
+                    "[]",
+                    "succeeded",
+                    '{"succeeded":1,"warned":0,"failed":0,"skipped":0,"not_started":0}',
+                ),
+            ],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_seed_run_when_it_loads_then_it_records_its_start_and_end(
+    test_case: SeedRunRecordTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_run_record_project(project_dir=tmp_path, settings="")
+    (tmp_path / "seeds").mkdir()
+    (tmp_path / "seeds" / "regions.csv").write_text("region_id\n1\n", encoding="utf-8")
+    (tmp_path / "seeds" / "regions.yml").write_text(
+        "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
+        "      - name: region_id\n        type: INTEGER\n",
+        encoding="utf-8",
+    )
+
+    exit_code: int = main(["--project-dir", str(tmp_path), "--no-color", "seed"])
+    captured: str = "".join(capsys.readouterr())
+
+    assert exit_code == 0, captured
+    assert run_rows(project_dir=tmp_path, columns=RUN_RECORD_COLUMNS) == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RunRecordFailureTestCase(
+            description="a view in the table's place makes every write fail; the build still succeeds",
+            warehouse_setup="CREATE VIEW main._sqlbuild_runs AS SELECT 1 AS run_id",
+            expected_exit_code=0,
+            expected_warning="Warning: could not record that run",
+            expected_tables=frozenset({"stg_orders"}),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_unwritable_runs_table_when_building_then_it_warns_and_succeeds(
+    test_case: RunRecordFailureTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_run_record_project(project_dir=tmp_path, settings="")
+    prepare_warehouse(project_dir=tmp_path, sql=test_case.warehouse_setup)
+
+    exit_code: int = main(
+        ["--project-dir", str(tmp_path), "--no-color", "build", "--no-tests", "-s", "stg_orders"]
+    )
+    captured: str = "".join(capsys.readouterr())
+
+    assert exit_code == test_case.expected_exit_code, captured
+    assert captured.count(test_case.expected_warning) == 2, captured
+    assert built_tables(project_dir=tmp_path) == test_case.expected_tables
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        KilledRunRecordTestCase(
+            description="a build killed mid-run leaves only its started row",
+            expected_phases=["started"],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_killed_build_when_reading_its_runs_then_only_started_remains(
+    test_case: KilledRunRecordTestCase,
+    tmp_path: Path,
+) -> None:
+    write_run_record_project(project_dir=tmp_path, settings="")
+
+    completed: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "--project-dir",
+            str(tmp_path),
+            "--no-color",
+            "build",
+            "--no-tests",
+            "--select",
+            "task:crash",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env={**os.environ, "NO_COLOR": "1"},
+        check=False,
+    )
+
+    assert completed.returncode == 137, completed.stdout + completed.stderr
+    assert [row[0] for row in run_rows(project_dir=tmp_path, columns="phase")] == (
+        test_case.expected_phases
+    )

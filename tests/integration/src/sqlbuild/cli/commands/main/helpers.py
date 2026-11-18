@@ -1373,3 +1373,77 @@ def write_python_rules_project(*, project_dir: Path, fixture: str, rules_toml: s
             "models/orders.sql": 'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
         },
     )
+
+
+RUN_RECORD_COLUMNS: str = (
+    "phase, command, select_json, named_jobs_json, var_keys_json, status, node_counts_json"
+)
+
+RUN_RECORD_PROJECT_FILES: dict[str, str] = {
+    "models/stg_orders.sql": (
+        "MODEL (description 'Staged orders.', materialized table);\nSELECT 1 AS order_id\n"
+    ),
+    "models/orders.sql": (
+        "MODEL (description 'Orders.', materialized table);\n"
+        'SELECT order_id FROM __ref("stg_orders")\n'
+    ),
+    "models/broken_orders.sql": (
+        "MODEL (description 'Fails at run time.', materialized table);\n"
+        "SELECT CAST('x' AS INTEGER) AS order_id\n"
+    ),
+    "orchestration/jobs/nightly_job.toml": (
+        'name = "nightly_job"\ndescription = "Orders."\nselect = "+orders"\n'
+    ),
+    "python/crash.py": (
+        '"""A task that kills its process, as a crash or kill -9 would."""\n\n'
+        "import os\n\n"
+        "from sqlbuild.tasks import task\n\n\n"
+        "@task()\n"
+        "def crash(ctx):\n"
+        '    """End the process without unwinding."""\n\n'
+        "    os._exit(137)\n"
+    ),
+}
+
+
+def write_run_record_project(*, project_dir: Path, settings: str) -> None:
+    """Write the project, with `settings` appended to the project file."""
+
+    files: dict[str, str] = {
+        **RUN_RECORD_PROJECT_FILES,
+        "sqlbuild_project.toml": (
+            'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+            '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n' + settings
+        ),
+    }
+    for relative_path, contents in files.items():
+        destination: Path = project_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(contents, encoding="utf-8")
+
+
+def run_rows(*, project_dir: Path, columns: str) -> list[tuple[object, ...]]:
+    """`columns` of every runs-table row, oldest first."""
+
+    with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
+        return warehouse.sql(
+            f"SELECT {columns} FROM main._sqlbuild_runs ORDER BY recorded_at, phase DESC"
+        ).fetchall()
+
+
+def built_tables(*, project_dir: Path) -> frozenset[str]:
+    """The project's own tables in the warehouse, without SQLBuild's state tables."""
+
+    with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
+        rows: list[tuple[str]] = warehouse.sql(
+            "SELECT table_name FROM duckdb_tables() "
+            "WHERE NOT internal AND NOT starts_with(table_name, '_sqlbuild')"
+        ).fetchall()
+    return frozenset(name for (name,) in rows)
+
+
+def prepare_warehouse(*, project_dir: Path, sql: str) -> None:
+    """Run `sql` in the project's warehouse before the build."""
+
+    with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
+        warehouse.execute(sql)
