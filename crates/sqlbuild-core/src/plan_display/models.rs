@@ -94,10 +94,3 @@ pub struct DiffStats {
     /// The removed and added lines read the same with every whitespace character taken out.
     pub whitespace_only: bool,
 }
-
-/// A planned model's diff text, as `sqb plan` prints it.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct PlanModelDiff {
-    pub query_diff: Option<Vec<String>>,
-    pub config_diff: Option<Vec<String>>,
-}

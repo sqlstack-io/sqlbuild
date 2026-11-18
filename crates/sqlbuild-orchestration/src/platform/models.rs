@@ -270,7 +270,7 @@ pub enum LocationWorkOutcome {
     Plan {
         #[schema(value_type = Object)]
         document: serde_json::Value,
-        /// Model diff text the document left out to stay under its cap; stored apart, never read back here.
+        /// Model diff text, which the document never carries; stored apart, never read back here.
         #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
         diffs: std::collections::BTreeMap<String, PlanModelDiff>,
     },
@@ -732,7 +732,7 @@ pub struct PlanDiffQuery {
     pub model: String,
 }
 
-/// A planned model's diff text, from the plan document or, where the document left it out, apart from it.
+/// A planned model's diff text, stored beside its plan document.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlanDiffRead {
