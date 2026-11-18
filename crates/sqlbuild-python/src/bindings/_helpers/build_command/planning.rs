@@ -1,6 +1,10 @@
 //! Compile the build plan, show it, gate it and write the compile target.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyDictMethods, PyErr, PyResult, Python};
+use pyo3::types::PyDict;
+use sqlbuild_config::command_connection::constants::{
+    CONNECTION_SOURCE_KEY, DBT_PROFILE_CONNECTION_SOURCE,
+};
 use sqlbuild_core::build_command::constants::{
     EXECUTION_LIMIT_BUILD_NOTE, MISSING_ORIGIN_BUILD_HELP, RETENTION_DECREASE_BUILD_HELP,
     SNAPSHOT_FULL_REFRESH_BUILD_HELP, TABLE_TYPE_DOWNGRADE_BUILD_HELP,
@@ -13,7 +17,7 @@ use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::policies::enforce_plan_policies;
 use crate::bindings::_helpers::build_command::policies::model_limit;
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
+use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -27,6 +31,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::manifest::main::build_manifest::build_manifest;
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_output::build_progress::main::with_verbose_inspection::with_verbose_inspection;
 use sqlbuild_python_planner::plan_output::main::format_plan::format_plan;
 
@@ -128,20 +133,48 @@ pub(crate) fn compile_build_plan<'py>(context: &BuildContext<'py>) -> PyResult<B
         ],
     )?;
     let verbose: bool = native_field(&context.request, "verbose")?.is_truthy()?;
+    let options: Bound<'py, PyAny> = request_options(context)?;
+    let held: Option<Bound<'py, PyAny>> = held_compile(context, &options)?;
     with_verbose_inspection(py, verbose, || {
-        run_compile_pipeline(
-            py,
-            Some(keywords(
-                py,
-                &[
-                    ("discovered_inputs", context.get("discovered_inputs")?),
-                    ("adapter", context.get("adapter")?),
-                    ("options", request_options(context)?),
-                    ("hooks", hooks),
-                ],
-            )?),
+        planned_project(
+            (&context.get("discovered_inputs")?, &context.get("adapter")?),
+            (&options, hooks),
+            (held.as_ref(), None),
         )
     })
+}
+
+/// The compile a worker verified, when compiling again could not differ: no run variables, validation and cache on, no dbt.
+fn held_compile<'py>(
+    context: &BuildContext<'py>,
+    options: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let held: Bound<'py, PyAny> = native_field(&context.request, "compiled_project")?;
+    let discovered: Bound<'py, PyAny> = context.get("discovered_inputs")?;
+    let project_config: Bound<'py, PyAny> = native_field(&discovered, "project_config")?;
+    let dbt_manifest: Bound<'py, PyAny> =
+        native_field(&native_field(&project_config, "dbt")?, "target_path")?;
+    if held.is_none()
+        || native_field(options, "cli_vars")?.is_truthy()?
+        || native_field(options, "no_sql_validation")?.is_truthy()?
+        || native_field(options, "no_cache")?.is_truthy()?
+        || !dbt_manifest.is_none()
+    {
+        return Ok(None);
+    }
+    let connection: Bound<'py, PyDict> = build_effective_connection_config(
+        &discovered,
+        Some(native_field(options, "selected_target")?),
+        None,
+        false,
+    )?
+    .cast_into()?;
+    let from_dbt_profile: bool = connection
+        .get_item(CONNECTION_SOURCE_KEY)?
+        .map(|source| source.eq(DBT_PROFILE_CONNECTION_SOURCE))
+        .transpose()?
+        .unwrap_or(false);
+    Ok((!from_dbt_profile).then_some(held))
 }
 
 /// Write the formatted plan to stdout, or stderr for debug and JSON runs.

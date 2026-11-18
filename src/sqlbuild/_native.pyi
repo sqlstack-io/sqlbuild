@@ -6595,6 +6595,7 @@ class BuildCommandRequest(NativeRecord):
     selector_files: tuple[SelectorFileSummary, ...]
     test_timeout: str | None
     discovered_inputs: DiscoveredProjectInputs | None
+    compiled_project: object | None
     def __init__(
         self,
         project_dir: Path | None = None,
@@ -6637,6 +6638,7 @@ class BuildCommandRequest(NativeRecord):
         selector_files: tuple[SelectorFileSummary, ...] = (),
         test_timeout: str | None = None,
         discovered_inputs: DiscoveredProjectInputs | None = None,
+        compiled_project: object | None = None,
     ) -> None: ...
 
 class CloneCommandRequest(NativeRecord):
