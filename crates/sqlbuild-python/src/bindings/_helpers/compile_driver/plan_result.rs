@@ -10,6 +10,9 @@ use sqlbuild_python_compile::compile_driver::main::stages::resolve_deferred_targ
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_graph_from_compiled_project::build_project_graph_from_compiled_project;
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_run_plan_outputs::build_python_run_plan_outputs;
 use sqlbuild_python_compile::compile_driver::main::setup::python_read_source_names_for::python_read_source_names_for;
+use crate::bindings::_helpers::compile_driver::job_node_settings::{
+    PlannedJobSettings, planned_job_settings,
+};
 use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -155,20 +158,25 @@ pub(crate) fn pipeline_result<'py>(
             ("sql_test_selection", sql_test_selection),
         ],
     )?;
-    let overrides: Bound<'py, PyAny> = new_record_with(
-        py,
-        RecordId::PlannerOverrides,
-        &option_fields(
-            options,
-            &[
-                "cursor_overrides",
-                "full_refresh",
-                "reload_sources",
-                "max_microbatches",
-                "concurrency",
-            ],
-        )?,
+    let job_settings: Option<PlannedJobSettings> = planned_job_settings(project, options)?;
+    let mut override_fields: Vec<(&str, Bound<'py, PyAny>)> = option_fields(
+        options,
+        &[
+            "cursor_overrides",
+            "full_refresh",
+            "reload_sources",
+            "max_microbatches",
+            "concurrency",
+        ],
     )?;
+    if let Some(job_settings) = &job_settings {
+        override_fields.push((
+            "full_refresh_models",
+            job_settings.full_refresh_models(py)?.into_any(),
+        ));
+    }
+    let overrides: Bound<'py, PyAny> =
+        new_record_with(py, RecordId::PlannerOverrides, &override_fields)?;
     let mut deferral_fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
         ("deferred_locations", deferred_locations),
         ("deferred_relations", deferred_relations),
@@ -218,6 +226,21 @@ pub(crate) fn pipeline_result<'py>(
             ],
         )?),
     )?;
+    let mut job_fields: Vec<(&str, Bound<'py, PyAny>)> = Vec::new();
+    let plan_output: Bound<'py, PyAny> = match &job_settings {
+        Some(job_settings) => {
+            let plan_output: Bound<'py, PyAny> = job_settings.apply_to_plan(
+                &plan_output,
+                &native_field(options, "cli_ignore_audit_failures")?,
+            )?;
+            let (limits, node_jobs) =
+                job_settings.job_limits(&plan_output, &native_field(options, "concurrency")?)?;
+            job_fields.push(("job_limits", limits.into_any()));
+            job_fields.push(("node_jobs", node_jobs.into_any()));
+            plan_output
+        }
+        None => plan_output,
+    };
     let custom_materializations: Bound<'py, PyAny> =
         host_entry(py, UserCodeHost::LoadCustomMaterializations)?
             .call1((native_field(discovered, "materialization_files")?,))?;
@@ -233,23 +256,21 @@ pub(crate) fn pipeline_result<'py>(
             ],
         )?),
     )?;
-    new_record_with(
-        py,
-        RecordId::CompilePipelineResult,
-        &[
-            ("project", project.clone()),
-            ("plan_output", native_field(&python_outputs, "plan_output")?),
-            ("custom_materializations", custom_materializations),
-            (
-                "python_node_names",
-                native_field(&python_outputs, "selected_python_node_names")?,
-            ),
-            (
-                "python_plan_entries",
-                native_field(&python_outputs, "python_plan_entries")?,
-            ),
-        ],
-    )
+    let mut result_fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
+        ("project", project.clone()),
+        ("plan_output", native_field(&python_outputs, "plan_output")?),
+        ("custom_materializations", custom_materializations),
+        (
+            "python_node_names",
+            native_field(&python_outputs, "selected_python_node_names")?,
+        ),
+        (
+            "python_plan_entries",
+            native_field(&python_outputs, "python_plan_entries")?,
+        ),
+    ];
+    result_fields.extend(job_fields);
+    new_record_with(py, RecordId::CompilePipelineResult, &result_fields)
 }
 
 /// `(name, options.name)` for each of `names`.

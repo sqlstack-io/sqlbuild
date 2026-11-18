@@ -5,6 +5,7 @@ pub mod entry_schema_fact;
 pub mod family_fact;
 pub mod graph_with_jobs;
 pub mod install;
+pub mod job_declarations;
 pub mod job_names;
 pub mod materialization;
 pub mod model_facts;

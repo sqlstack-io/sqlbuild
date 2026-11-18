@@ -135,6 +135,7 @@ pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 193] = [
     ("no_color", NamespaceDefault::Bool(false)),
     ("fail_fast", NamespaceDefault::Bool(false)),
     ("full_refresh", NamespaceDefault::Bool(false)),
+    ("job_settings", NamespaceDefault::Bool(true)),
     ("changed", NamespaceDefault::Bool(false)),
     ("changed_counts", NamespaceDefault::None),
     ("reach", NamespaceDefault::None),

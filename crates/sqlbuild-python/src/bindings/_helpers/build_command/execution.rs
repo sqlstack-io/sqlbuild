@@ -255,7 +255,7 @@ pub(crate) fn prepare_build_execution<'py>(
     })
     .and_then(|value| pyo3::Bound::new(py, value))
     .map(pyo3::Bound::into_any)?;
-    let concurrency = context.concurrency()?.limit;
+    let concurrency = connection_limit(context.concurrency()?.limit, pipeline)?;
     if context.verbose {
         write_run_context(context, pipeline)?;
     } else {
@@ -308,6 +308,28 @@ pub(crate) fn prepare_build_execution<'py>(
         lifecycle,
         cursors,
     })
+}
+
+/// The build's connections: its limit, or no more than its named jobs' limits add up to when each
+/// planned node belongs to a limited job, so a small job never opens connections it cannot use.
+fn connection_limit(limit: i64, pipeline: &Bound<'_, PyAny>) -> PyResult<i64> {
+    let limits: Bound<'_, PyAny> = native_field(pipeline, "job_limits")?;
+    if !limits.is_truthy()? {
+        return Ok(limit);
+    }
+    let node_jobs: Bound<'_, PyAny> = native_field(pipeline, "node_jobs")?;
+    for key in
+        native_field(&native_field(pipeline, "plan_output")?, "execution_order")?.try_iter()?
+    {
+        if !node_jobs.contains(key?)? {
+            return Ok(limit);
+        }
+    }
+    let mut total: i64 = 0;
+    for value in limits.call_method0("values")?.try_iter()? {
+        total = total.saturating_add(value?.extract::<i64>()?);
+    }
+    Ok(limit.min(total.max(1)))
 }
 
 fn verbose_callback<'py>(
@@ -375,6 +397,8 @@ pub(crate) fn execute_build_plan<'py>(
                 ("end_cursor_int", end_int.clone()),
                 ("use_color", boolean(py, context.use_color)),
                 ("providers", providers.clone()),
+                ("job_limits", native_field(pipeline, "job_limits")?),
+                ("node_jobs", native_field(pipeline, "node_jobs")?),
                 (
                     "test_timeouts",
                     timeout_record(

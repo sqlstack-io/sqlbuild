@@ -4,12 +4,15 @@ use crate::planner_phases::_helpers::timing::timings::STEPS;
 use crate::planner_phases::_helpers::timing::timings::timings_of;
 use crate::planner_phases::constants::MILLISECONDS;
 use crate::planner_phases::constants::PERCENT;
+use crate::planner_phases::constants::{FULL_REFRESH_KEY, FULL_REFRESH_MODELS_KEY};
 use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, Py, PyAny};
+use pyo3::prelude::{PyAnyMethods, PyResult};
 use pyo3::pyclass;
 use serde_json::{Value, json};
 use sqlbuild_python_base::native_host::models::Dialect;
-use std::collections::BTreeMap;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use std::collections::{BTreeMap, HashSet};
 use std::time::Instant;
 
 /// The plan output's fields and metadata entries, each set before the output is built.
@@ -196,5 +199,31 @@ impl PlanTimings {
                 .collect::<Vec<Value>>(),
             "planned_from": planned_from,
         })
+    }
+}
+
+/// Which models the invocation asks to rebuild from scratch: every model with `--full-refresh`, or
+/// the models of the named jobs that set `full_refresh`.
+#[derive(Clone, Debug, Default)]
+pub struct FullRefreshRequest {
+    pub all: bool,
+    pub models: HashSet<String>,
+}
+
+impl FullRefreshRequest {
+    /// The request of planner overrides' `full_refresh` and `full_refresh_models`.
+    pub fn of(overrides: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self {
+            all: native_field(overrides, FULL_REFRESH_KEY)?.is_truthy()?,
+            models: native_field(overrides, FULL_REFRESH_MODELS_KEY)?
+                .try_iter()?
+                .map(|name| name?.extract())
+                .collect::<PyResult<_>>()?,
+        })
+    }
+
+    /// Whether the invocation asks to rebuild `model` from scratch.
+    pub fn applies(&self, model: &str) -> bool {
+        self.all || self.models.contains(model)
     }
 }
