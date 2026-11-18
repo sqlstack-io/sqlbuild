@@ -19,6 +19,7 @@ Online: https://sqlbuild.com/docs/cli/build/
 - Failure behavior
 - Limits
 - Fingerprints
+- Run records
 - Runtime artifacts
 
 Compiles, plans, and executes the selected build lifecycle, running the full selected scope. Use
@@ -341,6 +342,21 @@ After a timeout, SQLBuild checks the connection and replaces it if it is no long
 ## Fingerprints
 
 After a successful build, SQLBuild writes version identities to `_sqlbuild_fingerprints` in the target schema. These are used on subsequent runs to detect changes and skip unchanged work. A build writes a row only for a resource whose identity differs from its latest row, so a build that changes no definitions writes none. In a project with model migration history, every build writes a row for each resource it builds. See [Planning and Change Detection](../concepts/planning.md) for details.
+
+## Run records
+
+Every build that runs nodes, and every `sqb seed`, appends a `started` row to `_sqlbuild_runs` in
+the target schema before its first node runs, and a `finished` row with its status and node counts
+when it ends. A run with only a `started` row was killed or crashed. A synced code location shows
+runs it did not start from these rows.
+
+Each row records the command, its selection as typed, the jobs it names, the target, the
+warehouse user, the `sqb login` identity if you're signed in, the operating-system user, the
+machine name, the SQLBuild version and the Git commit. Of `--vars` it records only the names,
+never the values. Set `[settings] record_run_host = false` to leave out the machine name.
+
+Recording a run never fails the build: if a row can't be written, the build prints a warning and
+carries on.
 
 ## Runtime artifacts
 

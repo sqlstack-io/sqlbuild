@@ -35,6 +35,7 @@ use sqlbuild_orchestration::runs::models::NodeOutcome;
 use sqlbuild_orchestration::runs::models::RunChange;
 use sqlbuild_orchestration::runs::models::RunCommand;
 use sqlbuild_orchestration::runs::models::RunExecution;
+use sqlbuild_orchestration::runs::models::RunOrigin;
 use sqlbuild_orchestration::runs::models::RunOutcome;
 use sqlbuild_orchestration::snapshots::main::publication::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
@@ -43,6 +44,11 @@ use sqlbuild_orchestration::worker::errors::WorkerError;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_state::runs::constants::FIRST_ATTEMPT;
+use sqlbuild_state::runs::constants::SYSTEM_RETRY_USER;
+use sqlbuild_state::runs::constants::SYSTEM_SCHEDULE_USER;
+use sqlbuild_state::runs::constants::SYSTEM_SENSOR_USER;
+use sqlbuild_state::runs::models::ServerRun;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::VecDeque;
@@ -182,6 +188,29 @@ impl WorkerBuild {
     /// The server run this build executes.
     pub fn run_id(&self) -> uuid::Uuid {
         self.execution.claim.request.run_id
+    }
+
+    /// What the runs table records of the server run this build executes.
+    pub fn server_run(&self) -> ServerRun {
+        let request = &self.execution.claim.request;
+        let retry_of_run_id: Option<String> = request
+            .retry
+            .and(request.rerun_of_run_id)
+            .map(|run_id| run_id.to_string());
+        let sqlbuild_user: String = match (request.origin, request.retry) {
+            (_, Some(_)) => SYSTEM_RETRY_USER.to_owned(),
+            (RunOrigin::Schedule, None) => SYSTEM_SCHEDULE_USER.to_owned(),
+            (RunOrigin::Sensor, None) => SYSTEM_SENSOR_USER.to_owned(),
+            _ => request.requested_by.clone(),
+        };
+        ServerRun {
+            orchestration_run_id: request.run_id.to_string(),
+            sqlbuild_user,
+            attempt: request
+                .retry
+                .map_or(FIRST_ATTEMPT, |retry| i64::from(retry.attempt) + 1),
+            retry_of_run_id,
+        }
     }
 
     /// Keep the build's cost finalization to collect after the run's outcome is published.

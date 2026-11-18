@@ -14,6 +14,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
     SnowflakeStateTableFallbackTestCase,
     SnowflakeStateTableRetentionErrorTestCase,
     SnowflakeStateTableSchemaFallbackTestCase,
+    SnowflakeWarehouseUserTestCase,
 )
 from tests.unit.src.sqlbuild.adapters.snowflake.helpers import (
     CustomInitSnowflakeAdapter,
@@ -92,6 +93,12 @@ _STANDARD_EDITION_REJECTION: str = (
             description="microbatches",
             render_method="render_create_microbatch_state_table_sql",
             expected_prefix="CREATE TABLE IF NOT EXISTS analytics.marts._sqlbuild_microbatches (",
+            expected_suffix=") DATA_RETENTION_TIME_IN_DAYS = 90",
+        ),
+        SnowflakeStateTableDdlTestCase(
+            description="runs",
+            render_method="render_create_runs_table_sql",
+            expected_prefix="CREATE TABLE IF NOT EXISTS analytics.marts._sqlbuild_runs (",
             expected_suffix=") DATA_RETENTION_TIME_IN_DAYS = 90",
         ),
     ],
@@ -440,3 +447,19 @@ def test_given_one_schema_rejecting_90_days_when_creating_state_tables_then_othe
         )
         == test_case.expected_executed
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakeWarehouseUserTestCase(
+            description="the session's Snowflake user",
+            expected_expression="CURRENT_USER()",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_snowflake_session_when_recording_a_run_then_its_user_comes_from_the_warehouse(
+    test_case: SnowflakeWarehouseUserTestCase,
+) -> None:
+    assert SnowflakeAdapter().render_current_warehouse_user() == test_case.expected_expression

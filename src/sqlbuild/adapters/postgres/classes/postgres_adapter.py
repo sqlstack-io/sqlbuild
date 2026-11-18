@@ -1002,6 +1002,9 @@ class PostgresAdapter(
     def render_current_utc_timestamp(self) -> str:
         return "(now() AT TIME ZONE 'UTC')"
 
+    def render_current_warehouse_user(self) -> str | None:
+        return "CURRENT_USER"
+
     def create_table_as(
         self,
         *,

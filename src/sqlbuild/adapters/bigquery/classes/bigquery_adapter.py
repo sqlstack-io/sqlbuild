@@ -1083,6 +1083,9 @@ class BigQueryAdapter(
     def render_current_utc_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP()"
 
+    def render_current_warehouse_user(self) -> str | None:
+        return "SESSION_USER()"
+
     def render_loader_logical_type(
         self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
     ) -> str:

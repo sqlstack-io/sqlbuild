@@ -42,8 +42,10 @@ pub const JANITOR_EVENTS_TABLE_NAME: &str = "_sqlbuild_janitor_events";
 pub const OBSERVATIONS_TABLE_NAME: &str = "_sqlbuild_observations";
 /// State table of estimated query cost per run, resource and warehouse; display only.
 pub const RESOURCE_COSTS_TABLE_NAME: &str = "_sqlbuild_resource_costs";
+/// State table of each build's start and end, which shows runs the control plane did not start.
+pub const RUNS_TABLE_NAME: &str = "_sqlbuild_runs";
 /// Every state table SQLBuild writes in a target's state schema.
-pub const STATE_TABLE_NAMES: [&str; 12] = [
+pub const STATE_TABLE_NAMES: [&str; 13] = [
     FINGERPRINT_TABLE_NAME,
     MICROBATCH_TABLE_NAME,
     SOURCE_FRESHNESS_TABLE_NAME,
@@ -56,6 +58,7 @@ pub const STATE_TABLE_NAMES: [&str; 12] = [
     OLD_NAME_VIEW_TABLE_NAME,
     OBSERVATIONS_TABLE_NAME,
     RESOURCE_COSTS_TABLE_NAME,
+    RUNS_TABLE_NAME,
 ];
 /// A zero-length cursor duration.
 pub const ZERO_DAY_DURATION: &str = "0d";

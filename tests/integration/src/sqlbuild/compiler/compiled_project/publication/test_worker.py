@@ -793,6 +793,17 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
     "test_case",
     [
         WorkerExecutionTestCase(
+            "a scheduled run records itself in the runs table as the CLI does, with the server run",
+            "SELECT 5 AS amount",
+            "SELECT phase, command, orchestration_run_id IS NOT NULL, sqlbuild_user, attempt, "
+            "retry_of_run_id, status FROM main._sqlbuild_runs ORDER BY recorded_at, phase DESC",
+            "success",
+            [
+                ("started", "build", True, "system:schedule", 1, None, None),
+                ("finished", "build", True, "system:schedule", 1, None, "succeeded"),
+            ],
+        ),
+        WorkerExecutionTestCase(
             "successful model writes actual rows",
             "WITH source(value) AS (VALUES ('23')) SELECT CAST(value AS BIGINT) AS amount FROM source",
             "SELECT amount FROM orders",
