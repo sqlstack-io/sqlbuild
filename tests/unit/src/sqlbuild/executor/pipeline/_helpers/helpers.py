@@ -18,6 +18,7 @@ from sqlbuild._native import (
     CompiledResourceType,
     CompiledSqlScenario,
     CompilePipelineResult,
+    Dialect,
     DiscoveredSqlScenarioFile,
     FunctionArgument,
     FunctionPlanEntry,
@@ -197,11 +198,11 @@ class ScenarioPipelinePlanBuilder:
         *,
         scenario: CompiledSqlScenario,
         pipeline_result: CompilePipelineResult,
-        adapter: ScenarioPipelineTestAdapter,
+        dialect: Dialect,
         project_name: str,
         source_lexical_syntax: SqlLexicalSyntax,
     ) -> ScenarioExecutionPlan:
-        del pipeline_result, adapter, project_name, source_lexical_syntax
+        del pipeline_result, dialect, project_name, source_lexical_syntax
         strategy: Callable[..., ScenarioExecutionPlan] = {
             self.planning_failure_name: self._raise_planning_error,
         }.get(scenario.name, build_scenario_pipeline_plan)
