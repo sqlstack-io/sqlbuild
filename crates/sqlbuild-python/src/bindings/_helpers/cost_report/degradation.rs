@@ -14,7 +14,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::cost_report::attribution::report_cost_status;
 use crate::bindings::_helpers::cost_report::publication::publish_resource_costs;
-use crate::bindings::_helpers::cost_report::records::cost_run;
 use crate::bindings::_helpers::cost_report::store;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -22,6 +21,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cost_context::main::cost_aware::cost_aware;
+use sqlbuild_python_front::resource_costs::main::cost_run::cost_run;
 
 const LOGGER_NAME: &str = "sqlbuild.cli.commands._helpers.cost.collection";
 const COLLECTION_LOGGER_NAME: &str = "sqlbuild.cost";

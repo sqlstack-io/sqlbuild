@@ -11,8 +11,8 @@ use sqlbuild_state::resource_costs::constants::COLLECTION_FAILED_STATUS;
 use sqlbuild_state::resource_costs::main::refresh_candidates::refresh_candidates;
 use sqlbuild_state::resource_costs::models::RunCostAttempt;
 
-use crate::bindings::_helpers::cost_report::records::summary;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::resource_costs::main::summary::summary;
 use sqlbuild_python_front::resource_costs::models::CostRunIdentity;
 use sqlbuild_python_front::resource_costs::models::ResourceCostStore;
 
