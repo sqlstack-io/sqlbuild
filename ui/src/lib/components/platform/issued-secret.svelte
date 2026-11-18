@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { copyText } from '$lib/browser/clipboard';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 
@@ -8,8 +9,7 @@
 	let copied = $state(false);
 
 	async function copy() {
-		await navigator.clipboard.writeText(secret);
-		copied = true;
+		copied = await copyText(secret);
 	}
 </script>
 
