@@ -129,8 +129,8 @@ ProxyPassReverse "/" "http://127.0.0.1:8000/"
 - **Usernames are case-insensitive.** The server trims and lowercases the username, so `Admin` and
   `admin` are one person; your identity provider must treat them as the same account. A username
   must be 1 to 128 characters of `a`-`z`, `0`-`9`, `.`, `_`, `@`, `+` or `-`, starting with a
-  letter or digit. Keys under `[trusted_proxy.identities]` are lowercased too; before this release
-  they matched the header's exact text, so check that no two keys now differ only in case.
+  letter or digit. Keys under `[trusted_proxy.identities]` are lowercased too, so no two keys may
+  differ only in case.
 - **New people.** A provisioned person is named after their username, and an administrator grants
   more roles in the UI. A username that matches another principal's name in any case is refused
   rather than taken over; bind it under `[trusted_proxy.identities]` to sign that person in.

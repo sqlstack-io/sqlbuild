@@ -4,7 +4,9 @@ use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 
 use crate::helpers::{api_ready, start_control_in, wait_for_exit};
-use crate::test_types::{ProxyCliTestCase, ProxyStartupTestCase, ServerConfigurationTestCase};
+use crate::test_types::{
+    ProxyCliTestCase, ProxyRemotePeerTestCase, ProxyStartupTestCase, ServerConfigurationTestCase,
+};
 
 #[test]
 fn given_an_owner_configured_proxy_when_requests_carry_a_subject_then_only_explicit_people_resolve_without_sessions_or_machine_authority()
@@ -316,6 +318,86 @@ fn given_an_http_proxy_origin_and_an_unconfigured_proxy_address_when_requests_ar
                 ),
                 (
                     vec![StatusCode::UNAUTHORIZED; 2],
+                    test_case.expected_warnings,
+                    false
+                ),
+                "{}: {log}",
+                test_case.description
+            );
+            #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
+        });
+    }
+}
+
+#[test]
+fn given_the_default_trusted_peers_when_a_non_loopback_peer_sends_the_username_header_then_it_is_ignored_and_logged_once()
+ {
+    let test_cases = [ProxyRemotePeerTestCase {
+        description: "a request from another address of this machine is not from loopback",
+        configuration: "[trusted_proxy]\norigin = \"https://control.example.com\"\n",
+        username: "orders-remote-reader",
+        expected_status: StatusCode::UNAUTHORIZED,
+        expected_warnings: 1,
+    }];
+    // The address this machine routes from; connecting a UDP socket sends nothing.
+    let route = std::net::UdpSocket::bind("0.0.0.0:0").expect("UDP socket");
+    route.connect("192.0.2.1:9").expect("a non-loopback route");
+    let host = route.local_addr().expect("route address").ip().to_string();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let directory = tempfile::tempdir().expect("proxy installation");
+            std::fs::write(
+                directory.path().join("server.toml"),
+                test_case.configuration,
+            )
+            .expect("server configuration");
+            let mut control = start_control_in(
+                directory,
+                &[
+                    "server",
+                    "--host",
+                    &host,
+                    "--port",
+                    "0",
+                    "--no-scheduler",
+                    "--config",
+                    "server.toml",
+                ],
+            );
+            let url = api_ready(&mut control).await;
+            let client = Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .expect("HTTP client");
+            let mut statuses = Vec::new();
+            for _ in 0..2 {
+                let response = client
+                    .get(format!("{url}/api/control/bootstrap"))
+                    .header("x-forwarded-host", "control.example.com")
+                    .header("x-forwarded-for", "127.0.0.1")
+                    .header("x-sqb-user", test_case.username)
+                    .send()
+                    .await
+                    .expect("remote request");
+                statuses.push(response.status());
+            }
+            let log = std::fs::read_to_string(&control.stderr).expect("server log");
+            let warning = format!(
+                "warning: ignored the trusted-proxy username header x-sqb-user from {host}, which is not in [trusted_proxy] trusted_peers"
+            );
+            assert_eq!(
+                (
+                    statuses,
+                    log.matches(&warning).count(),
+                    log.contains(test_case.username)
+                ),
+                (
+                    vec![test_case.expected_status; 2],
                     test_case.expected_warnings,
                     false
                 ),
