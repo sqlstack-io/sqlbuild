@@ -274,7 +274,7 @@ fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are
             ],
             node_waits: vec!["load_job", "staging_job", "marts_job"],
             pooled: vec!["load_job", "marts_job"],
-            expected: Ok(vec![("marts_job", vec!["load_job"])]),
+            expected_outcome: Ok(vec![("marts_job", vec!["load_job"])]),
         },
         NodeWaitCycleTestCase {
             description: "pooled members whose nodes cross both ways cannot run one at a time",
@@ -282,7 +282,7 @@ fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are
             jobs: crossing_jobs.clone(),
             node_waits: vec!["a_job", "b_job", "c_job"],
             pooled: vec!["a_job", "c_job"],
-            expected: Err(
+            expected_outcome: Err(
                 "model:a_mart (a_job) waits for model:b_mart (b_job); model:b_mart (b_job) waits \
                  for model:c_root (c_job); model:c_root (c_job) waits for the end of job a_job; \
                  the end of job a_job waits for model:a_mart (a_job) (members that share a pool \
@@ -295,7 +295,7 @@ fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are
             jobs: crossing_jobs.clone(),
             node_waits: vec!["a_job", "b_job", "c_job"],
             pooled: vec![],
-            expected: Ok(vec![]),
+            expected_outcome: Ok(vec![]),
         },
         NodeWaitCycleTestCase {
             description: "the same group waiting for jobs is refused, naming the nodes",
@@ -303,7 +303,7 @@ fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are
             jobs: crossing_jobs.clone(),
             node_waits: vec![],
             pooled: vec![],
-            expected: Err(
+            expected_outcome: Err(
                 "a_job waits for b_job (model:a_mart reads model:b_mart); b_job waits for c_job \
                  (model:b_mart reads model:c_root); c_job waits for a_job (model:c_report reads \
                  model:a_mart)",
@@ -315,7 +315,7 @@ fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are
             jobs: crossing_jobs.clone(),
             node_waits: vec!["a_job", "b_job"],
             pooled: vec![],
-            expected: Err(
+            expected_outcome: Err(
                 "model:a_mart (a_job) waits for model:b_mart (b_job); model:b_mart (b_job) waits \
                  for model:c_root (c_job); model:c_root (c_job) waits for the end of job a_job; \
                  the end of job a_job waits for model:a_mart (a_job)",
@@ -333,7 +333,7 @@ fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are
             ],
             node_waits: vec!["orders_job", "customers_job"],
             pooled: vec![],
-            expected: Err(
+            expected_outcome: Err(
                 "model:customers (customers_job) waits for model:stg_orders (orders_job); \
                  model:stg_orders (orders_job) waits for model:customers (customers_job)",
             ),
@@ -351,7 +351,7 @@ fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are
             ],
             node_waits: vec!["a_job", "c_job"],
             pooled: vec![],
-            expected: Err(
+            expected_outcome: Err(
                 "model:a_mart (a_job) waits for the start of job a_job; the start of job a_job \
                  waits for model:c_report (c_job); model:c_report (c_job) waits for model:a_mart \
                  (a_job)",
@@ -376,27 +376,35 @@ fn given_members_waiting_per_node_when_checking_cycles_then_only_node_cycles_are
             &jobs,
             (&members, &node_waits),
         )
-        .map(|order| order.pool_waits)
+        .map(|order| {
+            order
+                .pool_waits
+                .into_iter()
+                .map(|(member, jobs)| (member, jobs.into_iter().collect::<Vec<_>>()))
+                .collect::<Vec<_>>()
+        })
         .map_err(|error| error.to_string());
-        let expected = test_case
-            .expected
-            .map(|waits| {
-                waits
-                    .into_iter()
-                    .map(|(member, jobs)| {
-                        (
-                            member.to_owned(),
-                            jobs.into_iter().map(str::to_owned).collect(),
-                        )
-                    })
-                    .collect()
-            })
-            .map_err(|cycle| {
-                format!(
+        assert_eq!(
+            actual,
+            test_case
+                .expected_outcome
+                .map(|waits| {
+                    waits
+                        .into_iter()
+                        .map(|(member, jobs)| {
+                            (
+                                member.to_owned(),
+                                jobs.into_iter().map(str::to_owned).collect(),
+                            )
+                        })
+                        .collect()
+                })
+                .map_err(|cycle| format!(
                     "invalid control-plane data: group dependencies contain a cycle in job group \
                      orders_job_group: {cycle}"
-                )
-            });
-        assert_eq!(actual, expected, "{}", test_case.description);
+                )),
+            "{}",
+            test_case.description
+        );
     }
 }

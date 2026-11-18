@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
+import { waitingText } from '$lib/operate/labels';
 import { groupRunNodes, mergePlanPage, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
@@ -217,6 +218,18 @@ describe('run detail', () => {
 		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2']);
 		expect(nodes[4].status).toBe('not_run');
 		expect(nodes[2].skippedBecauseOf).toEqual({ nodeKey: 'model.n1', runId: 'run', jobKey: 'orders_daily' });
+	});
+
+	it('names what a pending node of a member that waits per node waits for, and nothing for other nodes', () => {
+		const run = toRuns([wire('run')], LOCATION)[0];
+		const waiting = toRunNode(
+			{ node_key: 'model.orders', status: 'pending', waiting_for: [{ job_key: 'staging_job', node_key: 'model.stg_orders' }] } as components['schemas']['RunNodeRecord'],
+			run
+		);
+		const built = toRunNode({ node_key: 'model.stg_orders', status: 'success' } as components['schemas']['RunNodeRecord'], run);
+		expect(waiting.waitingFor).toEqual([{ nodeKey: 'model.stg_orders', jobKey: 'staging_job' }]);
+		expect(waitingText(waiting.waitingFor)).toBe('waiting for model.stg_orders (staging_job)');
+		expect(built.waitingFor).toEqual([]);
 	});
 
 	it("shows the version a run executes from its snapshot, and none when the server doesn't report it", () => {

@@ -392,6 +392,9 @@ pub struct RunNodeRecord {
     pub rows_affected: Option<i64>,
     pub error_code: Option<String>,
     pub skipped_because_of: Option<String>,
+    /// For a pending node of a running member that waits per node, the inputs other members have still to build.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub waiting_for: Vec<GateInput>,
 }
 
 /// Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text.

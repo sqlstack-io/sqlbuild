@@ -84,6 +84,11 @@ function delayText(seconds: number): string {
 }
 
 /** A `[retry]` policy as a fact beside the "Retries" key, e.g. "2 × 5 min", "1 × 15 min" or "3 × immediate". */
+/** What a pending node of a member that waits per node waits for, such as `waiting for model:stg_orders (staging_job)`. */
+export function waitingText(waitingFor: { nodeKey: string; jobKey: string }[]): string {
+	return `waiting for ${waitingFor.map((input) => `${input.nodeKey} (${input.jobKey})`).join(', ')}`;
+}
+
 export function onFailureText(policy: OnFailure): string {
 	return `${policy.retries} × ${policy.retryDelaySeconds ? delayText(policy.retryDelaySeconds) : 'immediate'}`;
 }

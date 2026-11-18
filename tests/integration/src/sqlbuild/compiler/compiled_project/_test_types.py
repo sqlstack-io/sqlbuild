@@ -272,8 +272,8 @@ class PythonJobGroupCycleTestCase:
     description: str
     jobs: tuple[tuple[str, str], ...]
     expected_message: str
-    wait_for: str | None = None
-    """The group's `[dependencies] wait_for`; unset waits per node."""
+    dependencies: str = ""
+    """The group's `[dependencies]` table as written; empty waits per node."""
 
 
 @dataclass(frozen=True)

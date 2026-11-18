@@ -336,6 +336,7 @@ export function toRunNode(wire: Wire['RunNodeRecord'], run: Run): RunNode {
 		errorLocation: null,
 		errorDetail: null,
 		skippedBecauseOf: wire.skipped_because_of ? { nodeKey: wire.skipped_because_of, runId: run.id, jobKey: run.jobKey } : null,
+		waitingFor: (wire.waiting_for ?? []).map((input) => ({ nodeKey: input.node_key, jobKey: input.job_key })),
 		critical: false
 	};
 }

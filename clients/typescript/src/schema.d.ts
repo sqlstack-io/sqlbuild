@@ -1491,6 +1491,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/gates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["gates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/heartbeat": {
         parameters: {
             query?: never;
@@ -2008,6 +2024,11 @@ export interface components {
             source_event_id: string;
             version_hash: string;
         };
+        /** @description A node another member of the same group run builds, which a gated node reads. */
+        GateInput: {
+            job_key: string;
+            node_key: string;
+        };
         /** @description A role every member of an SSO group holds. */
         GroupRole: {
             group_name: string;
@@ -2462,6 +2483,29 @@ export interface components {
         };
         /** @enum {string} */
         NodeEventKind: "success" | "failed" | "recovered";
+        /** @description Whether a gated node may run now, must wait, or is skipped because an input was not built. */
+        NodeGate: {
+            /** @enum {string} */
+            state: "open";
+        } | {
+            /** @enum {string} */
+            state: "waiting";
+            waiting_for: components["schemas"]["GateInput"][];
+        } | {
+            cause: string;
+            /** @enum {string} */
+            state: "skipped";
+        };
+        /** @description Each asked-about node's gate. */
+        NodeGates: {
+            nodes: {
+                [key: string]: components["schemas"]["NodeGate"];
+            };
+        };
+        /** @description The gated nodes a worker asks about, each not yet started. */
+        NodeGatesRequest: {
+            nodes: string[];
+        };
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
         /** @description One build attempt of a node by a run in this target; the same metadata as the run's node list. */
@@ -3307,6 +3351,10 @@ export interface components {
         RunExecution: {
             claim: components["schemas"]["RunClaim"];
             environment_hash: string;
+            /** @description For a group member that waits per node, each selected node's inputs other members build; it runs once the gate opens. */
+            gated_nodes?: {
+                [key: string]: components["schemas"]["GateInput"][];
+            };
             node_hashes: {
                 [key: string]: string;
             };
@@ -3343,6 +3391,8 @@ export interface components {
             /** Format: date-time */
             started_at?: string | null;
             status: string;
+            /** @description For a pending node of a running member that waits per node, the inputs other members have still to build. */
+            waiting_for?: components["schemas"]["GateInput"][];
         };
         /** @enum {string} */
         RunOrigin: "manual" | "schedule" | "sensor" | "rerun" | "backfill";
@@ -8389,6 +8439,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunExecution"];
+                };
+            };
+            /** @description Inactive claim or invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    gates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NodeGatesRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeGates"];
                 };
             };
             /** @description Inactive claim or invalid credential */

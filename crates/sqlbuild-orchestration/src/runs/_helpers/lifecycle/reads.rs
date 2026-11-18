@@ -2,9 +2,13 @@
 
 use uuid::Uuid;
 
-use crate::runs::_helpers::lifecycle::waits::queue_states;
+use std::collections::BTreeSet;
 
-use crate::runs::models::{RunNodeRecord, RunRecord};
+use crate::runs::_helpers::groups::gate::node_gates;
+use crate::runs::_helpers::lifecycle::waits::queue_states;
+use crate::runs::constants::NODE_PENDING;
+
+use crate::runs::models::{NodeGate, RunNodeRecord, RunRecord, RunRequest, RunStatus};
 use crate::runs::types::RunsListing;
 use crate::store::errors::ControlError;
 use crate::store::main::query_records::query_records;
@@ -57,8 +61,52 @@ pub(crate) async fn run_nodes_in(
     transaction: ControlTransaction,
     run_id: Uuid,
 ) -> Result<(ControlTransaction, Vec<RunNodeRecord>), ControlError> {
-    query_records(transaction,
+    let (transaction, nodes) = query_records(transaction,
         "SELECT node_key, status, started_at, ended_at, rows_affected, error_code, skipped_because_of \
          FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
-        vec![Parameter::Id(run_id)]).await
+        vec![Parameter::Id(run_id)]).await?;
+    gate_waits(transaction, run_id, nodes).await
+}
+
+/// The run's request and status, for naming what its pending nodes wait for.
+#[derive(serde::Deserialize)]
+struct GatedRun {
+    request_json: RunRequest,
+    status: RunStatus,
+}
+
+/// Each pending node of a running group member that waits per node, with the inputs it still waits for.
+async fn gate_waits(
+    transaction: ControlTransaction,
+    run_id: Uuid,
+    mut nodes: Vec<RunNodeRecord>,
+) -> Result<(ControlTransaction, Vec<RunNodeRecord>), ControlError> {
+    let pending: BTreeSet<String> = nodes
+        .iter()
+        .filter(|node| node.status == NODE_PENDING)
+        .map(|node| node.node_key.clone())
+        .collect();
+    if pending.is_empty() {
+        return Ok((transaction, nodes));
+    }
+    let (transaction, runs): (ControlTransaction, Vec<GatedRun>) = query_records(
+        transaction,
+        "SELECT request_json, status FROM sqb_runs WHERE run_id=$1 AND parent_run_id IS NOT NULL",
+        vec![Parameter::Id(run_id)],
+    )
+    .await?;
+    let Some(run) = runs
+        .into_iter()
+        .next()
+        .filter(|run| !run.status.is_terminal())
+    else {
+        return Ok((transaction, nodes));
+    };
+    let (transaction, mut gates) = node_gates(transaction, &run.request_json, &pending).await?;
+    for node in &mut nodes {
+        if let Some(NodeGate::Waiting { waiting_for }) = gates.remove(&node.node_key) {
+            node.waiting_for = waiting_for;
+        }
+    }
+    Ok((transaction, nodes))
 }

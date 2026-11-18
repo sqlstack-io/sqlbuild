@@ -145,6 +145,10 @@ from sqlbuild.runtime.observability.classes.resource_attempt_lifecycle import (
 _DEBUG_LOGGER: logging.Logger = logging.getLogger("sqlbuild.execution")
 
 
+_GATE_POLL_SECONDS: float = 2.0
+"""How long a held node waits between asking whether its inputs from other members are built."""
+
+
 def _test_result_authored_order(*, plan: PlanOutput, result: SqlTestExecutionResult) -> int:
     entry: SqlTestPlanEntry
     for index, entry in enumerate(plan.test_entries):
@@ -155,10 +159,6 @@ def _test_result_authored_order(*, plan: PlanOutput, result: SqlTestExecutionRes
         ):
             return index
     return len(plan.test_entries)
-
-
-_GATE_POLL_SECONDS: float = 2.0
-"""How long a held node waits between asking whether its inputs from other members are built."""
 
 
 def _gate_key(key: CompiledObjectKey) -> str:
@@ -575,11 +575,7 @@ class BuildScheduler:
             self._report_scheduler_state()
 
     def _held_at_gate(self, key: CompiledObjectKey) -> bool:
-        """Hold `key` back while a node it reads from another group member is unbuilt.
-
-        A held node waits outside the executor's threads, so it never takes a slot from the
-        member's other nodes; one whose input failed is skipped under the member's policy.
-        """
+        """Hold `key`, taking no slot, while a node it reads from another member is unbuilt."""
 
         if self._node_gate is None:
             return False

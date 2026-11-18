@@ -7,7 +7,7 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { onMount } from 'svelte';
 	import type { RunNode } from '$lib/api';
-	import { nodeLabel, nodeStatusTone } from '$lib/operate/labels';
+	import { nodeLabel, nodeStatusTone, waitingText } from '$lib/operate/labels';
 	import { axisTicks as ticksFor, formatSpan, formatTick, tickStep as stepFor } from './utils';
 
 	export type GanttGroup = { runId: string; label: string; tone: string; href: string };
@@ -112,6 +112,7 @@
 			const across = n.skippedBecauseOf.runId !== n.runId;
 			return `skipped: ${n.skippedBecauseOf.nodeKey} failed${across ? ` in ${n.skippedBecauseOf.jobKey ?? n.skippedBecauseOf.runId}` : ''}`;
 		}
+		if (n.status === 'pending' && active && n.waitingFor.length) return waitingText(n.waitingFor);
 		if (n.status === 'pending') return active ? 'Waiting' : 'Not run';
 		if (n.status === 'not_run') return 'Not run';
 		if (n.status === 'cancelled') return 'Cancelled';

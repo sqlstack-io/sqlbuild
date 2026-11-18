@@ -53,15 +53,15 @@ def test_given_gated_nodes_when_scheduling_then_waiting_nodes_hold_no_slot_and_s
     skipped: list[str] = []
     lock: threading.Lock = threading.Lock()
 
+    planned: dict[str, deque[str | None]] = {
+        "model:waits_then_opens": deque([None, None]),
+        "model:input_failed": deque(["model:staged_orders"]),
+    }
+
     def node_gate(names: list[str]) -> list[tuple[str, str | None]]:
-        closed: list[tuple[str, str | None]] = []
-        for name in names:
-            polls[name] = polls.get(name, 0) + 1
-            if name == "model:waits_then_opens" and polls[name] < 3:
-                closed.append((name, None))
-            elif name == "model:input_failed":
-                closed.append((name, "model:staged_orders"))
-        return closed
+        polls.update({name: polls.get(name, 0) + 1 for name in names})
+        closed_now: filter[str] = filter(lambda name: bool(planned.get(name)), names)
+        return list(map(lambda name: (name, planned[name].popleft()), closed_now))
 
     def execute_node(*, key: CompiledObjectKey, connection: Any) -> object:
         del connection
@@ -108,10 +108,8 @@ def test_given_gated_nodes_when_scheduling_then_waiting_nodes_hold_no_slot_and_s
         scheduler, key
     )
 
-    if test_case.max_concurrency == 1:
-        BuildScheduler._run_serial(scheduler)
-    else:
-        BuildScheduler._run_concurrent(scheduler)
+    run_mode: dict[int, Any] = {1: BuildScheduler._run_serial, 2: BuildScheduler._run_concurrent}
+    run_mode[test_case.max_concurrency](scheduler)
 
     assert (tuple(sorted(executed)), tuple(skipped)) == (
         tuple(sorted(test_case.expected_executed)),

@@ -108,11 +108,14 @@ reports a job or sensor `select` that names more than three nodes one by one; se
 
 ## Group jobs
 
-A job group runs its jobs as one run. A job waits for another job in the group when it reads a node
-that job builds, directly or through nodes no job in the group builds. It waits only for the
-nearest such jobs: what they read is their own wait, so a node further upstream, such as a function
-many jobs build, adds no more waits. A job never waits for the other jobs that build a node it
+A job group runs its jobs as one run. A job depends on another job in the group when it reads a node
+that job builds, directly or through nodes no job in the group builds. It depends only on the
+nearest such jobs: what they read is their own dependency, so a node further upstream, such as a
+function many jobs build, adds no more. A job never waits for the other jobs that build a node it
 builds itself.
+
+By default every member starts with the group, and each of its nodes runs as soon as the nodes it
+reads from other members are built. See [Wait per node or per job](#wait-per-node-or-per-job).
 
 ```toml
 # orchestration/job_groups/daily_orders_job_group.toml
@@ -128,11 +131,51 @@ groups.
 
 When a location publishes, it records why each member waits, node by node: a node of the earlier
 job feeds a node of the waiting job, directly or through nodes no member selects, such as a source
-between a loader job and the models that read it. The job's page shows these reasons.
+between a loader job and the models that read it. The job's page shows these reasons, and these
+are the nodes a member waits for.
+
+### Wait per node or per job
+
+With the default, `wait_for = "node"`, members overlap. A member's nodes that read nothing from
+other members run straight away, and a node that reads another member's node runs right after
+that node is built, while both members are still running. A worker prints each node it holds back,
+such as `model:orders is waiting for model:stg_orders (staging_job).`
+
+This also lets jobs read from each other in both directions. Job A can read a model of job C while
+another model of job C reads job A: the jobs' waits form a loop, but the nodes don't, so the group
+runs. Only a loop between the nodes themselves is refused, when a location compiles its snapshot,
+such as under `sqb dev`, and again when the server receives it, with a message that names each node
+in the loop:
+
+```text
+group dependencies contain a cycle in job group nightly_job_group:
+model:customers (customers_job) waits for model:stg_orders (orders_job);
+model:stg_orders (orders_job) waits for model:customers (customers_job)
+```
+
+A few things still wait for more than single nodes:
+
+- **Python tasks, assets, checks, loaders and sources.** These run in phases of a build that hold
+  the member's other nodes back, so a member waits for their inputs from other members before it
+  starts at all. The cycle check counts these waits too, so a Python task that reads another job
+  whose nodes read the task's own job is refused as a loop, naming the start of the job.
+- **Members that share a pool.** Members that take the same [pool](concurrency.md#jobs-sharing-something-else-pools)
+  run one at a time within a group, so a member that reads a pooled member's nodes, directly or
+  through other members, waits for that whole job.
+
+Load stays bounded while members overlap. A node held back at its gate takes none of its member's
+`concurrency` slots, so the member's other nodes keep running, and pools still cap how many members
+use a warehouse at once.
+
+Set `wait_for = "job"` for the group, or for one member, to start a member only once every job it
+reads from has finished, as SQLBuild did before per-node waits. Choose it when a member must see
+all of its upstream jobs' output at once, such as an export that should never mix a fresh mart
+with a stale one, or when a member's start itself triggers work outside SQLBuild. A group that
+waits for jobs refuses any loop between its jobs, naming the nodes behind each wait.
 
 ### Choose what happens after a failure
 
-`[dependencies]` sets how a member reacts when a job it depends on fails:
+`[dependencies]` sets how a member waits, and how it reacts when a job it depends on fails:
 
 ```toml
 # orchestration/job_groups/nightly_job_group.toml
@@ -142,7 +185,7 @@ jobs = ["orders_job", "inventory_job", "partner_export_job"]
 schedule = { cron = "0 21 * * *", timezone = "UTC" }
 
 [dependencies]
-wait_for = "job"
+wait_for = "node"
 on_failure = "partial"
 
 [dependencies.partner_export_job]
@@ -151,10 +194,20 @@ on_failure = "skip"
 
 | Setting | Value | Meaning |
 | --- | --- | --- |
-| `wait_for` | `job` (default) | A member starts once the jobs it reads from have finished |
+| `wait_for` | `node` (default) | Each node runs once the nodes it reads from other members are built |
+| | `job` | A member starts once the jobs it reads from have finished |
 | `on_failure` | `partial` (default) | Build what can still be built; nodes downstream of a failed node are skipped |
-| | `skip` | Don't run the member; all its nodes end skipped and the member ends `skipped` |
-| | `run` | Run every node of the member regardless |
+| | `skip` | Don't run the member's remaining nodes; with `wait_for = "job"`, the member doesn't run and ends `skipped` |
+| | `run` | Run every node of the member regardless, once the nodes it reads have ended |
+
+With `wait_for = "node"`, `on_failure` applies node by node. A node input counts as failed only
+once the member that builds it has ended, so a retry of that member can still build it:
+
+- `partial` skips a node whose input failed, and the member's nodes downstream of it, each naming
+  the failed node; the member's other nodes run.
+- `skip` skips every node of the member that hasn't started once any of its inputs from other
+  members failed.
+- `run` runs a node once its inputs have ended, whether or not they were built.
 
 - `[dependencies.<job>]` overrides the group's settings for one member, and must name a job in
   `jobs`. Overrides live in the group file because a job can belong to several groups.
@@ -162,11 +215,10 @@ on_failure = "skip"
   not `"failed"`. The jobs that depend on it react to it as they would to a failure, since what
   they read was not built.
 - A member job's own `[retry]` runs it again inside the group run, and the jobs that depend on it
-  wait for its final attempt before `on_failure` applies. A group's `[retry]` reruns the whole
+  wait for its final attempt before `on_failure` applies. With per-node waits, a node whose input
+  failed keeps waiting while that input's member retries, and runs if the retry builds it. A group's `[retry]` reruns the whole
   group's failures once the group run ends; see
   [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures).
-- `wait_for = "node"`, which will start each node as soon as the nodes it reads are built, is
-  planned but not available yet; `sqb compile` refuses it, so use `"job"` for now.
 
 ## Schedule a job
 

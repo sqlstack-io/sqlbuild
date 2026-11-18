@@ -155,7 +155,9 @@ Details:
 - A run that waits for a pool takes none of its slots, in that pool or any other, until all have
   room. An earlier queued run taking the same pool goes first.
 - A job group takes every pool its members take, each at the largest amount, when it starts. Its
-  members then use the group's slots, one member per pool at a time.
+  members then use the group's slots, one member per pool at a time. Since they can't overlap, a
+  member that reads the nodes of a member sharing its pool waits for that whole job, even when the
+  group [waits per node](/docs/concepts/orchestration#wait-per-node-or-per-job).
 - The server can lower a limit for one launcher with `pool_caps`, never raise it; see
   [Cap pools](/docs/cli/server#cap-pools). A job whose amount is above the cap takes the whole
   capped pool, and the location's health shows a warning naming it, such as `job

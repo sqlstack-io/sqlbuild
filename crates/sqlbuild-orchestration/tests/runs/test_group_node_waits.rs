@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
-    advance_groups::advance_groups, claim_next_run::claim_next_run,
+    advance_groups::advance_groups, claim_next_run::claim_next_run, list_run_nodes::list_run_nodes,
     read_node_gates::read_node_gates, request_job_run::request_job_run,
     run_execution::run_execution,
 };
@@ -36,47 +36,74 @@ fn given_members_waiting_per_node_when_inputs_build_fail_or_retry_then_each_node
     let skipped = || NodeGate::Skipped {
         cause: "customers".into(),
     };
-    let test_cases = [Backend::Sqlite, Backend::Postgres]
-        .into_iter()
-        .flat_map(|backend| {
-            [
-                NodeGateTestCase {
-                    description: "partial skips only the node that reads the failed input",
-                    backend,
-                    dependency_failure: json!({}),
-                    staging_retries: 0,
-                    expected_orders: skipped(),
-                    expected_inventory: NodeGate::Open,
-                },
-                NodeGateTestCase {
-                    description: "skip skips every node once any input failed",
-                    backend,
-                    dependency_failure: json!({"marts_job": "skip"}),
-                    staging_retries: 0,
-                    expected_orders: skipped(),
-                    expected_inventory: skipped(),
-                },
-                NodeGateTestCase {
-                    description: "run opens every node once its inputs ended",
-                    backend,
-                    dependency_failure: json!({"marts_job": "run"}),
-                    staging_retries: 0,
-                    expected_orders: NodeGate::Open,
-                    expected_inventory: NodeGate::Open,
-                },
-                NodeGateTestCase {
-                    description: "a retry of the failed input re-opens its gate",
-                    backend,
-                    dependency_failure: json!({}),
-                    staging_retries: 1,
-                    expected_orders: waiting_for_customers(),
-                    expected_inventory: NodeGate::Open,
-                },
-            ]
-        });
+    let test_cases = [
+        NodeGateTestCase {
+            description: "SQLite: partial skips only the node that reads the failed input",
+            backend: Backend::Sqlite,
+            dependency_failure: json!({}),
+            staging_retries: 0,
+            expected_orders: skipped(),
+            expected_inventory: NodeGate::Open,
+        },
+        NodeGateTestCase {
+            description: "SQLite: skip skips every node once any input failed",
+            backend: Backend::Sqlite,
+            dependency_failure: json!({"marts_job": "skip"}),
+            staging_retries: 0,
+            expected_orders: skipped(),
+            expected_inventory: skipped(),
+        },
+        NodeGateTestCase {
+            description: "SQLite: run opens every node once its inputs ended",
+            backend: Backend::Sqlite,
+            dependency_failure: json!({"marts_job": "run"}),
+            staging_retries: 0,
+            expected_orders: NodeGate::Open,
+            expected_inventory: NodeGate::Open,
+        },
+        NodeGateTestCase {
+            description: "SQLite: a retry of the failed input re-opens its gate",
+            backend: Backend::Sqlite,
+            dependency_failure: json!({}),
+            staging_retries: 1,
+            expected_orders: waiting_for_customers(),
+            expected_inventory: NodeGate::Open,
+        },
+        NodeGateTestCase {
+            description: "PostgreSQL: partial skips only the node that reads the failed input",
+            backend: Backend::Postgres,
+            dependency_failure: json!({}),
+            staging_retries: 0,
+            expected_orders: skipped(),
+            expected_inventory: NodeGate::Open,
+        },
+        NodeGateTestCase {
+            description: "PostgreSQL: skip skips every node once any input failed",
+            backend: Backend::Postgres,
+            dependency_failure: json!({"marts_job": "skip"}),
+            staging_retries: 0,
+            expected_orders: skipped(),
+            expected_inventory: skipped(),
+        },
+        NodeGateTestCase {
+            description: "PostgreSQL: run opens every node once its inputs ended",
+            backend: Backend::Postgres,
+            dependency_failure: json!({"marts_job": "run"}),
+            staging_retries: 0,
+            expected_orders: NodeGate::Open,
+            expected_inventory: NodeGate::Open,
+        },
+        NodeGateTestCase {
+            description: "PostgreSQL: a retry of the failed input re-opens its gate",
+            backend: Backend::Postgres,
+            dependency_failure: json!({}),
+            staging_retries: 1,
+            expected_orders: waiting_for_customers(),
+            expected_inventory: NodeGate::Open,
+        },
+    ];
     let mut completed = 0;
     for test_case in test_cases {
-        let description = format!("{:?}: {}", test_case.backend, test_case.description);
         run(async {
             let fixture = open_test_store(test_case.backend)
                 .await
@@ -151,16 +178,18 @@ fn given_members_waiting_per_node_when_inputs_build_fail_or_retry_then_each_node
                 .await
                 .expect("start group");
             let mut claims = BTreeMap::new();
-            while let Some(claim) = claim_next_run(store, &lease, &limits, Some(scope))
-                .await
-                .expect("claim member")
-            {
+            for _ in 0..2 {
+                let claim = claim_next_run(store, &lease, &limits, Some(scope))
+                    .await
+                    .expect("claim member")
+                    .expect("every member starts with the group");
                 claims.insert(claim.request.job_key.clone().expect("member"), claim);
             }
             assert_eq!(
                 claims.keys().map(String::as_str).collect::<Vec<_>>(),
                 ["marts_job", "staging_job"],
-                "{description}: both members start with the group"
+                "{}: both members start with the group",
+                test_case.description
             );
             let (staging, marts) = (&claims["staging_job"], &claims["marts_job"]);
             let execution = run_execution(store, (marts.request.run_id, marts.claim_id))
@@ -174,7 +203,8 @@ fn given_members_waiting_per_node_when_inputs_build_fail_or_retry_then_each_node
                     .map(|(node, inputs)| (node.as_str(), inputs[0].node_key.as_str()))
                     .collect::<Vec<_>>(),
                 [("inventory", "products"), ("orders", "customers")],
-                "{description}: each marts node waits for the staging node it reads"
+                "{}: each marts node waits for the staging node it reads",
+                test_case.description
             );
             let asked = NodeGatesRequest {
                 nodes: ["inventory".to_owned(), "orders".to_owned()].into(),
@@ -210,8 +240,29 @@ fn given_members_waiting_per_node_when_inputs_build_fail_or_retry_then_each_node
                     ("inventory".into(), NodeGate::Open),
                     ("orders".into(), waiting_for_customers()),
                 ]),
-                "{description}: a built input opens its node while the member still runs, \
-                 and a failed one waits for the member to end"
+                "{}: a built input opens its node while the member still runs, and a failed one \
+                 waits for the member to end",
+                test_case.description
+            );
+            assert_eq!(
+                list_run_nodes(store, marts.request.run_id)
+                    .await
+                    .expect("marts nodes")
+                    .into_iter()
+                    .map(|node| (node.node_key, node.waiting_for))
+                    .collect::<Vec<_>>(),
+                [
+                    ("inventory".to_owned(), Vec::new()),
+                    (
+                        "orders".to_owned(),
+                        vec![GateInput {
+                            job_key: "staging_job".into(),
+                            node_key: "customers".into(),
+                        }]
+                    ),
+                ],
+                "{}: the run's node rows name what a pending node waits for",
+                test_case.description
             );
             report(
                 store,
@@ -232,22 +283,29 @@ fn given_members_waiting_per_node_when_inputs_build_fail_or_retry_then_each_node
                     ("inventory".into(), test_case.expected_inventory.clone()),
                     ("orders".into(), test_case.expected_orders.clone()),
                 ]),
-                "{description}"
+                "{}",
+                test_case.description
             );
-            if test_case.staging_retries > 0 {
-                let retry = claim_next_run(store, &lease, &limits, Some(scope))
-                    .await
-                    .expect("claim retry")
-                    .expect("retry ready");
+            let retries = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim retry");
+            assert_eq!(
+                retries.is_some(),
+                test_case.staging_retries > 0,
+                "{}: only a member with retries reruns",
+                test_case.description
+            );
+            for retry in retries.as_slice() {
                 assert_eq!(retry.request.selection, ["customers".to_owned()].into());
-                finish(store, &retry, (NodeOutcome::Success, RunOutcome::Success)).await;
+                finish(store, retry, (NodeOutcome::Success, RunOutcome::Success)).await;
                 assert_eq!(
                     gates().await,
                     BTreeMap::from([
                         ("inventory".into(), NodeGate::Open),
                         ("orders".into(), NodeGate::Open),
                     ]),
-                    "{description}: the retried input opens its node"
+                    "{}: the retried input opens its node",
+                    test_case.description
                 );
             }
             completed += 1;
@@ -260,22 +318,36 @@ fn given_members_waiting_per_node_when_inputs_build_fail_or_retry_then_each_node
 #[test]
 fn given_job_waits_that_cycle_over_acyclic_nodes_when_the_group_runs_then_every_member_starts_and_nodes_open_in_lineage_order()
  {
-    let test_cases = [Backend::Sqlite, Backend::Postgres].map(|backend| CrossingGroupTestCase {
-        description: "each build opens exactly the node that reads it",
-        backend,
-        expected_open_after: vec![
-            ("start", vec!["customers"]),
-            ("customers", vec!["customers", "orders"]),
-            ("orders", vec!["customers", "inventory", "orders"]),
-            (
-                "inventory",
-                vec!["customers", "inventory", "orders", "products"],
-            ),
-        ],
-    });
+    let test_cases = [
+        CrossingGroupTestCase {
+            description: "SQLite: each build opens exactly the node that reads it",
+            backend: Backend::Sqlite,
+            expected_open_after: vec![
+                ("start", vec!["customers"]),
+                ("customers", vec!["customers", "orders"]),
+                ("orders", vec!["customers", "inventory", "orders"]),
+                (
+                    "inventory",
+                    vec!["customers", "inventory", "orders", "products"],
+                ),
+            ],
+        },
+        CrossingGroupTestCase {
+            description: "PostgreSQL: each build opens exactly the node that reads it",
+            backend: Backend::Postgres,
+            expected_open_after: vec![
+                ("start", vec!["customers"]),
+                ("customers", vec!["customers", "orders"]),
+                ("orders", vec!["customers", "inventory", "orders"]),
+                (
+                    "inventory",
+                    vec!["customers", "inventory", "orders", "products"],
+                ),
+            ],
+        },
+    ];
     let mut completed = 0;
     for test_case in test_cases {
-        let description = format!("{:?}: {}", test_case.backend, test_case.description);
         run(async {
             let fixture = open_test_store(test_case.backend)
                 .await
@@ -348,32 +420,31 @@ fn given_job_waits_that_cycle_over_acyclic_nodes_when_the_group_runs_then_every_
                 .await
                 .expect("start group");
             let mut claims = BTreeMap::new();
-            while let Some(claim) = claim_next_run(store, &lease, &limits, Some(scope))
-                .await
-                .expect("claim member")
-            {
+            for _ in 0..3 {
+                let claim = claim_next_run(store, &lease, &limits, Some(scope))
+                    .await
+                    .expect("claim member")
+                    .expect("every member starts at once");
                 claims.insert(claim.request.job_key.clone().expect("member"), claim);
             }
-            assert_eq!(
-                claims.len(),
-                3,
-                "{description}: every member starts at once"
-            );
-            let owner = |node: &str| match node {
-                "orders" => "b_job",
-                "inventory" => "a_job",
-                _ => "c_job",
-            };
+            let owner: BTreeMap<&str, &str> = BTreeMap::from([
+                ("customers", "c_job"),
+                ("inventory", "a_job"),
+                ("orders", "b_job"),
+                ("products", "c_job"),
+            ]);
             for claim in claims.values() {
                 report(store, claim, vec![RunChange::Started]).await;
             }
-            for (built, expected_open) in &test_case.expected_open_after {
-                if *built != "start" {
+            let mut open_after: Vec<(&str, Vec<String>)> = Vec::new();
+            for (built, _) in &test_case.expected_open_after {
+                let finished = [*built].into_iter().filter(|built| *built != "start");
+                for built in finished {
                     report(
                         store,
-                        &claims[owner(built)],
+                        &claims[owner[built]],
                         vec![RunChange::NodeFinished {
-                            node_key: (*built).into(),
+                            node_key: built.into(),
                             outcome: NodeOutcome::Success,
                             rows_affected: None,
                             error_code: None,
@@ -404,8 +475,21 @@ fn given_job_waits_that_cycle_over_acyclic_nodes_when_the_group_runs_then_every_
                     );
                 }
                 open.sort();
-                assert_eq!(open, *expected_open, "{description}: after {built}");
+                open_after.push((built, open));
             }
+            assert_eq!(
+                open_after,
+                test_case
+                    .expected_open_after
+                    .iter()
+                    .map(|(built, open)| (
+                        *built,
+                        open.iter().map(|node| (*node).to_owned()).collect()
+                    ))
+                    .collect::<Vec<_>>(),
+                "{}",
+                test_case.description
+            );
             completed += 1;
             close_test_store(fixture).await;
         });

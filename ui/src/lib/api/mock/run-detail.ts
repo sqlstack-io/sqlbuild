@@ -122,6 +122,7 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 		errorLocation: null,
 		errorDetail: null,
 		skippedBecauseOf: null,
+		waitingFor: [],
 		critical: script.critical.includes(key)
 	});
 	if (started == null) {

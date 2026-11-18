@@ -21,7 +21,7 @@ use crate::bindings::_helpers::compiled_project::constants::{
 };
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::native_host::deferred_cost::DeferredCost;
-use crate::bindings::_helpers::recall::console::write_stderr;
+use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::records::fields::field;
 
 /// Node keys by snapshot node key, such as the models each test checks.
@@ -140,7 +140,7 @@ impl WorkerBuild {
         self.returned.store(true, Ordering::SeqCst);
     }
 
-    pub(crate) fn has_work(&self) -> PyResult<bool> {
+    pub(crate) fn work_remaining(&self) -> PyResult<bool> {
         let excluded = self.excluded()?;
         Ok(self
             .execution
@@ -217,8 +217,9 @@ impl WorkerBuild {
                             .iter()
                             .map(|input| format!("{} ({})", input.node_key, input.job_key))
                             .collect();
-                        write_stderr(
+                        write_console(
                             py,
+                            "stderr",
                             &format!("{key} is waiting for {}.\n", inputs.join(", ")),
                         )?;
                     }

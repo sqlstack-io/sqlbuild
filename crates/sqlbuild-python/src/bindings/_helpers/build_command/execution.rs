@@ -513,7 +513,6 @@ pub(crate) fn execute_build_plan<'py>(
     })
 }
 
-/// Report what `--changed` runs and skips, and any warnings from reading records.
 /// The scheduler's gate for a group member that waits per node; none for any other build.
 fn node_gate<'py>(py: Python<'py>, context: &BuildContext<'py>) -> PyResult<Bound<'py, PyAny>> {
     match context
@@ -532,6 +531,7 @@ fn node_gate<'py>(py: Python<'py>, context: &BuildContext<'py>) -> PyResult<Boun
     }
 }
 
+/// Report what `--changed` runs and skips, and any warnings from reading records.
 fn report_changed_decision(context: &BuildContext<'_>, prepared: &Prepared<'_>) -> PyResult<()> {
     for warning in &prepared.warnings {
         emit(&context.stream, &format!("warning: {warning}\n"))?;

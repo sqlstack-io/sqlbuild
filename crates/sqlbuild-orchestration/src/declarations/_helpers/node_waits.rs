@@ -36,43 +36,41 @@ pub(crate) struct GroupMembers<'a> {
     pub(crate) node_waits: &'a BTreeSet<String>,
 }
 
-/// Each node's nearest upstream nodes some member selects, reached through nodes none selects.
+/// Each selected node's nearest upstream nodes some member selects, reached through nodes none selects.
 fn selected_inputs<'a>(
     input: &'a SnapshotInput,
     owners: &BTreeMap<&'a str, BTreeSet<&'a str>>,
-    memo: &mut BTreeMap<&'a str, BTreeSet<&'a str>>,
-    key: &'a str,
-) -> BTreeSet<&'a str> {
-    if let Some(found) = memo.get(key) {
-        return found.clone();
-    }
-    let mut found: BTreeSet<&str> = BTreeSet::new();
-    let mut seen: BTreeSet<&str> = BTreeSet::new();
-    let mut pending: Vec<&str> = upstream_keys(input, key);
-    while let Some(upstream) = pending.pop() {
-        if !seen.insert(upstream) {
-            continue;
+) -> BTreeMap<&'a str, BTreeSet<&'a str>> {
+    let mut inputs: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    for key in owners.keys() {
+        let mut found: BTreeSet<&str> = BTreeSet::new();
+        let mut seen: BTreeSet<&str> = BTreeSet::new();
+        let mut pending: Vec<&str> = upstream_keys(input, key);
+        while let Some(upstream) = pending.pop() {
+            if !seen.insert(upstream) {
+                continue;
+            }
+            if owners.contains_key(upstream) {
+                found.insert(upstream);
+            } else {
+                pending.extend(upstream_keys(input, upstream));
+            }
         }
-        if owners.contains_key(upstream) {
-            found.insert(upstream);
-        } else {
-            pending.extend(upstream_keys(input, upstream));
-        }
+        inputs.insert(key, found);
     }
-    memo.insert(key, found.clone());
-    found
+    inputs
 }
 
 /// The cross-member inputs of each node of each member: `(owning member, node)` pairs it reads.
 fn cross_member_inputs<'a>(group: &GroupMembers<'a>) -> CrossInputs<'a> {
     let owners = owners(group);
-    let mut memo: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let selected = selected_inputs(group.input, &owners);
     let mut inputs: CrossInputs<'a> = BTreeMap::new();
     for member in group.edges.keys() {
         let own = &group.jobs[member].selection;
         let member_inputs = inputs.entry(member.as_str()).or_default();
         for node in own {
-            for upstream in selected_inputs(group.input, &owners, &mut memo, node) {
+            for upstream in selected.get(node.as_str()).into_iter().flatten().copied() {
                 if own.contains(upstream) {
                     continue;
                 }
@@ -107,8 +105,9 @@ fn wait_graph<'a>(
     serialized: &BTreeMap<String, BTreeSet<String>>,
 ) -> BTreeMap<Vertex<'a>, BTreeSet<Vertex<'a>>> {
     let owners = owners(group);
-    let mut memo: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let selected = selected_inputs(group.input, &owners);
     let cross = cross_member_inputs(group);
+    let no_jobs: BTreeSet<String> = BTreeSet::new();
     let mut waits: BTreeMap<Vertex<'_>, BTreeSet<Vertex<'_>>> = BTreeMap::new();
     for (member, upstream_jobs) in group.edges {
         let own = &group.jobs[member].selection;
@@ -128,20 +127,21 @@ fn wait_graph<'a>(
                 }
             }
         }
-        let job_ends: Vec<&str> = if per_node {
-            serialized
-                .get(member)
-                .into_iter()
-                .flatten()
-                .filter_map(|job| group.edges.get_key_value(job).map(|(job, _)| job.as_str()))
-                .collect()
+        let mut job_ends: Vec<&str> = Vec::new();
+        let ended: &BTreeSet<String> = if per_node {
+            serialized.get(member).unwrap_or(&no_jobs)
         } else {
-            upstream_jobs.iter().map(String::as_str).collect()
+            upstream_jobs
         };
+        for job in ended {
+            if let Some((job, _)) = group.edges.get_key_value(job) {
+                job_ends.push(job.as_str());
+            }
+        }
         for node in own {
             let vertex = Vertex::Node(member.as_str(), node.as_str());
             let mut node_waits: BTreeSet<Vertex<'_>> = BTreeSet::new();
-            for upstream in selected_inputs(group.input, &owners, &mut memo, node) {
+            for upstream in selected.get(node.as_str()).into_iter().flatten().copied() {
                 if own.contains(upstream) {
                     node_waits.insert(Vertex::Node(member.as_str(), upstream));
                 }
@@ -238,11 +238,13 @@ fn peel<'a>(
     let mut remaining = waits.clone();
     let mut order: Vec<Vertex<'_>> = Vec::new();
     loop {
-        let ready: Vec<Vertex<'_>> = remaining
-            .iter()
-            .filter(|(_, waits)| waits.iter().all(|wait| !remaining.contains_key(wait)))
-            .map(|(vertex, _)| *vertex)
-            .collect();
+        let left: BTreeSet<Vertex<'_>> = remaining.keys().copied().collect();
+        let mut ready: Vec<Vertex<'_>> = Vec::new();
+        for (vertex, waits) in &remaining {
+            if waits.is_disjoint(&left) {
+                ready.push(*vertex);
+            }
+        }
         if ready.is_empty() {
             break;
         }

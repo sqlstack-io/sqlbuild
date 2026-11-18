@@ -225,6 +225,8 @@ export type RunNode = {
 	/** Full error text (warehouse message, statement, trace); `errorMessage` is its first line. */
 	errorDetail: string | null;
 	skippedBecauseOf: SkippedBecauseOf | null;
+	/** A pending node of a member that waits per node: the nodes other members have still to build for it. */
+	waitingFor: { nodeKey: string; jobKey: string }[];
 	/** Node failure stops the whole group (`critical = true`). */
 	critical: boolean;
 };

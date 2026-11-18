@@ -2309,7 +2309,7 @@ def test_given_python_dependencies_across_jobs_when_publishing_a_group_then_jobs
                 ("staging_job", "stg_orders task:request_carrier_collection"),
                 ("export_job", "asset:partner_orders_file"),
             ),
-            wait_for="job",
+            dependencies='\n[dependencies]\nwait_for = "job"\n',
             expected_message=(
                 "group dependencies contain a cycle in job group orders_nightly_job_group: "
                 "export_job waits for staging_job (model:orders reads model:stg_orders); "
@@ -2326,7 +2326,7 @@ def test_given_a_python_dependency_cycle_across_jobs_when_publishing_a_group_the
     jobs: dict[str, str] = dict(test_case.jobs)
     with pytest.raises(ValueError, match=re.escape(test_case.expected_message)):
         python_pipeline_snapshot(
-            tmp_path, jobs, {"orders_nightly_job_group": tuple(jobs)}, test_case.wait_for
+            tmp_path, jobs, {"orders_nightly_job_group": tuple(jobs)}, test_case.dependencies
         )
 
 

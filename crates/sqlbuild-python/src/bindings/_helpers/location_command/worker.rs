@@ -366,7 +366,7 @@ pub(super) fn execute_worker<'py>(
     }
     let result = (|| {
         worker.wait_at_start(py)?;
-        if !worker.has_work()? {
+        if !worker.work_remaining()? {
             write_stderr(
                 py,
                 "Run inputs verified. All selected nodes are blocked by upstream failures.\n",

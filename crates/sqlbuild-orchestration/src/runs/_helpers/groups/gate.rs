@@ -1,8 +1,4 @@
-//! A member that waits per node runs each node once the nodes it reads from other members are built.
-//!
-//! An input counts as built once any attempt of its member built it, or when this group run does not
-//! build it. It counts as failed only once its member's latest attempt ended, so a retry re-opens
-//! the gate for the nodes it reruns.
+//! A member that waits per node runs each node once the nodes it reads from other members are built; a retry re-opens a failed input.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -135,43 +131,41 @@ pub(crate) async fn node_gates(
     let inputs = member_inputs(declaration, member, request);
     let (transaction, states) = input_states(transaction, parent_id, &inputs).await?;
     let policy = declaration.member_dependency_failure(member);
-    let failed_input = |node_inputs: &[GateInput]| {
-        node_inputs
-            .iter()
-            .find_map(|input| match states.get(input) {
-                Some(InputState::Failed(cause)) => Some(cause.clone()),
-                _ => None,
-            })
+    let failed_input = |node_inputs: &[GateInput]| -> Option<String> {
+        for input in node_inputs {
+            if let Some(InputState::Failed(cause)) = states.get(input) {
+                return Some(cause.clone());
+            }
+        }
+        None
     };
-    let member_failure = (policy == DependencyFailure::Skip)
-        .then(|| {
-            inputs
-                .values()
-                .find_map(|node_inputs| failed_input(node_inputs))
-        })
-        .flatten();
-    let gates = asked
-        .iter()
-        .map(|node| {
-            let node_inputs: &[GateInput] = inputs.get(node).map_or(&[], Vec::as_slice);
-            let waiting_for: Vec<GateInput> = node_inputs
-                .iter()
-                .filter(|input| states.get(*input) == Some(&InputState::Pending))
-                .cloned()
-                .collect();
-            let skipped_by = match policy {
-                DependencyFailure::Run => None,
-                DependencyFailure::Partial => failed_input(node_inputs),
-                DependencyFailure::Skip => member_failure.clone(),
-            };
-            let gate = match skipped_by {
-                Some(cause) => NodeGate::Skipped { cause },
-                None if waiting_for.is_empty() => NodeGate::Open,
-                None => NodeGate::Waiting { waiting_for },
-            };
-            (node.clone(), gate)
-        })
-        .collect();
+    let mut member_failure: Option<String> = None;
+    if policy == DependencyFailure::Skip {
+        for node_inputs in inputs.values() {
+            member_failure = member_failure.or_else(|| failed_input(node_inputs));
+        }
+    }
+    let mut gates: BTreeMap<String, NodeGate> = BTreeMap::new();
+    for node in asked {
+        let node_inputs: &[GateInput] = inputs.get(node).map_or(&[], Vec::as_slice);
+        let mut waiting_for: Vec<GateInput> = Vec::new();
+        for input in node_inputs {
+            if states.get(input) == Some(&InputState::Pending) {
+                waiting_for.push(input.clone());
+            }
+        }
+        let skipped_by = match policy {
+            DependencyFailure::Run => None,
+            DependencyFailure::Partial => failed_input(node_inputs),
+            DependencyFailure::Skip => member_failure.clone(),
+        };
+        let gate = match skipped_by {
+            Some(cause) => NodeGate::Skipped { cause },
+            None if waiting_for.is_empty() => NodeGate::Open,
+            None => NodeGate::Waiting { waiting_for },
+        };
+        gates.insert(node.clone(), gate);
+    }
     Ok((transaction, gates))
 }
 
@@ -230,35 +224,30 @@ async fn input_states(
             _ => {}
         }
     }
-    let states = inputs
-        .values()
-        .flatten()
-        .map(|input| {
-            let key = (input.job_key.clone(), input.node_key.clone());
-            let member_attempts: Vec<&Attempt> = attempts
-                .values()
-                .filter(|attempt| {
-                    attempt.job_key == input.job_key && attempt.selection.contains(&input.node_key)
-                })
-                .collect();
-            let latest_ended = member_attempts
-                .iter()
-                .filter(|attempt| !attempt.superseded)
-                .all(|attempt| attempt.terminal);
-            let state = if built.contains(&key) || member_attempts.is_empty() {
-                InputState::Built
-            } else if !latest_ended {
-                InputState::Pending
-            } else {
-                InputState::Failed(
-                    failed
-                        .get(&key)
-                        .cloned()
-                        .unwrap_or_else(|| input.node_key.clone()),
-                )
-            };
-            (input.clone(), state)
-        })
-        .collect();
+    let mut states: BTreeMap<GateInput, InputState> = BTreeMap::new();
+    for input in inputs.values().flatten() {
+        let key = (input.job_key.clone(), input.node_key.clone());
+        let mut selected_by_member = false;
+        let mut latest_ended = true;
+        for attempt in attempts.values() {
+            if attempt.job_key == input.job_key && attempt.selection.contains(&input.node_key) {
+                selected_by_member = true;
+                latest_ended &= attempt.superseded || attempt.terminal;
+            }
+        }
+        let state = if built.contains(&key) || !selected_by_member {
+            InputState::Built
+        } else if !latest_ended {
+            InputState::Pending
+        } else {
+            InputState::Failed(
+                failed
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or_else(|| input.node_key.clone()),
+            )
+        };
+        states.insert(input.clone(), state);
+    }
     Ok((transaction, states))
 }

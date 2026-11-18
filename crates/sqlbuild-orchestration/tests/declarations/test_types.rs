@@ -8,8 +8,8 @@ pub(crate) struct NodeWaitCycleTestCase {
     pub(crate) node_waits: Vec<&'static str>,
     /// The members that take the `warehouse` pool, so they run one at a time.
     pub(crate) pooled: Vec<&'static str>,
-    /// The cycle message, or the whole jobs each member that waits per node still waits for.
-    pub(crate) expected: Result<Vec<(&'static str, Vec<&'static str>)>, &'static str>,
+    /// The whole jobs each member that waits per node still waits for, or the waits that close a cycle.
+    pub(crate) expected_outcome: Result<Vec<(&'static str, Vec<&'static str>)>, &'static str>,
 }
 
 pub(crate) struct GroupWaitsTestCase {

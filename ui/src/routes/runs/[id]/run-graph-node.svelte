@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import type { RunNode } from '$lib/api';
-	import { nodeStatusLabel, nodeStatusTone } from '$lib/operate/labels';
+	import { nodeStatusLabel, nodeStatusTone, waitingText } from '$lib/operate/labels';
 
 	let { data, selected }: NodeProps = $props();
 	const n = $derived((data as { node: RunNode; ownRunId: string }).node);
@@ -21,6 +21,8 @@
 	</div>
 	{#if n.skippedBecauseOf}
 		<div class="why">needs {n.skippedBecauseOf.nodeKey}{n.skippedBecauseOf.runId !== n.runId ? ` · ${n.skippedBecauseOf.jobKey ?? n.skippedBecauseOf.runId}` : ''}</div>
+	{:else if n.status === 'pending' && n.waitingFor.length}
+		<div class="why" title={waitingText(n.waitingFor)}>{waitingText(n.waitingFor)}</div>
 	{:else if n.errorMessage}
 		<div class="why err" title={n.errorMessage}>{n.errorMessage}</div>
 	{/if}
