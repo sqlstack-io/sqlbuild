@@ -1,9 +1,7 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
-use sqlbuild_python_planner::planner_phases::constants::BUILD_HISTORY;
-use sqlbuild_python_planner::planner_phases::constants::DISCOVERING;
-use sqlbuild_python_planner::planner_phases::constants::WRITING;
+use sqlbuild_python_planner::planner_phases::constants::{BUILD_HISTORY, DISCOVERING, WRITING};
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
 use sqlbuild_python_planner::planner_phases::models::PlanTimings;
