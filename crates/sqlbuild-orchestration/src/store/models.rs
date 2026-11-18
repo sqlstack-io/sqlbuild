@@ -98,7 +98,7 @@ pub(crate) enum Change {
     Trigger(Uuid),
     Snapshot(Uuid, String),
     NodeStatus(Uuid, String),
-    /// An attention condition of a location's target was acknowledged or withdrawn.
+    /// A condition was acknowledged or withdrawn; the Overview reloads on the runs topic.
     Attention(Uuid, String),
     Credentials,
 }

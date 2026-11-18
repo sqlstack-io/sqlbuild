@@ -340,6 +340,19 @@ pub(crate) struct AcknowledgementTestCase {
     pub(crate) expected_acknowledged_by: &'static str,
 }
 
+pub(crate) struct AttentionAcknowledgementTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Statuses of: acknowledge, retry, reused event ID, same shape again, empty key, array shape, large shape.
+    pub(crate) expected_statuses: [u16; 7],
+    /// Whether each of acknowledge, retry, same shape, worse shape, other key, withdraw, again applied.
+    pub(crate) expected_applied: [bool; 7],
+    pub(crate) expected_acknowledged_by: &'static str,
+    pub(crate) expected_snooze_hours: i64,
+    /// Listed keys after the worse shape and another condition, then after withdrawing the first.
+    pub(crate) expected_keys: (&'static [&'static str], &'static [&'static str]),
+}
+
 pub(crate) struct ProvidersTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

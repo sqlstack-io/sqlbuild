@@ -1,19 +1,18 @@
-//! Anyone who can see a location's runs marks an attention condition handled, as it looks now, as an
-//! audit event; the same permission and retry rules as acknowledging a run.
+//! Anyone who can see a target's runs marks a condition handled as it looks now, as an audit event.
 
-use serde_json::{Value, json};
+use serde_json::json;
 use uuid::Uuid;
 
-use crate::acknowledgements::constants::{
-    ACKNOWLEDGED, MAX_KEY_CHARS, MAX_SHAPE_BYTES, WITHDRAWN, attention_snooze,
-};
+use crate::acknowledgements::_helpers::attention_state::{prior_attention, unchanged};
+use crate::acknowledgements::constants::{ACKNOWLEDGED, MAX_KEY_CHARS, MAX_SHAPE_BYTES, WITHDRAWN};
 use crate::acknowledgements::models::AttentionAcknowledgementRequest;
+use crate::acknowledgements::models::PriorAttention;
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, query::query};
-use crate::store::models::{Change, ControlStore, Parameter, TransactionMode};
+use crate::store::main::{begin::begin, commit::commit};
+use crate::store::models::{Change, ControlStore, TransactionMode};
 
 fn validate(request: &AttentionAcknowledgementRequest) -> Result<(), ControlError> {
     let key = request.key.as_str();
@@ -38,9 +37,7 @@ fn validate(request: &AttentionAcknowledgementRequest) -> Result<(), ControlErro
     Ok(())
 }
 
-/// Returns whether the condition's acknowledgement changed. Acknowledging again applies when the shape
-/// differs or the last acknowledgement has lapsed; each change signals the target's runs, so open
-/// Overviews reload.
+/// Whether the acknowledgement changed; the same shape again applies only once the last one lapsed.
 pub async fn acknowledge_person_attention(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
@@ -57,54 +54,18 @@ pub async fn acknowledge_person_attention(
     validate(request)?;
     let body =
         serde_json::to_value(request).map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let (transaction, retried) = query(
-        transaction,
-        "SELECT scope_json FROM sqb_security_audit WHERE event_id=$1",
-        vec![Parameter::Id(request.event_id)],
-    )
-    .await?;
-    if let Some(previous) = retried.first() {
-        if previous["scope_json"].get("request") != Some(&body) {
-            return Err(ControlError::Invalid(
-                "acknowledgement event ID already has different content".into(),
-            ));
-        }
+    let (transaction, prior) =
+        prior_attention(transaction, (location_id, target), (request, &body)).await?;
+    let PriorAttention::Standing {
+        acknowledged,
+        shape,
+        at,
+    } = prior
+    else {
         commit(transaction).await?;
         return Ok(false);
-    }
-    let (transaction, latest) = query(
-        transaction,
-        &format!(
-            "SELECT action, occurred_at, scope_json ->> 'shape' AS shape FROM sqb_security_audit \
-             WHERE action IN ('{ACKNOWLEDGED}','{WITHDRAWN}') AND scope_json ->> 'location_id'=$1 \
-             AND scope_json ->> 'target'=$2 AND scope_json ->> 'key'=$3 ORDER BY storage_id DESC LIMIT 1"
-        ),
-        vec![
-            Parameter::Text(location_id.to_string()),
-            Parameter::Text(target.into()),
-            Parameter::Text(request.key.clone()),
-        ],
-    )
-    .await?;
-    let previous = latest.first();
-    let acknowledged = previous.is_some_and(|row| row["action"].as_str() == Some(ACKNOWLEDGED));
-    let shape: Value = previous
-        .and_then(|row| row["shape"].as_str())
-        .and_then(|text| serde_json::from_str(text).ok())
-        .unwrap_or(Value::Null);
-    let at = previous.and_then(|row| {
-        serde_json::from_value::<chrono::DateTime<chrono::Utc>>(row["occurred_at"].clone()).ok()
-    });
-    let holding = acknowledged
-        && shape == request.shape
-        && at.is_some_and(|at| transaction.now < at + attention_snooze());
-    // Acknowledging is a no-op while the same shape's acknowledgement holds; withdrawing, while none stands.
-    let unchanged = if request.acknowledged {
-        holding
-    } else {
-        !acknowledged
     };
-    if unchanged {
+    if unchanged((acknowledged, &shape, at), request, transaction.now) {
         commit(transaction).await?;
         return Ok(false);
     }

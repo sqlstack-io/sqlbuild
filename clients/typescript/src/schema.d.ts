@@ -1661,23 +1661,14 @@ export interface components {
              */
             until: string;
         };
-        /**
-         * @description Marks an ongoing attention condition handled, as it looks now, or withdraws the mark; retried with
-         *     the same event ID it applies once.
-         */
+        /** @description Marks an ongoing condition handled as it looks now, or withdraws that; an event ID applies once. */
         AttentionAcknowledgementRequest: {
             acknowledged: boolean;
             /** Format: uuid */
             event_id: string;
-            /**
-             * @description The condition: its kind and subject, stable while it lasts, such as `stale_sources` or
-             *     `event:tick_overdue:<schedule>`.
-             */
+            /** @description The condition's kind and subject, stable while it lasts, such as `stale_sources`. */
             key: string;
-            /**
-             * @description What the condition looked like (counts, members, error codes), which later states are compared
-             *     with; a JSON object of at most 8 KiB. Never message text, which can hold relative times.
-             */
+            /** @description What the condition looks like, as a JSON object of at most 8 KiB that later states are compared with. */
             shape: unknown;
         };
         AuthenticationDenial: {

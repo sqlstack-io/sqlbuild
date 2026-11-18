@@ -1,42 +1,30 @@
-//! An acknowledgement is the latest acknowledging or withdrawing event of its subject, projected from the
-//! audit log; runs and attention conditions are both listed this way.
+//! An acknowledgement is its subject's latest acknowledging or withdrawing audit event.
 
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Duration, Utc};
-use serde_json::Value;
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::acknowledgements::models::{AcknowledgementListing, LatestAcknowledgement};
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
-use crate::credentials::models::{AuditContext, DefaultRole};
+use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
-/// The audit actions of one kind of acknowledgement, and the scope field naming its subject.
-pub(crate) struct AcknowledgementEvents {
-    pub(crate) acknowledged: &'static str,
-    pub(crate) withdrawn: &'static str,
-    pub(crate) subject: &'static str,
-}
-
-/// A subject's standing acknowledgement: who made it, when, and the event's scope.
-pub(crate) struct LatestAcknowledgement {
-    pub(crate) subject: String,
-    pub(crate) acknowledged_by: String,
-    pub(crate) acknowledged_at: DateTime<Utc>,
-    pub(crate) scope: Value,
-}
-
-/// Subjects of the target whose latest event within `window` acknowledges them, by subject. The person
-/// must be able to list the target's runs.
+/// Subjects whose latest event in the window acknowledges them, for a person who can list the runs.
 pub(crate) async fn latest_acknowledgements(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
-    (location_id, target): (Uuid, &str),
-    default_role: DefaultRole,
-    (events, window): (&AcknowledgementEvents, Duration),
+    listing: AcknowledgementListing<'_>,
 ) -> Result<Vec<LatestAcknowledgement>, ControlError> {
+    let AcknowledgementListing {
+        location_id,
+        target,
+        default_role,
+        events,
+        window,
+    } = listing;
     let (transaction, _) = authorize_listing(
         begin(store, TransactionMode::Write).await?,
         (context, credentials),

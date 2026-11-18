@@ -3,19 +3,13 @@
 use chrono::Duration;
 use uuid::Uuid;
 
-use crate::acknowledgements::_helpers::latest_events::{
-    AcknowledgementEvents, latest_acknowledgements,
-};
+use crate::acknowledgements::_helpers::latest_events::latest_acknowledgements;
+use crate::acknowledgements::constants::{RUN_EVENTS, RUN_LISTING_DAYS};
+use crate::acknowledgements::models::AcknowledgementListing;
 use crate::acknowledgements::models::RunAcknowledgement;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-
-const RUN_EVENTS: AcknowledgementEvents = AcknowledgementEvents {
-    acknowledged: "run.acknowledged",
-    withdrawn: "run.acknowledgement_withdrawn",
-    subject: "run_id",
-};
 
 /// Runs marked handled in the last week; the overview lists only a day of problems.
 pub async fn list_person_acknowledgements(
@@ -24,15 +18,15 @@ pub async fn list_person_acknowledgements(
     (location_id, target): (Uuid, &str),
     default_role: DefaultRole,
 ) -> Result<Vec<RunAcknowledgement>, ControlError> {
-    let latest = latest_acknowledgements(
-        store,
-        person,
-        (location_id, target),
+    let listing = AcknowledgementListing {
+        location_id,
+        target,
         default_role,
-        (&RUN_EVENTS, Duration::days(7)),
-    )
-    .await?;
-    latest
+        events: &RUN_EVENTS,
+        window: Duration::days(RUN_LISTING_DAYS),
+    };
+    latest_acknowledgements(store, person, listing)
+        .await?
         .into_iter()
         .map(|ack| {
             Ok(RunAcknowledgement {
