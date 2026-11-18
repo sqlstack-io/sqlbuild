@@ -14,11 +14,18 @@ use crate::store_migrations::models::{StoreMigration, StoreMigrationPlan};
 use crate::store::constants::{INDEXES, SCHEMA};
 
 /// The migrations after the baseline, in order: entry `i` includes `store_migrations/sql/{NNNN}_{name}.{sqlite,postgres}.sql` and brings a store to version `NNNN = BASELINE_VERSION + i + 1`.
-pub(crate) const MIGRATIONS: &[StoreMigration] = &[StoreMigration {
-    name: "large_project_server",
-    sqlite: include_str!("../sql/0002_large_project_server.sqlite.sql"),
-    postgres: include_str!("../sql/0002_large_project_server.postgres.sql"),
-}];
+pub(crate) const MIGRATIONS: &[StoreMigration] = &[
+    StoreMigration {
+        name: "large_project_server",
+        sqlite: include_str!("../sql/0002_large_project_server.sqlite.sql"),
+        postgres: include_str!("../sql/0002_large_project_server.postgres.sql"),
+    },
+    StoreMigration {
+        name: "attention_acknowledgement_index",
+        sqlite: include_str!("../sql/0003_attention_acknowledgement_index.sqlite.sql"),
+        postgres: include_str!("../sql/0003_attention_acknowledgement_index.postgres.sql"),
+    },
+];
 
 /// The schema version a store created by this build has.
 pub(crate) fn current_version(migrations: &[StoreMigration]) -> i64 {

@@ -327,11 +327,17 @@ server can't read what they wrote.
 the control server is older than this worker and refused its run report; upgrade the server before its workers
 ```
 
-Some releases add an index to the control database, which the server builds when it starts. On
-PostgreSQL that build holds a lock on its table, so on a large table writes wait for it: the index
-on acknowledgements in the audit log, for example, delays sign-ins until it is built. Upgrade when
-few people are signed in, or create the index yourself first with `CREATE INDEX CONCURRENTLY` and the
-definition in the release notes; the server then finds it already there.
+Some migrations add an index, which the server builds when it migrates. On PostgreSQL that build
+locks its table against writes, so on a large table those writes wait until it is built. Migration
+`0003` indexes acknowledgements in the audit log, so on a large audit log it holds up audit writes,
+including sign-ins. To avoid that, build the index yourself before you upgrade, without blocking
+writes:
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS sqb_security_audit_attention ON sqb_security_audit((scope_json ->> 'location_id'), (scope_json ->> 'target'), (scope_json ->> 'key'), storage_id) WHERE action IN ('attention.acknowledged', 'attention.acknowledgement_withdrawn');
+```
+
+The migration then finds the index already there and skips it.
 
 ## Set retention
 
