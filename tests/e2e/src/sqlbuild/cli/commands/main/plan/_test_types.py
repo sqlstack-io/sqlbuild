@@ -109,3 +109,13 @@ class PlanWithoutTimingsE2ETestCase:
     description: str
     plan_args: tuple[str, ...]
     expected_table_printed: bool
+
+
+@dataclass(frozen=True)
+class PlanFromE2ETestCase:
+    """Where a DuckDB plan is asked to read warehouse state, and what it says on stderr."""
+
+    description: str
+    plan_args: tuple[str, ...]
+    expected_stderr: str
+    unexpected_stderr: str

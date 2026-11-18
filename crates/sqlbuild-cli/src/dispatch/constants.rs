@@ -110,7 +110,7 @@ pub(crate) const DAG_ROUTE: Route = routed(
     },
 );
 
-const PLAN_FIELDS: [Field; 24] = [
+const PLAN_FIELDS: [Field; 25] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -135,6 +135,7 @@ const PLAN_FIELDS: [Field; 24] = [
     same("selection_diagnostics"),
     same("timings"),
     same("ignore_audit_failures"),
+    same("plan_from"),
 ];
 const PLAN_ARGUMENTS: [Field; 1] = [request(class("PlanCommandRequest"), &PLAN_FIELDS)];
 pub(crate) const PLAN_ROUTE: Route = routed(
@@ -144,13 +145,14 @@ pub(crate) const PLAN_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const BUILD_FIELDS: [Field; 39] = [
+const BUILD_FIELDS: [Field; 40] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
     same("defer_to"),
     same("defer_clone_from"),
     same("defer_sources_to"),
+    same("plan_from"),
     SELECTED_TARGET,
     CURSOR_OVERRIDES,
     NO_COLOR,

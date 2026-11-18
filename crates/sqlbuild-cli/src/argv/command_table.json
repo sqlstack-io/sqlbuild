@@ -1838,6 +1838,20 @@
        {
         "kind": "store",
         "options": [
+         "--plan-from"
+        ],
+        "dest": "plan_from",
+        "choices": [
+         "live",
+         "synced_state"
+        ],
+        "default": null,
+        "help": "read warehouse state live, or from the target's synced copy checked against the warehouse first (default: the target's plan_from, else live)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
          "--target"
         ],
         "dest": "target",
@@ -2275,6 +2289,20 @@
          "--defer-sources-to"
         ],
         "dest": "defer_sources_to",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--plan-from"
+        ],
+        "dest": "plan_from",
+        "choices": [
+         "live",
+         "synced_state"
+        ],
+        "default": null,
+        "help": "read warehouse state live, or from the target's synced copy checked against the warehouse first (default: the target's plan_from, else live)",
         "group": 1
        },
        {

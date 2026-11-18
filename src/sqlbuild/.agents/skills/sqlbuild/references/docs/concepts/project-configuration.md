@@ -188,6 +188,7 @@ A target is a named build context - the database and schema you build into, plus
 | `warehouses` | Snowflake warehouse per command group: `build`, `query` and `sync` (a location's warehouse syncs). See [Command-group warehouses](adapters/snowflake.md#command-group-warehouses) |
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
+| `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
 
 ```toml
 [connections.warehouse]
@@ -280,6 +281,37 @@ The value must be an integer of at least `1`; anything else fails with `D001`. `
 --verbose` shows the effective limit and the setting it came from, for example
 `8 configured limit (targets.prod.concurrency)`. `sqb scenario test` has no `--target` option and
 uses the active target's value.
+
+### Planning from synced state
+
+Every plan reads the warehouse's catalog: which tables and views exist and their columns. On a
+large project that is most of a plan's time. A target can instead plan from the copy of the
+catalog that `sqb dev` keeps synced in the project's control store, after checking it against
+the warehouse:
+
+```toml
+[targets.dev]
+schema = "analytics_dev"
+plan_from = "synced_state"
+```
+
+`--plan-from live` or `--plan-from synced_state` on `sqb plan` or `sqb build` overrides the target
+for one invocation. The default is `live`; SQLBuild cannot tell which target is production, so
+planning from synced state is something a target opts into.
+
+At the start of the plan, one `INFORMATION_SCHEMA.TABLES` read per database lists the schemas the
+copy holds, with each table's last DDL. The plan uses that listing, so tables created or dropped
+since the last sync are seen. It reads columns from the copy, except for tables whose last DDL is
+later than the copy's observation of them (allowing five minutes for clock skew), which it
+describes afresh. When more than 128 tables changed, it reads the schema's columns live instead.
+Cursor bounds and incremental state are still read live.
+
+The plan reads live, and says why on stderr (`Planning live: ...`), when the target's adapter
+isn't Snowflake (the only adapter that can check the copy), the project has no control store, no
+location syncs the target for this project, the copy is empty, or the check fails. Otherwise it reports `Planned from synced state: checked in 1.2s, 3 tables refreshed`. The
+control store is `.sqlbuild/control.sqlite3` in the project, or the database
+`SQLBUILD_CONTROL_DATABASE_URL` names. Planning never writes to it; only the location's sync
+refreshes the copy.
 
 ### Clone policies
 
