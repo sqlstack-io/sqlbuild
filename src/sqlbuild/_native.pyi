@@ -6560,6 +6560,7 @@ class BuildCommandRequest(NativeRecord):
     defer_to: str | None
     defer_clone_from: str | None
     defer_sources_to: str | None
+    plan_from: str | None
     selected_target: str | None
     cursor_overrides: CursorOverrides | None
     no_color: bool
@@ -6603,6 +6604,7 @@ class BuildCommandRequest(NativeRecord):
         defer_to: str | None = None,
         defer_clone_from: str | None = None,
         defer_sources_to: str | None = None,
+        plan_from: str | None = None,
         selected_target: str | None = None,
         cursor_overrides: CursorOverrides | None = None,
         no_color: bool = False,
@@ -6971,6 +6973,7 @@ class PlanCommandRequest(NativeRecord):
     no_sql_validation: bool
     defer_to: str | None
     defer_sources_to: str | None
+    plan_from: str | None
     selected_target: str | None
     as_target: str | None
     cursor_overrides: CursorOverrides | None
@@ -6997,6 +7000,7 @@ class PlanCommandRequest(NativeRecord):
         no_sql_validation: bool = False,
         defer_to: str | None = None,
         defer_sources_to: str | None = None,
+        plan_from: str | None = None,
         selected_target: str | None = None,
         as_target: str | None = None,
         cursor_overrides: CursorOverrides | None = None,
@@ -10234,6 +10238,7 @@ class CompilePipelineOptions(NativeRecord):
     accepts_unit_test_selectors: bool
     sql_test_selection: SqlTestSelection
     source_lexical_syntax: SqlLexicalSyntax | None
+    plan_from: str | None
     ignore_audit_failures: bool
     def __init__(
         self,
@@ -10262,6 +10267,7 @@ class CompilePipelineOptions(NativeRecord):
         accepts_unit_test_selectors: bool = ...,
         sql_test_selection: SqlTestSelection = ...,
         source_lexical_syntax: SqlLexicalSyntax | None = ...,
+        plan_from: str | None = ...,
         ignore_audit_failures: bool = ...,
     ) -> None: ...
 
@@ -11991,6 +11997,7 @@ class TargetConfig(NativeRecord):
     concurrency: int | None
     catalog_connection: str | None
     ignore_audit_failures: bool | None
+    plan_from: str | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12016,6 +12023,7 @@ class TargetConfig(NativeRecord):
         concurrency: int | None = ...,
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
+        plan_from: str | None = ...,
     ) -> None: ...
 
 class LocalTargetConfig(NativeRecord):
@@ -12044,6 +12052,7 @@ class LocalTargetConfig(NativeRecord):
     concurrency: int | None
     catalog_connection: str | None
     ignore_audit_failures: bool | None
+    plan_from: str | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12070,6 +12079,7 @@ class LocalTargetConfig(NativeRecord):
         concurrency: int | None = ...,
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
+        plan_from: str | None = ...,
     ) -> None: ...
 
 class SettingsConfig(NativeRecord):

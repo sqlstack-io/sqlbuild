@@ -121,6 +121,7 @@ from sqlbuild.adapter.relations.main.run_recorded_inspection_query import (
 )
 from sqlbuild.adapter.relations.models import (
     ListedRelation,
+    RelationChange,
     SchemaColumnListing,
     SchemaRelationListing,
 )
@@ -143,6 +144,7 @@ from sqlbuild.adapters.snowflake._helpers.metadata_types import (
     information_schema_type,
     show_columns_type,
 )
+from sqlbuild.adapters.snowflake._helpers.relation_changes import relation_change_from_row
 from sqlbuild.adapters.snowflake._helpers.relation_usage import read_relation_usage
 from sqlbuild.adapters.snowflake._helpers.show_metadata import (
     is_missing_object_error,
@@ -201,6 +203,10 @@ _RELATION_LISTING_COLUMNS: str = (
     "table_name, table_schema, table_type, is_transient, created, last_altered, retention_time"
 )
 _BULK_COLUMN_RELATION_CHUNK_SIZE: int = 2_000
+_RELATION_CHANGE_COLUMNS: str = (
+    "table_name, table_schema, table_type, is_transient, created, last_altered, last_ddl, "
+    "retention_time"
+)
 
 
 class SnowflakeAdapter(
@@ -2259,6 +2265,34 @@ class SnowflakeAdapter(
             last_altered_at=relation_age_timestamp_utc(row[5]),
             retention_days=None if row[6] is None else int(row[6]),
         )
+
+    def read_relation_changes(
+        self, *, connection: _SnowflakeConnection, database: str | None, schemas: tuple[str, ...]
+    ) -> dict[str, tuple[RelationChange, ...]]:
+        """List schemas from INFORMATION_SCHEMA.TABLES, whose LAST_DDL moves with each DDL."""
+
+        placeholders: str = ", ".join(["%s"] * len(schemas))
+        query: str = (
+            f"SELECT {_RELATION_CHANGE_COLUMNS} "
+            f"FROM {self._information_schema_relation(database=database, name='tables')} "
+            f"WHERE table_schema IN ({placeholders})"
+        )
+        params: list[str] = [self._information_schema_identifier(schema) for schema in schemas]
+        if database is not None:
+            query += " AND table_catalog = %s"
+            params.append(self._information_schema_identifier(database))
+        rows: list[tuple[Any, ...]] = self._fetch_inspection_rows(
+            connection=connection, query=query, params=tuple(params)
+        )
+        changes: dict[str, list[RelationChange]] = {
+            self.metadata_name_key(schema): [] for schema in schemas
+        }
+        row: tuple[Any, ...]
+        for row in rows:
+            changes.setdefault(self.metadata_name_key(str(row[1])), []).append(
+                relation_change_from_row(row=row, database=database)
+            )
+        return {schema: tuple(listed) for schema, listed in changes.items()}
 
     def read_relation_change_token(
         self, *, connection: _SnowflakeConnection, database: str | None, schema: str, name: str
