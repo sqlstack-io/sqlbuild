@@ -80,8 +80,7 @@ pub(crate) async fn next_ingestion_chunk(
     .await
 }
 
-/// Delivered rows take the scan's id; a complete scan deletes every row it did not deliver.
-/// A read's last page also counts the records the target mirrors of `table`.
+/// Delivered rows take the scan's id, a complete scan deletes the rest, and a last page counts `table`'s mirror.
 pub(crate) async fn commit_ingestion(
     mut transaction: ControlTransaction,
     (table, location_id, target): (&str, Uuid, &str),

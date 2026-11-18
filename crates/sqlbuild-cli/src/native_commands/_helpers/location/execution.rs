@@ -1368,8 +1368,7 @@ pub(crate) async fn stop_location_runtime(
     Ok(())
 }
 
-/// An outer absence means shutdown; an inner error is a failed read, never an empty table.
-/// A state-table or catalog page that takes longer than `page_seconds` counts as failed.
+/// An outer absence means shutdown; an inner error is a failed read, including a page slower than its limit.
 pub(crate) async fn read_metadata_page(
     (options, script, page_seconds): (&LocationServe, &Path, u64),
     mut state: LocationMetadataSync,

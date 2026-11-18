@@ -377,8 +377,7 @@ pub(crate) struct ScanToken {
     pub(crate) reconciled: bool,
     /// The read delivered rows or read on top of mirrored rows, so an empty mirror lost rows.
     pub(crate) delivered: bool,
-    /// The newest row count the server reported for this kind's mirror, which covers every state
-    /// location, so a later read of the same kind elsewhere replaces it; a skipped read reports it again.
+    /// The server's newest count of this kind's mirror over every state location, which a skipped read repeats.
     pub(crate) mirrored: Option<u64>,
 }
 

@@ -437,19 +437,22 @@ fn given_a_table_skipped_as_unchanged_when_reporting_health_then_the_newest_mirr
         state.scan_token = Some("t1".into());
         state.scan_delivered = true;
         state.progress.scan_mirrored = Some(120);
-        let mut state = acknowledge_complete_pages(state, 1);
+        let state = acknowledge_complete_pages(state, 1);
         assert_eq!(
             state.progress.scan_mirrored, None,
             "{}: the next table starts without a count",
             test_case.description
         );
-        if let Some(count) = test_case.later_read {
-            state.index = 0;
-            state.scan_token = Some("t2".into());
-            state.scan_delivered = true;
-            state.progress.scan_mirrored = Some(count);
-            state = acknowledge_complete_pages(state, 1);
-        }
+        let mut state = test_case
+            .later_read
+            .into_iter()
+            .fold(state, |mut state, count| {
+                state.index = 0;
+                state.scan_token = Some("t2".into());
+                state.scan_delivered = true;
+                state.progress.scan_mirrored = Some(count);
+                acknowledge_complete_pages(state, 1)
+            });
         state.index = skipped;
         state.skip_unchanged();
         let health = metadata_health_of(&state, (Instant::now(), None, None), Utc::now());
