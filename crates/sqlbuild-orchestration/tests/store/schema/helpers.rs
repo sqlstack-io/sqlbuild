@@ -278,6 +278,37 @@ pub(crate) async fn table_rows(store: &ControlStore, tables: &[&str]) -> Vec<Vec
     all
 }
 
+/// `rows` with only the columns each table's first `before` row has, so columns a migration added don't count as changes.
+pub(crate) fn without_added_columns(rows: Vec<Vec<Row>>, before: &[Vec<Row>]) -> Vec<Vec<Row>> {
+    rows.into_iter()
+        .zip(before)
+        .map(|(table, old)| {
+            let Some(columns) = old.first() else {
+                return table;
+            };
+            table
+                .into_iter()
+                .map(|mut row| {
+                    row.retain(|column, _| columns.contains_key(column));
+                    row
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// The text `item` column of every row `sql` returns, in its order.
+pub(crate) async fn query_items(store: &ControlStore, sql: &str) -> Vec<String> {
+    let transaction = begin(store, TransactionMode::Read)
+        .await
+        .expect("begin read");
+    let (transaction, rows) = query(transaction, sql, vec![])
+        .await
+        .unwrap_or_else(|error| panic!("{sql}: {error}"));
+    commit(transaction).await.expect("finish read");
+    rows.iter().map(|row| text(row, "item")).collect()
+}
+
 /// The store's recorded schema version.
 pub(crate) async fn recorded_version(store: &ControlStore) -> Option<i64> {
     let transaction = begin(store, TransactionMode::Read)

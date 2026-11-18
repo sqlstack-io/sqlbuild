@@ -4,11 +4,13 @@ use crate::store::constants::{INDEXES, SCHEMA};
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::schema::helpers::{
     BASELINE_ROWS, POPULATED_TABLES, POSTGRES_STORE, SQLITE_STORE, create_unversioned_baseline,
-    execute, migration_names, rebuilt_runs_table, recorded_version, schema_shape, table_rows,
+    execute, migration_names, query_items, rebuilt_runs_table, recorded_version, schema_shape,
+    table_rows, without_added_columns,
 };
 use crate::store::tests::schema::test_types::{
-    BaselineUpgradeTestCase, BrokenMigrationTestCase, MigrationRefusalTestCase,
-    PinnedChecksumTestCase, StoreMigrationPlanTestCase, TableRebuildTestCase,
+    BaselineUpgradeTestCase, BrokenMigrationTestCase, LiveWorkUpgradeTestCase,
+    MigrationRefusalTestCase, PinnedChecksumTestCase, StoreMigrationPlanTestCase,
+    TableRebuildTestCase,
 };
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_migrations::_helpers::migration::{
@@ -26,14 +28,61 @@ const SKIPPED_RUN: &str = "INSERT INTO sqb_runs (run_id, location_id, target, sn
     '018f0000-0000-7000-8000-000000000002', 'job', 'manual', \
     '018f0000-0000-7000-8000-000000000007', '018f0000-0000-7000-8000-000000000007', 'admin', \
     '[]', '{}', 'digest-2', 'skipped', '2026-11-02T10:00:00Z', '{}', 13)";
-const SQLITE_CHECKSUMS: &[(i64, &str)] = &[(
-    1,
-    "6d0e581f453370ec5156053d644dea3b22b19332cee588eb69ac3141ada5a76b",
-)];
-const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[(
-    1,
-    "2a81e526eb1181eeab0b897e8b3f48ae2dd9425d85cb788874670d942bbc76c4",
-)];
+const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
+    (
+        1,
+        "6d0e581f453370ec5156053d644dea3b22b19332cee588eb69ac3141ada5a76b",
+    ),
+    (
+        2,
+        "4d4e3aa56b3a39d8550f691ae12fe463187b4f4cdeacc66ca94803701cab5e0a",
+    ),
+];
+const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
+    (
+        1,
+        "2a81e526eb1181eeab0b897e8b3f48ae2dd9425d85cb788874670d942bbc76c4",
+    ),
+    (
+        2,
+        "99e13d88687d6e590e47149200a0d1cb03c0ff285a95339da40b76cba99e2a21",
+    ),
+];
+/// A version 1 store mid-run: a child run holding a concurrency slot, a jobs document and an audit result.
+const VERSION_1_LIVE_WORK: &str = "ALTER TABLE sqb_schema_version ADD COLUMN version BIGINT; \
+    UPDATE sqb_schema_version SET version = 1; \
+    INSERT INTO sqb_runs (run_id, location_id, target, snapshot_id, kind, origin, job_key, \
+    parent_run_id, root_run_id, requested_by, selection_json, request_json, write_set_digest, status, \
+    queued_at, node_counts_json, last_event_storage_id) VALUES \
+    ('018f0000-0000-7000-8000-000000000009', '018f0000-0000-7000-8000-000000000001', 'prod', \
+    '018f0000-0000-7000-8000-000000000002', 'job', 'manual', 'daily_orders', \
+    '018f0000-0000-7000-8000-000000000007', '018f0000-0000-7000-8000-000000000007', 'admin', '[]', \
+    '{}', 'digest-3', 'running', '2026-11-01T11:00:00Z', '{}', 14); \
+    INSERT INTO sqb_concurrency_slots (group_key, slot, run_id) VALUES \
+    ('orders', 1, '018f0000-0000-7000-8000-000000000009'); \
+    INSERT INTO sqb_documents (document_hash, body) VALUES ('document-1', ''); \
+    INSERT INTO sqb_snapshot_documents (snapshot_id, kind, document_hash) VALUES \
+    ('018f0000-0000-7000-8000-000000000002', 'jobs', 'document-1'); \
+    INSERT INTO sqb_warehouse_audit_results (event_id, location_id, target, observed_at, state_schema, \
+    audit_name, outcome, record_json, received_at) VALUES ('018f0000-0000-7000-8000-00000000000a', \
+    '018f0000-0000-7000-8000-000000000001', 'prod', '2026-11-01T10:03:00Z', 'analytics', \
+    'orders_present', 'error', '{}', '2026-11-01T10:04:00Z')";
+/// Writes version 2 allows: a skipped run, a second slot for one run and a connection document.
+const VERSION_2_WRITES: &str = "INSERT INTO sqb_concurrency_slots (group_key, slot, run_id) VALUES \
+    ('orders', 2, '018f0000-0000-7000-8000-000000000009'); \
+    INSERT INTO sqb_snapshot_documents (snapshot_id, kind, document_hash) VALUES \
+    ('018f0000-0000-7000-8000-000000000002', 'connection', 'document-1')";
+const RUNS_AFTER_UPGRADE: &str = "SELECT CAST(run_id AS TEXT) || ' ' || status || ' ' \
+    || CAST(ignored_audit_failures AS TEXT) AS item FROM sqb_runs ORDER BY run_id";
+const AUDITS_AFTER_UPGRADE: &str = "SELECT audit_name || CASE WHEN ignored THEN ' ignored' ELSE ' counted' END \
+    AS item FROM sqb_warehouse_audit_results UNION ALL SELECT 'view rows ' || CAST(COUNT(ignored) AS TEXT) \
+    FROM audit_results";
+const JOINED_REFERENCES: &str = "SELECT 'run nodes ' || CAST(COUNT(*) AS TEXT) AS item FROM sqb_run_nodes \
+    JOIN sqb_runs USING (run_id) UNION ALL SELECT 'slots ' || CAST(COUNT(*) AS TEXT) \
+    FROM sqb_concurrency_slots JOIN sqb_runs USING (run_id) UNION ALL SELECT 'child runs ' \
+    || CAST(COUNT(*) AS TEXT) FROM sqb_runs child JOIN sqb_runs parent ON parent.run_id = child.parent_run_id \
+    UNION ALL SELECT 'documents ' || CAST(COUNT(*) AS TEXT) FROM sqb_snapshot_documents \
+    JOIN sqb_documents USING (document_hash) UNION ALL SELECT 'runs ' || CAST(COUNT(*) AS TEXT) FROM sqb_runs";
 const DANGLING_RUN_NODE: &str = "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes) \
     VALUES ('018f0000-0000-7000-8000-0000000000ff', 'model.ghost', 'success', TRUE)";
 const WIDEN_RUN_STATUS_POSTGRES: &str = "ALTER TABLE sqb_runs DROP CONSTRAINT sqb_runs_status_check; \
@@ -93,7 +142,10 @@ fn given_store_at_the_baseline_when_migrating_then_it_matches_a_new_store_and_ke
             assert_eq!(
                 (
                     schema_shape(&upgraded.store, test_case.dialect).await,
-                    table_rows(&upgraded.store, &POPULATED_TABLES).await,
+                    without_added_columns(
+                        table_rows(&upgraded.store, &POPULATED_TABLES).await,
+                        &before
+                    ),
                     recorded_version(&upgraded.store).await,
                 ),
                 (
@@ -107,6 +159,78 @@ fn given_store_at_the_baseline_when_migrating_then_it_matches_a_new_store_and_ke
             );
             close_test_store(upgraded).await;
             close_test_store(created).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_version_1_store_with_live_work_when_migrating_then_rows_default_and_references_join() {
+    let test_cases = [
+        LiveWorkUpgradeTestCase {
+            description: "SQLite store",
+            dialect: &SQLITE_STORE,
+            foreign_key_check: "SELECT \"table\" || ' ' || parent AS item FROM pragma_foreign_key_check",
+            expected_version: 2,
+        },
+        LiveWorkUpgradeTestCase {
+            description: "PostgreSQL store",
+            dialect: &POSTGRES_STORE,
+            foreign_key_check: "SELECT 'enforced' AS item WHERE FALSE",
+            expected_version: 2,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.dialect.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            create_unversioned_baseline(
+                store,
+                test_case.dialect,
+                test_case.dialect.baseline_checksum,
+            )
+            .await;
+            execute(store, VERSION_1_LIVE_WORK).await;
+
+            migrate_store(store)
+                .await
+                .expect("upgrade the version 1 store");
+            execute(store, SKIPPED_RUN).await;
+            execute(store, VERSION_2_WRITES).await;
+
+            assert_eq!(
+                (
+                    recorded_version(store).await,
+                    query_items(store, test_case.foreign_key_check).await,
+                    query_items(store, RUNS_AFTER_UPGRADE).await,
+                    query_items(store, AUDITS_AFTER_UPGRADE).await,
+                    query_items(store, JOINED_REFERENCES).await,
+                ),
+                (
+                    Some(test_case.expected_version),
+                    Vec::<String>::new(),
+                    vec![
+                        "018f0000-0000-7000-8000-000000000007 success 0".to_owned(),
+                        "018f0000-0000-7000-8000-000000000008 skipped 0".to_owned(),
+                        "018f0000-0000-7000-8000-000000000009 running 0".to_owned(),
+                    ],
+                    vec![
+                        "orders_present counted".to_owned(),
+                        "view rows 0".to_owned()
+                    ],
+                    vec![
+                        "run nodes 1".to_owned(),
+                        "slots 2".to_owned(),
+                        "child runs 2".to_owned(),
+                        "documents 2".to_owned(),
+                        "runs 3".to_owned(),
+                    ],
+                ),
+                "{}: version, broken references, runs, audit results and joined references",
+                test_case.description
+            );
+            close_test_store(fixture).await;
         });
     }
 }

@@ -54,6 +54,14 @@ pub(crate) struct BaselineUpgradeTestCase {
     pub(crate) expected_version: i64,
 }
 
+pub(crate) struct LiveWorkUpgradeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static StoreDialect,
+    /// Rows naming each broken foreign key reference; SQLite checks them only on request.
+    pub(crate) foreign_key_check: &'static str,
+    pub(crate) expected_version: i64,
+}
+
 pub(crate) struct TableRebuildTestCase {
     pub(crate) description: &'static str,
     pub(crate) dialect: &'static StoreDialect,
