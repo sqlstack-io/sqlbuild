@@ -553,6 +553,7 @@ delta_compile = true
 | `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](python-nodes/providers.md#secrets). |
 | `allow_warehouse_round_trips` | `false` | Allow a loader to depend on a task or asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](python-nodes/overview.md#warehouse-round-trips). |
 | `ignore_audit_failures` | `false` | Let builds go on past failing audits: they still run and record `fail`, but promote, apply and build downstream as if they passed. A target, a job and `--ignore-audit-failures` / `--no-ignore-audit-failures` override it. See [Ignoring audit failures](audits.md#ignoring-audit-failures). |
+| `record_run_host` | `true` | Record the machine name in each run's rows in `_sqlbuild_runs`. See [Run records](../cli/build.md#run-records). |
 
 ### Unit test and scenario limits
 

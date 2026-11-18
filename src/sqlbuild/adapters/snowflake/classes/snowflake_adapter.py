@@ -699,6 +699,13 @@ class SnowflakeAdapter(
             schema=schema,
         )
 
+    def render_create_runs_table_sql(self, *, database: str | None, schema: str) -> str:
+        return self._with_state_table_retention(
+            create_sql=super().render_create_runs_table_sql(database=database, schema=schema),
+            database=database,
+            schema=schema,
+        )
+
     def render_create_microbatch_state_table_sql(self, *, database: str | None, schema: str) -> str:
         return self._with_state_table_retention(
             create_sql=super().render_create_microbatch_state_table_sql(
@@ -1307,6 +1314,9 @@ class SnowflakeAdapter(
 
     def render_current_utc_timestamp(self) -> str:
         return "SYSDATE()"
+
+    def render_current_warehouse_user(self) -> str | None:
+        return "CURRENT_USER()"
 
     def create_table_as(
         self,

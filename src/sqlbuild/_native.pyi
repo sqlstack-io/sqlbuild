@@ -191,6 +191,7 @@ OLD_NAME_VIEW_TABLE_NAME: str
 MICROBATCH_TABLE_NAME: str
 NODE_RESULTS_TABLE_NAME: str
 OBSERVATIONS_TABLE_NAME: str
+RUNS_TABLE_NAME: str
 AUDIT_RESULTS_TABLE_NAME: str
 JANITOR_EVENTS_TABLE_NAME: str
 COLUMN_NODE_TYPE: str
@@ -5535,6 +5536,13 @@ def build_consumption_prune_sql(
     retain_versions: int,
 ) -> str: ...
 def build_observations_create_table_sql(
+    *,
+    database: str | None,
+    schema: str,
+    render_qualified_name: Callable[..., str | None],
+    render_framework_type: Callable[[FrameworkType], str],
+) -> str: ...
+def build_runs_create_table_sql(
     *,
     database: str | None,
     schema: str,
@@ -12105,6 +12113,7 @@ class SettingsConfig(NativeRecord):
     allow_missing_secrets: bool
     allow_warehouse_round_trips: bool
     ignore_audit_failures: bool
+    record_run_host: bool
     def __init__(
         self,
         sql_analysis: bool = ...,
@@ -12127,6 +12136,7 @@ class SettingsConfig(NativeRecord):
         allow_missing_secrets: bool = ...,
         allow_warehouse_round_trips: bool = ...,
         ignore_audit_failures: bool = ...,
+        record_run_host: bool = ...,
     ) -> None: ...
     @property
     def sql_validation(self) -> bool: ...

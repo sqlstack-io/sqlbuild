@@ -16,6 +16,8 @@ use sqlbuild_core::seed_command::main::render_seed_row::render_seed_row;
 use sqlbuild_core::seed_command::main::seed_exit_code::seed_exit_code;
 use sqlbuild_core::seed_command::models::SeedRow;
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_state::runs::constants::SEED_COMMAND;
+use sqlbuild_state::runs::models::{RunEnding, RunNodeCounts};
 
 use crate::bindings::_helpers::command_runtime::invocation::resolve_command_invocation;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
@@ -39,6 +41,8 @@ use sqlbuild_python_output::result_output::main::results::write_execution_json_o
 use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
 use sqlbuild_python_planner::planner_entries::main::plans::build_seed_command_plan::build_seed_command_plan;
 use sqlbuild_python_planner::planner_entries::main::plans::read_selected_seed_fingerprints::read_selected_seed_fingerprints;
+use sqlbuild_python_project::native_host::main::run_recorder::run_recorder;
+use sqlbuild_python_project::native_host::models::RunRecorder;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 
@@ -479,17 +483,47 @@ pub(crate) fn run_seed<'py>(
     .limit
     .max(1);
     write_header(&invocation, &pipeline, concurrency)?;
+    let recorder: Option<RunRecorder<'_>> = run_recorder(
+        (SEED_COMMAND, env!("CARGO_PKG_VERSION")),
+        (request, &invocation, &native_field(&pipeline, "project")?),
+        worker.as_ref().map(|worker| worker.server_run()),
+    )?;
     let started: Instant = Instant::now();
-    let results: Vec<Bound<'_, PyAny>> = load_seeds(&invocation, &pipeline, (concurrency, worker))?;
+    let loaded: PyResult<Vec<Bound<'_, PyAny>>> =
+        load_seeds(&invocation, &pipeline, (concurrency, worker));
+    let results: Vec<Bound<'_, PyAny>> = match loaded {
+        Ok(results) => results,
+        Err(error) => {
+            if let Some(recorder) = &recorder {
+                recorder.raised(&error);
+            }
+            return Err(error);
+        }
+    };
     let elapsed: f64 = started.elapsed().as_secs_f64();
     let mut passed: usize = 0;
     let mut failed: usize = 0;
+    let mut warned: usize = 0;
     for result in &results {
         match status_value(result)?.as_str() {
             SUCCESS_STATUS => passed += 1,
             FAILED_STATUS => failed += 1,
             _ => {}
         }
+        warned += native_field(result, "warning_messages")?.len()?;
+    }
+    if let Some(recorder) = &recorder {
+        let count = |value: usize| i64::try_from(value).unwrap_or(i64::MAX);
+        recorder.finished(
+            &RunNodeCounts {
+                succeeded: count(passed),
+                warned: count(warned),
+                failed: count(failed),
+                skipped: count(results.len() - passed - failed),
+                not_started: 0,
+            },
+            RunEnding::Completed,
+        )?;
     }
     let stream: Bound<'_, PyAny> = native_field(&invocation, "progress_stream")?;
     let style: CliStyle = CliStyle {

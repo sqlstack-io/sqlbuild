@@ -11,6 +11,7 @@ rust-version.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
 pyo3.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 sqlbuild-analysis.workspace = true
@@ -30,6 +31,7 @@ sqlbuild-python-base.workspace = true
 sqlbuild-python-front.workspace = true
 sqlbuild-rules.workspace = true
 sqlbuild-sqltext.workspace = true
+sqlbuild-state.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 

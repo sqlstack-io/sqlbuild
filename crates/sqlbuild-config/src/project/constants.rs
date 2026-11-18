@@ -55,8 +55,10 @@ pub(crate) const ALLOW_MISSING_SECRETS_KEY: &str = "allow_missing_secrets";
 pub(crate) const SCENARIO_TIMEOUT_KEY: &str = "scenario_timeout";
 /// Whether a failing audit holds nothing back; `[settings]` and each target may set it.
 pub(crate) const IGNORE_AUDIT_FAILURES_KEY: &str = "ignore_audit_failures";
+/// Whether each run records the machine it ran on in the runs state table.
+pub(crate) const RECORD_RUN_HOST_KEY: &str = "record_run_host";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";
-pub(crate) const SETTINGS_KEYS: [&str; 18] = [
+pub(crate) const SETTINGS_KEYS: [&str; 19] = [
     "sql_analysis",
     "require_sql_analysis",
     "query_change_tracking",
@@ -75,6 +77,7 @@ pub(crate) const SETTINGS_KEYS: [&str; 18] = [
     "allow_missing_secrets",
     "allow_warehouse_round_trips",
     IGNORE_AUDIT_FAILURES_KEY,
+    RECORD_RUN_HOST_KEY,
 ];
 pub(crate) const DEFAULTS_KEYS: [&str; 33] = [
     "append_cursor_inclusive",

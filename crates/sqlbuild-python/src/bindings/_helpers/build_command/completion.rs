@@ -11,6 +11,7 @@ use sqlbuild_core::build_command::models::PhaseTimings;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::BuildStatus;
+use sqlbuild_state::runs::models::{RunEnding, RunNodeCounts};
 
 use crate::bindings::_helpers::build_command::execution::Outcome;
 use crate::bindings::_helpers::build_command::execution::Preparation;
@@ -416,6 +417,36 @@ fn check_node_text(check: &CheckResultText) -> PythonNodeText {
         },
         error_message: message,
     }
+}
+
+/// A completed build's footer node counts, and `Raised` when it failed without a failed node.
+pub(crate) fn finished_run(
+    outcome: &Outcome<'_>,
+    check_results: &Bound<'_, PyAny>,
+) -> PyResult<(RunNodeCounts, RunEnding)> {
+    let result = &outcome.result;
+    let mut counts: RunNodeCounts = RunNodeCounts {
+        succeeded: result.success_count,
+        warned: result.warning_count,
+        failed: result.failure_count,
+        skipped: result.skipped_count,
+        not_started: 0,
+    };
+    for node in outcome.python_results.try_iter()? {
+        let node: Bound<'_, PyAny> = node?;
+        let status: String = native_field(&node, "status")?.str()?.extract()?;
+        counts = counts.with_python_node(&status, native_field(&node, "warning_messages")?.len()?);
+    }
+    for check in check_results.try_iter()? {
+        let check: PythonNodeText = check_node_text(&check_result_text(&check?)?);
+        counts = counts.with_python_node(&check.status, check.warnings.len());
+    }
+    let ending: RunEnding = if result.status != BuildStatus::Success && counts.failed == 0 {
+        RunEnding::Raised
+    } else {
+        RunEnding::Completed
+    };
+    Ok((counts, ending))
 }
 
 /// Persist and render a completed direct build and return its exit code.

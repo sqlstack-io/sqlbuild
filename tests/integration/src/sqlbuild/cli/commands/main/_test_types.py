@@ -1436,3 +1436,42 @@ class JobSelectorBuildTestCase:
     expected_exit_code: int
     expected_tables: frozenset[str]
     expected_fragment: str = ""
+
+
+@dataclass(frozen=True)
+class RunRecordTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    expected_exit_code: int
+    # Each row as (phase, command, select_json, named_jobs_json, var_keys_json, status, counts).
+    expected_rows: list[tuple[str, str, str, str, str, str | None, str | None]]
+    settings: str = ""
+    expected_host_recorded: bool = True
+
+
+@dataclass(frozen=True)
+class RunRecordFailureTestCase:
+    description: str
+    warehouse_setup: str
+    expected_exit_code: int
+    expected_warning: str
+    expected_tables: frozenset[str]
+
+
+@dataclass(frozen=True)
+class InterruptedRunRecordTestCase:
+    description: str
+    expected_tables: frozenset[str]
+
+
+@dataclass(frozen=True)
+class KilledRunRecordTestCase:
+    description: str
+    expected_phases: list[str]
+
+
+@dataclass(frozen=True)
+class SeedRunRecordTestCase:
+    description: str
+    # Each row as (phase, command, select_json, named_jobs_json, var_keys_json, status, counts).
+    expected_rows: list[tuple[str, str, str, str, str, str | None, str | None]]

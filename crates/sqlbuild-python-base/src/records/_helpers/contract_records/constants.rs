@@ -239,6 +239,7 @@ const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("allow_missing_secrets", FieldDefault::False),
         FieldSpec::new("allow_warehouse_round_trips", FieldDefault::False),
         FieldSpec::new("ignore_audit_failures", FieldDefault::False),
+        FieldSpec::new("record_run_host", FieldDefault::True),
     ],
 };
 const R_SCOPES_CONFIG: RecordSpec = RecordSpec {

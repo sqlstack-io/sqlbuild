@@ -525,6 +525,15 @@ class SqlServerAdapter(
             key_columns=("kind", "node"),
         )
 
+    def render_create_runs_table_sql(self, *, database: str | None, schema: str) -> str:
+        from sqlbuild._native import RUNS_TABLE_NAME
+
+        return self._keyed_state_table_sql(
+            create_sql=super().render_create_runs_table_sql(database=database, schema=schema),
+            table=(database, schema, RUNS_TABLE_NAME),
+            key_columns=("run_id", "phase"),
+        )
+
     def render_create_consumption_index_sqls(
         self, *, database: str | None, schema: str
     ) -> tuple[str, ...]:
@@ -2306,6 +2315,9 @@ class SqlServerAdapter(
 
     def render_current_utc_timestamp(self) -> str:
         return "SYSUTCDATETIME()"
+
+    def render_current_warehouse_user(self) -> str | None:
+        return "SUSER_SNAME()"
 
     def render_delete_insert(
         self,
