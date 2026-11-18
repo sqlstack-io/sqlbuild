@@ -77,13 +77,14 @@ def test_given_default_config_when_running_janitor_then_it_reports_disabled(
             expected_stdout_fragments=(
                 "relations to archive   1",
                 "archives to delete     0",
-                "objects skipped        5",
+                "objects skipped        6",
                 "main.janitor_tracked_extra  ->  main._sqb_archive__",
                 "main.janitor_untracked_extra  relation is not tracked by SQLBuild",
                 "main.partition_state  relation matches exclude pattern 'partition_*'",
                 "main._sqlbuild_fingerprints  relation matches exclude pattern",
                 "main._sqlbuild_microbatches  relation matches exclude pattern",
                 "main._sqlbuild_consumption  relation matches exclude pattern",
+                "main._sqlbuild_runs  relation matches exclude pattern",
                 "Archived 1 relation.",
             ),
             expected_existing_tables=(
@@ -94,6 +95,7 @@ def test_given_default_config_when_running_janitor_then_it_reports_disabled(
                 "_sqlbuild_microbatches",
                 "_sqlbuild_janitor_events",
                 "_sqlbuild_consumption",
+                "_sqlbuild_runs",
             ),
             expected_missing_tables=("janitor_tracked_extra",),
             expected_archived_original_names=("janitor_tracked_extra",),
@@ -317,7 +319,7 @@ def test_given_source_in_managed_schema_when_running_direct_janitor_then_blocks_
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "relations to archive   2",
-                "objects skipped        3",
+                "objects skipped        4",
                 "main.__sqb_a13f09c2e7b8__model__daily_revenue  ->  main._sqb_archive__",
                 "main.__sqb_a13f09c2e7b8__source__raw_orders  ->  main._sqb_archive__",
                 "main.__sqb_a13f09c2e7b__model__daily_revenue  relation is not tracked by SQLBuild",
