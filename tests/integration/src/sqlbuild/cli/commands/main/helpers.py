@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from itertools import takewhile
 from pathlib import Path
 from types import ModuleType
@@ -1414,11 +1414,45 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
 }
 
 
-def write_run_record_project(*, project_dir: Path, settings: str) -> None:
-    """Write the project, with `settings` appended to the project file."""
+RUN_RECORD_MARTS_FILES: dict[str, str] = {
+    "models/marts/revenue.sql": (
+        "MODEL (description 'Revenue in the marts schema.', materialized table);\n"
+        "SELECT 10 AS amount\n"
+    ),
+    "models/marts/daily_events.sql": (
+        "MODEL (description 'Loaded events in the marts schema.', materialized table);\n"
+        'SELECT event_id FROM __source("landed_events")\n'
+    ),
+    "python/loaders/events.py": (
+        "from sqlbuild.loaders import loader\n\n\n"
+        "@loader\n"
+        "def landed_events(ctx):\n"
+        '    """Load one event."""\n\n'
+        '    return [{"event_id": 1}]\n'
+    ),
+    "sources/landed.yml": (
+        "sources:\n  - name: landed_events\n    description: Loaded events.\n    schema: landing\n"
+        "    managed: true\n    write_strategy: table\n    columns:\n"
+        "      - name: event_id\n        type: INTEGER\n"
+    ),
+    "seeds/regions.csv": "region_id\n1\n",
+    "seeds/regions.yml": (
+        "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
+        "      - name: region_id\n        type: INTEGER\n"
+    ),
+}
+
+RUN_RECORD_MARTS_SCHEMA: str = '\n[path_defaults.marts]\nschema = "marts"\n'
+
+
+def write_run_record_project(
+    *, project_dir: Path, settings: str, extra_files: dict[str, str] | None = None
+) -> None:
+    """Write the project with `extra_files`, and `settings` appended after its `dev` target."""
 
     files: dict[str, str] = {
         **RUN_RECORD_PROJECT_FILES,
+        **(extra_files or {}),
         "sqlbuild_project.toml": (
             'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
             '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n' + settings
@@ -1430,13 +1464,59 @@ def write_run_record_project(*, project_dir: Path, settings: str) -> None:
         destination.write_text(contents, encoding="utf-8")
 
 
-def run_rows(*, project_dir: Path, columns: str) -> list[tuple[object, ...]]:
-    """`columns` of every runs-table row, oldest first."""
+def run_rows(*, project_dir: Path, columns: str, schema: str = "main") -> list[tuple[object, ...]]:
+    """`columns` of every row of `schema`'s runs table, oldest first."""
 
     with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
         return warehouse.sql(
-            f"SELECT {columns} FROM main._sqlbuild_runs ORDER BY recorded_at, phase DESC"
+            f"SELECT {columns} FROM {schema}._sqlbuild_runs ORDER BY recorded_at, phase DESC"
         ).fetchall()
+
+
+def schema_run_phases(*, project_dir: Path, schemas: Iterable[str]) -> dict[str, list[str]]:
+    """The phases of each of `schemas`' runs table, oldest first."""
+
+    phases: dict[str, list[str]] = {}
+    schema: str
+    for schema in schemas:
+        rows: list[tuple[object, ...]] = run_rows(
+            project_dir=project_dir, columns="phase", schema=schema
+        )
+        phases[schema] = [str(row[0]) for row in rows]
+    return phases
+
+
+def schema_run_ids(*, project_dir: Path, schemas: Iterable[str]) -> set[object]:
+    """Every run ID in `schemas`' runs tables."""
+
+    run_ids: set[object] = set()
+    schema: str
+    for schema in schemas:
+        rows: list[tuple[object, ...]] = run_rows(
+            project_dir=project_dir, columns="run_id", schema=schema
+        )
+        run_ids.update(row[0] for row in rows)
+    return run_ids
+
+
+def warehouse_schemas(*, project_dir: Path) -> frozenset[str]:
+    """The schemas of the project's warehouse."""
+
+    with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
+        rows: list[tuple[str]] = warehouse.sql(
+            "SELECT schema_name FROM duckdb_schemas() WHERE database_name = 'demo'"
+        ).fetchall()
+    return frozenset(name for (name,) in rows)
+
+
+def runs_tables(*, project_dir: Path) -> frozenset[str]:
+    """The schemas holding a runs table."""
+
+    with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
+        rows: list[tuple[str]] = warehouse.sql(
+            "SELECT schema_name FROM duckdb_tables() WHERE table_name = '_sqlbuild_runs'"
+        ).fetchall()
+    return frozenset(name for (name,) in rows)
 
 
 def built_tables(*, project_dir: Path) -> frozenset[str]:
