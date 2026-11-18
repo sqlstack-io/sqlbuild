@@ -140,5 +140,5 @@ pub(super) struct NestedMacroTestCase {
     pub(super) description: &'static str,
     pub(super) depth: usize,
     /// The expansion's `REPLACE` count, or the P015 message text when the body is too deep.
-    pub(super) expected: Result<usize, String>,
+    pub(super) expected_outcome: Result<usize, String>,
 }
