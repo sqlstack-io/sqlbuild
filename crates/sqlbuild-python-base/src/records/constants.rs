@@ -273,6 +273,7 @@ const BUILD_COMMAND_REQUEST: RecordSpec = RecordSpec {
         FieldSpec::new("selector_files", FieldDefault::EmptyTuple),
         FieldSpec::new("test_timeout", FieldDefault::None),
         FieldSpec::new("discovered_inputs", FieldDefault::None),
+        FieldSpec::new("compiled_project", FieldDefault::None),
     ],
 };
 const BUILD_INVOCATION: RecordSpec = RecordSpec {

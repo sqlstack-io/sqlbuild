@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { configChange, cursorWords, diffPreview, diffStats, sectionNote, groupWarnings, planGroups, planSummaryLine, selectedGroup, sharedNote, whitespaceOnly, type PlanRow } from './plan-index';
+import { cursorWords, diffPreview, diffStats, sectionNote, groupWarnings, planGroups, planSummaryLine, selectedGroup, sharedNote, whitespaceOnly, type PlanRow } from './plan-index';
 
 const empty: PlanDocument = {
 	selected_count: 0,
@@ -45,18 +45,6 @@ describe('whitespace-only query changes', () => {
 	});
 });
 
-describe('config changes in one line', () => {
-	it('reads up to two changed keys of the config JSON', () => {
-		expect(configChange([...head, '-  "full_refresh": true,', '+  "full_refresh": false,'])).toBe('full_refresh true → false');
-		expect(configChange(['-  "cursor": "observed_at",', '+  "cursor": "event_date",', '+  "grain": "day"'])).toBe('cursor observed_at → event_date; grain (unset) → day');
-	});
-
-	it('leaves more keys, or a nested value, to the diff', () => {
-		expect(configChange(['-  "a": 1,', '+  "a": 2,', '-  "b": 1,', '+  "b": 2,', '-  "c": 1,', '+  "c": 2,'])).toBeNull();
-		expect(configChange(['+  "meta": {'])).toBeNull();
-	});
-});
-
 describe('cursor ranges in words', () => {
 	it("words the executor's bound placeholders", () => {
 		expect(cursorWords('range: __SQB_CURSOR_START__ → __SQB_CURSOR_END__')).toBe('range: from the last run → the latest data when the run starts');
@@ -65,7 +53,7 @@ describe('cursor ranges in words', () => {
 });
 
 describe('notes every row shares', () => {
-	const row = (name: string, detail: string, notes: string[] = []): PlanRow => ({ name, action: 'table', detail, notes, diff: null, diffOf: null, warnings: [], linked: true, fetch: null, pendingConfig: false });
+	const row = (name: string, detail: string, notes: string[] = []): PlanRow => ({ name, action: 'table', detail, notes, diff: null, diffOf: null, warnings: [], linked: true, fetch: null });
 
 	it('finds the note every row carries, and none when one differs', () => {
 		expect(sharedNote([row('a', 'no completed record'), row('b', 'no completed record')])).toBe('no completed record');
@@ -108,7 +96,7 @@ describe('the plan index', () => {
 		models: [
 			model('orders', 'query_changed', { query_diff: [...head, '-select 1', '+select 2'] }),
 			model('payments', 'query_changed', { query_diff: [...head, '-select  1', '+select 1'] }),
-			model('refunds', 'config_changed', { config_diff: ['-  "full_refresh": true,', '+  "full_refresh": false,'] }),
+			model('refunds', 'config_changed', { config_diff: ['-  "full_refresh": true,', '+  "full_refresh": false,'], config_change: 'full_refresh true → false' }),
 			model('customers', 'first_run'),
 			model('regions', 'no_change')
 		],
@@ -168,47 +156,77 @@ describe('a plan from a server summary', () => {
 		models: [
 			model('orders', 'query_changed', { diff_stats: { query: { added: 82, removed: 104, whitespace_only: false } } }),
 			model('payments', 'query_changed', { diff_stats: { query: { added: 2, removed: 2, whitespace_only: true } } }),
-			model('refunds', 'config_changed', { diff_stats: { config: { added: 1, removed: 1, whitespace_only: false } } }),
+			model('refunds', 'config_changed', { config_change: 'full_refresh true → false', diff_stats: { config: { added: 1, removed: 1, whitespace_only: false } } }),
+			model('ledger', 'config_changed', { diff_stats: { config: { added: 3, removed: 3, whitespace_only: false } } }),
 			model('regions', 'no_change')
 		],
 		sections: [
 			{ section: 'query_changed', total: 2, notes: [] },
-			{ section: 'config_changed', total: 1, notes: [] },
+			{ section: 'config_changed', total: 2, notes: [] },
 			{ section: 'routine_models', total: 1507, notes: [{ kind: 'run_reason', value: 'no completed record', count: 1507 }] },
-			{ section: 'seeds', total: 10, notes: [{ kind: 'reason', value: 'first_run', count: 2 }] },
-			{ section: 'unchanged', total: 300, notes: [] }
+			{ section: 'first_run_seeds', total: 2, notes: [] },
+			{ section: 'unchanged_seeds', total: 10, notes: [] },
+			{ section: 'unchanged', total: 300, notes: [] },
+			{ section: 'warnings', total: 74, notes: [] }
 		],
-		pages: { query_changed: 2, config_changed: 1, routine_models: 1507, seeds: 10, unchanged: 300 },
-		loaded: { query_changed: 2, config_changed: 1, routine_models: 1 },
-		changed: { counts: ['definition'], reach: 'all', runs: ['orders', 'payments', 'refunds', 'regions'].map((n) => ({ node: `model:${n}`, reason: n === 'regions' ? 'no completed record' : 'definition changed', downstream_of: null })), held_back: [], unchanged: [] }
+		pages: { query_changed: 2, config_changed: 2, routine_models: 1507, first_run_seeds: 2, unchanged_seeds: 10, unchanged: 300, warnings: 74 },
+		loaded: { query_changed: 2, config_changed: 2, routine_models: 1 },
+		warning_groups: [
+			{ template: 'Scenario … provides fixture for unknown model …', count: 71, subject: { noun: 'scenario', count: 24 } },
+			{ template: 'Scenario … requires source …', count: 3, subject: null }
+		],
+		changed: { counts: ['definition'], reach: 'all', runs: ['orders', 'payments', 'refunds', 'ledger', 'regions'].map((n) => ({ node: `model:${n}`, reason: n === 'regions' ? 'no completed record' : 'definition changed', downstream_of: null })), held_back: [], unchanged: [] }
 	};
 
 	it("counts groups from the server's sections, and pages their rows in plan order", () => {
 		const groups = planGroups(summary);
 		expect(groups.map((g) => [g.key, g.count])).toEqual([
-			['changed', 3],
+			['changed', 4],
+			['first_run', 2],
+			['warnings', 74],
 			['unchanged', 1517],
 			['skipped', 300]
 		]);
-		const unchanged = groups[1];
-		expect(unchanged.subtitle).toBe('1,507 models · 10 seeds · models: no completed record (all 1,507) · seeds: 2 first run');
+		const unchanged = groups[3];
+		expect(unchanged.subtitle).toBe('1,507 models · 10 seeds · models: no completed record (all 1,507)');
 		expect(unchanged.rows.map((r) => [r.name, r.action, r.detail])).toEqual([['regions', 'table', '']]);
 		expect(unchanged.pages).toEqual([
 			{ section: 'routine_models', loaded: 1, total: 1507 },
-			{ section: 'seeds', loaded: 0, total: 10 }
+			{ section: 'unchanged_seeds', loaded: 0, total: 10 }
 		]);
+		expect(groups[1].pages).toEqual([{ section: 'first_run_seeds', loaded: 0, total: 2 }]);
 	});
 
 	it("reads changed rows' counts from diff_stats, and reads a diff it doesn't carry on demand", () => {
 		const rows = (diffs?: Map<string, null | { model: string; config_diff?: string[] }>) => Object.fromEntries(planGroups(summary, undefined, diffs)[0].rows.map((r) => [r.name, r]));
 		const before = rows();
-		expect(before.orders).toMatchObject({ detail: 'query +82 −104', diff: null, fetch: 'diff', pendingConfig: false });
+		expect(before.orders).toMatchObject({ detail: 'query +82 −104', diff: null, fetch: 'diff' });
 		expect(before.payments.detail).toBe('whitespace only');
-		// A config change of up to two lines a side is read to show inline.
-		expect(before.refunds).toMatchObject({ detail: 'config', fetch: 'diff', pendingConfig: true });
-		const read = rows(new Map([['refunds', { model: 'refunds', config_diff: ['-  "full_refresh": true,', '+  "full_refresh": false,'] }], ['orders', null]]));
-		expect(read.refunds).toMatchObject({ detail: 'config · full_refresh true → false', fetch: null, diffOf: null });
+		// The server's short config change reads inline, with nothing to read; a longer one links to its diff.
+		expect(before.refunds).toMatchObject({ detail: 'config · full_refresh true → false', fetch: null, diffOf: null });
+		expect(before.ledger).toMatchObject({ detail: 'config', fetch: 'diff', diffOf: 'config' });
+		const read = rows(new Map([['orders', null]]));
 		// The server has no diff to give, as without permission to read the model's SQL.
 		expect(read.orders).toMatchObject({ detail: 'query +82 −104', diff: null, fetch: 'unavailable' });
+	});
+
+	it("lists the server's warning groups, counted and each where its warnings start, before any is read", () => {
+		const warnings = planGroups(summary).find((g) => g.key === 'warnings')!;
+		expect(warnings.subtitle).toBe('2 kinds');
+		expect(warnings.warningGroups?.map((g) => [g.template, g.label, g.count, g.offset, g.warnings.length])).toEqual([
+			['Scenario … provides fixture for unknown model …', '71 in 24 scenarios', 71, 0, 0],
+			['Scenario … requires source …', '3 warnings', 3, 71, 0]
+		]);
+	});
+
+	it('pages the warnings past the largest groups the summary lists as one more group, after them', () => {
+		const capped = { ...summary, sections: summary.sections!.map((s) => (s.section === 'warnings' ? { ...s, total: 80 } : s)) };
+		const warnings = planGroups(capped).find((g) => g.key === 'warnings')!;
+		expect(warnings.subtitle).toBe('2 kinds and more');
+		expect(warnings.warningGroups?.map((g) => [g.template, g.label, g.count, g.offset])).toEqual([
+			['Scenario … provides fixture for unknown model …', '71 in 24 scenarios', 71, 0],
+			['Scenario … requires source …', '3 warnings', 3, 71],
+			['Other warnings', '6 warnings of smaller kinds', 6, 74]
+		]);
 	});
 });

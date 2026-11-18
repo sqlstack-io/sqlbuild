@@ -48,6 +48,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
     SnowflakeRenderTableFunctionTestCase,
     SnowflakeSchemaDiffTestCase,
     SnowflakeSchemaExistsTestCase,
+    SnowflakeSeedReplaceTestCase,
     SnowflakeTableFreshnessBatchTestCase,
     SnowflakeTableFreshnessMetadataErrorTestCase,
     SnowflakeTableFreshnessMetadataTestCase,
@@ -1408,3 +1409,45 @@ def test_given_schema_when_checking_existence_then_show_needs_no_running_warehou
 
     assert exists is test_case.expected_exists
     assert test_case.expected_sql_fragment in str(cast(Any, test_case.cursor).executed_sql)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakeSeedReplaceTestCase(
+            description="one table drop clears the old table, with no separate view drop",
+            expected_statements=(
+                "DROP TABLE IF EXISTS dev.waffle_types",
+                "CREATE TRANSIENT TABLE dev.waffle_types (id INTEGER, name VARCHAR)",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_seed_replacing_its_table_when_loading_then_it_drops_only_the_table(
+    test_case: SnowflakeSeedReplaceTestCase,
+    tmp_path: Path,
+) -> None:
+    adapter: SnowflakeAdapter = SnowflakeAdapter()
+    cursor: FakeSnowflakeDescribeCursor = FakeSnowflakeDescribeCursor(description=())
+    connection: FakeSnowflakeDescribeConnection = FakeSnowflakeDescribeConnection(cursor)
+    seed_file: Path = tmp_path / "waffle_types.csv"
+    seed_file.write_text("id,name\n1,Liege\n", encoding="utf-8")
+    executed: list[str] = []
+
+    with patch.object(
+        adapter, "execute", side_effect=lambda *, connection, sql: executed.append(sql)
+    ):
+        adapter.load_seed(
+            connection=connection,
+            destination="dev.waffle_types",
+            file_path=seed_file,
+            columns=(
+                ColumnInfo(name="id", type="INTEGER"),
+                ColumnInfo(name="name", type="VARCHAR"),
+            ),
+            replace=True,
+            statement_recorder=StatementRecorder(),
+        )
+
+    assert tuple(executed) == test_case.expected_statements, test_case.description

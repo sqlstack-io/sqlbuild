@@ -147,12 +147,12 @@ fn job_run_settings(
     Ok(settings)
 }
 
-/// The frozen command's request and warehouse scope; build carries the verified inputs in its request.
+/// The frozen command's request and warehouse scope; build carries the verified inputs and compiled project in its request.
 fn command_request<'py>(
     py: Python<'py>,
     discovered: &Bound<'py, PyAny>,
     arguments: &KeywordArguments<'py>,
-    worker: &Bound<'py, NativeOrchestrationWorker>,
+    (worker, compiled): (&Bound<'py, NativeOrchestrationWorker>, &Bound<'py, PyAny>),
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let execution = worker.get().execution(py)?;
     let frozen = execution.claim.request;
@@ -230,7 +230,13 @@ fn command_request<'py>(
     }
     let mut request = Invocation::new(&args)?.value(route.arguments[0].source)?;
     if command == RunCommand::Build {
-        request = replaced(&request, &[("discovered_inputs", discovered.clone())])?;
+        request = replaced(
+            &request,
+            &[
+                ("discovered_inputs", discovered.clone()),
+                ("compiled_project", compiled.clone()),
+            ],
+        )?;
     }
     Ok((request, warehouse_scope(&args)?))
 }
@@ -343,7 +349,11 @@ fn record_compiled_vars<'py>(
 
 pub(super) fn execute_worker<'py>(
     py: Python<'py>,
-    (snapshot, project, blocked): (&NativeOrchestrationSnapshot, ProjectAdapter<'py>, NodeKeys),
+    ((snapshot, compiled), project, blocked): (
+        (&NativeOrchestrationSnapshot, &Bound<'py, PyAny>),
+        ProjectAdapter<'py>,
+        NodeKeys,
+    ),
     (arguments, input): (&KeywordArguments<'py>, &SnapshotInput),
     (bearer, identity, recall): (&str, (String, String), Option<&InvocationRecall>),
 ) -> PyResult<i32> {
@@ -385,7 +395,7 @@ pub(super) fn execute_worker<'py>(
             return Err(PyValueError::new_err(reason));
         }
         record_compiled_vars(py, (&owner, &frozen), (arguments, input, &project))?;
-        let (request, scope) = command_request(py, &discovered, arguments, &owner)?;
+        let (request, scope) = command_request(py, &discovered, arguments, (&owner, compiled))?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
         let _rules = RulesAtLoadScope::enter();
         within(&scope, |_| {

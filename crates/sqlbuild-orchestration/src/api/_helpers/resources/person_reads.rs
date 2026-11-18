@@ -33,8 +33,8 @@ use crate::platform::models::{
 };
 use crate::runs::main::listings::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::{
-    NodeRunRecord, RunEventRecord, RunNodeFailure, RunNodeRecord, RunOutput, RunStatementRecord,
-    RunStatementSql,
+    NodeRunRecord, RunEventRecord, RunIgnoredAuditFailure, RunNodeFailure, RunNodeRecord,
+    RunOutput, RunStatementRecord, RunStatementSql,
 };
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
@@ -49,6 +49,7 @@ use crate::warehouse_history::main::read_person_node_costs::read_person_node_cos
 use crate::warehouse_history::main::read_person_node_runs::read_person_node_runs;
 use crate::warehouse_history::main::read_person_run_cost::read_person_run_cost;
 use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
+use crate::warehouse_history::main::read_person_run_ignored_audits::read_person_run_ignored_audits;
 use crate::warehouse_history::main::read_person_run_node_error::read_person_run_node_error;
 use crate::warehouse_history::main::read_person_run_output::read_person_run_output;
 use crate::warehouse_history::main::read_person_run_statement_sql::read_person_run_statement_sql;
@@ -249,6 +250,29 @@ pub(crate) async fn run_statements(
             (location_id, &target, run_id),
             options.limit.unwrap_or(1000),
         ),
+        default_role,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("run not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/ignored-audits", operation_id = "listPersonRunIgnoredAudits",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path)),
+    responses((status = 200, body = Vec<RunIgnoredAuditFailure>, description = "The error-severity audit failures the run and its current group members let through, run by run"),
+        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 404, description = "Run not found for a person who may view the whole target")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn run_ignored_audits(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    Path((location_id, target, run_id)): Path<(Uuid, String, Uuid)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<RunIgnoredAuditFailure>>, ApiError> {
+    read_person_run_ignored_audits(
+        &store,
+        (&context, principal),
+        (location_id, &target, run_id),
         default_role,
     )
     .await?

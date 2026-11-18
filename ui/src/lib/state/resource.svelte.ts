@@ -42,7 +42,9 @@ export type Resource<T> = {
  */
 export function createResource<T>(
 	load: (client: ApiClient, scope: Scope) => Promise<T>,
-	topics: readonly string[] = []
+	topics: readonly string[] = [],
+	/** `every`: the least time between reloads a stream of change signals starts, for a large read. */
+	options: { every?: number } = {}
 ): Resource<T> {
 	let data = $state<T | undefined>(undefined);
 	let error = $state<string | null>(null);
@@ -52,9 +54,11 @@ export function createResource<T>(
 	let settled = 0;
 	let reloadAgain = false;
 	let pause: ReturnType<typeof setTimeout> | null = null;
+	let started = -Infinity;
 
 	function run(scope: Scope) {
 		const request = ++latest;
+		started = Date.now();
 		// The page's path and query tell apart reads of different jobs, runs and filters made by the same code.
 		const key = `${app.user?.name ?? ''}|${scope.locationId}|${browser ? window.location.pathname + window.location.search : ''}|${load}`;
 		if (key !== shownKey && remembered.has(key)) data = remembered.get(key) as T;
@@ -92,11 +96,12 @@ export function createResource<T>(
 
 	function signalled() {
 		if (pause) return;
+		const wait = Math.max(SIGNAL_PAUSE_MS, started + (options.every ?? 0) - Date.now());
 		pause = setTimeout(() => {
 			pause = null;
 			if (settled === latest) refresh();
 			else reloadAgain = true;
-		}, SIGNAL_PAUSE_MS);
+		}, wait);
 	}
 
 	function refresh() {

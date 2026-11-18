@@ -420,6 +420,23 @@ pub struct RunEventRecord {
     pub message: Option<String>,
 }
 
+/// One error-severity audit failure a run or one of its current members let through; never its SQL or evidence.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunIgnoredAuditFailure {
+    /// The run that evaluated the audit: the run itself or one of its group members.
+    pub run_id: Uuid,
+    pub job_key: Option<String>,
+    pub occurred_at: String,
+    /// The check's identity, as the checks endpoints name it.
+    pub binding_key: Option<String>,
+    pub audit_name: String,
+    pub attached_target_kind: Option<String>,
+    pub attached_target_name: Option<String>,
+    pub attached_column_name: Option<String>,
+    pub severity: String,
+    pub violation_count: Option<i64>,
+}
+
 /// Warehouse statement metadata of a run: kind, timing, counts and outcome, never the SQL text.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunStatementRecord {
@@ -630,6 +647,17 @@ impl RunChange {
             Self::CancelRequested { .. } => "run_cancel_requested",
             Self::Finished { .. } => "run_terminated",
             Self::AuditFailuresIgnored { .. } => "run_audit_failures_ignored",
+        }
+    }
+
+    /// The node or check the change is about, keyed `<kind>:<name>`.
+    pub(crate) fn node_key(&self) -> Option<&str> {
+        match self {
+            Self::NodeStarted { node_key }
+            | Self::NodeFinished { node_key, .. }
+            | Self::CheckStarted { node_key }
+            | Self::CheckFinished { node_key, .. } => Some(node_key),
+            _ => None,
         }
     }
 

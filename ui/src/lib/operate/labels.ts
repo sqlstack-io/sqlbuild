@@ -297,3 +297,8 @@ export function clockTime(iso: string): string {
 export function narrowingText(narrowing: { select: string[]; exclude: string[] }): string {
 	return [narrowing.select.length ? `--select ${narrowing.select.join(' ')}` : '', narrowing.exclude.length ? `--exclude ${narrowing.exclude.join(' ')}` : ''].filter(Boolean).join(' ');
 }
+
+/** A node key as a run shows it: `seed:countries` reads `countries`; the kind shows elsewhere, and the full key on hover. */
+export function nodeLabel(key: string): string {
+	return key.replace(/^[a-z_]+:(?=.)/, '');
+}

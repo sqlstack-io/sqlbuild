@@ -345,10 +345,10 @@ pub(crate) fn run_location<'py>(
             arguments.value("run_id")?.extract::<String>()?,
             arguments.value("claim_id")?.extract::<String>()?,
         );
-        let ((snapshot, blocked, _), project) = compile_location(py, &arguments, &input)?;
+        let ((snapshot, blocked, compiled), project) = compile_location(py, &arguments, &input)?;
         return execute_worker(
             py,
-            (&snapshot, project, blocked),
+            ((&snapshot, &compiled), project, blocked),
             (&arguments, &input),
             (&bearer, identity, recall),
         );

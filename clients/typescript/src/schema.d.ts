@@ -786,6 +786,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/ignored-audits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonRunIgnoredAudits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes": {
         parameters: {
             query?: never;
@@ -3317,6 +3333,25 @@ export interface components {
                 [key: string]: string;
             };
             sqb_version: string;
+        };
+        /** @description One error-severity audit failure a run or one of its current members let through; never its SQL or evidence. */
+        RunIgnoredAuditFailure: {
+            attached_column_name?: string | null;
+            attached_target_kind?: string | null;
+            attached_target_name?: string | null;
+            audit_name: string;
+            /** @description The check's identity, as the checks endpoints name it. */
+            binding_key?: string | null;
+            job_key?: string | null;
+            occurred_at: string;
+            /**
+             * Format: uuid
+             * @description The run that evaluated the audit: the run itself or one of its group members.
+             */
+            run_id: string;
+            severity: string;
+            /** Format: int64 */
+            violation_count?: number | null;
         };
         /** @enum {string} */
         RunKind: "job" | "group" | "adhoc";
@@ -5990,7 +6025,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description The section to page */
-                section: "full_refresh" | "query_changed" | "function_changed" | "config_changed" | "schema_changed" | "first_run" | "renamed" | "routine_models" | "migrations" | "column_migrations" | "table_type_conversions" | "retention" | "loader_reloads" | "loader_loads" | "source_reloads" | "source_loads" | "changed_functions" | "functions" | "seeds" | "python_nodes" | "held_back" | "unchanged" | "warnings";
+                section: "full_refresh" | "query_changed" | "function_changed" | "config_changed" | "schema_changed" | "first_run" | "renamed" | "routine_models" | "migrations" | "column_migrations" | "table_type_conversions" | "retention" | "loader_reloads" | "loader_loads" | "source_reloads" | "source_loads" | "changed_functions" | "functions" | "first_run_seeds" | "changed_seeds" | "unchanged_seeds" | "python_nodes" | "held_back" | "unchanged" | "warnings";
                 /** @description Rows to skip; 0 by default */
                 offset?: number;
                 /** @description At most this many rows, capped at 1000 */
@@ -6233,6 +6268,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunEventRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listPersonRunIgnoredAudits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The error-severity audit failures the run and its current group members let through, run by run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunIgnoredAuditFailure"][];
                 };
             };
             /** @description Session rejected */

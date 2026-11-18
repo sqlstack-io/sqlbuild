@@ -1,11 +1,10 @@
 <script lang="ts">
 	// The audit failures a successful run let through (`ignore_audit_failures`): each model and audit,
-	// marked ignored. The run counts them; the checks' newest results name them.
+	// marked ignored, from the run and its group's member runs.
 	import { plural } from '$lib/format/plural';
 	import { to } from '$lib/paths';
 	import { app } from '$lib/state/app.svelte';
-	import type { Check } from '$lib/api';
-	import { ignoredFailuresOf } from '$lib/run/ignored-audits';
+	import type { IgnoredAuditFailure } from '$lib/api';
 	import { ignoresAuditFailures } from '$lib/status';
 	import type { RunDetailState } from './state.svelte';
 
@@ -13,42 +12,42 @@
 
 	const run = $derived(view.run);
 	const count = $derived(run && ignoresAuditFailures(run.status, run.ignoredAuditFailures) ? run.ignoredAuditFailures : 0);
-	const runIds = $derived(new Set([run?.id ?? '', ...(view.detail?.children ?? []).map((c) => c.id)]));
-	let checks = $state<Check[] | null>(null);
+	const group = $derived((view.detail?.children ?? []).length > 0);
+	let failures = $state<IgnoredAuditFailure[] | null>(null);
 	let failed = $state(false);
 
-	// The checks are read once, only for a run that let failures through.
+	// Read once, only for a run that let failures through.
 	$effect(() => {
 		const scope = app.scope;
-		if (!count || !scope || checks || failed) return;
+		const id = run?.id;
+		if (!count || !scope || !id || failures || failed) return;
 		app.client
-			.listChecks(scope)
-			.then((all) => (checks = all))
+			.listRunIgnoredAudits(scope, id)
+			.then((all) => (failures = all))
 			.catch(() => (failed = true));
 	});
-	const found = $derived(checks ? ignoredFailuresOf(checks, runIds) : []);
-	const unnamed = $derived(checks ? Math.max(0, count - found.length) : 0);
 </script>
 
 {#if count}
 	<section class="ignored-audits" aria-label="Ignored audit failures" data-testid="ignored-audits">
 		<p class="head"><b>{plural(count, 'audit failure')} ignored</b> <span class="faint">· audit failures don't stop this job, so the run went on</span></p>
-		{#if found.length}
+		{#if failures?.length}
 			<ul>
-				{#each found as c (c.id)}
+				{#each failures as f, i (`${f.runId}:${f.checkId ?? f.audit}:${i}`)}
 					<li>
-						<span class="node mono">{c.node ?? '—'}</span>
-						<a href={to(`/checks/${c.id}`)} class="audit mono">{c.name}</a>
-						{#if c.latest?.violationCount}<span class="faint">{plural(c.latest.violationCount, 'row')} failing</span>{/if}
+						{#if group && f.jobKey}<span class="faint mono">{f.jobKey}</span>{/if}
+						<span class="node mono">{f.node ?? '—'}{f.column ? `.${f.column}` : ''}</span>
+						{#if f.checkId}<a href={to(`/checks/${f.checkId}`)} class="audit mono">{f.audit}</a>{:else}<span class="audit mono">{f.audit}</span>{/if}
+						{#if f.violationCount}<span class="faint">{plural(f.violationCount, 'row')} failing</span>{/if}
 						<span class="tag">ignored</span>
 					</li>
 				{/each}
 			</ul>
 		{/if}
-		{#if unnamed && checks}
-			<p class="faint more">{unnamed === count ? 'Their checks' : `${plural(unnamed, 'more')}: their checks`} have newer results since. <a href={to('/checks?outcome=ignored')}>Ignored failures on the Checks page</a></p>
-		{:else if failed}
-			<p class="faint more">Couldn't read the checks. <a href={to('/checks?outcome=ignored')}>Ignored failures on the Checks page</a></p>
+		{#if failed}
+			<p class="faint more">Couldn't read the failures. <a href={to('/checks?outcome=ignored')}>Ignored failures on the Checks page</a></p>
+		{:else if failures && failures.length < count}
+			<p class="faint more">{failures.length ? `${(count - failures.length).toLocaleString()} more no longer recorded` : 'Their results are no longer recorded'}. <a href={to('/checks?outcome=ignored')}>Ignored failures on the Checks page</a></p>
 		{/if}
 	</section>
 {/if}

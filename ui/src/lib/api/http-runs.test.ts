@@ -251,6 +251,21 @@ describe('run Recall reads', () => {
 		]);
 	});
 
+	it('names the node a seed build event is about, as the run keys its nodes, from the resource kind and name', () => {
+		// As the server sends them now: an opaque resource ID, with the resource's kind and name.
+		const seed = { resource_id: '3b7370f99e385665996e8f73523b4fd5', resource_kind: 'seed', resource_name: 'seed__order_type__alpha' };
+		const mapped = [event('resource_attempt_started', seed), event('resource_attempt_completed', { ...seed, outcome: 'success' }), event('statement_completed', { ...seed, statement_id: 's9' })].flatMap((e) => toRunEvent(e, 'r1') ?? []);
+		expect(mapped.map((e) => e.nodeKey)).toEqual(['seed:seed__order_type__alpha', 'seed:seed__order_type__alpha', 'seed:seed__order_type__alpha']);
+		const [statement] = toRunStatements([{ invocation_id: inv, statement_id: 's9', sql_available: true, ...seed }], 'r1');
+		expect(statement.nodeKey).toBe('seed:seed__order_type__alpha');
+		// A model's rows carry its materialization, which the run keys as `model:`.
+		const table = { resource_id: '9c1e', resource_kind: 'table', resource_name: 'orders' };
+		const view = { resource_id: '9c1f', resource_kind: 'view', resource_name: 'customers' };
+		expect([toRunEvent(event('resource_attempt_failed', table), 'r1')?.nodeKey, toRunStatements([{ invocation_id: inv, statement_id: 's10', sql_available: true, ...view }], 'r1')[0].nodeKey]).toEqual(['model:orders', 'model:customers']);
+		// A hash alone names no node; the scheduler's node events carry none yet.
+		expect(toRunEvent(event('resource_attempt_started', { resource_id: '3b7370f99e385665996e8f73523b4fd5' }), 'r1')?.nodeKey).toBeNull();
+	});
+
 	it('orders statements as sent and tells running from finished by the end time', () => {
 		const statement = (id: string, extra: Partial<W['RunStatementRecord']>): W['RunStatementRecord'] => ({ invocation_id: inv, statement_id: id, sql_available: true, ...extra });
 		const statements = toRunStatements(
@@ -265,6 +280,30 @@ describe('run Recall reads', () => {
 			[1, 'seed:countries', 'CREATE', 'completed', 3, true, null],
 			[2, 'orders', 'statement', 'failed', null, false, 'CatalogException'],
 			[3, '', 'model_build', 'running', null, true, null]
+		]);
+	});
+
+	it('shows printed output as the terminal left it: spinner redraws and colours gone, lines whole across chunks', () => {
+		const chunk = (sequence: number, text: string) => ({ invocation_id: inv, sequence, stream: 'stdout', occurred_at: `2026-11-08T06:00:0${sequence}Z`, text });
+		const output = toRunOutput({
+			lines: [
+				chunk(1, 'Location snapshot compiled.\n\x1b[?25l\r\x1b[K⠋ Compiling project...\r\x1b[K⠙ Compil'),
+				chunk(2, 'ing project...\r\x1b[K\x1b[?25hCompiled project. (18.07s)\n\n\n\x1b[1mPlan ready\x1b[0m  93 selected\n'),
+				chunk(3, '├── seed__order_type__alpha  (current)\n'),
+				chunk(4, 'Loaded orders.\r\n50%\r100%\r\n⠙ Waiting...\r\x1b[K\nDone.\n')
+			],
+			errors: []
+		} as never);
+		expect(output.map((l) => [l.at.slice(-3, -1), l.text])).toEqual([
+			['01', 'Location snapshot compiled.'],
+			['01', 'Compiled project. (18.07s)'],
+			['02', ''],
+			['02', 'Plan ready  93 selected'],
+			['03', '├── seed__order_type__alpha  (current)'],
+			['04', 'Loaded orders.'],
+			['04', '100%'],
+			['04', ''],
+			['04', 'Done.']
 		]);
 	});
 

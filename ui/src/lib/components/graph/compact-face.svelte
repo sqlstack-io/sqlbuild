@@ -5,7 +5,7 @@
 	import SquareSquareIcon from '@lucide/svelte/icons/square-square';
 	import { COMPACT_LEVELS } from '$lib/lineage/fit';
 	import { fonts } from './fonts.svelte';
-	import { measureCompact, pillFont, pillRoom } from './compact-title';
+	import { measureCompact, pillFont, pillRoom, pillText } from './compact-title';
 	import { COMPACT_TAILS, type CompactTails } from './compact-tails';
 
 	// A card's compact form, shown by the graph (the `compact` class on its canvas) when zoomed out too far
@@ -21,7 +21,14 @@
 	 * The name's size on screen at each level, fitted at the level's lowest zoom, where the card is
 	 * narrowest; measured again once the name's font has loaded.
 	 */
-	const sizes = $derived((void fonts.ready, void fonts.version, COMPACT_LEVELS.map((zoom) => pillFont(tail, pillRoom(zoom), measureCompact))));
+	const sizes = $derived(
+		(void fonts.ready,
+		void fonts.version,
+		COMPACT_LEVELS.map((zoom) => {
+			const px = pillFont(tail, pillRoom(zoom), measureCompact);
+			return { px, text: pillText(tail, px, pillRoom(zoom), measureCompact) };
+		}))
+	);
 	/** The icon's size on screen. */
 	const ICON = 10;
 	/** The badge's size on screen. */
@@ -33,7 +40,7 @@
 		<span class="ring" class:play={kind === 'job'} style:--icon="calc({ICON}px * var(--sb-title-unzoom, 1))">
 			{#if kind === 'job'}<PlayIcon strokeWidth={2.5} />{:else if kind === 'group'}<SquareSquareIcon strokeWidth={2.25} />{:else}<DiamondIcon strokeWidth={2.5} />{/if}
 		</span>
-		{#each sizes as px, level (level)}<span class="nm" data-level={level + 1} style:font-size="calc({px}px * var(--sb-title-unzoom, 1))">{tail}</span>{/each}
+		{#each sizes as fit, level (level)}<span class="nm" data-level={level + 1} data-tail={tail} style:font-size="calc({fit.px}px * var(--sb-title-unzoom, 1))">{fit.text}</span>{/each}
 		{#if badge != null}<span class="cbadge" style:font-size="calc({BADGE_PX}px * var(--sb-title-unzoom, 1))">{badge}</span>{/if}
 	</div>
 </div>
@@ -80,6 +87,12 @@
 		border-color: color-mix(in srgb, var(--chart-3) 45%, transparent);
 		background: color-mix(in srgb, var(--chart-3) 10%, var(--card));
 	}
+	/* Selected: unmistakable at any zoom, a primary edge, a ring around it and a tinted fill. */
+	:global(.svelte-flow__node.selected) .cface .pill {
+		border-color: var(--primary);
+		background: color-mix(in srgb, var(--primary) 16%, var(--card));
+		box-shadow: 0 0 0 calc(3px * var(--u)) color-mix(in srgb, var(--primary) 40%, transparent);
+	}
 	.ring {
 		display: grid;
 		box-sizing: border-box;
@@ -108,7 +121,6 @@
 		font-family: var(--font-node-compact);
 		font-weight: 500;
 		line-height: 1.2;
-		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	:global(.graph-canvas[data-compact='1']) .nm[data-level='1'],

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -18,12 +19,17 @@ from sqlbuild.observability import (
     invocation_scope,
 )
 from tests.unit.src.sqlbuild.executor.pipeline._helpers._test_types import (
+    SeedFingerprintSetupTestCase,
     SeedPipelineConcurrencyTestCase,
     SeedPipelineLifecycleTestCase,
+    SeedPipelineQueueTestCase,
 )
 from tests.unit.src.sqlbuild.executor.pipeline._helpers.helpers import (
+    RecordingDuckDbAdapter,
     SeedPipelineTestAdapter,
+    SlowSeedPipelineAdapter,
     build_seed_plan,
+    build_tracked_seed_plan,
 )
 
 
@@ -166,3 +172,79 @@ def test_given_seed_executor_raises_when_running_worker_then_attempt_fails_once_
     assert tuple(event.event_type for event in resource_events) == test_case.expected_terminal_types
     assert {event.resource_id for event in resource_events} == test_case.expected_resource_ids
     assert callbacks == []
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SeedPipelineQueueTestCase(
+            description="seeds behind a slow one load on the free connection meanwhile",
+            seed_names=("seed_slow", "seed_b", "seed_c", "seed_d"),
+            slow_seed="seed_slow",
+            max_concurrency=2,
+            expected_load_order=("seed_b", "seed_c", "seed_d", "seed_slow"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_slow_seed_when_running_seed_pipeline_then_other_seeds_take_the_free_connection(
+    test_case: SeedPipelineQueueTestCase,
+) -> None:
+    adapter: SlowSeedPipelineAdapter = SlowSeedPipelineAdapter(
+        slow_target=test_case.slow_seed, other_count=len(test_case.seed_names) - 1
+    )
+
+    results: tuple[SeedExecutionResult, ...] = run_seed_pipeline(
+        plan=build_seed_plan(seed_names=test_case.seed_names),
+        connection_config={},
+        adapter=adapter,
+        max_concurrency=test_case.max_concurrency,
+    )
+
+    assert tuple(adapter.order) == test_case.expected_load_order, test_case.description
+    assert tuple(result.seed_name for result in results) == test_case.seed_names
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SeedFingerprintSetupTestCase(
+            description="concurrent seeds on an empty schema set the table up once and each "
+            "record a row",
+            seed_names=("seed_a", "seed_b", "seed_c", "seed_d"),
+            max_concurrency=2,
+            expected_table_setups=1,
+            expected_fingerprint_rows=4,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_concurrent_seeds_when_recording_identity_then_the_fingerprint_table_is_set_up_once(
+    test_case: SeedFingerprintSetupTestCase,
+    tmp_path: Path,
+) -> None:
+    adapter: RecordingDuckDbAdapter = RecordingDuckDbAdapter()
+    config: dict[str, object] = {"database": str(tmp_path / "warehouse.duckdb")}
+
+    results: tuple[SeedExecutionResult, ...] = run_seed_pipeline(
+        plan=build_tracked_seed_plan(seed_names=test_case.seed_names, seed_dir=tmp_path),
+        connection_config=config,
+        adapter=adapter,
+        max_concurrency=test_case.max_concurrency,
+        run_id="seed-fingerprint-run",
+        query_change_tracking=True,
+    )
+
+    assert {result.status.value for result in results} == {"success"}, results
+    assert [result.warning_messages for result in results] == [()] * len(test_case.seed_names)
+    setups: int = sum(
+        sql.startswith("CREATE TABLE IF NOT EXISTS main._sqlbuild_fingerprints")
+        for sql in adapter.statements
+    )
+    assert setups == test_case.expected_table_setups, adapter.statements
+    connection: Any = adapter.connect(config)
+    rows: list[tuple[Any, ...]] = adapter.execute(
+        connection=connection, sql="SELECT count(*) FROM main._sqlbuild_fingerprints"
+    ).fetchall()
+    adapter.close(connection)
+    assert rows == [(test_case.expected_fingerprint_rows,)]

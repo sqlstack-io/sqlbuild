@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -39,7 +39,8 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			changed: document.changed ?? null,
 			...(document.ignore_audit_failures ? { ignore_audit_failures: true } : {}),
 			...(document.pages ? { pages: document.pages } : {}),
-			...(document.sections ? { sections: document.sections } : {})
+			...(document.sections ? { sections: document.sections } : {}),
+			...(document.warning_groups ? { warning_groups: document.warning_groups } : {})
 		},
 		error: null
 	};
@@ -65,7 +66,9 @@ const SECTION_LIST: Record<PlanPageSection, keyof PlanDocument | 'held_back' | '
 	source_loads: 'source_loads',
 	changed_functions: 'functions',
 	functions: 'functions',
-	seeds: 'seeds',
+	first_run_seeds: 'seeds',
+	changed_seeds: 'seeds',
+	unchanged_seeds: 'seeds',
 	python_nodes: 'python_nodes',
 	held_back: 'held_back',
 	unchanged: 'unchanged',
@@ -390,11 +393,20 @@ const KNOWN_EVENTS: ReadonlySet<string> = new Set(RECALL_EVENT_TYPES);
 /** Scheduler facts are stored as `run_<fact>` events in the scheduler invocation. */
 const SCHEDULER_EVENTS: ReadonlySet<string> = new Set(SCHEDULER_FACTS.map((f) => `run_${f}`));
 
-/** The node key a Recall resource ID names: `[invocation, key]`, or null for run-level rows. */
-function recallNodeKey(resourceId: string | null | undefined): string | null {
-	if (!resourceId) return null;
+/** Builds record a model under its materialization, while the run keys every model as `model:`. */
+const MODEL_RESOURCE_KINDS: ReadonlySet<string> = new Set(['table', 'view', 'custom', 'snapshot']);
+
+/**
+ * The node a Recall row is about, as a run's nodes are keyed (`seed:countries`): its resource's kind and
+ * name. Older servers sent no kind and name, and a `["<invocation>", "<node key>"]` resource ID instead;
+ * any other resource ID is an opaque hash.
+ */
+export function recallNodeKey(row: { resource_id?: string | null; resource_kind?: string | null; resource_name?: string | null }): string | null {
+	if (row.resource_kind && row.resource_name) return `${MODEL_RESOURCE_KINDS.has(row.resource_kind) ? 'model' : row.resource_kind}:${row.resource_name}`;
+	const id = row.resource_id;
+	if (!id?.startsWith('[')) return null;
 	try {
-		const parsed: unknown = JSON.parse(resourceId);
+		const parsed: unknown = JSON.parse(id);
 		return Array.isArray(parsed) && typeof parsed[1] === 'string' ? parsed[1] : null;
 	} catch {
 		return null;
@@ -434,11 +446,26 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 		occurredAt: wire.occurred_at,
 		level: levelOf(wire.severity),
 		invocationId: wire.invocation_id,
-		nodeKey: recallNodeKey(wire.resource_id),
+		nodeKey: recallNodeKey(wire),
 		statementId: wire.statement_id ?? null,
 		attempt: null,
 		message
 	};
+}
+
+/** A run's ignored audit failures as the server lists them, run by run. */
+export function toIgnoredAuditFailures(wire: Wire['RunIgnoredAuditFailure'][]): IgnoredAuditFailure[] {
+	return wire.map((f) => ({
+		runId: f.run_id,
+		jobKey: f.job_key ?? null,
+		at: f.occurred_at,
+		checkId: f.binding_key ?? null,
+		audit: f.audit_name,
+		node: f.attached_target_name ?? null,
+		column: f.attached_column_name ?? null,
+		severity: f.severity,
+		violationCount: f.violation_count ?? null
+	}));
 }
 
 /** Statement metadata in start order; error text is never sent, only its type and code. */
@@ -448,7 +475,7 @@ export function toRunStatements(wire: Wire['RunStatementRecord'][], runId: strin
 		runId,
 		invocationId: s.invocation_id,
 		sequence: i + 1,
-		nodeKey: recallNodeKey(s.resource_id) ?? s.resource_name ?? '',
+		nodeKey: recallNodeKey(s) ?? s.resource_name ?? '',
 		kind: s.statement_kind ?? s.purpose ?? 'statement',
 		status: s.outcome === 'failed' ? 'failed' : s.outcome === 'cancelled' ? 'cancelled' : s.ended_at || s.outcome ? 'completed' : 'running',
 		startedAt: s.started_at ?? '',
@@ -462,8 +489,42 @@ export function toRunStatements(wire: Wire['RunStatementRecord'][], runId: strin
 }
 
 /** Captured lines and error text in time order; error text reads as stderr of its invocation. */
+/** ANSI escape sequences: colours, cursor moves and the like. */
+const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-Z\\-_]/g;
+
+/**
+ * Printed output as a terminal would leave it on screen. `sqb` redraws spinner and progress lines with
+ * a carriage return, across chunks, so each stream's chunks are joined, split into lines, and each line
+ * drops the carriage return of a CRLF ending, then keeps only what follows its last carriage return,
+ * without escape codes; a line erased by `\r\x1b[K` stays blank. A line is timed by the chunk
+ * it started in; runs of blank lines read as one.
+ */
+export function terminalLines(chunks: { invocationId: string; stream: 'stdout' | 'stderr'; at: string; text: string }[]): RunOutputLine[] {
+	const out: RunOutputLine[] = [];
+	for (const stream of Map.groupBy(chunks, (c) => `${c.invocationId}\u0000${c.stream}`).values()) {
+		let line = '';
+		let at = stream[0].at;
+		const finish = () => {
+			const shown = line.replace(/\r+$/, '').replace(ANSI, '').split('\r').at(-1)!.trimEnd();
+			if (shown || out.at(-1)?.text) out.push({ invocationId: stream[0].invocationId, stream: stream[0].stream, at, text: shown, error: false });
+			line = '';
+		};
+		for (const chunk of stream) {
+			const parts = chunk.text.split('\n');
+			parts.forEach((part, i) => {
+				if (!line) at = chunk.at;
+				line += part;
+				if (i < parts.length - 1) finish();
+			});
+		}
+		if (line) finish();
+	}
+	return out;
+}
+
 export function toRunOutput(wire: Wire['RunOutput']): RunOutputLine[] {
-	const lines: RunOutputLine[] = wire.lines.map((l) => ({ invocationId: l.invocation_id, stream: l.stream === 'stderr' ? 'stderr' : 'stdout', at: l.occurred_at, text: l.text, error: false }));
+	const ordered = [...wire.lines].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at) || (a.sequence ?? 0) - (b.sequence ?? 0));
+	const lines = terminalLines(ordered.map((l) => ({ invocationId: l.invocation_id, stream: l.stream === 'stderr' ? 'stderr' : 'stdout', at: l.occurred_at, text: l.text })));
 	const errors: RunOutputLine[] = wire.errors.map((e) => ({ invocationId: e.invocation_id, stream: 'stderr', at: e.occurred_at ?? '', text: e.message, error: true }));
 	return [...lines, ...errors].sort((a, b) => a.at.localeCompare(b.at));
 }

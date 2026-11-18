@@ -12,7 +12,7 @@
 	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
 	import { openRow, to } from '$lib/paths';
 	import { goto } from '$app/navigation';
-	import type { Trigger } from '$lib/api';
+	import type { CatalogNode, RunNode, Trigger } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
@@ -20,7 +20,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
-	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
+	import { formatNodeCounts, isActiveRun, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
 	import { CONCURRENCY_DOCS, concurrencySource, formatCost, narrowingText, onFailureText, overlapHelp, overlapWhileRunning, poolText, shortRunId } from '$lib/operate/labels';
@@ -83,6 +83,15 @@
 	const pickedNodes = $derived(picked.map((k) => byKey.get(k)).filter((n) => !!n));
 	const canRunPicked = $derived(app.client.supports('launchAdhocRun'));
 	const latest = $derived(runs[0] ?? null);
+	// While the job's latest run is active, its nodes show that run's progress: running, succeeded, failed.
+	const liveRunId = $derived(latest && isActiveRun(latest.status) ? latest.id : null);
+	const liveRun = createResource((client, scope) => (liveRunId ? client.getRunDetail(scope, liveRunId) : Promise.resolve(null)), ['runs']);
+	const LIVE: Partial<Record<RunNode['status'], NonNullable<CatalogNode['liveStatus']>>> = { running: 'run', success: 'ok', warn: 'warn', failed: 'fail' };
+	const liveCatalog = $derived.by(() => {
+		const states = liveRunId && liveRun.data?.run.id === liveRunId ? new Map(liveRun.data.nodes.flatMap((n) => (LIVE[n.status] ? [[n.nodeKey, LIVE[n.status]!] as const] : []))) : null;
+		if (!states?.size || !catalog.data) return catalog.data;
+		return catalog.data.map((n) => (states.has(n.key) ? { ...n, liveStatus: states.get(n.key) } : n));
+	});
 	// Recent finished runs, oldest first, for the sidebar's strip and typical duration.
 	const finished = $derived(runs.filter((r) => r.endedAt).slice(0, 20).reverse());
 	const succeeded = $derived(finished.filter((r) => r.status === 'success').length);
@@ -190,7 +199,7 @@
 						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
 						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} bind:selection={memberSelection} details={{ open: details.open, toggle: details.toggle }} />
 					{:else if catalog.data}
-						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} onselect={(keys) => (picked = keys)} />
+						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={liveCatalog ?? catalog.data} onselect={(keys) => (picked = keys)} />
 					{:else}
 						{#if catalog.error}<p class="faint graph-wait">{catalog.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
 					{/if}

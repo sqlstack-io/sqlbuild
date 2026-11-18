@@ -140,6 +140,28 @@ class ScenarioPlanningLifecycleTestCase:
 
 
 @dataclass(frozen=True)
+class SeedPipelineQueueTestCase:
+    """Seeds behind a slow one: which load before it finishes."""
+
+    description: str
+    seed_names: tuple[str, ...]
+    slow_seed: str
+    max_concurrency: int
+    expected_load_order: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SeedFingerprintSetupTestCase:
+    """Concurrent seeds on an empty schema: how often the fingerprint table is set up."""
+
+    description: str
+    seed_names: tuple[str, ...]
+    max_concurrency: int
+    expected_table_setups: int
+    expected_fingerprint_rows: int
+
+
+@dataclass(frozen=True)
 class SeedPipelineConcurrencyTestCase:
     """One seed pipeline concurrency orchestration case."""
 

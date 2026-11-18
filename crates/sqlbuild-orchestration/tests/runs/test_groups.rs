@@ -3,7 +3,8 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use crate::credentials::models::AuditContext;
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
+use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::main::{
     execution::advance_groups::advance_groups, execution::change_run::change_run,
     execution::claim_next_run::claim_next_run, execution::run_execution::run_execution,
@@ -16,11 +17,14 @@ use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;
+use crate::warehouse_history::main::read_person_run_ignored_audits::read_person_run_ignored_audits;
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
-use crate::runs::tests::claim_helpers::{slot_counts, succeed, succeed_ignoring_audit_failures};
+use crate::runs::tests::claim_helpers::{
+    publish_audit_results, slot_counts, succeed, succeed_ignoring_audit_failures,
+};
 use crate::runs::tests::helpers::snapshot;
 use crate::runs::tests::test_types::{
     GroupMemberSettingsTestCase, RunLifecycleTestCase, TransactionFault,
@@ -522,6 +526,7 @@ fn given_group_members_with_different_audit_settings_when_run_then_each_keeps_it
                 .await
                 .expect("start virtual parent");
             let mut settings = BTreeMap::new();
+            let mut members: BTreeMap<String, Uuid> = BTreeMap::new();
             for _ in test_case.members {
                 let claim = claim_next_run(store, &lease, &limits, Some(scope))
                     .await
@@ -533,12 +538,92 @@ fn given_group_members_with_different_audit_settings_when_run_then_each_keeps_it
                     .into_iter()
                     .find(|(name, _, _)| *name == job)
                     .expect("declared member");
+                let mut audits: Vec<(String, bool)> = (0..ignored)
+                    .map(|index| (format!("{job}_error_{index}"), true))
+                    .collect();
+                audits.push((format!("{job}_warn"), false));
+                publish_audit_results(store, &claim, &audits).await;
+                members.insert(job.clone(), claim.request.run_id);
                 settings.insert(job, claim.request.settings.clone());
                 succeed_ignoring_audit_failures(store, &claim, ignored).await;
             }
             advance_groups(store, &lease, (&limits, scope))
                 .await
                 .expect("finish parent");
+            let administrator = bootstrap_user(store, &context, "orders-admin")
+                .await
+                .expect("administrator");
+            let ignored_audits = async |run_id| {
+                let mut failures: Vec<_> = read_person_run_ignored_audits(
+                    store,
+                    (&context, administrator),
+                    (location, "development", run_id),
+                    DefaultRole::None,
+                )
+                .await
+                .expect("ignored audits")?
+                .into_iter()
+                .map(|failure| {
+                    assert_eq!(
+                        Some(failure.run_id),
+                        failure.job_key.as_ref().map(|job| members[job]),
+                        "each failure names the member run that let it through"
+                    );
+                    (
+                        failure.job_key.expect("member job"),
+                        failure.audit_name,
+                        failure.binding_key,
+                        failure.severity,
+                        failure.violation_count,
+                        failure.attached_target_name,
+                        failure.attached_column_name,
+                    )
+                })
+                .collect();
+                failures.sort();
+                Some(failures)
+            };
+            let expected = |member: Option<&str>| {
+                test_case
+                    .members
+                    .iter()
+                    .filter(|(name, _, _)| member.is_none_or(|member| member == *name))
+                    .flat_map(|(name, _, ignored)| {
+                        (0..*ignored).map(move |index| {
+                            let audit = format!("{name}_error_{index}");
+                            (
+                                (*name).to_owned(),
+                                audit.clone(),
+                                Some(format!("orders.{audit}")),
+                                "error".to_owned(),
+                                Some(i64::from(index) + 2),
+                                Some("orders".to_owned()),
+                                Some("order_id".to_owned()),
+                            )
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(
+                ignored_audits(request.run_id).await,
+                Some(expected(None)),
+                "{}: the group lists every member's ignored failures and none of their passing or warning checks",
+                test_case.description
+            );
+            for (job, run_id) in &members {
+                assert_eq!(
+                    ignored_audits(*run_id).await,
+                    Some(expected(Some(job))),
+                    "{}: a member lists only its own",
+                    test_case.description
+                );
+            }
+            assert_eq!(
+                ignored_audits(Uuid::now_v7()).await,
+                None,
+                "{}: an unknown run is not found",
+                test_case.description
+            );
 
             assert_eq!(
                 settings,

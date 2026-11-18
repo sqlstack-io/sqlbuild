@@ -3434,10 +3434,9 @@ class SnowflakeAdapter(
     ) -> None:
         del infer_types
         if replace:
-            self.drop(
+            self.drop_table(
                 connection=connection,
                 destination=destination,
-                if_exists=True,
                 statement_recorder=statement_recorder,
             )
         column_defs: str = ", ".join(f"{col.name} {col.type}" for col in columns)
