@@ -478,7 +478,8 @@ pub(crate) fn plan_entries<'py>(
             &cursor_overrides,
             (start_override.clone(), end_override.clone()),
         )?;
-        let effective_full_refresh = resolve_model_full_refresh(&model, full_refresh)?;
+        let effective_full_refresh =
+            resolve_model_full_refresh(&model, full_refresh.applies(name))?;
         let (mut entry, entry_warnings) = plan_model_from_change(&ModelPlanRequest {
             model: model.clone(),
             snapshot: snapshot.clone(),

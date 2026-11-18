@@ -29,14 +29,11 @@ use crate::bindings::_helpers::cli::dispatch::warehouse_scope;
 use crate::bindings::_helpers::command_runtime::warehouses::WarehouseInputs;
 use crate::bindings::_helpers::command_runtime::warehouses::configured_warehouses;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
+use crate::bindings::_helpers::compiled_project::job_settings::job_run_settings;
 use crate::bindings::_helpers::cost_report::deferred::collect_deferred_cost_after_finish;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::command::compile_snapshot;
-use crate::bindings::_helpers::location_command::constants::CHANGED_SETTING;
 use crate::bindings::_helpers::location_command::constants::COMMAND_IMPLEMENTATIONS;
-use crate::bindings::_helpers::location_command::constants::JOB_RUN_COUNTS;
-use crate::bindings::_helpers::location_command::constants::JOB_RUN_REACH;
-use crate::bindings::_helpers::location_command::constants::REACH_SETTING;
 use crate::bindings::_helpers::location_command::constants::SQL_TEST_NODE_KIND;
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
 use crate::bindings::_helpers::seed_command::command::run_seed;
@@ -49,7 +46,6 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
-use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_project::constants::SQL_TEST_KEY_PREFIX;
@@ -125,27 +121,6 @@ fn upstream_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
             (key.clone(), deps.map(str::to_owned).collect())
         })
         .collect()
-}
-
-/// A job run's `--changed` settings: its whole selection, and source data counted unless configured.
-fn job_run_settings(
-    project_dir: &Bound<'_, PyAny>,
-    mut settings: BTreeMap<String, Value>,
-) -> PyResult<BTreeMap<String, Value>> {
-    let Some(changed) = settings.get(CHANGED_SETTING).cloned() else {
-        return Ok(settings);
-    };
-    if changed == Value::Bool(false) {
-        return Ok(settings);
-    }
-    settings.insert(REACH_SETTING.to_owned(), Value::from(JOB_RUN_REACH));
-    if changed == Value::Bool(true) && configured_changes(project_dir)?.counts.is_none() {
-        settings.insert(
-            CHANGED_SETTING.to_owned(),
-            Value::from(JOB_RUN_COUNTS.to_vec()),
-        );
-    }
-    Ok(settings)
 }
 
 /// The frozen command's request and warehouse scope; build carries the verified inputs and compiled project in its request.

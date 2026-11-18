@@ -1889,6 +1889,18 @@
         "group": 1
        },
        {
+        "kind": "store_false",
+        "options": [
+         "--no-job-settings"
+        ],
+        "dest": "job_settings",
+        "nargs": 0,
+        "const": false,
+        "default": true,
+        "help": "ignore the settings of the jobs the selection names, using only the command line's, the target's and the project's",
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--changed"
@@ -2546,6 +2558,18 @@
         "nargs": 0,
         "const": true,
         "default": false,
+        "group": 1
+       },
+       {
+        "kind": "store_false",
+        "options": [
+         "--no-job-settings"
+        ],
+        "dest": "job_settings",
+        "nargs": 0,
+        "const": false,
+        "default": true,
+        "help": "ignore the settings of the jobs the selection names, using only the command line's, the target's and the project's",
         "group": 1
        },
        {

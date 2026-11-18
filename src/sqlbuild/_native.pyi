@@ -6574,6 +6574,7 @@ class BuildCommandRequest(NativeRecord):
     no_color: bool
     fail_fast: bool
     full_refresh: bool
+    job_settings: bool
     changed: bool
     changed_counts: tuple[str, ...] | None
     reach: str | None
@@ -6618,6 +6619,7 @@ class BuildCommandRequest(NativeRecord):
         no_color: bool = False,
         fail_fast: bool = False,
         full_refresh: bool = False,
+        job_settings: bool = True,
         changed: bool = False,
         changed_counts: tuple[str, ...] | None = None,
         reach: str | None = None,
@@ -6987,6 +6989,7 @@ class PlanCommandRequest(NativeRecord):
     cursor_overrides: CursorOverrides | None
     json_output: bool
     full_refresh: bool
+    job_settings: bool
     changed: bool
     changed_counts: tuple[str, ...] | None
     reach: str | None
@@ -7014,6 +7017,7 @@ class PlanCommandRequest(NativeRecord):
         cursor_overrides: CursorOverrides | None = None,
         json_output: bool = False,
         full_refresh: bool = False,
+        job_settings: bool = True,
         changed: bool = False,
         changed_counts: tuple[str, ...] | None = None,
         reach: str | None = None,
@@ -10248,6 +10252,8 @@ class CompilePipelineOptions(NativeRecord):
     source_lexical_syntax: SqlLexicalSyntax | None
     plan_from: str | None
     ignore_audit_failures: bool
+    cli_ignore_audit_failures: bool | None
+    job_settings: bool
     def __init__(
         self,
         selected_target: str | None = ...,
@@ -10277,6 +10283,8 @@ class CompilePipelineOptions(NativeRecord):
         source_lexical_syntax: SqlLexicalSyntax | None = ...,
         plan_from: str | None = ...,
         ignore_audit_failures: bool = ...,
+        cli_ignore_audit_failures: bool | None = ...,
+        job_settings: bool = ...,
     ) -> None: ...
 
 class PythonPlanEntry(NativeRecord):
@@ -10494,6 +10502,7 @@ class PlannerOverrides(NativeRecord):
 
     cursor_overrides: CursorOverrides | None
     full_refresh: bool
+    full_refresh_models: frozenset[str]
     reload_sources: bool
     forced_stale_model_names: tuple[str, ...]
     external_blocked_model_names: tuple[str, ...]
@@ -10503,6 +10512,7 @@ class PlannerOverrides(NativeRecord):
         self,
         cursor_overrides: CursorOverrides | None = ...,
         full_refresh: bool = ...,
+        full_refresh_models: frozenset[str] = ...,
         reload_sources: bool = ...,
         forced_stale_model_names: tuple[str, ...] = ...,
         external_blocked_model_names: tuple[str, ...] = ...,
@@ -15286,6 +15296,8 @@ class CompilePipelineResult(NativeRecord):
     custom_materializations: dict[str, Callable[..., Any]]
     python_node_names: frozenset[str]
     python_plan_entries: tuple[PythonPlanEntry, ...]
+    job_limits: dict[str, int]
+    node_jobs: dict[CompiledObjectKey, tuple[str, ...]]
     compile_seconds: float | None
     planning_seconds: float | None
     def __init__(
@@ -15295,6 +15307,8 @@ class CompilePipelineResult(NativeRecord):
         custom_materializations: dict[str, Callable[..., Any]] = ...,
         python_node_names: frozenset[str] = ...,
         python_plan_entries: tuple[PythonPlanEntry, ...] = ...,
+        job_limits: dict[str, int] = ...,
+        node_jobs: dict[CompiledObjectKey, tuple[str, ...]] = ...,
         compile_seconds: float | None = ...,
         planning_seconds: float | None = ...,
     ) -> None: ...

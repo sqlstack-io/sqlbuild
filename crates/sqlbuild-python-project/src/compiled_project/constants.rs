@@ -24,3 +24,11 @@ pub(crate) const SENSOR_RUN_ARGUMENT: &str = "run";
 pub const CONTRACT_KEY: &str = "contract";
 
 pub const INCREMENTAL_MODE_KEY: &str = "incremental_mode";
+
+/// The build settings a job run's `--changed` reach reads, and the reach every job run uses.
+pub const CHANGED_SETTING: &str = "changed";
+pub const REACH_SETTING: &str = "reach";
+/// A job run reaches its whole selection: `reach` only stops builds that are not a job's run.
+pub const JOB_RUN_REACH: &str = "all";
+/// What a job run with `changed: True` counts when `[changes] counts` is not set: every change.
+pub const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];

@@ -242,6 +242,9 @@ class BuildScheduler:
             callbacks.python_identity_recorder
         )
         self._max_concurrency: int = len(connections)
+        self._job_limits: Mapping[str, int] = runtime.job_limits
+        self._node_jobs: Mapping[CompiledObjectKey, tuple[str, ...]] = runtime.node_jobs
+        self._job_running: dict[str, int] = {}
         self._blocked_keys: set[CompiledObjectKey] = set()
         self._unbuilt_keys: set[CompiledObjectKey] = set(initial_state.initial_failed_keys)
         self._completed_keys: set[CompiledObjectKey] = set(initial_state.precompleted_keys)
@@ -480,7 +483,10 @@ class BuildScheduler:
                 while self._ready and len(self._in_flight) < self._max_concurrency:
                     if self._stop:
                         break
-                    key: CompiledObjectKey = self._ready.popleft()
+                    next_key: CompiledObjectKey | None = self._take_ready_key()
+                    if next_key is None:
+                        break
+                    key: CompiledObjectKey = next_key
                     if key.resource_type == CompiledResourceType.SOURCE:
                         if key in self._blocked_keys:
                             self._record_skipped(key)
@@ -489,7 +495,7 @@ class BuildScheduler:
                         if not self._pre_dispatch(key):
                             self._mark_complete(key)
                             continue
-                        self._in_flight.add(key)
+                        self._start_in_flight(key)
                         pool.submit(copy_context().run, self._worker, key)
                         continue
                     if key in self._blocked_keys:
@@ -497,7 +503,9 @@ class BuildScheduler:
                         self._mark_complete(key)
                         continue
                     if self._is_concurrent_microbatch(key) and any(
-                        not self._is_concurrent_microbatch(candidate) for candidate in self._ready
+                        not self._is_concurrent_microbatch(candidate)
+                        and self._has_job_room(candidate)
+                        for candidate in self._ready
                     ):
                         self._ready.append(key)
                         continue
@@ -513,7 +521,7 @@ class BuildScheduler:
                                 self._ready.appendleft(key)
                                 break
                             self._microbatch_coordinators.add(key)
-                        self._in_flight.add(key)
+                        self._start_in_flight(key)
                         pool.submit(
                             copy_context().run,
                             self._concurrent_microbatch_worker,
@@ -521,7 +529,7 @@ class BuildScheduler:
                             pool=pool,
                         )
                         continue
-                    self._in_flight.add(key)
+                    self._start_in_flight(key)
                     pool.submit(copy_context().run, self._worker, key)
 
                 self._report_scheduler_state()
@@ -529,7 +537,7 @@ class BuildScheduler:
                     break
 
                 completion: NodeCompletion = self._completion_queue.get()
-                self._in_flight.discard(completion.key)
+                self._finish_in_flight(completion.key)
                 if completion.error is not None:
                     if escaped is None:
                         escaped = completion.error
@@ -540,6 +548,39 @@ class BuildScheduler:
             self._report_scheduler_state()
         if escaped is not None:
             raise escaped
+
+    def _take_ready_key(self) -> CompiledObjectKey | None:
+        """Remove and return the first ready node whose named jobs all have a free slot."""
+
+        index: int
+        key: CompiledObjectKey
+        for index, key in enumerate(self._ready):
+            if self._has_job_room(key):
+                del self._ready[index]
+                return key
+        return None
+
+    def _has_job_room(self, key: CompiledObjectKey) -> bool:
+        """Whether each job limiting `key` has a free slot; a node to skip never waits."""
+
+        return key in self._blocked_keys or all(
+            self._job_running.get(job, 0) < self._job_limits[job]
+            for job in self._node_jobs.get(key, ())
+        )
+
+    def _start_in_flight(self, key: CompiledObjectKey) -> None:
+        self._in_flight.add(key)
+        job: str
+        for job in self._node_jobs.get(key, ()):
+            self._job_running[job] = self._job_running.get(job, 0) + 1
+
+    def _finish_in_flight(self, key: CompiledObjectKey) -> None:
+        if key not in self._in_flight:
+            return
+        self._in_flight.discard(key)
+        job: str
+        for job in self._node_jobs.get(key, ()):
+            self._job_running[job] -= 1
 
     def _report_scheduler_state(self) -> None:
         callback: Callable[[SchedulerState], None] | None = self._callbacks.on_scheduler_state

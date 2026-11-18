@@ -30,6 +30,7 @@ pub(crate) fn setting_argument(
             | "dbt_profiles_dir"
             | "dbt_target"
             | "dbt_target_path"
+            | "job_settings"
     ) {
         return Err(format!("job setting {name} is owned by the run request"));
     }

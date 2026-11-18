@@ -101,6 +101,8 @@ class BuildRuntimeParams:
     microbatch_lease_check: Callable[[], None] | None = None
     project_relations: Mapping[SqlResourceRef, str] | None = None
     test_timeouts: RunItemTimeouts | None = None
+    job_limits: Mapping[str, int] = field(default_factory=dict)
+    node_jobs: Mapping[CompiledObjectKey, tuple[str, ...]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

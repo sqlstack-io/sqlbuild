@@ -9,3 +9,5 @@ pub const GROUP_AGREED_SETTINGS: [&str; 2] = ["vars", "changed"];
 /// The help every job setting conflict gives.
 pub const CONFLICT_HELP: &str = "make the jobs agree, set it in only one of them, override it with \
      the command-line flag, or build with --no-job-settings";
+/// The error code of job settings that cannot apply together.
+pub const JOB_SETTING_CONFLICT_CODE: &str = "S027";
