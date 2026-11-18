@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.243.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.242.0...v0.243.0) (2026-11-17)
+
+
+### Features
+
+* **plan:** say how to fix missing upstreams, and rebuild cloned tables with --changed ([#1562](https://github.com/sqlstack-io/sqlbuild/issues/1562)) ([4c4ffb0](https://github.com/sqlstack-io/sqlbuild/commit/4c4ffb052fd67a7ca2acab4b36c980fd26525791))
+
+
+### Bug Fixes
+
+* follow the Python fan-in rule for round-trip loads ([#1559](https://github.com/sqlstack-io/sqlbuild/issues/1559)) ([66652f6](https://github.com/sqlstack-io/sqlbuild/commit/66652f6588bf9cbb86a42fb20950f2057d6dd0ef))
+* read Python node fingerprints from the preserved loader schema ([#1560](https://github.com/sqlstack-io/sqlbuild/issues/1560)) ([2f0ef09](https://github.com/sqlstack-io/sqlbuild/commit/2f0ef09af68122a51b4421cc232ec7f575323645))
+
 ## [0.242.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.241.0...v0.242.0) (2026-11-17)
 
 
