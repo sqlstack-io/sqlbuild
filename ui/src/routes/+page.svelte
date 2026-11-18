@@ -63,7 +63,7 @@
 	const snoozeSeconds = $derived(data?.attentionSnoozeSeconds === undefined ? 86_400 : data.attentionSnoozeSeconds);
 	const ACK_HELP = $derived({
 		run: 'Hide this from the attention list for everyone viewing this target. It stays under Acknowledged, where anyone can undo it.',
-		condition: `Hide this from the attention list for everyone viewing this target, until it changes: it gets worse, or clears and comes back${snoozeSeconds === null ? '' : `, or ${snoozeWords(snoozeSeconds)} pass`}. It stays under Acknowledged, where anyone can undo it.`
+		condition: `Hide this from the attention list for everyone viewing this target, until it changes: it gets worse, or clears and comes back${snoozeSeconds === null ? '' : `, or after ${snoozeWords(snoozeSeconds)}`}. It stays under Acknowledged, where anyone can undo it.`
 	});
 	const handledLabel = (until: string | null | undefined) =>
 		until === undefined ? 'for good' : until === null ? 'hidden until it changes' : `hidden until it changes, or until ${formatStamp(until).slice(5, 16)}`;
