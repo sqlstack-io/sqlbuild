@@ -12,6 +12,7 @@ from sqlbuild.adapter.relations.main.resolve_relation_location_qualified_name im
     resolve_relation_location_qualified_name,
 )
 from sqlbuild.executor.build.models import SeedExecutionResult
+from sqlbuild.executor.run.classes.fingerprint_writes import FingerprintWrites
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.executor.seed._helpers.fingerprinting import try_write_seed_fingerprint
 from sqlbuild.executor.seed.constants import SEED_LOAD_FAILED_CODE
@@ -26,6 +27,7 @@ def execute_seed(
     run_id: str = "",
     query_change_tracking: bool = False,
     schema_prepared: bool = False,
+    fingerprint_writes: FingerprintWrites | None = None,
 ) -> SeedExecutionResult:
     """Load one seed into the warehouse."""
 
@@ -56,6 +58,7 @@ def execute_seed(
             connection=connection,
             run_id=run_id,
             query_change_tracking=query_change_tracking,
+            fingerprint_writes=fingerprint_writes,
         )
     except Exception as exc:
         return SeedExecutionResult(
