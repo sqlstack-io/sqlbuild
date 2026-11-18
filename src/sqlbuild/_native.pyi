@@ -10515,12 +10515,14 @@ class DeferralInputs(NativeRecord):
 
     deferred_locations: dict[str, CompiledRelationLocation] | None
     deferred_relations: dict[str, RelationInfo] | None
+    defer_to: str | None
     defer_sources_to: str | None
     source_deferral_enabled: bool
     def __init__(
         self,
         deferred_locations: dict[str, CompiledRelationLocation] | None = ...,
         deferred_relations: dict[str, RelationInfo] | None = ...,
+        defer_to: str | None = ...,
         defer_sources_to: str | None = ...,
         source_deferral_enabled: bool = ...,
     ) -> None: ...

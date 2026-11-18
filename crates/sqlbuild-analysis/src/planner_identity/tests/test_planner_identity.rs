@@ -460,6 +460,34 @@ fn given_selected_keys_when_checking_buildability_then_reports_missing_upstreams
             ),
         },
         BuildabilityTestCase {
+            description: "deferring reads models and seeds only from the deferred target",
+            selected: vec![model("report")],
+            upstream: HashMap::from([(
+                model("report"),
+                vec![model("dev_only"), model("prod_only"), key("seed", "codes")],
+            )]),
+            available: AvailableUpstreams {
+                existing_relations: names(&["dev_only", "codes"]),
+                deferred_relations: Some(names(&["prod_only", "codes"])),
+                ..AvailableUpstreams::default()
+            },
+            origins: HashMap::new(),
+            fixes: MissingUpstreamFixes {
+                target: Some("prod".to_owned()),
+                ..MissingUpstreamFixes::default()
+            },
+            expected_missing: vec![MissingUpstream {
+                key: model("dev_only"),
+                required_by: vec![model("report")],
+            }],
+            expected_message: concat!(
+                "1 upstream model this build reads doesn't exist in target 'prod'\n",
+                "  dev_only\n",
+                "\n",
+                "  Build it too:  add + before your selection",
+            ),
+        },
+        BuildabilityTestCase {
             description: "only an audit read requires the upstream",
             selected: vec![model("a")],
             upstream: HashMap::from([(model("a"), vec![model("lookup")])]),

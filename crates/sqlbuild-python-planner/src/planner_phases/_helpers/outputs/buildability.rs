@@ -79,7 +79,7 @@ pub(crate) fn check_selected_scope_buildability<'py>(
         let message = missing_upstream_message(
             &missing,
             &origins,
-            &missing_upstream_fixes(runtime, &project, available.deferred_relations.is_some())?,
+            &missing_upstream_fixes(runtime, &project, deferred_to(deferral, &available)?)?,
         );
         let names = missing.iter().map(|entry| entry.key.name.as_str());
         return Err(new_error_with_fields(
@@ -98,11 +98,28 @@ pub(crate) fn check_selected_scope_buildability<'py>(
 }
 
 /// The active target, its clone or deferral origins, and the clone `--to` it needs (also when the default target is unknown).
+/// The target this plan reads unselected models and seeds from, when it defers.
+fn deferred_to(
+    deferral: &Bound<'_, PyAny>,
+    available: &AvailableUpstreams,
+) -> PyResult<Option<String>> {
+    if available.deferred_relations.is_none() {
+        return Ok(None);
+    }
+    native_field(deferral, "defer_to")?.extract()
+}
+
 fn missing_upstream_fixes(
     runtime: &Bound<'_, PyAny>,
     project: &Bound<'_, PyAny>,
-    deferring: bool,
+    deferred_to: Option<String>,
 ) -> PyResult<MissingUpstreamFixes> {
+    if deferred_to.is_some() {
+        return Ok(MissingUpstreamFixes {
+            target: deferred_to,
+            ..MissingUpstreamFixes::default()
+        });
+    }
     let py: Python<'_> = runtime.py();
     let target: Option<String> = native_field(project, "effective_target_name")?.extract()?;
     let configs = (
@@ -129,7 +146,7 @@ fn missing_upstream_fixes(
             for name in native_field(config, "targets")?.try_iter()? {
                 let name: String = name?.extract()?;
                 if name != active && allows(&name, "allow_as_clone_origin")? {
-                    if project_targets && !deferring {
+                    if project_targets {
                         deferrable.push(name.clone());
                     }
                     origins.insert(name);
