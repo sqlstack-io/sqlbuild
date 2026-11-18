@@ -80,11 +80,11 @@ pub(crate) async fn next_ingestion_chunk(
     .await
 }
 
-/// Delivered rows take the scan's id, and catalog rows the time they were received; a complete scan deletes every row it did not deliver.
+/// Delivered rows take the scan's id and catalog rows their receipt time; a complete scan deletes the rest, and a last page counts `table`'s mirror.
 pub(crate) async fn commit_ingestion(
     mut transaction: ControlTransaction,
     (table, location_id, target): (&str, Uuid, &str),
-    (scan, keys): (Option<&MetadataScan>, &[Uuid]),
+    (scan, keys, last_page): (Option<&MetadataScan>, &[Uuid], bool),
     mut applied: bool,
 ) -> Result<WarehouseSyncResponse, ControlError> {
     if let Some(scan) = scan {
@@ -135,13 +135,27 @@ pub(crate) async fn commit_ingestion(
             applied |= !removed.is_empty();
         }
     }
+    let mut mirrored_records: Option<u64> = None;
+    if last_page {
+        let counted;
+        (transaction, counted) = query(
+            transaction,
+            &format!("SELECT COUNT(*) AS records FROM {table} WHERE location_id=$1 AND target=$2"),
+            vec![Parameter::Id(location_id), Parameter::Text(target.into())],
+        )
+        .await?;
+        mirrored_records = counted[0]["records"].as_u64();
+    }
     if applied {
         transaction
             .changes
             .insert(Change::NodeStatus(location_id, target.into()));
     }
     commit(transaction).await?;
-    Ok(WarehouseSyncResponse { applied })
+    Ok(WarehouseSyncResponse {
+        applied,
+        mirrored_records,
+    })
 }
 
 /// Every record of a scan page must come from the scanned physical namespace.

@@ -20,7 +20,8 @@ use crate::native_commands::tests::test_types::{
 };
 use crate::native_commands::tests::test_types::{
     MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
-    SafetySyncSettingTestCase, StoppedPassTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
+    SafetySyncSettingTestCase, SkippedCountTestCase, StoppedPassTestCase, SyncCoalescingTestCase,
+    UnchangedScanTestCase,
 };
 use crate::native_commands::tests::test_types::{
     RowsTextTestCase, ScanLineTestCase, SyncProgressTestCase, WakingIdleTestCase,
@@ -178,7 +179,8 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
 }
 
 #[test]
-fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_attempt() {
+fn given_a_stopped_sync_when_a_run_or_its_safety_sync_resumes_it_then_failed_reads_back_off_again()
+{
     let test_cases = [
         SafetyResumeTestCase {
             description: "before the safety sync is due the sync stays stopped",
@@ -189,12 +191,12 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_a
             expected_outcome: (false, false, None, true),
         },
         SafetyResumeTestCase {
-            description: "a due safety sync resumes it, and one more failure stops it for another interval",
+            description: "a due safety sync resumes it with a fresh count, so one more failure backs off",
             safety_seconds: 1800,
             due_in: Duration::ZERO,
             billed: false,
             ran: false,
-            expected_outcome: (true, true, None, true),
+            expected_outcome: (true, true, Some(Duration::from_secs(30)), false),
         },
         SafetyResumeTestCase {
             description: "with safety syncs off only a run, a request or a publication resumes it",
@@ -213,20 +215,20 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_a
             expected_outcome: (false, false, None, true),
         },
         SafetyResumeTestCase {
-            description: "on a billed warehouse a run that ends after the stop resumes it",
+            description: "on a billed warehouse a run that ends after the stop resumes it with a fresh count",
             safety_seconds: 1800,
             due_in: Duration::from_secs(600),
             billed: true,
             ran: true,
-            expected_outcome: (true, true, None, true),
+            expected_outcome: (true, true, Some(Duration::from_secs(30)), false),
         },
     ];
     for test_case in test_cases {
         let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
         state.reads_wake_compute = test_case.billed;
-        state.safety_explicit = !test_case.billed;
         state.begin_sync(Utc::now());
         let stopped: Vec<Option<Duration>> = (0..5).map(|_| state.fail_read(false)).collect();
+        let stopped_for: Duration = state.safety_at.saturating_duration_since(Instant::now());
         state.safety_at = Instant::now() + test_case.due_in;
         let runs_ended_at = test_case
             .ran
@@ -239,10 +241,7 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_is_due_then_it_makes_one_a
             (
                 stopped[4],
                 (resumed, paging, wait, state.halted),
-                (state.safety_at.saturating_duration_since(Instant::now())
-                    + Duration::from_secs(1))
-                .as_secs()
-                    >= test_case.safety_seconds,
+                (stopped_for + Duration::from_secs(1)).as_secs() >= test_case.safety_seconds,
             ),
             (None, test_case.expected_outcome, true),
             "{}",
@@ -404,6 +403,70 @@ fn given_recorded_change_token_when_scanning_again_then_only_proven_unchanged_re
             test_case.expected_token,
             "{description}",
             description = test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_table_skipped_as_unchanged_when_reporting_health_then_the_newest_mirrored_count_of_its_kind_repeats()
+ {
+    let test_cases = [
+        SkippedCountTestCase {
+            description: "one state location repeats its own read's count",
+            locations: 1,
+            later_read: None,
+            expected_mirrored: Some(120),
+        },
+        SkippedCountTestCase {
+            description: "a later read of the same kind in another location replaces the repeated count",
+            locations: 2,
+            later_read: Some(130),
+            expected_mirrored: Some(130),
+        },
+    ];
+    for test_case in test_cases {
+        let locations: Vec<WarehouseStateLocation> = (0..test_case.locations)
+            .map(|position| WarehouseStateLocation {
+                database: Some("analytics".into()),
+                schema: format!("state_{position}"),
+            })
+            .collect();
+        let kinds = WarehouseHistoryKind::ALL.len();
+        let skipped = (test_case.locations - 1) * kinds;
+        let mut state = metadata_sync((locations, 1), (3600, 0));
+        state.index = skipped;
+        state.scan_token = Some("t1".into());
+        state.scan_delivered = true;
+        state.progress.scan_mirrored = Some(120);
+        let state = acknowledge_complete_pages(state, 1);
+        assert_eq!(
+            state.progress.scan_mirrored, None,
+            "{}: the next table starts without a count",
+            test_case.description
+        );
+        let mut state = test_case
+            .later_read
+            .into_iter()
+            .fold(state, |mut state, count| {
+                state.index = 0;
+                state.scan_token = Some("t2".into());
+                state.scan_delivered = true;
+                state.progress.scan_mirrored = Some(count);
+                acknowledge_complete_pages(state, 1)
+            });
+        state.index = skipped;
+        state.skip_unchanged();
+        let health = metadata_health_of(&state, (Instant::now(), None, None), Utc::now());
+        let LocationHealth::WarehouseSync {
+            mirrored_records, ..
+        } = health
+        else {
+            panic!("{}: not a warehouse sync report", test_case.description);
+        };
+        assert_eq!(
+            mirrored_records, test_case.expected_mirrored,
+            "{}",
+            test_case.description
         );
     }
 }
@@ -606,35 +669,28 @@ fn given_a_state_history_limit_when_requesting_history_then_only_full_reads_of_b
             description: "a first read of builds stops at the limit",
             kind: WarehouseHistoryKind::Fingerprints,
             incremental: false,
-            server_limit: Some(5),
+            server_limit: 5,
             expected_newest_versions: Some(5),
         },
         NewestVersionsTestCase {
             description: "a first read of check results stops at the limit",
             kind: WarehouseHistoryKind::AuditResults,
             incremental: false,
-            server_limit: Some(20),
+            server_limit: 20,
             expected_newest_versions: Some(20),
         },
         NewestVersionsTestCase {
             description: "an incremental read delivers every new build; pruning bounds the store",
             kind: WarehouseHistoryKind::Fingerprints,
             incremental: true,
-            server_limit: Some(5),
+            server_limit: 5,
             expected_newest_versions: None,
         },
         NewestVersionsTestCase {
             description: "other tables are never limited",
             kind: WarehouseHistoryKind::NodeResults,
             incremental: false,
-            server_limit: Some(5),
-            expected_newest_versions: None,
-        },
-        NewestVersionsTestCase {
-            description: "a server without the setting gets the full history",
-            kind: WarehouseHistoryKind::Fingerprints,
-            incremental: false,
-            server_limit: None,
+            server_limit: 5,
             expected_newest_versions: None,
         },
     ];
@@ -644,7 +700,7 @@ fn given_a_state_history_limit_when_requesting_history_then_only_full_reads_of_b
             .iter()
             .position(|kind| *kind == test_case.kind)
             .expect("kind is listed");
-        state.state_history_versions = test_case.server_limit;
+        state.state_history_versions = Some(test_case.server_limit);
         state.observed_since = test_case.incremental.then(Utc::now);
         let request: serde_json::Value =
             serde_json::from_slice(&history_request(&state).expect("request")).expect("JSON");
@@ -712,7 +768,6 @@ fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_pag
             image_id: None,
             metadata_reconcile_seconds: 3600,
             safety_sync_seconds: 0,
-            safety_sync_explicit: false,
             dev_events: false,
         };
         let mut state = metadata_sync((one_location(), 1), (3600, 0));
@@ -720,13 +775,12 @@ fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_pag
             .iter()
             .position(|kind| *kind == test_case.kind)
             .expect("kind is listed");
-        state.page_seconds = 1;
         let (state, page) = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("runtime")
             .block_on(read_metadata_page(
-                (&options, &test_case.script),
+                (&options, &test_case.script, 1),
                 state,
                 std::future::pending(),
             ))
@@ -884,13 +938,11 @@ fn given_a_delivered_page_when_reporting_health_then_progress_completes_only_on_
 }
 
 #[test]
-fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_or_a_set_interval_sync()
- {
+fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_or_requests_sync() {
     let test_cases = [
         WakingIdleTestCase {
-            description: "the default interval never wakes compute on a timer",
+            description: "the interval, set or default, never wakes compute on a timer",
             wakes: true,
-            explicit: false,
             run_ended: false,
             requested: false,
             expected_due: false,
@@ -898,15 +950,6 @@ fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_o
         WakingIdleTestCase {
             description: "metadata-only reads keep the default interval",
             wakes: false,
-            explicit: false,
-            run_ended: false,
-            requested: false,
-            expected_due: true,
-        },
-        WakingIdleTestCase {
-            description: "an interval someone set still applies",
-            wakes: true,
-            explicit: true,
             run_ended: false,
             requested: false,
             expected_due: true,
@@ -914,7 +957,6 @@ fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_o
         WakingIdleTestCase {
             description: "a run that ended still syncs",
             wakes: true,
-            explicit: false,
             run_ended: true,
             requested: false,
             expected_due: true,
@@ -922,7 +964,6 @@ fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_o
         WakingIdleTestCase {
             description: "a request still syncs",
             wakes: true,
-            explicit: false,
             run_ended: false,
             requested: true,
             expected_due: true,
@@ -933,7 +974,6 @@ fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_o
         state.cycle_started_at = Some(Utc::now());
         state.safety_at = Instant::now() - Duration::from_secs(1);
         state.reads_wake_compute = test_case.wakes;
-        state.safety_explicit = test_case.explicit;
         test_case.requested.then(|| state.request_sync());
         let runs_ended_at = test_case
             .run_ended
@@ -1009,13 +1049,13 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
             ),
         },
         FailedReadHealthTestCase {
-            description: "a reader that did not start reports its own cause",
+            description: "a reader that did not start reports a read error that names it",
             failure: ReadFailure::ReaderStart("no such file".into()),
             failures_before: 0,
             billed: false,
             expected_report: (
                 false,
-                Some(WarehouseReadFailure::ReaderStart {}),
+                Some(WarehouseReadFailure::ReadError {}),
                 Some("the metadata reader did not start: no such file"),
                 false,
                 None,
@@ -1029,7 +1069,6 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
             .position(|kind| *kind == WarehouseHistoryKind::Fingerprints)
             .expect("kind is listed");
         state.reads_wake_compute = test_case.billed;
-        state.safety_explicit = false;
         state.begin_sync(Utc::now());
         (0..test_case.failures_before).for_each(|_| {
             let _ = state.fail_read(false);
@@ -1155,7 +1194,7 @@ fn given_a_published_location_when_its_sync_stops_before_any_page_succeeds_then_
                 let mut state = state;
                 for _ in 0..METADATA_FAILURE_LIMIT {
                     let (read, page) =
-                        read_metadata_page((&options, &script), state, std::future::pending())
+                        read_metadata_page((&options, &script, 5), state, std::future::pending())
                             .await
                             .expect("no control error")
                             .expect("not stopped");

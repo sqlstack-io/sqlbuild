@@ -68,7 +68,7 @@ pub struct ChangedBuildReport {
     pub generation: i64,
     pub changed: Vec<String>,
     pub downstream: Vec<String>,
-    /// Why the plan failed, sent with empty lists; only newer servers accept it.
+    /// Why the plan failed, sent with empty lists.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failing: Option<String>,
 }

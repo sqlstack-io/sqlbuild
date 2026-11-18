@@ -61,6 +61,7 @@ pub(super) fn acknowledge_complete_pages(
                 generation: 1,
                 records: Vec::new(),
                 scan: None,
+                last_page: false,
             },
             next_source_after: None,
         });
@@ -106,7 +107,6 @@ pub(super) fn published_location(
         image_id: None,
         metadata_reconcile_seconds: 3600,
         safety_sync_seconds: 1800,
-        safety_sync_explicit: false,
         dev_events: false,
     };
     let client = connect_location_work((&options.server_url, "token"), options.location_id)
@@ -130,6 +130,5 @@ pub(super) fn published_location(
     let mut state = metadata.expect("a connected publication starts a sync");
     state.begin_sync(chrono::Utc::now());
     state.idle = false;
-    state.page_seconds = 5;
     ((options, script), (client, poll), state)
 }

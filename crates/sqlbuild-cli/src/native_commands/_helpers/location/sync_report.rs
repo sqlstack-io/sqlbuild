@@ -131,6 +131,7 @@ pub(crate) fn metadata_health_of(
             ..sync_progress(state, failure.is_none())
         }),
         next_sync_at,
+        mirrored_records: state.progress.scan_mirrored,
     }
 }
 
@@ -167,12 +168,12 @@ pub(crate) async fn metadata_health(
     report_metadata_health(state, (client, poll), (started, failure, None)).await;
 }
 
-/// How long one page may take: statistics scale with their relations, other pages get a fixed allowance.
-pub(crate) fn read_timeout_seconds(state: &LocationMetadataSync) -> u64 {
+/// How long one page may take: statistics scale with their relations, other pages get `page_seconds`.
+pub(crate) fn read_timeout_seconds(state: &LocationMetadataSync, page_seconds: u64) -> u64 {
     if state.kind() == WarehouseHistoryKind::Statistics {
         METADATA_POLL_SECONDS + STATISTICS_RELATION_SECONDS * state.statistics_limit as u64
     } else {
-        state.page_seconds
+        page_seconds
     }
 }
 
@@ -185,20 +186,15 @@ pub(crate) fn page_limit(state: &LocationMetadataSync) -> usize {
     }
 }
 
-/// Say a stopped sync resumes; `one_attempt` when one more failure stops it again.
-pub(crate) fn resumed_line(one_attempt: bool) {
+/// Say a stopped sync resumes, with failed reads backing off again before they stop it.
+pub(crate) fn resumed_line() {
     drop(write_output(&[(
         Stream::Stderr,
         "Retrying the stopped warehouse history synchronization.\n",
     )]));
     location_warning(
         "warehouse sync retrying",
-        if one_attempt {
-            "one attempt; another failed read stops it again"
-        } else {
-            "on request; failed reads back off again before they stop it"
-        }
-        .to_owned(),
+        "failed reads back off again before they stop it".to_owned(),
     );
 }
 

@@ -17,6 +17,7 @@ use crate::native_commands::_helpers::location::sync_outcomes::{
     deliver_metadata_page, failed_read, retry_metadata,
 };
 use crate::native_commands::_helpers::location::sync_report::{metadata_health, resumed_line};
+use crate::native_commands::constants::METADATA_PAGE_SECONDS;
 use crate::native_commands::models::{LocationMetadataSync, LocationServe, LocationWatch};
 
 /// One bounded source or mirror page leaves named work polling a turn between pages.
@@ -43,7 +44,7 @@ pub(crate) async fn sync_location_metadata(
         };
         state = next;
         match due {
-            Ok(true) if halted => resumed_line(state.failed_reads > 0),
+            Ok(true) if halted => resumed_line(),
             Ok(true) => {}
             Ok(false) => return Ok(Some(state)),
             Err(error) => return retry_metadata(state, error),
@@ -70,8 +71,12 @@ pub(crate) async fn sync_location_metadata(
                 return retry_metadata(state, error);
             }
         }
-        let Some((read, page)) =
-            read_metadata_page((options, script), state, stopped.as_mut()).await?
+        let Some((read, page)) = read_metadata_page(
+            (options, script, METADATA_PAGE_SECONDS),
+            state,
+            stopped.as_mut(),
+        )
+        .await?
         else {
             return Ok(None);
         };
@@ -89,11 +94,11 @@ pub(crate) async fn sync_location_metadata(
             return Ok(Some(state));
         }
         if page.unchanged {
+            state.skip_unchanged();
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },
                 () = metadata_health(&state, (client, poll), (started, None)) => {},
             }
-            state.progress.scan_unchanged = true;
             return finish_metadata_page(next_scan(state)).await;
         }
         state = freeze_history_page(state, page, poll)?;

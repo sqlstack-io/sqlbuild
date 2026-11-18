@@ -554,7 +554,7 @@ pub(crate) async fn sync_due_scope(
         let fields = reply.as_object().expect("object");
         let mut keys: Vec<_> = fields.keys().collect();
         keys.sort();
-        assert_eq!(keys, ["now", "runs_ended_at"]);
+        assert_eq!(keys, ["now", "runs_ended_at", "state_history_versions"]);
         let ended = fields["runs_ended_at"]
             .as_str()
             .map(|time| time.parse::<chrono::DateTime<chrono::Utc>>().expect("time"));

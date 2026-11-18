@@ -34,6 +34,7 @@ use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_co
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
+use crate::native_commands::constants::PLAN_NOT_PRODUCED;
 use crate::native_commands::constants::SCREEN_INDENT;
 use crate::native_commands::constants::{
     ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS,
@@ -42,7 +43,6 @@ use crate::native_commands::constants::{
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
     UNKNOWN_COMMAND,
 };
-use crate::native_commands::constants::{METADATA_PAGE_SECONDS, PLAN_NOT_PRODUCED};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
@@ -502,7 +502,6 @@ pub(crate) fn metadata_sync(
         server_offset: chrono::Duration::zero(),
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
-        busy: false,
         failed_reads: 0,
         halted: false,
         change_tokens: HashMap::new(),
@@ -511,10 +510,8 @@ pub(crate) fn metadata_sync(
         mirror_holds_rows: false,
         reader: None,
         state_history_versions: None,
-        page_seconds: METADATA_PAGE_SECONDS,
         progress: SyncProgress::new(),
         reads_wake_compute: false,
-        safety_explicit: true,
     }
 }
 
@@ -597,6 +594,7 @@ pub(crate) fn freeze_history_page(
             location: state.location().clone(),
             complete: page.next_after.is_none(),
         }),
+        last_page: page.next_after.is_none(),
     };
     if serde_json::to_vec(&batch)
         .map_err(|error| ControlError::Invalid(error.to_string()))?
@@ -648,10 +646,7 @@ pub(crate) async fn begin_after_run(
     };
     let ran = state.sync_due(due.runs_ended_at);
     if ran {
-        state.state_history_versions = match client.metadata_retention(target).await {
-            Ok(retention) => retention.map(|retention| retention.state_history_versions),
-            Err(error) => return (state, Err(error)),
-        };
+        state.state_history_versions = Some(due.state_history_versions);
         state.begin_sync(due.now);
     }
     (state, Ok(ran))
@@ -670,12 +665,22 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
         if state.kind() == WarehouseHistoryKind::Statistics {
             state.statistics_limit = MAX_HISTORY_RECORDS;
         }
+        if let Some(count) = state.progress.scan_mirrored {
+            let kinds = WarehouseHistoryKind::ALL.len();
+            let kind = state.index % kinds;
+            state
+                .change_tokens
+                .iter_mut()
+                .filter(|(index, _)| *index % kinds == kind)
+                .for_each(|(_, recorded)| recorded.mirrored = Some(count));
+        }
         match state.scan_token.take() {
             Some(token) => {
                 let recorded = ScanToken {
                     token,
                     reconciled: state.reconciling(),
                     delivered: state.scan_delivered || state.observed_since.is_some(),
+                    mirrored: state.progress.scan_mirrored,
                 };
                 state.change_tokens.insert(state.index, recorded);
             }
@@ -743,6 +748,7 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
     state.progress.sync_rows += state.progress.scan_rows;
     state.progress.scan_rows = 0;
     state.progress.scan_unchanged = false;
+    state.progress.scan_mirrored = None;
     state.progress.scan_started = Instant::now();
     state.index += 1;
     state.scan_id = state.server_scan_id();
@@ -874,7 +880,6 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
     )
     .map_err(ControlError::Invalid)?;
     Ok(LocationServe {
-        safety_sync_explicit: safety_sync.is_some(),
         safety_sync_seconds: safety_sync.unwrap_or(METADATA_SAFETY_SYNC_SECONDS),
         project_dir,
         server_url: text(namespace, "location_server_url").unwrap_or_default(),
@@ -1363,9 +1368,9 @@ pub(crate) async fn stop_location_runtime(
     Ok(())
 }
 
-/// An outer absence means shutdown; an inner error is a failed read, never an empty table.
+/// An outer absence means shutdown; an inner error is a failed read, including a page slower than its limit.
 pub(crate) async fn read_metadata_page(
-    (options, script): (&LocationServe, &Path),
+    (options, script, page_seconds): (&LocationServe, &Path, u64),
     mut state: LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<
@@ -1375,7 +1380,6 @@ pub(crate) async fn read_metadata_page(
     )>,
     ControlError,
 > {
-    state.busy = false;
     if let Some(statistics) = &state.statistics
         && statistics.names.is_empty()
     {
@@ -1400,7 +1404,7 @@ pub(crate) async fn read_metadata_page(
             }
         },
     };
-    let seconds = read_timeout_seconds(&state);
+    let seconds = read_timeout_seconds(&state, page_seconds);
     tokio::pin!(stopped);
     let read = tokio::select! {
         result = &mut stopped => {
@@ -1417,7 +1421,6 @@ pub(crate) async fn read_metadata_page(
                 Ok(page)
             }
             Ok((reader, Ok(MetadataReply::Busy))) => {
-                state.busy = true;
                 state.reader = Some(reader);
                 Err(ReadFailure::Busy)
             }
@@ -1633,14 +1636,13 @@ pub(crate) async fn settle_publication(
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Settled>, ControlError> {
     let (mut metadata, deferred) = if connect {
-        let mut sync: LocationMetadataSync = metadata_sync(
+        let sync: LocationMetadataSync = metadata_sync(
             (locations, generation),
             (
                 options.metadata_reconcile_seconds,
                 options.safety_sync_seconds,
             ),
         );
-        sync.safety_explicit = options.safety_sync_explicit;
         (Some(sync), None)
     } else {
         (metadata, Some((locations, generation)))
