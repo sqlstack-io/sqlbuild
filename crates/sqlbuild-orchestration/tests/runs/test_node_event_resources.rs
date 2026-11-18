@@ -19,6 +19,7 @@ use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::helpers::read_recall_events;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::store::types::Row;
 use crate::warehouse_history::_helpers::run_recall::node_of;
 use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
 
@@ -197,53 +198,61 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
 }
 
 #[test]
-fn given_event_payloads_when_reading_their_node_then_only_node_identities_are_taken() {
+fn given_node_fields_when_reading_their_node_then_the_node_key_or_audit_target_names_it() {
     struct Case {
         description: &'static str,
-        payload: serde_json::Value,
+        fields: &'static [(&'static str, &'static str)],
         expected: Option<(&'static str, &'static str)>,
     }
     let cases = [
         Case {
             description: "a scheduler change keyed <kind>:<name>",
-            payload: json!({"change": {"change": {"kind": "node_started", "node_key": "seed:region_codes"}}}),
+            fields: &[("node_key", "seed:region_codes")],
             expected: Some(("seed", "region_codes")),
         },
         Case {
-            description: "a payload stored as JSON text",
-            payload: json!(json!({"change": {"change": {"node_key": "model:orders"}}}).to_string()),
-            expected: Some(("model", "orders")),
-        },
-        Case {
             description: "a node key without a kind names no node",
-            payload: json!({"change": {"change": {"node_key": "orders"}}}),
+            fields: &[
+                ("node_key", "orders"),
+                ("attachment_kind", "model"),
+                ("target_name", "orders"),
+            ],
             expected: None,
         },
         Case {
-            description: "an audit names the node it is attached to",
-            payload: json!({"attachment_kind": "seed", "target_name": "region_codes",
-                "attached_target_kind": "seed", "attached_target_name": "region_codes", "attached_column_name": "code"}),
+            description: "a column audit names the table it is attached to",
+            fields: &[
+                ("attachment_kind", "column"),
+                ("target_name", "code"),
+                ("attached_target_kind", "seed"),
+                ("attached_target_name", "region_codes"),
+            ],
             expected: Some(("seed", "region_codes")),
         },
         Case {
             description: "an audit without an attached target names its own target",
-            payload: json!({"attachment_kind": "model", "target_name": "orders"}),
+            fields: &[("attachment_kind", "model"), ("target_name", "orders")],
             expected: Some(("model", "orders")),
         },
         Case {
             description: "a run-scope audit has no node",
-            payload: json!({"attachment_kind": "end"}),
+            fields: &[("attachment_kind", "end")],
             expected: None,
         },
         Case {
-            description: "no payload",
-            payload: serde_json::Value::Null,
+            description: "no fields",
+            fields: &[],
             expected: None,
         },
     ];
     for case in cases {
+        let row: Row = case
+            .fields
+            .iter()
+            .map(|(column, value)| ((*column).to_owned(), json!(value)))
+            .collect();
         assert_eq!(
-            node_of(&case.payload),
+            node_of(&row),
             case.expected
                 .map(|(kind, name)| (kind.to_owned(), name.to_owned())),
             "{}",
