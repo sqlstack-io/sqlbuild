@@ -10,7 +10,7 @@ import pytest
 from sqlbuild._native import run_cli as main
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import JobSelectorBuildTestCase
 
-_PROJECT_FILES: dict[str, str] = {
+_MODEL_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
         '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n\n[targets.prod]\n'
@@ -26,6 +26,11 @@ _PROJECT_FILES: dict[str, str] = {
     "models/customers.sql": (
         "MODEL (description 'Customers.', materialized table);\nSELECT 7 AS customer_id\n"
     ),
+}
+_OFF_TARGET_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/orchestration/off_target_members")
+
+_PROJECT_FILES: dict[str, str] = {
+    **_MODEL_FILES,
     "orchestration/jobs/nightly_job.toml": (
         'name = "nightly_job"\ndescription = "Orders."\nselect = "+orders"\n'
     ),
@@ -137,3 +142,59 @@ def test_given_declared_jobs_when_building_by_job_then_only_their_nodes_build(
             "WHERE NOT internal AND NOT starts_with(table_name, '_sqlbuild')"
         ).fetchall()
     assert {name for (name,) in rows} == test_case.expected_tables
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        JobSelectorBuildTestCase(
+            description="a group skips a member declared only for another target",
+            build_args=("--select", "job:daily_job_group"),
+            expected_exit_code=0,
+            expected_tables=frozenset({"orders", "stg_orders"}),
+        ),
+        JobSelectorBuildTestCase(
+            description="a group runs that member under the target it is declared for",
+            build_args=("--target", "prod", "--select", "job:daily_job_group"),
+            expected_exit_code=0,
+            expected_tables=frozenset({"customers", "orders", "stg_orders"}),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_group_member_declared_for_another_target_when_building_the_group_then_it_is_skipped(
+    test_case: JobSelectorBuildTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    files: dict[str, str] = {
+        **_MODEL_FILES,
+        **{
+            f"orchestration/{path.relative_to(_OFF_TARGET_FIXTURE).as_posix()}": path.read_text()
+            for path in sorted(_OFF_TARGET_FIXTURE.rglob("*.toml"))
+        },
+    }
+    for relative_path, contents in files.items():
+        destination: Path = tmp_path / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(contents, encoding="utf-8")
+
+    exit_code: int = main(
+        [
+            "--project-dir",
+            str(tmp_path),
+            "--no-color",
+            "build",
+            "--no-tests",
+            *test_case.build_args,
+        ]
+    )
+    captured: str = "".join(capsys.readouterr())
+
+    assert exit_code == test_case.expected_exit_code, f"{test_case.description}: {captured}"
+    with duckdb.connect(str(tmp_path / "demo.duckdb")) as warehouse:
+        rows: list[tuple[str]] = warehouse.sql(
+            "SELECT table_name FROM duckdb_tables() "
+            "WHERE NOT internal AND NOT starts_with(table_name, '_sqlbuild')"
+        ).fetchall()
+    assert {name for (name,) in rows} == test_case.expected_tables, test_case.description

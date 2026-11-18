@@ -3,6 +3,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::assembly::project::types::ObjectKey;
+use crate::python_plan::_helpers::lifecycle::gate_frontier::gate_frontier;
 use crate::python_plan::main::upstream_closure::upstream_closure;
 use crate::python_plan::models::{LifecycleNode, RoundTripLoader, RunLifecycle};
 use crate::python_selection::constants::{ASSET_KIND, LOADER_KIND, TASK_KIND};
@@ -33,10 +34,12 @@ pub fn run_lifecycle(
             ingress_loaders.insert(loader.clone());
             continue;
         }
+        let gates: Vec<String> = closure.into_iter().filter(|name| runs(name)).collect();
         round_trip_loaders.push(RoundTripLoader {
             name: loader.clone(),
             waits_for: waits_for.into_iter().collect(),
-            gates: closure.into_iter().filter(|name| runs(name)).collect(),
+            frontier: gate_frontier(loader, &gates, nodes, upstream),
+            gates,
         });
     }
     let mut ingress: BTreeSet<String> = ingress_loaders.clone();

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from itertools import chain
 from pathlib import Path
 
 import pytest
@@ -13,12 +14,21 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     DiamondDagE2ETestCase,
     DiamondDagJsonE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
+    ALLOW_ROUND_TRIPS,
+    SCORING_TASK,
+    round_trip_project_files,
+)
 from tests.e2e.src.sqlbuild.cli.commands.main.lineage.helpers import (
     DIAMOND_EDGE_COUNT,
     diamond_model_names,
     prepare_diamond_lineage_project,
 )
-from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_waffle_shop, run_sqb
+from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    prepare_inline_project,
+    prepare_waffle_shop,
+    run_sqb,
+)
 
 
 @pytest.mark.parametrize(
@@ -91,6 +101,60 @@ def test_given_waffle_shop_when_running_dag_json_then_it_reports_static_graph(
         assert fragment not in result.stdout
     assert "query_sql" not in result.stdout
     assert "action" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DagJsonBuildE2ETestCase(
+            description="a task upstream of a declared loader points at the loader's source",
+            command=("dag", "--json"),
+            expected_exit_code=0,
+            expected_project_name="partner_scoring",
+            expected_node_ids=(
+                "model:orders",
+                "task:score_orders",
+                "source:partner_scores",
+                "model:scored_orders",
+            ),
+            expected_edge_pairs=(
+                ("model:orders", "task:score_orders"),
+                ("task:score_orders", "source:partner_scores"),
+                ("source:partner_scores", "model:scored_orders"),
+            ),
+            expected_check_ids=(),
+            expected_absent_fragments=("loader:partner_scores",),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_round_trip_when_running_dag_json_then_every_edge_ends_at_a_node(
+    test_case: DagJsonBuildE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="partner_scoring",
+        repo_files=round_trip_project_files(
+            project_settings=ALLOW_ROUND_TRIPS, task_body=SCORING_TASK
+        ),
+    )
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=test_case.command, project_dir=project_dir
+    )
+
+    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
+    payload: dict[str, object] = json.loads(result.stdout)
+    node_ids: set[str] = {str(node["id"]) for node in payload["nodes"]}
+    edge_pairs: set[tuple[str, str]] = {
+        (str(edge["from_id"]), str(edge["to_id"])) for edge in payload["edges"]
+    }
+    assert payload["project_name"] == test_case.expected_project_name, test_case.description
+    assert set(test_case.expected_node_ids) <= node_ids, test_case.description
+    assert set(test_case.expected_edge_pairs) <= edge_pairs, test_case.description
+    assert set(chain.from_iterable(edge_pairs)) <= node_ids, edge_pairs
+    for fragment in test_case.expected_absent_fragments:
+        assert fragment not in result.stdout, test_case.description
 
 
 @pytest.mark.parametrize(

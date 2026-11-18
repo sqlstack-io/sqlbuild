@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 import subprocess
 from pathlib import Path
 from textwrap import dedent
@@ -9,16 +11,37 @@ from textwrap import dedent
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.clone._test_types import (
+    CloneChangedPlanE2ETestCase,
     CloneDeferredSourceFunctionE2ETestCase,
     CloneE2ETestCase,
     CloneFunctionGraphE2ETestCase,
+    CloneMissingUpstreamE2ETestCase,
     ClonePolicyErrorTestCase,
     ClonePythonFunctionE2ETestCase,
+    MissingUpstreamFixesE2ETestCase,
+    PartialDeferCloneE2ETestCase,
+    UnwritableConsumptionDeferCloneE2ETestCase,
+)
+from tests.e2e.src.sqlbuild.cli.commands.main.clone.helpers import (
+    MISSING_UPSTREAMS,
+    defer_clone_with_missing_origin,
+    plan_missing_upstreams,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    REPO_ROOT,
     prepare_inline_project,
     query_duckdb,
     run_sqb,
+)
+
+_CHANGED_CLONE_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_clone"
+_UPSTREAMS: tuple[str, ...] = (
+    "customers",
+    "orders",
+    "payments",
+    "products",
+    "returns",
+    "shipments",
 )
 
 
@@ -879,3 +902,248 @@ def test_given_denied_clone_policy_when_running_then_error_identifies_configurat
     assert result.returncode != 0
     assert test_case.expected_error_code in combined_output
     assert test_case.expected_policy_key in combined_output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CloneChangedPlanE2ETestCase(
+            description="a cloned table rebuilds and an untouched one stays skipped",
+            commands=(("clone", "--from", "prod", "--select", "fact_orders"),),
+            expected_fragments=("no completed record", "Unchanged (1): skipped by --changed"),
+        ),
+        CloneChangedPlanE2ETestCase(
+            description="a cloned table rebuilds only once",
+            commands=(
+                ("clone", "--from", "prod", "--select", "fact_orders"),
+                ("build", "--changed", "--select", "fact_orders", "dim_customers"),
+            ),
+            expected_fragments=("Unchanged (2): skipped by --changed",),
+            unexpected_fragments=("no completed record",),
+        ),
+        CloneChangedPlanE2ETestCase(
+            description="an upstream a build clones for its deferral rebuilds",
+            commands=(("build", "--select", "orders_report", "--defer-clone-from", "prod"),),
+            expected_fragments=("Prephase  defer clone", "no completed record"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_cloned_table_when_planning_changed_then_it_rebuilds(
+    test_case: CloneChangedPlanE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="clone_changed_project",
+        repo_files={
+            "sqlbuild_project.toml": dedent(
+                """
+                name = "clone_changed_project"
+                adapter = "duckdb"
+                default_target = "dev"
+
+                [connection]
+                database = "clone.duckdb"
+
+                [targets.prod]
+                schema = "prod"
+
+                [targets.prod.clone]
+                allow_as_clone_origin = true
+
+                [targets.dev]
+                schema = "dev"
+
+                [targets.dev.clone]
+                allow_as_clone_destination = true
+                """
+            ).strip()
+            + "\n",
+            **{
+                str(path.relative_to(_CHANGED_CLONE_FIXTURE)): path.read_text(encoding="utf-8")
+                for path in sorted(_CHANGED_CLONE_FIXTURE.glob("models/*.sql"))
+            },
+        },
+    )
+    for command in (
+        ("build", "--target", "dev"),
+        ("build", "--target", "prod"),
+        *test_case.commands,
+    ):
+        result: subprocess.CompletedProcess[str] = run_sqb(
+            command=("--no-color", *command), project_dir=project_dir
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        output: str = result.stdout
+
+    plan: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", "--changed", "--select", "fact_orders", "dim_customers"),
+        project_dir=project_dir,
+    )
+
+    assert plan.returncode == 0, plan.stdout + plan.stderr
+    for fragment in test_case.expected_fragments:
+        assert fragment in output + plan.stdout, output + plan.stdout
+    for fragment in test_case.unexpected_fragments:
+        assert fragment not in plan.stdout, plan.stdout
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        MissingUpstreamFixesE2ETestCase(
+            description="a clone destination is offered deferring to and cloning from each origin",
+            destination_allowed=True,
+            expected_fragments=(
+                "  If they exist in prod:\n"
+                "    read them from it for this run:  --defer-to prod\n"
+                "    copy them into this target:      sqb clone --from prod -s "
+                + " ".join(MISSING_UPSTREAMS)
+                + "\n  Or build them too:                 add + before your selection",
+            ),
+            unexpected_fragments=(),
+        ),
+        MissingUpstreamFixesE2ETestCase(
+            description="a target that may not be cloned into is offered only building",
+            destination_allowed=False,
+            expected_fragments=("  Build them too:  add + before your selection",),
+            unexpected_fragments=("sqb clone", "--defer-to"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_missing_upstreams_when_planning_then_s301_lists_them_with_fixes(
+    test_case: MissingUpstreamFixesE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir, plan_command, refused = plan_missing_upstreams(
+        tmp_path=tmp_path,
+        default_target="dev",
+        destination_allowed=test_case.destination_allowed,
+        target_args=(),
+    )
+
+    as_json: subprocess.CompletedProcess[str] = run_sqb(
+        command=(*plan_command, "--json"), project_dir=project_dir
+    )
+
+    output: str = refused.stdout + refused.stderr
+    assert refused.returncode == 1, output
+    assert "error[S301]: 6 upstream models this build reads don't exist in target 'dev'\n" in output
+    assert "  returns\n  ... 1 more (sqb plan --json lists all)\n" in output
+    assert all(fragment in output for fragment in test_case.expected_fragments), output
+    assert not any(fragment in output for fragment in test_case.unexpected_fragments), output
+    assert json.loads(as_json.stdout)["error"]["missing"] == list(MISSING_UPSTREAMS)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CloneMissingUpstreamE2ETestCase(
+            description="the default target is cloned into without naming it",
+            default_target="dev",
+            target_args=(),
+            expected_clone_command="sqb clone --from prod -s " + " ".join(MISSING_UPSTREAMS),
+        ),
+        CloneMissingUpstreamE2ETestCase(
+            description="a target other than the default is named in the clone command",
+            default_target="prod",
+            target_args=("--target", "dev"),
+            expected_clone_command="sqb clone --from prod --to dev -s "
+            + " ".join(MISSING_UPSTREAMS),
+        ),
+        CloneMissingUpstreamE2ETestCase(
+            description="a default target that does not exist still yields a runnable clone",
+            default_target="retired",
+            target_args=("--target", "dev"),
+            expected_clone_command="sqb clone --from prod --to dev -s "
+            + " ".join(MISSING_UPSTREAMS),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_missing_upstreams_when_running_printed_clone_then_plan_succeeds(
+    test_case: CloneMissingUpstreamE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir, plan_command, refused = plan_missing_upstreams(
+        tmp_path=tmp_path,
+        default_target=test_case.default_target,
+        destination_allowed=True,
+        target_args=test_case.target_args,
+    )
+    printed: list[str] = re.findall(
+        r"^ +copy them into this target: +(sqb clone .+)$", refused.stdout + refused.stderr, re.M
+    )
+
+    cloned: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *printed[0].split()[1:]), project_dir=project_dir
+    )
+    planned: subprocess.CompletedProcess[str] = run_sqb(
+        command=plan_command, project_dir=project_dir
+    )
+
+    assert printed == [test_case.expected_clone_command], refused.stdout + refused.stderr
+    assert cloned.returncode == 0, cloned.stdout + cloned.stderr
+    assert planned.returncode == 0, planned.stdout + planned.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PartialDeferCloneE2ETestCase(
+            description="a boundary cloned before another failed still rebuilds",
+            dropped_origin_table="customers",
+            expected_fragments=(
+                "orders  no completed record",
+                "Unchanged (1): skipped by --changed",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_partly_failed_defer_clone_when_planning_changed_then_cloned_boundary_rebuilds(
+    test_case: PartialDeferCloneE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    cloned, planned = defer_clone_with_missing_origin(
+        tmp_path=tmp_path, dropped_origin_table=test_case.dropped_origin_table
+    )
+
+    assert cloned.returncode == 1, cloned.stdout + cloned.stderr
+    assert "error[C411]" in cloned.stdout + cloned.stderr
+    assert planned.returncode == 0, planned.stdout + planned.stderr
+    assert all(fragment in planned.stdout for fragment in test_case.expected_fragments), (
+        planned.stdout
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UnwritableConsumptionDeferCloneE2ETestCase(
+            description="the failed boundary is reported, not the consumption write",
+            dropped_origin_table="customers",
+            before_clone=(
+                "DROP TABLE dev._sqlbuild_consumption",
+                "CREATE TABLE dev._sqlbuild_consumption (unexpected INTEGER)",
+            ),
+            expected_fragments=("error[C411]", "customers: missing in origin environment"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_unwritable_consumption_table_when_defer_clone_partly_fails_then_c411_is_reported(
+    test_case: UnwritableConsumptionDeferCloneE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    cloned, _ = defer_clone_with_missing_origin(
+        tmp_path=tmp_path,
+        dropped_origin_table=test_case.dropped_origin_table,
+        before_clone=test_case.before_clone,
+    )
+
+    output: str = cloned.stdout + cloned.stderr
+    assert cloned.returncode == 1, output
+    assert all(fragment in output for fragment in test_case.expected_fragments), output

@@ -1650,12 +1650,14 @@ class WarehouseRoundTripE2ETestCase:
 
 @dataclass(frozen=True)
 class ChangedRoundTripE2ETestCase:
-    """A second `--changed` build of a round trip after an optional change to `orders`."""
+    """A second round-trip build with `build_flags`, after changing `orders` and `extra_files`."""
 
     description: str
     orders_sql: str
     expected_output_fragments: tuple[str, ...]
     expected_scored_rows: tuple[tuple[object, ...], ...]
+    build_flags: tuple[str, ...] = ("--changed",)
+    extra_files: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -1731,11 +1733,32 @@ class PreservedTargetNodeResultsE2ETestCase:
 
 @dataclass(frozen=True)
 class PreservedTargetRefusalE2ETestCase:
-    """A preserved target without a loader schema and the compile error it must print."""
+    """A preserved target without a usable loader schema and the compile error it must print."""
 
     description: str
     python_files: dict[str, str]
     expected_error: str
+    target_lines: str = ""
+
+
+@dataclass(frozen=True)
+class PlanAfterBuildsE2ETestCase:
+    """A target's location settings, and the line `sqb plan` prints for a task after two builds."""
+
+    description: str
+    target_lines: str
+    expected_plan_line: str
+    plan_args: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PlanAfterTargetChangeE2ETestCase:
+    """Location settings before and after a change, and the plan line for the task."""
+
+    description: str
+    earlier_target_lines: str
+    target_lines: str
+    expected_plan_line: str
 
 
 @dataclass(frozen=True)

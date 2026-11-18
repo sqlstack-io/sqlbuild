@@ -23,7 +23,7 @@ use std::collections::HashSet;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
@@ -45,6 +45,8 @@ pub(crate) struct PlanningInputs<'a, 'py> {
     /// The live planning connection, `None` when the plan reads a synced state.
     pub(crate) connection: &'a Bound<'py, PyAny>,
     pub(crate) reads: &'a Bound<'py, PlannerReads>,
+    /// Python nodes' `(database, schema)` under the active target.
+    pub(crate) node_results_location: Option<(Option<String>, Option<String>)>,
 }
 
 /// The selected Python nodes and SQL keys when loading is off: loaders out, their sources in.
@@ -209,6 +211,10 @@ pub(crate) fn pipeline_result<'py>(
                     native_field(discovered, "project_config")?,
                 ),
                 ("local_config", native_field(discovered, "local_config")?),
+                (
+                    "node_results_location",
+                    inputs.node_results_location.clone().into_bound_py_any(py)?,
+                ),
             ],
         )?),
     )?;

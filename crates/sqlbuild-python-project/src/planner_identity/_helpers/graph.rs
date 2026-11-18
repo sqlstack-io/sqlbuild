@@ -14,7 +14,9 @@ use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
 use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing_upstream_message as message_of;
 use sqlbuild_analysis::planner_identity::main::missing_upstreams::missing_upstreams;
 use sqlbuild_analysis::planner_identity::main::topological_order::topological_order;
-use sqlbuild_analysis::planner_identity::models::{AvailableUpstreams, GraphKey, MissingUpstream};
+use sqlbuild_analysis::planner_identity::models::{
+    AvailableUpstreams, GraphKey, MissingUpstream, MissingUpstreamFixes,
+};
 
 use crate::graph::main::nodes::closure::closure;
 use crate::graph::main::nodes::inverted::inverted;
@@ -270,5 +272,8 @@ pub(crate) fn missing_upstream_message<'py>(
     let rows: Vec<MissingUpstream> = missing_rows(missing, &mut objects)?;
     let origins: HashMap<(GraphKey, GraphKey), String> =
         self::edge_origins(edge_origins, &mut objects)?;
-    Ok(PyString::new(missing.py(), &message_of(&rows, &origins)))
+    Ok(PyString::new(
+        missing.py(),
+        &message_of(&rows, &origins, &MissingUpstreamFixes::default()),
+    ))
 }

@@ -398,7 +398,7 @@ pub(crate) const COMPILER_ERRORS: &[ErrorSpec] = &[
         doc: "Raised when planner inputs cannot be resolved safely.",
         class_attributes: &[("code", ClassValue::Text("S000"))],
         required: &[],
-        optional: &[],
+        optional: &["missing"],
         fixed: &[],
     },
     ErrorSpec {

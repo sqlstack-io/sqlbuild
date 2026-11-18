@@ -363,6 +363,8 @@ pub struct SnapshotRequest<'py> {
     pub(crate) on_progress: Bound<'py, PyAny>,
     pub(crate) deferred_locations: Bound<'py, PyAny>,
     pub(crate) cursor_scope: Bound<'py, PyAny>,
+    /// Python nodes' `(database, schema)`; their fingerprints are read there too. `None` when unknown.
+    pub(crate) node_results_location: Option<(Option<String>, Option<String>)>,
 }
 
 /// One warehouse read's answer: what the warehouse holds, or the item a plan reports as unknown.

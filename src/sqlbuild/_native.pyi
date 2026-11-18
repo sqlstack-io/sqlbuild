@@ -1267,6 +1267,7 @@ class PlannerRuntime:
     local_config: LocalConfig | None
     on_progress: Callable[[str], None] | None
     invocation_time: datetime
+    node_results_location: tuple[str | None, str | None] | None
     def __init__(
         self,
         *,
@@ -1277,6 +1278,7 @@ class PlannerRuntime:
         local_config: LocalConfig | None = ...,
         on_progress: Callable[[str], None] | None = ...,
         invocation_time: datetime = ...,
+        node_results_location: tuple[str | None, str | None] | None = ...,
     ) -> None: ...
 
 class PlannerScopeResolution:
@@ -5758,6 +5760,7 @@ def build_execution_plan(
     on_progress: Callable[[str], None] | None = None,
     project_config: ProjectConfig | None = None,
     local_config: LocalConfig | None = None,
+    node_results_location: tuple[str | None, str | None] | None = None,
 ) -> PlanOutput: ...
 
 class SqlTestPlanning:
@@ -13569,8 +13572,14 @@ class PlannerInputError(ValueError):
     code: str
     message: str
     help: str | None
+    missing: tuple[str, ...] | None
     def __init__(
-        self, message: str, *, code: str | None = None, help: str | None = None
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        help: str | None = None,
+        missing: tuple[str, ...] | None = None,
     ) -> None: ...
 
 class FutureCursorSafetyError(PlannerInputError):

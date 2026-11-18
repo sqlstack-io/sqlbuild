@@ -7,15 +7,21 @@ use crate::planner_phases::constants::MISSING_UPSTREAM_CODE;
 use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_warehouse::main::sources::check_selected_source_tables_exist::check_selected_source_tables_exist;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::{PyString, PyTuple};
 use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing_upstream_message;
 use sqlbuild_analysis::planner_identity::main::missing_upstreams::missing_upstreams;
-use sqlbuild_analysis::planner_identity::models::{AvailableUpstreams, GraphKey};
+use sqlbuild_analysis::planner_identity::models::{
+    AvailableUpstreams, GraphKey, MissingUpstreamFixes,
+};
+use sqlbuild_python_base::records::main::construct::new_error_with_fields::new_error_with_fields;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::planner_identity::main::execution_origins::execution_origins;
-use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use sqlbuild_python_project::resource_views::main::seed_reads::external::external;
@@ -70,11 +76,17 @@ pub(crate) fn check_selected_scope_buildability<'py>(
                 .into_iter()
                 .map(|((key, read), label)| ((GraphKey::from(&key), GraphKey::from(&read)), label))
                 .collect();
-        let message = missing_upstream_message(&missing, &origins);
-        return Err(planner_error(
+        let message = missing_upstream_message(
+            &missing,
+            &origins,
+            &missing_upstream_fixes(runtime, &project, available.deferred_relations.is_some())?,
+        );
+        let names = missing.iter().map(|entry| entry.key.name.as_str());
+        return Err(new_error_with_fields(
             py,
-            &message,
-            (Some(MISSING_UPSTREAM_CODE), None),
+            ErrorId::PlannerInput,
+            (&message, Some(MISSING_UPSTREAM_CODE), None),
+            &[("missing", PyTuple::new(py, names)?.into_any())],
         ));
     }
     check_selected_source_tables_exist(
@@ -83,4 +95,57 @@ pub(crate) fn check_selected_scope_buildability<'py>(
         &selected_scope,
         &warehouse_field(warehouse, |warehouse| &warehouse.inspection_relations)?,
     )
+}
+
+/// The active target, its clone or deferral origins, and the clone `--to` it needs (also when the default target is unknown).
+fn missing_upstream_fixes(
+    runtime: &Bound<'_, PyAny>,
+    project: &Bound<'_, PyAny>,
+    deferring: bool,
+) -> PyResult<MissingUpstreamFixes> {
+    let py: Python<'_> = runtime.py();
+    let target: Option<String> = native_field(project, "effective_target_name")?.extract()?;
+    let configs = (
+        runtime_field(runtime, |runtime| &runtime.project_config)?,
+        runtime_field(runtime, |runtime| &runtime.local_config)?,
+    );
+    let Some(active) = target.clone() else {
+        return Ok(MissingUpstreamFixes::default());
+    };
+    if configs.0.is_none() || configs.1.is_none() {
+        return Ok(MissingUpstreamFixes {
+            target,
+            ..MissingUpstreamFixes::default()
+        });
+    }
+    let allows = |name: &str, flag: &str| -> PyResult<bool> {
+        let config = resolve_target_config(py, &configs.0, &configs.1, &PyString::new(py, name))?;
+        native_field(&native_field(&config, "clone")?, flag)?.is_truthy()
+    };
+    let mut origins: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut deferrable: Vec<String> = Vec::new();
+    if allows(&active, "allow_as_clone_destination")? {
+        for (config, project_targets) in [(&configs.0, true), (&configs.1, false)] {
+            for name in native_field(config, "targets")?.try_iter()? {
+                let name: String = name?.extract()?;
+                if name != active && allows(&name, "allow_as_clone_origin")? {
+                    if project_targets && !deferring {
+                        deferrable.push(name.clone());
+                    }
+                    origins.insert(name);
+                }
+            }
+        }
+    }
+    let default: Option<String> =
+        match resolve_target_name(py, &configs.0, &configs.1, &py.None().into_bound(py)) {
+            Ok(name) => name.map(|name| name.to_string()),
+            Err(_) => None,
+        };
+    Ok(MissingUpstreamFixes {
+        clone_to: (default.as_deref() != Some(active.as_str())).then(|| active.clone()),
+        target,
+        origins: origins.into_iter().collect(),
+        deferrable,
+    })
 }

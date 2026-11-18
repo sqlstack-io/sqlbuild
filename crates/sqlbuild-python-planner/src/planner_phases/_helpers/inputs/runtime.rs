@@ -1,7 +1,7 @@
 //! The planner runtime and warehouse state: built from keyword arguments and read by planner phases.
 
 use crate::planner_warehouse::models::MigrationFingerprintCache;
-use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pymethods;
 use pyo3::types::{PyDict, PyTuple};
 
@@ -28,6 +28,7 @@ impl PlannerRuntime {
                     "local_config",
                     "on_progress",
                     "invocation_time",
+                    "node_results_location",
                 ],
             ),
         )?;
@@ -44,6 +45,7 @@ impl PlannerRuntime {
             local_config: args.value("local_config")?.unbind(),
             on_progress: args.value("on_progress")?.unbind(),
             invocation_time: invocation_time.unbind(),
+            node_results_location: args.value("node_results_location")?.extract()?,
         })
     }
 }

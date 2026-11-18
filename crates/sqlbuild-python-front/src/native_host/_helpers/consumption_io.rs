@@ -80,7 +80,7 @@ pub(crate) fn ensure_table(
 }
 
 /// Whether the warehouse catalog lists the consumption table in `location`.
-fn table_exists(
+pub(crate) fn table_exists(
     adapter: &Bound<'_, PyAny>,
     connection: &Bound<'_, PyAny>,
     location: &Location,

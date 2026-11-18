@@ -80,6 +80,8 @@ pub struct PlannerRuntime {
     pub(crate) local_config: Py<PyAny>,
     pub(crate) on_progress: Py<PyAny>,
     pub(crate) invocation_time: Py<PyAny>,
+    /// Python nodes' `(database, schema)`, where their results and fingerprints live; `None` when unknown.
+    pub(crate) node_results_location: Option<(Option<String>, Option<String>)>,
 }
 
 /// Warehouse snapshot, inspection relations and migration plans gathered once per plan.

@@ -410,7 +410,14 @@ pub(crate) fn loader_write_schemas<'py>(
             intermediate_loaders.insert(native_field(entry, "name")?.extract()?);
         }
     }
-    preserved_loader_schemas(discovered, selected_target, &intermediate_loaders)?;
+    preserved_loader_schemas(
+        discovered,
+        (
+            selected_target,
+            &target_vars(discovered, (selected_target, cli_vars))?,
+        ),
+        &intermediate_loaders,
+    )?;
     if connection_is_default_target(discovered)? {
         return Ok(());
     }

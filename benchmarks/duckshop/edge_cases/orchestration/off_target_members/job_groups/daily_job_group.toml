@@ -1,0 +1,3 @@
+name = "daily_job_group"
+description = "Orders everywhere; restocking only where it is declared."
+jobs = ["orders_job", "restock_job"]

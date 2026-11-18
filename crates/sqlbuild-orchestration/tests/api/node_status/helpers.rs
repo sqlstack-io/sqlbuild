@@ -22,12 +22,13 @@ use crate::warehouse_metadata::main::{
 };
 use crate::warehouse_metadata::models::{CatalogNodeRecord, MetadataBatch, NodeStatusQuery};
 
-/// Statements a cold node-list cache issues besides one build read per 100 nodes, 12 in all.
-/// The authorization transaction makes 5: its clock read, the node keys the listing authorizes, the principal,
-/// its roles and the current snapshot. The view transaction makes 6: its clock read, the current snapshot again,
-/// the snapshot's node definitions, the latest attempts, the check counts and the changed build.
-/// The 12th is the build read for the second namespace shape (nodes with and without a database).
-const WIDE_LISTING_FIXED_STATEMENTS: usize = 12;
+/// A cold listing's authorization statements: its clock read, the authorized node keys, the principal, its roles and the current snapshot.
+const LISTING_AUTHORIZATION_STATEMENTS: usize = 5;
+/// A cold listing's view statements: its clock read, the current snapshot again, node definitions, latest attempts, check counts and the changed build.
+const LISTING_VIEW_STATEMENTS: usize = 6;
+/// Statements a cold node-list cache issues besides one build read per 100 nodes; the last is the second namespace shape's build read.
+const WIDE_LISTING_FIXED_STATEMENTS: usize =
+    LISTING_AUTHORIZATION_STATEMENTS + LISTING_VIEW_STATEMENTS + 1;
 
 /// A new server's node list, so every listing reads the store.
 async fn list_person_catalog_nodes(

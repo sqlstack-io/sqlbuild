@@ -36,7 +36,12 @@ pub fn build_execution_plan<'py>(
                 "deferral",
                 "policies",
             ],
-            &["on_progress", "project_config", "local_config"],
+            &[
+                "on_progress",
+                "project_config",
+                "local_config",
+                "node_results_location",
+            ],
         ),
     )?;
     let project = args.value("project")?;
@@ -52,6 +57,7 @@ pub fn build_execution_plan<'py>(
             local_config: args.value("local_config")?.unbind(),
             on_progress: args.value("on_progress")?.unbind(),
             invocation_time: utc_now(py)?.unbind(),
+            node_results_location: args.value("node_results_location")?.extract()?,
         },
     )?
     .into_any();

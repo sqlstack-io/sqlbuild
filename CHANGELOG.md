@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.242.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.241.0...v0.242.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* the dlt and ingestr integrations are removed. A project that declares `dlt_sources` or a source `ingestr` block no longer compiles; declare the source with `managed: true` and load it with a Python `@loader` named after the source. The `dlt` and `ingestr` package extras no longer exist.
+
+### Tests
+
+* add DuckShop cases for warehouse round trips and off-target group members ([#1553](https://github.com/sqlstack-io/sqlbuild/issues/1553)) ([fa63ff6](https://github.com/sqlstack-io/sqlbuild/commit/fa63ff60718d064f2963c3470c979d3c480d879d))
+
+## [0.241.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.240.0...v0.241.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* `sqb compile` fails when a loader depends on a task or asset that reads SQL, unless the project sets `allow_warehouse_round_trips = true` under `[settings]` in sqlbuild_project.toml, and when the SQL graph has a cycle. Plan and build refused both before; compile and `compile --dag` passed them.
+
+### Features
+
+* warehouse round trips, kind: selectors and whole-graph compile refusals ([#1550](https://github.com/sqlstack-io/sqlbuild/issues/1550)) ([78a786a](https://github.com/sqlstack-io/sqlbuild/commit/78a786a5514e13164261ac7e1fc1f311e23ea32c))
+
 ## [0.240.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.239.0...v0.240.0) (2026-11-17)
 
 

@@ -32,7 +32,8 @@
 	import PlanTimings from '$lib/run/plan-timings.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { changedModelKeys, jobRefreshText, loadedRows } from '$lib/run/plan-text';
+	import { changedModelKeys, cloneCommands, jobRefreshText, loadedRows } from '$lib/run/plan-text';
+	import CopyButton from '$lib/components/copy-button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
@@ -400,7 +401,12 @@
 		<div class="data"><span class="faint">Data</span><DataRange cursorType={jobDetail.data.cursorType} window={runWindow} {fullRefresh} onchange={(c) => (cmd = withFullRefresh(withWindow(cmd, c.window), c.fullRefresh))} /></div>
 	{/if}
 
-	{#if problem}<p class="problem-bar" data-testid="adhoc-error">{problem}</p>{/if}
+	{#if problem}
+		<div class="problem-bar" data-testid="adhoc-error">
+			<p>{problem}</p>
+			{#each cloneCommands(problem) as clone (clone.command)}<CopyButton value={clone.command} label="Copy clone command" text="copy clone from {clone.origin}" />{/each}
+		</div>
+	{/if}
 
 	<div class="body">
 		<div class="stage">
@@ -583,7 +589,10 @@
 		color: var(--sb-error);
 		font-family: var(--font-mono);
 		font-size: 12px;
-		white-space: pre-line;
+	}
+	.problem-bar p {
+		margin: 0;
+		white-space: pre-wrap;
 	}
 	.overlay {
 		position: absolute;
