@@ -38,6 +38,13 @@ class PythonCheckSeverity(StrEnum):
     WARN = "warn"
 
 
+class NodeSetKind(StrEnum):
+    """What a set dependency names: a job's selection or every node carrying a tag."""
+
+    JOB = "job"
+    TAG = "tag"
+
+
 class SqlResourceRefKind(StrEnum):
     """Typed reference target for SQL graph resources."""
 

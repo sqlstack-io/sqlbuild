@@ -41,6 +41,7 @@ from sqlbuild.provider.main.runtime import (
 )
 from sqlbuild.python_nodes.main.calculate_retry_delay import calculate_retry_delay
 from sqlbuild.python_nodes.models import (
+    NodeSetRef,
     RetryPolicy,
     SqlResourceRef,
 )
@@ -367,7 +368,9 @@ def _missing_upstream_result(
     """Why the node cannot run: a Python upstream outside this run that has never succeeded."""
 
     python_dependencies: tuple[Callable[..., object], ...] = tuple(
-        dependency for dependency in node.depends_on if not isinstance(dependency, SqlResourceRef)
+        dependency
+        for dependency in node.depends_on
+        if not isinstance(dependency, (SqlResourceRef, NodeSetRef))
     )
     if len(upstream_results) == len(python_dependencies):
         return None

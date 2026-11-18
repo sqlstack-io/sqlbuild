@@ -674,7 +674,7 @@ reason = "Native code resolves these through the sqlbuild._native_host name tabl
 
 [[targets.python.dead_code.roots]]
 modules = ["sqlbuild.python_nodes.models"]
-symbols = ["AuditCase", "SqlResourceRef"]
+symbols = ["AuditCase", "NodeSetRef", "SqlResourceRef"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
@@ -1494,6 +1494,12 @@ rule = "FFS120"
 path = "src/sqlbuild/runtime/user_code/classes/user_code_finder.py"
 symbols = ["UserCodeFinder.find_spec"]
 reason = "importlib calls meta-path finders positionally as find_spec(fullname, path, target)."
+
+[[targets.python.rule_exceptions]]
+rule = "FFS120"
+path = "src/sqlbuild/refs.py"
+symbols = ["job", "tag"]
+reason = "Like model(name), job and tag take the job or tag name positionally, as authors write depends_on=job(\"orders_job\")."
 
 [[targets.python.rule_exceptions]]
 rule = "FFS120"

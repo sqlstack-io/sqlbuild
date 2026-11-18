@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from sqlbuild.executor.python_nodes.models import CheckContext, PythonCheckResult
 from sqlbuild.python_nodes.main.apply_check import apply_check
 from sqlbuild.python_nodes.main.read_check_definition import read_check_definition
-from sqlbuild.python_nodes.models import CheckDefinition, SqlResourceRef
+from sqlbuild.python_nodes.models import CheckDefinition, NodeSetRef, SqlResourceRef
 from sqlbuild.python_nodes.types import PythonCheckSeverity
 
 __all__ = ("CheckContext", "PythonCheckResult", "check", "get_check_definition")
@@ -17,8 +17,9 @@ def check(
     *,
     depends_on: Callable[..., object]
     | SqlResourceRef
-    | tuple[Callable[..., object] | SqlResourceRef, ...]
-    | list[Callable[..., object] | SqlResourceRef],
+    | NodeSetRef
+    | tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...]
+    | list[Callable[..., object] | SqlResourceRef | NodeSetRef],
     name: str | None = None,
     severity: str | PythonCheckSeverity = PythonCheckSeverity.ERROR,
     tags: Sequence[str] = (),

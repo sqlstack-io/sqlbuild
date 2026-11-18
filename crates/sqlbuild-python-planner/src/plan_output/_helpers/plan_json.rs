@@ -10,6 +10,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
 
 use crate::plan_output::_helpers::cursor_details::{CursorDetails, cursor_details, owner};
+use crate::plan_output::_helpers::plan_text::entry_wait_changes;
 use crate::plan_output::_helpers::plan_text::{model_config_diff, model_query_diff};
 use crate::plan_output::_helpers::python_identity::{
     definition_source_text, dependency_source_text,
@@ -467,6 +468,11 @@ pub(crate) fn python_entry_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Boun
     let diff: Bound<'py, PyDict> = identity_diff(entry)?;
     if !diff.is_empty() {
         item.set_item("identity_diff", diff)?;
+    }
+    let changes: Vec<String> =
+        entry_wait_changes(entry, &native_field(entry, "name")?.extract::<String>()?)?;
+    if !changes.is_empty() {
+        item.set_item("wait_changes", changes)?;
     }
     Ok(item.into_any())
 }

@@ -235,6 +235,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::UserCode,
     },
     HostEntry {
+        name: "NodeSetRef",
+        kind: HostKind::Class,
+        edge: HostEdge::UserCode,
+    },
+    HostEntry {
         name: "PythonCheckSeverity",
         kind: HostKind::Class,
         edge: HostEdge::UserCode,

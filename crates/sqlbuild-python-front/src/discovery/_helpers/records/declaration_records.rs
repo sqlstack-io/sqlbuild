@@ -36,6 +36,7 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 
@@ -367,6 +368,17 @@ fn macro_file<'py>(
     context.record(RecordId::DiscoveredMacroFile, &fields)
 }
 
+/// The discovery session `discovered` inputs were read in, which keeps their resolved set dependencies.
+pub(crate) fn discovered_session<'py>(
+    discovered: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, NativeDiscoverySession>>> {
+    let session: Bound<'py, PyAny> = native_field(discovered, "native_session")?;
+    if session.is_none() {
+        return Ok(None);
+    }
+    Ok(Some(session.cast_into::<NativeDiscoverySession>()?))
+}
+
 /// The session of this pass, created and memoised by the first declaration collection.
 pub(crate) fn discovery_session<'py>(
     project_dir: &Bound<'py, PyAny>,
@@ -382,6 +394,7 @@ pub(crate) fn discovery_session<'py>(
         py,
         NativeDiscoverySession {
             inner: DiscoverySession::new(project_root(project_dir)?, declaration_file_options()),
+            node_sets: std::sync::Mutex::new(None),
         },
     )?;
     memo.set_item(SESSION_MEMO_KEY, &created)?;
