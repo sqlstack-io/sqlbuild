@@ -258,6 +258,10 @@ describe('run Recall reads', () => {
 		expect(mapped.map((e) => e.nodeKey)).toEqual(['seed:seed__order_type__alpha', 'seed:seed__order_type__alpha', 'seed:seed__order_type__alpha']);
 		const [statement] = toRunStatements([{ invocation_id: inv, statement_id: 's9', sql_available: true, ...seed }], 'r1');
 		expect(statement.nodeKey).toBe('seed:seed__order_type__alpha');
+		// A model's rows carry its materialization, which the run keys as `model:`.
+		const table = { resource_id: '9c1e', resource_kind: 'table', resource_name: 'orders' };
+		const view = { resource_id: '9c1f', resource_kind: 'view', resource_name: 'customers' };
+		expect([toRunEvent(event('resource_attempt_failed', table), 'r1')?.nodeKey, toRunStatements([{ invocation_id: inv, statement_id: 's10', sql_available: true, ...view }], 'r1')[0].nodeKey]).toEqual(['model:orders', 'model:customers']);
 		// A hash alone names no node; the scheduler's node events carry none yet.
 		expect(toRunEvent(event('resource_attempt_started', { resource_id: '3b7370f99e385665996e8f73523b4fd5' }), 'r1')?.nodeKey).toBeNull();
 	});
@@ -285,7 +289,8 @@ describe('run Recall reads', () => {
 			lines: [
 				chunk(1, 'Location snapshot compiled.\n\x1b[?25l\r\x1b[K⠋ Compiling project...\r\x1b[K⠙ Compil'),
 				chunk(2, 'ing project...\r\x1b[K\x1b[?25hCompiled project. (18.07s)\n\n\n\x1b[1mPlan ready\x1b[0m  93 selected\n'),
-				chunk(3, '├── seed__order_type__alpha  (current)\n')
+				chunk(3, '├── seed__order_type__alpha  (current)\n'),
+				chunk(4, 'Loaded orders.\r\n50%\r100%\r\n')
 			],
 			errors: []
 		} as never);
@@ -294,7 +299,9 @@ describe('run Recall reads', () => {
 			['01', 'Compiled project. (18.07s)'],
 			['02', ''],
 			['02', 'Plan ready  93 selected'],
-			['03', '├── seed__order_type__alpha  (current)']
+			['03', '├── seed__order_type__alpha  (current)'],
+			['04', 'Loaded orders.'],
+			['04', '100%']
 		]);
 	});
 

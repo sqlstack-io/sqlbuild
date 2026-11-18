@@ -390,14 +390,16 @@ const KNOWN_EVENTS: ReadonlySet<string> = new Set(RECALL_EVENT_TYPES);
 /** Scheduler facts are stored as `run_<fact>` events in the scheduler invocation. */
 const SCHEDULER_EVENTS: ReadonlySet<string> = new Set(SCHEDULER_FACTS.map((f) => `run_${f}`));
 
-/** The node key a Recall resource ID names: `[invocation, key]`, or null for run-level rows. */
+/** Builds record a model under its materialization, while the run keys every model as `model:`. */
+const MODEL_RESOURCE_KINDS: ReadonlySet<string> = new Set(['table', 'view', 'custom', 'snapshot']);
+
 /**
  * The node a Recall row is about, as a run's nodes are keyed (`seed:countries`): its resource's kind and
  * name. Older servers sent no kind and name, and a `["<invocation>", "<node key>"]` resource ID instead;
  * any other resource ID is an opaque hash.
  */
 export function recallNodeKey(row: { resource_id?: string | null; resource_kind?: string | null; resource_name?: string | null }): string | null {
-	if (row.resource_kind && row.resource_name) return `${row.resource_kind}:${row.resource_name}`;
+	if (row.resource_kind && row.resource_name) return `${MODEL_RESOURCE_KINDS.has(row.resource_kind) ? 'model' : row.resource_kind}:${row.resource_name}`;
 	const id = row.resource_id;
 	if (!id?.startsWith('[')) return null;
 	try {
@@ -484,7 +486,7 @@ export function terminalLines(chunks: { invocationId: string; stream: 'stdout' |
 		let line = '';
 		let at = stream[0].at;
 		const finish = () => {
-			const shown = line.replace(ANSI, '').split('\r').at(-1)!.trimEnd();
+			const shown = line.replace(ANSI, '').replace(/\r+$/, '').split('\r').at(-1)!.trimEnd();
 			if (shown || out.at(-1)?.text) out.push({ invocationId: stream[0].invocationId, stream: stream[0].stream, at, text: shown, error: false });
 			line = '';
 		};
