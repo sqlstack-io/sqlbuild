@@ -56,55 +56,58 @@
 	const groups = $derived(planGroups(plan, refresh, diffs));
 	const group = $derived(selectedGroup(groups, section));
 	const warningGroups = $derived(group?.warningGroups ?? []);
-	/** A server summary's groups come counted; each one's warnings are read when it opens, by template. */
-	let readWarnings = $state<Record<string, PlanWarning[]>>({});
-	/** The templates being read, one read each, and the summary groups they were read for. */
-	const readingWarnings = new Set<string>();
+	/** A server summary's groups come counted; each one's warnings are read when it opens, by where they start. */
+	let readWarnings = $state<Record<number, PlanWarning[]>>({});
+	/** Which warning groups are open, and which show all their warnings, by where their warnings start. */
+	let openWarnings = $state<Record<number, boolean>>({});
+	let allWarnings = $state<Record<number, boolean>>({});
+	/** The groups being read, by where their warnings start, one read each, and the summary groups they were read for. */
+	const readingWarnings = new Set<number>();
 	let readFor: unknown = null;
-	// Another plan's groups start unread; a page of this plan's rows keeps the same groups.
+	// Another plan's groups start closed and unread; a page of this plan's rows keeps the same groups.
 	$effect.pre(() => {
 		if (plan.warning_groups === readFor) return;
 		readFor = plan.warning_groups;
 		readWarnings = {};
 		readingWarnings.clear();
+		openWarnings = {};
+		allWarnings = {};
 	});
 	function readGroup(w: WarningGroup, limit: number) {
 		const want = Math.min(limit, w.count);
-		const have = readWarnings[w.template]?.length ?? 0;
-		if (w.warnings.length || !load || have >= want || readingWarnings.has(w.template)) return;
+		const have = readWarnings[w.offset]?.length ?? 0;
+		if (w.warnings.length || !load || have >= want || readingWarnings.has(w.offset)) return;
 		const read = readWarnings;
-		readingWarnings.add(w.template);
+		readingWarnings.add(w.offset);
 		load('warnings', w.offset + have, want - have, '')
 			.then((page) => {
 				// A read another plan replaced lands nowhere.
 				if (read !== readWarnings) return;
-				readingWarnings.delete(w.template);
-				readWarnings[w.template] = [...(readWarnings[w.template] ?? []), ...(page.rows as PlanWarning[])];
+				readingWarnings.delete(w.offset);
+				readWarnings[w.offset] = [...(readWarnings[w.offset] ?? []), ...(page.rows as PlanWarning[])];
 				// "show all" asked while the first rows were read.
-				if (page.rows.length) readGroup(w, allWarnings[w.template] ? WARNINGS_READ : limit);
+				if (page.rows.length) readGroup(w, allWarnings[w.offset] ? WARNINGS_READ : limit);
 			})
 			.catch((e: unknown) => {
-				if (read === readWarnings) readingWarnings.delete(w.template);
+				if (read === readWarnings) readingWarnings.delete(w.offset);
 				loadError = e instanceof Error ? e.message : String(e);
 			});
 	}
 	function toggleWarnings(w: WarningGroup) {
-		openWarnings[w.template] = !openWarnings[w.template];
-		if (openWarnings[w.template]) readGroup(w, WARNINGS_SHOWN);
+		openWarnings[w.offset] = !openWarnings[w.offset];
+		if (openWarnings[w.offset]) readGroup(w, WARNINGS_SHOWN);
 	}
 	function showAllWarnings(w: WarningGroup) {
-		allWarnings[w.template] = true;
+		allWarnings[w.offset] = true;
 		readGroup(w, WARNINGS_READ);
 	}
-	const warningsOf = (w: WarningGroup) => (w.warnings.length ? w.warnings : (readWarnings[w.template] ?? []));
+	const warningsOf = (w: WarningGroup) => (w.warnings.length ? w.warnings : (readWarnings[w.offset] ?? []));
 
-	/** Per group: rows shown, the filter typed and the one asked for, and which diffs and warning groups are open. */
+	/** Per group: rows shown, the filter typed and the one asked for, and which diffs are open. */
 	let shownOf = $state<Record<string, number>>({});
 	let filterOf = $state<Record<string, string>>({});
 	let askedOf = $state<Record<string, string>>({});
 	let openDiff = $state<Record<string, 'preview' | 'full'>>({});
-	let openWarnings = $state<Record<string, boolean>>({});
-	let allWarnings = $state<Record<string, boolean>>({});
 	let loading = $state(false);
 	let loadError = $state<string | null>(null);
 
@@ -236,20 +239,22 @@
 			</header>
 
 			{#if group.key === 'warnings'}
-				{#each warningGroups as w (w.template)}
+				{#each warningGroups as w (w.offset)}
 					<div class="warning-group">
 						<div class="row">
 							<span class="template">{w.template}</span>
 							<span class="detail">{w.label}</span>
-							<Button variant="link" size="inline" class="text-[11.5px]" onclick={() => toggleWarnings(w)}>{openWarnings[w.template] ? 'hide' : 'show'}</Button>
+							<Button variant="link" size="inline" class="text-[11.5px]" onclick={() => toggleWarnings(w)}>{openWarnings[w.offset] ? 'hide' : 'show'}</Button>
 						</div>
-						{#if openWarnings[w.template]}
-							{@const all = allWarnings[w.template]}
+						{#if openWarnings[w.offset]}
+							{@const all = allWarnings[w.offset]}
 							{@const listed = warningsOf(w)}
 							<ul class="warning-list">
 								{#each all ? listed : listed.slice(0, WARNINGS_SHOWN) as one, i (i)}<li class:err={one.severity === 'error'}>{#if one.code}<code>{one.code}</code> {/if}{one.message}</li>{/each}
 							</ul>
-							{#if !all && w.count > WARNINGS_SHOWN}
+							{#if all && listed.length >= WARNINGS_READ && listed.length < w.count}
+								<p class="hint">The first {listed.length.toLocaleString()} of {w.count.toLocaleString()}.</p>
+							{:else if !all && w.count > WARNINGS_SHOWN}
 								<Button variant="link" size="inline" class="ml-4 text-[11.5px]" onclick={() => showAllWarnings(w)}>show all {w.count.toLocaleString()}</Button>
 							{/if}
 						{/if}

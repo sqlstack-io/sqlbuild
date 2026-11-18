@@ -47,7 +47,7 @@
 		{#if failed}
 			<p class="faint more">Couldn't read the failures. <a href={to('/checks?outcome=ignored')}>Ignored failures on the Checks page</a></p>
 		{:else if failures && failures.length < count}
-			<p class="faint more">{failures.length ? `${plural(count - failures.length, 'more')} no longer recorded` : 'Their results are no longer recorded'}. <a href={to('/checks?outcome=ignored')}>Ignored failures on the Checks page</a></p>
+			<p class="faint more">{failures.length ? `${(count - failures.length).toLocaleString()} more no longer recorded` : 'Their results are no longer recorded'}. <a href={to('/checks?outcome=ignored')}>Ignored failures on the Checks page</a></p>
 		{/if}
 	</section>
 {/if}

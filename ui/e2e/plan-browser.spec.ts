@@ -181,6 +181,10 @@ test('an open warning group keeps its warnings while other sections load, and re
 		{ section: 'warnings', offset: 0, limit: 20 },
 		{ section: 'warnings', offset: 71, limit: 3 }
 	]);
+	// Another plan's groups start closed and unread.
+	await page.getByRole('button', { name: 'Plan again' }).click();
+	await expect(groups.first().getByRole('button', { name: 'show', exact: true })).toBeVisible({ timeout: 30_000 });
+	await expect(groups.locator('li')).toHaveCount(0);
 });
 
 test('the Checks tab under --changed leaves out the checks of nodes it skips', async ({ page }) => {
