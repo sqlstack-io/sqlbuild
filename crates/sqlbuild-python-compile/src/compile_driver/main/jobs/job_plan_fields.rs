@@ -1,11 +1,10 @@
 //! The plan and pipeline fields the named jobs' settings give a planned build.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_analysis::job_settings::main::setting_scope::setting_scope;
+use sqlbuild_analysis::job_settings::models::SettingScope;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_project::job_settings::main::given_settings::given_settings;
-
-/// The option that sets the build's limit and turns the named jobs' limits off when given.
-const CONCURRENCY_SETTING: &str = "concurrency";
 
 use crate::compile_driver::models::PlannedJobSettings;
 use crate::compile_driver::types::PipelineFields;
@@ -26,8 +25,12 @@ pub fn job_plan_fields<'py>(
             native_field(options, "ignore_audit_failures")?.is_truthy()?,
         ),
     )?;
-    let (limits, node_jobs) =
-        job_settings.job_limits(&plan_output, given_settings().contains(CONCURRENCY_SETTING))?;
+    let (limits, node_jobs) = job_settings.job_limits(
+        &plan_output,
+        given_settings()
+            .iter()
+            .any(|name| setting_scope(name) == SettingScope::JobLimit),
+    )?;
     let (nodes, python) = job_settings.node_warehouses(&plan_output)?;
     Ok((
         plan_output,

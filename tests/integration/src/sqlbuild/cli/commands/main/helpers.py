@@ -1586,8 +1586,10 @@ def warehouse_switches(executed_sql: list[str]) -> tuple[str, ...]:
 
     uses: list[tuple[int, str]] = [
         (connection, sql.removeprefix(_USE_WAREHOUSE))
-        for connection, sql in _STATEMENT_CONNECTIONS.get(id(executed_sql), [])
-        if sql.startswith(_USE_WAREHOUSE)
+        for connection, sql in filter(
+            lambda statement: statement[1].startswith(_USE_WAREHOUSE),
+            _STATEMENT_CONNECTIONS.get(id(executed_sql), []),
+        )
     ]
     first_use: dict[int, int] = {
         connection: index for index, (connection, _) in reversed(list(enumerate(uses)))
