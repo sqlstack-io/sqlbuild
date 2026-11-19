@@ -1,9 +1,9 @@
 //! The schemas a build or seed writes, where it records its rows in the runs table, each once.
 
 use crate::native_host::constants::SKIP_ACTION;
+use crate::native_host::main::target_location::target_location;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::analysis_route::main::same_unquoted_name::same_unquoted_name;
-use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::native_host::models::Location;
 use sqlbuild_state::runs::main::distinct_run_schemas::distinct_run_schemas;
@@ -23,20 +23,13 @@ fn written_schema(destination: &Bound<'_, PyAny>) -> PyResult<Option<Location>> 
         .transpose()
 }
 
-/// A target namespace value, None when the target keeps each resource's own (`preserve`).
-fn target_value(project: &Bound<'_, PyAny>, field: &str) -> PyResult<Option<String>> {
-    Ok(native_field(project, field)?
-        .extract::<Option<String>>()?
-        .filter(|value| value != PRESERVE_TARGET_VALUE))
-}
-
 /// Where a run writing no relation records, as audits do: the target's schema, else the first node's.
 fn default_location(
     plan: &Bound<'_, PyAny>,
     project: &Bound<'_, PyAny>,
 ) -> PyResult<Option<Location>> {
-    let database: Option<String> = target_value(project, "effective_target_database")?;
-    if let Some(schema) = target_value(project, "effective_target_schema")? {
+    let database: Option<String> = target_location(project, "effective_target_database")?;
+    if let Some(schema) = target_location(project, "effective_target_schema")? {
         return Ok(Some(Location { database, schema }));
     }
     for locations in ["model_locations", "seed_locations"] {
@@ -64,7 +57,7 @@ fn run_locations(
         return Ok(default_location(plan, project)?.into_iter().collect());
     }
     let dialect: Option<String> = native_field(project, "sql_analysis_dialect")?.extract()?;
-    let target_database: Option<String> = target_value(project, "effective_target_database")?;
+    let target_database: Option<String> = target_location(project, "effective_target_database")?;
     let same_name = |left: &str, right: &str| same_unquoted_name(dialect.as_deref(), left, right);
     Ok(distinct_run_schemas(
         schemas
