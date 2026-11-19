@@ -168,7 +168,7 @@ state table. Models are not affected: their table type follows the model's `tabl
 
 ## Maintained models
 
-A [maintained model](../models/materializations.md#maintained) is a Snowflake dynamic
+A [maintained model](../models/maintained.md) is a Snowflake dynamic
 table. `materialized materialized_view` fails with `A014`; use `materialized maintained`.
 
 The build role needs these grants:
