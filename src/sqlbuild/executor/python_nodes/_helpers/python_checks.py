@@ -135,7 +135,18 @@ def _execute_one_python_check(
     result_store: Any | None,
     callbacks: PythonCheckCallbacks,
 ) -> PythonCheckExecutionResult:
-    runtime = node_runtime(runtime=runtime, name=check_function.name)
+    if blocked is None:
+        runtime, warehouse_failure = node_runtime(runtime=runtime, name=check_function.name)
+        blocked = (
+            None
+            if warehouse_failure is None
+            else PythonCheckExecutionResult(
+                node_name=check_function.name,
+                passed=False,
+                severity=PythonCheckSeverity.ERROR,
+                error_message=warehouse_failure,
+            )
+        )
     adapter: BaseAdapter = runtime.adapter
     providers: ProviderContainer | None = runtime.providers
     with (

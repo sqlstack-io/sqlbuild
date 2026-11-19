@@ -10503,6 +10503,7 @@ class PlannerOverrides(NativeRecord):
     cursor_overrides: CursorOverrides | None
     full_refresh: bool
     full_refresh_models: frozenset[str]
+    full_refresh_functions: frozenset[str]
     reload_sources: bool
     forced_stale_model_names: tuple[str, ...]
     external_blocked_model_names: tuple[str, ...]
@@ -10513,6 +10514,7 @@ class PlannerOverrides(NativeRecord):
         cursor_overrides: CursorOverrides | None = ...,
         full_refresh: bool = ...,
         full_refresh_models: frozenset[str] = ...,
+        full_refresh_functions: frozenset[str] = ...,
         reload_sources: bool = ...,
         forced_stale_model_names: tuple[str, ...] = ...,
         external_blocked_model_names: tuple[str, ...] = ...,

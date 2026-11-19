@@ -31,6 +31,7 @@ use crate::planner_phases::main::outputs::unselected_upstream_models::unselected
 use crate::planner_phases::main::rebuilds::build_planner_entry_results::build_planner_entry_results;
 use crate::planner_phases::main::rebuilds::defer_to_migration_origins::defer_to_migration_origins;
 use crate::planner_phases::main::rebuilds::reconcile_execution_changes::reconcile_execution_changes;
+use crate::planner_phases::models::FullRefreshRequest;
 use crate::planner_phases::models::PlannerIdentityContext;
 use crate::planner_phases::models::{
     PlanOutputContext, PlanWarningContext, PlannedModelEntries, StoragePolicyContext,
@@ -87,13 +88,14 @@ fn change_results<'py>(
     let versions = class_field(identities, |i: &PlannerIdentityContext| {
         &i.version_identities
     })?;
+    let full_refresh: FullRefreshRequest = FullRefreshRequest::of(overrides)?;
     let changes = detect_changes(
         (
             project,
             &class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?,
             snapshot,
         ),
-        native_field(overrides, "full_refresh")?.is_truthy()?,
+        (full_refresh.all, &full_refresh.functions),
         (
             native_field(&versions, "model_version_hashes")?,
             native_field(&versions, "model_metadata_jsons")?,

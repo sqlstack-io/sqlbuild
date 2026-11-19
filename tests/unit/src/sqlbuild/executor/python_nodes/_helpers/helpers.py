@@ -46,6 +46,7 @@ from sqlbuild.executor.python_nodes.models import (
     PythonNodeRuntime,
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode
+from sqlbuild.executor.scheduling.classes.session_warehouses import SessionWarehouses
 from sqlbuild.executor.scheduling.main._unlock_downstream import unlock_downstream_python_nodes
 from sqlbuild.executor.scheduling.models import LifecycleExecutionNode
 from sqlbuild.observability import LifecycleEvent
@@ -671,3 +672,24 @@ _RESULT_READ_STRATEGIES: dict[tuple[bool, bool], Callable[..., object]] = {
     (False, False): _read_default_result,
     (False, True): _raise_missing_result,
 }
+
+
+MISSING_WAREHOUSE_FAILURE: str = (
+    "cannot run on warehouse MISSING_WH: Object does not exist: warehouse MISSING_WH"
+)
+
+
+def missing_warehouse_runtime(*, adapter: Any, node: str) -> PythonNodeRuntime:
+    """A runtime putting `node` on MISSING_WH through `adapter`'s session warehouses."""
+
+    return PythonNodeRuntime(
+        adapter=PythonNodeContextTestAdapter(),
+        connection_config={},
+        connection=object(),
+        run_id="warehouse-run",
+        target="dev",
+        vars={},
+        is_reload=False,
+        node_warehouses={node: "MISSING_WH"},
+        session_warehouses=SessionWarehouses(adapter=cast(BaseAdapter, adapter), home="BUILD_WH"),
+    )

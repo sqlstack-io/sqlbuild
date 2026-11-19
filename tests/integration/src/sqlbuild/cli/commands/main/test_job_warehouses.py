@@ -14,8 +14,10 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
 from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     install_writable_offline_snowflake,
     run_cli_exit_code,
+    unit_test_sql,
     warehouse_switches,
     write_job_warehouse_project,
+    write_project_files,
 )
 
 _BOTH_JOBS: tuple[str, ...] = (
@@ -37,16 +39,36 @@ _BOTH_JOBS: tuple[str, ...] = (
             expected_switches=("ORDERS_WH", "REFUNDS_WH", "BUILD_WH"),
         ),
         JobWarehouseSwitchTestCase(
-            description="a job's task runs on the job's warehouse",
+            description="a single named job's warehouse is the whole build's, its task included",
             argv=("build", "--select", "job:tasks_wh_job"),
-            expected_connect_warehouses=frozenset({"BUILD_WH"}),
-            expected_switches=("TASKS_WH",),
+            expected_connect_warehouses=frozenset({"TASKS_WH"}),
+            expected_switches=(),
+        ),
+        JobWarehouseSwitchTestCase(
+            description="a warehouse every named job shares runs upstream nodes outside them too",
+            argv=("build", "--select", "stg", "job:orders_wh_job", "job:orders_copy_job"),
+            expected_connect_warehouses=frozenset({"ORDERS_WH"}),
+            expected_switches=(),
         ),
         JobWarehouseSwitchTestCase(
             description="--warehouse wins over every named job, even ones that would conflict",
             argv=("build", "--warehouse", "CLI_WH", *_BOTH_JOBS, "job:refunds_alt_job"),
             expected_connect_warehouses=frozenset({"CLI_WH"}),
             expected_switches=(),
+        ),
+        JobWarehouseSwitchTestCase(
+            description="a SQL test covering nodes with and without a job warehouse stays put",
+            argv=("build", *_BOTH_JOBS),
+            expected_connect_warehouses=frozenset({"BUILD_WH"}),
+            expected_switches=("ORDERS_WH", "REFUNDS_WH", "BUILD_WH"),
+            extra_files={"tests/unit/test_refunds.sql": unit_test_sql("refunds", "summary")},
+        ),
+        JobWarehouseSwitchTestCase(
+            description="a SQL test covering only one job's nodes runs on its warehouse",
+            argv=("build", *_BOTH_JOBS),
+            expected_connect_warehouses=frozenset({"BUILD_WH"}),
+            expected_switches=("REFUNDS_WH", "ORDERS_WH", "REFUNDS_WH", "BUILD_WH"),
+            extra_files={"tests/unit/test_refunds.sql": unit_test_sql("refunds")},
         ),
         JobWarehouseSwitchTestCase(
             description="--no-job-settings keeps every node on the build's warehouse",
@@ -70,6 +92,7 @@ def test_given_named_jobs_with_warehouses_when_building_then_each_node_runs_on_i
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     write_job_warehouse_project(project_dir=tmp_path)
+    write_project_files(project_dir=tmp_path, files=test_case.extra_files)
     connect_calls, executed_sql = install_writable_offline_snowflake(monkeypatch)
 
     exit_code: int = run_cli_exit_code(test_case.argv, tmp_path)

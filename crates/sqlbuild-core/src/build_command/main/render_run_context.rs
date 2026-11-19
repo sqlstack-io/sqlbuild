@@ -6,13 +6,13 @@ use crate::build_command::models::RunContextFacts;
 use crate::cli_text::models::{CliDocument, CliStyle};
 use crate::number_text::main::format_thousands::format_thousands;
 
-/// `true`, the models of the named jobs that rebuild theirs from scratch, or `false`.
+/// `true`, the nodes of the named jobs that rebuild theirs from scratch, or `false`.
 fn full_refresh(facts: &RunContextFacts) -> String {
     match facts.full_refresh_jobs.as_slice() {
         _ if facts.full_refresh => true.to_string(),
         [] => false.to_string(),
-        [job] => format!("models of job {}", sanitize(job)),
-        jobs => format!("models of jobs {}", sanitize(&jobs.join(", "))),
+        [job] => format!("nodes of job {}", sanitize(job)),
+        jobs => format!("nodes of jobs {}", sanitize(&jobs.join(", "))),
     }
 }
 

@@ -3,19 +3,22 @@
 use std::collections::BTreeMap;
 
 use serde_json::Value as Json;
+use sqlbuild_analysis::job_settings::constants::WAREHOUSE_SETTING;
 use sqlbuild_analysis::job_settings::main::setting_scope::setting_scope;
 use sqlbuild_analysis::job_settings::models::SettingScope;
 
 use crate::argv::main::job_settings_arguments::job_settings_arguments;
 
-/// `--select job:<job>` and the job's build-wide settings as flags; the build applies the rest.
+/// `--select job:<job>` and its build-wide settings and warehouse, the run's own, as flags.
 pub fn job_run_arguments(
     job: &str,
     settings: &BTreeMap<String, Json>,
 ) -> Result<Vec<String>, String> {
     let build_wide: BTreeMap<String, Json> = settings
         .iter()
-        .filter(|(name, _)| setting_scope(name) == SettingScope::Build)
+        .filter(|(name, _)| {
+            setting_scope(name) == SettingScope::Build || name.as_str() == WAREHOUSE_SETTING
+        })
         .map(|(name, value)| (name.clone(), value.clone()))
         .collect();
     let mut arguments: Vec<String> = job_settings_arguments(&build_wide)?;

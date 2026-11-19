@@ -19,6 +19,7 @@ from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
 from sqlbuild.executor.node_results.models import NodeResultRecord
 from sqlbuild.executor.node_results.types import NodeResultStatus
+from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
 from sqlbuild.executor.python_nodes._helpers.relation_guard import build_python_node_relation_guard
 from sqlbuild.executor.python_nodes._helpers.results import (
     build_python_node_failure_result,
@@ -177,6 +178,16 @@ def _execute_ready_node_in_cost_scope(
             kind=node_kind,
             status=PythonNodeStatus.FAILED,
             error_message=decision.reason,
+        )
+        _persist_python_node_result(result_store=result_store, result=result, run_id=run_id)
+        return result, None
+    runtime, warehouse_failure = node_runtime(runtime=runtime, name=node.name)
+    if warehouse_failure is not None:
+        result = PythonNodeExecutionResult(
+            node_name=node.name,
+            kind=node_kind,
+            status=PythonNodeStatus.FAILED,
+            error_message=warehouse_failure,
         )
         _persist_python_node_result(result_store=result_store, result=result, run_id=run_id)
         return result, None

@@ -435,6 +435,52 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 ("udf:udf__order_band", "success", None, None, None),
             ],
         ),
+        WorkerExecutionTestCase(
+            "a job's full_refresh, run_tests and ignore_audit_failures act as the global flags did",
+            "SELECT 7 AS amount",
+            "SELECT count(*) FROM parity_events",
+            "success",
+            [(1,)],
+            files={
+                "functions/sql/udf__band.sql": (
+                    "FUNCTION (description 'Band.', arguments (amount INT), returns VARCHAR);\n"
+                    "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
+                ),
+                "models/parity_lookup.sql": (
+                    "MODEL (description 'Lookup.', materialized table, "
+                    "columns (id (type INTEGER, audits [not_null])));\n"
+                    "SELECT CAST(NULL AS INTEGER) AS id\n"
+                ),
+                "models/parity_events.sql": (
+                    "MODEL (description 'Events.', materialized incremental, "
+                    "incremental_strategy append);\n"
+                    'SELECT 1 AS event_id, __udf("udf__band")(5) AS band\n'
+                ),
+                "tests/unit/test_parity_events.sql": (
+                    "TEST();\n\nWITH\n__ref__parity_lookup AS (SELECT 1 AS id),\n"
+                    "__expected__parity_events AS (SELECT 99 AS event_id, 'x' AS band)\nSELECT 1\n"
+                ),
+                "audits/singular/events_have_lookups.sql": (
+                    'AUDIT (name "events_have_lookups", severity error);\n'
+                    'SELECT e.event_id FROM __ref("parity_events") e '
+                    'LEFT JOIN __ref("parity_lookup") l ON e.event_id = l.id WHERE l.id IS NULL\n'
+                ),
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders udf__band parity_lookup parity_events"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
+                    "\n[settings]\nfull_refresh = true\nrun_tests = false\n"
+                    "ignore_audit_failures = true\n"
+                ),
+            },
+            expected_run_nodes=[
+                ("model:orders", "success", None, None, None),
+                ("model:parity_events", "success", None, None, None),
+                ("model:parity_lookup", "success", None, None, None),
+                ("udf:udf__band", "success", None, None, None),
+            ],
+        ),
     ],
     ids=lambda case: case.description,
 )

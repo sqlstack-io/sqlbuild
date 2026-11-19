@@ -1,12 +1,27 @@
-//! A group's jobs must agree on every build-wide setting on each target that declares them.
+//! A group's jobs must agree on `vars` and `changed` on each target that declares them.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use sqlbuild_discovery::orchestration_files::models::{GroupFile, OrchestrationInventory};
 
+use crate::job_settings::constants::GROUP_AGREED_SETTINGS;
 use crate::job_settings::main::build_job_settings::build_job_settings;
 use crate::job_settings::main::declared_runs::declared_runs;
 use crate::job_settings::models::DeclaredRun;
+
+/// `run` keeping only the settings a group's jobs must agree on.
+fn agreed_settings_only(run: DeclaredRun) -> DeclaredRun {
+    match run {
+        DeclaredRun::Job { settings, retry } => DeclaredRun::Job {
+            settings: settings
+                .into_iter()
+                .filter(|(name, _)| GROUP_AGREED_SETTINGS.contains(&name.as_str()))
+                .collect(),
+            retry,
+        },
+        group => group,
+    }
+}
 
 /// Why `group` cannot run as one build on some target, as building it would say; `None` if never.
 #[must_use]
@@ -26,7 +41,10 @@ pub fn group_setting_mismatch(
         }
     }
     for target in targets {
-        let declared: BTreeMap<String, DeclaredRun> = declared_runs(inventory, target);
+        let declared: BTreeMap<String, DeclaredRun> = declared_runs(inventory, target)
+            .into_iter()
+            .map(|(name, run)| (name, agreed_settings_only(run)))
+            .collect();
         let Some(DeclaredRun::Group { members }) = declared.get(&group.run.name.value) else {
             continue;
         };

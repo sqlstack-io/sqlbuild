@@ -74,8 +74,8 @@ class RecordingWarehouseAdapter:
 
 
 class MissingWarehouseAdapter(RecordingWarehouseAdapter):
-    """An adapter whose session cannot use any warehouse it is asked for."""
+    """An adapter whose session cannot use any warehouse it is asked for; records each attempt."""
 
     def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
-        del connection
+        self.statements.append((connection, warehouse))
         raise RuntimeError(f"Object does not exist: warehouse {warehouse}")

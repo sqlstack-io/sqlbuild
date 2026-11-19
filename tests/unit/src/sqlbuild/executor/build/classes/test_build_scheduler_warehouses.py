@@ -6,15 +6,20 @@ from typing import Any
 
 import pytest
 
+from sqlbuild._native import CompiledObjectKey, CompiledResourceType
 from sqlbuild.executor.build.classes.build_scheduler import BuildScheduler
-from sqlbuild.executor.run.models import BatchWindow, ModelExecutionResult
-from sqlbuild.executor.scheduling.types import ExecutionStatus
+from sqlbuild.executor.build.models import FunctionExecutionResult, SeedExecutionResult
+from sqlbuild.executor.load.models import LoadExecutionResult
+from sqlbuild.executor.run.models import BatchWindow
+from sqlbuild.executor.testing.models import SqlTestExecutionResult
 from tests.unit.src.sqlbuild.executor.build.classes._test_types import (
     NodeWarehouseFailureTestCase,
     SubworkerWarehouseTestCase,
 )
 from tests.unit.src.sqlbuild.executor.build.classes.helpers import (
-    model_key,
+    failed_node_result,
+    node_key,
+    source_plan,
     warehouse_scheduler,
 )
 from tests.unit.src.sqlbuild.executor.scheduling.classes.helpers import (
@@ -87,6 +92,51 @@ def test_given_a_coordinator_warehouse_when_a_subworker_runs_a_batch_then_its_co
                 "cannot run on warehouse MISSING_WH: Object does not exist: warehouse MISSING_WH"
             ),
         ),
+        NodeWarehouseFailureTestCase(
+            description="a seed fails with its own kind's result",
+            node_warehouse="MISSING_WH",
+            expected_message=(
+                "cannot run on warehouse MISSING_WH: Object does not exist: warehouse MISSING_WH"
+            ),
+            resource_type=CompiledResourceType.SEED,
+            expected_result_type=SeedExecutionResult,
+        ),
+        NodeWarehouseFailureTestCase(
+            description="a source fails with its own kind's result",
+            node_warehouse="MISSING_WH",
+            expected_message=(
+                "cannot run on warehouse MISSING_WH: Object does not exist: warehouse MISSING_WH"
+            ),
+            resource_type=CompiledResourceType.SOURCE,
+            expected_result_type=LoadExecutionResult,
+        ),
+        NodeWarehouseFailureTestCase(
+            description="a udf fails with its own kind's result",
+            node_warehouse="MISSING_WH",
+            expected_message=(
+                "cannot run on warehouse MISSING_WH: Object does not exist: warehouse MISSING_WH"
+            ),
+            resource_type=CompiledResourceType.UDF,
+            expected_result_type=FunctionExecutionResult,
+        ),
+        NodeWarehouseFailureTestCase(
+            description="a table_fn fails with its own kind's result",
+            node_warehouse="MISSING_WH",
+            expected_message=(
+                "cannot run on warehouse MISSING_WH: Object does not exist: warehouse MISSING_WH"
+            ),
+            resource_type=CompiledResourceType.TABLE_FN,
+            expected_result_type=FunctionExecutionResult,
+        ),
+        NodeWarehouseFailureTestCase(
+            description="a sql_test fails with its own kind's result",
+            node_warehouse="MISSING_WH",
+            expected_message=(
+                "cannot run on warehouse MISSING_WH: Object does not exist: warehouse MISSING_WH"
+            ),
+            resource_type=CompiledResourceType.SQL_TEST,
+            expected_result_type=SqlTestExecutionResult,
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -95,14 +145,14 @@ def test_given_an_unusable_job_warehouse_when_a_node_starts_then_it_fails_naming
 ) -> None:
     adapter: MissingWarehouseAdapter = MissingWarehouseAdapter(session_warehouse=None)
     scheduler: Any = warehouse_scheduler(adapter)
-    scheduler._node_warehouses = {model_key("orders"): test_case.node_warehouse}
+    key: CompiledObjectKey = node_key(resource_type=test_case.resource_type, name="orders")
+    scheduler._node_warehouses = {key: test_case.node_warehouse}
+    scheduler._plan = source_plan("orders")
 
-    result: ModelExecutionResult | None = BuildScheduler._enter_node_warehouse(
-        scheduler, key=model_key("orders"), connection=object()
-    )
+    result: Any = BuildScheduler._enter_node_warehouse(scheduler, key=key, connection=object())
 
-    assert result is not None
-    assert (result.status, result.error_message) == (
-        ExecutionStatus.FAILED,
+    assert (type(result), failed_node_result(result), result.error_message) == (
+        test_case.expected_result_type,
+        True,
         test_case.expected_message,
     )

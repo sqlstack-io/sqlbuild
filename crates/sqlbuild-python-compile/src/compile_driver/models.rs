@@ -8,6 +8,7 @@ use pyo3::prelude::PyAny;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use pyo3::types::PyBool;
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_analysis::job_settings::models::NodeJobSettings;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -161,4 +162,6 @@ pub struct PlannedJobSettings {
     pub(crate) refreshing_jobs: Vec<String>,
     /// Each named job whose `warehouse` its own nodes run on, and that warehouse.
     pub(crate) job_warehouses: BTreeMap<String, String>,
+    /// The nodes each audit attached to no node reads, by the audit's key.
+    pub(crate) unattached_audit_reads: BTreeMap<ObjectKey, Vec<ObjectKey>>,
 }

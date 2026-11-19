@@ -1528,6 +1528,7 @@ class JobWarehouseSwitchTestCase:
     argv: tuple[str, ...]
     expected_connect_warehouses: frozenset[str]
     expected_switches: tuple[str, ...]
+    extra_files: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -1538,3 +1539,16 @@ class JobWarehouseOutputTestCase:
     argv: tuple[str, ...]
     expected_exit_code: int
     expected_fragment: str
+
+
+@dataclass(frozen=True)
+class JobFlagParityTestCase:
+    """A single named job's run, and the global flags its node settings used to be."""
+
+    description: str
+    job_args: tuple[str, ...]
+    flag_plan_args: tuple[str, ...]
+    flag_build_args: tuple[str, ...]
+    expected_function_reasons: tuple[tuple[str, str], ...]
+    expected_full_refresh_counts: tuple[str, ...]
+    expected_exit_code: int

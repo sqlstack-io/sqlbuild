@@ -691,9 +691,14 @@ class BuildScheduler:
                 ledger_path=(self._runtime_dir / "executions" / self._run_id / "statements.jsonl"),
                 on_statement_complete=self._on_statement_complete,
             ):
-                failure: ModelExecutionResult | None = self._enter_node_warehouse(
-                    key=key, connection=connection
-                )
+                failure: (
+                    ModelExecutionResult
+                    | SeedExecutionResult
+                    | FunctionExecutionResult
+                    | SqlTestExecutionResult
+                    | LoadExecutionResult
+                    | None
+                ) = self._enter_node_warehouse(key=key, connection=connection)
                 if failure is not None:
                     return failure
                 return self._execute_model_node(
@@ -1052,9 +1057,14 @@ class BuildScheduler:
     ):
         """Execute a single node. Runs in a worker thread (or scheduler thread for serial)."""
 
-        failure: ModelExecutionResult | None = self._enter_node_warehouse(
-            key=key, connection=connection
-        )
+        failure: (
+            ModelExecutionResult
+            | SeedExecutionResult
+            | FunctionExecutionResult
+            | SqlTestExecutionResult
+            | LoadExecutionResult
+            | None
+        ) = self._enter_node_warehouse(key=key, connection=connection)
         if failure is not None:
             return failure
         if key.resource_type == CompiledResourceType.SEED:
@@ -1076,8 +1086,15 @@ class BuildScheduler:
 
     def _enter_node_warehouse(
         self, *, key: CompiledObjectKey, connection: Any
-    ) -> ModelExecutionResult | None:
-        """Put `connection` on the node's job warehouse, or the build's; the failure if not."""
+    ) -> (
+        ModelExecutionResult
+        | SeedExecutionResult
+        | FunctionExecutionResult
+        | SqlTestExecutionResult
+        | LoadExecutionResult
+        | None
+    ):
+        """Put `connection` on the node's job warehouse, or the build's; its failure if not."""
 
         if self._session_warehouses is None:
             return None
@@ -1085,10 +1102,8 @@ class BuildScheduler:
         try:
             self._session_warehouses.use(connection=connection, warehouse=warehouse)
         except Exception as error:  # noqa: BLE001 - the node fails with the reason
-            return ModelExecutionResult(
-                model_name=key.name,
-                status=ExecutionStatus.FAILED,
-                error_code=BUILD_WORKER_FAILED_CODE,
+            return self._failed_node_result(
+                key=key,
                 error_message=(
                     f"cannot run on warehouse {warehouse}: {error}"
                     if warehouse is not None
@@ -1096,6 +1111,56 @@ class BuildScheduler:
                 ),
             )
         return None
+
+    def _failed_node_result(
+        self, *, key: CompiledObjectKey, error_message: str
+    ) -> (
+        ModelExecutionResult
+        | SeedExecutionResult
+        | FunctionExecutionResult
+        | SqlTestExecutionResult
+        | LoadExecutionResult
+    ):
+        """The failed result of the node's own kind, so its kind's failure handling applies."""
+
+        if key.resource_type == CompiledResourceType.SEED:
+            return SeedExecutionResult(
+                seed_name=key.name,
+                status=ExecutionStatus.FAILED,
+                error_code=BUILD_WORKER_FAILED_CODE,
+                error_message=error_message,
+            )
+        if key.resource_type == CompiledResourceType.SOURCE:
+            source: SourceEntry = self._plan.source_map[key.name]
+            return LoadExecutionResult(
+                source_name=source.name,
+                loader_name=source.loader or "",
+                status=ExecutionStatus.FAILED,
+                target=source.table or source.name,
+                resource_kind=load_resource_kind(source),
+                error_message=error_message,
+            )
+        if key.resource_type in {CompiledResourceType.UDF, CompiledResourceType.TABLE_FN}:
+            return FunctionExecutionResult(
+                function_name=key.name,
+                status=ExecutionStatus.FAILED,
+                function_kind=str(key.resource_type),
+                error_code=BUILD_WORKER_FAILED_CODE,
+                error_message=error_message,
+            )
+        if key.resource_type == CompiledResourceType.SQL_TEST:
+            return SqlTestExecutionResult(
+                test_name=key.name,
+                outcome=SqlTestOutcome.ERROR,
+                error_code=BUILD_WORKER_FAILED_CODE,
+                error_message=error_message,
+            )
+        return ModelExecutionResult(
+            model_name=key.name,
+            status=ExecutionStatus.FAILED,
+            error_code=BUILD_WORKER_FAILED_CODE,
+            error_message=error_message,
+        )
 
     def _execute_source_node(
         self, *, key: CompiledObjectKey, connection: Any
