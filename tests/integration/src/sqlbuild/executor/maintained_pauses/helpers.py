@@ -92,11 +92,20 @@ class TokenPausingDuckDbAdapter(PausingDuckDbAdapter):
         self, *, connection: Any, database: str | None, schema: str, name: str
     ) -> str | None:
         del database
-        row: tuple[Any, ...] = connection.execute(
-            f"SELECT COUNT(*) || '/' || COALESCE(CAST(MAX(recorded_at) AS VARCHAR), '') "
-            f"FROM {schema}.{name}"
-        ).fetchone()
-        return str(row[0])
+        return _table_token(connection=connection, table=f"{schema}.{name}")
+
+
+def _table_token(*, connection: Any, table: str) -> str:
+    row: tuple[Any, ...] = connection.execute(
+        f"SELECT COUNT(*) || '/' || COALESCE(CAST(MAX(recorded_at) AS VARCHAR), '') FROM {table}"
+    ).fetchone()
+    return str(row[0])
+
+
+def pause_table_token(*, connection: Any) -> str:
+    """The staging pause table's change token, as `TokenPausingDuckDbAdapter` reads it."""
+
+    return _table_token(connection=connection, table="staging._sqlbuild_maintained_pauses")
 
 
 def lease_project_case(

@@ -1442,10 +1442,10 @@ pub(crate) async fn read_metadata_page(
 
 /// A completed synchronization resumes expired maintained holds, then closes its reader, so no warehouse session outlives the sync.
 pub(crate) async fn finish_metadata_page(
-    mut state: LocationMetadataSync,
+    state: LocationMetadataSync,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
     if state.idle {
-        resume_expired_holds(&mut state).await;
+        let state = resume_expired_holds(state).await;
         return Ok(Some(close_metadata_reader(state).await?));
     }
     Ok(Some(state))

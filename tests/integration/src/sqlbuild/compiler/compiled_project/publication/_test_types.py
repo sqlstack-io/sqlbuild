@@ -586,3 +586,10 @@ class ChangedBuildReplanTestCase:
     edit: tuple[str, str]
     expected_published: dict[str, list[str]]
     expected_rebuilt: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class ServedResumeTestCase:
+    description: str
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_kept: tuple[tuple[str, str], ...]

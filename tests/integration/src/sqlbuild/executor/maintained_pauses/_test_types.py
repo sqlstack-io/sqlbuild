@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+
+from tests.integration.src.sqlbuild.executor.maintained_pauses.helpers import (
+    PausingDuckDbAdapter,
+)
 
 
 @dataclass(frozen=True)
@@ -81,7 +86,6 @@ class SyncResumeTestCase:
     description: str
     holds: tuple[tuple[str, str, int], ...]
     hand_suspended: tuple[str, ...]
-    pause_table: bool
     expected_resumed: tuple[tuple[str, str], ...]
     expected_states: dict[str, str]
     expected_events: tuple[tuple[str, str, str, str], ...]
@@ -91,10 +95,10 @@ class SyncResumeTestCase:
 class QuietTokenTestCase:
     description: str
     holds: tuple[tuple[str, str, int], ...]
-    tokens: bool
-    quiet: bool
+    adapter: Callable[[], PausingDuckDbAdapter]
+    sent_token: Callable[[str], str | None]
     expected_resumed: tuple[tuple[str, str], ...]
-    expected_quiet: bool
+    expected_token: Callable[[str], str | None]
 
 
 @dataclass(frozen=True)

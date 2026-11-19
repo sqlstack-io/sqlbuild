@@ -35,10 +35,21 @@ from tests.integration.src.sqlbuild.executor.maintained_pauses.helpers import (
     pause_table_names,
     plan_lease_project,
     TokenPausingDuckDbAdapter,
+    pause_table_token,
     seed_hold,
 )
 
 _GRACE_SECONDS: float = 600.0
+
+
+def _same_token(token: str) -> str | None:
+    return token
+
+
+def _no_token(token: str) -> str | None:
+    del token
+    return None
+
 _SYNC: str = "location-sync:warehouse"
 
 
@@ -49,7 +60,6 @@ _SYNC: str = "location-sync:warehouse"
             description="an expired hold is resumed and closed by the sync",
             holds=(("dead_run", "daily_totals", 900),),
             hand_suspended=(),
-            pause_table=True,
             expected_resumed=(("dead_run", "daily_totals"),),
             expected_states={"daily_totals": "ACTIVE"},
             expected_events=(
@@ -61,7 +71,6 @@ _SYNC: str = "location-sync:warehouse"
             description="a live hold is left alone",
             holds=(("busy_run", "daily_totals", 30),),
             hand_suspended=(),
-            pause_table=True,
             expected_resumed=(),
             expected_states={"daily_totals": "SUSPENDED"},
             expected_events=(("paused", "busy_run", "busy_run", "daily_totals"),),
@@ -70,7 +79,6 @@ _SYNC: str = "location-sync:warehouse"
             description="a model suspended by hand stays suspended",
             holds=(("dead_run", "daily_totals", 900),),
             hand_suspended=("weekly_totals",),
-            pause_table=True,
             expected_resumed=(("dead_run", "daily_totals"),),
             expected_states={"daily_totals": "ACTIVE", "weekly_totals": "SUSPENDED"},
             expected_events=(
@@ -82,7 +90,6 @@ _SYNC: str = "location-sync:warehouse"
             description="an expired hold on a model another run holds live is left alone",
             holds=(("dead_run", "daily_totals", 900), ("busy_run", "daily_totals", 30)),
             hand_suspended=(),
-            pause_table=True,
             expected_resumed=(),
             expected_states={"daily_totals": "SUSPENDED"},
             expected_events=(
@@ -94,7 +101,6 @@ _SYNC: str = "location-sync:warehouse"
             description="of two models only the one whose hold expired is resumed",
             holds=(("dead_run", "daily_totals", 900), ("busy_run", "weekly_totals", 30)),
             hand_suspended=(),
-            pause_table=True,
             expected_resumed=(("dead_run", "daily_totals"),),
             expected_states={"daily_totals": "ACTIVE", "weekly_totals": "SUSPENDED"},
             expected_events=(
@@ -102,15 +108,6 @@ _SYNC: str = "location-sync:warehouse"
                 ("paused", "dead_run", "dead_run", "daily_totals"),
                 ("resumed", "dead_run", _SYNC, "daily_totals"),
             ),
-        ),
-        SyncResumeTestCase(
-            description="without a pause table the sync writes nothing",
-            holds=(),
-            hand_suspended=("daily_totals",),
-            pause_table=False,
-            expected_resumed=(),
-            expected_states={"daily_totals": "SUSPENDED"},
-            expected_events=(),
         ),
     ],
     ids=lambda case: case.description,
@@ -141,9 +138,26 @@ def test_given_pause_holds_when_a_location_syncs_then_only_expired_holds_are_res
         test_case.expected_resumed
     )
     assert adapter.states == test_case.expected_states
-    assert bool(pause_table_names(connection=connection)) == test_case.pause_table
-    if test_case.pause_table:
-        assert pause_events(connection=connection) == list(test_case.expected_events)
+    assert pause_events(connection=connection) == list(test_case.expected_events)
+
+
+def test_given_no_pause_table_when_a_location_syncs_then_it_writes_nothing(
+    adapter: PausingDuckDbAdapter, connection: Any
+) -> None:
+    adapter.states["daily_totals"] = "SUSPENDED"
+
+    outcome: ResumeOutcome = resume_expired_holds(
+        adapter=adapter,
+        connection=connection,
+        location=(None, "staging"),
+        grace_seconds=_GRACE_SECONDS,
+        recorded_by=_SYNC,
+        quiet_token=None,
+    )
+
+    assert outcome == ResumeOutcome(resumed=(), quiet_token=None)
+    assert adapter.states == {"daily_totals": "SUSPENDED"}
+    assert pause_table_names(connection=connection) == []
 
 
 @pytest.mark.parametrize(
@@ -152,42 +166,42 @@ def test_given_pause_holds_when_a_location_syncs_then_only_expired_holds_are_res
         QuietTokenTestCase(
             description="a pause table unchanged since a pass left it quiet is not read",
             holds=(("dead_run", "daily_totals", 900),),
-            tokens=True,
-            quiet=True,
+            adapter=TokenPausingDuckDbAdapter,
+            sent_token=_same_token,
             expected_resumed=(),
-            expected_quiet=True,
+            expected_token=_same_token,
         ),
         QuietTokenTestCase(
             description="a pass that leaves no hold open returns the table's token",
             holds=(),
-            tokens=True,
-            quiet=False,
+            adapter=TokenPausingDuckDbAdapter,
+            sent_token=_no_token,
             expected_resumed=(),
-            expected_quiet=True,
+            expected_token=_same_token,
         ),
         QuietTokenTestCase(
             description="a pass that resumes returns no token, so the next pass reads again",
             holds=(("dead_run", "daily_totals", 900),),
-            tokens=True,
-            quiet=False,
+            adapter=TokenPausingDuckDbAdapter,
+            sent_token=_no_token,
             expected_resumed=(("dead_run", "daily_totals"),),
-            expected_quiet=False,
+            expected_token=_no_token,
         ),
         QuietTokenTestCase(
             description="a live hold keeps the table from going quiet",
             holds=(("busy_run", "daily_totals", 30),),
-            tokens=True,
-            quiet=False,
+            adapter=TokenPausingDuckDbAdapter,
+            sent_token=_no_token,
             expected_resumed=(),
-            expected_quiet=False,
+            expected_token=_no_token,
         ),
         QuietTokenTestCase(
             description="an adapter without change tokens reads every pass",
             holds=(("dead_run", "daily_totals", 900),),
-            tokens=False,
-            quiet=True,
+            adapter=PausingDuckDbAdapter,
+            sent_token=_same_token,
             expected_resumed=(("dead_run", "daily_totals"),),
-            expected_quiet=False,
+            expected_token=_no_token,
         ),
     ],
     ids=lambda case: case.description,
@@ -195,9 +209,7 @@ def test_given_pause_holds_when_a_location_syncs_then_only_expired_holds_are_res
 def test_given_a_quiet_token_when_a_location_syncs_then_only_a_changed_pause_table_is_read(
     test_case: QuietTokenTestCase, connection: Any
 ) -> None:
-    adapter: PausingDuckDbAdapter = (
-        TokenPausingDuckDbAdapter() if test_case.tokens else PausingDuckDbAdapter()
-    )
+    adapter: PausingDuckDbAdapter = test_case.adapter()
     for statement in setup_statements(adapter=adapter, location=(None, "staging")):
         connection.execute(statement)
     for run_id, name, idle_seconds in test_case.holds:
@@ -208,16 +220,6 @@ def test_given_a_quiet_token_when_a_location_syncs_then_only_a_changed_pause_tab
             name=name,
             idle_seconds=idle_seconds,
         )
-    token: str | None = (
-        TokenPausingDuckDbAdapter().read_relation_change_token(
-            connection=connection,
-            database=None,
-            schema="staging",
-            name="_sqlbuild_maintained_pauses",
-        )
-        if test_case.quiet
-        else None
-    )
 
     outcome: ResumeOutcome = resume_expired_holds(
         adapter=adapter,
@@ -225,16 +227,13 @@ def test_given_a_quiet_token_when_a_location_syncs_then_only_a_changed_pause_tab
         location=(None, "staging"),
         grace_seconds=_GRACE_SECONDS,
         recorded_by=_SYNC,
-        quiet_token=token,
+        quiet_token=test_case.sent_token(pause_table_token(connection=connection)),
     )
 
-    current: str | None = TokenPausingDuckDbAdapter().read_relation_change_token(
-        connection=connection, database=None, schema="staging", name="_sqlbuild_maintained_pauses"
-    )
     assert tuple((hold.run_id, hold.relation.name) for hold in outcome.resumed) == (
         test_case.expected_resumed
     )
-    assert outcome.quiet_token == (current if test_case.expected_quiet else None)
+    assert outcome.quiet_token == test_case.expected_token(pause_table_token(connection=connection))
 
 
 @pytest.mark.parametrize(
@@ -323,15 +322,17 @@ def test_given_a_sync_resuming_mid_takeover_when_the_build_holds_then_it_pauses_
     assert dead is not None
     dead.acquire(connection=connection, on_progress=None)
     adapter.operations.clear()
-    execute: Callable[..., Any] = adapter.execute
+    yield_to_earlier: Callable[..., None] = MaintainedHold._yield_to_earlier
 
-    def resumed_by_a_sync_after_the_takeover(*, connection: Any, sql: str) -> Any:
-        cursor: Any = execute(connection=connection, sql=sql)
-        if "'paused'" in sql and "'second_run'" in sql:
-            adapter.states["daily_totals"] = "ACTIVE"
-        return cursor
+    def resumed_by_a_sync_after_the_takeover(
+        hold: MaintainedHold, *, connection: Any, location: Any
+    ) -> None:
+        yield_to_earlier(hold, connection=connection, location=location)
+        adapter.states["daily_totals"] = "ACTIVE"
 
-    monkeypatch.setattr(adapter, "execute", resumed_by_a_sync_after_the_takeover)
+    monkeypatch.setattr(
+        MaintainedHold, "_yield_to_earlier", resumed_by_a_sync_after_the_takeover
+    )
 
     result: BuildExecutionResult = build_lease_project(
         adapter=adapter,

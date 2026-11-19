@@ -52,6 +52,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     PageBytesTestCase,
     ReadFailureTestCase,
     StateEventsTestCase,
+    ServedResumeTestCase,
     SyncPacingTestCase,
     WarehouseHistoryTestCase,
 )
@@ -1077,8 +1078,19 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
                 record_finished_run(control)
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ServedResumeTestCase(
+            description="a sync closes the hold silent past the project's grace and keeps the live one",
+            expected_resumed=(("stopped-build", "daily_totals"),),
+            expected_kept=(("running-build", "weekly_totals"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_then_only_its_expired_hold_is_closed(
-    tmp_path: Path,
+    test_case: ServedResumeTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
     fixture: dict[str, Any] = json.loads(
@@ -1155,16 +1167,13 @@ def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_th
         limit=10,
     ).rows
     adapter.close(connection)
-    expected: list[tuple[str, str, str]] = [
-        (hold["run_id"], recorder, hold["model"]) for hold in fixture["holds"] if hold["resumed"]
-    ]
-    assert [tuple(row) for row in resumed] == expected, text
-    for hold in fixture["holds"]:
-        line: str = (
-            f"Resumed maintained model main.{hold['model']}: run {hold['run_id']} "
-            "stopped heartbeating."
-        )
-        assert (line in text) == hold["resumed"], text
+    assert [tuple(row) for row in resumed] == [
+        (run_id, recorder, model) for run_id, model in test_case.expected_resumed
+    ], text
+    assert [
+        f"Resumed maintained model main.{model}: run {run_id} stopped heartbeating." in text
+        for run_id, model in (*test_case.expected_resumed, *test_case.expected_kept)
+    ] == [True] * len(test_case.expected_resumed) + [False] * len(test_case.expected_kept), text
 
 
 @pytest.mark.parametrize(

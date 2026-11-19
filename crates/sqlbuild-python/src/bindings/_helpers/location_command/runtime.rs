@@ -79,17 +79,10 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                 } else if let Some(plan) = request.get(PLAN_REQUEST) {
                     serde_json::to_string(&runtime_plan(py, held.as_ref(), plan)?)
                 } else if let Some(locations) = request.get(MAINTAINED_RESUME_REQUEST) {
-                    serde_json::to_string(&match runtime_resume(py, &options, locations) {
-                        Ok(resumed) => MaintainedResumeReply::Resumed(resumed),
-                        Err(error) => {
-                            let reason = failure_reason(&error);
-                            write_stderr(
-                                py,
-                                &format!("Resuming expired maintained holds failed: {reason}\n"),
-                            )?;
-                            MaintainedResumeReply::Failed(reason)
-                        }
-                    })
+                    serde_json::to_string(&runtime_resume(py, &options, locations).map_or_else(
+                        |error| MaintainedResumeReply::Failed(failure_reason(&error)),
+                        MaintainedResumeReply::Resumed,
+                    ))
                 } else if let Some(kind) = WarehouseHistoryKind::ALL
                     .iter()
                     .find(|kind| request.get(kind.as_str()).is_some())
@@ -102,7 +95,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     let mut unconnected = WarehouseHistoryFailure::default();
                     if session.is_none() {
                         let arguments = location_arguments(py, Some(options.clone()))?;
-                        session = match open_history_session(py, &arguments) {
+                        session = match open_history_session(py, &arguments, false) {
                             Ok(opened) => Some(opened),
                             Err(error) => {
                                 busy = error.to_string().contains(DUCKDB_LOCK_CONFLICT);

@@ -14,16 +14,13 @@ use crate::native_commands::_helpers::location::execution::location_warning;
 use crate::native_commands::constants::{MAINTAINED_RESUME_SECONDS, METADATA_REPLY_BYTES};
 use crate::native_commands::models::{LocationCompiler, LocationMetadataSync};
 
-/// Ask the reader to resume expired holds in the synced locations; a failure only warns.
-///
-/// Each location sends the pause table token its last quiet pass returned, so a table no build wrote
-/// since is not read and a quiet sync wakes no warehouse.
-pub(crate) async fn resume_expired_holds(state: &mut LocationMetadataSync) {
+/// Resume expired holds, sending each location's quiet token so an unchanged pause table is not read.
+pub(crate) async fn resume_expired_holds(mut state: LocationMetadataSync) -> LocationMetadataSync {
     if state.halted {
-        return;
+        return state;
     }
-    let Some(reader) = state.reader.as_mut() else {
-        return;
+    let Some(reader) = state.reader.take() else {
+        return state;
     };
     let locations: Vec<MaintainedResumeLocation> = state
         .locations
@@ -34,13 +31,10 @@ pub(crate) async fn resume_expired_holds(state: &mut LocationMetadataSync) {
         })
         .collect();
     let request = serde_json::json!({ MAINTAINED_RESUME_REQUEST: locations }).to_string();
-    let reason = match tokio::time::timeout(
-        Duration::from_secs(MAINTAINED_RESUME_SECONDS),
-        exchange(reader, request),
-    )
-    .await
-    {
-        Ok(Ok(MaintainedResumeReply::Resumed(resumed))) => {
+    let (reader, reply) = exchange(reader, request).await;
+    state.reader = Some(reader);
+    let reason = match reply {
+        Ok(MaintainedResumeReply::Resumed(resumed)) => {
             for (location, token) in state.locations.iter().zip(resumed.quiet_tokens) {
                 match token {
                     Some(token) => state
@@ -58,48 +52,43 @@ pub(crate) async fn resume_expired_holds(state: &mut LocationMetadataSync) {
                     ),
                 )]));
             }
-            return;
+            return state;
         }
-        Ok(Ok(MaintainedResumeReply::Failed(reason))) => reason,
-        Ok(Err(reason)) => {
-            drop(write_output(&[(
-                Stream::Stderr,
-                &format!("Resuming expired maintained holds failed: {reason}\n"),
-            )]));
-            reason
-        }
-        Err(_) => {
-            let reason = format!("no reply in {MAINTAINED_RESUME_SECONDS} s");
-            drop(write_output(&[(
-                Stream::Stderr,
-                &format!("Resuming expired maintained holds failed: {reason}\n"),
-            )]));
-            reason
-        }
+        Ok(MaintainedResumeReply::Failed(reason)) | Err(reason) => reason,
     };
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!("Resuming expired maintained holds failed: {reason}\n"),
+    )]));
     location_warning("maintained resume failed", reason);
+    state
 }
 
-/// One request line and its bounded reply line.
+/// One request line and its bounded reply line, within `MAINTAINED_RESUME_SECONDS`.
 async fn exchange(
-    reader: &mut LocationCompiler,
+    mut reader: LocationCompiler,
     request: String,
-) -> Result<MaintainedResumeReply, String> {
-    let fail = |error: std::io::Error| error.to_string();
-    reader
-        .stdin
-        .write_all(format!("{request}\n").as_bytes())
-        .await
-        .map_err(fail)?;
-    reader.stdin.flush().await.map_err(fail)?;
-    let mut line = String::new();
-    let read = (&mut reader.stdout)
-        .take(METADATA_REPLY_BYTES + 1)
-        .read_line(&mut line)
-        .await
-        .map_err(fail)?;
-    if read == 0 {
-        return Err("location runtime exited before replying".into());
-    }
-    serde_json::from_str(&line).map_err(|_| "invalid location reply".into())
+) -> (LocationCompiler, Result<MaintainedResumeReply, String>) {
+    let reply = tokio::time::timeout(Duration::from_secs(MAINTAINED_RESUME_SECONDS), async {
+        let fail = |error: std::io::Error| error.to_string();
+        reader
+            .stdin
+            .write_all(format!("{request}\n").as_bytes())
+            .await
+            .map_err(fail)?;
+        reader.stdin.flush().await.map_err(fail)?;
+        let mut line = String::new();
+        let read = (&mut reader.stdout)
+            .take(METADATA_REPLY_BYTES + 1)
+            .read_line(&mut line)
+            .await
+            .map_err(fail)?;
+        if read == 0 {
+            return Err("location runtime exited before replying".to_owned());
+        }
+        serde_json::from_str(&line).map_err(|_| "invalid location reply".to_owned())
+    })
+    .await
+    .unwrap_or_else(|_| Err(format!("no reply in {MAINTAINED_RESUME_SECONDS} s")));
+    (reader, reply)
 }

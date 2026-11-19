@@ -551,8 +551,10 @@ Details:
   interval, add one more sync after it, not one each.
 - The interval restarts after every completed sync, so a location that syncs often for other
   reasons never syncs extra.
-- A sync reads the warehouse and never writes to it. On Snowflake, it skips state tables that
-  haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
+- A sync reads the warehouse and writes only to resume
+  [maintained models](/docs/concepts/models/materializations#during-a-build) a stopped build left
+  suspended (see [Follow a sync](#follow-a-sync)). On Snowflake, it skips state tables that haven't
+  changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
   or time retries a smaller page. Any other error, such as a missing permission or table, retries
   after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
@@ -596,7 +598,14 @@ Warehouse history 1/14: fingerprints, 1,204 rows in 0.8 s
 Warehouse history 2/14: source freshness, unchanged in 0.1 s
 ...
 Warehouse history synchronization completed: 14 kinds, 31,204 rows in 12.8 s.
+Resumed maintained model analytics.marts.daily_totals: run 0f6d2c1e-5b7a-4c3e-9a21-3d8e4b6f0a12 stopped heartbeating.
 ```
+
+After a completed sync, the location resumes the maintained models a build paused and left
+suspended once that build has been silent for `[maintained] heartbeat_grace`, and prints one
+`Resumed maintained model` line for each. A failed resume prints
+`Resuming expired maintained holds failed:` and the reason; the sync still counts as complete, and
+the next completed sync tries again. A sync stopped by failed reads resumes nothing.
 
 A page holds up to 2,000 rows and ends early at 8 MiB, so wide rows make smaller pages. A failed
 read prints which kind failed, the page size and why, then what the location does next. A read that

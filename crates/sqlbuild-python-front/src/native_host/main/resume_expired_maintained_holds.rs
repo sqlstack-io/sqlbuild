@@ -1,43 +1,47 @@
 //! Resume the maintained models whose holds expired, in each state location a sync read.
 
-use crate::discovery::_helpers::project::project_config::configured;
+use crate::discovery::main::project::configured_heartbeat_grace::configured_heartbeat_grace;
 use pyo3::IntoPyObjectExt;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
-use sqlbuild_config::project::main::load_maintained_config::load_maintained_config;
+use serde_json::Value;
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_orchestration::warehouse_metadata::constants::MAINTAINED_RESUME_RECORDER;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    MaintainedResumeLocation, MaintainedResumed, ResumedHold,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
-/// One state location's database and schema, and the pause table token its last quiet pass left.
-pub type ResumeLocation = ((Option<String>, String), Option<String>);
-
-/// Each resumed hold's run ID and dotted relation, after `[maintained] heartbeat_grace` of silence,
-/// and each location's new quiet token, in `locations` order.
+/// The holds silent past `[maintained] heartbeat_grace` it closed, and each location's quiet token.
 pub fn resume_expired_maintained_holds<'py>(
     (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    project_dir: &Bound<'py, PyAny>,
-    locations: &[ResumeLocation],
-    recorded_by: &str,
-) -> PyResult<(Vec<(String, String)>, Vec<Option<String>>)> {
+    (project_dir, location_id): (&Bound<'py, PyAny>, &str),
+    locations: &Value,
+) -> PyResult<MaintainedResumed> {
     let py = adapter.py();
-    let grace_seconds: u64 =
-        configured(project_dir, load_maintained_config)?.heartbeat_grace_seconds;
+    let locations: Vec<MaintainedResumeLocation> = serde_json::from_value(locations.clone())
+        .map_err(|_| PyValueError::new_err("runtime received an invalid maintained resume"))?;
+    let grace_seconds = configured_heartbeat_grace(project_dir)? as f64;
     let resume: Bound<'py, PyAny> = host_entry(py, ExecutorHost::ResumeExpiredMaintainedHolds)?;
-    let mut resumed: Vec<(String, String)> = Vec::new();
-    let mut quiet_tokens: Vec<Option<String>> = Vec::new();
-    for (location, quiet_token) in locations {
+    let mut resumed = MaintainedResumed {
+        holds: Vec::new(),
+        quiet_tokens: Vec::new(),
+    };
+    for request in locations {
+        let location = (request.location.database, request.location.schema);
         let outcome: Bound<'py, PyAny> = call_with(
             &resume,
             &[
                 ("adapter", adapter.clone()),
                 ("connection", connection.clone()),
-                ("location", location.clone().into_bound_py_any(py)?),
+                ("location", location.into_bound_py_any(py)?),
+                ("grace_seconds", grace_seconds.into_bound_py_any(py)?),
                 (
-                    "grace_seconds",
-                    (grace_seconds as f64).into_bound_py_any(py)?,
+                    "recorded_by",
+                    format!("{MAINTAINED_RESUME_RECORDER}{location_id}").into_bound_py_any(py)?,
                 ),
-                ("recorded_by", recorded_by.into_bound_py_any(py)?),
-                ("quiet_token", quiet_token.clone().into_bound_py_any(py)?),
+                ("quiet_token", request.quiet_token.into_bound_py_any(py)?),
             ],
         )?;
         for hold in outcome.getattr("resumed")?.try_iter()? {
@@ -47,9 +51,14 @@ pub fn resume_expired_maintained_holds<'py>(
             for part in ["database", "schema", "name"] {
                 parts.extend(relation.getattr(part)?.extract::<Option<String>>()?);
             }
-            resumed.push((hold.getattr("run_id")?.extract()?, parts.join(".")));
+            resumed.holds.push(ResumedHold {
+                run_id: hold.getattr("run_id")?.extract()?,
+                relation: parts.join("."),
+            });
         }
-        quiet_tokens.push(outcome.getattr("quiet_token")?.extract()?);
+        resumed
+            .quiet_tokens
+            .push(outcome.getattr("quiet_token")?.extract()?);
     }
-    Ok((resumed, quiet_tokens))
+    Ok(resumed)
 }

@@ -2,8 +2,8 @@
   "model": "MODEL (description 'Orders.', materialized table); SELECT 17 AS amount\n",
   "maintained": "[maintained]\nheartbeat_grace = \"10m\"\n",
   "holds": [
-    {"run_id": "stopped-build", "model": "daily_totals", "idle_seconds": 900, "resumed": true},
-    {"run_id": "running-build", "model": "weekly_totals", "idle_seconds": 0, "resumed": false}
+    {"run_id": "stopped-build", "model": "daily_totals", "idle_seconds": 900},
+    {"run_id": "running-build", "model": "weekly_totals", "idle_seconds": 0}
   ],
   "lifecycle": [
     "a build pauses two maintained models and stops heartbeating on one",

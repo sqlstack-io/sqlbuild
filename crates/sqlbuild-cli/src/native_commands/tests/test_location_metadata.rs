@@ -1375,11 +1375,11 @@ fn given_a_completed_sync_when_finishing_then_its_reader_resumes_expired_holds_o
                 let mut state = metadata_sync((one_location(), 1), (3600, 1800));
                 state.idle = test_case.idle;
                 state.halted = test_case.halted;
-                if let Some(token) = test_case.quiet_token {
-                    state
-                        .maintained_quiet_tokens
-                        .insert(one_location().remove(0), token.to_owned());
-                }
+                state.maintained_quiet_tokens.extend(
+                    test_case
+                        .quiet_token
+                        .map(|token| (one_location().remove(0), token.to_owned())),
+                );
                 state.reader =
                     Some(open_location_runtime(&options, &script, Vec::new()).expect("runtime"));
                 finish_metadata_page(state).await

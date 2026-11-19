@@ -22,11 +22,7 @@ def resume_expired_holds(
     recorded_by: str,
     quiet_token: str | None,
 ) -> ResumeOutcome:
-    """Close holds silent for `grace_seconds` on models no run holds live.
-
-    A pause table whose change token is still `quiet_token` is not read, so a quiet sync starts no
-    warehouse compute.
-    """
+    """Close holds silent for `grace_seconds`, skipping a pause table still at `quiet_token`."""
 
     if not adapter.relation_exists(
         connection=connection,
@@ -61,7 +57,7 @@ def resume_expired_holds(
         if hold.idle_seconds >= grace_seconds
         and (hold.relation.database, hold.relation.schema, hold.relation.name) not in live
     )
-    resume_holds(
+    _ = resume_holds(
         adapter=adapter,
         connection=connection,
         location=location,
