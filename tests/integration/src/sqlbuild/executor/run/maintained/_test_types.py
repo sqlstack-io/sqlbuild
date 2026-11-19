@@ -46,3 +46,10 @@ class ChangeTrackingTableTestCase:
     promotion_mode: TablePromotionMode
     declared_columns: tuple[tuple[str, str], ...]
     expected_tracking: tuple[bool, ...]
+
+
+@dataclass(frozen=True)
+class ChangeTrackingSnapshotTestCase:
+    description: str
+    maintained_readers: tuple[str, ...]
+    expected_tracked: tuple[str, ...]

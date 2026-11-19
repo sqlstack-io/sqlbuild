@@ -19,6 +19,7 @@ from sqlbuild.executor.build.models import (
     BuildExecutionResult,
     BuildRuntimeParams,
 )
+from sqlbuild.executor.maintained_pauses.models import MaintainedPauseEvent
 from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
     BuildExecutionPlanTestCase,
 )
@@ -174,3 +175,10 @@ def pause_table_names(*, connection: Any) -> list[tuple[Any, ...]]:
         "SELECT table_name FROM information_schema.tables "
         "WHERE table_schema = 'staging' AND table_name = '_sqlbuild_maintained_pauses'"
     ).fetchall()
+
+
+def refuse_insert(*, connection: Any, events: tuple[MaintainedPauseEvent, ...]) -> None:
+    """Stand in for a pause-table insert the warehouse refuses."""
+
+    del connection, events
+    raise RuntimeError("pause table is read-only")

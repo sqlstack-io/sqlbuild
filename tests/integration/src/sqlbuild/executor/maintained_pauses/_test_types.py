@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlbuild.executor.maintained_pauses.types import MaintainedPauseEventType
+
 
 @dataclass(frozen=True)
 class PauseLeaseTestCase:
@@ -74,3 +76,33 @@ class HeartbeatTestCase:
     heartbeat_seconds: float
     wait_seconds: float
     expected_min_beats: int
+
+
+@dataclass(frozen=True)
+class CreatedModelHoldTestCase:
+    description: str
+    refused_events: tuple[MaintainedPauseEventType, ...]
+    rival_closes: tuple[str, ...]
+    expected_release_operations: tuple[tuple[str, str], ...]
+    expected_code: str
+    expected_message_fragments: tuple[str, ...]
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class LateCommitTestCase:
+    description: str
+    expected_code: str
+    expected_rival: str
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class TakenOverPauseTestCase:
+    description: str
+    expected_code: str
+    expected_rival: str
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
