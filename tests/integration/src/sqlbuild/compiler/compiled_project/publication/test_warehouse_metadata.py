@@ -47,6 +47,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     AutomaticHistoryTestCase,
     CatalogConnectionTestCase,
+    ExpiredHoldSyncTestCase,
     FingerprintHistoryTestCase,
     NewestVersionsTestCase,
     PageBytesTestCase,
@@ -1077,13 +1078,22 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
                 record_finished_run(control)
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ExpiredHoldSyncTestCase(
+            description="a sync closes the hold silent past the project's grace, not the live one",
+            fixture="benchmarks/duckshop/edge_cases/orchestration/dynamic_expired_hold.json",
+            expected_resumed=(("stopped-build", "daily_totals"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_then_only_its_expired_hold_is_closed(
-    tmp_path: Path,
+    test_case: ExpiredHoldSyncTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
-    fixture: dict[str, Any] = json.loads(
-        Path("benchmarks/duckshop/edge_cases/orchestration/dynamic_expired_hold.json").read_text()
-    )
+    fixture: dict[str, Any] = json.loads(Path(test_case.fixture).read_text())
     adapter: Any
     connection: Any
     adapter, connection = open_legacy_warehouse(project, "duckdb", "database")
@@ -1156,7 +1166,7 @@ def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_th
     ).rows
     adapter.close(connection)
     expected: list[tuple[str, str, str]] = [
-        (hold["run_id"], recorder, hold["model"]) for hold in fixture["holds"] if hold["resumed"]
+        (run_id, recorder, model) for run_id, model in test_case.expected_resumed
     ]
     assert [tuple(row) for row in resumed] == expected, text
     for hold in fixture["holds"]:

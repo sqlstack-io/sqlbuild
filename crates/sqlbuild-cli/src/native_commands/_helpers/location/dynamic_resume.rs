@@ -14,16 +14,13 @@ use crate::native_commands::_helpers::location::execution::location_warning;
 use crate::native_commands::constants::{DYNAMIC_RESUME_SECONDS, METADATA_REPLY_BYTES};
 use crate::native_commands::models::{LocationCompiler, LocationMetadataSync};
 
-/// Ask the reader to resume expired holds in the synced locations; a failure only warns.
-///
-/// Each location sends the pause table token its last quiet pass returned, so a table no build wrote
-/// since is not read and a quiet sync wakes no warehouse.
-pub(crate) async fn resume_expired_holds(state: &mut LocationMetadataSync) {
+/// Ask the reader to resume expired holds, sending each location's quiet token; a failure only warns.
+pub(crate) async fn resume_expired_holds(mut state: LocationMetadataSync) -> LocationMetadataSync {
     if state.halted {
-        return;
+        return state;
     }
-    let Some(reader) = state.reader.as_mut() else {
-        return;
+    let Some(reader) = state.reader.take() else {
+        return state;
     };
     let locations: Vec<DynamicResumeLocation> = state
         .locations
@@ -40,7 +37,8 @@ pub(crate) async fn resume_expired_holds(state: &mut LocationMetadataSync) {
     )
     .await
     {
-        Ok(Ok(DynamicResumeReply::Resumed(resumed))) => {
+        Ok((reader, Ok(DynamicResumeReply::Resumed(resumed)))) => {
+            state.reader = Some(reader);
             for (location, token) in state.locations.iter().zip(resumed.quiet_tokens) {
                 match token {
                     Some(token) => state.dynamic_quiet_tokens.insert(location.clone(), token),
@@ -56,10 +54,14 @@ pub(crate) async fn resume_expired_holds(state: &mut LocationMetadataSync) {
                     ),
                 )]));
             }
-            return;
+            return state;
         }
-        Ok(Ok(DynamicResumeReply::Failed(reason))) => reason,
-        Ok(Err(reason)) => {
+        Ok((reader, Ok(DynamicResumeReply::Failed(reason)))) => {
+            state.reader = Some(reader);
+            reason
+        }
+        Ok((reader, Err(reason))) => {
+            state.reader = Some(reader);
             drop(write_output(&[(
                 Stream::Stderr,
                 &format!("Resuming expired dynamic holds failed: {reason}\n"),
@@ -76,28 +78,33 @@ pub(crate) async fn resume_expired_holds(state: &mut LocationMetadataSync) {
         }
     };
     location_warning("dynamic resume failed", reason);
+    state
 }
 
-/// One request line and its bounded reply line.
+/// One request line and its bounded reply line, handing the reader back.
 async fn exchange(
-    reader: &mut LocationCompiler,
+    mut reader: LocationCompiler,
     request: String,
-) -> Result<DynamicResumeReply, String> {
-    let fail = |error: std::io::Error| error.to_string();
-    reader
-        .stdin
-        .write_all(format!("{request}\n").as_bytes())
-        .await
-        .map_err(fail)?;
-    reader.stdin.flush().await.map_err(fail)?;
-    let mut line = String::new();
-    let read = (&mut reader.stdout)
-        .take(METADATA_REPLY_BYTES + 1)
-        .read_line(&mut line)
-        .await
-        .map_err(fail)?;
-    if read == 0 {
-        return Err("location runtime exited before replying".into());
+) -> (LocationCompiler, Result<DynamicResumeReply, String>) {
+    let reply: Result<DynamicResumeReply, String> = async {
+        let fail = |error: std::io::Error| error.to_string();
+        reader
+            .stdin
+            .write_all(format!("{request}\n").as_bytes())
+            .await
+            .map_err(fail)?;
+        reader.stdin.flush().await.map_err(fail)?;
+        let mut line = String::new();
+        let read = (&mut reader.stdout)
+            .take(METADATA_REPLY_BYTES + 1)
+            .read_line(&mut line)
+            .await
+            .map_err(fail)?;
+        if read == 0 {
+            return Err("location runtime exited before replying".into());
+        }
+        serde_json::from_str(&line).map_err(|_| "invalid location reply".to_owned())
     }
-    serde_json::from_str(&line).map_err(|_| "invalid location reply".into())
+    .await;
+    (reader, reply)
 }

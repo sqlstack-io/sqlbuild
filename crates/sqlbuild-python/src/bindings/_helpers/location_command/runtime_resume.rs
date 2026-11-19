@@ -14,12 +14,10 @@ use crate::bindings::_helpers::location_command::command::location_arguments;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
-use sqlbuild_python_front::native_host::main::resume_expired_dynamic_holds::{
-    ResumeLocation, resume_expired_dynamic_holds,
-};
+use sqlbuild_python_front::native_host::main::resume_expired_dynamic_holds::resume_expired_dynamic_holds;
+use sqlbuild_python_front::native_host::types::ResumeLocation;
 
-/// Resume expired holds in `locations` over a writable session of its own, closed before it returns;
-/// a location whose pause table still has its quiet token is not read.
+/// Resume expired holds in `locations` over a session of its own; a still-quiet pause table is not read.
 pub(super) fn runtime_resume(
     py: Python<'_>,
     options: &Bound<'_, PyDict>,
@@ -52,20 +50,12 @@ pub(super) fn runtime_resume(
         (&py.None().into_bound(py), true),
         false,
     )?;
-    let connection: Bound<'_, PyAny> = adapter.call_method1("connect", (config,))?;
     let recorded_by = format!(
         "{DYNAMIC_RESUME_RECORDER}{}",
         arguments.value("location_id")?.str()?
     );
-    let resumed = resume_expired_dynamic_holds(
-        (&adapter, &connection),
-        &project_dir,
-        &locations,
-        &recorded_by,
-    );
-    let closed = adapter.call_method1("close", (&connection,));
-    let (holds, quiet_tokens) = resumed?;
-    closed?;
+    let (holds, quiet_tokens) =
+        resume_expired_dynamic_holds((&adapter, &config), &project_dir, &locations, &recorded_by)?;
     Ok(DynamicResumed {
         holds: holds
             .into_iter()

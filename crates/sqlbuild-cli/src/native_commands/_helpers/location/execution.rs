@@ -1445,7 +1445,7 @@ pub(crate) async fn finish_metadata_page(
     mut state: LocationMetadataSync,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
     if state.idle {
-        resume_expired_holds(&mut state).await;
+        state = resume_expired_holds(state).await;
         return Ok(Some(close_metadata_reader(state).await?));
     }
     Ok(Some(state))

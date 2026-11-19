@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -202,11 +203,11 @@ def pause_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
 def recorded_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
     """The recorded pause events, or none when no build created the pause table."""
 
-    return [
-        event
-        for _ in pause_table_names(connection=connection)
-        for event in pause_events(connection=connection)
-    ]
+    read: Callable[..., list[tuple[str, str, str, str]]] = {
+        True: pause_events,
+        False: lambda **_: [],
+    }[bool(pause_table_names(connection=connection))]
+    return read(connection=connection)
 
 
 def pause_table_names(*, connection: Any) -> list[tuple[Any, ...]]:

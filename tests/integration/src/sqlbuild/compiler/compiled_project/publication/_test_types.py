@@ -584,6 +584,13 @@ class ChangedBuildPublicationTestCase:
 
 
 @dataclass(frozen=True)
+class ExpiredHoldSyncTestCase:
+    description: str
+    fixture: str
+    expected_resumed: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
 class ChangedBuildReplanTestCase:
     description: str
     edit: tuple[str, str]
