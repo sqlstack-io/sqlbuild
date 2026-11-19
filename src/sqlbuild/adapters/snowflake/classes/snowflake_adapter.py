@@ -200,7 +200,6 @@ _SCHEMA_OBJECTS_REUSE_SECONDS: float = 60.0
 _SHOW_OBJECT_RELATION_TYPES: dict[str, str] = {"TABLE": "base table", "VIEW": "view"}
 _COST_LOGIN_TIMEOUT_SECONDS: int = 5
 _COST_NETWORK_TIMEOUT_SECONDS: int = 15
-# A warehouse name CURRENT_WAREHOUSE() returns that USE WAREHOUSE accepts without quotes.
 _UNQUOTED_WAREHOUSE: re.Pattern[str] = re.compile(r"[A-Z_][A-Z0-9_$]*")
 _SHOW_COLUMN_KIND: str = "COLUMN"
 _SHOW_COLUMN_KINDS: frozenset[str] = frozenset({_SHOW_COLUMN_KIND, "VIRTUAL_COLUMN"})

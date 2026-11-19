@@ -1,6 +1,6 @@
 //! Ingress Python before the build and read-side tasks and assets dispatched as SQL completes.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Mutex;
 
 use pyo3::exceptions::PyRuntimeError;
@@ -345,7 +345,7 @@ struct RuntimeParts<'a, 'py> {
     relations: (Bound<'py, PyAny>, Bound<'py, PyAny>),
     inputs: &'a LifecycleInputs<'py>,
     /// Each Python node's job warehouse, by name.
-    warehouses: Bound<'py, PyAny>,
+    warehouses: BTreeMap<String, String>,
 }
 
 fn node_runtime<'py>(
@@ -377,7 +377,10 @@ fn node_runtime<'py>(
             ("relation_targets", parts.relations.0.clone()),
             ("project_relations", parts.relations.1.clone()),
             ("providers", parts.inputs.providers.clone()),
-            ("node_warehouses", parts.warehouses.clone()),
+            (
+                "node_warehouses",
+                pyo3::IntoPyObject::into_pyobject(parts.warehouses.clone(), py)?.into_any(),
+            ),
         ],
     )
 }
@@ -531,7 +534,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         target_config,
         relations: (relation_targets, project_relations),
         inputs,
-        warehouses: native_field(pipeline, "python_node_warehouses")?,
+        warehouses: native_field(pipeline, "python_node_warehouses")?.extract()?,
     };
     let mut ingress_python: Bound<'py, PyAny> = tuple(py, &[])?;
     let mut ingress_loads: Bound<'py, PyAny> = tuple(py, &[])?;

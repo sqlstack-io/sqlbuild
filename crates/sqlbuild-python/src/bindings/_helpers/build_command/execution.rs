@@ -4,7 +4,7 @@ use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
-use sqlbuild_config::effective::models::{ConcurrencySource, EffectiveConcurrency};
+use sqlbuild_config::effective::models::EffectiveConcurrency;
 use sqlbuild_core::build_command::main::render_run_context::render_run_context;
 use sqlbuild_core::build_command::models::{RunContextFacts, SelectorFileFact};
 use sqlbuild_core::cli_text::models::CliStyle;
@@ -43,6 +43,9 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::jobs::build_concurrency::build_concurrency;
+use sqlbuild_python_compile::compile_driver::main::jobs::connection_limit::connection_limit;
+use sqlbuild_python_compile::compile_driver::main::jobs::job_run_context::job_run_context;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
@@ -65,9 +68,7 @@ use sqlbuild_python_planner::consumption::models::ConsumptionRecorder;
 use sqlbuild_python_planner::consumption::models::Prepared;
 use sqlbuild_python_planner::freshness::main::append_freshness_records::append_freshness_records;
 use sqlbuild_python_planner::observations::main::append_build_observations::append_build_observations;
-use sqlbuild_python_planner::plan_output::main::job_warehouses::job_warehouses;
 use sqlbuild_python_planner::planner_resolution::main::cursor::type_cursor_overrides::type_cursor_overrides;
-use sqlbuild_python_project::compiled_project::constants::JOB_FULL_REFRESH_KEY;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_state::consumption::models::ChangedPolicy;
 
@@ -167,6 +168,7 @@ fn run_context_facts(
             selector_count: native_field(&file, "selector_count")?.extract()?,
         });
     }
+    let (full_refresh_jobs, job_warehouses) = job_run_context(pipeline)?;
     Ok(RunContextFacts {
         command: EXECUTION_COMMAND.to_owned(),
         run_id: display_text(&native_field(&project, "run_id")?)?,
@@ -177,11 +179,8 @@ fn run_context_facts(
         concurrency: concurrency.limit,
         concurrency_source: concurrency.source.to_string(),
         full_refresh: context.request_flag("full_refresh")?,
-        full_refresh_jobs: full_refresh_jobs(pipeline)?,
-        job_warehouses: job_warehouses(&native_field(
-            &native_field(pipeline, "plan_output")?,
-            "metadata",
-        )?)?,
+        full_refresh_jobs,
+        job_warehouses,
         selected_count,
         total_count,
         date_vars: (
@@ -190,17 +189,6 @@ fn run_context_facts(
         ),
         selector_files,
     })
-}
-
-/// The named jobs whose own models the planned build rebuilds from scratch.
-fn full_refresh_jobs(pipeline: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let metadata: Bound<'_, PyAny> =
-        native_field(&native_field(pipeline, "plan_output")?, "metadata")?;
-    let jobs: Bound<'_, PyAny> = mapping_get(&metadata, JOB_FULL_REFRESH_KEY)?;
-    if jobs.is_none() {
-        return Ok(Vec::new());
-    }
-    jobs.try_iter()?.map(|job| job?.extract()).collect()
 }
 
 /// Write the resolved non-secret placement, mode and selection context.
@@ -273,10 +261,7 @@ pub(crate) fn prepare_build_execution<'py>(
     })
     .and_then(|value| pyo3::Bound::new(py, value))
     .map(pyo3::Bound::into_any)?;
-    let concurrency = connection_limit(
-        build_concurrency(context.concurrency()?, pipeline)?.limit,
-        pipeline,
-    )?;
+    let concurrency = connection_limit(context.concurrency()?, pipeline)?;
     if context.verbose {
         write_run_context(context, pipeline)?;
     } else {
@@ -329,50 +314,6 @@ pub(crate) fn prepare_build_execution<'py>(
         lifecycle,
         cursors,
     })
-}
-
-/// The named jobs' `concurrency` limits added together; none without a command-line override.
-fn job_limit_total(pipeline: &Bound<'_, PyAny>) -> PyResult<Option<i64>> {
-    let limits: Bound<'_, PyDict> = native_field(pipeline, "job_limits")?.cast_into()?;
-    if limits.is_empty() {
-        return Ok(None);
-    }
-    let mut total: i64 = 0;
-    for value in limits.values() {
-        total = total.saturating_add(value.extract::<i64>()?);
-    }
-    Ok(Some(total))
-}
-
-/// The build's limit: the configured one, raised to the named jobs' limits added together.
-fn build_concurrency(
-    configured: EffectiveConcurrency,
-    pipeline: &Bound<'_, PyAny>,
-) -> PyResult<EffectiveConcurrency> {
-    Ok(match job_limit_total(pipeline)? {
-        Some(total) if total > configured.limit => EffectiveConcurrency {
-            limit: total,
-            source: ConcurrencySource::NamedJobs,
-        },
-        _ => configured,
-    })
-}
-
-/// The build's connections: its limit, or the named jobs' limits added together when every planned
-/// node belongs to one of them, so a job never opens connections it cannot use.
-fn connection_limit(limit: i64, pipeline: &Bound<'_, PyAny>) -> PyResult<i64> {
-    let Some(total) = job_limit_total(pipeline)? else {
-        return Ok(limit);
-    };
-    let node_jobs: Bound<'_, PyDict> = native_field(pipeline, "node_jobs")?.cast_into()?;
-    for key in
-        native_field(&native_field(pipeline, "plan_output")?, "execution_order")?.try_iter()?
-    {
-        if !node_jobs.contains(key?)? {
-            return Ok(limit);
-        }
-    }
-    Ok(limit.min(total.max(1)))
 }
 
 fn verbose_callback<'py>(

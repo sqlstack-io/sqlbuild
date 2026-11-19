@@ -135,7 +135,7 @@ def _execute_one_python_check(
     result_store: Any | None,
     callbacks: PythonCheckCallbacks,
 ) -> PythonCheckExecutionResult:
-    runtime = node_runtime(runtime, check_function.name)
+    runtime = node_runtime(runtime=runtime, name=check_function.name)
     adapter: BaseAdapter = runtime.adapter
     providers: ProviderContainer | None = runtime.providers
     with (

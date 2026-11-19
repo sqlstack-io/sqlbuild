@@ -568,8 +568,8 @@ pub struct GraphViewMappings<'a, 'py> {
     pub path_index: &'a Bound<'py, PyAny>,
 }
 
-/// A project graph with the jobs some selectors name attached as a build selects them, Python
-/// nodes included, and the project facts selectors resolve with.
+/// A project graph with the named jobs attached, Python nodes included, and the facts to resolve.
+#[derive(Debug)]
 pub struct PythonAwareSelection<'g> {
     pub(crate) graph: Cow<'g, ProjectGraph>,
     pub(crate) sources: Vec<(String, Option<String>)>,

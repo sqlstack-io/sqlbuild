@@ -391,7 +391,6 @@ fn provider_usages(
     Ok(usages)
 }
 
-/// `str(item)` of a metadata tuple or list, else nothing.
 /// The plan metadata's named jobs and the warehouses their nodes run on.
 pub(crate) fn job_warehouses(metadata: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
     let value: Bound<'_, PyAny> = mapping_get(metadata, JOB_WAREHOUSES_KEY)?;
@@ -404,6 +403,7 @@ pub(crate) fn job_warehouses(metadata: &Bound<'_, PyAny>) -> PyResult<Vec<(Strin
         .collect()
 }
 
+/// `str(item)` of a metadata tuple or list, else nothing.
 fn metadata_names(value: Option<Bound<'_, PyAny>>) -> PyResult<Vec<String>> {
     match value {
         Some(value) if value.is_instance_of::<PyTuple>() || value.is_instance_of::<PyList>() => {

@@ -20,8 +20,8 @@ use sqlbuild_analysis::python_selection::models::{
     SqlSelectionGraph,
 };
 
-use crate::compiled_project::main::needed_jobs::needed_jobs;
 use crate::graph::models::{CompiledProjectGraph, NativeProjectGraph, PythonAwareSelection};
+use crate::job_settings::main::needed_jobs::needed_jobs;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;

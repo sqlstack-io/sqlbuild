@@ -1,7 +1,7 @@
 //! The keys whitespace-separated selector tokens match, without required build resources.
 
-use crate::compiled_project::main::graph_with_jobs::graph_with_jobs;
 use crate::graph::models::NativeProjectGraph;
+use crate::job_settings::main::graph_with_jobs::graph_with_jobs;
 use crate::planner_selection::_helpers::selectors::VIEW_OPTIONS;
 use crate::planner_selection::_helpers::selectors::arguments_graph;
 use crate::planner_selection::_helpers::selectors::graph_names;

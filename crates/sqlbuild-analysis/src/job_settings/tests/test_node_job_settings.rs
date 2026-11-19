@@ -228,17 +228,20 @@ fn given_a_python_node_in_named_jobs_when_resolving_then_it_takes_only_their_war
         PythonNodeValuesTestCase {
             description: "the warehouse applies; run_tests and [retry] do not",
             jobs: &["orders_wh_job"],
-            expected_result: Ok(BTreeMap::from([("warehouse", json!("ORDERS_WH"))])),
+            expected_values: Some(BTreeMap::from([("warehouse", json!("ORDERS_WH"))])),
+            expected_conflict: None,
         },
         PythonNodeValuesTestCase {
             description: "jobs that agree on everything Python nodes take do not conflict",
             jobs: &["orders_wh_job", "orders_job"],
-            expected_result: Ok(BTreeMap::from([("warehouse", json!("ORDERS_WH"))])),
+            expected_values: Some(BTreeMap::from([("warehouse", json!("ORDERS_WH"))])),
+            expected_conflict: None,
         },
         PythonNodeValuesTestCase {
             description: "two warehouses conflict",
             jobs: &["orders_wh_job", "refunds_wh_job"],
-            expected_result: Err(
+            expected_values: None,
+            expected_conflict: Some(
                 "asset:daily_report is selected through jobs orders_wh_job and refunds_wh_job, \
                  which set warehouse differently (\"ORDERS_WH\" and \"REFUNDS_WH\")",
             ),
@@ -247,22 +250,23 @@ fn given_a_python_node_in_named_jobs_when_resolving_then_it_takes_only_their_war
     let key = ("asset".to_owned(), "daily_report".to_owned());
     for test_case in test_cases {
         let resolved = node_values(&key, &strings(test_case.jobs), &declared());
-        let shown = match resolved {
-            Ok((values, retry)) => {
-                assert_eq!(retry, None, "{}", test_case.description);
-                Ok(values)
-            }
-            Err(conflict) => Err(conflict.message),
-        };
-        let expected = test_case
-            .expected_result
-            .map(|values| {
+        let values: Option<BTreeMap<&str, serde_json::Value>> =
+            resolved.as_ref().ok().map(|(values, _)| {
                 values
-                    .into_iter()
-                    .map(|(name, value)| (name.to_owned(), value))
+                    .iter()
+                    .map(|(name, value)| (name.as_str(), value.clone()))
                     .collect()
-            })
-            .map_err(str::to_owned);
-        assert_eq!(shown, expected, "{}", test_case.description);
+            });
+        let retry = resolved.as_ref().ok().and_then(|(_, retry)| *retry);
+        let conflict: Option<&str> = resolved
+            .as_ref()
+            .err()
+            .map(|conflict| conflict.message.as_str());
+        assert_eq!(
+            (values, retry, conflict),
+            (test_case.expected_values, None, test_case.expected_conflict),
+            "{}",
+            test_case.description
+        );
     }
 }

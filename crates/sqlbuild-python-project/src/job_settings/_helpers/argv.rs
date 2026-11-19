@@ -3,26 +3,20 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use pyo3::exceptions::{PyOSError, PyRuntimeError, PyUnicodeError, PyValueError};
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::exceptions::{PyOSError, PyRuntimeError, PyValueError};
+use pyo3::prelude::{Bound, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use serde_json::Value;
 use sqlbuild_cli::argv::main::accepted_settings_arguments::accepted_settings_arguments;
 use sqlbuild_cli::argv::main::given_setting_dests::given_setting_dests;
 use sqlbuild_cli::dispatch::main::selector_file_selectors::selector_file_selectors;
 use sqlbuild_discovery::constants::ORCHESTRATION_DIRECTORY;
-
-use crate::bindings::_helpers::compiled_project::job_settings::{
-    could_name_job, named_job_build_settings,
-};
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;
 
-/// Ends the options; job flags go before it so they are never read as selectors.
-const OPTIONS_TERMINATOR: &str = "--";
-
-/// The commands whose selections take the settings of the jobs they name.
-const JOB_SETTING_COMMANDS: [&str; 2] = ["build", "plan"];
+use crate::job_settings::_helpers::could_name_job::could_name_job;
+use crate::job_settings::_helpers::named_job_build_settings::named_job_build_settings;
+use crate::job_settings::constants::{JOB_SETTING_COMMANDS, OPTIONS_TERMINATOR};
 
 /// One parsed argument, `None` when unset.
 fn argument<'py, T: pyo3::FromPyObject<'py>>(
@@ -58,7 +52,7 @@ fn project_dir(namespace: &Bound<'_, PyDict>) -> PyResult<PathBuf> {
 }
 
 /// `argv` plus the flags it leaves out of its named jobs' build-wide settings; `None` if unchanged.
-fn named_job_argv(
+pub(crate) fn named_job_argv(
     py: Python<'_>,
     argv: &[String],
     namespace: &Bound<'_, PyDict>,
@@ -106,25 +100,8 @@ fn named_job_argv(
 }
 
 /// Whether the command meets `error` again, and reports it, when it runs.
-fn reported_when_run(py: Python<'_>, error: &PyErr) -> PyResult<bool> {
+pub(crate) fn reported_when_run(py: Python<'_>, error: &PyErr) -> PyResult<bool> {
     Ok(error.is_instance(py, &error_class(py, ErrorId::CliUser)?)
         || error.is_instance_of::<PyValueError>(py)
         || error.is_instance_of::<PyOSError>(py))
-}
-
-/// The argv to parse again with its named jobs' build-wide flags, or `None` to keep the parse.
-pub(crate) fn job_settings_argv(
-    argv: &Bound<'_, PyAny>,
-    namespace: &Bound<'_, PyDict>,
-) -> PyResult<Option<Vec<String>>> {
-    let py: Python<'_> = argv.py();
-    let arguments: Vec<String> = match argv.extract() {
-        Ok(arguments) => arguments,
-        Err(undecodable) if undecodable.is_instance_of::<PyUnicodeError>(py) => return Ok(None),
-        Err(error) => return Err(error),
-    };
-    match named_job_argv(py, &arguments, namespace) {
-        Err(error) if reported_when_run(py, &error)? => Ok(None),
-        result => result,
-    }
 }

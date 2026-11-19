@@ -1,7 +1,7 @@
 //! Each job a schedule or sensor starts with the nodes it refreshes, less those of jobs `selectors` run.
 
-use crate::compiled_project::_helpers::job_catalog::job_catalog;
-use crate::compiled_project::_helpers::job_catalog::selected_jobs;
+use crate::job_settings::_helpers::job_catalog::job_catalog;
+use crate::job_settings::_helpers::job_catalog::selected_jobs;
 use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;

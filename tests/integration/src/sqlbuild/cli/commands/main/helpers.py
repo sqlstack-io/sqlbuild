@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -11,7 +12,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from itertools import accumulate, takewhile
+from itertools import accumulate, chain, takewhile
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
@@ -1469,10 +1470,12 @@ def peak_concurrency(*, events_path: Path, names: tuple[str, ...]) -> int:
     for line in events_path.read_text(encoding="utf-8").splitlines():
         event: dict[str, Any] = json.loads(line)
         events[(event["event_type"], str(event.get("resource_name")))].append(event)
+    completions: list[dict[str, Any]] = list(
+        chain.from_iterable(events[(_COMPLETED_EVENT, name)] for name in names)
+    )
     ends: list[tuple[datetime, float]] = [
         (datetime.fromisoformat(event["occurred_at"]), event["duration_ms"])
-        for name in names
-        for event in events[(_COMPLETED_EVENT, name)]
+        for event in completions
     ]
     changes: list[tuple[datetime, int]] = sorted(
         [(end - timedelta(milliseconds=duration), 1) for end, duration in ends]
@@ -1484,8 +1487,7 @@ def peak_concurrency(*, events_path: Path, names: tuple[str, ...]) -> int:
 _CONNECT_MARKER: str = "-- connect"
 
 
-def _job_warehouse_model(dep: str | None) -> str:
-    source: str = "" if dep is None else f' FROM __ref("{dep}")'
+def _job_warehouse_model(source: str) -> str:
     return f"MODEL (description 'Step.', materialized table);\nSELECT 1 AS id{source}\n"
 
 
@@ -1509,11 +1511,11 @@ def write_job_warehouse_project(*, project_dir: Path) -> None:
     write_project_files(
         project_dir=project_dir,
         files={
-            "models/stg.sql": _job_warehouse_model(None),
-            "models/orders.sql": _job_warehouse_model("stg"),
-            "models/orders_daily.sql": _job_warehouse_model("orders"),
-            "models/refunds.sql": _job_warehouse_model("orders_daily"),
-            "models/summary.sql": _job_warehouse_model("refunds"),
+            "models/stg.sql": _job_warehouse_model(""),
+            "models/orders.sql": _job_warehouse_model(' FROM __ref("stg")'),
+            "models/orders_daily.sql": _job_warehouse_model(' FROM __ref("orders")'),
+            "models/refunds.sql": _job_warehouse_model(' FROM __ref("orders_daily")'),
+            "models/summary.sql": _job_warehouse_model(' FROM __ref("refunds")'),
             "python/tasks.py": (
                 "from sqlbuild.tasks import task\n\n\n@task\ndef refresh_marker(ctx):\n"
                 '    """Refresh."""\n    ctx.execute_sql("SELECT \'task marker\'")\n'
@@ -1558,9 +1560,14 @@ def install_writable_offline_snowflake(
 def warehouse_switches(executed_sql: list[str]) -> tuple[str, ...]:
     """The warehouses statements switch to, leaving out each new connection's own setup."""
 
-    prefix: str = "USE WAREHOUSE "
-    return tuple(
-        sql.removeprefix(prefix)
-        for previous, sql in zip([_CONNECT_MARKER, *executed_sql], executed_sql, strict=False)
-        if sql.startswith(prefix) and previous != _CONNECT_MARKER
-    )
+    statements: str = "\n".join(executed_sql)
+    return tuple(re.findall(rf"(?<!{_CONNECT_MARKER}\n)USE WAREHOUSE (\S+)", statements))
+
+
+def run_cli_exit_code(argv: tuple[str, ...], project_dir: Path) -> int:
+    """The exit code of one CLI invocation in `project_dir`, returned or raised."""
+
+    try:
+        return int(main(["--no-color", "--project-dir", str(project_dir), *argv]) or 0)
+    except SystemExit as exited:
+        return int(exited.code or 0)

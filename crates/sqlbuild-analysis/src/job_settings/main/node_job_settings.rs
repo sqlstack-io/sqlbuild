@@ -9,7 +9,8 @@ use crate::job_settings::_helpers::node_values::node_values;
 use crate::job_settings::_helpers::selection::node_jobs;
 use crate::job_settings::constants::JOB_LIMIT_SETTING;
 use crate::job_settings::errors::NodeJobSettingsError;
-use crate::job_settings::models::{DeclaredRun, NodeJobSettings, TokenNodes};
+use crate::job_settings::models::{DeclaredRun, NodeJobSettings};
+use crate::job_settings::types::TokenNodes;
 
 /// Each node's named jobs, the settings they give it, and their limits.
 pub fn node_job_settings(

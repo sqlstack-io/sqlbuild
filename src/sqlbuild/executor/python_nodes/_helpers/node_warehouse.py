@@ -11,9 +11,8 @@ from sqlbuild.executor.scheduling.classes.session_warehouses import (
 )
 
 
-def node_runtime(runtime: PythonNodeRuntime, name: str) -> PythonNodeRuntime:
-    """Put the shared connection on node `name`'s warehouse; code opening its own connections
-    from `connection_config` gets that warehouse too."""
+def node_runtime(*, runtime: PythonNodeRuntime, name: str) -> PythonNodeRuntime:
+    """The runtime of node `name`, its connection and `connection_config` on its warehouse."""
 
     session_warehouses: SessionWarehouses | None = runtime.session_warehouses
     if session_warehouses is None:
@@ -23,5 +22,8 @@ def node_runtime(runtime: PythonNodeRuntime, name: str) -> PythonNodeRuntime:
     if warehouse is None:
         return runtime
     return replace(
-        runtime, connection_config=with_session_warehouse(runtime.connection_config, warehouse)
+        runtime,
+        connection_config=with_session_warehouse(
+            connection_config=runtime.connection_config, warehouse=warehouse
+        ),
     )

@@ -5,14 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from _pytest.capture import CaptureResult
 
-from sqlbuild._native import run_cli as main
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     JobWarehouseOutputTestCase,
     JobWarehouseSwitchTestCase,
 )
 from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     install_writable_offline_snowflake,
+    run_cli_exit_code,
     warehouse_switches,
     write_job_warehouse_project,
 )
@@ -24,13 +25,6 @@ _BOTH_JOBS: tuple[str, ...] = (
     "job:refunds_wh_job",
     "summary",
 )
-
-
-def _run(argv: tuple[str, ...], project_dir: Path) -> int:
-    try:
-        return int(main(["--no-color", "--project-dir", str(project_dir), *argv]) or 0)
-    except SystemExit as exited:
-        return int(exited.code or 0)
 
 
 @pytest.mark.parametrize(
@@ -78,9 +72,9 @@ def test_given_named_jobs_with_warehouses_when_building_then_each_node_runs_on_i
     write_job_warehouse_project(project_dir=tmp_path)
     connect_calls, executed_sql = install_writable_offline_snowflake(monkeypatch)
 
-    exit_code: int = _run(test_case.argv, tmp_path)
+    exit_code: int = run_cli_exit_code(test_case.argv, tmp_path)
 
-    captured = capsys.readouterr()
+    captured: CaptureResult[str] = capsys.readouterr()
     assert (
         exit_code,
         {call.get("warehouse") for call in connect_calls},
@@ -150,9 +144,9 @@ def test_given_named_jobs_with_warehouses_when_planning_or_building_then_output_
     write_job_warehouse_project(project_dir=tmp_path)
     install_writable_offline_snowflake(monkeypatch)
 
-    exit_code: int = _run(test_case.argv, tmp_path)
+    exit_code: int = run_cli_exit_code(test_case.argv, tmp_path)
 
-    captured = capsys.readouterr()
+    captured: CaptureResult[str] = capsys.readouterr()
     output: str = captured.out + captured.err
     assert (exit_code, test_case.expected_fragment in output) == (
         test_case.expected_exit_code,

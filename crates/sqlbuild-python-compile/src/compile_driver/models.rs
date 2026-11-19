@@ -9,9 +9,11 @@ use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use pyo3::types::PyBool;
 use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
+use sqlbuild_analysis::job_settings::models::NodeJobSettings;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::types::RecordId;
+use std::collections::BTreeMap;
 
 /// Semantic analysis cache outcome counts for one invocation.
 #[derive(Debug)]
@@ -147,4 +149,16 @@ impl TargetSettingsValues {
             &[("target_config", self.record(py)?)],
         )
     }
+}
+
+/// What the planned build takes from its named jobs, or nothing when it names none.
+#[derive(Debug)]
+pub struct PlannedJobSettings {
+    pub(crate) settings: NodeJobSettings,
+    /// The named jobs that set `ignore_audit_failures = true` for nodes they select.
+    pub(crate) ignoring_jobs: Vec<String>,
+    /// The named jobs that set `full_refresh = true` for models they select.
+    pub(crate) refreshing_jobs: Vec<String>,
+    /// Each named job whose `warehouse` its own nodes run on, and that warehouse.
+    pub(crate) job_warehouses: BTreeMap<String, String>,
 }

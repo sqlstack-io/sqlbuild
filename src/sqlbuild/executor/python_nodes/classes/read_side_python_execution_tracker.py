@@ -153,7 +153,7 @@ class ReadSidePythonExecutionTracker:
 
     def _execute_python_node(self, node: DiscoveredPythonNode) -> None:
         runtime: PythonNodeRuntime = node_runtime(
-            replace(self._runtime, result_store=self._result_store), node.name
+            runtime=replace(self._runtime, result_store=self._result_store), name=node.name
         )
         _ = run_ready_python_node(
             node=_to_executable_python_node(node),

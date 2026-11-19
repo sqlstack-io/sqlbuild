@@ -10,8 +10,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
-use sqlbuild_python_project::compiled_project::main::triggered_jobs::triggered_jobs;
 use sqlbuild_python_project::graph::models::NativeProjectGraph;
+use sqlbuild_python_project::job_settings::main::triggered_jobs::triggered_jobs;
 use sqlbuild_state::consumption::models::{ChangeKind, ChangedPolicy, Reach};
 use std::collections::BTreeSet;
 

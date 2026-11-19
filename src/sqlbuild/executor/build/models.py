@@ -109,7 +109,6 @@ class BuildRuntimeParams:
     dynamic_hold: DynamicHold | None = None
     job_limits: Mapping[str, int] = field(default_factory=dict)
     node_jobs: Mapping[CompiledObjectKey, tuple[str, ...]] = field(default_factory=dict)
-    # The warehouse each node runs on when its named job sets one; others use the build's.
     node_warehouses: Mapping[CompiledObjectKey, str] = field(default_factory=dict)
 
 

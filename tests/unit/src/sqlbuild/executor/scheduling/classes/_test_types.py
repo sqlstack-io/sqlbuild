@@ -20,7 +20,14 @@ class SessionWarehousesTestCase:
     configured: str | None
     session_warehouse: str | None
     steps: tuple[tuple[str, str | None], ...]
-    restore: bool
     expected_statements: tuple[tuple[str, str], ...]
     expected_session_reads: int
-    expected_error: str | None = None
+
+
+@dataclass(frozen=True)
+class SessionWithoutWarehouseTestCase:
+    """A connection moved to a job's warehouse when the session had no warehouse to return to."""
+
+    description: str
+    job_warehouse: str
+    expected_error: str

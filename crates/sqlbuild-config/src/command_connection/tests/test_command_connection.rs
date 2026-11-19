@@ -143,36 +143,40 @@ fn given_a_job_warehouse_when_checking_then_it_names_the_job_and_follows_identif
         JobWarehouseTestCase {
             description: "unquoted identifier",
             value: Some("ORDERS_WH"),
-            expected_result: Ok("ORDERS_WH"),
+            expected_name: Some("ORDERS_WH"),
+            expected_message: None,
         },
         JobWarehouseTestCase {
             description: "blank value",
             value: Some(" "),
-            expected_result: Err("job orders_job sets an empty warehouse name"),
+            expected_name: None,
+            expected_message: Some("job orders_job sets an empty warehouse name"),
         },
         JobWarehouseTestCase {
             description: "not an identifier",
             value: Some("bad wh"),
-            expected_result: Err(
+            expected_name: None,
+            expected_message: Some(
                 "job orders_job sets warehouse 'bad wh', which is not a valid Snowflake warehouse identifier",
             ),
         },
         JobWarehouseTestCase {
             description: "not text",
             value: None,
-            expected_result: Err("job orders_job sets a warehouse that is not text"),
+            expected_name: None,
+            expected_message: Some("job orders_job sets a warehouse that is not text"),
         },
     ];
 
     for test_case in test_cases {
         let result = check_job_warehouse("orders_job", test_case.value);
-        let shown: Result<&str, Option<String>> = match &result {
-            Ok(name) => Ok(name.as_str()),
-            Err(error) => Err(Some(error.message().to_owned())),
-        };
-        let expected: Result<&str, Option<String>> = test_case
-            .expected_result
-            .map_err(|text| Some(text.to_owned()));
-        assert_eq!(shown, expected, "{}", test_case.description);
+        let name: Option<&str> = result.as_deref().ok();
+        let message: Option<&str> = result.as_ref().err().map(|error| error.message());
+        assert_eq!(
+            (name, message),
+            (test_case.expected_name, test_case.expected_message),
+            "{}",
+            test_case.description
+        );
     }
 }

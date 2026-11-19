@@ -9,7 +9,8 @@ pub(super) struct CliWarehouseTestCase {
 pub(super) struct JobWarehouseTestCase {
     pub(super) description: &'static str,
     pub(super) value: Option<&'static str>,
-    pub(super) expected_result: Result<&'static str, &'static str>,
+    pub(super) expected_name: Option<&'static str>,
+    pub(super) expected_message: Option<&'static str>,
 }
 
 pub(super) struct SnowflakeKeyTestCase {

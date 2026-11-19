@@ -7,7 +7,8 @@ use crate::graph::errors::SelectorError;
 use crate::graph::models::ProjectGraph;
 use crate::job_settings::_helpers::tokens::token_jobs;
 use crate::job_settings::errors::JobSelectorError;
-use crate::job_settings::models::{DeclaredRun, TokenNodes};
+use crate::job_settings::models::DeclaredRun;
+use crate::job_settings::types::TokenNodes;
 
 /// Each node a `--select` token, less `--exclude`, selects through a job it names that holds it.
 pub(crate) fn node_jobs(
