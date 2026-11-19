@@ -90,9 +90,16 @@ def wait_for_statistics(
 
 
 def request_plan(
-    control: Path, selection: list[str], settings: dict[str, object] | None = None
+    control: Path,
+    selection: list[str],
+    settings: dict[str, object] | None = None,
+    *,
+    fresh: bool = False,
 ) -> str:
-    """Queue the plan work a person's Plan creates, frozen to exact node keys and settings."""
+    """Queue the plan work a person's Plan creates, frozen to exact node keys and settings.
+
+    `fresh` is Plan again: the location plans anew rather than return a plan it kept.
+    """
     request_id: str = str(uuid4())
     now: datetime = datetime.now(UTC)
     with closing(sqlite3.connect(control)) as database:
@@ -101,7 +108,7 @@ def request_plan(
             "request_json,requested_by,requested_at,expires_at) SELECT ?,c.location_id,c.target,"
             "c.snapshot_id,s.generation,json_object('request_id',?,'location_id',c.location_id,"
             "'target',c.target,'reason','Plan','work',json_object('kind','plan','command',"
-            "json('[\"build\"]'),'selection',json(?),'settings',json(?))),"
+            "json('[\"build\"]'),'selection',json(?),'settings',json(?),'fresh',json(?))),"
             "'test-admin',?,? FROM sqb_current_snapshots c JOIN sqb_snapshots s "
             "ON s.snapshot_id=c.snapshot_id",
             (
@@ -109,6 +116,7 @@ def request_plan(
                 request_id,
                 json.dumps(selection),
                 json.dumps(settings or {}),
+                json.dumps(fresh),
                 now.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                 (now + timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             ),

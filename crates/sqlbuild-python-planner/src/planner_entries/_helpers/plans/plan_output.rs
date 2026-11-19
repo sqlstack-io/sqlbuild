@@ -8,18 +8,24 @@ use crate::planner_entries::models::PlanOutputInputs;
 use crate::planner_resolution::main::references::resolve_function_sql::resolve_function_sql;
 use crate::planner_strategy::main::audit_entries::build_selected_audit_entries::build_selected_audit_entries;
 use crate::planner_strategy::main::model_entries::extract_seed_columns::extract_seed_columns;
+use pyo3::exceptions::PyException;
+use pyo3::prelude::Py;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
+use pyo3::types::PyTupleMethods;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
+use sqlbuild_python_project::compiled_views::models::NativeProjectView;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::build_source_load_entries::build_source_load_entries;
 use sqlbuild_python_project::planner_scope::main::upstream_loader_dependency_names::upstream_loader_dependency_names;
@@ -38,6 +44,10 @@ use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::sch
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
 use sqlbuild_python_project::sql_test_glue::main::assemble_sql_test_plans::assemble_sql_test_plans;
 use sqlbuild_python_project::sql_test_glue::models::SqlTestAssembly;
+use std::sync::{Arc, OnceLock};
+
+/// The stream a location's log reads, told once per publication how planning every SQL test went.
+const STDERR: &str = "stderr";
 
 const LOADER_CONSUMER: &str = "loader";
 const HOOK_CONSUMER: &str = "hook";
@@ -506,29 +516,48 @@ pub(crate) fn selected_test_entries<'py>(
         }
         selected.push(test);
     }
-    let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    let mut warnings: Vec<Bound<'py, PyAny>> = Vec::new();
     if selected.is_empty() {
-        return Ok(SelectedTests { entries, warnings });
+        return Ok(SelectedTests {
+            entries: Vec::new(),
+            warnings: Vec::new(),
+        });
     }
+    let results = test_plan_results((project, dialect), &selected)?;
+    selected_from_results(py, results.try_iter()?.collect::<PyResult<Vec<_>>>()?)
+}
+
+/// One plan result per test in `tests`, in order, with fixture diagnostics in place of failed plans.
+fn test_plan_results<'py>(
+    (project, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
+    tests: &[Bound<'py, PyAny>],
+) -> PyResult<Bound<'py, PyTuple>> {
+    let py = project.py();
     let analysis = native_field(&native_field(project, "settings")?, "sql_analysis")?;
     let fixture_context = if analysis.is_truthy()? {
         Bound::new(py, planning_context(project, None)?)?.into_any()
     } else {
         none(py)
     };
-    let results = assemble_sql_test_plans(
-        &selected,
+    assemble_sql_test_plans(
+        tests,
         (project, dialect),
         &SqlTestAssembly {
             sql_analysis_enabled: analysis,
             validate_fixtures: true,
             fixture_planning_context: fixture_context,
         },
-    )?;
+    )
+}
+
+/// The entries and warnings of planned results, failing on invalid fixtures.
+fn selected_from_results<'py>(
+    py: Python<'py>,
+    results: Vec<Bound<'py, PyAny>>,
+) -> PyResult<SelectedTests<'py>> {
+    let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
+    let mut warnings: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut diagnostics: Vec<String> = Vec::new();
-    for result in results.try_iter()? {
-        let result = result?;
+    for result in results {
         let entry = native_field(&result, "entry")?;
         if entry.is_none() {
             for diagnostic in native_field(&result, "fixture_diagnostics")?.try_iter()? {
@@ -552,15 +581,83 @@ pub(crate) fn selected_test_entries<'py>(
     Ok(SelectedTests { entries, warnings })
 }
 
-/// SQL tests selected by name or overlapping one selection, planned into a reusable result.
+/// The selection's entries from every test a held project planned once, or `None` to plan it.
+fn held_selected_test_entries<'py>(
+    (project, dialect): (&Bound<'py, PyAny>, &Bound<'py, Dialect>),
+    selected_keys: &Bound<'py, PyAny>,
+    selection: &Bound<'py, PyAny>,
+) -> PyResult<Option<SelectedTests<'py>>> {
+    let py = project.py();
+    let held: Py<NativeCompiledProject> = match project.cast::<NativeProjectView>() {
+        Ok(view) => view.get().native_project(py),
+        Err(_) => match project.cast::<NativeCompiledProject>() {
+            Ok(held) => held.clone().unbind(),
+            Err(_) => return Ok(None),
+        },
+    };
+    let tests: Vec<Bound<'py, PyAny>> = sql_tests(project)?.try_iter()?.collect::<PyResult<_>>()?;
+    let results: Arc<OnceLock<Option<Py<PyTuple>>>> =
+        held.bind(py).borrow().held_sql_test_results();
+    if results.get().is_none() {
+        let planned: Option<Py<PyTuple>> = match test_plan_results((project, dialect), &tests) {
+            Ok(planned) => {
+                write_console(
+                    py,
+                    STDERR,
+                    &format!(
+                        "Planned the publication's {} SQL tests once for previews.\n",
+                        tests.len()
+                    ),
+                )?;
+                Some(planned.unbind())
+            }
+            Err(error) if error.is_instance_of::<PyException>(py) => {
+                write_console(
+                    py,
+                    STDERR,
+                    &format!(
+                        "Planning the publication's SQL tests once failed, so each preview plans its own: {error}\n"
+                    ),
+                )?;
+                None
+            }
+            Err(error) => return Err(error),
+        };
+        drop(results.set(planned));
+    }
+    let Some(Some(planned)) = results.get() else {
+        return Ok(None);
+    };
+    let planned: &Bound<'py, PyTuple> = planned.bind(py);
+    if planned.len() != tests.len() {
+        return Ok(None);
+    }
+    let mut selected: Vec<Bound<'py, PyAny>> = Vec::new();
+    for (position, test) in tests.iter().enumerate() {
+        if test_selected(test, selected_keys, selection)? {
+            selected.push(planned.get_item(position)?);
+        }
+    }
+    selected_from_results(py, selected).map(Some)
+}
+
+/// SQL tests selected by name or overlapping one selection; `held` reads a held project's plans.
 fn planned_sql_tests<'py>(
     project: &Bound<'py, PyAny>,
     dialect: &Bound<'py, Dialect>,
-    selected_keys: &Bound<'py, PyAny>,
-    selection: &Bound<'py, PyAny>,
+    (selected_keys, selection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    held: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
-    let selected = selected_test_entries((project, dialect), selected_keys, selection, &none(py))?;
+    let reused: Option<SelectedTests<'py>> = if held {
+        held_selected_test_entries((project, dialect), selected_keys, selection)?
+    } else {
+        None
+    };
+    let selected = match reused {
+        Some(selected) => selected,
+        None => selected_test_entries((project, dialect), selected_keys, selection, &none(py))?,
+    };
     native(
         py,
         RecordId::PlannedSqlTests,
@@ -660,7 +757,7 @@ pub(crate) fn plan_output_fields<'py>(
         || native_field(&planned, "selected_keys")?.ne(&selected_keys)?
         || native_field(&planned, "sql_test_selection")?.ne(&selection)?
     {
-        planned = planned_sql_tests(&project, &dialect, &selected_keys, &selection)?;
+        planned = planned_sql_tests(&project, &dialect, (&selected_keys, &selection), false)?;
     }
     let test_entries = native_field(&planned, "entries")?;
     let mut test_keys: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -763,10 +860,10 @@ pub(crate) fn plan_output_fields<'py>(
 pub(crate) fn plan_selected_sql_tests<'py>(
     project: &Bound<'py, PyAny>,
     dialect: &Bound<'py, Dialect>,
-    selected_keys: &Bound<'py, PyAny>,
-    sql_test_selection: &Bound<'py, PyAny>,
+    (selected_keys, sql_test_selection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    held: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
-    planned_sql_tests(project, dialect, selected_keys, sql_test_selection)
+    planned_sql_tests(project, dialect, (selected_keys, sql_test_selection), held)
 }
 
 /// Selected SQL test entries and warnings, optionally narrowed to one parameterized case.

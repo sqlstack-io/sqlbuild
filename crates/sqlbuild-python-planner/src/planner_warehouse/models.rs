@@ -487,15 +487,18 @@ impl ConsumptionReads for dyn WarehouseReads + '_ {
 #[derive(Debug)]
 pub struct SyncedReads {
     state: Arc<WarehouseState>,
+    /// Whether the plan uses the compiled project the location holds for its generation.
+    held_project: bool,
     unknowns: Mutex<BTreeSet<String>>,
     windows: Mutex<BTreeMap<String, String>>,
 }
 
 impl SyncedReads {
-    /// Reads over `state`, which several plans may share.
-    pub fn new(state: Arc<WarehouseState>) -> Self {
+    /// Reads over `state`, which several plans may share, for a plan of the held project or not.
+    pub fn new(state: Arc<WarehouseState>, held_project: bool) -> Self {
         Self {
             state,
+            held_project,
             unknowns: Mutex::new(BTreeSet::new()),
             windows: Mutex::new(BTreeMap::new()),
         }
@@ -568,6 +571,10 @@ impl SyncedReads {
 }
 
 impl WarehouseReads for SyncedReads {
+    fn held_project(&self) -> bool {
+        self.held_project
+    }
+
     fn relations<'py>(
         &self,
         py: Python<'py>,

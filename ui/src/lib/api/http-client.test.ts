@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpChangeFeed, createHttpClient, feedAllowed } from './http-client';
+import { timingTitle } from '$lib/run/plan-timings';
 import type { ChangedSignal, ConnectionState } from './signals';
 
 /** A stand-in `EventSource` the test opens, fails and feeds by hand. */
@@ -950,5 +951,52 @@ describe('listWarehouseConnections', () => {
 		expect((await client.listWarehouseConnections()).map((c) => c.target)).toEqual(['development']);
 		expect(health.filter((p) => p.includes('/preview/'))).toHaveLength(1);
 		expect(health.filter((p) => p.includes('/development/'))).toHaveLength(2);
+	});
+});
+
+describe('planning a build', () => {
+	function server() {
+		const bodies: Record<string, unknown>[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				if (request.method === 'POST') {
+					bodies.push(await request.json());
+					return Response.json({ applied: true });
+				}
+				return Response.json({ expires_at: '2999-01-01T00:00:00Z', outcome: { kind: 'plan', document: { error: { code: 'plan_failed', message: 'stop here' } } } });
+			})
+		);
+		return { bodies, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('asks the location to plan again only when the person asks for a fresh plan', async () => {
+		const { bodies, client } = server();
+		for (const options of [undefined, { fresh: true }]) {
+			const planned = client.planBuild(ORDERS, ['build', '--changed'], options);
+			await vi.advanceTimersByTimeAsync(1000);
+			expect((await planned).error).toBe('plan_failed: stop here');
+		}
+		expect(bodies.map((body) => body.fresh)).toEqual([false, true]);
+	});
+
+	it("carries a kept plan's age from the server's summary to the plan it returns", async () => {
+		const timings = { total_seconds: 4.2, steps: [{ name: 'Detecting changes', seconds: 4.2 }], planned_from: 'synced_state', reused_from: '2026-01-02T03:04:05Z' };
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) =>
+				request.method === 'POST'
+					? Response.json({ applied: true })
+					: Response.json({ expires_at: '2999-01-01T00:00:00Z', outcome: { kind: 'plan', document: { selected_count: 1, models: [], sections: [], migration_steps: 0 }, diffs: {} }, timings })
+			)
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		const planned = client.planBuild(ORDERS, ['build', '--changed']);
+		await vi.advanceTimersByTimeAsync(1000);
+		const { plan } = await planned;
+		expect(plan?.timings).toEqual(timings);
+		expect(timingTitle(plan!.timings!, Date.parse('2026-01-02T03:10:05Z'))).toBe('Reused plan from 6m ago');
 	});
 });

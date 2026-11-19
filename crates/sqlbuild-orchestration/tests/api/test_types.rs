@@ -319,8 +319,19 @@ pub(crate) struct OlderNodeFinished {
 pub(crate) struct PlanTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
+    /// Whether the person asks to plan again rather than reuse a kept plan.
+    pub(crate) fresh: bool,
+    /// When the plan the location answered with was made, for a reused plan.
+    pub(crate) reused_from: Option<&'static str>,
     pub(crate) expected_selection: &'static [&'static str],
     pub(crate) expected_warning: &'static str,
+}
+
+pub(crate) struct PlanTimingsReadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) timings: serde_json::Value,
+    /// Whether the plan's summary reads.
+    pub(crate) expected_read: bool,
 }
 
 pub(crate) struct UpcomingTestCase {

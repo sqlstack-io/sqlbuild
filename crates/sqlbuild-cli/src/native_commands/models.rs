@@ -565,6 +565,45 @@ pub(crate) enum LostStdout {
     Raised(String),
 }
 
+/// What makes two plan requests identical once the generation and synced copy are the same.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PlanKey {
+    /// The `sqb plan` arguments the location built from the request's settings.
+    pub(crate) argv: Vec<String>,
+    /// The node names the server froze from the request's selection.
+    pub(crate) select: Vec<String>,
+    /// Whether the plan read the copy's consumption.
+    pub(crate) consumption: bool,
+}
+
+/// One finished plan, kept as the JSON text of its document and of the diffs beside it.
+#[derive(Debug)]
+pub(crate) struct ReusedPlan {
+    pub(crate) key: PlanKey,
+    pub(crate) document: String,
+    pub(crate) diffs: String,
+    /// When the plan started, which its windows and expiry follow.
+    pub(crate) planned_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// The finished plans of one published generation and synced copy, oldest first, and their bytes.
+#[derive(Debug)]
+pub(crate) struct PlanReuse {
+    pub(crate) generation: i64,
+    pub(crate) version: String,
+    pub(crate) plans: std::collections::VecDeque<std::sync::Arc<ReusedPlan>>,
+    pub(crate) bytes: usize,
+}
+
+/// A plan the location may keep once its checks pass: its generation, copy, key and start time.
+#[derive(Clone, Debug)]
+pub(crate) struct PlanToKeep {
+    pub(crate) generation: i64,
+    pub(crate) version: String,
+    pub(crate) key: PlanKey,
+    pub(crate) planned_at: chrono::DateTime<chrono::Utc>,
+}
+
 /// The copy file the location last read, the mirror version it holds and whether it has consumption.
 #[derive(Clone, Debug)]
 pub(crate) struct HeldCopy {

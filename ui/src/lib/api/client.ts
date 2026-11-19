@@ -149,8 +149,11 @@ export interface ApiClient extends PlatformApi {
 	/** The server's pre-launch check: resolution, write set and authorization. */
 	checkAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<AdhocRunCheck>;
 	launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run>;
-	/** Asks the location to run `sqb plan` on a build command against the warehouse, and waits for it. */
-	planBuild(scope: Scope, command: string[]): Promise<PlanResult>;
+	/**
+	 * Asks the location to run `sqb plan` on a build command against the warehouse, and waits for it.
+	 * The location may answer with the plan it kept for the same command; `fresh` makes it plan again.
+	 */
+	planBuild(scope: Scope, command: string[], options?: { fresh?: boolean }): Promise<PlanResult>;
 	/** One page of a large section of the plan `requestId` names, which its summary only counts. */
 	/** One page of a plan section; `name` finds rows whose name contains it, ignoring case. */
 	planRows(scope: Scope, requestId: string, section: PlanPageSection, offset: number, limit?: number, name?: string): Promise<PlanPage>;

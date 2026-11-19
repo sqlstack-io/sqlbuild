@@ -2311,6 +2311,8 @@ export interface components {
             kind: "evaluate_sensor";
         } | {
             command: string[];
+            /** @description Plan again even when the location kept a plan for the same request. */
+            fresh: boolean;
             /** @enum {string} */
             kind: "plan";
             selection: string[];
@@ -2812,6 +2814,8 @@ export interface components {
         /** @description A person's build command to plan on the location; the server freezes it like an ad-hoc run. */
         PlanRequest: {
             command: string[];
+            /** @description Plan again instead of returning the plan the location kept for the same request. */
+            fresh: boolean;
             /** Format: uuid */
             request_id: string;
         };
@@ -2846,6 +2850,11 @@ export interface components {
         PlanTimings: {
             /** @description `synced_state` for a preview over the synced warehouse state; `live` when it read the warehouse. */
             planned_from: string;
+            /**
+             * Format: date-time
+             * @description When the plan the location kept, and answered with again, was made; `None` for a new plan.
+             */
+            reused_from?: string | null;
             steps: components["schemas"]["PlanTimingStep"][];
             /** Format: double */
             total_seconds: number;

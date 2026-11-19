@@ -268,7 +268,6 @@ pub enum ExecutorHost {
     LoadCallbacks,
     LoadExecutionResult,
     LoadRuntimeParams,
-    MigrationRelationForLocation,
     IsCompatibilityView,
     AuditExecutionError,
     WarehouseConnectionError,

@@ -23,6 +23,7 @@ pub(crate) fn plan_request(tokens: &[&str]) -> PlanRequest {
     PlanRequest {
         request_id: Uuid::now_v7(),
         command: tokens.iter().map(|token| (*token).to_owned()).collect(),
+        fresh: false,
     }
 }
 

@@ -218,6 +218,15 @@ pub(crate) const CHANGED_BUILD_COMMAND: [&str; 2] = ["build", "--changed"];
 /// How long an idle location waits between checks for named work; after work it checks at once.
 pub(crate) const LOCATION_WORK_IDLE_POLL: std::time::Duration = std::time::Duration::from_secs(2);
 
+/// Finished plans a location keeps for identical requests; a newer generation or synced copy drops them.
+pub(crate) const REUSED_PLANS: usize = 16;
+
+/// The most bytes of plan text a location keeps for reuse; the oldest plans go first.
+pub(crate) const REUSED_PLAN_BYTES: usize = 256 * 1024 * 1024;
+
+/// How long a kept plan may answer a request: its windows and expiry follow the time it planned at.
+pub(crate) const REUSED_PLAN_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(10);
+
 /// What a location reports when `sqb plan` produced no plan.
 pub(crate) const PLAN_NOT_PRODUCED: &str =
     "sqb plan did not produce a plan; see the location's log";

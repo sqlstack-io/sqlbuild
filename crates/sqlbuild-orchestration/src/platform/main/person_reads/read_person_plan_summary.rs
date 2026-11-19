@@ -1,7 +1,6 @@
 //! A plan request's state with its summary, which the plan page polls instead of the whole document.
 
 use serde_json::Value;
-use serde_json::error::Category;
 use sqlbuild_core::plan_display::main::plan_summary::plan_summary;
 use uuid::Uuid;
 
@@ -43,14 +42,12 @@ pub async fn read_person_plan_summary(
     }))
 }
 
-/// The document's planning timings; absent from older locations, left out if of an unknown shape.
+/// The document's planning timings; a failed plan's report has none.
 fn plan_timings(document: &Value) -> Result<Option<PlanTimings>, ControlError> {
     let Some(timings) = document.get(PLAN_TIMINGS_KEY) else {
         return Ok(None);
     };
-    match serde_json::from_value(timings.clone()) {
-        Ok(timings) => Ok(Some(timings)),
-        Err(error) if error.classify() == Category::Data => Ok(None),
-        Err(error) => Err(ControlError::Invalid(format!("plan timings: {error}"))),
-    }
+    serde_json::from_value(timings.clone())
+        .map(Some)
+        .map_err(|error| ControlError::Invalid(format!("plan timings: {error}")))
 }

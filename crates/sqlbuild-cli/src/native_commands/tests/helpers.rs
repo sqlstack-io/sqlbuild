@@ -1,4 +1,8 @@
 use std::path::Path;
+use std::sync::Mutex;
+
+use chrono::{DateTime, TimeZone, Utc};
+use serde_json::json;
 
 use sqlbuild_orchestration::warehouse_metadata::models::{MetadataBatch, WarehouseStateLocation};
 use uuid::Uuid;
@@ -10,7 +14,11 @@ use crate::native_commands::_helpers::command::paths::location_watch;
 use crate::native_commands::_helpers::location::execution::{
     acknowledge_metadata_page, settle_publication,
 };
-use crate::native_commands::models::{LocationMetadataPage, LocationMetadataSync, LocationServe};
+use crate::native_commands::_helpers::location::plan_reuse::remember_plan;
+use crate::native_commands::models::{
+    LocationMetadataPage, LocationMetadataSync, LocationServe, PlanKey, PlanReuse, PlanToKeep,
+};
+use crate::native_commands::types::LocationPlan;
 use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::{
     ConnectionCheckTrigger, LocationWorkClient, LocationWorkPoll,
@@ -131,4 +139,64 @@ pub(super) fn published_location(
     state.begin_sync(chrono::Utc::now());
     state.idle = false;
     ((options, script), (client, poll), state)
+}
+
+/// The plan key of a `--changed` plan of `select`.
+pub(super) fn reuse_key(select: &[&str]) -> PlanKey {
+    PlanKey {
+        argv: vec!["plan".into(), "--json".into(), "--changed".into()],
+        select: select.iter().map(|name| (*name).to_owned()).collect(),
+        consumption: true,
+    }
+}
+
+/// A finished plan document, or a failed plan's error report.
+pub(super) fn finished_plan(failed: bool) -> LocationPlan {
+    let documents = [
+        json!({
+            "models": [{"name": "orders"}],
+            "timings": {"planned_from": "synced_state", "total_seconds": 4.2,
+                "steps": [{"name": "Detecting changes", "seconds": 4.2}]},
+        }),
+        json!({"error": {"code": "plan_failed", "message": "no plan"}}),
+    ];
+    (documents[usize::from(failed)].clone(), Default::default())
+}
+
+/// The bytes `finished_plan(false)` takes when kept: its document's and diffs' JSON text.
+pub(super) fn finished_plan_bytes() -> usize {
+    let (document, diffs) = finished_plan(false);
+    serde_json::to_string(&document).expect("document").len()
+        + serde_json::to_string(&diffs).expect("diffs").len()
+}
+
+/// The time the reuse tests plan at.
+pub(super) fn reuse_clock() -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 1, 2, 3, 4, 5)
+        .single()
+        .expect("time")
+}
+
+/// A plan of `select` to keep under `generation` and `version`, started at `reuse_clock`.
+pub(super) fn plan_to_keep(generation: i64, version: &str, select: &[&str]) -> PlanToKeep {
+    PlanToKeep {
+        generation,
+        version: version.to_owned(),
+        key: reuse_key(select),
+        planned_at: reuse_clock(),
+    }
+}
+
+/// `count` finished plans of `model_<n>` under generation 1 and `copy-1`, oldest first, within `limits`.
+pub(super) fn kept_plans(count: usize, limits: (usize, usize)) -> Mutex<Option<PlanReuse>> {
+    let reuse: Mutex<Option<PlanReuse>> = Mutex::new(None);
+    let (document, diffs) = finished_plan(false);
+    for index in 0..count {
+        remember_plan(
+            (&reuse, limits),
+            plan_to_keep(1, "copy-1", &[format!("model_{index}").as_str()]),
+            (&document, &diffs),
+        );
+    }
+    reuse
 }

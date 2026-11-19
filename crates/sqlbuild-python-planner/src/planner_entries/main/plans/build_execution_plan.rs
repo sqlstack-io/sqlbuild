@@ -2,7 +2,7 @@
 
 use crate::planner_entries::_helpers::plans::execution_plan::planned_output;
 use crate::planner_entries::_helpers::plans::execution_plan::scopes_and_cursor_overrides;
-use crate::planner_entries::_helpers::plans::test_planning::{PlanningRequest, start_planning};
+use crate::planner_entries::_helpers::plans::test_planning::start_scope_planning;
 use crate::planner_phases::main::inputs::class_field::class_field;
 use crate::planner_phases::models::PlannerRuntime;
 use crate::planner_warehouse::models::PlannerReads;
@@ -63,14 +63,9 @@ pub fn build_execution_plan<'py>(
     .into_any();
     let (scopes, overrides) = scopes_and_cursor_overrides(&args)?;
     let inspection = class_field(&scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?;
-    let test_planning = start_planning(
-        py,
-        PlanningRequest {
-            project: project.clone().unbind(),
-            dialect: dialect.unbind(),
-            selected_keys: native_field(&inspection, "selected_keys")?.unbind(),
-            sql_test_selection: native_field(&inspection, "sql_test_selection")?.unbind(),
-        },
+    let test_planning = start_scope_planning(
+        (&project, dialect),
+        (&inspection, &reads),
         native_field(&args.value("policies")?, "plan_sql_tests")?.is_truthy()?,
     )?;
     let planned = reads.get().reads().within_inspection(py, &mut || {

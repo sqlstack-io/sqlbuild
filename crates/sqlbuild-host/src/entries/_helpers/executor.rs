@@ -310,11 +310,6 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
-        name: "migration_relation_for_location",
-        kind: HostKind::Function,
-        edge: HostEdge::Executor,
-    },
-    HostEntry {
         name: "is_compatibility_view",
         kind: HostKind::Function,
         edge: HostEdge::Executor,

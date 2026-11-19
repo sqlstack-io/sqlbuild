@@ -2,6 +2,15 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class IdleDispatcherTestCase:
+    description: str
+    idle_seconds: float
+    polling_seconds: float
+    expected_max_waits: int
+    expected_max_delivery_seconds: float
+
+
+@dataclass(frozen=True)
 class EventExporterDispatcherTestCase:
     description: str
     expected_delivered: int

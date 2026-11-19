@@ -19,6 +19,9 @@ pub const WORKER_ATTRIBUTE: &str = "_sqlbuild_event_exporter_worker";
 /// The longest single wait of a polling delivery loop, as the Python dispatcher polled.
 pub const POLL_SECONDS: f64 = 0.01;
 
+/// The longest an idle dispatcher loop waits for the notification that brings it work.
+pub const IDLE_POLL_SECONDS: f64 = 1.0;
+
 /// The most one dispatch round charges a sink call, so the dispatcher's GIL waits are not counted.
 pub const CHARGE_LIMIT_SECONDS: f64 = 2.0 * POLL_SECONDS;
 
