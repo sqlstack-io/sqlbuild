@@ -169,7 +169,7 @@ const BUILD_FIELDS: [Field; 41] = [
     same("allow_retention_decrease"),
     same("allow_missing_migration_origin"),
     same("allow_snapshot_schema_change"),
-    same("ignore_maintained_grace"),
+    same("ignore_dynamic_grace"),
     same("concurrency"),
     SELECT,
     field("selector_files", Source::SelectorFiles),

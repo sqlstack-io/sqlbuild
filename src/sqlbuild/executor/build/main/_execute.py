@@ -35,11 +35,11 @@ from sqlbuild.executor.build.models import (
     SeedExecutionResult,
 )
 from sqlbuild.executor.build.types import BuildStatus
-from sqlbuild.executor.load.models import LoadExecutionResult
-from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
-from sqlbuild.executor.maintained_pauses.main.hold_maintained_models import (
-    hold_maintained_models,
+from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
+from sqlbuild.executor.dynamic_pauses.main.hold_dynamic_models import (
+    hold_dynamic_models,
 )
+from sqlbuild.executor.load.models import LoadExecutionResult
 from sqlbuild.executor.migrations.main._apply import apply_model_migrations
 from sqlbuild.executor.migrations.main._apply_columns import apply_column_migrations
 from sqlbuild.executor.run.models import ModelExecutionResult
@@ -59,9 +59,9 @@ def execute_build_plan(
     initial_state: BuildInitialState | None = None,
     schema_prepared: bool = False,
 ) -> BuildExecutionResult:
-    """Execute a build plan with the DAG scheduler, holding the maintained models it touches."""
+    """Execute a build plan with the DAG scheduler, holding the dynamic models it touches."""
 
-    hold: MaintainedHold | None = hold_maintained_models(
+    hold: DynamicHold | None = hold_dynamic_models(
         plan=plan, adapter=adapter, runtime=runtime, connection_config=connection_config
     )
     held: AbstractContextManager[object] = (
@@ -79,7 +79,7 @@ def execute_build_plan(
             connection_config=connection_config,
             connections=connections,
             scheduler_connection=scheduler_connection,
-            runtime=replace(runtime, maintained_hold=hold),
+            runtime=replace(runtime, dynamic_hold=hold),
             callbacks=callbacks,
             customizations=customizations,
             initial_state=initial_state,

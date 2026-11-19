@@ -1,16 +1,16 @@
 use crate::project::errors::ConfigFailure;
 use crate::project::main::load_changes_config::load_changes_config;
 use crate::project::main::load_control_config::load_control_config;
+use crate::project::main::load_dynamic_config::load_dynamic_config;
 use crate::project::main::load_git_base_ref::load_git_base_ref;
-use crate::project::main::load_maintained_config::load_maintained_config;
 use crate::project::main::load_pool_limits::load_pool_limits;
 use crate::project::main::load_review_config::load_review_config;
 use crate::project::models::ConfigFile;
-use crate::project::models::{ChangesConfig, ControlConfig, MaintainedConfig, ReviewConfig};
+use crate::project::models::{ChangesConfig, ControlConfig, DynamicConfig, ReviewConfig};
 use crate::project::tests::helpers::{failure_at, first_failure, project_directory};
 use crate::project::tests::test_types::{
-    ChangesConfigTestCase, ControlConfigTestCase, GitBaseRefTestCase,
-    MaintainedConfigErrorTestCase, MaintainedConfigTestCase, PoolsErrorTestCase, PoolsTestCase,
+    ChangesConfigTestCase, ControlConfigTestCase, DynamicConfigErrorTestCase,
+    DynamicConfigTestCase, GitBaseRefTestCase, PoolsErrorTestCase, PoolsTestCase,
     ProjectFailureTestCase, ReviewConfigErrorTestCase, ReviewConfigTestCase,
 };
 
@@ -65,35 +65,35 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
             )),
         },
         ProjectFailureTestCase {
-            description: "a target may keep its maintained models paused between builds",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[targets.dev]\npause_maintained = true\n",
-            local: "[targets.dev]\npause_maintained = false\n",
+            description: "a target may keep its dynamic models paused between builds",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[targets.dev]\npause_dynamic = true\n",
+            local: "[targets.dev]\npause_dynamic = false\n",
             expected_failure: None,
         },
         ProjectFailureTestCase {
-            description: "pause_maintained is a boolean",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[targets.dev]\npause_maintained = 'yes'\n",
+            description: "pause_dynamic is a boolean",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[targets.dev]\npause_dynamic = 'yes'\n",
             local: "",
             expected_failure: Some(ConfigFailure::plain(
-                "Expected 'pause_maintained' to be a boolean when provided",
+                "Expected 'pause_dynamic' to be a boolean when provided",
             )),
         },
         ProjectFailureTestCase {
-            description: "an invalid maintained section fails the project load",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\nheartbeat_grace = 'soon'\n",
+            description: "an invalid dynamic section fails the project load",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\nheartbeat_grace = 'soon'\n",
             local: "",
             expected_failure: Some(ConfigFailure::at(
                 ConfigFile::Project,
-                "maintained.heartbeat_grace must be a fixed duration such as 30m or 2h",
+                "dynamic.heartbeat_grace must be a fixed duration such as 30m or 2h",
             )),
         },
         ProjectFailureTestCase {
             description: "a grace no longer than the heartbeat interval would expire every build",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\nheartbeat_grace = '1m'\n",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\nheartbeat_grace = '1m'\n",
             local: "",
             expected_failure: Some(ConfigFailure::at(
                 ConfigFile::Project,
-                "maintained.heartbeat_grace must be longer than 1m: a build writes a heartbeat every minute, so a shorter grace expires builds that are still running",
+                "dynamic.heartbeat_grace must be longer than 1m: a build writes a heartbeat every minute, so a shorter grace expires builds that are still running",
             )),
         },
         ProjectFailureTestCase {
@@ -633,30 +633,30 @@ fn given_invalid_pools_when_loading_then_project_loading_rejects_them() {
 }
 
 #[test]
-fn given_maintained_section_when_reading_then_returns_its_values_or_defaults() {
+fn given_dynamic_section_when_reading_then_returns_its_values_or_defaults() {
     let test_cases = [
-        MaintainedConfigTestCase {
+        DynamicConfigTestCase {
             description: "a longer grace that may be ignored",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\n\
+            project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\n\
                       heartbeat_grace = '45m'\nallow_ignore_grace = true\n",
-            expected_config: MaintainedConfig {
+            expected_config: DynamicConfig {
                 heartbeat_grace_seconds: 2_700,
                 allow_ignore_grace: true,
             },
         },
-        MaintainedConfigTestCase {
+        DynamicConfigTestCase {
             description: "any grace longer than the heartbeat interval",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\n\
+            project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\n\
                       heartbeat_grace = '61s'\n",
-            expected_config: MaintainedConfig {
+            expected_config: DynamicConfig {
                 heartbeat_grace_seconds: 61,
                 allow_ignore_grace: false,
             },
         },
-        MaintainedConfigTestCase {
-            description: "no maintained section",
+        DynamicConfigTestCase {
+            description: "no dynamic section",
             project: PROJECT,
-            expected_config: MaintainedConfig {
+            expected_config: DynamicConfig {
                 heartbeat_grace_seconds: 1_800,
                 allow_ignore_grace: false,
             },
@@ -665,7 +665,7 @@ fn given_maintained_section_when_reading_then_returns_its_values_or_defaults() {
     for test_case in test_cases {
         let (_directory, paths) = project_directory(test_case.project, "");
 
-        let config: MaintainedConfig = load_maintained_config(&paths).expect(test_case.description);
+        let config: DynamicConfig = load_dynamic_config(&paths).expect(test_case.description);
 
         assert_eq!(
             config, test_case.expected_config,
@@ -676,31 +676,31 @@ fn given_maintained_section_when_reading_then_returns_its_values_or_defaults() {
 }
 
 #[test]
-fn given_invalid_maintained_section_when_reading_then_it_is_rejected() {
+fn given_invalid_dynamic_section_when_reading_then_it_is_rejected() {
     let test_cases = [
-        MaintainedConfigErrorTestCase {
+        DynamicConfigErrorTestCase {
             description: "a grace that is not a duration",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\n\
+            project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\n\
                       heartbeat_grace = 'soon'\n",
-            expected_fragment: "maintained.heartbeat_grace must be a fixed duration such as 30m or 2h",
+            expected_fragment: "dynamic.heartbeat_grace must be a fixed duration such as 30m or 2h",
         },
-        MaintainedConfigErrorTestCase {
+        DynamicConfigErrorTestCase {
             description: "a grace in months",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\n\
+            project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\n\
                       heartbeat_grace = '1mo'\n",
-            expected_fragment: "maintained.heartbeat_grace must be a fixed duration such as 30m or 2h",
+            expected_fragment: "dynamic.heartbeat_grace must be a fixed duration such as 30m or 2h",
         },
-        MaintainedConfigErrorTestCase {
+        DynamicConfigErrorTestCase {
             description: "allow_ignore_grace written as text",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\n\
+            project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\n\
                       allow_ignore_grace = 'yes'\n",
-            expected_fragment: "maintained.allow_ignore_grace must be true or false",
+            expected_fragment: "dynamic.allow_ignore_grace must be true or false",
         },
-        MaintainedConfigErrorTestCase {
-            description: "a misspelt maintained key",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\n\
+        DynamicConfigErrorTestCase {
+            description: "a misspelt dynamic key",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\n\
                       heartbeat_grase = '30m'\n",
-            expected_fragment: "maintained contains unknown key(s): heartbeat_grase",
+            expected_fragment: "dynamic contains unknown key(s): heartbeat_grase",
         },
     ];
     for test_case in test_cases {
@@ -708,7 +708,7 @@ fn given_invalid_maintained_section_when_reading_then_it_is_rejected() {
 
         let failure: String = format!(
             "{:?}",
-            load_maintained_config(&paths).expect_err(test_case.description)
+            load_dynamic_config(&paths).expect_err(test_case.description)
         );
 
         assert!(

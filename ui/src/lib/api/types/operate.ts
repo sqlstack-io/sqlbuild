@@ -656,9 +656,9 @@ export type PlanModel = {
 	backfill: { action: string; duration: string | null };
 	qualified_name?: string;
 	changed_functions?: string[];
-	/** The rebuilt upstream that makes this kept maintained model recompute in full. */
+	/** The rebuilt upstream that makes this kept dynamic model recompute in full. */
 	reinitialised_by?: string;
-	/** Whether the warehouse lists this kept maintained model as suspended. */
+	/** Whether the warehouse lists this kept dynamic model as suspended. */
 	paused?: boolean;
 	cursor_type?: string;
 	cursor?: { requested_bounds: { start: string | null; end: string | null }; resolved_bounds: { start: string | null; end: string | null } | null } | null;

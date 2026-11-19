@@ -9,13 +9,13 @@ fn given_recorded_metadata_when_hashing_then_it_matches_the_config_as_written() 
     let test_cases = [
         RecordedLocalHashTestCase {
             description: "a written-out default refresh mode stays in the hash",
-            metadata_json: r#"{"config":{"materialized":"maintained","refresh_mode":"incremental"},"execution_signature":{},"local_function_hashes":{},"model_name":"daily_totals"}"#,
-            expected_hashed_json: r#"{"config":{"materialized":"maintained","refresh_mode":"incremental"},"execution_signature":{},"local_function_hashes":{},"model_name":"daily_totals"}"#,
+            metadata_json: r#"{"config":{"materialized":"dynamic","refresh_mode":"incremental"},"execution_signature":{},"local_function_hashes":{},"model_name":"daily_totals"}"#,
+            expected_hashed_json: r#"{"config":{"materialized":"dynamic","refresh_mode":"incremental"},"execution_signature":{},"local_function_hashes":{},"model_name":"daily_totals"}"#,
         },
         RecordedLocalHashTestCase {
             description: "a model that declares no refresh mode",
-            metadata_json: r#"{"config":{"materialized":"maintained"},"execution_signature":{},"local_function_hashes":{},"model_name":"daily_totals"}"#,
-            expected_hashed_json: r#"{"config":{"materialized":"maintained"},"execution_signature":{},"local_function_hashes":{},"model_name":"daily_totals"}"#,
+            metadata_json: r#"{"config":{"materialized":"dynamic"},"execution_signature":{},"local_function_hashes":{},"model_name":"daily_totals"}"#,
+            expected_hashed_json: r#"{"config":{"materialized":"dynamic"},"execution_signature":{},"local_function_hashes":{},"model_name":"daily_totals"}"#,
         },
     ];
 

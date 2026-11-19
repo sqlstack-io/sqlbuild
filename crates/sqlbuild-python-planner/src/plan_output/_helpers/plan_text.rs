@@ -251,7 +251,7 @@ fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
         config_diff: coloured(model_config_diff(entry, &reason)?),
         query_diff: coloured(model_query_diff(entry, &reason)?),
         reinitialised_by: optional_text(&native_field(entry, "reinitialised_by")?)?,
-        paused: native_field(entry, "maintained_paused")?.is_truthy()?,
+        paused: native_field(entry, "dynamic_paused")?.is_truthy()?,
         name,
         action,
         reason,

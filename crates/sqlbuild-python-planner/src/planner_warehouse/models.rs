@@ -383,8 +383,8 @@ pub enum AdapterRead<'py> {
     FreshnessQuery(Bound<'py, PyAny>),
     /// Why a destination cannot rename columns, `None` when it can.
     ColumnRenameUnavailable(Bound<'py, PyAny>),
-    /// One maintained model's `[database, schema, name]` listed target lag and refresh warehouse.
-    MaintainedRefresh([Bound<'py, PyAny>; 3]),
+    /// One dynamic model's `[database, schema, name]` listed target lag and refresh warehouse.
+    DynamicRefresh([Bound<'py, PyAny>; 3]),
 }
 
 /// A read of what the warehouse state tables recorded.
@@ -756,8 +756,8 @@ impl WarehouseReads for SyncedReads {
             AdapterRead::ColumnRenameUnavailable(_) => {
                 return Ok(unknown(self, "column rename support"));
             }
-            AdapterRead::MaintainedRefresh(_) => {
-                return Ok(unknown(self, "maintained model listings"));
+            AdapterRead::DynamicRefresh(_) => {
+                return Ok(unknown(self, "dynamic model listings"));
             }
         };
         let unavailable =

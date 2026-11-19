@@ -592,26 +592,26 @@ def test_given_dropped_relation_with_recorded_build_when_planning_then_plans_fir
         ),
         DetectModelMetadataTestCase(
             description="writing out the default refresh_mode is no change",
-            config_values={"materialized": "maintained", "refresh_mode": "incremental"},
+            config_values={"materialized": "dynamic", "refresh_mode": "incremental"},
             schema_columns=(),
             deps=(),
             function_local_hashes={},
             previous_metadata_json=build_version_identity_metadata_json(
                 model_name="orders",
-                config_values={"materialized": "maintained"},
+                config_values={"materialized": "dynamic"},
                 execution_signature={},
             ),
             expected_change_kind=ChangeKind.NO_CHANGE,
         ),
         DetectModelMetadataTestCase(
             description="removing a written-out default refresh_mode is no change",
-            config_values={"materialized": "maintained"},
+            config_values={"materialized": "dynamic"},
             schema_columns=(),
             deps=(),
             function_local_hashes={},
             previous_metadata_json=build_version_identity_metadata_json(
                 model_name="orders",
-                config_values={"materialized": "maintained", "refresh_mode": "incremental"},
+                config_values={"materialized": "dynamic", "refresh_mode": "incremental"},
                 execution_signature={},
             ),
             expected_change_kind=ChangeKind.NO_CHANGE,
@@ -724,13 +724,13 @@ def test_given_model_identity_metadata_when_detecting_changes_then_uses_aligned_
             expected_backfill=BackfillResult(action=BackfillAction.FORWARD_ONLY),
         ),
         DetectFunctionCallerChangeTestCase(
-            description="a maintained model's refresh_mode change is a config change",
+            description="a dynamic model's refresh_mode change is a config change",
             metadata_case=build_function_caller_metadata_case(
-                config_values={"materialized": "maintained", "refresh_mode": "full"},
+                config_values={"materialized": "dynamic", "refresh_mode": "full"},
                 function_local_hashes={},
                 previous_function_hashes={},
                 previous_config_values={
-                    "materialized": "maintained",
+                    "materialized": "dynamic",
                     "refresh_mode": "incremental",
                 },
             ),
@@ -740,12 +740,12 @@ def test_given_model_identity_metadata_when_detecting_changes_then_uses_aligned_
             expected_backfill=BackfillResult(action=BackfillAction.FORWARD_ONLY),
         ),
         DetectFunctionCallerChangeTestCase(
-            description="a maintained model's lag change is altered in place, not a config change",
+            description="a dynamic model's lag change is altered in place, not a config change",
             metadata_case=build_function_caller_metadata_case(
-                config_values={"materialized": "maintained", "refresh": {"lag": "5m"}},
+                config_values={"materialized": "dynamic", "refresh": {"lag": "5m"}},
                 function_local_hashes={},
                 previous_function_hashes={},
-                previous_config_values={"materialized": "maintained", "refresh": {"lag": "1h"}},
+                previous_config_values={"materialized": "dynamic", "refresh": {"lag": "1h"}},
             ),
             query_change_tracking=True,
             expected_changed_functions=(),

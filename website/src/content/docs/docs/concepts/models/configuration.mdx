@@ -20,7 +20,7 @@ which accepts any keys.
 
 | Field | Description |
 |-------|-------------|
-| `materialized` | `view`, `table`, `incremental`, `snapshot`, `maintained`, or a custom materialization name; see [Materializations](/docs/concepts/models/materializations) |
+| `materialized` | `view`, `table`, `incremental`, `snapshot`, `dynamic`, or a custom materialization name; see [Materializations](/docs/concepts/models/materializations) |
 | `tags` | Tags used by selectors |
 | `critical` | `true` marks the model as critical, so [`sqb review`](/docs/cli/review) builds and compares it whenever something upstream of it changes (default `false`) |
 | `description` | Required human-readable model description; see [Descriptions](#descriptions) |

@@ -31,7 +31,7 @@
 			"docs/concepts/seeds",
 			"docs/concepts/incremental",
 			"docs/concepts/snapshots",
-			"docs/concepts/models/maintained",
+			"docs/concepts/models/dynamic",
 			"docs/concepts/functions",
 			{
 				"label": "Macros",

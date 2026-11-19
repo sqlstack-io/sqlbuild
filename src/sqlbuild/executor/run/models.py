@@ -40,7 +40,7 @@ from sqlbuild.cursor_algebra.types import BoundSentinel, CursorScalar
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.auditing.models import AuditExecutionResult
 from sqlbuild.executor.custom.models import MaterializationResult
-from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
+from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
 from sqlbuild.executor.python_nodes.classes.runtime_relation_guard import RuntimeRelationGuard
 from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
 from sqlbuild.executor.run.classes.fingerprint_writes import FingerprintWrites
@@ -334,7 +334,7 @@ class ModelMaterializationContext:
     enforce_explicit_references: bool = False
     bound_views: BoundViewGuard = field(default_factory=BoundViewGuard)
     fingerprint_writes: FingerprintWrites | None = None
-    maintained_hold: MaintainedHold | None = None
+    dynamic_hold: DynamicHold | None = None
 
 
 @dataclass(frozen=True, kw_only=True, init=False)

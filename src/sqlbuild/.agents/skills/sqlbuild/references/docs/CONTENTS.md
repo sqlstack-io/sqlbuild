@@ -24,7 +24,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [Seeds](concepts/seeds.md) (`concepts/seeds`) - Load static CSV data into your pipeline as tables.
 - [Incremental Models](concepts/incremental.md) (`concepts/incremental`) - Cursor-based incremental strategies, microbatch execution, and backfill policies.
 - [Snapshots (SCD Type 2)](concepts/snapshots.md) (`concepts/snapshots`) - Preserve row history over time using SCD Type 2 semantics with timestamp or check-based change detection.
-- [Maintained Models](concepts/models/maintained.md) (`concepts/models/maintained`) - Let the warehouse keep a model up to date on a schedule, paused safely while builds run.
+- [Dynamic models](concepts/models/dynamic.md) (`concepts/models/dynamic`) - Let the warehouse keep a model up to date on a schedule, paused safely while builds run.
 - [Functions](concepts/functions.md) (`concepts/functions`) - User-defined functions and table functions managed as part of your project.
 - [Macros](concepts/macros.md) (`concepts/macros`) - Reuse SQL with typed SQL macros, or generate it with Python macros when it needs logic.
 - [SQL Macros](concepts/macros/sql-macros.md) (`concepts/macros/sql-macros`) - Write typed, logic-free SQL fragments that the compiler checks and sees inside.

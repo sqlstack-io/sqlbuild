@@ -12,7 +12,7 @@ pub enum MaterializationType {
     Seed,
     Custom,
     /// A stored result the warehouse keeps fresh between builds.
-    Maintained,
+    Dynamic,
 }
 
 /// What the plan does with a model.
@@ -26,12 +26,12 @@ pub enum PlanAction {
     Snapshot,
     Skip,
     Custom,
-    /// Create or replace the warehouse-maintained object.
-    CreateMaintained,
+    /// Create or replace the warehouse-dynamic object.
+    CreateDynamic,
     /// Change its refresh settings in place.
-    AlterMaintained,
+    AlterDynamic,
     /// Leave the object as it is; builds may still refresh it.
-    KeepMaintained,
+    KeepDynamic,
 }
 
 /// Why the plan does it.

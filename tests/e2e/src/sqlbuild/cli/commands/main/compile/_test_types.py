@@ -1464,8 +1464,8 @@ class JobGroupCyclesCase:
 
 
 @dataclass(frozen=True)
-class MaintainedCompileE2ETestCase:
-    """A project with maintained models, its exit code and text its compile output contains."""
+class DynamicCompileE2ETestCase:
+    """A project with dynamic models, its exit code and text its compile output contains."""
 
     description: str
     adapter: str

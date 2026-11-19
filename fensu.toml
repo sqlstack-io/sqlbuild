@@ -1352,8 +1352,8 @@ path = "src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"
 reason = "The SQL Server adapter intentionally keeps overrideable backend behavior on one class."
 
 [[dupes.allowlist]]
-paths = ["scripts/native_layering/_helpers/layering.py", "src/sqlbuild/executor/maintained_pauses/_helpers/scope.py"]
-reason = "A ten-line depth-first walk in two packages that must not import each other: the dependency-layering tool walks Cargo.lock packages, the build's maintained-model hold walks plan edges between models."
+paths = ["scripts/native_layering/_helpers/layering.py", "src/sqlbuild/executor/dynamic_pauses/_helpers/scope.py"]
+reason = "A ten-line depth-first walk in two packages that must not import each other: the dependency-layering tool walks Cargo.lock packages, the build's dynamic-model hold walks plan edges between models."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-planner/src/planner_changes/_helpers/detect.rs", "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_selection.rs"]

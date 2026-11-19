@@ -27,7 +27,7 @@ use crate::planner_phases::main::outputs::base_plan_output::base_plan_output;
 use crate::planner_phases::main::outputs::build_planner_identity_context::build_planner_identity_context;
 use crate::planner_phases::main::outputs::check_selected_scope_buildability::check_selected_scope_buildability;
 use crate::planner_phases::main::outputs::detect_stale_warning_changes::detect_stale_warning_changes;
-use crate::planner_phases::main::outputs::plan_maintained_refresh::plan_maintained_refresh;
+use crate::planner_phases::main::outputs::plan_dynamic_refresh::plan_dynamic_refresh;
 use crate::planner_phases::main::outputs::unselected_upstream_models::unselected_upstream_models;
 use crate::planner_phases::main::rebuilds::build_planner_entry_results::build_planner_entry_results;
 use crate::planner_phases::main::rebuilds::defer_to_migration_origins::defer_to_migration_origins;
@@ -197,7 +197,7 @@ pub(crate) fn planned_output<'py>(
         (&inspection_scope, &reconciliation),
         &source_freshness,
     )?;
-    let entries = plan_maintained_refresh(runtime, &inspection_scope, entries)?;
+    let entries = plan_dynamic_refresh(runtime, &inspection_scope, entries)?;
     record_step(BUILDING_ENTRIES, entries_started.elapsed().as_secs_f64());
     let planned_sql_tests = timed(TEST_FIXTURES, || test_planning.result(py))?.into_bound(py);
     let assembling_started = Instant::now();
