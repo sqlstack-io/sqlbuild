@@ -10,6 +10,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyTuple;
 use pyo3::{IntoPyObject, pyfunction};
 
+use sqlbuild_analysis::graph::main::edge_keys::edge_keys;
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::main::reachable_graph_keys::reachable_graph_keys;
 use sqlbuild_analysis::graph::models::{EdgeDirection, GraphIndexes, ProjectGraph};
@@ -157,25 +158,42 @@ pub(crate) fn outside_target_lineage(
     outside_lineage(audit, &lineage)
 }
 
-/// `outside_target_lineage` of each audit, walking each distinct target's lineage once.
-///
-/// Many audits attach to one model; walking its upstream lineage per audit dominated planning.
-/// One target's lineage is held at a time.
+/// An audit's position among the selected audits and the keys of what it reads.
+type AuditDependencies = (usize, Vec<(String, String)>);
+
+/// `outside_target_lineage` of each audit, walking a target's lineage once and only when needed.
 pub(crate) fn outside_target_lineages(
     audits: &[Bound<'_, PyAny>],
     graph: &ProjectGraph,
 ) -> PyResult<Vec<bool>> {
     let mut outside: Vec<bool> = vec![false; audits.len()];
-    let mut by_target: HashMap<(String, String), Vec<usize>> = HashMap::new();
+    let mut by_target: HashMap<(String, String), Vec<AuditDependencies>> = HashMap::new();
     for (position, audit) in audits.iter().enumerate() {
-        if let Some(target) = lineage_target(audit)? {
-            by_target.entry(target).or_default().push(position);
+        let Some(target) = lineage_target(audit)? else {
+            continue;
+        };
+        let dependencies: Vec<(String, String)> = scope_deps(audit)?
+            .try_iter()?
+            .map(|dependency| native_key(&dependency?))
+            .collect::<PyResult<_>>()?;
+        let parents = edge_keys(graph, &target, EdgeDirection::Upstream);
+        if dependencies
+            .iter()
+            .all(|dependency| *dependency == target || parents.contains(dependency))
+        {
+            continue;
         }
+        by_target
+            .entry(target)
+            .or_default()
+            .push((position, dependencies));
     }
-    for (target, positions) in by_target {
+    for (target, walked) in by_target {
         let lineage = reachable_graph_keys(&[target], graph, EdgeDirection::Upstream);
-        for position in positions {
-            outside[position] = outside_lineage(&audits[position], &lineage)?;
+        for (position, dependencies) in walked {
+            outside[position] = dependencies
+                .iter()
+                .any(|dependency| !lineage.contains(dependency));
         }
     }
     Ok(outside)
