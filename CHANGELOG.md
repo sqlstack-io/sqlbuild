@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.250.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.249.1...v0.250.0) (2026-11-19)
+
+
+### Features
+
+* acknowledge any attention item, and browse catalog folders as a tree ([#1589](https://github.com/sqlstack-io/sqlbuild/issues/1589)) ([9c0e0e5](https://github.com/sqlstack-io/sqlbuild/commit/9c0e0e5094f482f2252761862a69ac4b04f4eabf))
+
 ## [0.249.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.249.0...v0.249.1) (2026-11-18)
 
 
