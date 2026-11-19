@@ -56,7 +56,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--no-audits` | Skip audits |
 | `--ignore-audit-failures` | Run every audit, but let failures through: staged tables are promoted, incremental batches applied and downstream nodes built. Failures are listed as ignored; see [Ignoring audit failures](../concepts/audits.md#ignoring-audit-failures). Not allowed with `--no-audits` |
 | `--no-ignore-audit-failures` | Let audit failures block the build even where `ignore_audit_failures` is set |
-| `--no-python` | Skip read-side Python tasks and assets (loader-side Python still runs for selected sources) |
+| `--no-python` | Skip read-side Python assets (loader-side Python still runs for selected sources) |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--no-cache` | Bypass the reusable compile-analysis cache for this invocation |
 | `--full-refresh` | Drop and rebuild selected models unless a model sets `full_refresh false`; `full_refresh true` forces a model even without this flag |
@@ -153,7 +153,7 @@ A model or seed always runs, whatever counts, when:
 | Its last build did not finish | The build was killed or failed after the model started writing |
 | Its relation is missing, or `--full-refresh` or a cursor override applies | `sqb build --changed --full-refresh` |
 | The planner must rebuild it for a reason other than an edit to its definition | A renamed model |
-| What it reads can't be listed | SQL that reads relations not declared as sources or models, or a Python task or asset upstream |
+| What it reads can't be listed | SQL that reads relations not declared as sources or models, or a Python asset upstream |
 | An upstream needs to run, even when it is not selected | `sqb build customer_orders --changed` runs `customer_orders` until a changed `stg_orders` is built |
 
 ### How far a change reaches

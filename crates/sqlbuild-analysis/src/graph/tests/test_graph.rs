@@ -277,7 +277,7 @@ fn given_invalid_selectors_when_resolving_then_errors_match_python() {
             exclude: &[],
             expected_error: (
                 "S010",
-                "selector type 'task' does not map to a resource type yet",
+                "selector type 'asset' does not map to a resource type yet",
                 None,
             ),
         },

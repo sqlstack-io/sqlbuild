@@ -412,9 +412,9 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             expected_plan: Ok((
                 &[
                     "asset:partner_orders_file",
+                    "asset:request_carrier_collection",
                     "model:orders",
                     "model:stg_orders",
-                    "asset:request_carrier_collection",
                 ],
                 json!({}),
             )),
@@ -451,9 +451,9 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             expected_plan: Ok((
                 &[
                     "asset:partner_orders_file",
+                    "asset:request_carrier_collection",
                     "model:orders",
                     "model:stg_orders",
-                    "asset:request_carrier_collection",
                 ],
                 json!({}),
             )),
@@ -464,9 +464,9 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             expected_plan: Ok((
                 &[
                     "asset:partner_orders_file",
+                    "asset:request_carrier_collection",
                     "model:orders",
                     "model:stg_orders",
-                    "asset:request_carrier_collection",
                 ],
                 json!({}),
             )),
@@ -477,8 +477,8 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             expected_plan: Ok((
                 &[
                     "asset:partner_orders_file",
-                    "model:orders",
                     "asset:request_carrier_collection",
+                    "model:orders",
                 ],
                 json!({}),
             )),

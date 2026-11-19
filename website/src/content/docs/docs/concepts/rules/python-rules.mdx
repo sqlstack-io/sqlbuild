@@ -64,7 +64,7 @@ python/
   __init__.py
   fulfillment/
     shipment_export/
-      node.py          # @task shipment_export
+      node.py          # @asset shipment_export
       main.py          # main(), the unit's implementation
   utils/
     currency/
@@ -97,7 +97,7 @@ python/orders/
     checks.py             # @check declarations for this unit
     _helpers/             # private functions for this unit
   refund_review/
-    node.py               # @task
+    node.py               # @asset
     main.py
 ```
 
@@ -123,21 +123,21 @@ These are reported:
 | Code | Finding | Fix |
 |---|---|---|
 | `SQBRPYTHON003` | A unit without `main.py`, or another module or folder in it | Add `main.py`; move other code into `_helpers/` or a role file |
-| `SQBRPYTHON004` | `node.py` holding a helper, a constant, a class or a second declaration | Keep one `@loader`, `@task`, `@asset` or `@factory` function and its imports |
+| `SQBRPYTHON004` | `node.py` holding a helper, a constant, a class or a second declaration | Keep one `@loader`, `@asset` or `@factory` function and its imports |
 | `SQBRPYTHON005` | A declaration that does more than `return main(...)`, or passes a positional argument | Move the logic into `main()` and pass every argument as `name=value` |
 | `SQBRPYTHON006` | `main.py` holding more than one function, or a `main()` whose return annotation does not fit the node | Move other code into `_helpers/` and annotate `main()` with its result |
 | `SQBRPYTHON007` | A signature other than `(ctx: <Kind>Context, *, provider: ProviderClass)` | Take `ctx` positionally and providers after `*`, each annotated |
 | `SQBRPYTHON008` | An import of another unit's `main.py`, role files or `_helpers/`, or another domain's code | Import shared code from `python/utils/` or the domain's role files |
 | `SQBRPYTHON009` | `checks.py` holding other code, or a check that does not depend on the unit's node | Name the unit's node in `depends_on` and return directly |
 | `SQBRPYTHON010` | A factory that does not loop over the unit's specs, or a generated node without `name=` | Loop over specs from the unit's `constants.py` or `models.py` and name each node |
-| `SQBRPYTHON011` | A docstring on a node or check, a task, asset or check without `description=`, or a described loader | Use `description=`; a loader takes its description from its managed source |
+| `SQBRPYTHON011` | A docstring on a node or check, an asset or check without `description=`, or a described loader | Use `description=`; a loader takes its description from its managed source |
 | `SQBRPYTHON012` | A node declared outside a unit's `node.py`, or a check outside its `checks.py` | Move it into its own unit folder |
 
 `main()` returns:
 
 | Node | Return annotation |
 |---|---|
-| `@task`, `@asset` | `PythonNodeResult` or `PythonNodeSkipResult`, from `ctx.result(...)` and `ctx.skip(...)` |
+| `@asset` | `PythonNodeResult` or `PythonNodeSkipResult`, from `ctx.result(...)` and `ctx.skip(...)` |
 | `@loader` | rows such as `list[...]` or `Iterator[...]`, `LoaderResult`, `LoaderSkipResult`, or `None` |
 
 A unit may import another unit's `node.py` only to name that node in `depends_on`. It may import
@@ -322,7 +322,7 @@ The other size limits check every function.
 ## Unreachable definitions
 
 `SQBRPYTHON306` reports functions, classes and module values that nothing SQLBuild loads can reach.
-SQLBuild loads every decorated function under `python/` (`@loader`, `@task`, `@asset`, `@check`,
+SQLBuild loads every decorated function under `python/` (`@loader`, `@asset`, `@check`,
 `@factory` and `@audit_factory`) and everything defined outside `python/`, such as hooks and
 providers. A definition reached only through them is live. Imports through folders without an
 `__init__.py` count too.
@@ -389,7 +389,7 @@ remediation.
 | `SQBRPYTHON008` | node-import-boundaries | `python/` | yes | A unit imports only what it owns, its domain's role files, `python/utils/`, provider role files and other nodes for `depends_on` |
 | `SQBRPYTHON009` | checks-module-shape | `python/` | yes | `checks.py` holds checks of the unit's node that return directly, or one factory |
 | `SQBRPYTHON010` | factory-shape | `python/` | yes | A factory loops over its unit's specs and names every node it generates |
-| `SQBRPYTHON011` | node-description-not-docstring | `python/` | yes | Tasks, assets and checks set `description=` without a docstring; loaders set neither |
+| `SQBRPYTHON011` | node-description-not-docstring | `python/` | yes | Assets and checks set `description=` without a docstring; loaders set neither |
 | `SQBRPYTHON012` | node-declared-in-unit | `python/` | yes | Nodes are declared in a unit's `node.py`, and checks in its `checks.py` |
 
 ### Providers

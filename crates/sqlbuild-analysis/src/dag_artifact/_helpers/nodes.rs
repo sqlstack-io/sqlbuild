@@ -394,7 +394,7 @@ pub(crate) fn model_node(model: &DagModelInput) -> DagValue {
     .value()
 }
 
-/// The node of a Python task, asset or check.
+/// The node of a Python asset or check.
 pub(crate) fn python_node(node: &DagPythonNodeInput) -> DagValue {
     let mut fields: NodeFields = NodeFields {
         id: python_node_id(&node.kind, &node.name),

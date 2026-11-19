@@ -140,7 +140,7 @@ Python hooks declare a `HookContext` parameter named `ctx`, `context`, `_ctx`, o
 
 ## Providers
 
-Providers may be injected into Python hook parameters by name or accessed through `ctx.providers`. They are resolved lazily using the same lifecycle as loaders, tasks, assets, and checks. SQL hooks cannot use providers because they are compiled SQL statements rather than Python callables.
+Providers may be injected into Python hook parameters by name or accessed through `ctx.providers`. They are resolved lazily using the same lifecycle as loaders, assets, and checks. SQL hooks cannot use providers because they are compiled SQL statements rather than Python callables.
 
 ```python
 from sqlbuild.hooks import hook

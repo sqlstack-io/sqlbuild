@@ -957,12 +957,12 @@ class OrdersProvider(Provider):
 """
 
 
-def write_provider_task_project(*, project_dir: Path, annotation: str) -> None:
-    """Write a DuckDB project whose task takes a provider parameter with `annotation`."""
+def write_provider_asset_project(*, project_dir: Path, annotation: str) -> None:
+    """Write a DuckDB project whose asset takes a provider parameter with `annotation`."""
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": (
-            'name = "orders_tasks"\nadapter = "duckdb"\n\n'
+            'name = "orders_assets"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "orders.duckdb"\n'
         ),
         "providers/orders.py": PROVIDER_SOURCE,

@@ -83,7 +83,7 @@ error[P010]: model 'orders_summary' has no description
 | SQL function or table function | `FUNCTION (description "...")` |
 | Python UDF | `@udf(description="...")` or the function docstring |
 | Named SQL hook | `HOOK (description "...")` |
-| Python hook, task, asset, check | `description="..."` on the decorator or the function docstring |
+| Python hook, asset, check | `description="..."` on the decorator or the function docstring |
 | Loader | `@loader(description="...")` or the function docstring; a loader that feeds a declared source may instead rely on the source's YAML description |
 | Provider | The provider class docstring |
 

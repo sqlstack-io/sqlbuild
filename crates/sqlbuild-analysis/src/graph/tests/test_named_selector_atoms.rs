@@ -31,7 +31,7 @@ fn given_a_selection_when_listing_named_atoms_then_only_single_node_names_count(
         },
         NamedAtomsTestCase {
             description: "kinds do not count",
-            selection: "kind:model kind:task",
+            selection: "kind:model kind:asset",
             expected_atoms: &[],
         },
         NamedAtomsTestCase {

@@ -21,7 +21,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 |------|-------------|
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--no-cache` | Bypass the reusable compile-analysis cache for this invocation |
-| `--no-python` | Exclude read-side Python tasks and assets from the plan |
+| `--no-python` | Exclude read-side Python assets from the plan |
 | `--defer-to` | Resolve unselected model references against another target |
 | `--plan-from` | Read warehouse state `live`, or from the target's `synced_state` checked against the warehouse first; overrides the target's `plan_from`. See [Planning from synced state](/docs/concepts/project-configuration#planning-from-synced-state) |
 | `--as` | Compile for another target and show its plan, including [model migration](/docs/concepts/models/migrations) decisions, using the current connection. Inspection only. |

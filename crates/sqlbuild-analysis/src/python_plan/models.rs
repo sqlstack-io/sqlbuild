@@ -5,7 +5,7 @@ use crate::assembly::project::types::ObjectKey;
 /// One Python node as lifecycle classification reads it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LifecycleNode {
-    /// `task`, `asset`, `loader` or `check`.
+    /// `asset`, `loader` or `check`.
     pub kind: String,
     /// The SQL resources the node reads, in authored order.
     pub sql_deps: Vec<ObjectKey>,

@@ -191,9 +191,9 @@ fn given_run_selectors_when_resolving_then_selection_matches_python() {
         },
         RunSelectionTestCase {
             description: "kind selects every Python node of one kind",
-            select: &["kind:task"],
+            select: &["kind:asset"],
             exclude: &[],
-            expected_selection: Ok((&[], &["prepare_orders"])),
+            expected_selection: Ok((&[], &["export_orders", "prepare_orders"])),
         },
         RunSelectionTestCase {
             description: "+ expands only the comma part it marks: upstream of a node, then only its sources",
@@ -211,7 +211,7 @@ fn given_run_selectors_when_resolving_then_selection_matches_python() {
             description: "kind excludes like tag",
             select: &["tag:daily"],
             exclude: &["kind:asset"],
-            expected_selection: Ok((&[("model", "orders")], &["prepare_orders"])),
+            expected_selection: Ok((&[("model", "orders")], &[])),
         },
         RunSelectionTestCase {
             description: "an unknown kind is refused",

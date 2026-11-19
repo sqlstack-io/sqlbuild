@@ -192,9 +192,9 @@ fn given_python_node_results_when_rendering_then_shows_status_and_detail() {
             ],
             expected_failed: true,
             expected_text: concat!(
-                "  python    task      count_orders                                       OK\n",
+                "  python    asset     count_orders                                       OK\n",
                 "  python    asset     extract                                            SKIP  upstream failed\n",
-                "  python    task      boom                                               FAIL  boom\n",
+                "  python    asset     boom                                               FAIL  boom\n",
             ),
         },
         PythonRowsTestCase {

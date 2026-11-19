@@ -323,10 +323,13 @@ fn removed_tasks_guidance(
     let Some(cause) = error.cause(py) else {
         return error;
     };
-    if !cause.is_instance_of::<PyImportError>(py)
-        || !imports_removed_tasks(cause.value(py).as_any())
-    {
+    if !cause.is_instance_of::<PyImportError>(py) {
         return error;
+    }
+    match imports_removed_tasks(cause.value(py).as_any()) {
+        Ok(true) => {}
+        Ok(false) => return error,
+        Err(unexpected) => return unexpected,
     }
     let Ok(path) = project.relative_to(file_path) else {
         return error;
@@ -339,14 +342,21 @@ fn removed_tasks_guidance(
 }
 
 /// Whether an `ImportError` names `sqlbuild.tasks`, or `tasks` imported from `sqlbuild`.
-fn imports_removed_tasks(error: &Bound<'_, PyAny>) -> bool {
-    let text = |attribute: &str| -> Option<String> {
-        error.getattr_opt(attribute).ok().flatten()?.extract().ok()
+fn imports_removed_tasks(error: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let text = |attribute: &str| -> PyResult<Option<String>> {
+        Ok(error
+            .getattr_opt(attribute)?
+            .map(|value| value.extract())
+            .transpose()?
+            .flatten())
     };
     let (package, name) = REMOVED_TASKS;
-    let imported: Option<String> = text("name");
-    imported.as_deref() == Some(format!("{package}.{name}").as_str())
-        || (imported.as_deref() == Some(package) && text("name_from").as_deref() == Some(name))
+    let imported: Option<String> = text("name")?;
+    Ok(
+        imported.as_deref() == Some(format!("{package}.{name}").as_str())
+            || (imported.as_deref() == Some(package)
+                && text("name_from")?.as_deref() == Some(name)),
+    )
 }
 
 fn audit_cases<'py>(

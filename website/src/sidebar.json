@@ -175,7 +175,6 @@
 				"items": [
 					"docs/concepts/python-nodes/overview",
 					"docs/concepts/python-nodes/loaders",
-					"docs/concepts/python-nodes/tasks",
 					"docs/concepts/python-nodes/assets",
 					"docs/concepts/python-nodes/checks",
 					"docs/concepts/python-nodes/factories",

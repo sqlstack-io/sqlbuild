@@ -9,7 +9,7 @@ use crate::python_plan::tests::test_types::LifecycleTestCase;
 fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
     let test_cases = [
         LifecycleTestCase {
-            description: "a loader pulls its selected upstream tasks into ingress",
+            description: "a loader pulls its selected upstream assets into ingress",
             selected: &["fetch_rates", "load_orders", "report", "check_orders"],
             nodes: &[
                 ("fetch_rates", "asset", &[]),

@@ -34,7 +34,7 @@ fn python_node(name: &str, kind: &str) -> (String, ReviewNode) {
     )
 }
 
-/// A waffle shop with a critical `daily_revenue`, a loader-fed `stg_toppings` and a Python task.
+/// A waffle shop with a critical `daily_revenue`, a loader-fed `stg_toppings` and a Python asset.
 pub(super) fn waffle_shop() -> ReviewGraph {
     let edges: [(&str, &str); 8] = [
         ("waffle_types", "stg_orders"),

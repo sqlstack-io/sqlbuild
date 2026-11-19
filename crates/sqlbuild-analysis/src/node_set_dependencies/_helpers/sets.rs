@@ -119,8 +119,7 @@ pub(crate) fn members(
         };
         return Err(failure(
             format!(
-                "{owner} depends on {set}, which leaves no model, seed, source, loader, task or \
-                 asset{after}"
+                "{owner} depends on {set}, which leaves no model, seed, source, loader or asset{after}"
             ),
             None,
         ));

@@ -2,7 +2,7 @@
 
 # Checks
 
-> Validate tasks, assets, loaders, and SQL relations with Python checks.
+> Validate assets, loaders, and SQL relations with Python checks.
 
 Online: https://sqlbuild.com/docs/concepts/python-nodes/checks/
 
@@ -16,9 +16,9 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/checks/
 - Running checks
 - Checks vs audits
 
-Checks are Python nodes that validate the output of tasks, assets, and loaders, or the data in SQL models, sources, and seeds. They are the Python analog of SQL [audits](../audits.md). See [Python Nodes](overview.md) for the shared model.
+Checks are Python nodes that validate the output of assets and loaders, or the data in SQL models, sources, and seeds. They are the Python analog of SQL [audits](../audits.md). See [Python Nodes](overview.md) for the shared model.
 
-Checks are separate graph nodes, not callbacks embedded in a task or asset. A check declares what it validates through `depends_on`.
+Checks are separate graph nodes, not callbacks embedded in an asset. A check declares what it validates through `depends_on`.
 
 ## Defining a check
 
@@ -27,7 +27,7 @@ Place Python files under `python/` (the playgrounds use `python/checks/`) and de
 ```python
 # python/checks/orders.py
 from sqlbuild.checks import check, CheckContext
-from python.tasks.orders import export_orders
+from python.exports.orders import export_orders
 
 @check(depends_on=export_orders)
 def check_orders_exported(ctx: CheckContext):
@@ -97,7 +97,7 @@ def orders_freshness(ctx):
 
 ## What checks can depend on
 
-- Checks may depend on **tasks, assets, and loaders**.
+- Checks may depend on **assets and loaders**.
 - Checks may depend on SQL **models, sources, and seeds** through `model()`, `source()`, and `seed()` references. They may **not** depend on functions.
 - Checks may **not** depend on other checks.
 - Checks may **not** depend on a terminal source loader directly. Validate loaded source data with a source audit instead.
@@ -108,7 +108,7 @@ A check that depends on a single node is displayed grouped under that node. Mult
 
 | Parameter | Description |
 |-----------|-------------|
-| `depends_on` | Required. Tasks/assets/loaders to validate, and `model()`/`source()`/`seed()` references (function, reference, tuple, or list) |
+| `depends_on` | Required. Assets/loaders to validate, and `model()`/`source()`/`seed()` references (function, reference, tuple, or list) |
 | `name` | Override the node name (defaults to the function name) |
 | `severity` | `error` (default) or `warn` |
 | `tags` | Labels for selection and grouping |
@@ -137,13 +137,13 @@ sqb check --select +check_orders_exported
 sqb check --select tag:exports
 ```
 
-`sqb check` rejects selecting non-check nodes; use `sqb build` to run tasks and assets. The models, sources, and seeds a check depends on must already exist; `sqb check` does not build them. Check results are written to `target/run/checks/python_checks.json`, and `sqb check --json` prints them to stdout.
+`sqb check` rejects selecting non-check nodes; use `sqb build` to run assets. The models, sources, and seeds a check depends on must already exist; `sqb check` does not build them. Check results are written to `target/run/checks/python_checks.json`, and `sqb check --json` prints them to stdout.
 
 ## Checks vs audits
 
 | | Checks | Audits |
 |---|--------|--------|
-| Validates | Python tasks, assets, loaders, and SQL relations | SQL relations |
+| Validates | Python assets, loaders, and SQL relations | SQL relations |
 | Authored in | `python/` (Python) | `MODEL()` headers / `audits/` (SQL) |
 | Run by | `sqb build`, `sqb check` | `sqb build`, `sqb audit` |
 | Severity | `error`, `warn` | `error`, `warn` |

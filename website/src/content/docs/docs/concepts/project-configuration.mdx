@@ -152,7 +152,7 @@ A target is a named build context - the database and schema you build into, plus
 | Field | Description |
 |-------|-------------|
 | `schema` | Schema for all models in this target; required for named targets |
-| `loader_schema` | Default write schema for managed source loaders; falls back to `schema`. Required when `schema` is `preserve` and the project has loaders, tasks, assets or checks, because their [results](/docs/concepts/python-nodes/overview#result-persistence) go there |
+| `loader_schema` | Default write schema for managed source loaders; falls back to `schema`. Required when `schema` is `preserve` and the project has loaders, assets or checks, because their [results](/docs/concepts/python-nodes/overview#result-persistence) go there |
 | `database` | Database for all models in this target |
 | `connection` | Name from `[connections.<name>]` used for endpoint, authentication, and compute; optional when exactly one named connection is defined |
 | `vars` | Target-specific project variables |
@@ -525,7 +525,7 @@ delta_compile = true
 | `scenario_timeout` | none | Time limit for each scenario, or `"disabled"` |
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](/docs/cli/compile#compiling-after-an-edit). |
 | `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](/docs/concepts/python-nodes/providers#secrets). |
-| `allow_warehouse_round_trips` | `false` | Allow a loader to depend on a task or asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](/docs/concepts/python-nodes/overview#warehouse-round-trips). |
+| `allow_warehouse_round_trips` | `false` | Allow a loader to depend on an asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](/docs/concepts/python-nodes/overview#warehouse-round-trips). |
 | `ignore_audit_failures` | `false` | Let builds go on past failing audits: they still run and record `fail`, but promote, apply and build downstream as if they passed. A target, a job and `--ignore-audit-failures` / `--no-ignore-audit-failures` override it. See [Ignoring audit failures](/docs/concepts/audits#ignoring-audit-failures). |
 | `record_run_host` | `true` | Record the machine name in each run's rows in `_sqlbuild_runs`. See [Run records](/docs/cli/build#run-records). |
 
@@ -588,7 +588,7 @@ Every reference to a model, source, or seed must be explicit and typed. By defau
 - A macro whose expanded output contains `__ref()`, `__source()`, or `__seed()` fails to compile
   with `P006`. Pass the reference to the macro as an argument instead; see
   [Typed reference arguments](/docs/concepts/macros/python-macros#typed-reference-arguments).
-- Literal SQL passed to `ctx.query()` or `ctx.execute_sql()` in a task, asset, check, loader, or
+- Literal SQL passed to `ctx.query()` or `ctx.execute_sql()` in an asset, check, loader, or
   Python hook that names a project relation fails to compile with `P008`.
 - The same check runs on SQL sent at run time and reports a `P008` warning; the query still runs.
   See [Hard-coded relation names](/docs/concepts/python-nodes/sql-references#hard-coded-relation-names).
@@ -780,7 +780,7 @@ See [skills CLI reference](/docs/cli/skills) for usage details.
 ## Project Python
 
 Project-owned Python lives in a small set of roots. Anything that runs as part of the pipeline graph
-goes in `python/`: loaders, tasks, assets, checks, factories, and the helper modules they import.
+goes in `python/`: loaders, assets, checks, factories, and the helper modules they import.
 Modules under `python/` are normal Python: constants, classes, undecorated helper functions, and
 helper-only modules such as `python/_helpers.py` are allowed, while decorators determine which
 functions become graph nodes. See [Python nodes](/docs/concepts/python-nodes/overview#the-python-folder).

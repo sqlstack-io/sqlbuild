@@ -1030,7 +1030,7 @@ pub struct SelectionRefusal {
     pub part: String,
     /// Which comma part of the token it is, from 0.
     pub index: u32,
-    /// `tag`, `path`, `job`, `source`, `seed`, `kind`, `test`, `name`, `glob`, or a Python node type such as `task`.
+    /// `tag`, `path`, `job`, `source`, `seed`, `kind`, `test`, `name`, `glob`, or a Python node type such as `asset`.
     #[serde(rename = "type")]
     pub selector_type: String,
     /// The value the part names, without its type prefix or `+` markers, such as `finanse`.

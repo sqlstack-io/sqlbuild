@@ -29,7 +29,7 @@ fn given_job_and_tag_dependencies_when_resolving_then_each_reduces_to_its_end_no
             description: "a Python node reading the job's model is its end",
             groups: &[],
             sets: &[("job", "with_task", None)],
-            expected_ends: &[&["task 'export_orders'"]],
+            expected_ends: &[&["asset 'export_orders'"]],
         },
         EndNodesTestCase {
             description: "exclude removes nodes before reducing to end nodes",
@@ -89,7 +89,7 @@ fn given_unresolvable_dependencies_when_resolving_then_compile_fails_naming_the_
             groups: &[],
             sets: &[("job", "weekly", None)],
             expected_fragments: &[
-                "task 'report' depends on job 'weekly', which the project does not declare",
+                "asset 'report' depends on job 'weekly', which the project does not declare",
             ],
         },
         FailureTestCase {
@@ -98,7 +98,7 @@ fn given_unresolvable_dependencies_when_resolving_then_compile_fails_naming_the_
             groups: &[],
             sets: &[("tag", "marketing", None)],
             expected_fragments: &[
-                "task 'report' depends on tag 'marketing', which no node carries",
+                "asset 'report' depends on tag 'marketing', which no node carries",
             ],
         },
         FailureTestCase {
@@ -133,7 +133,7 @@ fn given_unresolvable_dependencies_when_resolving_then_compile_fails_naming_the_
             groups: &[],
             sets: &[("job", "loop", None)],
             expected_fragments: &[
-                "task 'report' depends on job 'loop', but job 'loop''s task 'audit_export' reads task 'report''s output",
+                "asset 'report' depends on job 'loop', but job 'loop''s asset 'audit_export' reads asset 'report''s output",
                 "job(\"loop\", exclude=\"audit_export\")",
             ],
         },
@@ -143,7 +143,7 @@ fn given_unresolvable_dependencies_when_resolving_then_compile_fails_naming_the_
             groups: &[],
             sets: &[("tag", "finance", None)],
             expected_fragments: &[
-                "task 'self_tagged' depends on tag 'finance', which includes task 'self_tagged' itself",
+                "asset 'self_tagged' depends on tag 'finance', which includes asset 'self_tagged' itself",
                 "tag(\"finance\", exclude=\"self_tagged\")",
             ],
         },

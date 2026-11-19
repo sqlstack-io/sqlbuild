@@ -79,7 +79,7 @@ Downstream models the policy leaves out are always listed as **not validated**, 
 The impact tree is computed from the whole changed set, whatever the policy.
 
 A review never runs [Python nodes](../concepts/python-nodes/overview.md). A changed Python node,
-and every task, asset or check downstream of a change, appears in the impact tree as not validated
+and every asset or check downstream of a change, appears in the impact tree as not validated
 with the reason. So does every model that reads a changed loader's source, directly or through
 other models: the review would build it from the `--against` data rather than from the changed
 loader, so it is listed as `reads Python node loader:<name>, not rebuilt by review` instead of
