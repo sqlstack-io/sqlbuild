@@ -893,9 +893,10 @@ These stay unknown until it does:
   plan takes as declared.
 
 A location keeps its last 16 plans for the current publication and synced copy, in memory, and
-answers an identical request with the plan it kept instead of planning again. A newer publication
+answers an identical request with the plan it kept instead of planning again, for up to 10
+minutes: a plan's incremental windows and expiry follow the time it was made. A newer publication
 or synced copy drops them all. A kept plan's `timings` say so in `reused_from`, the time it was
-made. The page's **Plan again** asks for a fresh plan.
+made, and the page shows its age. The page's **Plan again** asks for a fresh plan.
 
 Over the API, queue a plan, then read it until `result_json` is set. `fresh` is required: `true`
 plans again even when the location kept a plan for the same command.
