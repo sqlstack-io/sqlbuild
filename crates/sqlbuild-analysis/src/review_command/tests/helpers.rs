@@ -42,7 +42,7 @@ pub(super) fn waffle_shop() -> ReviewGraph {
         ("order_totals", "daily_revenue"),
         ("stg_orders", "order_archive"),
         ("stg_customers", "customer_lifetime"),
-        ("daily_revenue", "task:export_revenue"),
+        ("daily_revenue", "asset:export_revenue"),
         ("loader:raw_toppings", "stg_toppings"),
         ("stg_toppings", "topping_totals"),
     ];
@@ -62,7 +62,7 @@ pub(super) fn waffle_shop() -> ReviewGraph {
             node("order_archive", "model", false),
             node("daily_revenue", "model", true),
             node("customer_lifetime", "model", false),
-            python_node("task:export_revenue", "task"),
+            python_node("asset:export_revenue", "asset"),
             python_node("loader:raw_toppings", "loader"),
             node("stg_toppings", "model", false),
             node("topping_totals", "model", true),
@@ -81,7 +81,7 @@ pub(super) fn waffle_shop() -> ReviewGraph {
             "order_totals",
             "topping_totals",
             "daily_revenue",
-            "task:export_revenue",
+            "asset:export_revenue",
         ]
         .iter()
         .map(|name| (*name).to_owned())

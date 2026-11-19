@@ -176,7 +176,7 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                 Path("sqlbuild_project.toml"),
                 Path("sources/raw.yml"),
                 Path("models/fact_orders.sql"),
-                Path("python/tasks/orders.py"),
+                Path("python/assets/orders_inputs.py"),
                 Path("python/loaders/orders.py"),
                 Path("python/assets/orders_export.py"),
                 Path("python/checks/orders_export.py"),
@@ -188,9 +188,9 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                     ("[connections.developer]", 'connection = "developer"'),
                 ),
                 (
-                    Path("python/tasks/orders.py"),
+                    Path("python/assets/orders_inputs.py"),
                     (
-                        "from sqlbuild.tasks import SkipMode, task",
+                        "from sqlbuild.assets import SkipMode, asset",
                         "def prepare_raw_orders",
                         "SkipMode.SOFT",
                         "def export_window",
@@ -216,7 +216,9 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                     ),
                 ),
             ),
-            unexpected_file_fragments=((Path("python/tasks/orders.py"), ("sqlbuild.compiler",)),),
+            unexpected_file_fragments=(
+                (Path("python/assets/orders_inputs.py"), ("sqlbuild.compiler",)),
+            ),
         ),
     ],
     ids=lambda case: case.description,

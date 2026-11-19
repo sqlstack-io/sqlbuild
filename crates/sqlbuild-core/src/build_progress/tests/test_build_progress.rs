@@ -51,7 +51,7 @@ fn given_build_results_when_formatting_footer_then_matches_python_layout() {
             },
             python: vec![PythonNodeText {
                 name: "refresh".to_owned(),
-                kind: "task".to_owned(),
+                kind: "asset".to_owned(),
                 status: "failed".to_owned(),
                 error_message: None,
                 warnings: Vec::new(),

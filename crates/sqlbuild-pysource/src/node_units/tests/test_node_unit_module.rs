@@ -6,9 +6,9 @@ use crate::node_units::tests::test_types::{
     FunctionTestCase, ImportsTestCase, StatementKindsTestCase,
 };
 
-const CRLF_NODE_MODULE: &str = "\"\"\"Doc.\"\"\"\r\nfrom .main import main\r\nfrom python.orders.daily.node import daily as upstream\r\nimport python.utils.text\r\n\r\nX = 'é'\r\n\r\n\r\n@sqlbuild.task(depends_on=[upstream], description=\"D.\")\r\ndef run(ctx: TaskContext, /, *, store: \"providers.Store\") -> PythonNodeResult | None:\r\n    \"\"\"Doc.\"\"\"\r\n    return main(ctx=ctx, store=store)\r\n";
+const CRLF_NODE_MODULE: &str = "\"\"\"Doc.\"\"\"\r\nfrom .main import main\r\nfrom python.orders.daily.node import daily as upstream\r\nimport python.utils.text\r\n\r\nX = 'é'\r\n\r\n\r\n@sqlbuild.task(depends_on=[upstream], description=\"D.\")\r\ndef run(ctx: AssetContext, /, *, store: \"providers.Store\") -> PythonNodeResult | None:\r\n    \"\"\"Doc.\"\"\"\r\n    return main(ctx=ctx, store=store)\r\n";
 
-const FACTORY_MODULE: &str = "@factory\ndef tables():\n    for table in TABLES:\n        for _ in specs():\n            pass\n\n        @task(name=table)\n        def load(ctx, *args, **kwargs) -> Optional[Union[LoaderResult, list]]:\n            rows = main(ctx=ctx)\n            return rows\n\n    def plain():\n        return main(ctx, **extra)\n";
+const FACTORY_MODULE: &str = "@factory\ndef tables():\n    for table in TABLES:\n        for _ in specs():\n            pass\n\n        @asset(name=table)\n        def load(ctx, *args, **kwargs) -> Optional[Union[LoaderResult, list]]:\n            rows = main(ctx=ctx)\n            return rows\n\n    def plain():\n        return main(ctx, **extra)\n";
 
 #[test]
 fn given_module_when_reading_then_each_top_level_statement_has_its_kind() {
@@ -90,11 +90,11 @@ fn given_declaration_when_reading_then_signature_body_and_inner_declarations_are
                 name: "run".to_owned(),
                 position: at(10, 5),
                 decorators: vec![decorator(
-                    "task",
+                    "asset",
                     &["depends_on", "description"],
                     &["upstream"],
                 )],
-                positional: vec![parameter("ctx", Some("TaskContext"))],
+                positional: vec![parameter("ctx", Some("AssetContext"))],
                 variadic: false,
                 keyword_only: vec![parameter("store", Some("Store"))],
                 keywords_variadic: false,
@@ -124,7 +124,7 @@ fn given_declaration_when_reading_then_signature_body_and_inner_declarations_are
                 inner: vec![UnitFunction {
                     name: "load".to_owned(),
                     position: at(8, 13),
-                    decorators: vec![decorator("task", &["name"], &[])],
+                    decorators: vec![decorator("asset", &["name"], &[])],
                     positional: vec![parameter("ctx", None)],
                     variadic: true,
                     keyword_only: vec![],

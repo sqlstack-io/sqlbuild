@@ -28,11 +28,11 @@ from sqlbuild.assets import asset
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 def make_task(name):
-    @task(name=name)
+    @asset(name=name)
     def generated_task(ctx):
         return {"name": name}
     return generated_task
@@ -197,10 +197,10 @@ REGION = "emea"
 from python._helpers import REGION
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(name="prepare_orders")
+@asset(name="prepare_orders")
 def prepare_orders(ctx):
     return {"region": REGION}
 
@@ -233,13 +233,13 @@ def test_given_factory_nodes_when_discovering_python_nodes_then_returns_generate
     result: DiscoveredPythonNodeFunctions = discover_python_node_functions(project_dir=tmp_path)
 
     assert tuple(node.name for node in result.loaders) == test_case.expected_loader_names
-    assert tuple(node.name for node in result.tasks) == test_case.expected_task_names
+    assert tuple(node.name for node in result.assets) == test_case.expected_task_names
     assert tuple(node.name for node in result.assets) == test_case.expected_asset_names
     assert tuple(node.name for node in result.checks) == test_case.expected_check_names
     assert tuple(len(node.depends_on) for node in result.loaders) == (
         test_case.expected_loader_dependency_counts
     )
-    assert tuple(len(node.depends_on) for node in result.tasks) == (
+    assert tuple(len(node.depends_on) for node in result.assets) == (
         test_case.expected_task_dependency_counts
     )
     assert tuple(len(node.depends_on) for node in result.assets) == (
@@ -370,10 +370,10 @@ def broken_factory():
             files={
                 "python/tasks/generated.py": """
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(name="generated_task")
+@asset(name="generated_task")
 def generated_task(ctx):
     return None
 

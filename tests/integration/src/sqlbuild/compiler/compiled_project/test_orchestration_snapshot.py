@@ -456,8 +456,8 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                 ),
                 "python/tasks/publish_orders.py": (
                     "from providers.fulfillment import FulfillmentApi\n"
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
                     "def publish_orders(fulfillment_api: FulfillmentApi):\n"
                     '    """Send orders to fulfillment."""\n'
                 ),
@@ -537,10 +537,14 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                             },
                         ],
                         "used_by": [
-                            {"kind": "task", "name": "publish_orders"},
+                            {"kind": "asset", "name": "publish_orders"},
                             {"kind": "hook", "name": "notify_fulfillment"},
                         ],
-                        "nodes": ["hook:notify_fulfillment", "model:orders", "task:publish_orders"],
+                        "nodes": [
+                            "hook:notify_fulfillment",
+                            "model:orders",
+                            "asset:publish_orders",
+                        ],
                     }
                 ]
             },
@@ -2204,22 +2208,22 @@ def test_given_projects_compiled_in_one_process_when_one_imports_orchestration_t
         ),
         PythonJobSelectionTestCase(
             description="a task selector selects only the task",
-            select="task:request_carrier_collection",
-            expected_selection=("task:request_carrier_collection",),
+            select="asset:request_carrier_collection",
+            expected_selection=("asset:request_carrier_collection",),
         ),
         PythonJobSelectionTestCase(
             description="typed selectors select the task and the asset it depends on",
-            select="task:request_carrier_collection asset:partner_orders_file",
-            expected_selection=("asset:partner_orders_file", "task:request_carrier_collection"),
+            select="asset:request_carrier_collection asset:partner_orders_file",
+            expected_selection=("asset:partner_orders_file", "asset:request_carrier_collection"),
         ),
         PythonJobSelectionTestCase(
             description="upstream of a task crosses its Python and SQL dependencies",
-            select="+task:request_carrier_collection",
+            select="+asset:request_carrier_collection",
             expected_selection=(
                 "asset:partner_orders_file",
                 "model:orders",
                 "model:stg_orders",
-                "task:request_carrier_collection",
+                "asset:request_carrier_collection",
             ),
         ),
         PythonJobSelectionTestCase(
@@ -2234,7 +2238,7 @@ def test_given_projects_compiled_in_one_process_when_one_imports_orchestration_t
                 "asset:partner_orders_file",
                 "model:orders",
                 "model:stg_orders",
-                "task:request_carrier_collection",
+                "asset:request_carrier_collection",
             ),
         ),
     ],
@@ -2299,14 +2303,14 @@ def test_given_python_dependencies_across_jobs_when_publishing_a_group_then_jobs
         PythonJobGroupCycleTestCase(
             description="a Python edge that closes a cycle names both jobs and the edges",
             jobs=(
-                ("staging_job", "stg_orders task:request_carrier_collection"),
+                ("staging_job", "stg_orders asset:request_carrier_collection"),
                 ("export_job", "asset:partner_orders_file"),
             ),
             expected_message=(
                 "group dependencies contain a cycle in job group orders_nightly_job_group: "
                 "export_job waits for staging_job (model:orders reads model:stg_orders); "
                 "staging_job waits for export_job "
-                "(task:request_carrier_collection reads asset:partner_orders_file)"
+                "(asset:request_carrier_collection reads asset:partner_orders_file)"
             ),
         ),
     ],

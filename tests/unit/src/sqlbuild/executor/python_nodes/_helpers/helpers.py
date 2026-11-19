@@ -18,7 +18,6 @@ from sqlbuild._native import (
     DiscoveredLoaderFunction,
     DiscoveredProjectInputs,
     DiscoveredPythonNode,
-    DiscoveredTaskFunction,
     LocalConfig,
     ProjectConfig,
     PythonNodeGraph,
@@ -52,7 +51,6 @@ from sqlbuild.observability import LifecycleEvent
 from sqlbuild.providers import Provider
 from sqlbuild.python_nodes.types import PythonCheckSeverity
 from sqlbuild.refs import model
-from sqlbuild.tasks import TaskContext, task
 from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
     build_intermediate_loader_asset_dependency_python_node_graph,
     build_orders_python_node_graph,
@@ -181,7 +179,7 @@ class PythonNodeContextTestResultStore:
         return self._results.get((node_type, node_name), ())[:limit]
 
 
-def provider_task(ctx: TaskContext, slack_provider: ExecutionSlackProvider) -> dict[str, object]:
+def provider_task(ctx: AssetContext, slack_provider: ExecutionSlackProvider) -> dict[str, object]:
     return {"target": ctx.target, "provider": slack_provider.label}
 
 
@@ -193,7 +191,7 @@ def provider_check(ctx: CheckContext, slack_provider: ExecutionSlackProvider) ->
     return ctx.target == "dev" and slack_provider.label == "slack"
 
 
-def context_provider_task(ctx: TaskContext) -> dict[str, object]:
+def context_provider_task(ctx: AssetContext) -> dict[str, object]:
     return {
         "attr": cast(ExecutionSlackProvider, ctx.providers.slack_provider).label,
         "item": cast(ExecutionSlackProvider, ctx.providers["slack_provider"]).label,
@@ -214,7 +212,7 @@ def context_provider_check(ctx: CheckContext) -> bool:
     )
 
 
-def missing_context_provider_task(ctx: TaskContext) -> object:
+def missing_context_provider_task(ctx: AssetContext) -> object:
     return ctx.providers["slack_provider"]
 
 
@@ -225,8 +223,8 @@ def build_task_context(
     logger_name: str,
     run_state: PythonNodeRunState | None = None,
     result_store: object | None = None,
-) -> TaskContext:
-    return TaskContext(
+) -> AssetContext:
+    return AssetContext(
         adapter=adapter,
         connection_config={"warehouse": "dev"},
         connection=object(),
@@ -293,18 +291,18 @@ def build_check_context(
     )
 
 
-@task
+@asset
 def upstream_task(_ctx: object) -> object:
     return None
 
 
-@task
+@asset
 def skipped_upstream_task(_ctx: object) -> object:
     return None
 
 
-@task
-def fetch_orders(ctx: TaskContext) -> object:
+@asset
+def fetch_orders(ctx: AssetContext) -> object:
     return ctx.result(
         payload={"file": "orders.json"},
         metadata={"row_count": 3},
@@ -326,11 +324,11 @@ def export_orders(ctx: AssetContext) -> object:
     )
 
 
-def skip_empty_orders(ctx: TaskContext) -> object:
+def skip_empty_orders(ctx: AssetContext) -> object:
     return ctx.skip(reason="No new orders")
 
 
-def hard_skip_empty_orders(ctx: TaskContext) -> object:
+def hard_skip_empty_orders(ctx: AssetContext) -> object:
     return ctx.skip(reason="No new orders", mode=SkipMode.HARD)
 
 
@@ -338,7 +336,7 @@ def export_after_skip(ctx: AssetContext) -> object:
     return ctx.result(payload={"uri": "should-not-run"}, materialized=True)
 
 
-def successful_sibling(ctx: TaskContext) -> object:
+def successful_sibling(ctx: AssetContext) -> object:
     return ctx.result(payload={"status": "ready"})
 
 
@@ -346,11 +344,11 @@ def export_after_mixed_skip(ctx: AssetContext) -> object:
     return ctx.result(payload={"uri": "s3://exports/orders.json"}, materialized=True)
 
 
-def fail_orders(_ctx: TaskContext) -> object:
+def fail_orders(_ctx: AssetContext) -> object:
     raise RuntimeError("API unavailable")
 
 
-def cursor_window(ctx: TaskContext) -> object:
+def cursor_window(ctx: AssetContext) -> object:
     return ctx.result(
         payload={
             "start_cursor_ts": ctx.start_cursor_ts,
@@ -379,22 +377,22 @@ class FlakyTask:
         self.exception_type: type[Exception] = exception_type
         self.attempts: int = 0
         self.cost_contexts: list[CostResourceContext | None] = []
-        failures: Iterator[Callable[[TaskContext], object]] = (
+        failures: Iterator[Callable[[AssetContext], object]] = (
             self._raise_transient_failure for _attempt in range(self.failures_before_success)
         )
         self._strategies = iter(chain(failures, repeat(self._return_success)))
 
-    def __call__(self, ctx: TaskContext) -> object:
+    def __call__(self, ctx: AssetContext) -> object:
         self.attempts += 1
         cost_context: CostResourceContext | None = CostContext.current()
         self.cost_contexts.append(cost_context)
         return next(self._strategies)(ctx)
 
-    def _raise_transient_failure(self, ctx: TaskContext) -> object:
+    def _raise_transient_failure(self, ctx: AssetContext) -> object:
         del ctx
         raise self.exception_type("transient failure")
 
-    def _return_success(self, ctx: TaskContext) -> object:
+    def _return_success(self, ctx: AssetContext) -> object:
         return ctx.result(payload={"attempts": self.attempts})
 
 
@@ -454,8 +452,8 @@ def ingress_calls() -> tuple[str, ...]:
     return tuple(INGRESS_CALLS)
 
 
-@task
-def prepare_ingress_orders(ctx: TaskContext) -> object:
+@asset
+def prepare_ingress_orders(ctx: AssetContext) -> object:
     INGRESS_CALLS.append("prepare_ingress_orders")
     return ctx.result(payload={"prepared": True})
 
@@ -481,7 +479,7 @@ def build_ingress_task_loader_graph() -> PythonNodeGraph:
             project_config=ProjectConfig(name="demo", adapter="duckdb"),
             local_config=LocalConfig(),
             loader_functions=(ingress_loader_function(),),
-            task_functions=(ingress_task_function(),),
+            asset_functions=(ingress_task_function(),),
         )
     )
 
@@ -491,8 +489,8 @@ def build_ingress_task_asset_graph() -> PythonNodeGraph:
         discovered_inputs=DiscoveredProjectInputs(
             project_config=ProjectConfig(name="demo", adapter="duckdb"),
             local_config=LocalConfig(),
-            task_functions=(ingress_task_function(),),
             asset_functions=(
+                ingress_task_function(),
                 DiscoveredAssetFunction(
                     file_path=Path("/project/assets/orders.py"),
                     relative_path=Path("python/assets/orders.py"),
@@ -505,8 +503,8 @@ def build_ingress_task_asset_graph() -> PythonNodeGraph:
     )
 
 
-def ingress_task_function() -> DiscoveredTaskFunction:
-    return DiscoveredTaskFunction(
+def ingress_task_function() -> DiscoveredAssetFunction:
+    return DiscoveredAssetFunction(
         file_path=Path("/project/tasks/orders.py"),
         relative_path=Path("python/tasks/orders.py"),
         name="prepare_ingress_orders",
@@ -544,8 +542,8 @@ def read_side_calls() -> tuple[str, ...]:
     return tuple(READ_SIDE_CALLS)
 
 
-@task(depends_on=(model("stg_orders"),))
-def profile_stg_orders(ctx: TaskContext) -> object:
+@asset(depends_on=(model("stg_orders"),))
+def profile_stg_orders(ctx: AssetContext) -> object:
     READ_SIDE_CALLS.append("profile_stg_orders")
     return ctx.result(payload={"profiled": True})
 
@@ -564,16 +562,14 @@ def build_read_side_sql_task_asset_graph() -> PythonNodeGraph:
         discovered_inputs=DiscoveredProjectInputs(
             project_config=ProjectConfig(name="demo", adapter="duckdb"),
             local_config=LocalConfig(),
-            task_functions=(
-                DiscoveredTaskFunction(
+            asset_functions=(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
                     relative_path=Path("python/tasks/orders.py"),
                     name="profile_stg_orders",
                     function=profile_stg_orders,
                     depends_on=(model("stg_orders"),),
                 ),
-            ),
-            asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/assets/orders.py"),
                     relative_path=Path("python/assets/orders.py"),
@@ -586,7 +582,7 @@ def build_read_side_sql_task_asset_graph() -> PythonNodeGraph:
     )
 
 
-@task(name="upstream_task")
+@asset(name="upstream_task")
 def check_upstream_task(_ctx: object) -> object:
     return {"rows": 3}
 
@@ -631,8 +627,8 @@ def build_python_check_graph(*, check_function: DiscoveredCheckFunction) -> Pyth
         discovered_inputs=DiscoveredProjectInputs(
             project_config=ProjectConfig(name="demo", adapter="duckdb"),
             local_config=LocalConfig(),
-            task_functions=(
-                DiscoveredTaskFunction(
+            asset_functions=(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
                     relative_path=Path("python/tasks/orders.py"),
                     name="upstream_task",

@@ -18,7 +18,7 @@ fn given_typed_selections_when_evaluated_then_keys_or_located_refusals_match_sqb
                 "asset:partner_orders_file",
                 "model:orders",
                 "model:stg_orders",
-                "task:request_carrier_collection",
+                "asset:request_carrier_collection",
             ]),
         },
         SelectionEvaluationTestCase {
@@ -140,11 +140,10 @@ fn given_a_publication_when_its_vocabulary_is_read_then_each_value_counts_the_no
             description: "a kind counts its nodes",
             entries_of: |vocabulary| &vocabulary.kinds,
             expected_entries: &[
-                ("asset", 1),
+                ("asset", 2),
                 ("loader", 2),
                 ("model", 4),
                 ("source", 1),
-                ("task", 1),
             ],
         },
     ];

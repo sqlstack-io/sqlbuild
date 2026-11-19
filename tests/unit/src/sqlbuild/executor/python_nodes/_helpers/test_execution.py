@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from sqlbuild._native import CostContext, DiscoveredAssetFunction, DiscoveredTaskFunction
+from sqlbuild._native import CostContext, DiscoveredAssetFunction
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.compiler.python_nodes.types import PythonNodeStatus
 from sqlbuild.cost.models import CostResourceContext
@@ -90,7 +90,7 @@ def test_given_malformed_task_return_when_executing_then_operation_fails_once(
     with invocation_scope("inv-malformed-task"), dispatcher_scope(dispatcher):
         result: tuple[PythonNodeExecutionResult, ...] = execute_ordered_test_nodes(
             nodes=(
-                DiscoveredTaskFunction(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/bad.py"),
                     relative_path=Path("python/tasks/bad.py"),
                     name="malformed_task",
@@ -150,7 +150,7 @@ def test_given_successful_callable_when_result_persistence_fails_then_resource_o
         "write",
         lambda record: (_ for _ in ()).throw(RuntimeError("persistence failed")),
     )
-    node: DiscoveredTaskFunction = DiscoveredTaskFunction(
+    node: DiscoveredAssetFunction = DiscoveredAssetFunction(
         file_path=Path("/project/tasks/orders.py"),
         relative_path=Path("python/tasks/orders.py"),
         name="persist_orders",
@@ -203,7 +203,7 @@ def test_given_successful_callable_when_owned_finalizer_fails_then_resource_only
     events: list[LifecycleEvent] = []
     dispatcher: EventDispatcher = EventDispatcher()
     dispatcher.subscribe_lifecycle(subscriber=events.append, accepts_opaque=False)
-    node: DiscoveredTaskFunction = DiscoveredTaskFunction(
+    node: DiscoveredAssetFunction = DiscoveredAssetFunction(
         file_path=Path("/project/tasks/orders.py"),
         relative_path=Path("python/tasks/orders.py"),
         name="finalize_orders",
@@ -255,8 +255,8 @@ def test_given_successful_callable_when_owned_finalizer_fails_then_resource_only
 def test_given_task_asset_chain_when_executing_python_nodes_then_records_results(
     test_case: PythonNodeExecutorTestCase,
 ) -> None:
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="fetch_orders",
@@ -317,8 +317,8 @@ def test_given_task_asset_chain_when_executing_python_nodes_then_records_results
 def test_given_provider_parameters_when_executing_python_nodes_then_providers_are_injected(
     test_case: PythonNodeExecutorTestCase,
 ) -> None:
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/provider.py"),
             relative_path=Path("python/tasks/provider.py"),
             name="provider_task",
@@ -375,8 +375,8 @@ def test_given_provider_parameters_when_executing_python_nodes_then_providers_ar
 def test_given_provider_container_when_executing_python_nodes_then_context_exposes_providers(
     test_case: PythonNodeExecutorTestCase,
 ) -> None:
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/provider.py"),
             relative_path=Path("python/tasks/provider.py"),
             name="context_provider_task",
@@ -435,8 +435,8 @@ def test_given_provider_container_when_executing_python_nodes_then_context_expos
 def test_given_missing_provider_container_when_executing_python_nodes_then_failures_are_recorded(
     test_case: PythonNodeExecutorTestCase,
 ) -> None:
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/provider.py"),
             relative_path=Path("python/tasks/provider.py"),
             name="provider_task",
@@ -494,7 +494,7 @@ def test_given_missing_context_provider_when_executing_python_node_then_failure_
 ) -> None:
     result: tuple[PythonNodeExecutionResult, ...] = execute_ordered_test_nodes(
         nodes=(
-            DiscoveredTaskFunction(
+            DiscoveredAssetFunction(
                 file_path=Path("/project/tasks/provider.py"),
                 relative_path=Path("python/tasks/provider.py"),
                 name="missing_context_provider_task",
@@ -542,7 +542,7 @@ def test_given_ready_python_node_when_executing_then_uses_existing_run_state(
     test_case: PythonNodeExecutorTestCase,
 ) -> None:
     run_state: PythonNodeRunState = PythonNodeRunState()
-    task_node: DiscoveredTaskFunction = DiscoveredTaskFunction(
+    task_node: DiscoveredAssetFunction = DiscoveredAssetFunction(
         file_path=Path("/project/tasks/orders.py"),
         relative_path=Path("python/tasks/orders.py"),
         name="fetch_orders",
@@ -632,8 +632,8 @@ def test_given_ready_python_node_when_executing_then_uses_existing_run_state(
 def test_given_cursor_overrides_when_executing_python_nodes_then_context_receives_cursors(
     test_case: PythonNodeExecutorTestCase,
 ) -> None:
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="cursor_window",
@@ -684,8 +684,8 @@ def test_given_cursor_overrides_when_executing_python_nodes_then_context_receive
 def test_given_hard_skipped_upstream_when_executing_python_nodes_then_skips_downstream(
     test_case: PythonNodeExecutorTestCase,
 ) -> None:
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="skip_empty_orders",
@@ -776,14 +776,14 @@ def test_given_mixed_python_skips_when_executing_nodes_then_fan_in_matches_mode(
 ) -> None:
     skip_function: Callable[..., object] | None = test_case.skip_function
     assert skip_function is not None
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="skip_empty_orders",
             function=skip_function,
         ),
-        DiscoveredTaskFunction(
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/sibling.py"),
             relative_path=Path("python/tasks/sibling.py"),
             name="successful_sibling",
@@ -844,8 +844,8 @@ def test_given_mixed_python_skips_when_executing_nodes_then_fan_in_matches_mode(
 def test_given_failed_upstream_when_executing_python_nodes_then_blocks_downstream(
     test_case: PythonNodeExecutorTestCase,
 ) -> None:
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="fail_orders",
@@ -906,8 +906,8 @@ def test_given_retry_policy_when_transient_failures_then_retries_and_succeeds(
 ) -> None:
     flaky_task: FlakyTask = FlakyTask(failures_before_success=2, exception_type=TimeoutError)
     sleeps: list[float] = []
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="flaky_task",
@@ -1031,8 +1031,8 @@ def test_given_retry_policy_when_attempts_exhausted_then_records_final_exception
 ) -> None:
     flaky_task: FlakyTask = FlakyTask(failures_before_success=3, exception_type=TimeoutError)
     sleeps: list[float] = []
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="flaky_task",
@@ -1090,8 +1090,8 @@ def test_given_retry_policy_when_exception_is_not_selected_then_does_not_retry(
 ) -> None:
     flaky_task: FlakyTask = FlakyTask(failures_before_success=1, exception_type=ValueError)
     sleeps: list[float] = []
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="flaky_task",
@@ -1144,8 +1144,8 @@ def test_given_retry_policy_when_backoff_exceeds_cap_then_sleep_is_capped(
 ) -> None:
     flaky_task: FlakyTask = FlakyTask(failures_before_success=3, exception_type=TimeoutError)
     sleeps: list[float] = []
-    nodes: tuple[DiscoveredTaskFunction | DiscoveredAssetFunction, ...] = (
-        DiscoveredTaskFunction(
+    nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
+        DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
             relative_path=Path("python/tasks/orders.py"),
             name="flaky_task",

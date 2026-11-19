@@ -189,7 +189,7 @@ pub struct RunContextFacts {
     pub selector_files: Vec<SelectorFileFact>,
 }
 
-/// One finished task or asset.
+/// One finished asset.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PythonNodeRow {
     pub kind: String,

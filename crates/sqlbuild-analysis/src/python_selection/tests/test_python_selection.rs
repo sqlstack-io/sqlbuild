@@ -35,7 +35,7 @@ fn given_python_node_selectors_when_resolving_then_names_match_python() {
         },
         NodeSelectorTestCase {
             description: "intersection",
-            select: &["task:prepare_orders,tag:orders"],
+            select: &["asset:prepare_orders,tag:orders"],
             exclude: &[],
             expected_names: Ok(&["prepare_orders"]),
         },

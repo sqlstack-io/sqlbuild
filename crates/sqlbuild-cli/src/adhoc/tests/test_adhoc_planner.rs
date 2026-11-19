@@ -373,7 +373,7 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             Some("python/orders/partner_export"),
         ),
         resource(
-            "task:request_carrier_collection",
+            "asset:request_carrier_collection",
             &["asset:partner_orders_file"],
             &["orders"],
             Some("python/fulfillment/carrier_sync"),
@@ -398,13 +398,13 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
     ];
     let jobs: PublishedJobs = BTreeMap::from([(
         "carrier_sync".to_owned(),
-        BTreeSet::from(["task:request_carrier_collection".to_owned()]),
+        BTreeSet::from(["asset:request_carrier_collection".to_owned()]),
     )]);
     let test_cases = [
         AdhocPlanTestCase {
             description: "a published job selects its Python nodes",
             command: &["build", "--select", "job:carrier_sync"],
-            expected_plan: Ok((&["task:request_carrier_collection"], json!({}))),
+            expected_plan: Ok((&["asset:request_carrier_collection"], json!({}))),
         },
         AdhocPlanTestCase {
             description: "upstream of a published job crosses its Python node's dependencies",
@@ -414,7 +414,7 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
                     "asset:partner_orders_file",
                     "model:orders",
                     "model:stg_orders",
-                    "task:request_carrier_collection",
+                    "asset:request_carrier_collection",
                 ],
                 json!({}),
             )),
@@ -424,21 +424,21 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             command: &[
                 "build",
                 "--select",
-                "task:request_carrier_collection",
+                "asset:request_carrier_collection",
                 "asset:partner_orders_file",
             ],
             expected_plan: Ok((
                 &[
                     "asset:partner_orders_file",
-                    "task:request_carrier_collection",
+                    "asset:request_carrier_collection",
                 ],
                 json!({}),
             )),
         },
         AdhocPlanTestCase {
-            description: "a task runs without the Python node it depends on, as on the command line",
-            command: &["build", "--select", "task:request_carrier_collection"],
-            expected_plan: Ok((&["task:request_carrier_collection"], json!({}))),
+            description: "an asset runs without the Python node it depends on, as on the command line",
+            command: &["build", "--select", "asset:request_carrier_collection"],
+            expected_plan: Ok((&["asset:request_carrier_collection"], json!({}))),
         },
         AdhocPlanTestCase {
             description: "a python folder selects the nodes under it",
@@ -453,20 +453,20 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
                     "asset:partner_orders_file",
                     "model:orders",
                     "model:stg_orders",
-                    "task:request_carrier_collection",
+                    "asset:request_carrier_collection",
                 ],
                 json!({}),
             )),
         },
         AdhocPlanTestCase {
-            description: "upstream of a task crosses its Python and SQL dependencies",
-            command: &["build", "--select", "+task:request_carrier_collection"],
+            description: "upstream of an asset crosses its Python and SQL dependencies",
+            command: &["build", "--select", "+asset:request_carrier_collection"],
             expected_plan: Ok((
                 &[
                     "asset:partner_orders_file",
                     "model:orders",
                     "model:stg_orders",
-                    "task:request_carrier_collection",
+                    "asset:request_carrier_collection",
                 ],
                 json!({}),
             )),
@@ -478,7 +478,7 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
                 &[
                     "asset:partner_orders_file",
                     "model:orders",
-                    "task:request_carrier_collection",
+                    "asset:request_carrier_collection",
                 ],
                 json!({}),
             )),

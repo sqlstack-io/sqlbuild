@@ -190,18 +190,18 @@ fn given_a_loader_depending_on_a_task_when_building_dag_json_then_the_edge_reach
         },
         python: DagPythonGraphInput {
             nodes: vec![
-                python_node("task", "score_orders", vec![key("model", "orders")]),
+                python_node("asset", "score_orders", vec![key("model", "orders")]),
                 python_node("loader", "partner_scores", Vec::new()),
             ],
             dependency_edges: vec![("score_orders".to_owned(), "partner_scores".to_owned())],
             kinds_by_name: vec![
-                ("score_orders".to_owned(), "task".to_owned()),
+                ("score_orders".to_owned(), "asset".to_owned()),
                 ("partner_scores".to_owned(), "loader".to_owned()),
             ],
         },
         expected_edges: &[
-            ("model:orders", "task:score_orders"),
-            ("task:score_orders", "source:partner_scores"),
+            ("model:orders", "asset:score_orders"),
+            ("asset:score_orders", "source:partner_scores"),
         ],
     }];
     for test_case in test_cases {

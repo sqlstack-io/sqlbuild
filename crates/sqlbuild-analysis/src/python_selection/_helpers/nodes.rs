@@ -13,7 +13,7 @@ use crate::graph::models::{EdgeDirection, ParsedSelector, ProjectGraph};
 use crate::python_selection::constants::{
     ASSET_KIND, CHECK_KIND, INTERSECTION_SEPARATOR, JOB_KIND, LOADER_KIND, NAME_KIND,
     NODE_KIND_KIND, PATH_BETWEEN_CODE, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR,
-    PATTERN_CHARACTERS, PLANNER_DEFAULT_CODE, SQL_MODEL_PATH_ROOT, TAG_KIND, TASK_KIND, TEST_KIND,
+    PATTERN_CHARACTERS, PLANNER_DEFAULT_CODE, SQL_MODEL_PATH_ROOT, TAG_KIND, TEST_KIND,
     UNIT_TEST_CODE, UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE,
     UNKNOWN_TAG_CODE, UNMAPPED_KIND_CODE,
 };
@@ -214,9 +214,9 @@ fn tagged(index: &NodeIndex<'_>, tag: &str) -> Resolved {
     Ok(names)
 }
 
-/// The Python nodes of one kind, such as every `task`.
+/// The Python nodes of one kind, such as every `asset`.
 fn of_kind(index: &NodeIndex<'_>, kind: &str) -> Resolved {
-    if ![TASK_KIND, ASSET_KIND, LOADER_KIND, CHECK_KIND].contains(&kind) {
+    if ![ASSET_KIND, LOADER_KIND, CHECK_KIND].contains(&kind) {
         return Err(error(
             UNMAPPED_KIND_CODE,
             format!("node kind '{kind}' is not a Python node kind"),
@@ -278,7 +278,7 @@ fn lookup(index: &NodeIndex<'_>, kind: &str, value: &str) -> Resolved {
             .map(|(_, node)| node.name.clone())
             .collect());
     }
-    if ![TASK_KIND, ASSET_KIND, LOADER_KIND, CHECK_KIND].contains(&kind) {
+    if ![ASSET_KIND, LOADER_KIND, CHECK_KIND].contains(&kind) {
         return Err(error(
             UNMAPPED_KIND_CODE,
             format!("selector type '{kind}' does not map to a Python node type"),

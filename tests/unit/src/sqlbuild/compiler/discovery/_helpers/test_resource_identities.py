@@ -195,8 +195,8 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
             description="Python task name",
             project_files={
                 "python/tasks/orders.py": (
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def DailyTask(ctx):\n"
                     "    return None\n"
                 )

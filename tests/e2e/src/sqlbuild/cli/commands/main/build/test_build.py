@@ -676,8 +676,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     'database = "python_build_ingress_failure_project.duckdb"\n'
                 ),
                 "python/tasks/prepare.py": (
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def prepare_orders(ctx):\n"
                     "    '''Test task prepare_orders.'''\n    raise RuntimeError('prepare failed')\n"
                 ),
@@ -723,8 +723,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 ),
                 "python/tasks/prepare.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def prepare_orders(ctx):\n"
                     "    '''Test task prepare_orders.'''\n    return ctx.skip(reason='no input', mode=SkipMode.HARD)\n"
                 ),
@@ -769,8 +769,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     'database = "python_build_non_json_result_project.duckdb"\n'
                 ),
                 "python/tasks/bad.py": (
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def produce_bad_result(ctx):\n"
                     "    '''Test task produce_bad_result.'''\n    return ctx.result(payload={'bad': {'a', 'b'}})\n"
                 ),
@@ -793,8 +793,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     'database = "python_build_non_json_metadata_project.duckdb"\n'
                 ),
                 "python/tasks/bad.py": (
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def produce_bad_metadata(ctx):\n"
                     "    '''Test task produce_bad_metadata.'''\n    return ctx.result(payload={}, metadata={'bad': {'a', 'b'}})\n"
                 ),
@@ -829,8 +829,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 ),
                 "python/tasks/profile.py": (
                     "from sqlbuild.refs import model\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task(depends_on=model('fact_orders'))\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset(depends_on=model('fact_orders'))\n"
                     "def fail_after_fact(ctx):\n"
                     "    '''Test task fail_after_fact.'''\n    raise RuntimeError('profile failed')\n"
                 ),
@@ -869,8 +869,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "python/tasks/profile.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.refs import model\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task(depends_on=model('fact_orders'))\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset(depends_on=model('fact_orders'))\n"
                     "def skip_after_fact(ctx):\n"
                     "    '''Test task skip_after_fact.'''\n    return ctx.skip(reason='no profile needed', mode=SkipMode.HARD)\n"
                 ),
@@ -909,8 +909,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "python/tasks/profile.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.refs import model\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task(depends_on=model('fact_orders'))\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset(depends_on=model('fact_orders'))\n"
                     "def soft_skip_after_fact(ctx):\n"
                     "    '''Test task soft_skip_after_fact.'''\n    return ctx.skip(reason='optional profile skipped', mode=SkipMode.SOFT)\n"
                 ),
@@ -937,8 +937,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 ),
                 "python/tasks/prepare.py": (
                     "from pathlib import Path\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def prepare_orders(ctx):\n"
                     "    '''Test task prepare_orders.'''\n    marker = Path(__file__).parents[2].joinpath('prepared.txt')\n"
                     "    marker.write_text('prepared')\n"
@@ -966,8 +966,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "python/tasks/profile.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.refs import model\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task(depends_on=model('fact_orders'))\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset(depends_on=model('fact_orders'))\n"
                     "def profile_fact(ctx):\n"
                     "    '''Test task profile_fact.'''\n    marker = Path(__file__).parents[2].joinpath('profile.txt')\n"
                     "    marker.write_text('profiled')\n"
@@ -1012,8 +1012,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "python/tasks/profile.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.refs import source\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task(depends_on=source('raw_orders'))\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset(depends_on=source('raw_orders'))\n"
                     "def profile_raw_orders(ctx):\n"
                     "    '''Test task profile_raw_orders.'''\n    relation = ctx.relation(source('raw_orders'))\n"
                     "    value = ctx.query(f'SELECT order_id FROM {relation}').fetchall()[0][0]\n"
@@ -1113,8 +1113,8 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                 ),
                 "python/tasks/prepare.py": (
                     "from pathlib import Path\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def prepare_events(ctx):\n"
                     "    '''Test task prepare_events.'''\n    marker = Path(__file__).parents[2].joinpath('prepared.txt')\n"
                     "    marker.write_text('prepared')\n"
@@ -1372,8 +1372,8 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
             ),
             "python/tasks/prepare.py": (
                 "from python.loaders.window import load_window_orders\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=load_window_orders)\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=load_window_orders)\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    rows = ctx.query('SELECT order_id FROM window_orders').fetchall()\n"
                 "    return ctx.result(payload={'order_id': rows[0][0]})\n"
@@ -1412,8 +1412,8 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
             ),
             "python/tasks/profile.py": (
                 "from sqlbuild.refs import model\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=model('fact_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=model('fact_orders'))\n"
                 "def profile_fact_orders(ctx):\n"
                 "    '''Test task profile_fact_orders.'''\n    relation = ctx.relation(model('fact_orders'))\n"
                 "    order_id = ctx.query(f'SELECT order_id FROM {relation}').fetchall()[0][0]\n"
@@ -1430,8 +1430,8 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
             "python/tasks/notify.py": (
                 "from pathlib import Path\n"
                 "from python.assets.export import export_fact_orders\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=export_fact_orders)\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=export_fact_orders)\n"
                 "def notify_fact_orders(ctx):\n"
                 "    '''Test task notify_fact_orders.'''\n    payload = ctx.result_of(node_function=export_fact_orders).payload\n"
                 "    output = Path(__file__).parents[2].joinpath('notify.txt')\n"
@@ -1517,8 +1517,8 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
                 'database = "python_persisted_result_project.duckdb"\n'
             ),
             "python/tasks/produce.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'first'})\n"
             ),
@@ -1536,8 +1536,8 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
     first_run_id: str = str(first_run_rows[0][0])
     (project_dir / "python" / "tasks" / "produce.py").write_text(
         (
-            "from sqlbuild.tasks import task\n\n"
-            "@task\n"
+            "from sqlbuild.assets import asset\n\n"
+            "@asset\n"
             "def produce_result(ctx):\n"
             "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 84}, metadata={'source': 'second'})\n"
         ),
@@ -1549,8 +1549,8 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
     )
     (project_dir / "python" / "tasks" / "produce.py").write_text(
         (
-            "from sqlbuild.tasks import task\n\n"
-            "@task\n"
+            "from sqlbuild.assets import asset\n\n"
+            "@asset\n"
             "def produce_result(ctx):\n"
             "    '''Test task produce_result.'''\n    raise RuntimeError('producer failed after previous success')\n"
         ),
@@ -1572,8 +1572,8 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
         (
             "from pathlib import Path\n"
             "from python.tasks.produce import produce_result\n"
-            "from sqlbuild.tasks import task\n\n"
-            "@task\n"
+            "from sqlbuild.assets import asset\n\n"
+            "@asset\n"
             "def consume_result(ctx):\n"
             "    '''Test task consume_result.'''\n    latest = ctx.result_of(node_function=produce_result)\n"
             f"    first = ctx.result_of(node_function=produce_result, run_id='{first_run_id}')\n"
@@ -1680,8 +1680,8 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
             "python/tasks/consume.py": (
                 "from pathlib import Path\n"
                 "from python.loaders.events import raw_events\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def consume_loader_result(ctx):\n"
                 "    '''Test task consume_loader_result.'''\n    result = ctx.result_of(node_function=raw_events)\n"
                 "    output = Path(__file__).parents[2].joinpath('loader_result.txt')\n"
@@ -1763,8 +1763,8 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 ),
                 "python/tasks/prepare.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def prepare_events(ctx):\n"
                     "    '''Test task prepare_events.'''\n    return ctx.skip(reason='no input', mode=SkipMode.HARD)\n"
                 ),
@@ -1901,8 +1901,8 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
             "python/tasks/configured.py": (
                 "from providers.target_probe import TargetProbe\n"
                 "from python.recorder import record\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def configured_task(ctx, target_probe: TargetProbe):\n"
                 "    '''Test task configured_task.'''\n"
                 "    record(ctx, 'task')\n"
@@ -2092,8 +2092,8 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
             ),
             "python/tasks/configured.py": (
                 "from python.recorder import record\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def configured_task(ctx):\n"
                 '    """Test task configured_task."""\n'
                 "    record(ctx, 'task')\n"
@@ -2179,16 +2179,16 @@ def test_given_same_node_results_in_multiple_targets_when_reading_then_uses_acti
                 'schema = "prod"\n'
             ),
             "python/tasks/produce.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'target': ctx.target})\n"
             ),
             "python/tasks/consume.py": (
                 "from pathlib import Path\n"
                 "from python.tasks.produce import produce_result\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def consume_result(ctx):\n"
                 "    '''Test task consume_result.'''\n    result = ctx.result_of(node_function=produce_result)\n"
                 "    output = Path(__file__).parents[2].joinpath('target_result.txt')\n"

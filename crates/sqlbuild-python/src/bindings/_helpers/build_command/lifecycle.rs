@@ -1,4 +1,4 @@
-//! Ingress Python before the build and read-side tasks and assets dispatched as SQL completes.
+//! Ingress Python before the build and read-side assets dispatched as SQL completes.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -65,7 +65,7 @@ fn node_rows(results: &Bound<'_, PyAny>) -> PyResult<Vec<PythonNodeRow>> {
     Ok(rows)
 }
 
-/// Write human-readable task and asset rows.
+/// Write human-readable asset rows.
 pub(crate) fn write_python_node_results(
     stream: &Bound<'_, PyAny>,
     results: &Bound<'_, PyAny>,
@@ -101,11 +101,11 @@ pub(crate) struct DirectPythonLifecycle {
     ingress_python_results: Py<PyAny>,
     ingress_load_results: Py<PyAny>,
     ingress_loader_names: Py<PyAny>,
-    /// Each round-trip loader's selected upstream tasks and assets, `(kind, name)`, and whether each is on its frontier.
+    /// Each round-trip loader's selected upstream assets, `(kind, name)`, and whether each is on its frontier.
     round_trip_gates: RoundTripGates,
     /// Each round-trip loader's source load key and the SQL keys it waits for.
     round_trip_waits: Vec<(ObjectKey, Vec<ObjectKey>)>,
-    /// Whether the build runs read-side tasks and assets; `--no-python` turns this off.
+    /// Whether the build runs read-side assets; `--no-python` turns this off.
     include_python: bool,
 }
 
@@ -439,15 +439,13 @@ fn lifecycle_plan<'py>(
     })
 }
 
-fn task_asset_names(
+fn asset_names(
     discovered: &Bound<'_, PyAny>,
     pipeline: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<String>> {
     let mut known: HashSet<String> = HashSet::new();
-    for kind in ["task_functions", "asset_functions"] {
-        for node in native_field(discovered, kind)?.try_iter()? {
-            known.insert(native_field(&node?, "name")?.extract()?);
-        }
+    for node in native_field(discovered, "asset_functions")?.try_iter()? {
+        known.insert(native_field(&node?, "name")?.extract()?);
     }
     let mut names: Vec<String> = Vec::new();
     for name in native_field(pipeline, "python_node_names")?.try_iter()? {
@@ -473,7 +471,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
     let plan_output: Bound<'py, PyAny> = native_field(pipeline, "plan_output")?;
     let include_python: bool = context.request_flag("include_python")?;
     let selected: Vec<String> = if include_python {
-        task_asset_names(&discovered, pipeline)?
+        asset_names(&discovered, pipeline)?
     } else {
         Vec::new()
     };
@@ -722,7 +720,7 @@ impl SourceLoadGate {
                 None if !lifecycle.include_python => {
                     not_run_reason.get_or_insert_with(|| {
                         format!(
-                            "Upstream {kind} '{name}' did not run; --no-python skips read-side tasks and assets"
+                            "Upstream {kind} '{name}' did not run; --no-python skips read-side assets"
                         )
                     });
                     continue;

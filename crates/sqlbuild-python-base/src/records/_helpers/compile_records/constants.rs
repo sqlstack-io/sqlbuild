@@ -949,29 +949,6 @@ const R_DISCOVERED_LOADER_FUNCTION: RecordSpec = RecordSpec {
         },
     ],
 };
-const R_DISCOVERED_TASK_FUNCTION: RecordSpec = RecordSpec {
-    name: "DiscoveredTaskFunction",
-    doc: "A discovered project task function.",
-    fields: &[
-        FieldSpec::required("file_path"),
-        FieldSpec::required("relative_path"),
-        FieldSpec::required("name"),
-        FieldSpec::required("function"),
-        FieldSpec::new("depends_on", FieldDefault::EmptyTuple),
-        FieldSpec::new("tags", FieldDefault::EmptyTuple),
-        FieldSpec::new("group", FieldDefault::None),
-        FieldSpec::new("description", FieldDefault::None),
-        FieldSpec::new("meta", FieldDefault::None),
-        FieldSpec::new("retry", FieldDefault::None),
-        FieldSpec::new("provider_usages", FieldDefault::EmptyTuple),
-        FieldSpec {
-            name: "identity",
-            default: FieldDefault::None,
-            compared: false,
-            shown: false,
-        },
-    ],
-};
 const R_DISCOVERED_ASSET_FUNCTION: RecordSpec = RecordSpec {
     name: "DiscoveredAssetFunction",
     doc: "A discovered project asset function.",
@@ -1134,7 +1111,6 @@ const R_DISCOVERED_PYTHON_NODE_FUNCTIONS: RecordSpec = RecordSpec {
     doc: "Discovered project Python DAG node functions grouped by kind.",
     fields: &[
         FieldSpec::new("loaders", FieldDefault::EmptyTuple),
-        FieldSpec::new("tasks", FieldDefault::EmptyTuple),
         FieldSpec::new("assets", FieldDefault::EmptyTuple),
         FieldSpec::new("checks", FieldDefault::EmptyTuple),
         FieldSpec::new("audit_factories", FieldDefault::EmptyTuple),
@@ -1163,7 +1139,6 @@ const R_DISCOVERED_PROJECT_INPUTS: RecordSpec = RecordSpec {
         FieldSpec::new("macro_files", FieldDefault::EmptyTuple),
         FieldSpec::new("materialization_files", FieldDefault::EmptyTuple),
         FieldSpec::new("loader_functions", FieldDefault::EmptyTuple),
-        FieldSpec::new("task_functions", FieldDefault::EmptyTuple),
         FieldSpec::new("asset_functions", FieldDefault::EmptyTuple),
         FieldSpec::new("check_functions", FieldDefault::EmptyTuple),
         FieldSpec::new("audit_factories", FieldDefault::EmptyTuple),
@@ -1705,7 +1680,6 @@ pub(crate) const COMPILE_VALUE_RECORDS: &[RecordSpec] = &[
     R_DISCOVERED_MATERIALIZATION_FILE,
     R_DISCOVERED_PROVIDER_USAGE,
     R_DISCOVERED_LOADER_FUNCTION,
-    R_DISCOVERED_TASK_FUNCTION,
     R_DISCOVERED_ASSET_FUNCTION,
     R_DISCOVERED_CHECK_FUNCTION,
     R_DISCOVERED_HOOK_FUNCTION,

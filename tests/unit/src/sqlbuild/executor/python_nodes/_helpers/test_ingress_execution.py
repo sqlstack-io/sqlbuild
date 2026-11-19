@@ -209,7 +209,7 @@ def test_given_ingress_task_and_asset_when_executing_then_each_completion_follow
     (
         IngressSchedulerSkipLifecycleTestCase(
             description="scheduler bypasses downstream loader and task exactly once",
-            expected_resource_ids=("source:raw_orders", "task:bypassed_task"),
+            expected_resource_ids=("source:raw_orders", "asset:bypassed_task"),
             expected_event_types=(
                 "resource_attempt_started",
                 "resource_attempt_skipped",
@@ -225,7 +225,7 @@ def test_given_pre_recorded_hard_skip_when_scheduler_bypasses_downstream_then_on
 ) -> None:
     base_graph: PythonNodeGraph = build_ingress_task_loader_graph()
     bypassed_node: DiscoveredPythonNode = DiscoveredPythonNode(
-        kind=PythonNodeKind.TASK,
+        kind=PythonNodeKind.ASSET,
         file_path=Path("/project/tasks/bypassed.py"),
         relative_path=Path("python/tasks/bypassed.py"),
         name="bypassed_task",
@@ -241,7 +241,7 @@ def test_given_pre_recorded_hard_skip_when_scheduler_bypasses_downstream_then_on
         name="prepare_ingress_orders",
         result=PythonNodeExecutionResult(
             node_name="prepare_ingress_orders",
-            kind=PythonNodeKind.TASK,
+            kind=PythonNodeKind.ASSET,
             status=PythonNodeStatus.SKIPPED,
             skip_mode=SkipMode.HARD,
             skip_reason="upstream hard skip",
@@ -251,7 +251,7 @@ def test_given_pre_recorded_hard_skip_when_scheduler_bypasses_downstream_then_on
         results=(
             LifecycleNodeResult(
                 name="prepare_ingress_orders",
-                kind="task",
+                kind="asset",
                 status=LifecycleNodeStatus.SKIPPED,
                 skip_mode=SkipMode.HARD,
             ),
@@ -263,7 +263,7 @@ def test_given_pre_recorded_hard_skip_when_scheduler_bypasses_downstream_then_on
             ),
             LifecycleNodeResult(
                 name="bypassed_task",
-                kind="task",
+                kind="asset",
                 status=LifecycleNodeStatus.SKIPPED,
                 skip_mode=SkipMode.HARD,
             ),
@@ -333,7 +333,7 @@ def test_given_scheduler_bypassed_loader_when_persistence_fails_then_attempt_fai
         name="prepare_ingress_orders",
         result=PythonNodeExecutionResult(
             node_name="prepare_ingress_orders",
-            kind=PythonNodeKind.TASK,
+            kind=PythonNodeKind.ASSET,
             status=PythonNodeStatus.SKIPPED,
             skip_mode=SkipMode.HARD,
         ),

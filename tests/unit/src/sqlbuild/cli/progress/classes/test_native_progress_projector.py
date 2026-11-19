@@ -70,7 +70,7 @@ def test_given_skipped_resource_when_projected_then_skip_terminal_renders_once(
         run_scope("run-skip-projection"),
         dispatcher_scope(dispatcher),
         ResourceAttemptLifecycle(
-            resource_id="task:skipped",
+            resource_id="asset:skipped",
             resource_kind="task",
             resource_name="skipped",
         ) as lifecycle,
@@ -119,7 +119,7 @@ def test_given_retrying_child_operation_when_projected_then_each_line_flushes_be
         run_scope("run-retry-projection"),
         dispatcher_scope(dispatcher),
         ResourceAttemptLifecycle(
-            resource_id="task:flaky",
+            resource_id="asset:flaky",
             resource_kind="task",
             resource_name="flaky",
         ),
@@ -290,7 +290,7 @@ def test_given_retried_resource_when_final_result_claims_then_prior_attempt_rend
         lifecycle_event(
             "resource_attempt_started",
             run_id="run",
-            resource_id="task:orders",
+            resource_id="asset:orders",
             resource_attempt_id="orders-attempt-1",
             payload={
                 "resource_kind": "task",
@@ -309,7 +309,7 @@ def test_given_retried_resource_when_final_result_claims_then_prior_attempt_rend
     unrelated_start: LifecycleEvent = replace(
         first_start,
         event_id="inventory-start",
-        resource_id="task:inventory",
+        resource_id="asset:inventory",
         resource_attempt_id="inventory-attempt",
         payload={
             "resource_kind": "task",
@@ -819,7 +819,7 @@ def test_given_line_lock_held_when_projector_writes_concurrently_then_no_deadloc
             run_scope("run-lock-order"),
             dispatcher_scope(dispatcher),
             ResourceAttemptLifecycle(
-                resource_id="task:writer", resource_kind="task", resource_name="writer"
+                resource_id="asset:writer", resource_kind="task", resource_name="writer"
             ) as lifecycle,
         ):
             lifecycle.skipped(skip_code="scheduler")

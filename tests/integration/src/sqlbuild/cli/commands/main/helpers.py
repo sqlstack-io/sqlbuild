@@ -968,8 +968,8 @@ def write_provider_task_project(*, project_dir: Path, annotation: str) -> None:
         "providers/orders.py": PROVIDER_SOURCE,
         "python/orders.py": (
             "from providers.orders import OrdersProvider\n"
-            "from sqlbuild.tasks import task\n\n\n"
-            "@task\n"
+            "from sqlbuild.assets import asset\n\n\n"
+            "@asset\n"
             f"def refresh_orders(ctx, orders_provider: {annotation}):\n"
             '    """Refresh the order snapshot."""\n'
             "    return None\n"
@@ -1397,16 +1397,16 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
     "python/crash.py": (
         '"""A task that kills its process, as a crash or kill -9 would."""\n\n'
         "import os\n\n"
-        "from sqlbuild.tasks import task\n\n\n"
-        "@task()\n"
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset()\n"
         "def crash(ctx):\n"
         '    """End the process without unwinding."""\n\n'
         "    os._exit(137)\n"
     ),
     "python/fail.py": (
         '"""A task that raises, so the build exits non-zero."""\n\n'
-        "from sqlbuild.tasks import task\n\n\n"
-        "@task()\n"
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset()\n"
         "def fail(ctx):\n"
         '    """Raise."""\n\n'
         '    raise RuntimeError("task failed")\n'

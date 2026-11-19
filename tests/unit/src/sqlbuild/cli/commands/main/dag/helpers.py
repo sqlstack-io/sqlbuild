@@ -89,10 +89,10 @@ def prepare_python_dag_project(root: Path) -> Path:
     (tasks_dir / "prepare_orders.py").write_text(
         "\n".join(
             (
-                "from sqlbuild.tasks import task",
+                "from sqlbuild.assets import asset",
                 "from sqlbuild.refs import model",
                 "",
-                "@task(",
+                "@asset(",
                 "    depends_on=model('orders'),",
                 "    tags=['daily'],",
                 "    group='python',",

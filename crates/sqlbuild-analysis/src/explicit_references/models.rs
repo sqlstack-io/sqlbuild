@@ -22,7 +22,7 @@ pub struct ReferenceRequest {
     pub audits: Vec<AuditGate>,
     /// `project.hook_functions` in order.
     pub hooks: Vec<PythonHook>,
-    /// Python SQL owners: tasks, assets, checks, loaders, then hooks.
+    /// Python SQL owners: assets, checks, loaders, then hooks.
     pub owners: Vec<SqlOwner>,
 }
 

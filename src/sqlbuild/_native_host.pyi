@@ -463,9 +463,6 @@ from sqlbuild.python_nodes.main.read_hook_definition import (
 from sqlbuild.python_nodes.main.read_loader_definition import (
     read_loader_definition as read_loader_definition,
 )
-from sqlbuild.python_nodes.main.read_task_definition import (
-    read_task_definition as read_task_definition,
-)
 from sqlbuild.python_nodes.models import RELATION_RENDERER as RELATION_RENDERER
 from sqlbuild.python_nodes.models import AuditCase as AuditCase
 from sqlbuild.python_nodes.models import SqlResourceRef as SqlResourceRef

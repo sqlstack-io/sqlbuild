@@ -259,8 +259,8 @@ def test_given_python_result_when_running_check_on_postgres_then_persists_node_r
                 config=postgres_e2e_config,
             ),
             "python/tasks/results.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'postgres'})\n"
             ),

@@ -436,8 +436,8 @@ def test_given_project_files_when_running_compile_pipeline_then_produces_valid_o
                 "sqlbuild_project.toml": _PROJECT_TOML,
                 "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
                 "python/tasks/orders.py": (
-                    "from sqlbuild.tasks import task\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n"
+                    "@asset\n"
                     "def prepare_orders(ctx):\n"
                     "    '''Test task prepare_orders.'''\n    return ctx.result(payload={'ok': True})\n"
                 ),
@@ -460,7 +460,7 @@ def test_given_python_run_selector_when_running_compile_pipeline_then_tracks_pyt
     result: CompilePipelineResult = run_compile_pipeline_for_project(
         project_dir=tmp_path,
         adapter=DuckDbAdapter(),
-        select=("task:prepare_orders",),
+        select=("asset:prepare_orders",),
         resolve_python_run_selectors=True,
     )
 

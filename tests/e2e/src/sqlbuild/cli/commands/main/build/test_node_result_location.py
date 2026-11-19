@@ -34,8 +34,8 @@ _LOADER: str = (
     '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
 )
 _TASK: str = (
-    "from sqlbuild.refs import source\nfrom sqlbuild.tasks import task\n\n\n"
-    '@task(depends_on=source("raw_orders"))\n'
+    "from sqlbuild.refs import source\nfrom sqlbuild.assets import asset\n\n\n"
+    '@asset(depends_on=source("raw_orders"))\n'
     "def announce_orders(ctx):\n"
     '    """Announce the loaded orders."""\n'
     "    return ctx.result(payload={'announced': True})\n"

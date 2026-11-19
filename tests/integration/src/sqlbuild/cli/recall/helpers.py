@@ -52,8 +52,8 @@ EMIT_TASK: str = (
     "import sys\n"
     "import threading\n"
     "import time\n\n"
-    "from sqlbuild.tasks import task\n\n\n"
-    "@task()\n"
+    "from sqlbuild.assets import asset\n\n\n"
+    "@asset()\n"
     "def emit_bytes(ctx):\n"
     '    """Write binary stdout, UTF-8 stderr, then more stdout."""\n\n'
     "    sys.stdout.flush()\n"

@@ -22,7 +22,7 @@ pub const DEPENDENCIES_KIND: &str = "dependencies";
 /// The one node of each project-wide kind.
 pub const PROJECT_NODE_NAME: &str = "project";
 /// Python nodes by decorator.
-pub const PYTHON_NODE_KINDS: [&str; 4] = ["loader", "task", "asset", "check"];
+pub const PYTHON_NODE_KINDS: [&str; 3] = ["loader", "asset", "check"];
 
 /// Normalised SQL of a model, a function body or a scenario.
 pub const SQL_ASPECT: &str = "sql";

@@ -10,7 +10,7 @@ use crate::review_command::tests::test_types::{
     SchemaNameTestCase,
 };
 
-const EXPORT_TASK: (&str, &str) = ("task:export_revenue", "Python task, not run by review");
+const EXPORT_TASK: (&str, &str) = ("asset:export_revenue", "Python task, not run by review");
 const ARCHIVE_LEFT_OUT: (&str, &str) = (
     "order_archive",
     "not on a path to a critical model (--downstream critical)",

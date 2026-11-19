@@ -34,7 +34,6 @@ from sqlbuild._native import (
     DiscoveredProjectInputs,
     DiscoveredPythonNodeFunctions,
     DiscoveredSourceFile,
-    DiscoveredTaskFunction,
     LocalConfig,
     ProjectConfig,
     ProjectGraph,
@@ -48,6 +47,7 @@ from sqlbuild._native import (
     discover_python_node_functions,
     resolve_python_sql_run_selection,
 )
+from sqlbuild.assets import asset
 from sqlbuild.compiler.compile.types import (
     CompiledModelView,
     CompiledProjectView,
@@ -58,7 +58,6 @@ from sqlbuild.providers import Provider
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import PythonCheckSeverity
 from sqlbuild.refs import model, source
-from sqlbuild.tasks import task
 from tests.unit.src.sqlbuild.compiler.graph.helpers import project_graph_from_indexes
 
 
@@ -86,7 +85,7 @@ def summarize_orders(_ctx: object) -> None:
     return None
 
 
-@task(name="prepare_orders")
+@asset(name="prepare_orders")
 def imported_prepare_orders(_ctx: object) -> None:
     return None
 
@@ -143,16 +142,14 @@ def build_orders_python_node_graph() -> PythonNodeGraph:
                     depends_on=(prepare_orders,),
                 ),
             ),
-            task_functions=(
-                DiscoveredTaskFunction(
+            asset_functions=(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
                     relative_path=Path("python/tasks/orders.py"),
                     name="prepare_orders",
                     function=prepare_orders,
                     tags=("orders", "daily"),
                 ),
-            ),
-            asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/assets/orders.py"),
                     relative_path=Path("python/assets/orders.py"),
@@ -257,8 +254,8 @@ def build_sql_ref_python_node_graph(*, dependency: SqlResourceRef) -> PythonNode
         discovered_inputs=DiscoveredProjectInputs(
             project_config=ProjectConfig(name="demo", adapter="duckdb"),
             local_config=LocalConfig(),
-            task_functions=(
-                DiscoveredTaskFunction(
+            asset_functions=(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
                     relative_path=Path("python/tasks/orders.py"),
                     name="profile_orders",
@@ -271,21 +268,21 @@ def build_sql_ref_python_node_graph(*, dependency: SqlResourceRef) -> PythonNode
 
 
 def build_sibling_sql_ref_python_node_graph() -> PythonNodeGraph:
-    """Return tasks reading orders and, separately, its upstream raw_orders source."""
+    """Return assets reading orders and, separately, its upstream raw_orders source."""
 
     return build_python_node_graph(
         discovered_inputs=DiscoveredProjectInputs(
             project_config=ProjectConfig(name="demo", adapter="duckdb"),
             local_config=LocalConfig(),
-            task_functions=(
-                DiscoveredTaskFunction(
+            asset_functions=(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
                     relative_path=Path("python/tasks/orders.py"),
                     name="export_orders",
                     function=prepare_orders,
                     depends_on=(model_ref("orders"),),
                 ),
-                DiscoveredTaskFunction(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/raw.py"),
                     relative_path=Path("python/tasks/raw.py"),
                     name="export_raw_orders",
@@ -297,7 +294,7 @@ def build_sibling_sql_ref_python_node_graph() -> PythonNodeGraph:
     )
 
 
-def build_sql_downstream_task_to_loader_python_node_graph() -> PythonNodeGraph:
+def build_sql_downstream_asset_to_loader_python_node_graph() -> PythonNodeGraph:
     return build_python_node_graph(
         discovered_inputs=DiscoveredProjectInputs(
             project_config=ProjectConfig(name="demo", adapter="duckdb"),
@@ -311,8 +308,8 @@ def build_sql_downstream_task_to_loader_python_node_graph() -> PythonNodeGraph:
                     depends_on=(prepare_orders,),
                 ),
             ),
-            task_functions=(
-                DiscoveredTaskFunction(
+            asset_functions=(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
                     relative_path=Path("python/tasks/orders.py"),
                     name="prepare_orders",
@@ -332,14 +329,6 @@ def source_ref(name: str) -> SqlResourceRef:
     return source(name)
 
 
-def build_terminal_loader_task_dependency_python_node_graph() -> PythonNodeGraph:
-    return _build_loader_dependency_python_node_graph(
-        dependency_function=raw_orders,
-        include_intermediate_loader=False,
-        dependent_kind="task",
-    )
-
-
 def build_terminal_loader_asset_dependency_python_node_graph() -> PythonNodeGraph:
     return _build_loader_dependency_python_node_graph(
         dependency_function=raw_orders,
@@ -353,14 +342,6 @@ def build_terminal_loader_check_dependency_python_node_graph() -> PythonNodeGrap
         dependency_function=raw_orders,
         include_intermediate_loader=False,
         dependent_kind="check",
-    )
-
-
-def build_intermediate_loader_task_dependency_python_node_graph() -> PythonNodeGraph:
-    return _build_loader_dependency_python_node_graph(
-        dependency_function=fetch_pages,
-        include_intermediate_loader=True,
-        dependent_kind="task",
     )
 
 
@@ -414,15 +395,6 @@ def _build_loader_dependency_python_node_graph(
         intermediate_loaders,
     )[include_intermediate_loader]
 
-    task_functions: tuple[DiscoveredTaskFunction, ...] = (
-        DiscoveredTaskFunction(
-            file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
-            name="summarize_orders",
-            function=summarize_orders,
-            depends_on=(dependency_function,),
-        ),
-    )
     asset_functions: tuple[DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/orders.py"),
@@ -442,16 +414,14 @@ def _build_loader_dependency_python_node_graph(
             severity=PythonCheckSeverity.ERROR,
         ),
     )
-    task_functions = ((), task_functions)[dependent_kind == "task"]
     asset_functions = ((), asset_functions)[dependent_kind == "asset"]
-    check_functions = ((), check_functions)[dependent_kind not in {"task", "asset"}]
+    check_functions = ((), check_functions)[dependent_kind != "asset"]
 
     return build_python_node_graph(
         discovered_inputs=DiscoveredProjectInputs(
             project_config=ProjectConfig(name="demo", adapter="duckdb"),
             local_config=LocalConfig(),
             loader_functions=loader_functions,
-            task_functions=task_functions,
             asset_functions=asset_functions,
             check_functions=check_functions,
         )
@@ -461,17 +431,11 @@ def _build_loader_dependency_python_node_graph(
 def build_python_node_graph_for_case(case_name: str) -> PythonNodeGraph:
     builders: MappingProxyType[str, Callable[[], PythonNodeGraph]] = MappingProxyType(
         {
-            "terminal_loader_task_dependency": (
-                build_terminal_loader_task_dependency_python_node_graph
-            ),
             "terminal_loader_asset_dependency": (
                 build_terminal_loader_asset_dependency_python_node_graph
             ),
             "terminal_loader_check_dependency": (
                 build_terminal_loader_check_dependency_python_node_graph
-            ),
-            "intermediate_loader_task_dependency": (
-                build_intermediate_loader_task_dependency_python_node_graph
             ),
             "intermediate_loader_asset_dependency": (
                 build_intermediate_loader_asset_dependency_python_node_graph
@@ -609,11 +573,11 @@ def imported_identity_nodes(
 def identity_summary(
     *, name: str, node: tuple[Callable[..., object], Path]
 ) -> tuple[tuple[str, ...], str]:
-    """A task node's dependency paths and qualnames, and a digest of every identity field."""
+    """An asset node's dependency paths and qualnames, and a digest of every identity field."""
 
     function, file_path = node
     identity: PythonNodeIdentity = python_node_identity(
-        kind="task",
+        kind="asset",
         name=name,
         function=function,
         file_path=file_path,
@@ -711,10 +675,10 @@ def _node_files(domain: str, index: int) -> dict[str, str]:
 from providers.warehouse_api.provider import WarehouseApi
 from python.{domain}._helpers.rows import RowBatch
 from python.{domain}.{name}.main import main
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(description="Sync {domain} batch {index}.")
+@asset(description="Sync {domain} batch {index}.")
 def {name}(ctx, warehouse_api: WarehouseApi):
     RowBatch([])
     return main(ctx=ctx, warehouse_api=warehouse_api)
@@ -807,7 +771,7 @@ def _in_package(package: str, module_name: str) -> bool:
 class DiscoveryWork(NamedTuple):
     """Reads, parses and hashes counted while discovering a generated project."""
 
-    tasks: int
+    assets: int
     most_per_unit: int
     shared: Counter[str]
     per_node: float
@@ -851,7 +815,7 @@ def discovery_work(
     shared_units: dict[tuple[str, str], int] = _unit_work(work, shared)
     node_units: dict[tuple[str, str], int] = _unit_work(work, nodes)
     return DiscoveryWork(
-        tasks=len(discovered.tasks),
+        assets=len(discovered.assets),
         most_per_unit=max((shared_units | node_units).values()),
         shared=_work_by_kind(shared_units),
         per_node=sum(node_units.values()) / node_count,

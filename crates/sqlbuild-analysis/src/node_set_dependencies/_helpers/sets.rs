@@ -46,7 +46,7 @@ pub(crate) fn members(
     if dependant.kind == LOADER_KIND {
         return Err(failure(
             format!("{owner} depends on {set}; loaders cannot depend on a job or a tag"),
-            Some("name the loaders, tasks or assets it depends on one by one".to_owned()),
+            Some("name the loaders or assets it depends on one by one".to_owned()),
         ));
     }
     if dependency.name.contains(LOCATION_SEPARATOR) {

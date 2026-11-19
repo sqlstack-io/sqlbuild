@@ -325,9 +325,9 @@ class AnalysisFeatureWriter:
     def _python_sql(self) -> None:
         self._features.add("python_sql")
         self._files["python/tasks/flag_exports.py"] = (
-            "from sqlbuild.tasks import TaskContext, task\n\n\n"
-            "@task\n"
-            "def count_flagged_events(ctx: TaskContext):\n"
+            "from sqlbuild.assets import AssetContext, asset\n\n\n"
+            "@asset\n"
+            "def count_flagged_events(ctx: AssetContext):\n"
             '    """Count externally flagged events."""\n'
             '    ctx.query("SELECT COUNT(*) FROM main.external_event_flags")\n'
             "    return ctx.result()\n"

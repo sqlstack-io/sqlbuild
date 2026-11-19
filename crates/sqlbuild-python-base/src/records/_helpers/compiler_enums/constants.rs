@@ -179,7 +179,6 @@ const E_SELECTOR_KIND: EnumSpec = EnumSpec {
         ("NAME", "name"),
         ("SEED", "seed"),
         ("SOURCE", "source"),
-        ("TASK", "task"),
         ("ASSET", "asset"),
         ("LOADER", "loader"),
         ("CHECK", "check"),

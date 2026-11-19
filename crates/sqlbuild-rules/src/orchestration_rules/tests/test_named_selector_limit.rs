@@ -40,7 +40,7 @@ fn given_job_and_sensor_selections_when_evaluating_then_more_named_nodes_than_th
                     "orchestration/jobs/orders/nightly.toml",
                     job(
                         "orders_nightly_job",
-                        "fct_orders,tag:orders task:refund_review source:raw_orders tag:finance",
+                        "fct_orders,tag:orders asset:refund_review source:raw_orders tag:finance",
                     ),
                 ),
             ],

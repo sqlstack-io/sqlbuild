@@ -42,7 +42,7 @@ _GROUP_FILES: tuple[tuple[str, str], ...] = (
     ),
     (
         "orchestration/jobs/reporting_job.toml",
-        'name = "reporting_job"\ndescription = "Reporting."\nselect = "task:report customers"\n',
+        'name = "reporting_job"\ndescription = "Reporting."\nselect = "asset:report customers"\n',
     ),
     (
         "orchestration/job_groups/daily_job_group.toml",
@@ -93,7 +93,7 @@ def test_given_set_dependency_when_planning_the_tasks_upstream_then_selects_the_
         discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         options=CompilePipelineOptions(
-            no_sql_validation=True, select=("+task:report",), resolve_python_run_selectors=True
+            no_sql_validation=True, select=("+asset:report",), resolve_python_run_selectors=True
         ),
         hooks=ConnectionHooks(),
     )

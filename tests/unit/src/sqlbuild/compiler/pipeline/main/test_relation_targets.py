@@ -119,7 +119,7 @@ def test_given_selected_python_declarations_when_collecting_refs_then_all_kinds_
             sql_deps=(source("loader_source"),),
         ),
         DiscoveredPythonNode(
-            kind=PythonNodeKind.TASK,
+            kind=PythonNodeKind.ASSET,
             file_path=project_path,
             relative_path=project_path,
             name="score_orders",

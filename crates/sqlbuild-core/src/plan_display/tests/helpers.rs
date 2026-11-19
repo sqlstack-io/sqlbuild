@@ -109,7 +109,7 @@ pub(super) fn full_plan() -> serde_json::Value {
             {"name": "to_cents", "language": "sql", "reason": "definition_changed"},
             {"name": "clean_name", "language": "sql", "reason": "no_change"},
         ],
-        "python_nodes": [{"name": "score_orders", "kind": "task", "phase": "after", "identity_status": "changed"}],
+        "python_nodes": [{"name": "score_orders", "kind": "asset", "phase": "after", "identity_status": "changed"}],
         "warnings": [
             {"severity": "warning", "model_name": "orders", "message": "orders: already-built dates keep their old results"},
             {"severity": "warning", "message": "scenario 'checkout' step 'pay' is stale", "code": "W1"},

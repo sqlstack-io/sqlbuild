@@ -272,8 +272,8 @@ fn given_invalid_selectors_when_resolving_then_errors_match_python() {
             ),
         },
         SelectorErrorTestCase {
-            description: "task:abc",
-            select: &["task:abc"],
+            description: "asset:abc",
+            select: &["asset:abc"],
             exclude: &[],
             expected_error: (
                 "S010",

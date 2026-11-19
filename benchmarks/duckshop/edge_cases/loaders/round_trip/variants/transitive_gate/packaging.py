@@ -1,9 +1,9 @@
 from python.tasks.scoring import score_orders
 
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(depends_on=[score_orders])
+@asset(depends_on=[score_orders])
 def package_scores(ctx):
     """Package the partner's scores; skips softly when there is nothing new to send."""
     return ctx.skip(reason="nothing to package")

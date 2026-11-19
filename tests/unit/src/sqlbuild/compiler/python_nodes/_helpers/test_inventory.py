@@ -17,7 +17,6 @@ from sqlbuild._native import (
     DiscoveredProjectInputs,
     DiscoveredProvider,
     DiscoveredPythonNode,
-    DiscoveredTaskFunction,
     LocalConfig,
     ProjectConfig,
     PythonNodeGraph,
@@ -57,14 +56,14 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
             ),
             expected_kinds=(
                 PythonNodeKind.LOADER,
-                PythonNodeKind.TASK,
+                PythonNodeKind.ASSET,
                 PythonNodeKind.ASSET,
                 PythonNodeKind.ASSET,
                 PythonNodeKind.CHECK,
             ),
             expected_typed_selectors=(
                 "loader:load_events",
-                "task:prepare_orders",
+                "asset:prepare_orders",
                 "asset:export_orders",
                 "asset:notify_orders",
                 "check:check_orders_export",
@@ -101,8 +100,8 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
                 depends_on=(prepare_orders,),
             ),
         ),
-        task_functions=(
-            DiscoveredTaskFunction(
+        asset_functions=(
+            DiscoveredAssetFunction(
                 file_path=Path("/project/tasks/orders.py"),
                 relative_path=Path("python/tasks/orders.py"),
                 name="prepare_orders",
@@ -113,8 +112,6 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
                 meta={"owner": "data-eng"},
                 retry=retry,
             ),
-        ),
-        asset_functions=(
             DiscoveredAssetFunction(
                 file_path=Path("/project/assets/orders.py"),
                 relative_path=Path("python/assets/orders.py"),
@@ -177,10 +174,10 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
     assert task_node.group == "ingestion"
     assert task_node.description == "Prepare order export inputs."
     assert task_node.meta == {"owner": "data-eng"}
-    assert task_node.task is not None
-    assert task_node.task.retry is retry
+    assert task_node.asset is not None
+    assert task_node.asset.retry is retry
     assert task_node.identity is not None
-    assert task_node.identity.node_type == "task"
+    assert task_node.identity.node_type == "asset"
     assert task_node.identity.node_name == "prepare_orders"
     assert "Prepare order export inputs." in task_node.identity.definition_json
 
@@ -241,7 +238,7 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
                     "unique_key",
                     "write_strategy",
                 ),
-                "task:prepare_orders": ("description", "group", "meta", "tags"),
+                "asset:prepare_orders": ("description", "group", "meta", "tags"),
                 "asset:export_orders": (
                     "column_lineage",
                     "columns",
@@ -285,8 +282,8 @@ def test_given_fully_configured_python_nodes_when_building_then_identity_config_
                     contract="enforced",
                 ),
             ),
-            task_functions=(
-                DiscoveredTaskFunction(
+            asset_functions=(
+                DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
                     relative_path=Path("python/tasks/orders.py"),
                     name="prepare_orders",
@@ -297,8 +294,6 @@ def test_given_fully_configured_python_nodes_when_building_then_identity_config_
                     meta={"owner": "data-eng"},
                     retry=retry,
                 ),
-            ),
-            asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/assets/orders.py"),
                     relative_path=Path("python/assets/orders.py"),

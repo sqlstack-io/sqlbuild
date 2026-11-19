@@ -77,9 +77,9 @@ def fetch_orders(ctx):
     return []
 """,
                 "python/tasks/windows.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task(tags=("api",), group="ingestion")
+@asset(tags=("api",), group="ingestion")
 def fetch_window(ctx):
     return {"window": "today"}
 """,
@@ -266,7 +266,7 @@ def test_given_project_repo_slice_when_discovering_inputs_then_it_returns_expect
         == test_case.expected_loader_names
     )
     assert (
-        tuple(task_function.name for task_function in discovered_inputs.task_functions)
+        tuple(task_function.name for task_function in discovered_inputs.asset_functions)
         == test_case.expected_task_names
     )
     assert (
@@ -432,12 +432,12 @@ def generated_loaders():
                 "python/factories/generated.py": """
 from sqlbuild.assets import asset
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 @factory
 def generated_nodes():
-    @task(name="prepare_orders")
+    @asset(name="prepare_orders")
     def prepare(ctx):
         return None
 
@@ -457,12 +457,12 @@ def generated_nodes():
             | {
                 "python/factories/generated_tasks.py": """
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 @factory
 def generated_tasks():
-    @task(name="prepare_orders")
+    @asset(name="prepare_orders")
     def prepare(ctx):
         return None
 
@@ -477,10 +477,10 @@ def generated_tasks():
             | {
                 "python/factories/orders.py": """
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def orders(ctx):
     return None
 
@@ -498,14 +498,14 @@ def order_nodes():
             | {
                 "python/factories/orders.py": """
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 @factory
 def order_nodes():
     global orders
 
-    @task
+    @asset
     def orders(ctx):
         return None
 
@@ -521,21 +521,21 @@ def order_nodes():
                 "python/a_factories/orders.py": """
 from python.tasks.orders import prepare_orders
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 @factory
 def order_nodes():
-    @task(name="publish_orders", depends_on=prepare_orders)
+    @asset(name="publish_orders", depends_on=prepare_orders)
     def publish(ctx):
         return None
     return [prepare_orders, publish]
 """,
                 "python/tasks/orders.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def prepare_orders(ctx):
     return None
 """,
@@ -550,12 +550,12 @@ def prepare_orders(ctx):
                 "python/factories/orders/generated.py": """
 from python.factories.orders._helpers import TASK_NAME
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 @factory
 def generated_tasks():
-    @task(name=TASK_NAME)
+    @asset(name=TASK_NAME)
     def prepare(ctx):
         return None
 
@@ -572,12 +572,12 @@ def generated_tasks():
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 from sqlbuild.refs import model, seed
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 @factory
 def generated_nodes():
-    @task(name="export_countries", depends_on=seed("country_codes"))
+    @asset(name="export_countries", depends_on=seed("country_codes"))
     def export_countries(ctx):
         return None
 
@@ -606,7 +606,7 @@ def test_given_generated_factory_nodes_when_discovering_inputs_then_validates_ex
     assert (
         tuple(loader.name for loader in result.loader_functions) == test_case.expected_loader_names
     )
-    assert tuple(task.name for task in result.task_functions) == test_case.expected_task_names
+    assert tuple(task.name for task in result.asset_functions) == test_case.expected_task_names
     assert tuple(asset.name for asset in result.asset_functions) == test_case.expected_asset_names
     assert tuple(check.name for check in result.check_functions) == test_case.expected_check_names
 
@@ -786,11 +786,11 @@ def test_given_non_project_with_python_when_discovering_then_missing_config_erro
             | {
                 "python/tasks/generated.py": """
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 def make_task():
-    @task(name="profile")
+    @asset(name="profile")
     def profile(ctx):
         return None
     return profile
@@ -808,10 +808,10 @@ def generated_tasks():
             repo_files=base_repo_files()
             | {
                 "python/tasks/top_level.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(name="profile")
+@asset(name="profile")
 def top_level_profile(ctx):
     return None
 """,
@@ -836,17 +836,17 @@ def generated_assets():
             | {
                 "python/factories/orders.py": """
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def orders(ctx):
     return None
 
 
 @factory
 def order_nodes():
-    @task(name="orders")
+    @asset(name="orders")
     def generated_orders(ctx):
         return None
     return generated_orders
@@ -860,7 +860,7 @@ def order_nodes():
             | {
                 "python/tasks/generated.py": """
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 @factory
@@ -869,9 +869,9 @@ def generated_tasks():
         return None
     def second_body(ctx):
         return None
-    first = task(name="first", depends_on=[])(first_body)
-    second = task(name="second", depends_on=[first])(second_body)
-    first = task(name="first", depends_on=[second])(first)
+    first = asset(name="first", depends_on=[])(first_body)
+    second = asset(name="second", depends_on=[first])(second_body)
+    first = asset(name="first", depends_on=[second])(first)
     return [first, second]
 """,
             },
@@ -1280,9 +1280,9 @@ def raw_orders(ctx):
             repo_files=base_repo_files()
             | {
                 "python/tasks/export_customers.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task
+@asset
 def export_customers(ctx):
     return None
 """,
@@ -1301,9 +1301,9 @@ def export_customers(ctx):
             repo_files=base_repo_files()
             | {
                 "python/tasks/export_customers.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task
+@asset
 def export_customers(ctx):
     return None
 """,
@@ -1324,9 +1324,9 @@ def export_customers_check(ctx):
             | {
                 "models/marts/export_customers.sql": "MODEL ();\n\nselect 1\n",
                 "python/tasks/export_customers.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task
+@asset
 def export_customers(ctx):
     return None
 """,
@@ -1371,9 +1371,9 @@ sources:
 """.strip()
                 + "\n",
                 "python/tasks/export_customers.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task
+@asset
 def export_customers(ctx):
     return None
 """,
@@ -1498,12 +1498,12 @@ def notify(ctx):
             repo_files=base_repo_files()
             | {
                 "python/tasks/windows.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 def fetch_window(ctx):
     return None
 
-@task(depends_on=fetch_window)
+@asset(depends_on=fetch_window)
 def export_window(ctx):
     return None
 """,
@@ -1515,16 +1515,16 @@ def export_window(ctx):
             repo_files=base_repo_files()
             | {
                 "python/tasks/windows.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 def fetch_window(ctx):
     return None
 
-@task(depends_on=fetch_window)
+@asset(depends_on=fetch_window)
 def enrich_window(ctx):
     return None
 
-fetch_window = task(depends_on=enrich_window)(fetch_window)
+fetch_window = asset(depends_on=enrich_window)(fetch_window)
 """,
             },
             expected_error_fragment="Python node dependency cycle detected",

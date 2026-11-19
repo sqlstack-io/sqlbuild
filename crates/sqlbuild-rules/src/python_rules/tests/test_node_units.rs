@@ -20,15 +20,15 @@ const UNIT_RULES: [&str; 10] = [
 const DAILY_TASK: &str = r#"from .main import main
 
 
-@task(description="Daily.")
-def daily(ctx: TaskContext) -> None:
+@asset(description="Daily.")
+def daily(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#;
 
 const TASK_MAIN: &str = r#"from sqlbuild import PythonNodeResult
 
 
-def main(ctx: TaskContext) -> PythonNodeResult:
+def main(ctx: AssetContext) -> PythonNodeResult:
     return ctx.result()
 "#;
 
@@ -56,8 +56,8 @@ fn given_node_units_when_evaluating_unit_rules_then_reports_each_broken_conventi
 from .main import main
 
 
-@task(description="Daily.")
-def daily(ctx: TaskContext, *, store: Store) -> None:
+@asset(description="Daily.")
+def daily(ctx: AssetContext, *, store: Store) -> None:
     return main(ctx=ctx, store=store)
 "#,
                 ),
@@ -74,7 +74,7 @@ from python.utils.text import clean
 from ._helpers.rows import rows
 
 
-def main(ctx: TaskContext, store: Store) -> PythonNodeResult | PythonNodeSkipResult:
+def main(ctx: AssetContext, store: Store) -> PythonNodeResult | PythonNodeSkipResult:
     return ctx.result(rows(today(), clean(), LIMIT, store))
 "#,
                 ),
@@ -131,8 +131,8 @@ from .main import main
 def region_exports():
     for region in REGIONS:
 
-        @task(name=f"export_{region}", description="Export one region.")
-        def export(ctx: TaskContext) -> None:
+        @asset(name=f"export_{region}", description="Export one region.")
+        def export(ctx: AssetContext) -> None:
             return main(ctx=ctx, region=region)
 
         @check(name=f"export_{region}_ok", depends_on=[export], description="Exported.")
@@ -146,7 +146,7 @@ def region_exports():
                 ),
                 (
                     "python/orders/regions/main.py",
-                    "def main(ctx: TaskContext, region: str) -> PythonNodeResult:\n    return ctx.result()\n",
+                    "def main(ctx: AssetContext, region: str) -> PythonNodeResult:\n    return ctx.result()\n",
                 ),
             ],
             config: json!({ "select": UNIT_RULES }),
@@ -184,13 +184,13 @@ def helper() -> int:
     return 1
 
 
-@task(description="Daily.")
-def daily(ctx: TaskContext) -> None:
+@asset(description="Daily.")
+def daily(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 
 
-@task(description="Extra.")
-def extra(ctx: TaskContext) -> None:
+@asset(description="Extra.")
+def extra(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
@@ -213,24 +213,24 @@ def extra(ctx: TaskContext) -> None:
 from python.orders.weekly.main import main as weekly_main
 
 
-@task(description="A.")
-def by_keyword(ctx: TaskContext) -> None:
+@asset(description="A.")
+def by_keyword(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 
 
-@task(description="B.")
-def positional(ctx: TaskContext) -> None:
+@asset(description="B.")
+def positional(ctx: AssetContext) -> None:
     return main(ctx)
 
 
-@task(description="C.")
-def computes(ctx: TaskContext) -> None:
+@asset(description="C.")
+def computes(ctx: AssetContext) -> None:
     rows = main(ctx=ctx)
     return rows
 
 
-@task(description="D.")
-def unpacked(ctx: TaskContext) -> None:
+@asset(description="D.")
+def unpacked(ctx: AssetContext) -> None:
     return main(**ctx)
 "#,
                 ),
@@ -240,8 +240,8 @@ def unpacked(ctx: TaskContext) -> None:
                     r#"from python.orders.daily.main import main
 
 
-@task(description="W.")
-def weekly(ctx: TaskContext) -> None:
+@asset(description="W.")
+def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
@@ -266,7 +266,7 @@ def weekly(ctx: TaskContext) -> None:
 LIMIT = 3
 
 
-def main(ctx: TaskContext) -> list:
+def main(ctx: AssetContext) -> list:
     return []
 
 
@@ -309,23 +309,23 @@ def helper() -> None:
                     r#"from .main import main
 
 
-@task(description="A.")
-def no_ctx(context: TaskContext) -> None:
+@asset(description="A.")
+def no_ctx(context: AssetContext) -> None:
     return main(ctx=context)
 
 
-@task(description="B.")
+@asset(description="B.")
 def wrong_type(ctx: AssetContext, *, store: Store) -> None:
     return main(ctx=ctx, store=store)
 
 
-@task(description="C.")
-def loose(ctx: TaskContext, *args, store, **kwargs) -> None:
+@asset(description="C.")
+def loose(ctx: AssetContext, *args, store, **kwargs) -> None:
     return main(ctx=ctx)
 
 
-@task(description="D.")
-def positional_only(ctx: TaskContext, /) -> None:
+@asset(description="D.")
+def positional_only(ctx: AssetContext, /) -> None:
     return main(ctx=ctx)
 "#,
                 ),
@@ -335,7 +335,7 @@ def positional_only(ctx: TaskContext, /) -> None:
 
 
 @check(depends_on=[no_ctx], description="Q.")
-def quality(ctx: TaskContext) -> bool:
+def quality(ctx: AssetContext) -> bool:
     return True
 "#,
                 ),
@@ -380,7 +380,7 @@ from python.billing.invoices.node import invoices
 from providers.store.client import Client
 
 
-def main(ctx: TaskContext) -> PythonNodeResult:
+def main(ctx: AssetContext) -> PythonNodeResult:
     return invoices
 "#,
                 ),
@@ -390,8 +390,8 @@ def main(ctx: TaskContext) -> PythonNodeResult:
 from .main import main
 
 
-@task(depends_on=[daily], description="W.")
-def weekly(ctx: TaskContext) -> None:
+@asset(depends_on=[daily], description="W.")
+def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
@@ -417,7 +417,7 @@ def weekly(ctx: TaskContext) -> None:
                 ("python/orders/daily/node.py", DAILY_TASK),
                 (
                     "python/orders/weekly/node.py",
-                    "@task\ndef weekly(ctx):\n    pass\n",
+                    "@asset\ndef weekly(ctx):\n    pass\n",
                 ),
                 (
                     "python/orders/daily/checks.py",
@@ -471,8 +471,8 @@ from .main import main
 def market_exports():
     for market in MARKETS:
 
-        @task(description="M.")
-        def export(ctx: TaskContext) -> None:
+        @asset(description="M.")
+        def export(ctx: AssetContext) -> None:
             return main(ctx=ctx)
 "#,
                 ),
@@ -483,8 +483,8 @@ def market_exports():
 
 @factory
 def once():
-    @task(name="once", description="O.")
-    def run(ctx: TaskContext) -> None:
+    @asset(name="once", description="O.")
+    def run(ctx: AssetContext) -> None:
         return main(ctx=ctx)
 "#,
                 ),
@@ -504,8 +504,8 @@ def once():
                     r#"from .main import main
 
 
-@task(description="A.")
-def described(ctx: TaskContext) -> None:
+@asset(description="A.")
+def described(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 
 
@@ -560,7 +560,7 @@ def raw_orders_present(ctx: CheckContext) -> bool:
                 ),
                 (
                     "python/orders/daily/main.py",
-                    "@task(description=\"X.\")\ndef stray(ctx: TaskContext) -> None:\n    return None\n",
+                    "@asset(description=\"X.\")\ndef stray(ctx: AssetContext) -> None:\n    return None\n",
                 ),
                 (
                     "python/orders/daily/node.py",
@@ -572,8 +572,8 @@ from .main import main
 def tables():
     for table in TABLES:
 
-        @task(name=table, description="T.")
-        def load(ctx: TaskContext) -> None:
+        @asset(name=table, description="T.")
+        def load(ctx: AssetContext) -> None:
             return main(ctx=ctx)
 
         @check(name=f"{table}_ok", depends_on=[load], description="C.")
@@ -591,7 +591,7 @@ def tables():
                 ),
                 (
                     "python/utils/flat.py",
-                    "@task\ndef util_task(ctx):\n    return 1\n",
+                    "@asset\ndef util_task(ctx):\n    return 1\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON012"] }),
@@ -658,14 +658,14 @@ def region_exports():
     for region, spec in SPECS.items():
         for column in spec.columns:
 
-            @task(name=f"export_{region}_{column}", description="E.")
-            def export(ctx: TaskContext) -> None:
+            @asset(name=f"export_{region}_{column}", description="E.")
+            def export(ctx: AssetContext) -> None:
                 return main(ctx=ctx, region=region)
 
     for table in constants.TABLES:
 
-        @task(name=table, description="T.")
-        def load(ctx: TaskContext) -> None:
+        @asset(name=table, description="T.")
+        def load(ctx: AssetContext) -> None:
             return main(ctx=ctx)
 "#,
                 ),
@@ -681,8 +681,8 @@ from .main import main
 def ranked_exports():
     for rank, region in enumerate(sorted(SPECS)):
 
-        @task(name=f"export_{rank}_{region}", description="E.")
-        def export(ctx: TaskContext) -> None:
+        @asset(name=f"export_{rank}_{region}", description="E.")
+        def export(ctx: AssetContext) -> None:
             return main(ctx=ctx, region=region)
 "#,
                 ),
@@ -706,8 +706,8 @@ if TYPE_CHECKING:
     from python.orders.weekly.main import main as weekly_main
 
 
-@task(description="Daily.")
-def daily(ctx: TaskContext, *, store: "Store") -> None:
+@asset(description="Daily.")
+def daily(ctx: AssetContext, *, store: "Store") -> None:
     return main(ctx=ctx, store=store)
 "#,
                 ),
@@ -730,8 +730,8 @@ def daily(ctx: TaskContext, *, store: "Store") -> None:
 from .main import main
 
 
-@task(depends_on=[python.orders.daily.node.daily], description="W.")
-def weekly(ctx: TaskContext) -> None:
+@asset(depends_on=[python.orders.daily.node.daily], description="W.")
+def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
@@ -755,7 +755,7 @@ def weekly(ctx: TaskContext) -> None:
                 ("python/orders/daily/node.py", DAILY_TASK),
                 (
                     "python/orders/daily/main.py",
-                    "def main(ctx: TaskContext) -> \"PythonNodeResult | PythonNodeSkipResult\":\n    return ctx.result()\n",
+                    "def main(ctx: AssetContext) -> \"PythonNodeResult | PythonNodeSkipResult\":\n    return ctx.result()\n",
                 ),
                 (
                     "python/orders/raw/node.py",
@@ -774,7 +774,7 @@ def weekly(ctx: TaskContext) -> None:
             files: &[
                 (
                     "python/orders/daily/node.py",
-                    "from . import main\n\n\n@task(description=\"D.\")\ndef daily(ctx: TaskContext) -> None:\n    return main(ctx=ctx)\n",
+                    "from . import main\n\n\n@asset(description=\"D.\")\ndef daily(ctx: AssetContext) -> None:\n    return main(ctx=ctx)\n",
                 ),
                 ("python/orders/daily/main.py", TASK_MAIN),
             ],

@@ -604,7 +604,7 @@ def test_given_chained_loader_project_when_running_source_model_then_runs_loader
             expected_return_code=1,
             expected_error_fragment="No persisted result found for Python node 'prepare_events'",
             dependency_dir="tasks",
-            decorator_import="from sqlbuild.tasks import task\n",
+            decorator_import="from sqlbuild.assets import asset\n",
             decorator_name="task",
         ),
         SourceOnlyComplexIngressE2ETestCase(

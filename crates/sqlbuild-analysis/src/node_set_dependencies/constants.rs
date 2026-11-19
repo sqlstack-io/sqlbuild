@@ -9,7 +9,7 @@ pub(crate) const NODE_SET_CODE: &str = "S000";
 /// SQL resource types a Python node may depend on.
 pub(crate) const DEPENDABLE_SQL_KINDS: [&str; 3] = ["model", "seed", "source"];
 /// Python node kinds a Python node may depend on.
-pub(crate) const DEPENDABLE_PYTHON_KINDS: [&str; 3] = ["loader", "task", "asset"];
+pub(crate) const DEPENDABLE_PYTHON_KINDS: [&str; 2] = ["loader", "asset"];
 /// The Python node kind that may depend on Python nodes only.
 pub(crate) const LOADER_KIND: &str = "loader";
 /// The SQL resource type a loader fills.

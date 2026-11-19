@@ -563,13 +563,13 @@ class ProjectBuilder:
             return
         self._features.add("python_nodes")
         self._files["python/tasks/exports.py"] = (
-            "from sqlbuild.tasks import TaskContext, task\n\n\n"
-            "@task\n"
-            "def collect_exports(ctx: TaskContext):\n"
+            "from sqlbuild.assets import AssetContext, asset\n\n\n"
+            "@asset\n"
+            "def collect_exports(ctx: AssetContext):\n"
             '    """Collect generated exports."""\n'
             '    return ctx.result(payload={"rows": 3})\n\n\n'
-            "@task(depends_on=collect_exports)\n"
-            "def publish_exports(ctx: TaskContext):\n"
+            "@asset(depends_on=collect_exports)\n"
+            "def publish_exports(ctx: AssetContext):\n"
             '    """Publish generated exports."""\n'
             '    return ctx.result(metadata={"published": True})\n'
         )

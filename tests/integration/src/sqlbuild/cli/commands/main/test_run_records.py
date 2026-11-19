@@ -98,14 +98,14 @@ _SUCCEEDED_TWO: str = '{"succeeded":2,"warned":0,"failed":0,"skipped":0,"not_sta
         ),
         RunRecordTestCase(
             description="a failing task fails the run even though no model failed",
-            build_args=("--select", "task:fail"),
+            build_args=("--select", "asset:fail"),
             expected_exit_code=1,
             expected_rows=[
-                ("started", "build", '["task:fail"]', "[]", "[]", None, None),
+                ("started", "build", '["asset:fail"]', "[]", "[]", None, None),
                 (
                     "finished",
                     "build",
-                    '["task:fail"]',
+                    '["asset:fail"]',
                     "[]",
                     "[]",
                     "failed",
@@ -297,7 +297,7 @@ def test_given_a_killed_build_when_reading_its_runs_then_only_started_remains(
             "build",
             "--no-tests",
             "--select",
-            "task:crash",
+            "asset:crash",
         ],
         capture_output=True,
         text=True,

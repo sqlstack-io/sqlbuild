@@ -17,8 +17,8 @@ function node(
 			? 'models/sources.yml'
 			: kind === 'seed'
 				? `seeds/${key}.csv`
-				: kind === 'task' || kind === 'loader'
-					? `tasks/${key}.py`
+				: kind === 'asset' || kind === 'loader'
+					? `python/${key}.py`
 					: `models/${group}/${key}.sql`);
 	return { key, kind, group, tags: options.tags ?? [], path, cursor: options.cursor ?? null, upstream };
 }
@@ -40,7 +40,7 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	node('daily_activity_rollup', 'incremental', 'activity', ['hourly_activity_ctx'], { cursor: 'timestamp' }),
 	node('revenue_report', 'table', 'reporting', ['daily_revenue'], { tags: ['finance'] }),
 	node('activity_report', 'table', 'reporting', ['hourly_activity_ctx']),
-	node('export_revenue_csv', 'task', 'exports', ['revenue_report'], { tags: ['export'] })
+	node('export_revenue_csv', 'asset', 'exports', ['revenue_report'], { tags: ['export'] })
 ];
 
 const BY_KEY = new Map(SNAPSHOT_NODES.map((n) => [n.key, n]));

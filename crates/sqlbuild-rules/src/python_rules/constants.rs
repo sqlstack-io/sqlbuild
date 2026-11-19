@@ -52,7 +52,7 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         enabled_by_default: true,
         options: &[],
         message: "node.py holds imports and exactly one node or factory declaration",
-        remediation: "Keep one @loader, @task, @asset or @factory function in node.py; move helpers to _helpers/, constants to constants.py and checks to checks.py.",
+        remediation: "Keep one @loader, @asset or @factory function in node.py; move helpers to _helpers/, constants to constants.py and checks to checks.py.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON005",
@@ -76,7 +76,7 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         enabled_by_default: true,
         options: &[],
         message: "main.py holds imports and one public main() whose return annotation fits the node kind",
-        remediation: "Move other functions and classes into _helpers/ or a role file, and annotate main() with the result it returns: ctx.result(...) or ctx.skip(...) for a task or asset, and rows or a loader result for a loader.",
+        remediation: "Move other functions and classes into _helpers/ or a role file, and annotate main() with the result it returns: ctx.result(...) or ctx.skip(...) for an asset, and rows or a loader result for a loader.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON007",
@@ -135,7 +135,7 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Package,
         enabled_by_default: true,
         options: &[],
-        message: "@task, @asset and @check set description= without a docstring, and @loader sets neither",
+        message: "@asset and @check set description= without a docstring, and @loader sets neither",
         remediation: "Move the docstring text into description=; for a loader, describe the managed source in its YAML instead.",
     },
     PythonRuleSpec {
@@ -1395,14 +1395,8 @@ pub(crate) const NAMING_CONTRACTS: [(&str, &str); 10] = [
     ("iter_*", "returns-iterator"),
 ];
 /// Decorators whose top-level functions SQLBuild loads from `python/`, making their module an entry point.
-pub(crate) const LOADED_DECORATORS: [&str; 6] = [
-    "loader",
-    "task",
-    "asset",
-    "check",
-    "factory",
-    "audit_factory",
-];
+pub(crate) const LOADED_DECORATORS: [&str; 5] =
+    ["loader", "asset", "check", "factory", "audit_factory"];
 /// Fensu codes whose own remediation names settings SQLBuild does not have, so the catalogue's is used.
 pub(crate) const CATALOGUE_REMEDIATION_CODES: [&str; 1] = [fensu::DEAD_DEFINITION_CODE];
 /// How Fensu's observation index names the project directory itself.
@@ -1412,11 +1406,9 @@ pub(crate) const ENTRYPOINT_KIND: &str = "sqlbuild";
 /// Fensu's family of naming-contract rules, which read the naming contracts.
 pub(crate) const NAMING_FAMILY: &str = "naming";
 /// Folders named after node kinds, which belong inside a domain rather than directly under `python/`.
-pub(crate) const NODE_KIND_DIRECTORIES: [&str; 10] = [
+pub(crate) const NODE_KIND_DIRECTORIES: [&str; 8] = [
     "loaders",
     "loader",
-    "tasks",
-    "task",
     "assets",
     "asset",
     "checks",
@@ -1623,11 +1615,8 @@ pub(crate) const CONTEXT_PARAMETER: &str = "ctx";
 pub(crate) const DESCRIPTION_KEYWORD: &str = "description";
 pub(crate) const NAME_KEYWORD: &str = "name";
 /// Node decorators and the context type each node's `ctx` is annotated with.
-pub(crate) const NODE_KINDS: [(&str, &str); 3] = [
-    ("loader", "LoaderContext"),
-    ("task", "TaskContext"),
-    ("asset", "AssetContext"),
-];
+pub(crate) const NODE_KINDS: [(&str, &str); 2] =
+    [("loader", "LoaderContext"), ("asset", "AssetContext")];
 /// The check decorator and its context type.
 pub(crate) const CHECK_KIND: (&str, &str) = ("check", "CheckContext");
 /// Decorators that generate nodes or checks.
@@ -1638,8 +1627,7 @@ pub(crate) const DEFERRED_CODE_MARKERS: [&str; 2] = ["lambda", "__main__"];
 /// The loader decorator, which takes no description because its managed source has one.
 pub(crate) const LOADER_DECORATOR: &str = "loader";
 /// Return annotations `main()` may use, by node decorator.
-pub(crate) const MAIN_RESULTS: [(&str, &[&str]); 3] = [
-    ("task", &["PythonNodeResult", "PythonNodeSkipResult"]),
+pub(crate) const MAIN_RESULTS: [(&str, &[&str]); 2] = [
     ("asset", &["PythonNodeResult", "PythonNodeSkipResult"]),
     (
         "loader",

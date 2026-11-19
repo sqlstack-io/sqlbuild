@@ -8,7 +8,6 @@ from enum import StrEnum
 class PythonNodeKind(StrEnum):
     """Framework-owned Python node kind."""
 
-    TASK = "task"
     ASSET = "asset"
     LOADER = "loader"
     CHECK = "check"

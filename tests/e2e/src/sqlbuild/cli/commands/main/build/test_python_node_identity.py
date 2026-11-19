@@ -196,10 +196,10 @@ def test_given_helper_package_with_relative_imports_when_editing_helper_then_tas
             "python/orders.py": dedent(
                 """
                 import python.helpers.clean
-                from sqlbuild.tasks import task
+                from sqlbuild.assets import asset
 
 
-                @task
+                @asset
                 def orders(ctx):
                     '''Test task orders.'''
                     return ctx.result(

@@ -12,7 +12,7 @@ fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
             description: "a loader pulls its selected upstream tasks into ingress",
             selected: &["fetch_rates", "load_orders", "report", "check_orders"],
             nodes: &[
-                ("fetch_rates", "task", &[]),
+                ("fetch_rates", "asset", &[]),
                 ("load_orders", "loader", &[]),
                 ("report", "asset", &[("model", "orders")]),
                 ("check_orders", "check", &[]),
@@ -40,7 +40,7 @@ fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
             description: "a loader whose selected upstream reads SQL loads after it, gated by it",
             selected: &["score_orders", "package_scores", "partner_scores"],
             nodes: &[
-                ("score_orders", "task", &[("model", "orders")]),
+                ("score_orders", "asset", &[("model", "orders")]),
                 ("package_scores", "asset", &[]),
                 ("partner_scores", "loader", &[]),
             ],
@@ -59,7 +59,7 @@ fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
             )],
         },
         LifecycleTestCase {
-            description: "only the tasks and assets a loader reads directly can let it run",
+            description: "only the assets a loader reads directly can let it run",
             selected: &[
                 "fetch_rates",
                 "score_orders",
@@ -67,8 +67,8 @@ fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
                 "partner_scores",
             ],
             nodes: &[
-                ("fetch_rates", "task", &[]),
-                ("score_orders", "task", &[("model", "orders")]),
+                ("fetch_rates", "asset", &[]),
+                ("score_orders", "asset", &[("model", "orders")]),
                 ("package_scores", "asset", &[]),
                 ("partner_scores", "loader", &[]),
             ],
@@ -90,7 +90,7 @@ fn given_selection_when_classifying_lifecycle_then_matches_python_regions() {
             description: "a loader selected without its SQL-reading upstream is ordinary ingress",
             selected: &["partner_scores"],
             nodes: &[
-                ("score_orders", "task", &[("model", "orders")]),
+                ("score_orders", "asset", &[("model", "orders")]),
                 ("partner_scores", "loader", &[]),
             ],
             upstream: &[("partner_scores", &["score_orders"])],

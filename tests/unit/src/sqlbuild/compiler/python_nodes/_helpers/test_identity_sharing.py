@@ -259,7 +259,7 @@ def test_given_nodes_sharing_helpers_when_discovered_then_each_file_and_object_i
         project_dir=tmp_path / "large", node_count=large_count, monkeypatch=monkeypatch
     )
 
-    assert (small.tasks, large.tasks) == test_case.node_counts
+    assert (small.assets, large.assets) == test_case.node_counts
     assert (small.most_per_unit, large.most_per_unit) == (
         test_case.expected_most_per_unit,
         test_case.expected_most_per_unit,

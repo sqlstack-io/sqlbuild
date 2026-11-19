@@ -1,6 +1,5 @@
 //! Python node kinds, selector kinds, error codes and messages of Python's node selectors.
 
-pub(crate) const TASK_KIND: &str = "task";
 pub(crate) const ASSET_KIND: &str = "asset";
 pub(crate) const LOADER_KIND: &str = "loader";
 pub(crate) const CHECK_KIND: &str = "check";

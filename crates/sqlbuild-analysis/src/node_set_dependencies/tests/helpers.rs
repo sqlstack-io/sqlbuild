@@ -25,16 +25,16 @@ type NodeSpec = (
 pub(super) type SetSpec = (&'static str, &'static str, Option<&'static str>);
 
 const NODES: &[NodeSpec] = &[
-    ("report", "task", &["reports"], &[], &[]),
-    ("export_orders", "task", &[], &[], &[("model", "orders")]),
+    ("report", "asset", &["reports"], &[], &[]),
+    ("export_orders", "asset", &[], &[], &[("model", "orders")]),
     (
         "audit_export",
-        "task",
+        "asset",
         &[],
         &["export_orders", "report"],
         &[],
     ),
-    ("self_tagged", "task", &["finance"], &[], &[]),
+    ("self_tagged", "asset", &["finance"], &[], &[]),
     ("sync_events", "loader", &[], &[], &[]),
 ];
 
@@ -64,10 +64,10 @@ const JOBS: &[(&str, &str)] = &[
     ("nightly", "stg_orders orders order_items"),
     ("single", "customers"),
     ("diamond", "stg_orders orders order_items finance_daily"),
-    ("with_task", "orders task:export_orders"),
-    ("loop", "task:export_orders task:audit_export"),
+    ("with_task", "orders asset:export_orders"),
+    ("loop", "asset:export_orders asset:audit_export"),
     ("nightly_wide", "orders customer_orders"),
-    ("reporting", "task:report customers"),
+    ("reporting", "asset:report customers"),
 ];
 
 fn key(spec: &str) -> ObjectKey {

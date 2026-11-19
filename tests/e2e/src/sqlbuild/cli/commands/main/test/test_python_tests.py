@@ -38,16 +38,16 @@ PROJECT_FILES: dict[str, str] = {
         "SELECT 1\n"
     ),
     "python/orders/storefront_import/node.py": (
-        "from sqlbuild.tasks import task\n\n\n"
-        "@task(description='Import storefront orders.', tags=['ingest'])\n"
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset(description='Import storefront orders.', tags=['ingest'])\n"
         "def storefront_import(ctx):\n    return None\n"
     ),
     "python/orders/storefront_import/_helpers/row_mapping.py": (
         "def map_row(raw):\n    return {'status': str(raw['state']).lower()}\n"
     ),
     "python/inventory/stock_sync/node.py": (
-        "from sqlbuild.tasks import task\n\n\n"
-        "@task(description='Sync stock.')\n"
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset(description='Sync stock.')\n"
         "def stock_sync(ctx):\n    return None\n"
     ),
 }

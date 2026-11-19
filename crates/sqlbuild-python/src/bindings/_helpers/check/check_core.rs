@@ -131,14 +131,12 @@ pub(crate) fn record_python_run_state_results<'py>(
         result_by_name.set_item(native_field(&result, "node_name")?, result)?;
     }
     let node_by_name: Bound<'py, PyDict> = PyDict::new(py);
-    for attribute in ["task_functions", "asset_functions"] {
-        for node in native_field(discovered_inputs, attribute)?.try_iter()? {
-            let node: Bound<'py, PyAny> = node?;
-            node_by_name.set_item(
-                native_field(&node, "name")?,
-                native_field(&node, "function")?,
-            )?;
-        }
+    for node in native_field(discovered_inputs, "asset_functions")?.try_iter()? {
+        let node: Bound<'py, PyAny> = node?;
+        node_by_name.set_item(
+            native_field(&node, "name")?,
+            native_field(&node, "function")?,
+        )?;
     }
     for (name, function) in node_by_name.iter() {
         if let Some(result) = result_by_name.get_item(name)? {

@@ -62,11 +62,11 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             ),
         },
         ValidationTestCase {
-            description: "a task cycle names its path",
+            description: "an asset cycle names its path",
             facts: ProjectFacts {
                 nodes: vec![
-                    node(NodeKind::Task, "extract", vec![on(1, "load")]),
-                    node(NodeKind::Task, "load", vec![on(0, "extract")]),
+                    node(NodeKind::Asset, "extract", vec![on(1, "load")]),
+                    node(NodeKind::Asset, "load", vec![on(0, "extract")]),
                 ],
                 ..ProjectFacts::default()
             },
@@ -86,7 +86,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             },
             expected_failure: failure(
                 FailureKind::Conflict,
-                "Check 'second' depends on another check; checks may depend on loaders, tasks, \
+                "Check 'second' depends on another check; checks may depend on loaders, \
                  assets, models, sources, and seeds only",
             ),
         },

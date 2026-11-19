@@ -75,8 +75,8 @@ def test_given_empty_project_directory_when_running_init_then_typed_resource_dir
                 "python/_helpers.py": "def order_count(rows):\n    return len(rows)\n",
                 "python/tasks/orders.py": (
                     "from python._helpers import order_count\n"
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
                     "def count_orders(ctx):\n"
                     "    '''Test task count_orders.'''\n    return ctx.result(payload={'order_count': order_count([1, 2])})\n"
                 ),

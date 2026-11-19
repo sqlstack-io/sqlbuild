@@ -11,20 +11,13 @@ from sqlbuild._native import (
     DiscoveredCheckFunction,
     DiscoveredLoaderFunction,
     DiscoveredProjectInputs,
-    DiscoveredTaskFunction,
 )
 from sqlbuild.python_nodes.main.read_asset_definition import read_asset_definition
 from sqlbuild.python_nodes.main.read_check_definition import read_check_definition
 from sqlbuild.python_nodes.main.read_loader_definition import read_loader_definition
-from sqlbuild.python_nodes.main.read_task_definition import read_task_definition
 from sqlbuild.python_nodes.models import NodeSetRef, SqlResourceRef
 
-type _PythonNode = (
-    DiscoveredLoaderFunction
-    | DiscoveredTaskFunction
-    | DiscoveredAssetFunction
-    | DiscoveredCheckFunction
-)
+type _PythonNode = DiscoveredLoaderFunction | DiscoveredAssetFunction | DiscoveredCheckFunction
 
 
 class _NodeDefinition(Protocol):
@@ -34,7 +27,6 @@ class _NodeDefinition(Protocol):
 
 _DEFINITION_READERS: tuple[Callable[[Callable[..., object]], _NodeDefinition | None], ...] = (
     read_loader_definition,
-    read_task_definition,
     read_asset_definition,
     read_check_definition,
 )
@@ -49,7 +41,6 @@ def validate_discovered_inputs(discovered_inputs: DiscoveredProjectInputs) -> No
 def _nodes(inputs: DiscoveredProjectInputs) -> list[dict[str, object]]:
     nodes: tuple[tuple[str, _PythonNode], ...] = (
         *(("loader", node) for node in inputs.loader_functions),
-        *(("task", node) for node in inputs.task_functions),
         *(("asset", node) for node in inputs.asset_functions),
         *(("check", node) for node in inputs.check_functions),
     )

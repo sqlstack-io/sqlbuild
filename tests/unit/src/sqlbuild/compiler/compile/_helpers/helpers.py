@@ -373,8 +373,8 @@ def python_task_source(*, body: str) -> str:
 
     return (
         "from sqlbuild.refs import model\n"
-        "from sqlbuild.tasks import task\n\n\n"
-        '@task(depends_on=model("orders"))\n'
+        "from sqlbuild.assets import asset\n\n\n"
+        '@asset(depends_on=model("orders"))\n'
         "def export_orders(ctx):\n"
         f"{body}"
     )

@@ -39,7 +39,6 @@ DESCRIPTION_REQUIRED_INPUT_KINDS: dict[str, str] = {
     "sql_hook_files": "hook",
     "hook_functions": "hook",
     "loader_functions": "loader",
-    "task_functions": "task",
     "asset_functions": "asset",
     "check_functions": "check",
     "providers": "provider",
@@ -406,7 +405,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         ),
         expected_diagnostic=("P010", "python/tasks/refresh_exports.py", 4),
         expected_message="task 'refresh_exports' has no description",
-        expected_help_fragments=('@task(description="What refresh_exports does", ...)',),
+        expected_help_fragments=('@asset(description="What refresh_exports does", ...)',),
     ),
     RequiredDescriptionCase(
         description="asset",

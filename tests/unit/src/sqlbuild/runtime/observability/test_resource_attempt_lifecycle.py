@@ -72,7 +72,7 @@ def test_given_bounded_skip_when_attempt_marked_skipped_then_reason_is_not_canon
 
     with invocation_scope("inv-skip"), run_scope("run-skip"), dispatcher_scope(dispatcher):
         with ResourceAttemptLifecycle(
-            resource_id="task:orders",
+            resource_id="asset:orders",
             resource_kind="task",
             resource_name="orders",
         ) as lifecycle:
@@ -103,7 +103,7 @@ def test_given_no_context_when_attempt_runs_then_transient_identity_and_dispatch
     assert current_event_dispatcher() is None
 
     with ResourceAttemptLifecycle(
-        resource_id="task:direct",
+        resource_id="asset:direct",
         resource_kind="task",
         resource_name="direct",
         run_id="direct-run",
@@ -111,7 +111,7 @@ def test_given_no_context_when_attempt_runs_then_transient_identity_and_dispatch
         identity: ExecutionIdentity | None = current_execution_identity()
         assert identity is not None
         assert identity.run_id == "direct-run"
-        assert identity.resource_id == "task:direct"
+        assert identity.resource_id == "asset:direct"
         assert current_event_dispatcher() is not None
         with OperationLifecycle(operation_kind="python_node", operation_name="python_task"):
             nested: ExecutionIdentity | None = current_execution_identity()
@@ -141,7 +141,7 @@ def test_given_invalid_direct_attempt_when_start_fails_then_transient_context_is
 
     with pytest.raises(ObservabilityValidationError):
         with ResourceAttemptLifecycle(
-            resource_id="task:invalid",
+            resource_id="asset:invalid",
             resource_kind="task",
             resource_name="invalid",
             attempt_number=-1,
@@ -171,13 +171,13 @@ def test_given_parent_context_when_nested_start_fails_then_exact_parent_is_resto
     with (
         invocation_scope("parent-inv"),
         run_scope("parent-run"),
-        resource_attempt_scope(resource_id="task:parent", resource_attempt_id="parent-attempt"),
+        resource_attempt_scope(resource_id="asset:parent", resource_attempt_id="parent-attempt"),
         dispatcher_scope(dispatcher),
     ):
         parent: ExecutionIdentity | None = current_execution_identity()
         with pytest.raises(ObservabilityValidationError):
             with ResourceAttemptLifecycle(
-                resource_id="task:invalid",
+                resource_id="asset:invalid",
                 resource_kind="task",
                 resource_name="invalid",
                 attempt_number=-1,

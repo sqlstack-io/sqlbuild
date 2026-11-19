@@ -58,15 +58,15 @@ _ONE_MODEL_AUDIT: str = 'AUDIT ();\nSELECT * FROM __ref("{read}") WHERE order_id
 _NULL_AUDIT: str = 'AUDIT ();\nSELECT * FROM __ref("@model") WHERE order_id IS NULL\n'
 _LITERAL_TASK: str = (
     "from sqlbuild.refs import model\n"
-    "from sqlbuild.tasks import task\n\n\n"
-    '@task(depends_on=model("all_orders"))\n'
+    "from sqlbuild.assets import asset\n\n\n"
+    '@asset(depends_on=model("all_orders"))\n'
     "def export_orders(ctx):\n"
     '    """Test task export_orders."""\n    ctx.query("SELECT count(*) FROM stg_customers")\n'
 )
 _RUNTIME_TASK: str = (
     "from sqlbuild.refs import model\n"
-    "from sqlbuild.tasks import task\n\n\n"
-    '@task(depends_on=model("all_orders"))\n'
+    "from sqlbuild.assets import asset\n\n\n"
+    '@asset(depends_on=model("all_orders"))\n'
     "def export_orders(ctx):\n"
     '    """Test task export_orders."""\n    orders = ctx.relation(model("all_orders"))\n'
     '    ctx.query(f"SELECT count(*) FROM {orders}")\n'
@@ -83,8 +83,8 @@ _COUNTRY_SEED_FILES: dict[str, str] = {
 }
 _SEED_TASK: str = (
     "from sqlbuild.refs import seed\n"
-    "from sqlbuild.tasks import task\n\n\n"
-    '@task(depends_on=seed("countries"))\n'
+    "from sqlbuild.assets import asset\n\n\n"
+    '@asset(depends_on=seed("countries"))\n'
     "def count_countries(ctx):\n"
     '    """Test task count_countries."""\n    countries = ctx.relation(seed("countries"))\n'
     "    ctx.execute_sql(\n"
@@ -123,11 +123,11 @@ _PICK_MACROS: str = EXPLICIT_REFERENCE_MACROS + (
 )
 _SIBLING_TASKS: str = (
     "from sqlbuild.refs import model\n"
-    "from sqlbuild.tasks import task\n\n\n"
-    '@task(depends_on=model("all_orders"))\n'
+    "from sqlbuild.assets import asset\n\n\n"
+    '@asset(depends_on=model("all_orders"))\n'
     "def export_summary(ctx):\n"
     '    """Test task export_summary."""\n    ctx.execute_sql("CREATE OR REPLACE TABLE export_summary_ran AS SELECT 1 AS n")\n\n\n'
-    '@task(depends_on=model("stg_orders_eu"))\n'
+    '@asset(depends_on=model("stg_orders_eu"))\n'
     "def export_eu(ctx):\n"
     '    """Test task export_eu."""\n    ctx.execute_sql("CREATE OR REPLACE TABLE export_eu_ran AS SELECT 1 AS n")\n'
 )
@@ -138,9 +138,9 @@ _SIBLING_TASKS: str = (
     [
         ExplicitReferencePythonDependencyE2ETestCase(
             description="task on a seed and check on a model build, order, select and check",
-            select=("+task:count_countries",),
+            select=("+asset:count_countries",),
             expected_dag_edges=(
-                ("seed:countries", "task:count_countries"),
+                ("seed:countries", "asset:count_countries"),
                 ("model:all_orders", "check:orders_present"),
             ),
             expected_checked_asset_ids=("model:all_orders",),
@@ -257,7 +257,7 @@ def test_given_unrendered_macro_argument_when_building_then_it_is_still_a_depend
     [
         CrossBoundarySelectionE2ETestCase(
             description="both-way task selection skips a task reading its upstream",
-            select=("+task:export_summary+",),
+            select=("+asset:export_summary+",),
             expected_ran=("export_summary_ran",),
             expected_not_ran=("export_eu_ran",),
         ),
@@ -386,7 +386,7 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
             command=("--no-color", "compile"),
             expected_exit_code=1,
             expected_output_fragments=(
-                "error[P008]: task:export_orders names model:stg_customers as 'stg_customers'",
+                "error[P008]: asset:export_orders names model:stg_customers as 'stg_customers'",
                 "--> python/tasks/export.py:8",
                 "[references]\n            enforce_explicit = false",
             ),
@@ -581,7 +581,7 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
                 "orders_base()",
                 "error[P006]: model:hidden_customers depends on model:stg_customers through macro "
                 "customers_base()",
-                "error[P008]: task:export_orders names model:stg_customers as 'stg_customers'",
+                "error[P008]: asset:export_orders names model:stg_customers as 'stg_customers'",
                 "3 errors",
             ),
             expected_json_diagnostics=(
@@ -593,7 +593,7 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
                 ),
                 (
                     "P008",
-                    "task:export_orders names model:stg_customers as 'stg_customers' in SQL "
+                    "asset:export_orders names model:stg_customers as 'stg_customers' in SQL "
                     "passed to ctx.query()",
                 ),
             ),

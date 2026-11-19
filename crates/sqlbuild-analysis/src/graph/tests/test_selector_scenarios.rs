@@ -58,8 +58,8 @@ fn given_raw_selector_when_parsing_then_returns_kind_value_and_expansion() {
         },
         ParseSelectorTestCase {
             description: "task typed selector",
-            raw: "task:prepare_orders",
-            expected_selector: kind("task", "prepare_orders", false, false),
+            raw: "asset:prepare_orders",
+            expected_selector: kind("asset", "prepare_orders", false, false),
         },
         ParseSelectorTestCase {
             description: "asset typed selector",

@@ -611,10 +611,10 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
             "python/tasks/uses_shared.py": dedent(
                 """
                 from providers.z_shared import SharedProvider
-                from sqlbuild.tasks import task
+                from sqlbuild.assets import asset
 
 
-                @task
+                @asset
                 def uses_shared(ctx, shared_provider: SharedProvider):
                     '''Test task uses_shared.'''
                     del ctx, shared_provider

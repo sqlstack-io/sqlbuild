@@ -311,11 +311,7 @@ fn project_fields<'py>(
         fields.set_item(name, native_field(&discovered, name)?)?;
     }
     let python_inputs: Bound<'py, PyDict> = PyDict::new(py);
-    for (kind, collection) in [
-        ("task", "task_functions"),
-        ("asset", "asset_functions"),
-        ("check", "check_functions"),
-    ] {
+    for (kind, collection) in [("asset", "asset_functions"), ("check", "check_functions")] {
         for function in native_field(&discovered, collection)?.try_iter()? {
             let function = function?;
             let name: String = native_field(&function, "name")?.extract()?;

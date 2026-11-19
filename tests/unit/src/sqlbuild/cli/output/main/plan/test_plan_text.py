@@ -644,7 +644,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             python_plan_entries=(
                 PythonPlanEntry(
                     name="prepare_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.PRE_SQL_INGRESS,
                 ),
                 PythonPlanEntry(
@@ -654,7 +654,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
                 ),
                 PythonPlanEntry(
                     name="profile_fact_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.READ_SIDE,
                 ),
             ),
@@ -681,7 +681,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             python_plan_entries=(
                 PythonPlanEntry(
                     name="prepare_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.PRE_SQL_INGRESS,
                     identity_status=PythonIdentityStatus.CHANGED,
                     previous_definition_json=json.dumps(
@@ -1164,7 +1164,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             python_plan_entries=(
                 PythonPlanEntry(
                     name="publish_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.READ_SIDE,
                     provider_usages=(build_discovered_provider_usage(),),
                 ),
@@ -1194,7 +1194,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             python_plan_entries=(
                 PythonPlanEntry(
                     name="publish_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.READ_SIDE,
                     provider_usages=(build_discovered_provider_usage(),),
                 ),
@@ -1435,7 +1435,7 @@ def test_given_plan_output_when_formatting_then_contains_expected_fragments(
             python_plan_entries=(
                 PythonPlanEntry(
                     name="prepare_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.PRE_SQL_INGRESS,
                     identity_status=PythonIdentityStatus.CHANGED,
                     previous_metadata_json=json.dumps(

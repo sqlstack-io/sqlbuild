@@ -39,7 +39,6 @@ NODE_RESULT_COLUMN_TYPES: dict[str, StateSqlValueType] = {
 }
 
 RESULT_DEPENDENCY_ATTRIBUTES: tuple[tuple[str, str], ...] = (
-    ("__sqlbuild_task__", PythonNodeKind.TASK.value),
     ("__sqlbuild_asset__", PythonNodeKind.ASSET.value),
     ("__sqlbuild_loader__", PythonNodeKind.LOADER.value),
 )
