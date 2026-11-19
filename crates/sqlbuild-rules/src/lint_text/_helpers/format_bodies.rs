@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::LazyLock;
 
 use regex::Regex;
+use sqlbuild_analysis::parse_guard::constants::MAX_FUNCTION_CALL_DEPTH;
 use sqlbuild_attachments::ceremonial_select::main::omitted_select_offset::omitted_select_offset;
 use sqlbuild_attachments::ceremonial_select::models::OmittedSelect;
 use sqlbuild_core::text::main::python_isspace::python_isspace;
@@ -21,8 +22,8 @@ use crate::lint_text::constants::{
     BLOCK_COMMENT_OPENER, DECLARATION_GROUP_DIRECTORY, DECLINED_WITHOUT_REASON,
     EXPRESSION_SELECT_PREFIX, FIXTURE_HEADER_KINDS, FORMAT_API_VERSION, FUNCTION_HEADER_KIND,
     GLOBAL_NAMED_ROOTS, GROUPED_NAMED_ROLES, LINE_COMMENT_PREFIX, LINTED_EXPRESSION_ALIAS,
-    MACRO_HEADER_KIND, MAX_FUNCTION_CALL_DEPTH, MOVED_EXPRESSION_ALIAS, MOVED_OMITTED_SELECT,
-    OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN,
+    MACRO_HEADER_KIND, MOVED_EXPRESSION_ALIAS, MOVED_OMITTED_SELECT, OMITTED_CEREMONIAL_SELECT_SQL,
+    OMITTED_SELECT_SUFFIX_PATTERN,
 };
 use crate::lint_text::errors::LintTextError;
 use crate::lint_text::main::neutralize_interpolation::neutralize_interpolation;

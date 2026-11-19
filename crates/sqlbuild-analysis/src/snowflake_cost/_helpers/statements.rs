@@ -1,7 +1,8 @@
 //! Query-type prefixes, Python whitespace and CREATE statement parsing.
 
-use polyglot_sql::{Dialect, DialectType, Expression, ParseOptions};
+use polyglot_sql::{Dialect, DialectType, Expression};
 
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::snowflake_cost::constants::{CREATE_VARIANT_PREFIX, DYNAMIC_TABLE_MODIFIER};
 
 pub(crate) fn of_kind(query_type: &str, kind: &str) -> bool {
@@ -18,11 +19,8 @@ pub(crate) fn python_space(character: char) -> bool {
 
 /// Whether a CREATE statement's text parses as a definition that needs no warehouse.
 pub(crate) fn metadata_only_create(query_text: &str) -> bool {
-    let options: ParseOptions = ParseOptions {
-        complexity_guard: None,
-    };
-    let Ok(mut statements) =
-        Dialect::get(DialectType::Snowflake).parse_with_options(query_text, &options)
+    let Ok(mut statements) = Dialect::get(DialectType::Snowflake)
+        .parse_with_options(query_text, &polyglot_parse_options())
     else {
         return false;
     };

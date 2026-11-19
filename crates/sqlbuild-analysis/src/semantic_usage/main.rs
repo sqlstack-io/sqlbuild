@@ -1,5 +1,7 @@
 //! On-demand direct non-projection column usage extraction.
 
+use crate::parse_guard::main::polyglot_complexity_guard::polyglot_complexity_guard;
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use polyglot_sql::{
     Dialect, DialectType, Expression, ExpressionWalk, Resolver, SchemaValidationOptions,
     ValidationSchema, build_scope, mapping_schema_from_validation_schema_with_dialect,
@@ -62,6 +64,7 @@ pub fn analyze_json(request_json: &str) -> Result<String, String> {
         &SchemaValidationOptions {
             check_references: true,
             strict: Some(true),
+            complexity_guard: Some(polyglot_complexity_guard()),
             ..SchemaValidationOptions::default()
         },
     );
@@ -70,7 +73,7 @@ pub fn analyze_json(request_json: &str) -> Result<String, String> {
             .map_err(|error| error.to_string());
     }
     let statements = Dialect::get(dialect)
-        .parse(&request.sql)
+        .parse_with_options(&request.sql, &polyglot_parse_options())
         .map_err(|error| error.to_string())?;
     let schema = mapping_schema_from_validation_schema_with_dialect(&request.schema, dialect);
     let mut uses: Vec<UsageFact> = Vec::new();

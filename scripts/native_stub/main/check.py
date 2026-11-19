@@ -2,27 +2,28 @@
 
 from __future__ import annotations
 
-import argparse
 import importlib
-import sys
 from pathlib import Path
 
 from scripts.native_stub._helpers.declarations import stub_drift
 from scripts.native_stub.constants import NATIVE_MODULE, STUB_PATH
+from scripts.root_check.main.run_root_check import run_root_check
 
 
 def run_native_stub_check(argv: list[str] | None = None) -> int:
     """Fail when the stub declares a runtime name the built native extension does not register."""
-    parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path.cwd())
-    arguments: argparse.Namespace = parser.parse_args(argv)
+    return run_root_check(
+        argv=argv,
+        description=__doc__,
+        errors_under=_unregistered_names,
+        messages=(
+            f"{STUB_PATH} declares names {NATIVE_MODULE} does not register:",
+            f"{STUB_PATH} declares only registered names.",
+        ),
+    )
+
+
+def _unregistered_names(root: Path) -> tuple[str, ...]:
     registered: frozenset[str] = frozenset(dir(importlib.import_module(NATIVE_MODULE)))
-    stub_text: str = (arguments.root / STUB_PATH).read_text(encoding="utf-8")
-    missing: tuple[str, ...] = stub_drift(stub_text=stub_text, registered=registered)
-    if missing:
-        print(f"{STUB_PATH} declares names {NATIVE_MODULE} does not register:", file=sys.stderr)
-        for name in missing:
-            print(f"- {name}", file=sys.stderr)
-        return 1
-    print(f"{STUB_PATH} declares only registered names.")
-    return 0
+    stub_text: str = (root / STUB_PATH).read_text(encoding="utf-8")
+    return stub_drift(stub_text=stub_text, registered=registered)

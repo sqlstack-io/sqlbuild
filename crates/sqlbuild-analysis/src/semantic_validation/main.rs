@@ -14,6 +14,8 @@ pub mod normalize_native_renamed;
 pub mod sqlbuild_code;
 pub mod text_findings;
 pub mod truth_test_spans;
+use crate::parse_guard::main::polyglot_complexity_guard::polyglot_complexity_guard;
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::semantic_validation::models::ProjectCatalog;
 
 use polyglot_sql::{
@@ -88,6 +90,13 @@ pub(super) fn validation_result(request: ValidationRequest) -> Result<Validation
             request.dialect
         )
     })?;
+    let request = ValidationRequest {
+        options: SchemaValidationOptions {
+            complexity_guard: Some(polyglot_complexity_guard()),
+            ..request.options
+        },
+        ..request
+    };
     if request.quoted_ignore_case {
         return ProjectCatalog::with_options(dialect, request.options, true)
             .validate(&request.sql, &request.schema);
@@ -158,7 +167,7 @@ pub(crate) fn complete_parsed_validation(
             .extend(missing_clause_columns(&build_scope(expression), &mapping));
     } else {
         for expression in Dialect::get(dialect)
-            .parse(sql)
+            .parse_with_options(sql, &polyglot_parse_options())
             .map_err(|error| error.to_string())?
         {
             result

@@ -56,8 +56,6 @@ pub(crate) const FILTER_CONTEXT: &str = "filter";
 pub(crate) const NULL_KEYWORD: &str = "NULL";
 pub(crate) const RESOLVED_SOURCE_CONFIDENCE: &str = "resolved";
 pub(crate) const WILDCARD: &str = "*";
-/// SQLBuild's `analyze_query` complexity guard.
-pub(crate) const MAX_FUNCTION_CALL_DEPTH: usize = 512;
 /// The dialects whose dynamic pivots the compiler proves, and those with DuckDB's PIVOT form.
 pub(crate) const SUPPORTED_PIVOT_DIALECTS: [&str; 3] = ["duckdb", "motherduck", "snowflake"];
 pub(crate) const SIMPLIFIED_PIVOT_DIALECTS: [&str; 2] = ["duckdb", "motherduck"];
