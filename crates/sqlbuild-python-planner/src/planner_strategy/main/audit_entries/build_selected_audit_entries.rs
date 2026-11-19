@@ -1,7 +1,6 @@
 //! Assemble selected audits in compiled-project order without querying lineage for an empty selection.
 
-use crate::planner_strategy::_helpers::audit_entries::plan_audit;
-use crate::planner_strategy::_helpers::audits::outside_target_lineages;
+use crate::planner_strategy::_helpers::audit_entries::plan_audits;
 use crate::planner_strategy::main::audit_entries::audit_is_selected::audit_is_selected;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyList, PyListMethods};
@@ -40,10 +39,8 @@ pub fn build_selected_audit_entries<'py>(
         model_materializations: request.get("model_materializations")?,
         lineage: native_field(&project, "lineage_graph")?.extract()?,
     };
-    let outside: Vec<bool> =
-        outside_target_lineages(&selected, planning.lineage.bind(py).borrow().graph())?;
-    for (audit, outside) in selected.iter().zip(outside) {
-        entries.append(plan_audit(audit, &planning, Some(outside))?)?;
+    for entry in plan_audits(&selected, &planning)? {
+        entries.append(entry)?;
     }
     Ok(entries)
 }
