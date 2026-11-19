@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from sqlbuild._native import PlanOutput
+from sqlbuild._native import CompiledRelationLocation, PlanOutput
 from sqlbuild.adapter.contract.types import (
     MaintainedListing,
     MaintainedOperation,
@@ -19,6 +19,9 @@ from sqlbuild.executor.build.models import (
     BuildExecutionResult,
     BuildRuntimeParams,
 )
+from sqlbuild.executor.maintained_pauses._helpers.sql import insert_sql, setup_statements
+from sqlbuild.executor.maintained_pauses.models import MaintainedPauseEvent
+from sqlbuild.executor.maintained_pauses.types import MaintainedPauseEventType, StateLocation
 from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
     BuildExecutionPlanTestCase,
 )
@@ -174,3 +177,45 @@ def pause_table_names(*, connection: Any) -> list[tuple[Any, ...]]:
         "SELECT table_name FROM information_schema.tables "
         "WHERE table_schema = 'staging' AND table_name = '_sqlbuild_maintained_pauses'"
     ).fetchall()
+
+
+def seed_hold(
+    *, adapter: PausingDuckDbAdapter, connection: Any, run_id: str, name: str, idle_seconds: int
+) -> None:
+    """A run's pause of `name`, with its last write `idle_seconds` ago, and the model suspended."""
+
+    location: StateLocation = (None, "staging")
+    for statement in setup_statements(adapter=adapter, location=location):
+        connection.execute(statement)
+    relation: CompiledRelationLocation = CompiledRelationLocation(
+        database=None, schema="staging", name=name, qualified_name=None
+    )
+    connection.execute(
+        insert_sql(
+            adapter=adapter,
+            location=location,
+            events=(
+                MaintainedPauseEvent(
+                    event_type=MaintainedPauseEventType.PAUSED,
+                    run_id=run_id,
+                    recorded_by=run_id,
+                    relation=relation,
+                ),
+            ),
+        )
+    )
+    connection.execute(
+        "UPDATE staging._sqlbuild_maintained_pauses "
+        f"SET recorded_at = recorded_at - INTERVAL {idle_seconds} SECOND WHERE run_id = '{run_id}'"
+    )
+    adapter.states[name] = "SUSPENDED"
+
+
+def pause_event_ids(*, connection: Any) -> list[tuple[str, str, str]]:
+    """Each resume's event ID, holding run and recording run, sorted."""
+
+    rows: list[tuple[Any, ...]] = connection.execute(
+        "SELECT event_id, run_id, recorded_by FROM staging._sqlbuild_maintained_pauses "
+        "WHERE event_type = 'resumed' ORDER BY 1, 2, 3"
+    ).fetchall()
+    return [(str(row[0]), str(row[1]), str(row[2])) for row in rows]
