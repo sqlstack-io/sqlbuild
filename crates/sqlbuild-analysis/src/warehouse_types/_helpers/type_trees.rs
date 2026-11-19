@@ -2,10 +2,11 @@
 
 use serde_json::Value;
 use sqlquack_parse::parse_strict;
+use sqlquack_syntax::expressions::types::models::DataType;
 use sqlquack_syntax::tokens::models::Dialect;
 use sqlquack_syntax::{Expression, ParseOptions};
 
-use crate::warehouse_types::constants::{CAST_KEY, CAST_TARGET_KEY};
+use crate::warehouse_types::constants::{CAST_KEY, CAST_TARGET_KEY, DATA_TYPE_KEY, NAMED_TYPE_TAG};
 
 /// `spelling` read by `sqlquack-syntax-postgres`'s type grammar.
 pub(crate) fn postgres_type(spelling: &str) -> Result<Value, String> {
@@ -39,8 +40,32 @@ fn cast(spelling: &str) -> String {
 fn single_cast_target(spelling: &str, statements: &[Expression]) -> Result<Value, String> {
     let tree: Value = serde_json::to_value(statements).map_err(|error| error.to_string())?;
     match (statements.len(), cast_targets(&tree).as_slice()) {
-        (1, [target]) => Ok((*target).clone()),
+        (1, [target]) => Ok(unnamed((*target).clone())),
         _ => Err(format!("`{spelling}` is not a single type name")),
+    }
+}
+
+/// `tree` with every type kept as written, such as Snowflake's `NUMBER(10, 2)`, read as the type it denotes.
+fn unnamed(tree: Value) -> Value {
+    match tree {
+        Value::Object(fields)
+            if fields.get(DATA_TYPE_KEY).and_then(Value::as_str) == Some(NAMED_TYPE_TAG) =>
+        {
+            let written: Value = Value::Object(fields);
+            serde_json::from_value::<DataType>(written.clone())
+                .ok()
+                .and_then(|data_type| data_type.unnamed())
+                .and_then(|data_type| serde_json::to_value(data_type).ok())
+                .unwrap_or(written)
+        }
+        Value::Object(fields) => Value::Object(
+            fields
+                .into_iter()
+                .map(|(key, value)| (key, unnamed(value)))
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.into_iter().map(unnamed).collect()),
+        other => other,
     }
 }
 
