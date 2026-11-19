@@ -708,16 +708,9 @@ class BuildScheduler:
                 ledger_path=(self._runtime_dir / "executions" / self._run_id / "statements.jsonl"),
                 on_statement_complete=self._on_statement_complete,
             ):
-                failure: (
-                    ModelExecutionResult
-                    | SeedExecutionResult
-                    | FunctionExecutionResult
-                    | SqlTestExecutionResult
-                    | LoadExecutionResult
-                    | None
-                ) = self._enter_node_warehouse(key=key, connection=connection)
+                failure: str | None = self._switch_failure(key=key, connection=connection)
                 if failure is not None:
-                    return failure
+                    return self._failed_model_result(key=key, error_message=failure)
                 return self._execute_model_node(
                     key=key,
                     connection=connection,
@@ -1111,6 +1104,22 @@ class BuildScheduler:
             return self._adapter.session_warehouse(connection=connection)
         return self._session_warehouses.build_warehouse(connection=connection)
 
+    def _switch_failure(self, *, key: CompiledObjectKey, connection: Any) -> str | None:
+        """Put `connection` on the node's job warehouse, or the build's; why it could not."""
+
+        if self._session_warehouses is None:
+            return None
+        warehouse: str | None = self._node_warehouses.get(key)
+        try:
+            self._session_warehouses.use(connection=connection, warehouse=warehouse)
+        except Exception as error:  # noqa: BLE001 - the node fails with the reason
+            return (
+                f"cannot run on warehouse {warehouse}: {error}"
+                if warehouse is not None
+                else f"cannot return to the build's warehouse: {error}"
+            )
+        return None
+
     def _enter_node_warehouse(
         self, *, key: CompiledObjectKey, connection: Any
     ) -> (
@@ -1121,23 +1130,22 @@ class BuildScheduler:
         | LoadExecutionResult
         | None
     ):
-        """Put `connection` on the node's job warehouse, or the build's; its failure if not."""
+        """Put `connection` on the node's warehouse; the node's own kind of failure if not."""
 
-        if self._session_warehouses is None:
+        failure: str | None = self._switch_failure(key=key, connection=connection)
+        if failure is None:
             return None
-        warehouse: str | None = self._node_warehouses.get(key)
-        try:
-            self._session_warehouses.use(connection=connection, warehouse=warehouse)
-        except Exception as error:  # noqa: BLE001 - the node fails with the reason
-            return self._failed_node_result(
-                key=key,
-                error_message=(
-                    f"cannot run on warehouse {warehouse}: {error}"
-                    if warehouse is not None
-                    else f"cannot return to the build's warehouse: {error}"
-                ),
-            )
-        return None
+        return self._failed_node_result(key=key, error_message=failure)
+
+    def _failed_model_result(
+        self, *, key: CompiledObjectKey, error_message: str
+    ) -> ModelExecutionResult:
+        return ModelExecutionResult(
+            model_name=key.name,
+            status=ExecutionStatus.FAILED,
+            error_code=BUILD_WORKER_FAILED_CODE,
+            error_message=error_message,
+        )
 
     def _failed_node_result(
         self, *, key: CompiledObjectKey, error_message: str
@@ -1182,12 +1190,7 @@ class BuildScheduler:
                 error_code=BUILD_WORKER_FAILED_CODE,
                 error_message=error_message,
             )
-        return ModelExecutionResult(
-            model_name=key.name,
-            status=ExecutionStatus.FAILED,
-            error_code=BUILD_WORKER_FAILED_CODE,
-            error_message=error_message,
-        )
+        return self._failed_model_result(key=key, error_message=error_message)
 
     def _execute_source_node(
         self, *, key: CompiledObjectKey, connection: Any
