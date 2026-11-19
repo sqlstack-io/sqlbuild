@@ -22,7 +22,6 @@ use sqlbuild_core::dbt_process::main::spawn_dbt_json_process::spawn_dbt_json_pro
 use sqlbuild_core::dbt_process::main::stop_dbt_process::stop_dbt_process;
 use sqlbuild_core::dbt_process::models::DbtJsonProcess;
 
-use crate::bindings::_helpers::dbt_events::stream::DbtEventStream;
 use crate::bindings::_helpers::dbt_interop::runner::{
     dbt_command_lifecycle, launch_failure, launch_os_error, report_exit,
 };
@@ -32,6 +31,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_output::dbt_events::models::DbtEventStream;
 
 const STREAM_OPTIONS: (&[&str], &[&str]) = (
     &["argv", "cwd", "stream", "use_color", "target_path"],

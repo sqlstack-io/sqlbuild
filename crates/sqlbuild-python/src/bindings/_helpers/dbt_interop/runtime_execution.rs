@@ -1,6 +1,5 @@
 //! Execute dbt through the subprocess boundary and finalize results in artifact order.
 
-use crate::bindings::_helpers::dbt_events::stream::render_dbt_node_result;
 use crate::bindings::_helpers::dbt_interop::cli::parse_dbt_ls_json_lines;
 use crate::bindings::_helpers::dbt_interop::event_stream::execute_dbt_json_event_stream;
 use crate::bindings::_helpers::dbt_interop::execution::dbt_execution_ls_argv;
@@ -16,6 +15,7 @@ use sqlbuild_python_base::presentation_text::models::PythonCliStyle;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_output::dbt_events::main::render_dbt_node_result::render_dbt_node_result;
 use std::collections::HashSet;
 use std::time::Instant;
 
