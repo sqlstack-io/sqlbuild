@@ -98,7 +98,7 @@
 			})
 			.catch((e: unknown) => {
 				if (read === readWarnings) readingWarnings.delete(w.offset);
-				loadError = e instanceof Error ? e.message : String(e);
+				if (read === readWarnings) loadErrors.warnings = e instanceof Error ? e.message : String(e);
 			});
 	}
 	function toggleWarnings(w: WarningGroup) {
@@ -117,7 +117,22 @@
 	let askedOf = $state<Record<string, string>>({});
 	let openDiff = $state<Record<string, 'preview' | 'full'>>({});
 	let loading = $state(false);
-	let loadError = $state<string | null>(null);
+	/** Failed reads, by group: shown there with Retry, and that group reads nothing more until then. */
+	let loadErrors = $state<Record<string, string>>({});
+	const failed = (e: unknown) => (e instanceof Error ? e.message : String(e));
+	// Another plan (a re-plan) starts with no failed reads: its rows are read from scratch.
+	let erroredFor: unknown = null;
+	$effect.pre(() => {
+		if (plan.sections === erroredFor) return;
+		erroredFor = plan.sections;
+		loadErrors = {};
+	});
+	/** Reads a group's rows again after a failure; a filter's view starts over. */
+	function retry(key: string) {
+		delete loadErrors[key];
+		if (view?.key === key) view = null;
+		if (key === 'warnings') for (const w of warningGroups) if (openWarnings[w.offset]) readGroup(w, allWarnings[w.offset] ? WARNINGS_READ : WARNINGS_SHOWN);
+	}
 
 	const shown = $derived(group ? (shownOf[group.key] ?? PAGE) : PAGE);
 	const filter = $derived(group ? (filterOf[group.key] ?? '') : '');
@@ -143,10 +158,9 @@
 	 */
 	type View = { key: string; name: string; doc: PlanDocument; matches: Partial<Record<PlanPageSection, number>>; sections: PlanDocument['sections'] };
 	let view = $state.raw<View | null>(null);
-	const viewDoc = (matches: View['matches'], doc: PlanDocument): PlanDocument => ({
-		...doc,
-		sections: (plan.sections ?? []).map((c) => ({ section: c.section, total: matches[c.section] ?? 0, notes: [] }))
-	});
+	/** Only a server summary is filtered by the server, so a view's document is always a summary. */
+	const viewDoc = (matches: View['matches'], doc: PlanDocument): PlanDocument =>
+		doc.sections ? { ...doc, sections: (plan.sections ?? []).map((c) => ({ section: c.section, total: matches[c.section] ?? 0, notes: [] })) } : doc;
 
 	// A new filter starts its view: the first page of each of the group's sections, for how many each matches.
 	$effect(() => {
@@ -157,7 +171,7 @@
 		const start: View = { key: g.key, name, doc: viewDoc({}, withoutRows(plan)), matches: {}, sections: plan.sections };
 		view = start;
 		loading = true;
-		loadError = null;
+		delete loadErrors[g.key];
 		(async () => {
 			let current = start;
 			for (const s of g.sections) {
@@ -168,7 +182,7 @@
 				view = current;
 			}
 		})()
-			.catch((e: unknown) => (loadError = e instanceof Error ? e.message : String(e)))
+			.catch((e: unknown) => (loadErrors[g.key] = failed(e)))
 			.finally(() => (loading = false));
 	});
 
@@ -191,7 +205,7 @@
 		const g = shownGroup;
 		const page = nextPage;
 		// After a failed read nothing more is read until Retry, so a lasting failure doesn't repeat its request.
-		if (!g || !page || loading || loadError || renamesPane || g.key === 'warnings' || g.rows.length >= Math.min(shown, g.count)) return;
+		if (!g || !page || loading || loadErrors[g.key] || renamesPane || g.key === 'warnings' || g.rows.length >= Math.min(shown, g.count)) return;
 		if (filtering && !serverFilter) return;
 		const current = view;
 		const step = filtering
@@ -204,8 +218,7 @@
 			: (more?.(page.section, PAGE) ?? null);
 		if (!step) return;
 		loading = true;
-		loadError = null;
-		step.catch((e: unknown) => (loadError = e instanceof Error ? e.message : String(e))).finally(() => (loading = false));
+		step.catch((e: unknown) => (loadErrors[g.key] = failed(e))).finally(() => (loading = false));
 	});
 
 	function showMore() {
@@ -311,6 +324,7 @@
 						{/if}
 					</div>
 				{/each}
+				{#if loadErrors.warnings}<p class="hint err" data-testid="plan-rows-error">Couldn't read the warnings: {loadErrors.warnings} <Button variant="link" size="inline" class="text-[12px]" onclick={() => retry('warnings')}>Retry</Button></p>{/if}
 			{:else}
 				<label class="filter">
 					<SearchIcon size={13} />
@@ -349,7 +363,7 @@
 					{#if filtering && !shownGroup}<p class="hint">Finding {group.title.toLowerCase()}…</p>
 					{:else if filtering && !rowCount && !loading}<p class="hint">No {group.title.toLowerCase()} match “{filter.trim()}”.</p>{/if}
 				</div>
-				{#if loadError}<p class="hint err" data-testid="plan-rows-error">Couldn't load more rows: {loadError} <Button variant="link" size="inline" class="text-[12px]" onclick={() => (loadError = null)}>Retry</Button></p>{/if}
+				{#if loadErrors[group.key]}<p class="hint err" data-testid="plan-rows-error">Couldn't load more rows: {loadErrors[group.key]} <Button variant="link" size="inline" class="text-[12px]" onclick={() => retry(group.key)}>Retry</Button></p>{/if}
 				{#if remaining > 0}
 					<Button variant="link" size="inline" class="show-more mt-2 self-start text-[12px]" disabled={loading} onclick={showMore}>
 						{loading ? 'Loading…' : `Show more · ${remaining.toLocaleString()} not shown`}

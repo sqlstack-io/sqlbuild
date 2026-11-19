@@ -168,6 +168,7 @@ describe('a plan from a server summary', () => {
 			{ section: 'unchanged', total: 300, notes: [] },
 			{ section: 'warnings', total: 74, notes: [] }
 		],
+		migration_steps: 0,
 		pages: { query_changed: 2, config_changed: 2, routine_models: 1507, first_run_seeds: 2, unchanged_seeds: 10, unchanged: 300, warnings: 74 },
 		loaded: { query_changed: 2, config_changed: 2, routine_models: 1 },
 		warning_groups: [

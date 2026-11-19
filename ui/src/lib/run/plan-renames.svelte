@@ -52,17 +52,27 @@
 	const sections = $derived<PlanPageSection[]>(['renamed', ...kinds.map((k) => k.section)]);
 
 	let busy = $state(false);
-	/** A failed read: shown with Retry, and nothing more is read until then. */
-	let error = $state<string | null>(null);
+	/** A failed page read: shown with Retry, and no more pages are read until then. */
+	let pageError = $state<string | null>(null);
+	/** A failed filter read, kept apart: a paging failure doesn't stop the filter, nor the other way round. */
+	let filterError = $state<string | null>(null);
+	// Another plan (a re-plan) starts with no failed reads.
+	let erroredFor: unknown = null;
+	$effect.pre(() => {
+		if (plan.sections === erroredFor) return;
+		erroredFor = plan.sections;
+		pageError = null;
+		filterError = null;
+	});
+	const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 	// Load what is shown, one page at a time, in order, until each section lists the rows it shows.
 	$effect(() => {
-		if (!more || busy || filtering || error) return;
+		if (!more || busy || filtering || pageError) return;
 		for (const s of sections) {
 			if (listed(s) >= Math.min(wanted(s), total(s)) || read(s) >= sectionTotal(s)) continue;
 			busy = true;
-			error = null;
 			more(s, PAGE)
-				.catch((e: unknown) => (error = e instanceof Error ? e.message : String(e)))
+				.catch((e: unknown) => (pageError = message(e)))
 				.finally(() => (busy = false));
 			return;
 		}
@@ -84,13 +94,13 @@
 		const ask = load;
 		const sections = plan.sections;
 		const all = ['renamed', ...STEP_KINDS.map((k) => k.section)].filter((s) => sectionTotal(s as PlanPageSection) > 0) as PlanPageSection[];
-		if (!name || !serverFilter || !ask || error || current(found, name)) return;
+		if (!name || !serverFilter || !ask || filterError || current(found, name)) return;
 		const timer = setTimeout(async () => {
 			try {
 				const pages = await Promise.all(all.map(async (s) => [s, await ask(s, 0, FILTER_READ, name)] as const));
 				if (wantedName === name && plan.sections === sections) found = { name, sections, pages: Object.fromEntries(pages.map(([s, p]) => [s, { rows: p.rows, total: p.total }])) };
 			} catch (e) {
-				error = e instanceof Error ? e.message : String(e);
+				filterError = message(e);
 			}
 		}, FILTER_WAIT_MS);
 		return () => clearTimeout(timer);
@@ -213,7 +223,9 @@
 			</section>
 		{/if}
 	{/if}
-	{#if error}<p class="hint err" data-testid="renames-error">Couldn't load rows: {error} <Button variant="link" size="inline" class="text-[12px]" onclick={() => (error = null)}>Retry</Button></p>{/if}
+	{#if filtering ? filterError : pageError}
+		<p class="hint err" data-testid="renames-error">Couldn't load rows: {filtering ? filterError : pageError} <Button variant="link" size="inline" class="text-[12px]" onclick={() => (filtering ? (filterError = null) : (pageError = null))}>Retry</Button></p>
+	{/if}
 </div>
 
 <style>

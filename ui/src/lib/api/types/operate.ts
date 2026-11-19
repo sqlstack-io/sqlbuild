@@ -727,8 +727,26 @@ export type PlanRetention = {
 	irreversible_warning?: string | null;
 };
 
-/** `sqb plan --json` as the location printed it; sections the page doesn't show are kept as they are. */
-export type PlanDocument = {
+/**
+ * `sqb plan --json` as the location printed it; sections the page doesn't show are kept as they are. A
+ * server summary has its sections counted and its migration steps with them; only the default mock
+ * serves a whole plan, without either.
+ */
+export type PlanDocument = PlanFields & (WholePlan | PlanSummaryCounts);
+
+/** The default mock's whole plan: every row, nothing counted. */
+type WholePlan = { sections?: undefined; migration_steps?: undefined };
+
+/** A server summary's counts. */
+type PlanSummaryCounts = {
+	/** The nonempty sections in plan order, each with the notes its rows share most. */
+	sections: PlanSectionCount[];
+	/** The migration steps: migrations other than renamed models' own, column migrations, table type and retention changes. */
+	migration_steps: number;
+};
+
+/** The fields of every plan document. */
+type PlanFields = {
 	selected_count: number;
 	models: PlanModel[];
 	seeds: { name: string; reason: string; qualified_name?: string }[];
@@ -752,10 +770,6 @@ export type PlanDocument = {
 	pages?: Partial<Record<PlanPageSection, number>>;
 	/** A server summary's warnings by message template, largest first; the warnings section pages them in this order. */
 	warning_groups?: PlanWarningGroup[];
-	/** A server summary's migration steps: migrations other than renamed models' own, column migrations, table type and retention changes. */
-	migration_steps?: number;
-	/** A server summary's nonempty sections in plan order, each with the notes its rows share most. */
-	sections?: PlanSectionCount[];
 	/** Rows of each paged section loaded so far, which is the offset of its next page. */
 	loaded?: Partial<Record<PlanPageSection, number>>;
 };
