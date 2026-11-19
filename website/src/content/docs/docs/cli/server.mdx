@@ -552,7 +552,7 @@ Details:
 - The interval restarts after every completed sync, so a location that syncs often for other
   reasons never syncs extra.
 - A sync reads the warehouse and writes only to resume
-  [maintained models](/docs/concepts/models/materializations#during-a-build) a stopped build left
+  [maintained models](/docs/concepts/models/maintained#when-a-build-dies) a stopped build left
   suspended (see [Follow a sync](#follow-a-sync)). On Snowflake, it skips state tables that haven't
   changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
