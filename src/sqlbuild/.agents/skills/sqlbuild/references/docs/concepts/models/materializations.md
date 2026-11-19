@@ -86,75 +86,17 @@ See [Snapshots](../snapshots.md) for timestamp and check strategies, historical 
 
 ## Maintained
 
-The warehouse keeps a maintained model up to date on a schedule you set, between builds. On Snowflake it is a dynamic table; a build creates it, changes it when its definition changes, and otherwise leaves the refreshing to Snowflake.
+The warehouse keeps the model up to date on a schedule you set, and builds pause it while they change its inputs:
 
 ```sql
-MODEL (
-  description "One row per customer per order date",
-  materialized maintained,
-  refresh (lag 1h),
-);
+MODEL (description "One row per customer per order date", materialized maintained, refresh (lag 1h));
 
 SELECT customer_id, CAST(ordered_at AS DATE) AS order_date, SUM(amount) AS revenue
 FROM __ref("stg_orders")
 GROUP BY customer_id, CAST(ordered_at AS DATE)
 ```
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `refresh (lag <duration>)` | none | How far behind its inputs the model may fall: a fixed duration such as `5m`, `1h` or `1d`, at least `1m` on Snowflake and no shorter than the lag of a maintained model it reads. Without it, the model refreshes when a maintained model that reads it refreshes |
-| `refresh_mode` | `incremental` | `incremental`, `full`, `auto` or `adaptive`. Snowflake rejects `incremental` for a query it can't refresh incrementally; use `full` for that query |
-| `refresh_warehouse` | the connection's warehouse | Warehouse the scheduled refreshes run on |
-| `refresh_on_build` | `false` | Refresh the model in every build that selects it, not only on its schedule |
-
-Only Snowflake supports maintained models. See [Snowflake](../adapters/snowflake.md#maintained-models) for the grants and change tracking they need.
-
-### What the plan shows
-
-| Change | Plan | What the build does |
-|--------|------|---------------------|
-| First build, or the dynamic table is missing | `create` | Creates it and fills it |
-| Query or `refresh_mode` changed | `recreate, full recompute` | Replaces it; every row is computed again |
-| `refresh` lag or `refresh_warehouse` differs from the warehouse | `change refresh settings in place` | Alters the schedule; rows stay |
-| Nothing | `maintained` | Leaves it alone |
-
-A model the plan keeps can carry one more line:
-
-- `recomputes in full: stg_orders is rebuilt`: the build replaces a model it reads, so its next refresh computes every row again.
-- `paused: scheduled refreshes are suspended`: Snowflake lists it as suspended, so it is not refreshing.
-
-### During a build
-
-A build pauses the maintained models it changes, and those that read a model it rebuilds, directly or through views, so they never refresh from half-built inputs. It resumes them when it ends, whether it succeeds or fails.
-
-- Dynamic tables outside the project that read a paused model pause too, until the build resumes it. One that someone had suspended before stays suspended.
-- A model that was already suspended when the build started stays suspended, and the build warns about it.
-- If someone suspends a model during the build, the build's resume undoes that suspend.
-- A kept model is refreshed during the build when a model built later in the same build reads it, so that model reads current rows. `refresh_on_build` refreshes it in every build.
-- A target with `pause_maintained = true` leaves its maintained models suspended between builds and refreshes them only in builds; see [Targets](../project-configuration.md#targets).
-
-Two builds can't pause the same models at once. A build that needs a model another build holds fails with `A718`, naming that run. When two builds pause a model at the same moment, the one that recorded its pause first keeps it, and the other fails with `A718` without suspending or resuming anything. A build that stops without resuming, for example because its process was killed, leaves its models suspended. The next build that pauses maintained models on the target resumes them once that build has been silent for `[maintained] heartbeat_grace` (see [Maintained](../project-configuration.md#maintained)). Until then, resume them in Snowflake by hand, or run `sqb build --ignore-maintained-grace` where the project allows it.
-
-### Error codes
-
-| Code | When | Fix |
-|------|------|-----|
-| `A013` | `materialized maintained` on an adapter other than Snowflake | Use `table` or `incremental` on that adapter |
-| `A014` | `materialized materialized_view` on Snowflake | Use `materialized maintained` |
-| `A015` | A `refresh` lag under `1m` on Snowflake | Set a lag of at least `1m` |
-| `A016` | A model with no `refresh` that no maintained model reads, so it would never refresh | Add `refresh (lag 1h)` or another lag |
-| `A716` | The adapter can't build a maintained model | Use an adapter that supports them |
-| `A717` | No warehouse to refresh with | Set `refresh_warehouse`, or a `warehouse` on the connection |
-| `A718` | Another build holds the models this build needs | Wait for it to finish, or for its hold to pass `heartbeat_grace` |
-| `A719` | `--ignore-maintained-grace` without `allow_ignore_grace = true` | Set `[maintained] allow_ignore_grace = true`, or wait for the grace to pass |
-
-### Limitations
-
-- Writing out the default `refresh_mode incremental` changes the model's definition, so the next build recreates it once.
-- A custom materialization named `maintained` is not used; the built-in one takes the name.
-- Unit tests and scenarios treat a maintained model as a table.
-- On a target with `schema = "preserve"`, builds see each other's pauses only when their maintained models share a schema.
-- A snapshot rebuilt in full is created without change tracking. Before a maintained model reads it again, run `ALTER TABLE <snapshot> SET CHANGE_TRACKING = TRUE`.
+See [Maintained models](maintained.md) for its settings, what the plan shows and what happens when a build dies.
 
 ## Custom
 
