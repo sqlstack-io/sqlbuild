@@ -2,14 +2,14 @@
 
 use crate::compiled_views::models::NativeCompiledModel;
 use crate::native_host::_helpers::run_writes::{
-    RowWrite, RunRow, ShareResult, warn_on_errors, write_shares,
+    RowWrite, RunRow, SharesOutcome, warn_on_errors, write_shares,
 };
 use crate::native_host::_helpers::runs_state::CREATE_TABLE_METHOD;
 use crate::native_host::constants::MAX_RUN_RECORD_CONNECTIONS;
 use crate::planner_scope::models::ScopeData;
 use pyo3::IntoPyObject;
 use pyo3::PyErr;
-use pyo3::exceptions::PyKeyboardInterrupt;
+use pyo3::exceptions::{PyException, PyKeyboardInterrupt};
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
@@ -18,6 +18,7 @@ use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use sqlbuild_core::constants::RUNS_TABLE_NAME;
 use sqlbuild_orchestration::declarations::models::TriggerDefinition;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::native_host::main::state_table_name::state_table_name;
@@ -245,22 +246,39 @@ impl<'py> RunRecorder<'py> {
         let _ = self.finished(&RunNodeCounts::default(), ending);
     }
 
-    /// Append the row to every schema's table over a few connections, then warn for each failure.
-    ///
-    /// An interrupt, raised in a writer or while waiting for them, escapes once every write is done.
+    /// Append the row to every schema's table over a few connections; only an interrupt escapes.
     fn append_everywhere(&self, row: RunRow<'_>, mode: RowWrite) -> PyResult<()> {
         let py: Python<'py> = self.adapter.py();
         let connections: usize = self.tables.len().min(MAX_RUN_RECORD_CONNECTIONS);
         let shares: Vec<Vec<usize>> = (0..connections)
             .map(|first| (first..self.tables.len()).step_by(connections).collect())
             .collect();
-        let (shared, signal): (Vec<ShareResult>, Option<PyErr>) = write_shares(
+        let outcome: SharesOutcome = match write_shares(
             (&self.adapter, &self.connection_config),
             (&self.tables, &self.identity),
             &shares,
             (row, mode),
+        ) {
+            Ok(outcome) => outcome,
+            Err(error) if error.is_instance_of::<PyException>(py) => {
+                let _ = write_console(
+                    py,
+                    "stderr",
+                    &format!(
+                        "Warning: could not record that run {} {} in {RUNS_TABLE_NAME}: {error}\n",
+                        self.identity.run_id, row.0
+                    ),
+                );
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        };
+        let escaped: Option<PyErr> = warn_on_errors(
+            py,
+            (&self.tables, &self.identity),
+            (row.0, outcome.stopped),
+            outcome.shared,
         );
-        warn_on_errors(py, (&self.tables, &self.identity), row.0, shared)?;
-        signal.map_or(Ok(()), Err)
+        outcome.signal.or(escaped).map_or(Ok(()), Err)
     }
 }

@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -1559,6 +1560,19 @@ def runs_tables(*, project_dir: Path) -> frozenset[str]:
             "SELECT schema_name FROM duckdb_tables() WHERE table_name = '_sqlbuild_runs'"
         ).fetchall()
     return frozenset(name.lower() for (name,) in rows)
+
+
+def recalled_run_inserts(*, project_dir: Path) -> list[tuple[int, int]]:
+    """Per recalled invocation, its statement count and how many insert into the runs table."""
+
+    with sqlite3.connect(project_dir / "logs" / "recall.sqlite3") as store:
+        return store.execute(
+            "SELECT COUNT(DISTINCT s.statement_id), "
+            "COUNT(DISTINCT CASE WHEN a.content LIKE 'INSERT INTO %_sqlbuild_runs%' "
+            "THEN s.statement_id END) "
+            "FROM statements AS s LEFT JOIN artifacts AS a ON a.statement_id = s.statement_id "
+            "GROUP BY s.invocation_id"
+        ).fetchall()
 
 
 def built_tables(*, project_dir: Path) -> frozenset[str]:

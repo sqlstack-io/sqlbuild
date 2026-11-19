@@ -1,5 +1,6 @@
-//! The schemas a run writes, where it records its rows in the runs table, each physical schema once.
+//! The schemas a build or seed writes, where it records its rows in the runs table, each once.
 
+use crate::native_host::constants::SKIP_ACTION;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::analysis_route::main::same_unquoted_name::same_unquoted_name;
 use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
@@ -10,7 +11,7 @@ use sqlbuild_state::runs::models::RunSchema;
 use std::collections::BTreeSet;
 
 /// The schema of a relation the run writes; None for a relation without one.
-pub(crate) fn written_schema(destination: &Bound<'_, PyAny>) -> PyResult<Option<Location>> {
+fn written_schema(destination: &Bound<'_, PyAny>) -> PyResult<Option<Location>> {
     let schema: Option<String> = native_field(destination, "schema")?.extract()?;
     schema
         .map(|schema| {
@@ -55,7 +56,7 @@ fn default_location(
 }
 
 /// Each physical schema of `schemas` once, as the dialect resolves names; else the default location.
-pub(crate) fn run_locations(
+fn run_locations(
     schemas: BTreeSet<Location>,
     (plan, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
 ) -> PyResult<Vec<Location>> {
@@ -82,4 +83,43 @@ pub(crate) fn run_locations(
         schema: schema.schema,
     })
     .collect())
+}
+
+/// Where a build records: its models' and seeds' schemas that run, its functions', its sources'.
+pub(crate) fn build_write_locations(pipeline: &Bound<'_, PyAny>) -> PyResult<Vec<Location>> {
+    let plan: &Bound<'_, PyAny> = &native_field(pipeline, "plan_output")?;
+    let project: &Bound<'_, PyAny> = &native_field(pipeline, "project")?;
+    let mut schemas: BTreeSet<Location> = BTreeSet::new();
+    for entries in ["model_entries", "seed_entries"] {
+        for entry in native_field(plan, entries)?.try_iter()? {
+            let entry: Bound<'_, PyAny> = entry?;
+            if !native_field(&entry, "action")?.eq(SKIP_ACTION)? {
+                schemas.extend(written_schema(&native_field(&entry, "destination")?)?);
+            }
+        }
+    }
+    for entry in native_field(plan, "function_entries")?.try_iter()? {
+        schemas.extend(written_schema(&native_field(&entry?, "destination")?)?);
+    }
+    let sources: Bound<'_, PyAny> = native_field(plan, "source_map")?;
+    for entry in native_field(plan, "source_load_entries")?.try_iter()? {
+        if let Some(source) = sources
+            .call_method1("get", (native_field(&entry?, "name")?,))?
+            .extract::<Option<Bound<'_, PyAny>>>()?
+        {
+            schemas.extend(written_schema(&source)?);
+        }
+    }
+    run_locations(schemas, (plan, project))
+}
+
+/// Where `sqb seed` records: the schemas of every seed it loads.
+pub(crate) fn seed_write_locations(pipeline: &Bound<'_, PyAny>) -> PyResult<Vec<Location>> {
+    let plan: &Bound<'_, PyAny> = &native_field(pipeline, "plan_output")?;
+    let project: &Bound<'_, PyAny> = &native_field(pipeline, "project")?;
+    let mut schemas: BTreeSet<Location> = BTreeSet::new();
+    for entry in native_field(plan, "seed_entries")?.try_iter()? {
+        schemas.extend(written_schema(&native_field(&entry?, "destination")?)?);
+    }
+    run_locations(schemas, (plan, project))
 }
