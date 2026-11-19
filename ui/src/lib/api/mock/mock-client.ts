@@ -371,7 +371,7 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.launchAdhocRun(scope, request);
 	}
 
-	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+	async planBuild(scope: Scope, command: string[], _options: { fresh?: boolean } = {}): Promise<PlanResult> {
 		this.#location(scope);
 		// `--changed` starts from the nodes whose own definition changed, as the catalog marks them.
 		const changed = command.some((t) => t === '--changed' || t.startsWith('--changed='))

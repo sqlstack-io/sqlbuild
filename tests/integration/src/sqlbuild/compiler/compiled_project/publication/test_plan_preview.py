@@ -455,16 +455,20 @@ def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_
         HeldPlanTestCase(
             description=(
                 "only the plan that sets variables compiles the project again; the other two "
-                "and the changed-build count plan from the published project"
+                "and the changed-build count plan from the published project, and the same "
+                "request again returns the kept plan unless it asks to plan again"
             ),
             settings=(
                 {"changed": True},
                 {"changed": True, "vars": {"batch": "2"}},
                 {"changed": True},
+                {"changed": True},
             ),
-            expected_runs=((), ("model:order_count",), ()),
+            fresh=frozenset({2}),
+            expected_runs=((), ("model:order_count",), (), ()),
             expected_compiles=1,
             expected_held_plans=3,
+            expected_reused=(False, False, False, True),
         ),
     ],
     ids=lambda case: case.description,
@@ -486,10 +490,11 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
         (["model:order_count"], settings) for settings in test_case.settings
     ]
 
-    plans: list[dict[str, Any]] = plans_from_copy(tmp_path, project, requests)
+    plans: list[dict[str, Any]] = plans_from_copy(tmp_path, project, requests, test_case.fresh)
 
     log: str = (tmp_path / "location.log").read_text()
     assert tuple(map(changed_runs, plans)) == test_case.expected_runs, log
+    assert tuple("reused_from" in plan["timings"] for plan in plans) == test_case.expected_reused
     assert log.count("Compiling project...") == test_case.expected_compiles, log
     assert log.count(_HELD) == test_case.expected_held_plans, log
     assert log.count(_SYNCED_READING) == test_case.expected_held_plans + 1, log

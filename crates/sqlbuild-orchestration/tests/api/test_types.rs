@@ -319,6 +319,8 @@ pub(crate) struct OlderNodeFinished {
 pub(crate) struct PlanTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
+    /// Whether the person asks to plan again rather than reuse a kept plan.
+    pub(crate) fresh: bool,
     pub(crate) expected_selection: &'static [&'static str],
     pub(crate) expected_warning: &'static str,
 }

@@ -90,6 +90,34 @@ pub(super) struct InitFailureTestCase {
     pub(super) expected_exit_code: i32,
 }
 
+/// The frozen settings of one plan request.
+pub(super) struct PlanArgumentsTestCase {
+    pub(super) description: &'static str,
+    pub(super) settings: serde_json::Value,
+    /// Whether the location refuses the settings instead of planning, and keeping, them.
+    pub(super) expected_refused: bool,
+}
+
+/// One kept plan, then one request for a plan.
+pub(super) struct PlanReuseTestCase {
+    pub(super) description: &'static str,
+    /// The kept plan's generation, copy version and whether it failed.
+    pub(super) kept: (i64, &'static str, bool),
+    /// The generation, copy version and selected names of the request.
+    pub(super) asked: (i64, &'static str, &'static [&'static str]),
+    /// The reused plan's timings, or `None` when the location plans again.
+    pub(super) expected_timings: Option<serde_json::Value>,
+}
+
+/// One more finished plan than a location keeps, maybe a plan of a newer copy, then one request.
+pub(super) struct PlanReuseBoundTestCase {
+    pub(super) description: &'static str,
+    pub(super) newer_copy: bool,
+    /// The selected name and copy version of the request.
+    pub(super) asked: (&'static str, &'static str),
+    pub(super) expected_reused: bool,
+}
+
 /// One `sqb plan --json` output, whether it exited as a plan, and the first model the server receives.
 pub(super) struct PlanDocumentTestCase {
     pub(super) description: &'static str,

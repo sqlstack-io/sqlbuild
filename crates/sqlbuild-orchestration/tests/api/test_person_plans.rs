@@ -38,12 +38,14 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
         PlanTestCase {
             description: "SQLite plans",
             backend: Backend::Sqlite,
+            fresh: true,
             expected_selection: &["customers", "orders"],
             expected_warning: "connect failed: db_password=[REDACTED]",
         },
         PlanTestCase {
             description: "PostgreSQL plans",
             backend: Backend::Postgres,
+            fresh: false,
             expected_selection: &["customers", "orders"],
             expected_warning: "connect failed: db_password=[REDACTED]",
         },
@@ -100,14 +102,17 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             )
             .await;
             let outsider = person(store, owner, ("orders-outsider", location), &[]).await;
-            let first = plan_request(&[
-                "build",
-                "customers",
-                "orders",
-                "--full-refresh",
-                "--warehouse",
-                "WH_PLAN",
-            ]);
+            let first = PlanRequest {
+                fresh: test_case.fresh,
+                ..plan_request(&[
+                    "build",
+                    "customers",
+                    "orders",
+                    "--full-refresh",
+                    "--warehouse",
+                    "WH_PLAN",
+                ])
+            };
 
             let silent = ask(store, (&context, viewer), location, &first).await;
             assert!(
@@ -225,6 +230,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                     command: vec!["build".into(), "orders".into()],
                     selection: ["orders".to_owned()].into(),
                     settings: Default::default(),
+                    fresh: false,
                 },
             };
             assert!(
@@ -278,6 +284,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             let LocationWork::Plan {
                 selection,
                 settings,
+                fresh,
                 ..
             } = &claimed.request.work
             else {
@@ -286,6 +293,12 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                     description = test_case.description
                 )
             };
+            assert_eq!(
+                *fresh,
+                test_case.fresh,
+                "{description}: the location sees whether to plan again",
+                description = test_case.description
+            );
             assert_eq!(
                 selection.iter().map(String::as_str).collect::<Vec<_>>(),
                 test_case.expected_selection,

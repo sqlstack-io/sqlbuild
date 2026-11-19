@@ -599,12 +599,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		 * Queues the plan, then waits for the location's summary: changed models in full and the large sections counted.
 		 * The first page of each large section loads with it; a plan the location could not make is a result, not a throw.
 		 */
-		async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+		async planBuild(scope: Scope, command: string[], options: { fresh?: boolean } = {}): Promise<PlanResult> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };
 			const requestId = newRequestId();
 			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/plans', {
-				body: { request_id: requestId, command },
+				body: { request_id: requestId, command, fresh: options.fresh ?? false },
 				params: { path, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
 			});
 			if (asked.response.status === 401) onUnauthorized();

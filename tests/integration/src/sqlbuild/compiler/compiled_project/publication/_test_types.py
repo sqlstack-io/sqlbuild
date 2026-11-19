@@ -532,9 +532,11 @@ class PlanPreviewTestCase:
 class HeldPlanTestCase:
     description: str
     settings: tuple[dict[str, object], ...]
+    fresh: frozenset[int]
     expected_runs: tuple[tuple[str, ...], ...]
     expected_compiles: int
     expected_held_plans: int
+    expected_reused: tuple[bool, ...]
 
 
 @dataclass(frozen=True)

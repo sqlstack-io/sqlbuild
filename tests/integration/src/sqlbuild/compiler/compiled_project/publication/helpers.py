@@ -1886,9 +1886,15 @@ def changed_build_and_plan_from_copy(
 
 
 def plans_from_copy(
-    tmp_path: Path, project: Path, requests: list[tuple[list[str], dict[str, object]]]
+    tmp_path: Path,
+    project: Path,
+    requests: list[tuple[list[str], dict[str, object]]],
+    fresh: frozenset[int] = frozenset(),
 ) -> list[dict[str, Any]]:
-    """Serve `project` until its first sync completes, then plan each request from the copy."""
+    """Serve `project` until its first sync completes, then plan each request from the copy.
+
+    The requests at the `fresh` positions are Plan again, which plans anew instead of reusing.
+    """
     control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
     log: Path = tmp_path / "location.log"
     started: datetime = datetime.now(UTC)
@@ -1922,8 +1928,8 @@ def plans_from_copy(
             log,
             after=started,
         )
-        for selection, settings in requests:
-            request_id: str = request_plan(control, selection, settings)
+        for position, (selection, settings) in enumerate(requests):
+            request_id: str = request_plan(control, selection, settings, fresh=position in fresh)
             result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
             outcome: dict[str, Any] = result["result_json"]["outcome"]
             assert outcome["kind"] == "plan", outcome

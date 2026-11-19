@@ -892,11 +892,17 @@ These stay unknown until it does:
 - the columns of an expression source whose SQL changed since it was last described, which the
   plan takes as declared.
 
-Over the API, queue a plan, then read it until `result_json` is set:
+A location keeps its last 16 plans for the current publication and synced copy, in memory, and
+answers an identical request with the plan it kept instead of planning again. A newer publication
+or synced copy drops them all. A kept plan's `timings` say so in `reused_from`, the time it was
+made. The page's **Plan again** asks for a fresh plan.
+
+Over the API, queue a plan, then read it until `result_json` is set. `fresh` is required: `true`
+plans again even when the location kept a plan for the same command.
 
 ```json
 POST /api/control/locations/{location_id}/targets/{target}/plans
-{ "request_id": "0191f0aa-0000-7000-8000-0000000000a1", "command": ["build", "--select", "+orders"] }
+{ "request_id": "0191f0aa-0000-7000-8000-0000000000a1", "command": ["build", "--select", "+orders"], "fresh": false }
 
 GET /api/control/locations/{location_id}/targets/{target}/plans/{request_id}
 ```
