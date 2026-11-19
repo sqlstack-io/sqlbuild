@@ -15,12 +15,13 @@ use crate::lineage::_helpers::references::{
     PhysicalResource, normalized_sql, physical_resource_name, physical_resources,
 };
 use crate::lineage::_helpers::stars::star_lineage;
-use crate::lineage::constants::{MAX_FUNCTION_CALL_DEPTH, STAR_COLUMN_NAME, UNKNOWN_COLUMN_TYPE};
+use crate::lineage::constants::{STAR_COLUMN_NAME, UNKNOWN_COLUMN_TYPE};
 use crate::lineage::models::{
     LineageColumn, LineageConfidence, LineageNullability, LineageResourceType,
     LineageSchemaResource, LineageSource, LineageTransformKind, RichLineageColumn,
     RichLineageOutcome, RichSchemaResource,
 };
+use crate::parse_guard::main::polyglot_complexity_guard::polyglot_complexity_guard;
 
 /// What every model of one request shares: the dialect, the guard and the known tables.
 pub(crate) struct RichContext {
@@ -42,10 +43,7 @@ impl RichContext {
     ) -> Self {
         Self {
             dialect,
-            guard: ComplexityGuardOptions {
-                max_function_call_depth: Some(MAX_FUNCTION_CALL_DEPTH),
-                ..ComplexityGuardOptions::default()
-            },
+            guard: polyglot_complexity_guard(),
             tables: schema_tables(schema, referenced),
             names,
         }

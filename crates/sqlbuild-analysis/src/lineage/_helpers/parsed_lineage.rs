@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use polyglot_sql::{ComplexityGuardOptions, Dialect, DialectType, Expression, ParseOptions};
+use polyglot_sql::{Dialect, DialectType, Expression, ParseOptions};
 
 use crate::lineage::_helpers::projections::{
     UnreadableExpression, classify_transform, is_star, projection_output_name,
@@ -10,21 +10,11 @@ use crate::lineage::_helpers::projections::{
 };
 use crate::lineage::_helpers::references::{PhysicalResource, normalized_sql, physical_resources};
 use crate::lineage::_helpers::stars::star_lineage;
-use crate::lineage::constants::{KIND_SELECT, KIND_UNION, MAX_FUNCTION_CALL_DEPTH};
+use crate::lineage::constants::{KIND_SELECT, KIND_UNION};
 use crate::lineage::models::{
     FastLineageOutcome, LineageColumn, LineageConfidence, LineageResourceType, LineageSource,
     LineageTransformKind,
 };
-
-/// The parse options SQLBuild's Polyglot proxy gives `parse_one`, decoded as the wheel does.
-pub(crate) fn proxy_parse_options() -> Result<ParseOptions, serde_json::Error> {
-    let guard: ComplexityGuardOptions = serde_json::from_value(serde_json::json!({
-        "maxFunctionCallDepth": MAX_FUNCTION_CALL_DEPTH,
-    }))?;
-    Ok(ParseOptions {
-        complexity_guard: Some(guard),
-    })
-}
 
 pub(crate) struct ParsedModel<'a> {
     pub(crate) query_sql: &'a str,
@@ -32,7 +22,7 @@ pub(crate) struct ParsedModel<'a> {
     pub(crate) schema: &'a HashMap<String, Vec<String>>,
     /// The parser dialect, or the dialect name Polyglot does not know.
     pub(crate) dialect: Result<DialectType, &'a str>,
-    pub(crate) options: &'a Result<ParseOptions, serde_json::Error>,
+    pub(crate) options: &'a ParseOptions,
 }
 
 /// The model's lineage outcome; fails on a tree the lineage walk cannot read.
@@ -41,10 +31,7 @@ pub(crate) fn parsed_model_lineage(model: &ParsedModel<'_>) -> Result<FastLineag
         Ok(dialect) => dialect,
         Err(name) => return Ok(FastLineageOutcome::UnknownDialect(name.to_owned())),
     };
-    let options: &ParseOptions = model
-        .options
-        .as_ref()
-        .map_err(|_| "the parse options do not build".to_owned())?;
+    let options: &ParseOptions = model.options;
     let physical = physical_resources(model.query_sql);
     let sql = normalized_sql(model.query_sql);
     let mut statements = match Dialect::get(dialect).parse_with_options(&sql, options) {

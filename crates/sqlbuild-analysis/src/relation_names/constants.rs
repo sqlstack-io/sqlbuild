@@ -11,5 +11,3 @@ pub(crate) const CREATE_TABLE_KEY: &str = "create_table";
 pub(crate) const TEMPORARY_KEY: &str = "temporary";
 pub(crate) const QUALIFIER_SEPARATOR: char = '.';
 pub(crate) const GENERIC_DIALECT: &str = "generic";
-/// The guarded proxy's `maxFunctionCallDepth` for the wheel's `parse`.
-pub(crate) const MAX_FUNCTION_CALL_DEPTH: usize = 512;

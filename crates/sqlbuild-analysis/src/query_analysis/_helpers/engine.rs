@@ -15,6 +15,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use crate::constants::{UNKNOWN_SQL_TYPE, VARCHAR_SQL_TYPE};
+use crate::parse_guard::main::polyglot_complexity_guard::polyglot_complexity_guard;
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use sqlbuild_core::constants::SQL_WILDCARD;
 
 const DEFAULT_WORKERS: usize = 4;
@@ -89,6 +91,7 @@ impl AnalysisRequest {
             check_references: true,
             strict: Some(true),
             strict_syntax: false,
+            complexity_guard: Some(polyglot_complexity_guard()),
             ..Default::default()
         }
     }
@@ -612,16 +615,9 @@ fn try_borrowed_query(
     if !matches!(dialect, DialectType::Snowflake | DialectType::DuckDB) {
         return Err(Box::new(work));
     }
-    let Ok(mut statements) = polyglot_sql::parse_with_options(
-        &work.query.sql,
-        dialect,
-        &polyglot_sql::ParseOptions {
-            complexity_guard: Some(polyglot_sql::ComplexityGuardOptions {
-                max_function_call_depth: Some(128),
-                ..Default::default()
-            }),
-        },
-    ) else {
+    let Ok(mut statements) =
+        polyglot_sql::parse_with_options(&work.query.sql, dialect, &polyglot_parse_options())
+    else {
         return Err(Box::new(work));
     };
     if statements.len() != 1 {
@@ -1036,7 +1032,7 @@ fn compile_query(mut request: AnalysisRequest, project_projections: bool) -> Com
     let compiled = polyglot_sql::compile_required_query_analysis(
         &request.sql,
         AnalyzeQueryOptions {
-            complexity_guard: None,
+            complexity_guard: Some(polyglot_complexity_guard()),
             dialect,
             schema: request.schema,
         },
@@ -1105,7 +1101,7 @@ fn query_analysis(
         }
     };
     let options = AnalyzeQueryOptions {
-        complexity_guard: None,
+        complexity_guard: Some(polyglot_complexity_guard()),
         dialect,
         schema: request.schema,
     };

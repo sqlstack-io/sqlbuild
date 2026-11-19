@@ -21,8 +21,6 @@ pub(crate) const PAYLOAD_COLUMN: &str = "column";
 pub(crate) const PAYLOAD_NAME: &str = "name";
 pub(crate) const PAYLOAD_TABLE: &str = "table";
 pub(crate) const SET_OPERATION_SIDES: [&str; 2] = ["left", "right"];
-/// The function-call depth SQLBuild's Polyglot proxy passes on every parse.
-pub(crate) const MAX_FUNCTION_CALL_DEPTH: usize = 512;
 pub(crate) const REFERENCE_PREFIX: &str = "__";
 pub(crate) const UDF_CALL: &str = "__udf(";
 pub(crate) const PHYSICAL_RESOURCE_PREFIX: &str = "__sqlbuild_";

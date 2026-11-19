@@ -1,9 +1,10 @@
-//! Register the queries functions and classes.
+//! Register the queries functions and classes, and the shared parse call depth.
 
 use crate::analysis::_helpers::queries::parse_warehouse_type;
 use crate::analysis::_helpers::queries::query_fingerprint;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
+use sqlbuild_analysis::parse_guard::constants::MAX_FUNCTION_CALL_DEPTH;
 use sqlbuild_python_project::analysis::main::register_binding_catalog::register_binding_catalog;
 use sqlbuild_python_project::references::main::register_explicit_references::register_explicit_references;
 
@@ -15,5 +16,6 @@ pub fn register_queries(module: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::analysis::_helpers::binding_locations::register(module)?;
     module.add_function(wrap_pyfunction!(query_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(parse_warehouse_type, module)?)?;
+    module.add("MAX_FUNCTION_CALL_DEPTH", MAX_FUNCTION_CALL_DEPTH)?;
     Ok(())
 }

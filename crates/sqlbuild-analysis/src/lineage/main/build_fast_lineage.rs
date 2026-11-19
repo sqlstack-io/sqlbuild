@@ -11,13 +11,12 @@ use sqlbuild_core::panics::main::native_failure::native_failure;
 use crate::analysis_route::main::analysis_route::analysis_route;
 use crate::analysis_route::main::fast_lineage::fast_lineage;
 use crate::analysis_route::models::AnalysisRoute;
-use crate::lineage::_helpers::parsed_lineage::{
-    ParsedModel, parsed_model_lineage, proxy_parse_options,
-};
+use crate::lineage::_helpers::parsed_lineage::{ParsedModel, parsed_model_lineage};
 use crate::lineage::_helpers::references::physical_resources;
 use crate::lineage::_helpers::stars::{schema_mapping, star_lineage};
 use crate::lineage::main::parser_dialect::parser_dialect;
 use crate::lineage::models::{FastLineageModel, FastLineageOutcome, FastLineageRequest};
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::semantic_validation::main::new_analysis_pool::new_analysis_pool;
 use crate::semantic_validation::models::ProjectCatalog;
 
@@ -56,7 +55,7 @@ fn model_outcomes(request: &FastLineageRequest) -> Vec<Result<FastLineageOutcome
         .unwrap_or("generic");
     let dialect = parser_dialect(Some(name));
     let route: AnalysisRoute = analysis_route(Some(name));
-    let options: Result<ParseOptions, serde_json::Error> = proxy_parse_options();
+    let options: ParseOptions = polyglot_parse_options();
     request
         .models
         .par_iter()

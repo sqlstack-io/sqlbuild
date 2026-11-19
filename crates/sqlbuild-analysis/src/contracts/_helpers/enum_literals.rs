@@ -5,6 +5,7 @@ use polyglot_sql::tokens::{Token, TokenType};
 use polyglot_sql::{Dialect, DialectType, Expression};
 
 use crate::contracts::models::LiteralLocation;
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 
 /// How deep the walk follows set operations and passthrough columns before it stops.
 const MAX_DEPTH: usize = 64;
@@ -69,7 +70,9 @@ pub(crate) fn parsed_query(sql: &str, dialect: &str) -> Option<Expression> {
     let Ok(dialect) = dialect.parse::<DialectType>() else {
         return None;
     };
-    let Ok(mut statements) = polyglot_sql::parse(sql, dialect) else {
+    let Ok(mut statements) =
+        polyglot_sql::parse_with_options(sql, dialect, &polyglot_parse_options())
+    else {
         return None;
     };
     (statements.len() == 1).then(|| statements.pop()).flatten()
