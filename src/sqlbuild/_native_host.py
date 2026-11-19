@@ -590,6 +590,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.runtime.execution_limits.main.execution_deadline_scope",
         "execution_deadline_scope",
     ),
+    "execution_deadlines_suspended": (
+        "sqlbuild.runtime.execution_limits.main.execution_deadlines_suspended",
+        "execution_deadlines_suspended",
+    ),
     "audit_evidence_scope": (
         "sqlbuild.executor.auditing.main._audit_evidence_scope",
         "audit_evidence_scope",

@@ -705,6 +705,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
+        name: "execution_deadlines_suspended",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
         name: "audit_evidence_scope",
         kind: HostKind::Function,
         edge: HostEdge::Executor,
