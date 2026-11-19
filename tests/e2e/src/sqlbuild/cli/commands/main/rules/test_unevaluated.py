@@ -11,6 +11,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules._test_types import (
     EvaluatedModelRulesCase,
     EvaluatedPredicateCase,
     GroupedRulesCase,
+    SharedDepthModelRuleCase,
     SnowflakeBodyShapeCase,
     UnevaluatedResourceCase,
     UnevaluatedRuleCase,
@@ -47,14 +48,6 @@ _SNOWFLAKE_RULES_PROJECT: str = (
                     "MODEL (description 'Test model customers.');\nSELECT 1 AS order_id\n",
                 ),
             ),
-        ),
-        UnevaluatedResourceCase(
-            "built-in model rule beyond the parser budget",
-            "models/staging/orders.sql",
-            "MODEL (description 'Test model orders.');\nSELECT {expression} AS order_id",
-            expected_evaluated_models=0,
-            expected_reason="could not parse models/staging/orders.sql for rules",
-            rule="SQBRMODEL101",
         ),
         UnevaluatedResourceCase(
             "SQL-test guard",
@@ -107,6 +100,40 @@ def test_given_guarded_resource_when_running_rules_then_reports_failure_and_cove
         item["code"] == "rules-unevaluated" and item["path"] == test_case.path
         for item in diagnostics
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SharedDepthModelRuleCase(
+            "a built-in model rule parses calls nested as deep as the compiler accepts",
+            "MODEL (description 'Test model orders.');\nSELECT {expression} AS order_id",
+            "SQBRMODEL101",
+            expected_evaluated_models=1,
+            expected_unevaluated_resources=0,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_calls_nested_within_the_shared_depth_when_running_model_rules_then_evaluates(
+    test_case: SharedDepthModelRuleCase,
+    tmp_path: Path,
+) -> None:
+    write_unevaluated_rules_project(
+        project_dir=tmp_path,
+        resource_path="models/staging/orders.sql",
+        resource_template=test_case.template,
+        selected_rules=(test_case.rule,),
+    )
+
+    result: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
+        tmp_path, "rules", "--json", "run", test_case.rule
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload: dict[str, Any] = json.loads(result.stdout)
+    assert payload["unevaluated_resources"] == test_case.expected_unevaluated_resources
+    assert payload["evaluated_models"] == test_case.expected_evaluated_models
 
 
 @pytest.mark.parametrize(

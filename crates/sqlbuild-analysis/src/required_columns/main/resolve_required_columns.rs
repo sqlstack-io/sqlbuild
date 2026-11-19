@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use polyglot_sql::{Dialect, Expression, ParseOptions};
+use polyglot_sql::{Dialect, Expression};
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::required_columns::_helpers::queries::query_reads;
 use crate::required_columns::_helpers::relations::{RelationMap, RelationReads, unique_reads};
 use crate::required_columns::constants::{GENERIC_DIALECT, TABLE_FUNCTION_STUB_PREFIX};
@@ -28,7 +29,7 @@ pub fn resolve_required_columns(
     .map_err(RequiredColumnsError::Normalization)?;
     let parser: Dialect = Dialect::get_by_name(dialect_name)
         .ok_or_else(|| RequiredColumnsError::UnknownDialect(dialect_name.to_owned()))?;
-    let Ok(mut statements) = parser.parse_with_options(&sql, &ParseOptions::default()) else {
+    let Ok(mut statements) = parser.parse_with_options(&sql, &polyglot_parse_options()) else {
         return Ok(Vec::new());
     };
     if statements.len() != 1 {

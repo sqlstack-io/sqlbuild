@@ -1,5 +1,6 @@
 //! Resolve every reference to one relation column, with the spans a rename rewrites.
 
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use polyglot_sql::{
     Dialect, DialectType, Expression, MappingSchema, Resolver, Scope, ValidationSchema,
     build_scope, mapping_schema_from_validation_schema_with_dialect, walk_in_scope,
@@ -109,7 +110,9 @@ pub(crate) fn analyze_json(request_json: &str) -> Result<String, String> {
             request.dialect
         )
     })?;
-    let Ok(statements) = Dialect::get(dialect).parse(&request.sql) else {
+    let Ok(statements) =
+        Dialect::get(dialect).parse_with_options(&request.sql, &polyglot_parse_options())
+    else {
         return serde_json::to_string(&ReferenceResponse::default())
             .map_err(|error| error.to_string());
     };

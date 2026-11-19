@@ -5,7 +5,6 @@ pub(crate) const COMPARISON_CODE: &str = "B217";
 pub(crate) const SQL_TEST_COLUMN_CODE: &str = "B302";
 pub(crate) const SEMANTIC_CODE_PREFIX: &str = "B";
 pub(crate) const MODEL_RESOURCE_TYPE: &str = "model";
-pub(crate) const MAX_FUNCTION_CALL_DEPTH: u64 = 512;
 pub(crate) const GENERIC_DIALECT: &str = "generic";
 pub(crate) const OPEN_PARENTHESIS: &str = "(";
 pub(crate) const CLOSE_PARENTHESIS: &str = ")";

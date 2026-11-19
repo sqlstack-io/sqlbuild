@@ -13,4 +13,3 @@ pub(crate) const UNKNOWN_TAG_CODE: &str = "S008";
 pub(crate) const UNKNOWN_PATH_CODE: &str = "S009";
 pub(crate) const RAW_QUERY_READ_ONLY_ROOTS: [&str; 5] =
     ["except", "intersect", "select", "union", "values"];
-pub(crate) const RAW_QUERY_GUARD: &str = r#"{"maxFunctionCallDepth": 512}"#;

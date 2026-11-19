@@ -1,5 +1,7 @@
 //! Compile-owned schema catalog and native, batched binding requests.
 
+use crate::parse_guard::main::polyglot_complexity_guard::polyglot_complexity_guard;
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::semantic_validation::main::normalize_batch;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -68,7 +70,7 @@ impl ProjectCatalog {
     ) -> Result<Vec<(String, Option<String>)>, String> {
         use polyglot_sql::{Expression, ExpressionWalk};
         let parsed = Dialect::get(self.dialect)
-            .parse(sql)
+            .parse_with_options(sql, &polyglot_parse_options())
             .map_err(|error| error.to_string())?;
         let mut identifiers: HashMap<String, String> = HashMap::new();
         for expression in &parsed {
@@ -151,10 +153,7 @@ impl ProjectCatalog {
                 check_references: true,
                 semantic: true,
                 strict: Some(true),
-                complexity_guard: Some(polyglot_sql::ComplexityGuardOptions {
-                    max_function_call_depth: Some(512),
-                    ..Default::default()
-                }),
+                complexity_guard: Some(polyglot_complexity_guard()),
                 ..Default::default()
             },
             tables: HashMap::new(),
