@@ -989,7 +989,7 @@ describe('planning a build', () => {
 			vi.fn(async (request: Request) =>
 				request.method === 'POST'
 					? Response.json({ applied: true })
-					: Response.json({ expires_at: '2999-01-01T00:00:00Z', outcome: { kind: 'plan', document: { selected_count: 1, models: [] }, diffs: {} }, timings })
+					: Response.json({ expires_at: '2999-01-01T00:00:00Z', outcome: { kind: 'plan', document: { selected_count: 1, models: [], sections: [], migration_steps: 0 }, diffs: {} }, timings })
 			)
 		);
 		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
