@@ -1465,6 +1465,24 @@ class InterruptedRunRecordTestCase:
 
 
 @dataclass(frozen=True)
+class SignalledRunRecordTestCase:
+    description: str
+    # The warehouse-user SQL that keeps the started row's insert running until it is cancelled.
+    blocking_warehouse_user_sql: str
+    signal_after_seconds: float
+    max_stop_seconds: float
+    expected_tables: frozenset[str]
+
+
+@dataclass(frozen=True)
+class RecalledRunRecordTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    # How many of the build's recalled statements insert into the runs table.
+    expected_run_inserts: int
+
+
+@dataclass(frozen=True)
 class KilledRunRecordTestCase:
     description: str
     expected_phases: list[str]
@@ -1475,6 +1493,20 @@ class SeedRunRecordTestCase:
     description: str
     # Each row as (phase, command, select_json, named_jobs_json, var_keys_json, status, counts).
     expected_rows: list[tuple[str, str, str, str, str, str | None, str | None]]
+
+
+@dataclass(frozen=True)
+class RunRecordSchemasTestCase:
+    description: str
+    command_args: tuple[str, ...]
+    settings: str
+    warehouse_setup: str
+    expected_exit_code: int
+    # The phases each schema's runs table holds, oldest first.
+    expected_phases: dict[str, list[str]]
+    expected_absent_schemas: frozenset[str]
+    expected_warnings: tuple[str, ...]
+    expected_finished_status: str = "succeeded"
 
 
 @dataclass(frozen=True)

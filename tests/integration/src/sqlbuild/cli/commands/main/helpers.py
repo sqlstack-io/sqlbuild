@@ -5,12 +5,13 @@ import os
 import re
 import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from itertools import accumulate, chain, compress, takewhile
 from pathlib import Path
@@ -1420,11 +1421,74 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
 }
 
 
-def write_run_record_project(*, project_dir: Path, settings: str) -> None:
-    """Write the project, with `settings` appended to the project file."""
+RUN_RECORD_MARTS_FILES: dict[str, str] = {
+    "models/marts/revenue.sql": (
+        "MODEL (description 'Revenue in the marts schema.', materialized table);\n"
+        "SELECT 10 AS amount\n"
+    ),
+    "models/marts/daily_events.sql": (
+        "MODEL (description 'Loaded events in the marts schema.', materialized table);\n"
+        'SELECT event_id FROM __source("landed_events")\n'
+    ),
+    "python/loaders/events.py": (
+        "from sqlbuild.loaders import loader\n\n\n"
+        "@loader\n"
+        "def landed_events(ctx):\n"
+        '    """Load one event."""\n\n'
+        '    return [{"event_id": 1}]\n'
+    ),
+    "sources/landed.yml": (
+        "sources:\n  - name: landed_events\n    description: Loaded events.\n    schema: landing\n"
+        "    managed: true\n    write_strategy: table\n    columns:\n"
+        "      - name: event_id\n        type: INTEGER\n"
+    ),
+    "models/upper/revenue_upper.sql": (
+        "MODEL (description 'Revenue under an upper-case schema name.', materialized table);\n"
+        "SELECT 20 AS amount\n"
+    ),
+    "models/marts/doubled.sql": (
+        "MODEL (description 'Calls a function in its own schema.', materialized table);\n"
+        'SELECT __udf("udf__doubled")(2) AS amount\n'
+    ),
+    "functions/sql/udf__doubled.sql": (
+        'FUNCTION (\n  description "Twice its argument",\n  arguments (value INTEGER),\n'
+        "  returns INTEGER,\n  schema udfs,\n);\nvalue * 2\n"
+    ),
+    "models/marts/slow_total.sql": (
+        "MODEL (description 'Runs past a one-second deadline.', materialized table);\n"
+        "SELECT COUNT(*) AS total FROM range(100000000000)\n"
+    ),
+    "models/archive/old_orders.sql": (
+        "MODEL (description 'A disabled model in its own schema.', materialized table,\n"
+        "  enabled false, schema archive);\nSELECT 1 AS order_id\n"
+    ),
+    "python/noop.py": (
+        '"""A task that writes no relation."""\n\n'
+        "from sqlbuild.tasks import task\n\n\n"
+        "@task()\n"
+        "def noop(ctx):\n"
+        '    """Do nothing."""\n'
+    ),
+    "seeds/regions.csv": "region_id\n1\n",
+    "seeds/regions.yml": (
+        "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
+        "      - name: region_id\n        type: INTEGER\n"
+    ),
+}
+
+RUN_RECORD_MARTS_SCHEMA: str = (
+    '\n[path_defaults.marts]\nschema = "marts"\n\n[path_defaults.upper]\nschema = "MARTS"\n'
+)
+
+
+def write_run_record_project(
+    *, project_dir: Path, settings: str, extra_files: dict[str, str] | None = None
+) -> None:
+    """Write the project with `extra_files`, and `settings` appended after its `dev` target."""
 
     files: dict[str, str] = {
         **RUN_RECORD_PROJECT_FILES,
+        **(extra_files or {}),
         "sqlbuild_project.toml": (
             'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
             '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n' + settings
@@ -1436,12 +1500,84 @@ def write_run_record_project(*, project_dir: Path, settings: str) -> None:
         destination.write_text(contents, encoding="utf-8")
 
 
-def run_rows(*, project_dir: Path, columns: str) -> list[tuple[object, ...]]:
-    """`columns` of every runs-table row, oldest first."""
+def run_rows(*, project_dir: Path, columns: str, schema: str = "main") -> list[tuple[object, ...]]:
+    """`columns` of every row of `schema`'s runs table, oldest first."""
 
     with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
         return warehouse.sql(
-            f"SELECT {columns} FROM main._sqlbuild_runs ORDER BY recorded_at, phase DESC"
+            f"SELECT {columns} FROM {schema}._sqlbuild_runs ORDER BY recorded_at, phase DESC"
+        ).fetchall()
+
+
+def schema_run_phases(*, project_dir: Path, schemas: Iterable[str]) -> dict[str, list[str]]:
+    """The phases of each of `schemas`' runs table, oldest first."""
+
+    phases: dict[str, list[str]] = {}
+    schema: str
+    for schema in schemas:
+        rows: list[tuple[object, ...]] = run_rows(
+            project_dir=project_dir, columns="phase", schema=schema
+        )
+        phases[schema] = [str(row[0]) for row in rows]
+    return phases
+
+
+def schema_run_ids(*, project_dir: Path, schemas: Iterable[str]) -> set[object]:
+    """Every run ID in `schemas`' runs tables."""
+
+    run_ids: set[object] = set()
+    schema: str
+    for schema in schemas:
+        rows: list[tuple[object, ...]] = run_rows(
+            project_dir=project_dir, columns="run_id", schema=schema
+        )
+        run_ids.update(row[0] for row in rows)
+    return run_ids
+
+
+def schema_run_statuses(*, project_dir: Path, schemas: Iterable[str]) -> set[object]:
+    """The status of every row in `schemas`' runs tables; `started` rows have none."""
+
+    statuses: set[object] = set()
+    schema: str
+    for schema in schemas:
+        rows: list[tuple[object, ...]] = run_rows(
+            project_dir=project_dir, columns="status", schema=schema
+        )
+        statuses.update(row[0] for row in rows)
+    return statuses
+
+
+def warehouse_schemas(*, project_dir: Path) -> frozenset[str]:
+    """The schemas of the project's warehouse."""
+
+    with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
+        rows: list[tuple[str]] = warehouse.sql(
+            "SELECT schema_name FROM duckdb_schemas() WHERE database_name = 'demo'"
+        ).fetchall()
+    return frozenset(name for (name,) in rows)
+
+
+def runs_tables(*, project_dir: Path) -> frozenset[str]:
+    """The schemas holding a runs table."""
+
+    with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
+        rows: list[tuple[str]] = warehouse.sql(
+            "SELECT schema_name FROM duckdb_tables() WHERE table_name = '_sqlbuild_runs'"
+        ).fetchall()
+    return frozenset(name.lower() for (name,) in rows)
+
+
+def recalled_run_inserts(*, project_dir: Path) -> list[tuple[int, int]]:
+    """Per recalled invocation, its statement count and how many insert into the runs table."""
+
+    with sqlite3.connect(project_dir / "logs" / "recall.sqlite3") as store:
+        return store.execute(
+            "SELECT COUNT(DISTINCT s.statement_id), "
+            "COUNT(DISTINCT CASE WHEN a.content LIKE 'INSERT INTO %_sqlbuild_runs%' "
+            "THEN s.statement_id END) "
+            "FROM statements AS s LEFT JOIN artifacts AS a ON a.statement_id = s.statement_id "
+            "GROUP BY s.invocation_id"
         ).fetchall()
 
 

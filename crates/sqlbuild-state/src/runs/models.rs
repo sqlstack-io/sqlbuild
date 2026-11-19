@@ -54,3 +54,10 @@ pub enum RunEnding {
     Interrupted,
     Raised,
 }
+
+/// One schema a run writes its rows to; no database means the connection's.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RunSchema {
+    pub database: Option<String>,
+    pub schema: String,
+}

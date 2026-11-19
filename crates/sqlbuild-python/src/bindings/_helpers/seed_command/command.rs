@@ -485,7 +485,7 @@ pub(crate) fn run_seed<'py>(
     write_header(&invocation, &pipeline, concurrency)?;
     let recorder: Option<RunRecorder<'_>> = run_recorder(
         (SEED_COMMAND, env!("CARGO_PKG_VERSION")),
-        (request, &invocation, &native_field(&pipeline, "project")?),
+        (request, &invocation, &pipeline),
         worker.as_ref().map(|worker| worker.server_run()),
     )?;
     let started: Instant = Instant::now();

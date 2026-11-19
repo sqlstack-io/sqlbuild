@@ -169,11 +169,7 @@ fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) 
     let started_at: Bound<'_, PyAny> = record_pending_cost(context, &pipeline)?;
     let recorder: Option<RunRecorder<'_>> = run_recorder(
         (BUILD_COMMAND, env!("CARGO_PKG_VERSION")),
-        (
-            &context.request,
-            &context.invocation,
-            &native_field(&pipeline, "project")?,
-        ),
+        (&context.request, &context.invocation, &pipeline),
         context.worker.as_ref().map(|worker| worker.server_run()),
     )?;
     match execute_direct_build(context, &pipeline, providers) {

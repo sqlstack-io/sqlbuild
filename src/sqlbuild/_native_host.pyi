@@ -552,6 +552,9 @@ from sqlbuild.runtime.execution_limits.main._cancel_running_statements import (
 from sqlbuild.runtime.execution_limits.main.execution_deadline_scope import (
     execution_deadline_scope as execution_deadline_scope,
 )
+from sqlbuild.runtime.execution_limits.main.execution_deadlines_suspended import (
+    execution_deadlines_suspended as execution_deadlines_suspended,
+)
 from sqlbuild.runtime.execution_limits.models import RunItemTimeouts as RunItemTimeouts
 from sqlbuild.runtime.observability.classes.event_dispatcher import (
     EventDispatcher as EventDispatcher,

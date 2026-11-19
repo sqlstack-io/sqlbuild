@@ -26,6 +26,8 @@ mod test_native_revalidation;
 mod test_postgres_dialect;
 #[path = "tests/test_same_column_type.rs"]
 mod test_same_column_type;
+#[path = "tests/test_same_unquoted_name.rs"]
+mod test_same_unquoted_name;
 #[path = "tests/test_type_spelling.rs"]
 mod test_type_spelling;
 #[path = "tests/test_types.rs"]
