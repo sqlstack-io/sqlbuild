@@ -460,7 +460,7 @@
 						<SegmentedFilter label="View" value={tab} options={[{ value: 'plan' as const, label: shown.verb === 'build' ? 'Plan' : 'Nodes' }, { value: 'graph' as const, label: 'Graph' }, ...(shown.verb === 'build' && selectedChecks.length && planChecks?.length !== 0 ? [{ value: 'checks' as const, label: 'Checks', ...(planChecks ? { count: planChecks.length } : {}) }] : [])]} onselect={(v) => (view = v)} />
 					</div>
 					{#if shown.verb === 'build' && plan}
-						{#if plan.timings}<span class="ml-auto"><PlanTimings {plan} timings={plan.timings} /></span>{/if}
+						{#if plan.timings}<span class="ml-auto"><PlanTimings {plan} timings={plan.timings} now={app.now} /></span>{/if}
 						<Button variant="ghost" size="sm" class={plan.timings ? '' : 'ml-auto'} onclick={replan} disabled={planning}><RotateCwIcon class={planning ? 'animate-spin' : ''} />{planning ? 'Planning…' : 'Plan again'}</Button>
 					{/if}
 				</div>

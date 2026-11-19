@@ -2850,6 +2850,11 @@ export interface components {
         PlanTimings: {
             /** @description `synced_state` for a preview over the synced warehouse state; `live` when it read the warehouse. */
             planned_from: string;
+            /**
+             * Format: date-time
+             * @description When the plan the location kept, and answered with again, was made; `None` for a new plan.
+             */
+            reused_from?: string | null;
             steps: components["schemas"]["PlanTimingStep"][];
             /** Format: double */
             total_seconds: number;

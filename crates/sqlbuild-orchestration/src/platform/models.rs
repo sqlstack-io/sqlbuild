@@ -746,7 +746,7 @@ pub struct PlanSummaryRead {
     pub expires_at: DateTime<Utc>,
     /// `None` until the location answers; a plan's document is its summary.
     pub outcome: Option<LocationWorkOutcome>,
-    /// How long the location took to plan, step by step; `None` for plans recorded without timings.
+    /// How long the location took to plan, step by step; `None` until it planned, or when planning failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timings: Option<PlanTimings>,
 }
@@ -759,6 +759,9 @@ pub struct PlanTimings {
     pub steps: Vec<PlanTimingStep>,
     /// `synced_state` for a preview over the synced warehouse state; `live` when it read the warehouse.
     pub planned_from: String,
+    /// When the plan the location kept, and answered with again, was made; `None` for a new plan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reused_from: Option<DateTime<Utc>>,
 }
 
 /// One planning step and its wall time.

@@ -7,7 +7,7 @@ use sqlbuild_core::plan_display::main::detach_model_diffs::detach_model_diffs;
 use uuid::Uuid;
 
 use crate::api::tests::plans_helpers::{ask, person, plan_request, register_instance, run_rows};
-use crate::api::tests::test_types::{PlanDiffTestCase, PlanTestCase};
+use crate::api::tests::test_types::{PlanDiffTestCase, PlanTestCase, PlanTimingsReadTestCase};
 use crate::api::tests::work_helpers::execute;
 use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, BuiltinRole};
@@ -39,6 +39,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             description: "SQLite plans",
             backend: Backend::Sqlite,
             fresh: true,
+            reused_from: None,
             expected_selection: &["customers", "orders"],
             expected_warning: "connect failed: db_password=[REDACTED]",
         },
@@ -46,6 +47,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             description: "PostgreSQL plans",
             backend: Backend::Postgres,
             fresh: false,
+            reused_from: Some("2026-01-02T03:04:05Z"),
             expected_selection: &["customers", "orders"],
             expected_warning: "connect failed: db_password=[REDACTED]",
         },
@@ -182,6 +184,17 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                     .await
                     .is_err(),
                 "{description}: a request ID cannot carry another command",
+                description = test_case.description
+            );
+            let refreshed = PlanRequest {
+                fresh: !first.fresh,
+                ..first.clone()
+            };
+            assert!(
+                ask(store, (&context, viewer), location, &refreshed)
+                    .await
+                    .is_err(),
+                "{description}: a request ID cannot change whether it plans again",
                 description = test_case.description
             );
             assert!(
@@ -356,7 +369,8 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                         "config_change": "full_refresh true → false"}],
                 "warnings": [{"severity": "warning", "message": "connect failed: db_password=orders-pass"}],
                 "python_nodes": [{"name": "orders_export", "identity_diff": {"source_diff": ["-a", "+b"]}}],
-                "timings": {"total_seconds": 1.5, "steps": [{"name": "Reading warehouse state", "seconds": 1.0}, {"name": "Other", "seconds": 0.5}], "planned_from": "synced_state"},
+                "timings": {"total_seconds": 1.5, "steps": [{"name": "Reading warehouse state", "seconds": 1.0}, {"name": "Other", "seconds": 0.5}], "planned_from": "synced_state",
+                    "reused_from": test_case.reused_from},
             });
             assert!(
                 complete_location_work(
@@ -432,8 +446,11 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                         },
                     ],
                     planned_from: "synced_state".to_owned(),
+                    reused_from: test_case
+                        .reused_from
+                        .map(|at| at.parse().expect("reused_from")),
                 }),
-                "{description}: typed plan timings",
+                "{description}: typed plan timings, with when a reused plan was made",
                 description = test_case.description
             );
             let Some(LocationWorkOutcome::Plan {
@@ -714,6 +731,77 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
                 test_case.description
             );
             close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_plan_with_timings_when_its_summary_is_read_then_timings_of_another_shape_are_an_error() {
+    let test_cases = [
+        PlanTimingsReadTestCase {
+            description: "a reused plan's timings say when it was made",
+            timings: json!({"total_seconds": 1.5, "steps": [], "planned_from": "synced_state",
+                "reused_from": "2026-01-02T03:04:05Z"}),
+            expected_read: true,
+        },
+        PlanTimingsReadTestCase {
+            description: "timings of another shape fail the read rather than vanish",
+            timings: json!({"total_seconds": 1.5, "steps": [], "planned_from": "synced_state",
+                "reused": true}),
+            expected_read: false,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(Backend::Sqlite).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let context = AuditContext {
+                actor: "control-store-owner".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let admin = bootstrap_user(store, &context, "orders-admin")
+                .await
+                .expect("bootstrap");
+            let location = create_location(store, "orders", "test-owner")
+                .await
+                .expect("location");
+            publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("publish");
+            let poll = register_instance(store, location).await;
+            let request = plan_request(&["build", "orders"]);
+            ask(store, (&context, admin), location, &request)
+                .await
+                .expect("plan");
+            let claimed = claim_location_work(store, location, &poll)
+                .await
+                .expect("claim")
+                .expect("plan work");
+            let result = LocationWorkResult {
+                claim_id: claimed.claim_id,
+                session_id: poll.session_id,
+                outcome: LocationWorkOutcome::Plan {
+                    document: json!({"models": [], "timings": test_case.timings}),
+                    diffs: BTreeMap::new(),
+                },
+            };
+            complete_location_work(store, (location, request.request_id), &result)
+                .await
+                .expect("complete");
+            let plan = (location, "development", request.request_id);
+            assert_eq!(
+                read_person_plan_summary(store, (&context, admin), plan)
+                    .await
+                    .is_ok(),
+                test_case.expected_read,
+                "{}",
+                test_case.description
+            );
         });
     }
 }

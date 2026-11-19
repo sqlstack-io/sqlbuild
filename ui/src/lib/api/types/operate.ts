@@ -780,6 +780,8 @@ export type PlanTimings = {
 	steps: { name: string; seconds: number }[];
 	/** `synced_state` for a location preview over the synced warehouse state; `live` when it read the warehouse. */
 	planned_from: string;
+	/** When the plan the location kept, and answered with again, was made; absent for a new plan. */
+	reused_from?: string | null;
 };
 
 /** The server's synced copy of warehouse metadata a location's plan preview planned from. */

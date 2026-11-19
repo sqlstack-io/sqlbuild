@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpChangeFeed, createHttpClient, feedAllowed } from './http-client';
+import { timingTitle } from '$lib/run/plan-timings';
 import type { ChangedSignal, ConnectionState } from './signals';
 
 /** A stand-in `EventSource` the test opens, fails and feeds by hand. */
@@ -978,5 +979,24 @@ describe('planning a build', () => {
 			expect((await planned).error).toBe('plan_failed: stop here');
 		}
 		expect(bodies.map((body) => body.fresh)).toEqual([false, true]);
+	});
+
+	it("carries a kept plan's age from the server's summary to the plan it returns", async () => {
+		const timings = { total_seconds: 4.2, steps: [{ name: 'Detecting changes', seconds: 4.2 }], planned_from: 'synced_state', reused_from: '2026-01-02T03:04:05Z' };
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) =>
+				request.method === 'POST'
+					? Response.json({ applied: true })
+					: Response.json({ expires_at: '2999-01-01T00:00:00Z', outcome: { kind: 'plan', document: { selected_count: 1, models: [] }, diffs: {} }, timings })
+			)
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		const planned = client.planBuild(ORDERS, ['build', '--changed']);
+		await vi.advanceTimersByTimeAsync(1000);
+		const { plan } = await planned;
+		expect(plan?.timings).toEqual(timings);
+		expect(timingTitle(plan!.timings!, Date.parse('2026-01-02T03:10:05Z'))).toBe('Reused plan from 6m ago');
 	});
 });
