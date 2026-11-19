@@ -14,6 +14,7 @@ Online: https://sqlbuild.com/docs/concepts/adapters/snowflake/
 - Case-sensitive column names
 - Metadata reads
 - State tables
+- Maintained models
 - Shared connections across targets
 - Cost estimates
 - Functions in unit tests
@@ -164,6 +165,28 @@ and row count.
 SQLBuild records its state in `_sqlbuild_*` tables. On Snowflake it creates them as permanent tables
 with 90 days of time travel, or 1 day on editions that allow only that. It never alters an existing
 state table. Models are not affected: their table type follows the model's `table_type` setting.
+
+## Maintained models
+
+A [maintained model](../models/materializations.md#maintained) is a Snowflake dynamic
+table. `materialized materialized_view` fails with `A014`; use `materialized maintained`.
+
+The build role needs these grants:
+
+| Grant | Why |
+|-------|-----|
+| `CREATE DYNAMIC TABLE` on the model's schema | Create and recreate the model |
+| Ownership or `OPERATE` on the dynamic table | Suspend, resume, refresh and alter it during builds |
+| `USAGE` on the `refresh_warehouse` | Run the scheduled refreshes |
+
+Dynamic tables refresh from changes, which needs change tracking on every table they read:
+
+- A table model that a maintained model reads is built with change tracking on.
+- For a source table, Snowflake turns change tracking on when the build role owns the table.
+  Otherwise its owner runs `ALTER TABLE <source> SET CHANGE_TRACKING = TRUE`.
+
+Builds record the models they pause in the `_sqlbuild_maintained_pauses` state table, so another
+build can tell whether they are still held.
 
 ## Shared connections across targets
 
