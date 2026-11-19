@@ -343,6 +343,7 @@ pub(crate) fn execute_build_plan<'py>(
     let lifecycle: &DirectPythonLifecycle = preparation.lifecycle.get();
     let [start_ts, end_ts, start_int, end_int] = &preparation.cursors;
     let request = |name: &str| native_field(&context.request, name);
+    let planned = |name: &str| native_field(pipeline, name);
     let discovered: Bound<'py, PyAny> = context.get("discovered_inputs")?;
     let project_dir: Bound<'py, PyAny> = context.get("effective_project_dir")?;
     let target_config: TargetSettingsValues =
@@ -381,12 +382,9 @@ pub(crate) fn execute_build_plan<'py>(
                 ("end_cursor_int", end_int.clone()),
                 ("use_color", boolean(py, context.use_color)),
                 ("providers", providers.clone()),
-                ("job_limits", native_field(pipeline, "job_limits")?),
-                ("node_jobs", native_field(pipeline, "node_jobs")?),
-                (
-                    "node_warehouses",
-                    native_field(pipeline, "node_warehouses")?,
-                ),
+                ("job_limits", planned("job_limits")?),
+                ("node_jobs", planned("node_jobs")?),
+                ("node_warehouses", planned("node_warehouses")?),
                 (
                     "test_timeouts",
                     timeout_record(
