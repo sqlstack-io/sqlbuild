@@ -13,10 +13,12 @@ use pyo3::types::PyDict;
 use pyo3::{pyclass, pyfunction, pymethods};
 
 use crate::planner_entries::_helpers::plans::plan_output::plan_selected_sql_tests;
+use crate::planner_warehouse::models::PlannerReads;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_threads::main::signal_interpreter_exit::signal_interpreter_exit;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 
 const TEST_PLANNING_THREAD: &str = "sqlbuild-test-planning";
@@ -155,6 +157,8 @@ pub(crate) struct PlanningRequest {
     pub(crate) dialect: Py<Dialect>,
     pub(crate) selected_keys: Py<PyAny>,
     pub(crate) sql_test_selection: Py<PyAny>,
+    /// Plan from the tests a location's held project planned once for its generation.
+    pub(crate) held: bool,
 }
 
 /// Plan the request's selected SQL tests, reporting a panic as a native compiler error.
@@ -163,8 +167,11 @@ fn plan(py: Python<'_>, request: &PlanningRequest) -> Planned {
         plan_selected_sql_tests(
             request.project.bind(py),
             request.dialect.bind(py),
-            request.selected_keys.bind(py),
-            request.sql_test_selection.bind(py),
+            (
+                request.selected_keys.bind(py),
+                request.sql_test_selection.bind(py),
+            ),
+            request.held,
         )
         .map(Bound::unbind)
     })
@@ -211,6 +218,25 @@ pub(crate) fn start_planning(
     Py::new(py, SqlTestPlanning::of(Some(receiver), None))
 }
 
+/// Start planning the scope's SQL tests; a location's previews read its held project's plans.
+pub(crate) fn start_scope_planning<'py>(
+    (project, dialect): (&Bound<'py, PyAny>, Bound<'py, Dialect>),
+    (scope, reads): (&Bound<'py, PyAny>, &Bound<'py, PlannerReads>),
+    enabled: bool,
+) -> PyResult<Py<SqlTestPlanning>> {
+    start_planning(
+        project.py(),
+        PlanningRequest {
+            project: project.clone().unbind(),
+            dialect: dialect.unbind(),
+            selected_keys: native_field(scope, "selected_keys")?.unbind(),
+            sql_test_selection: native_field(scope, "sql_test_selection")?.unbind(),
+            held: reads.get().reads().preview(),
+        },
+        enabled,
+    )
+}
+
 /// Join SQL test planning threads at exit: finalization ending one inside native planning aborts.
 #[pyfunction]
 pub(crate) fn join_sql_test_planning_threads(py: Python<'_>) -> PyResult<()> {
@@ -249,6 +275,7 @@ pub(crate) fn start_sql_test_planning<'py>(
             dialect: Dialect::passed(args.value("dialect")?)?.unbind(),
             selected_keys: args.value("selected_keys")?.unbind(),
             sql_test_selection: args.value("sql_test_selection")?.unbind(),
+            held: false,
         },
         args.flag("enabled")?,
     )
