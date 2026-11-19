@@ -1,17 +1,11 @@
 //! Every build option as a job setting, and the wording of job setting conflicts.
 
 use crate::job_settings::models::GroupAgreement::{EachBuild, OneBuild};
-use crate::job_settings::models::JobSettingSpec;
 use crate::job_settings::models::SettingScope::{Build, JobLimit, Node, RunRequest};
+use crate::job_settings::models::{CommandLineValues, JobSettingSpec, NodeConsumer};
 
 /// The warehouse the job's nodes run on.
 pub const WAREHOUSE_SETTING: &str = "warehouse";
-/// The help of two named jobs giving one node different values of a node-level setting.
-pub const NODE_CONFLICT_HELP: &str = "make the jobs agree, set it in only one of them, override it \
-     with the command-line flag, or build with --no-job-settings";
-/// The help of named jobs disagreeing on a build-wide setting, where unset differs from set.
-pub const BUILD_CONFLICT_HELP: &str =
-    "make the jobs agree, override it with the command-line flag, or build with --no-job-settings";
 /// The help of two named jobs giving one node different `[retry]` tables, which no flag overrides.
 pub const RETRY_CONFLICT_HELP: &str =
     "make the jobs agree, set [retry] in only one of them, or build with --no-job-settings";
@@ -27,6 +21,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -35,6 +31,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -43,6 +41,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -51,6 +51,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -59,6 +61,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -67,6 +71,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -75,6 +81,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -83,6 +91,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -91,6 +101,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -99,6 +111,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -107,6 +121,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyFalse,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -115,6 +131,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Node,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyFalse,
+        consumer: Some(NodeConsumer::TestEntries),
         group: OneBuild,
     },
     JobSettingSpec {
@@ -123,6 +141,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyFalse,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -131,6 +151,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Node,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: Some(NodeConsumer::AuditEntries),
         group: OneBuild,
     },
     JobSettingSpec {
@@ -139,6 +161,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -147,6 +171,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -155,6 +181,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -163,6 +191,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -171,6 +201,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -179,6 +211,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -187,6 +221,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -195,6 +231,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -203,6 +241,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -211,6 +251,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -219,6 +261,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -227,6 +271,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -235,6 +281,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -243,6 +291,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Node,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: Some(NodeConsumer::RefreshOverrides),
         group: OneBuild,
     },
     JobSettingSpec {
@@ -251,6 +301,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyFalse,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -259,6 +311,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: EachBuild,
     },
     JobSettingSpec {
@@ -267,6 +321,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -275,6 +331,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -283,6 +341,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -291,6 +351,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -299,6 +361,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -307,6 +371,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -315,6 +381,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: JobLimit,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -323,6 +391,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -331,6 +401,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -339,6 +411,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -347,6 +421,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -355,6 +431,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -363,6 +441,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -371,6 +451,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: EachBuild,
     },
     JobSettingSpec {
@@ -379,6 +461,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -387,6 +471,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -395,6 +481,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -403,6 +491,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -411,6 +501,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Node,
         python_nodes: true,
         whole_run: true,
+        command_line: CommandLineValues::Any,
+        consumer: Some(NodeConsumer::NodeWarehouses),
         group: OneBuild,
     },
     JobSettingSpec {
@@ -419,6 +511,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -427,6 +521,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
     JobSettingSpec {
@@ -435,6 +531,8 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
         scope: Build,
         python_nodes: false,
         whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
         group: OneBuild,
     },
 ];

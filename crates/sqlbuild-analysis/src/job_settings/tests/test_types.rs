@@ -60,3 +60,18 @@ pub(super) struct WholeRunTestCase {
     pub(super) values: [Option<Json>; 3],
     pub(super) expected_value: Option<Json>,
 }
+
+/// A setting two named jobs disagree on, and the help the conflict gives.
+pub(super) struct ConflictHelpTestCase {
+    pub(super) description: &'static str,
+    pub(super) setting: &'static str,
+    pub(super) expected_help: &'static str,
+}
+
+/// The table's node settings, which must each name one distinct consumer, and the others none.
+pub(super) struct NodeConsumerTestCase {
+    pub(super) description: &'static str,
+    pub(super) expected_unconsumed_node_settings: Vec<&'static str>,
+    pub(super) expected_consumed_other_settings: Vec<&'static str>,
+    pub(super) expected_shared_consumers: usize,
+}

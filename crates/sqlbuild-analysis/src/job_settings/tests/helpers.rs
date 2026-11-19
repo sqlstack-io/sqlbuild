@@ -9,9 +9,12 @@ use crate::graph::main::resolve_selector_tokens::resolve_selector_tokens;
 use crate::graph::models::{GraphResource, JobSelection, ProjectGraph};
 use crate::job_settings::_helpers::node_job_settings::node_job_settings;
 use crate::job_settings::_helpers::node_values::node_values;
+use crate::job_settings::constants::JOB_SETTINGS;
 use crate::job_settings::errors::NodeJobSettingsError;
 use crate::job_settings::main::resolve_job_settings::resolve_job_settings;
-use crate::job_settings::models::{DeclaredRun, JobRetry, NodeJobSettings};
+use crate::job_settings::models::{
+    DeclaredRun, JobRetry, JobSettingSpec, NodeConsumer, NodeJobSettings, SettingScope,
+};
 
 fn key(kind: &str, name: &str) -> ObjectKey {
     (kind.to_owned(), name.to_owned())
@@ -233,4 +236,30 @@ pub(super) fn whole_run_value(name: &str, values: [Option<Json>; 3]) -> Option<J
     )
     .ok()
     .and_then(|resolved| resolved.whole_run.get(name).cloned())
+}
+
+/// Node settings without a consumer, other settings with one, and consumers named twice.
+pub(super) fn consumer_faults() -> (Vec<&'static str>, Vec<&'static str>, usize) {
+    let node = |spec: &&JobSettingSpec| spec.scope == SettingScope::Node;
+    let unconsumed: Vec<&str> = JOB_SETTINGS
+        .iter()
+        .filter(node)
+        .filter(|spec| spec.consumer.is_none())
+        .map(|spec| spec.name)
+        .collect();
+    let consumed_others: Vec<&str> = JOB_SETTINGS
+        .iter()
+        .filter(|spec| spec.scope != SettingScope::Node && spec.consumer.is_some())
+        .map(|spec| spec.name)
+        .collect();
+    let consumers: Vec<NodeConsumer> = JOB_SETTINGS
+        .iter()
+        .filter_map(|spec| spec.consumer)
+        .collect();
+    let distinct: BTreeSet<NodeConsumer> = consumers.iter().copied().collect();
+    (
+        unconsumed,
+        consumed_others,
+        consumers.len() - distinct.len(),
+    )
 }

@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use serde_json::Value as Json;
 
-use crate::job_settings::constants::BUILD_CONFLICT_HELP;
 use crate::job_settings::errors::JobSettingConflict;
+use crate::job_settings::main::conflict_help::conflict_help;
 use crate::job_settings::main::setting_scope::setting_scope;
 use crate::job_settings::models::{DeclaredRun, SettingScope};
 
@@ -52,7 +52,7 @@ pub(crate) fn build_job_settings(
                             shown(seen),
                             shown(value)
                         ),
-                        help: BUILD_CONFLICT_HELP,
+                        help: conflict_help(key),
                     });
                 }
                 Some(_) => {}

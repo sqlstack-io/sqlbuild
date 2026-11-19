@@ -109,7 +109,7 @@ nodes differently:
 | --- | --- |
 | `full_refresh` | The job's incremental models, rebuilt from scratch, and its functions, recreated |
 | `run_tests` | The SQL unit tests of the job's models |
-| `ignore_audit_failures` | The audits of the job's nodes, and singular audits that read them; a singular audit is ignored when every named job that sets it for the nodes the audit reads sets `true` |
+| `ignore_audit_failures` | The audits of the job's nodes, and singular audits that read them; a singular audit is ignored only when every node it reads ignores failures, by its job's setting or else the build's |
 | `warehouse` | The Snowflake warehouse the job's nodes run on, Python nodes included; see [A job's own warehouse](/docs/concepts/adapters/snowflake#a-jobs-own-warehouse) |
 | `concurrency` | How many of the job's nodes build at once, and a node in two named jobs fits within both. The build's own limit becomes the larger of the configured limit and the named jobs' limits added together |
 | `[retry]` | The job's nodes |
@@ -329,9 +329,9 @@ Details:
   them, as on the server.
 - Job settings that cannot apply together fail the build or plan with `S027`, such as `model:orders
   is selected through jobs orders_job and finance_job, which set run_tests differently (false and
-  true)`. Make the jobs agree, set it in only one of them, pass the flag, or use
-  `--no-job-settings`. For a build-wide setting, where unset differs from set, make the jobs agree,
-  pass the flag, or use `--no-job-settings`.
+  true)`. The help names the way out: make the jobs agree, set a node setting in only one of
+  them, or use `--no-job-settings`. It offers a flag only for the value the flag gives, such as
+  `--no-tests` to turn tests off for all; no flag turns them back on.
 - Selectors are checked for syntax at compile. A selector that names a node the project does not
   have fails when a location publishes, such as `job nightly_orders_job: unknown selector name
   'order_total'`.

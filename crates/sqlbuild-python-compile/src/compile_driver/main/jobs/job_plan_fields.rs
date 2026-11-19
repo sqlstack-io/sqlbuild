@@ -1,6 +1,6 @@
 //! The plan and pipeline fields the named jobs' settings give a planned build.
 
-use pyo3::prelude::{Bound, PyAny, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 use crate::compile_driver::models::PlannedJobSettings;
@@ -17,7 +17,10 @@ pub fn job_plan_fields<'py>(
     };
     let plan_output: Bound<'py, PyAny> = job_settings.apply_to_plan(
         &plan_output,
-        &native_field(options, "cli_ignore_audit_failures")?,
+        (
+            &native_field(options, "cli_ignore_audit_failures")?,
+            native_field(options, "ignore_audit_failures")?.is_truthy()?,
+        ),
     )?;
     let (limits, node_jobs) =
         job_settings.job_limits(&plan_output, &native_field(options, "concurrency")?)?;

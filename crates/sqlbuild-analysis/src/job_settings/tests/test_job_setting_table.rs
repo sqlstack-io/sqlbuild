@@ -3,11 +3,14 @@ use std::collections::BTreeSet;
 use serde_json::json;
 
 use crate::job_settings::constants::JOB_SETTINGS;
+use crate::job_settings::main::conflict_help::conflict_help;
 use crate::job_settings::models::SettingScope;
 use crate::job_settings::tests::helpers::{
-    conflicts_on_a_node, resolves_build_wide, whole_run_value,
+    conflicts_on_a_node, consumer_faults, resolves_build_wide, whole_run_value,
 };
-use crate::job_settings::tests::test_types::{JobSettingScopeTestCase, WholeRunTestCase};
+use crate::job_settings::tests::test_types::{
+    ConflictHelpTestCase, JobSettingScopeTestCase, NodeConsumerTestCase, WholeRunTestCase,
+};
 
 #[test]
 fn given_every_job_setting_when_named_jobs_merge_it_then_its_scope_decides_and_the_command_line_wins()
@@ -108,5 +111,79 @@ fn given_a_whole_run_setting_when_named_jobs_share_its_value_then_it_is_the_buil
                 spec.name
             );
         }
+    }
+}
+
+#[test]
+fn given_two_jobs_disagreeing_on_a_setting_when_reporting_then_the_help_offers_only_flags_that_settle_it()
+ {
+    let test_cases = [
+        ConflictHelpTestCase {
+            description: "--no-tests can only turn tests off",
+            setting: "run_tests",
+            expected_help: "make the jobs agree, set it in only one of them, pass --no-tests to make \
+                            it false for all, or build with --no-job-settings",
+        },
+        ConflictHelpTestCase {
+            description: "--full-refresh can only turn full refresh on",
+            setting: "full_refresh",
+            expected_help: "make the jobs agree, set it in only one of them, pass --full-refresh to \
+                            make it true for all, or build with --no-job-settings",
+        },
+        ConflictHelpTestCase {
+            description: "a build-wide flag cannot be left unset by one job",
+            setting: "fail_fast",
+            expected_help: "make the jobs agree, pass --fail-fast to make it true for all, or build \
+                            with --no-job-settings",
+        },
+        ConflictHelpTestCase {
+            description: "a flag pair gives either value",
+            setting: "ignore_audit_failures",
+            expected_help: "make the jobs agree, set it in only one of them, override it with \
+                            --ignore-audit-failures or --no-ignore-audit-failures, or build with \
+                            --no-job-settings",
+        },
+        ConflictHelpTestCase {
+            description: "an option taking a value gives any",
+            setting: "vars",
+            expected_help: "make the jobs agree, override it with --vars, or build with \
+                            --no-job-settings",
+        },
+        ConflictHelpTestCase {
+            description: "no flag gives a retry table",
+            setting: "[retry]",
+            expected_help: "make the jobs agree, set [retry] in only one of them, or build with \
+                            --no-job-settings",
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            conflict_help(test_case.setting),
+            test_case.expected_help,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_the_job_setting_table_when_checked_then_each_node_setting_names_its_own_consumer() {
+    let test_cases = [NodeConsumerTestCase {
+        description: "a node setting without a consumer would never reach the plan",
+        expected_unconsumed_node_settings: Vec::new(),
+        expected_consumed_other_settings: Vec::new(),
+        expected_shared_consumers: 0,
+    }];
+    for test_case in test_cases {
+        assert_eq!(
+            consumer_faults(),
+            (
+                test_case.expected_unconsumed_node_settings,
+                test_case.expected_consumed_other_settings,
+                test_case.expected_shared_consumers,
+            ),
+            "{}",
+            test_case.description
+        );
     }
 }

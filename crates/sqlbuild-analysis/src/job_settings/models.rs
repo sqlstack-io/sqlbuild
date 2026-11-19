@@ -59,7 +59,35 @@ pub struct JobSettingSpec {
     pub python_nodes: bool,
     /// Whether one value every named job shares becomes the whole build's, setup included.
     pub whole_run: bool,
+    /// The values its command-line options can give it.
+    pub command_line: CommandLineValues,
+    /// For a node setting, what applies it to the plan.
+    pub consumer: Option<NodeConsumer>,
     pub group: GroupAgreement,
+}
+
+/// The values a setting's command-line options can give it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CommandLineValues {
+    /// Any value it takes, or both `true` and `false`.
+    Any,
+    /// Only `true`, as a flag such as `--full-refresh`.
+    OnlyTrue,
+    /// Only `false`, as a flag such as `--no-tests`.
+    OnlyFalse,
+}
+
+/// What applies a node setting to the planned build.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum NodeConsumer {
+    /// The planner's `full_refresh_models` and `full_refresh_functions` overrides.
+    RefreshOverrides,
+    /// The plan's SQL test entries, dropping the tests a job turns off.
+    TestEntries,
+    /// Each audit entry's `ignore_failure`.
+    AuditEntries,
+    /// The warehouse each node runs on.
+    NodeWarehouses,
 }
 
 /// What the jobs a selection names give each of its nodes.

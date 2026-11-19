@@ -117,6 +117,20 @@ _FAIL_FAST_FILES: dict[str, str] = {
         'name = "fail_job_group"\ndescription = "Fails."\njobs = ["events_job", "fast_fail_job"]\n'
     ),
 }
+_LENIENT_PAIR_FILES: dict[str, str] = {
+    "models/lenient_peer.sql": (
+        "MODEL (description 'Lenient peer.', materialized table);\nSELECT 1 AS id\n"
+    ),
+    "audits/singular/lenient_pair.sql": (
+        'AUDIT (name "lenient_pair", severity error);\n'
+        'SELECT p.id FROM __ref("lenient_peer") p '
+        'LEFT JOIN __ref("lenient_model") m ON p.id = m.id WHERE m.id IS NULL\n'
+    ),
+    "orchestration/jobs/lenient_peer_job.toml": (
+        'name = "lenient_peer_job"\ndescription = "Lenient peer."\nselect = "lenient_peer"\n\n'
+        "[settings]\nignore_audit_failures = true\n"
+    ),
+}
 _STEADY_EVENTS_FILES: dict[str, str] = {
     "orchestration/jobs/steady_events_job.toml": (
         'name = "steady_events_job"\ndescription = "Events, kept."\nselect = "order_events"\n\n'
@@ -232,7 +246,7 @@ def test_given_a_named_job_when_building_then_its_settings_apply_below_the_comma
             expected_fragment=(
                 "jobs events_job and fast_fail_job set fail_fast differently (not set and true); "
                 "a build applies fail_fast to everything it runs  = help: make the jobs agree, "
-                "override it with the command-line flag, or build with --no-job-settings"
+                "pass --fail-fast to make it true for all, or build with --no-job-settings"
             ),
             extra_files=_FAIL_FAST_FILES,
         ),
@@ -544,6 +558,22 @@ def test_given_a_job_concurrency_when_building_then_its_nodes_never_exceed_it(
             expected_present=("Completed successfully",),
             expected_absent=("S027",),
             extra_files=_STEADY_EVENTS_FILES,
+        ),
+        JobOutputTestCase(
+            description="a singular audit over a lenient job node and a node outside it fails",
+            command_args=("build", "--select", "job:lenient_job", "lenient_peer"),
+            expected_exit_code=1,
+            expected_present=("lenient_pair",),
+            expected_absent=("lenient_pair returned 1 row (ignored)",),
+            extra_files=_LENIENT_PAIR_FILES,
+        ),
+        JobOutputTestCase(
+            description="a singular audit whose nodes' jobs all ignore failures is ignored",
+            command_args=("build", "--select", "job:lenient_job", "job:lenient_peer_job"),
+            expected_exit_code=0,
+            expected_present=("audit lenient_pair returned 1 row (ignored)",),
+            expected_absent=(),
+            extra_files=_LENIENT_PAIR_FILES,
         ),
         JobOutputTestCase(
             description="a command-line option beats a job option it excludes",
