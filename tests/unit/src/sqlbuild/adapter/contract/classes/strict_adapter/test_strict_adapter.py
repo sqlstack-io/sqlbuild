@@ -95,6 +95,7 @@ def test_given_first_class_adapters_when_checking_contract_then_no_method_comes_
                     "render_create_temporary_function",
                     "render_drop_schema",
                     "render_maintained_operation",
+                    "render_track_changes",
                     "session_warehouse",
                 }
             ),

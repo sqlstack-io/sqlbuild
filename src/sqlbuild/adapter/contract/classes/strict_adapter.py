@@ -353,6 +353,12 @@ class StrictAdapter(
         del operation
         raise self._maintained_unsupported(destination)
 
+    def render_track_changes(self, *, destination: str) -> tuple[str, ...]:
+        """Optional: SQL that turns on change tracking for a table a maintained model reads."""
+
+        del destination
+        return ()
+
     def _maintained_unsupported(self, destination: str) -> AdapterUserError:
         return AdapterUserError(
             f"the {self.adapter_name} adapter cannot build maintained model '{destination}'",

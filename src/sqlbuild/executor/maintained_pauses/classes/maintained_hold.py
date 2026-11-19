@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlbuild._native import CompiledRelationLocation
@@ -111,7 +113,7 @@ class MaintainedHold:
         )
         for name in sorted(self._left_paused):
             self._warn(f"maintained model {name} was paused outside SQLBuild; it stays paused")
-        self._record(
+        window: timedelta = self._timed_record(
             connection=connection,
             events=(
                 *(
@@ -124,13 +126,15 @@ class MaintainedHold:
                 ),
             ),
         )
-        self._yield_to_earlier(connection=connection, location=location)
+        self._yield_to_rivals(
+            connection=connection, location=location, names=tuple(self._paused), window=window
+        )
         self._suspend_active(connection=connection, names=tuple(self._paused), states=states)
         self._heartbeat = self._new_heartbeat(self._write_heartbeat)
         self._heartbeat.start()
 
     def after_create(self, *, connection: Any, name: str) -> None:
-        """Suspend a held model that CREATE OR REPLACE made active; resume it only if ours."""
+        """Suspend a model CREATE OR REPLACE made active; check its new hold as acquire does."""
 
         if name not in self._held:
             return
@@ -140,12 +144,18 @@ class MaintainedHold:
             )
             if newly_paused:
                 self._paused.append(name)
+        window: timedelta = timedelta()
         if newly_paused:
-            self._record(
+            window = self._timed_record(
                 connection=connection,
                 events=(self._own(event_type=MaintainedPauseEventType.PAUSED, name=name),),
             )
         self._operate(connection=connection, name=name, operation=MaintainedOperation.SUSPEND)
+        location: StateLocation | None = self._state_location
+        if newly_paused and location is not None:
+            self._yield_to_rivals(
+                connection=connection, location=location, names=(name,), window=window
+            )
 
     def release(self, *, connection: Any) -> None:
         """Stop the heartbeat and resume what this build paused, upstream first."""
@@ -218,10 +228,17 @@ class MaintainedHold:
         self._report(holds=taken, verb="Took over")
         return taken
 
-    def _yield_to_earlier(self, *, connection: Any, location: StateLocation) -> None:
-        """Read the pauses back; if another live hold on a model came first, close ours and stop."""
+    def _yield_to_rivals(
+        self,
+        *,
+        connection: Any,
+        location: StateLocation,
+        names: tuple[str, ...],
+        window: timedelta,
+    ) -> None:
+        """Read the pauses back; if another live hold may have come first, close ours and stop."""
 
-        mine: set[_RelationKey] = {_key(self._held[name]) for name in self._paused}
+        mine: set[_RelationKey] = {_key(self._held[name]) for name in names}
         if not mine:
             return
         rows: tuple[tuple[Any, ...], ...] = tuple(
@@ -231,24 +248,38 @@ class MaintainedHold:
                 limit=None,
             ).rows
         )
-        first: dict[_RelationKey, OpenHold] = {}
-        for hold in sorted(open_holds(rows=rows), key=lambda hold: (hold.paused_at, hold.run_id)):
-            if hold.idle_seconds < self._grace_seconds and _key(hold.relation) in mine:
-                first.setdefault(_key(hold.relation), hold)
-        winners: tuple[OpenHold, ...] = tuple(
-            hold for hold in first.values() if hold.run_id != self._run_id
-        )
-        if not winners:
-            return
-        self._record(
-            connection=connection,
-            events=tuple(
-                self._own(event_type=MaintainedPauseEventType.RESUMED, name=name)
-                for name in self._paused
+        holds: tuple[OpenHold, ...] = open_holds(rows=rows)
+        paused_at: dict[_RelationKey, datetime] = {
+            _key(hold.relation): hold.paused_at
+            for hold in holds
+            if hold.run_id == self._run_id and _key(hold.relation) in mine
+        }
+        rivals: list[OpenHold] = sorted(
+            (
+                hold
+                for hold in holds
+                if hold.run_id != self._run_id
+                and hold.idle_seconds < self._grace_seconds
+                and _key(hold.relation) in mine
+                and hold.paused_at <= paused_at[_key(hold.relation)] + window
             ),
+            key=lambda hold: (hold.paused_at, hold.run_id),
         )
-        self._paused = []
-        raise _held_elsewhere(holds=winners)
+        if not rivals:
+            return
+        with self._lock:
+            self._paused = [name for name in self._paused if name not in names]
+        try:
+            self._record(
+                connection=connection,
+                events=tuple(
+                    self._own(event_type=MaintainedPauseEventType.RESUMED, name=name)
+                    for name in names
+                ),
+            )
+        except Exception as error:
+            raise _held_elsewhere(holds=tuple(rivals), close_failure=error) from error
+        raise _held_elsewhere(holds=tuple(rivals))
 
     def _still_held(self, *, connection: Any) -> frozenset[_RelationKey] | None:
         """This run's holds nobody took over, or None when the pause table can't say."""
@@ -323,6 +354,15 @@ class MaintainedHold:
                 database=location.database, schema=location.schema, name=location.name
             )
         )
+
+    def _timed_record(
+        self, *, connection: Any, events: tuple[MaintainedPauseEvent, ...]
+    ) -> timedelta:
+        """Record, and return how long the insert took: an upper bound on its commit delay."""
+
+        started: float = time.monotonic()
+        self._record(connection=connection, events=events)
+        return timedelta(seconds=time.monotonic() - started)
 
     def _record(self, *, connection: Any, events: tuple[MaintainedPauseEvent, ...]) -> None:
         location: StateLocation | None = self._state_location
@@ -399,12 +439,19 @@ def _key(location: CompiledRelationLocation) -> _RelationKey:
     return (location.database, location.schema, location.name)
 
 
-def _held_elsewhere(*, holds: tuple[OpenHold, ...]) -> AdapterUserError:
+def _held_elsewhere(
+    *, holds: tuple[OpenHold, ...], close_failure: Exception | None = None
+) -> AdapterUserError:
     first: OpenHold = holds[0]
     names: str = ", ".join(sorted({hold.relation.name for hold in holds}))
+    closing: str = (
+        ""
+        if close_failure is None
+        else f"; closing this build's own pause also failed: {close_failure}"
+    )
     return AdapterUserError(
         f"run {first.run_id} holds maintained models this build needs ({names}); "
-        f"its last heartbeat was {int(first.idle_seconds)}s ago",
+        f"its last heartbeat was {int(first.idle_seconds)}s ago{closing}",
         code=HELD_ELSEWHERE_CODE,
         help=(
             "wait for that build to finish, or for its hold to pass [maintained] "

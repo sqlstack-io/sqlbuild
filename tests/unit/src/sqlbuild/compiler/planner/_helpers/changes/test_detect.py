@@ -591,6 +591,32 @@ def test_given_dropped_relation_with_recorded_build_when_planning_then_plans_fir
             ),
         ),
         DetectModelMetadataTestCase(
+            description="writing out the default refresh_mode is no change",
+            config_values={"materialized": "maintained", "refresh_mode": "incremental"},
+            schema_columns=(),
+            deps=(),
+            function_local_hashes={},
+            previous_metadata_json=build_version_identity_metadata_json(
+                model_name="orders",
+                config_values={"materialized": "maintained"},
+                execution_signature={},
+            ),
+            expected_change_kind=ChangeKind.NO_CHANGE,
+        ),
+        DetectModelMetadataTestCase(
+            description="removing a written-out default refresh_mode is no change",
+            config_values={"materialized": "maintained"},
+            schema_columns=(),
+            deps=(),
+            function_local_hashes={},
+            previous_metadata_json=build_version_identity_metadata_json(
+                model_name="orders",
+                config_values={"materialized": "maintained", "refresh_mode": "incremental"},
+                execution_signature={},
+            ),
+            expected_change_kind=ChangeKind.NO_CHANGE,
+        ),
+        DetectModelMetadataTestCase(
             description="ignores runtime audit gate proof when version identity matches",
             config_values={"materialized": "table"},
             schema_columns=(),

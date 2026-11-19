@@ -3710,6 +3710,9 @@ class SnowflakeAdapter(
     ) -> tuple[str, ...]:
         return (f"ALTER DYNAMIC TABLE {destination} {operation.value.upper()}",)
 
+    def render_track_changes(self, *, destination: str) -> tuple[str, ...]:
+        return (f"ALTER TABLE {destination} SET CHANGE_TRACKING = TRUE",)
+
     def _warehouse_name(self, warehouse: str) -> str:
         """A plain warehouse name as written, resolved without case; any other quoted exactly."""
 

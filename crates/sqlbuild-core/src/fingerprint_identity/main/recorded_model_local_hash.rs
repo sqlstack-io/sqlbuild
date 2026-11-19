@@ -7,7 +7,7 @@ use crate::fingerprint_identity::main::{
 };
 
 pub fn recorded_model_local_hash(query_hash: &str, metadata_json: &str) -> Option<String> {
-    let mut object = match decoded_object(metadata_json) {
+    let object = match decoded_object(metadata_json) {
         Ok(Some(object)) => object,
         Ok(None) | Err(_) => return None,
     };
@@ -19,9 +19,8 @@ pub fn recorded_model_local_hash(query_hash: &str, metadata_json: &str) -> Optio
     {
         return None;
     }
-    normalize_version_identity_metadata(&mut object, false);
     Some(model_local_identity_hash(
         query_hash,
-        &canonical_text(object),
+        &canonical_text(normalize_version_identity_metadata(object, false)),
     ))
 }

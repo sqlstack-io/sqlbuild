@@ -219,6 +219,7 @@ class MaintainedRefreshPlanTestCase:
     expected_reinitialised_by: str | None
     expected_read_names: tuple[str, ...]
     expected_paused: bool = False
+    totals_config: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)

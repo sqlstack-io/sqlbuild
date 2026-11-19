@@ -858,14 +858,19 @@ class ListingDuckDbAdapter(DuckDbAdapter):
         return self.listed
 
 
-def maintained_project_case(upstream_query: str) -> BuildExecutionPlanTestCase:
+def maintained_project_case(
+    upstream_query: str, totals_config: dict[str, object] | None = None
+) -> BuildExecutionPlanTestCase:
     """Clean orders and the daily totals maintained from it, both refreshed within an hour."""
 
     return BuildExecutionPlanTestCase(
         description="clean orders and the daily totals maintained from it",
         setup_sql=(),
         model_locations={"clean_orders": "staging", "daily_totals": "staging"},
-        model_configs={"clean_orders": _MAINTAINED, "daily_totals": _MAINTAINED},
+        model_configs={
+            "clean_orders": _MAINTAINED,
+            "daily_totals": {**_MAINTAINED, **(totals_config or {})},
+        },
         model_queries={
             "clean_orders": upstream_query,
             "daily_totals": "SELECT count(*) AS orders FROM staging.clean_orders",

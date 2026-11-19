@@ -38,6 +38,17 @@ from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
             expected_read_names=("clean_orders", "daily_totals"),
         ),
         MaintainedRefreshPlanTestCase(
+            description="writing out the default refresh_mode keeps the model",
+            listed_settings=MaintainedListing("60 minutes", "TRANSFORM_WH", "ACTIVE"),
+            upstream_query=CLEAN_ORDERS_QUERY,
+            expected_upstream_action=PlanAction.KEEP_MAINTAINED,
+            expected_action=PlanAction.KEEP_MAINTAINED,
+            expected_reason=PlanReason.NO_CHANGE,
+            expected_reinitialised_by=None,
+            expected_read_names=("clean_orders", "daily_totals"),
+            totals_config={"refresh_mode": "incremental"},
+        ),
+        MaintainedRefreshPlanTestCase(
             description="a kept model listed as suspended is reported as paused",
             listed_settings=MaintainedListing("60 minutes", "TRANSFORM_WH", "SUSPENDED"),
             upstream_query=CLEAN_ORDERS_QUERY,
@@ -107,7 +118,9 @@ def test_given_built_maintained_models_when_replanning_then_live_settings_and_re
         )
 
     plan: PlanOutput = build_execution_plan_from_kwargs(
-        project=build_project_from_test_case(maintained_project_case(test_case.upstream_query)),
+        project=build_project_from_test_case(
+            maintained_project_case(test_case.upstream_query, test_case.totals_config)
+        ),
         adapter=adapter,
         connection=connection,
     )

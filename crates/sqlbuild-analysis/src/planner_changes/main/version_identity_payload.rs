@@ -15,9 +15,9 @@ pub fn version_identity_payload(
     match decoded_object(text) {
         Err(_) => IdentityPayload::Raw(text.to_owned()),
         Ok(None) => IdentityPayload::Absent,
-        Ok(Some(mut object)) => {
-            normalize_version_identity_metadata(&mut object, without_functions);
-            IdentityPayload::Object(object)
-        }
+        Ok(Some(object)) => IdentityPayload::Object(normalize_version_identity_metadata(
+            object,
+            without_functions,
+        )),
     }
 }
