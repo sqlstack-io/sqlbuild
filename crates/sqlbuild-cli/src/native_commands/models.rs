@@ -287,6 +287,8 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) applied: bool,
     /// The generation was published after the last plan of what changed, which waits for this sync.
     pub(crate) replan: bool,
+    /// Per state location, the pause table's change token after a resume pass left no hold open.
+    pub(crate) maintained_quiet_tokens: std::collections::BTreeMap<WarehouseStateLocation, String>,
 }
 
 /// Rows delivered and time taken by the current synchronization and its current table.

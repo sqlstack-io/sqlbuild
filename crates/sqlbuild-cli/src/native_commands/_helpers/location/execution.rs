@@ -31,6 +31,7 @@ use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_columns};
+use crate::native_commands::_helpers::location::maintained_resume::resume_expired_holds;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
@@ -512,6 +513,7 @@ pub(crate) fn metadata_sync(
         state_history_versions: None,
         progress: SyncProgress::new(),
         reads_wake_compute: false,
+        maintained_quiet_tokens: std::collections::BTreeMap::new(),
     }
 }
 
@@ -1438,11 +1440,12 @@ pub(crate) async fn read_metadata_page(
     Ok(Some((state, read)))
 }
 
-/// A completed synchronization closes its reader, so no warehouse session outlives the sync.
+/// A completed synchronization resumes expired maintained holds, then closes its reader, so no warehouse session outlives the sync.
 pub(crate) async fn finish_metadata_page(
-    state: LocationMetadataSync,
+    mut state: LocationMetadataSync,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
     if state.idle {
+        resume_expired_holds(&mut state).await;
         return Ok(Some(close_metadata_reader(state).await?));
     }
     Ok(Some(state))

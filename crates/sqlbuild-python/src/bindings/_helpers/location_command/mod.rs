@@ -3,6 +3,7 @@ mod constants;
 mod load_rules;
 mod runtime;
 mod runtime_plan;
+mod runtime_resume;
 mod snapshot;
 mod snapshot_connection;
 mod snapshot_lineage;

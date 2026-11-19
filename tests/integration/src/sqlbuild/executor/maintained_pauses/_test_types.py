@@ -88,6 +88,16 @@ class SyncResumeTestCase:
 
 
 @dataclass(frozen=True)
+class QuietTokenTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    tokens: bool
+    quiet: bool
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_quiet: bool
+
+
+@dataclass(frozen=True)
 class DoubleCloseTestCase:
     description: str
     closers: tuple[str, ...]

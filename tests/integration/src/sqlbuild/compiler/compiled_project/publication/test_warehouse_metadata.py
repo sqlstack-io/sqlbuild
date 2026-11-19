@@ -22,6 +22,7 @@ import duckdb
 import pytest
 
 from sqlbuild._native import (
+    CompiledRelationLocation,
     DiscoveredProjectInputs,
     Fingerprint,
     SourceFreshnessRecord,
@@ -36,6 +37,9 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
+from sqlbuild.executor.maintained_pauses._helpers.sql import insert_sql, setup_statements
+from sqlbuild.executor.maintained_pauses.models import MaintainedPauseEvent
+from sqlbuild.executor.maintained_pauses.types import MaintainedPauseEventType, StateLocation
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     METADATA,
     PUBLISHABLE_FILES,
@@ -1071,6 +1075,96 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
                     )
                 adapter.close(connection)
                 record_finished_run(control)
+
+
+def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_then_only_its_expired_hold_is_closed(
+    tmp_path: Path,
+) -> None:
+    project: Path = tmp_path / "project"
+    fixture: dict[str, Any] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/maintained_expired_hold.json").read_text()
+    )
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(project, "duckdb", "database")
+    location: StateLocation = (None, "main")
+    for statement in setup_statements(adapter=adapter, location=location):
+        _ = adapter.execute(connection=connection, sql=statement)
+    for hold in fixture["holds"]:
+        event: MaintainedPauseEvent = MaintainedPauseEvent(
+            event_type=MaintainedPauseEventType.PAUSED,
+            run_id=hold["run_id"],
+            recorded_by=hold["run_id"],
+            relation=CompiledRelationLocation(
+                database=None, schema="main", name=hold["model"], qualified_name=None
+            ),
+        )
+        _ = adapter.execute(
+            connection=connection,
+            sql=insert_sql(adapter=adapter, location=location, events=(event,)),
+        )
+        _ = adapter.execute(
+            connection=connection,
+            sql=(
+                "UPDATE main._sqlbuild_maintained_pauses SET recorded_at = recorded_at - "
+                f"INTERVAL {hold['idle_seconds']} SECOND WHERE run_id = '{hold['run_id']}'"
+            ),
+        )
+    adapter.close(connection)
+    (project / "orchestration/calendars/unexpected_calendar.py").unlink()
+    with (project / "sqlbuild_project.toml").open("a") as config:
+        _ = config.write(fixture["maintained"])
+    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    with snapshot_api(tmp_path / "control") as api:
+        log: Path = tmp_path / "location.log"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location:
+            _ = wait_for_generation(api, "development", 1, location, log)
+            deadline: float = time.monotonic() + 45
+            while "synchronization completed" not in log.read_text():
+                assert location.poll() is None, log.read_text()
+                assert time.monotonic() < deadline, log.read_text()
+                record_finished_run(tmp_path / "control/.sqlbuild/control.sqlite3")
+                time.sleep(0.5)
+            wait_for_idle_sync(location, log)
+        recorder: str = f"location-sync:{api.location_id}"
+    text: str = log.read_text()
+    connection = adapter.connect({"database": str(project / "warehouse.db")})
+    resumed: list[tuple[Any, ...]] = adapter.query(
+        connection=connection,
+        sql=(
+            "SELECT run_id, recorded_by, relation_name FROM main._sqlbuild_maintained_pauses "
+            "WHERE event_type = 'resumed' ORDER BY run_id"
+        ),
+        limit=10,
+    ).rows
+    adapter.close(connection)
+    expected: list[tuple[str, str, str]] = [
+        (hold["run_id"], recorder, hold["model"]) for hold in fixture["holds"] if hold["resumed"]
+    ]
+    assert [tuple(row) for row in resumed] == expected, text
+    for hold in fixture["holds"]:
+        line: str = (
+            f"Resumed maintained model main.{hold['model']}: run {hold['run_id']} "
+            "stopped heartbeating."
+        )
+        assert (line in text) == hold["resumed"], text
 
 
 @pytest.mark.parametrize(
