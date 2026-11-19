@@ -3736,13 +3736,26 @@ class SnowflakeAdapter(
     def _listed_dynamic_table(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
     ) -> dict[str, object] | None:
-        stored_name: str = self._information_schema_identifier(name)
         if schema is None:
             return None
+        return self._show_named_row(
+            connection=connection,
+            listing="DYNAMIC TABLES",
+            database=database,
+            schema=schema,
+            name=name,
+        )
+
+    def _show_named_row(
+        self, *, connection: Any, listing: str, database: str | None, schema: str, name: str
+    ) -> dict[str, object] | None:
+        """The SHOW <listing> row for exactly this name in the schema, if it lists one."""
+
+        stored_name: str = self._information_schema_identifier(name)
         rows: list[dict[str, object]] = self._fetch_schema_show_rows(
             connection=connection,
             query=(
-                f"SHOW DYNAMIC TABLES LIKE '{show_like_pattern(stored_name)}' IN SCHEMA "
+                f"SHOW {listing} LIKE '{show_like_pattern(stored_name)}' IN SCHEMA "
                 + self._show_schema_scope(connection=connection, database=database, schema=schema)
             ),
             show_database=self._show_database(
@@ -3888,27 +3901,14 @@ class SnowflakeAdapter(
     ) -> tuple[Any, Any] | None:
         """Rows and bytes of one table; a view or other object lists neither."""
 
-        stored_name: str = self._information_schema_identifier(name)
-        rows: list[dict[str, object]] = self._fetch_schema_show_rows(
-            connection=connection,
-            query=(
-                f"SHOW OBJECTS LIKE '{show_like_pattern(stored_name)}' IN SCHEMA "
-                + self._show_schema_scope(connection=connection, database=database, schema=schema)
-            ),
-            show_database=self._show_database(
-                connection=connection, database=database, schema=schema
-            ),
-            schema=schema,
+        row: dict[str, object] | None = self._show_named_row(
+            connection=connection, listing="OBJECTS", database=database, schema=schema, name=name
         )
-        row: dict[str, object]
-        for row in rows:
-            if str(row.get("name")) == stored_name:
-                return (
-                    (row.get("rows"), row.get("bytes"))
-                    if str(row.get("kind")) == SHOW_OBJECTS_TABLE_KIND
-                    else (None, None)
-                )
-        return None
+        if row is None:
+            return None
+        if str(row.get("kind")) != SHOW_OBJECTS_TABLE_KIND:
+            return (None, None)
+        return (row.get("rows"), row.get("bytes"))
 
     def inspect_row_diff_coverage(
         self,
