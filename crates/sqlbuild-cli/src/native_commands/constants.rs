@@ -221,6 +221,12 @@ pub(crate) const LOCATION_WORK_IDLE_POLL: std::time::Duration = std::time::Durat
 /// Finished plans a location keeps for identical requests; a newer generation or synced copy drops them.
 pub(crate) const REUSED_PLANS: usize = 16;
 
+/// The most bytes of plan text a location keeps for reuse; the oldest plans go first.
+pub(crate) const REUSED_PLAN_BYTES: usize = 256 * 1024 * 1024;
+
+/// How long a kept plan may answer a request: its windows and expiry follow the time it planned at.
+pub(crate) const REUSED_PLAN_AGE: chrono::TimeDelta = chrono::TimeDelta::minutes(10);
+
 /// What a location reports when `sqb plan` produced no plan.
 pub(crate) const PLAN_NOT_PRODUCED: &str =
     "sqb plan did not produce a plan; see the location's log";

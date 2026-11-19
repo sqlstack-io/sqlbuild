@@ -16,6 +16,7 @@ use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::changed_build::{
     changed_build_nodes, changed_build_settings,
 };
+use crate::native_commands::_helpers::location::plan_reuse::keep_plan;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::models::{LocationRuntimeRequest, LocationServe, LocationWatch};
 
@@ -44,7 +45,7 @@ pub(super) async fn report_changed_build(
         }
     };
     report("Planning what changed from the synced warehouse copy...\n");
-    let Some((document, _)) = plan_location(
+    let Some(((document, diffs), keep)) = plan_location(
         (options, runtime),
         (&BTreeSet::new(), &settings, false),
         (client, session_id, generation),
@@ -58,6 +59,7 @@ pub(super) async fn report_changed_build(
         report("Project files changed while planning what changed; not reported.\n");
         return Ok(Some(false));
     }
+    keep_plan(keep, (&document, &diffs));
     if let Some(reason) = document["error"]["message"].as_str() {
         report(&format!("Could not plan what changed: {reason}\n"));
         let request = ChangedBuildReport {

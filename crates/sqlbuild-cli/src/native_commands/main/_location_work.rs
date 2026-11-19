@@ -18,11 +18,12 @@ use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::paths::location_files;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::check_location_connection;
+use crate::native_commands::_helpers::location::plan_reuse::keep_plan;
 use crate::native_commands::_helpers::location::work::work_error;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
 use crate::native_commands::models::{
-    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn,
+    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn, PlanToKeep,
 };
 
 /// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
@@ -74,7 +75,7 @@ pub(super) async fn run_location_work(
             expires,
         )
         .await?;
-        let Some((outcome, local_files)) = checked else {
+        let Some((outcome, local_files, keep)) = checked else {
             drop(write_output(&[(
                 Stream::Stderr,
                 "Location work stopped before completion; no result reported.\n",
@@ -93,6 +94,9 @@ pub(super) async fn run_location_work(
         let mut excluded = watch.local_files.clone();
         excluded.extend(files.clone());
         if location_files(&options.project_dir, &watch.rules, &excluded) == expected.0 {
+            if let LocationWorkOutcome::Plan { document, diffs } = &outcome {
+                keep_plan(keep, (document, diffs));
+            }
             outcome
         } else {
             LocationWorkOutcome::Superseded {}
@@ -147,7 +151,7 @@ pub(super) async fn run_location_work(
     }))
 }
 
-/// One named operation; `None` means it stopped at shutdown or its lease ended; `sqb dev` never signs in here.
+/// One named operation and a plan to keep once checked; `None` when it stopped at shutdown or its lease ended.
 async fn perform_work(
     (options, script, (runtime, connected)): (
         &LocationServe,
@@ -157,7 +161,7 @@ async fn perform_work(
     work: LocationWork,
     copy: (&LocationWorkClient, Uuid, i64),
     expires: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(LocationWorkOutcome, Vec<PathBuf>)>, ControlError> {
+) -> Result<Option<(LocationWorkOutcome, Vec<PathBuf>, Option<PlanToKeep>)>, ControlError> {
     let message = match &work {
         LocationWork::CheckConnection {} => "Checking requested location connection...\n",
         LocationWork::SyncWarehouse {} => "Synchronizing warehouse history on request...\n",
@@ -166,11 +170,15 @@ async fn perform_work(
     };
     drop(write_output(&[(Stream::Stderr, message)]));
     Ok(match work {
-        LocationWork::SyncWarehouse {} => Some((LocationWorkOutcome::SyncStarted {}, Vec::new())),
+        LocationWork::SyncWarehouse {} => {
+            Some((LocationWorkOutcome::SyncStarted {}, Vec::new(), None))
+        }
         LocationWork::CheckConnection {} => {
             check_location_connection((options, script, connected), expires)
                 .await?
-                .map(|(healthy, _, files)| (LocationWorkOutcome::Connection { healthy }, files))
+                .map(|(healthy, _, files)| {
+                    (LocationWorkOutcome::Connection { healthy }, files, None)
+                })
         }
         LocationWork::EvaluateSensor { evaluation } => {
             evaluate_location_sensor(options, script, &evaluation, expires)
@@ -179,6 +187,7 @@ async fn perform_work(
                     (
                         LocationWorkOutcome::SensorEvaluation { outcome },
                         Vec::new(),
+                        None,
                     )
                 })
         }
@@ -194,6 +203,12 @@ async fn perform_work(
             expires,
         )
         .await?
-        .map(|(document, diffs)| (LocationWorkOutcome::Plan { document, diffs }, Vec::new())),
+        .map(|((document, diffs), keep)| {
+            (
+                LocationWorkOutcome::Plan { document, diffs },
+                Vec::new(),
+                keep,
+            )
+        }),
     })
 }

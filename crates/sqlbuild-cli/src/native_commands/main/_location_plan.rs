@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use sqlbuild_orchestration::platform::models::LocationWorkClient;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -16,24 +16,24 @@ use crate::native_commands::_helpers::location::held_copy::{HELD_COPY, held_copy
 use crate::native_commands::_helpers::location::plan_request::{
     plan_arguments, run_plan, selected_names,
 };
-use crate::native_commands::_helpers::location::plan_reuse::{
-    PLAN_REUSE, remember_plan, reused_plan,
+use crate::native_commands::_helpers::location::plan_reuse::{PLAN_REUSE, reused_plan};
+use crate::native_commands::models::{
+    HeldCopy, LocationRuntimeRequest, LocationServe, PlanKey, PlanToKeep,
 };
-use crate::native_commands::models::{HeldCopy, LocationRuntimeRequest, LocationServe, PlanKey};
 use crate::native_commands::types::LocationPlan;
 
-/// The plan document with the diffs it left out, an `{"error": ...}` report, or `None` when stopped first.
+/// The plan with what to keep once its checks pass, an `{"error": ...}` report, or `None` when stopped first.
 pub(super) async fn plan_location(
     (options, runtime): (&LocationServe, &mpsc::Sender<LocationRuntimeRequest>),
     (selection, settings, fresh): (&BTreeSet<String>, &BTreeMap<String, Value>, bool),
     (client, session_id, generation): (&LocationWorkClient, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<LocationPlan>, ControlError> {
+) -> Result<Option<(LocationPlan, Option<PlanToKeep>)>, ControlError> {
     let (argv, select) = match plan_arguments(options, settings)
         .and_then(|argv| Ok((argv, selected_names(selection)?)))
     {
         Ok(planned) => planned,
-        Err(message) => return Ok(Some(without_diffs(plan_failure(&message)))),
+        Err(message) => return Ok(Some((without_diffs(plan_failure(&message)), None))),
     };
     let consumption: bool = settings
         .get("changed")
@@ -49,9 +49,12 @@ pub(super) async fn plan_location(
     let copy = match client.preview_copy(&options.target, &read).await {
         Ok(copy) => copy,
         Err(error) => {
-            return Ok(Some(without_diffs(plan_failure(&format!(
-                "the synced warehouse copy is unavailable: {error}"
-            )))));
+            return Ok(Some((
+                without_diffs(plan_failure(&format!(
+                    "the synced warehouse copy is unavailable: {error}"
+                ))),
+                None,
+            )));
         }
     };
     let planned: HeldCopy = match held {
@@ -63,8 +66,16 @@ pub(super) async fn plan_location(
         select: select.clone(),
         consumption: planned.consumption,
     };
-    if !fresh && let Some(reused) = reused_plan(&PLAN_REUSE, (generation, &planned.version), &key) {
-        return Ok(Some(reused));
+    let planned_at: DateTime<Utc> = Utc::now();
+    if !fresh
+        && let Some(reused) = reused_plan(
+            &PLAN_REUSE,
+            (generation, &planned.version),
+            &key,
+            planned_at,
+        )
+    {
+        return Ok(Some((reused, None)));
     }
     let request = json!({"plan": {
         "argv": argv,
@@ -73,14 +84,13 @@ pub(super) async fn plan_location(
         "version": planned.version,
         "consumption": planned.consumption,
     }});
-    let plan: Option<LocationPlan> = run_plan(runtime, request, stopped).await?;
-    if let Some(plan) = &plan {
-        remember_plan(
-            &PLAN_REUSE,
-            (generation, &planned.version),
-            key,
-            (plan, Utc::now()),
-        );
-    }
-    Ok(plan)
+    let keep = PlanToKeep {
+        generation,
+        version: planned.version,
+        key,
+        planned_at,
+    };
+    Ok(run_plan(runtime, request, stopped)
+        .await?
+        .map(|plan| (plan, Some(keep))))
 }
