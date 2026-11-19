@@ -29,8 +29,24 @@ async function select(page: Page, key: string) {
 test('the index lists the sections in order, opens on the first, and the address keeps the one picked', async ({ page }) => {
 	await openPlan(page);
 	await expect(page).toHaveTitle('Plan · sqb build --changed');
-	await expect(page.locator('.index .summary')).toHaveText('94 changed, 672 new, 121 renames, 64 loads, 433 Python, 40 held back · 1,519 unchanged, 300 skipped');
-	expect(await page.locator('.index .entry').evaluateAll((es) => es.map((e) => (e as HTMLElement).dataset.section))).toEqual(['changed', 'renames', 'first_run', 'loads', 'python', 'held_back', 'warnings', 'unchanged', 'skipped']);
+	// Grouped under what will run and what won't, each heading counting nodes once, with no summary sentence.
+	await expect(page.locator('.index .summary')).toHaveCount(0);
+	await expect(page.getByTestId('index-will-run')).toHaveText('Will run2,770');
+	await expect(page.getByTestId('index-wont-run')).toHaveText('Won’t run340');
+	expect(await page.locator('.index .entry').evaluateAll((es) => es.map((e) => [(e as HTMLElement).dataset.section, e.querySelector('.count')?.textContent]))).toEqual([
+		['changed', '94'],
+		// The mock's migrations act on models outside the selection: no renamed nodes, only steps, which
+		// the section's header counts.
+		['renames', '121 steps'],
+		['first_run', '672'],
+		['loads', '64'],
+		['python', '433'],
+		// 1,507 models; the section also lists 12 unchanged functions, which are not nodes.
+		['unchanged', '1,507'],
+		['held_back', '40'],
+		['skipped', '300'],
+		['warnings', '74']
+	]);
 	await expect(page.locator('.index .entry[aria-current="true"]')).toHaveAttribute('data-section', 'changed');
 	await select(page, 'first_run');
 	await expect(page).toHaveURL(/[?&]section=first_run/);
@@ -210,6 +226,9 @@ test('seeds sit with the models of the same reason: first runs, changes and unch
 	await expect(pane(page).locator('.subtitle')).toHaveText('87 query · 6 config · 1 function · 1 seed');
 	await select(page, 'unchanged');
 	await expect(pane(page).locator('.subtitle')).toHaveText('1,507 models · 12 functions · 7 seeds');
+	// The header counts nodes as the index does, and the functions listed with them apart.
+	await expect(pane(page).locator('h3')).toHaveText('Unchanged 1,514 nodes · 12 functions');
+	await expect(page.locator('.index .entry[data-section="unchanged"] .count')).toHaveText('1,514');
 	await expect(rows(page)).toHaveCount(50);
 	if (shots) await page.screenshot({ path: `${shots}/plan-b-seeds.png` });
 });
@@ -227,7 +246,37 @@ test('photographs every section of the large plan', async ({ page }) => {
 	await openPlan(page);
 	for (const key of ['changed', 'renames', 'first_run', 'loads', 'python', 'held_back', 'skipped']) {
 		await select(page, key);
-		await expect(rows(page).first()).toBeVisible();
+		await expect(pane(page).locator('.plan-row, [data-testid="plan-renames"] .row').first()).toBeVisible();
 		await page.screenshot({ path: `${shots}/plan-b-${key}.png` });
 	}
+});
+
+test('a failed read is not repeated on its own: it says so, and Retry reads again', async ({ page }) => {
+	await page.addInitScript(() => ((window as unknown as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows = true));
+	await page.goto(`${LARGE}&section=unchanged`);
+	await expect(page.getByTestId('plan-rows-error')).toContainText('The plan has expired', { timeout: 30_000 });
+	await page.waitForTimeout(1500);
+	expect((await calls(page)).filter((c) => c.section === 'routine_models'), 'one read, not a retry loop').toHaveLength(1);
+	await page.evaluate(() => ((window as unknown as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows = false));
+	await page.getByTestId('plan-rows-error').getByRole('button', { name: 'Retry' }).click();
+	await expect(rows(page)).toHaveCount(50);
+	await expect(page.getByTestId('plan-rows-error')).toHaveCount(0);
+});
+
+test('a failed read blocks only its own group, and a re-plan reads afresh', async ({ page }) => {
+	const fail = (on: boolean) => page.evaluate((v) => ((window as unknown as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows = v), on);
+	await page.addInitScript(() => ((window as unknown as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows = true));
+	await page.goto(`${LARGE}&section=unchanged`);
+	await expect(page.getByTestId('plan-rows-error')).toBeVisible({ timeout: 30_000 });
+	await fail(false);
+	// Another group reads its rows, though Unchanged's read failed.
+	await select(page, 'first_run');
+	await expect(rows(page).first()).toBeVisible();
+	await expect(page.getByTestId('plan-rows-error')).toHaveCount(0);
+	// Back on Unchanged the failure stands until Retry, or until the plan is made again.
+	await select(page, 'unchanged');
+	await expect(page.getByTestId('plan-rows-error')).toBeVisible();
+	await page.getByRole('button', { name: 'Plan again' }).click();
+	await expect(rows(page)).toHaveCount(50, { timeout: 30_000 });
+	await expect(page.getByTestId('plan-rows-error')).toHaveCount(0);
 });

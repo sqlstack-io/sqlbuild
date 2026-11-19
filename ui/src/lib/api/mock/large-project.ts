@@ -7,6 +7,7 @@ import type { ApiClient } from '../client';
 import type { PlanDocument, PlanPage, PlanResult } from '../types';
 import { largePlanDocument, planModelDiff, planPage, planSummary } from './large-plan';
 import { recordPlanDiff, recordPlanRows } from './plan-rows-log';
+import { summaryPlanDocument } from './plan-summary-mockup';
 import type { CatalogNode } from '../types';
 import { newRequestId } from '$lib/browser/request-id';
 
@@ -44,8 +45,11 @@ export function largeProjectNodes(template: CatalogNode): CatalogNode[] {
 /** The large plans planned so far, by request, for their pages. */
 const plans = new Map<string, PlanDocument>();
 
-/** The client with its catalog replaced by the large project, and a build planned as the large plan. */
-export function largeProject(client: ApiClient): ApiClient {
+/**
+ * The client with its catalog replaced by the large project, and a build planned as the large plan;
+ * `summary` plans the plan summary's mock plan instead (CHI-1563).
+ */
+export function largeProject(client: ApiClient, { summary = false }: { summary?: boolean } = {}): ApiClient {
 	return new Proxy(client, {
 		get(target, prop, receiver) {
 			const value = Reflect.get(target, prop, receiver);
@@ -53,7 +57,8 @@ export function largeProject(client: ApiClient): ApiClient {
 				return async (...args: Parameters<ApiClient['planBuild']>): Promise<PlanResult> => {
 					const result = await target.planBuild(...args);
 					if (!result.plan) return result;
-					const doc = largePlanDocument(args[1].some((t) => t === '--changed' || t.startsWith('--changed=')));
+					const changed = args[1].some((t) => t === '--changed' || t.startsWith('--changed='));
+					const doc = summary ? summaryPlanDocument(changed) : largePlanDocument(changed);
 					const requestId = newRequestId();
 					plans.set(requestId, doc);
 					return { plan: { ...planSummary(doc), timings: result.plan.timings }, error: null, requestId };
@@ -65,6 +70,8 @@ export function largeProject(client: ApiClient): ApiClient {
 					if (!doc) return target.planRows(scope, requestId, section, offset, limit, name);
 					recordPlanRows(section, offset, limit, name);
 					await new Promise((resolve) => setTimeout(resolve, 120));
+					// The browser suite sets `window.__sqbFailPlanRows` to make every read fail, as an expired plan's do.
+					if ((globalThis as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows) throw new Error('The plan has expired; plan again.');
 					return planPage(doc, section, offset, limit, name);
 				};
 			}

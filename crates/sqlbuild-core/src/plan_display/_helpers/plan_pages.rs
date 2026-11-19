@@ -7,7 +7,8 @@ use serde_json::Value;
 use crate::plan_display::_helpers::diff_lines::diff_stats;
 use crate::plan_display::_helpers::warning_groups::warning_groups;
 use crate::plan_display::constants::{
-    DIFF_STATS_FIELD, FIRST_RUN_REASON, NO_CHANGE_REASON, SKIP_ACTION,
+    DIFF_STATS_FIELD, FIRST_RUN_REASON, IS_RENAME_FIELD, NO_CHANGE_REASON, ORIGIN_MODEL_FIELD,
+    SKIP_ACTION,
 };
 use crate::plan_display::models::PlanPageSection;
 
@@ -79,6 +80,21 @@ impl<'document> PlanRows<'document> {
             runs
         });
         Self { document, runs }
+    }
+
+    /// The migration steps: every migration-like row except renamed models' own migrations.
+    pub(crate) fn migration_steps(&self) -> usize {
+        let migrations = self
+            .list("migrations")
+            .into_iter()
+            .filter(|migration| {
+                migration.get(IS_RENAME_FIELD).and_then(Value::as_bool) != Some(true)
+            })
+            .count();
+        migrations
+            + self.list("column_migrations").len()
+            + self.list("table_type_conversions").len()
+            + self.list("retention").len()
     }
 
     /// The section's rows in plan order.
@@ -345,13 +361,26 @@ fn model_section(model: &Value) -> PlanPageSection {
         .map_or(PlanPageSection::RoutineModels, |(_, section)| *section)
 }
 
-/// The name a row is found by; a warning is found by its model and message.
+/// The name a row is found by; renames match old names and retention changes their models.
 pub(crate) fn row_name(section: PlanPageSection, row: &Value) -> String {
     match section {
+        PlanPageSection::Renamed => {
+            format!("{} {}", text(row, "name"), text(row, ORIGIN_MODEL_FIELD))
+        }
         PlanPageSection::Migrations
         | PlanPageSection::ColumnMigrations
-        | PlanPageSection::TableTypeConversions
-        | PlanPageSection::Retention => text(row, "model").to_owned(),
+        | PlanPageSection::TableTypeConversions => text(row, "model").to_owned(),
+        PlanPageSection::Retention => {
+            let mut names: Vec<&str> = row
+                .get("models")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect();
+            names.push(text(row, "name"));
+            names.join(" ")
+        }
         PlanPageSection::HeldBack => key_name(text(row, "node")).to_owned(),
         PlanPageSection::Unchanged => key_name(row.as_str().unwrap_or_default()).to_owned(),
         PlanPageSection::Warnings => {

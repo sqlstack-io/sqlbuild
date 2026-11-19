@@ -246,6 +246,9 @@ migration decisions using your current connection. It only inspects; nothing is 
 - A recorded view that no longer exists is not re-created by a build; janitor records it as dropped.
 - Run the same SQLBuild version for `sqb janitor` as for builds. An older janitor doesn't recognise
   compatibility views and archives them as stale relations.
+- In `sqb plan --json`, a migration that moves a renamed model has `"is_rename": true`, and the renamed
+  model's own row names its old model in `origin_model` and carries the same `old_name` object as that
+  migration, or no `old_name` when the migration has none. Other migrations have `"is_rename": false`.
 - In `sqb plan --json`, each migration has an `old_name` object with `action` (`archive_and_view`,
   `view_only`, `live` or `none`), `view`, `reads`, `expires_at`, `column_aliases`, `grants_copied`
   and `reason`. The top-level `old_names` list also includes steps that resume an earlier move.

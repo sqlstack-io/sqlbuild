@@ -339,7 +339,8 @@ describe('group run nodes', () => {
 
 describe('planResultOf', () => {
 	it.each([
-		{ description: 'a plan keeps its models and fills missing sections', outcome: { kind: 'plan', document: { selected_count: 1, models: [{ name: 'orders', reason: 'first_run' }] } }, expected: { plan: 'orders', error: null } },
+		{ description: 'a plan keeps its models and fills missing sections', outcome: { kind: 'plan', document: { selected_count: 1, models: [{ name: 'orders', reason: 'first_run' }], sections: [], migration_steps: 0 } }, expected: { plan: 'orders', error: null } },
+		{ description: 'a plan without its section counts is refused', outcome: { kind: 'plan', document: { selected_count: 1, models: [{ name: 'orders', reason: 'first_run' }] } }, expected: { plan: null, error: 'The server sent a plan without its section counts' } },
 		{ description: "sqb plan's own error is the result", outcome: { kind: 'plan', document: { error: { code: 'S007', message: "unknown selector name 'ordrs'" } } }, expected: { plan: null, error: "S007: unknown selector name 'ordrs'" } },
 		{ description: 'the help line follows the error', outcome: { kind: 'plan', document: { error: { code: 'S000', message: 'no cursor interval', help: 'pass --start-cursor-ts' } } }, expected: { plan: null, error: 'S000: no cursor interval\nhelp: pass --start-cursor-ts' } },
 		{ description: 'a superseded plan asks to plan again', outcome: { kind: 'superseded' }, expected: { plan: null, error: 'The project changed on the location while it was planning; plan again' } }
@@ -351,12 +352,31 @@ describe('planResultOf', () => {
 	});
 });
 
+describe('planResultOf with renames', () => {
+	it('keeps the migration step count and the rename fields on rows', () => {
+		const plan = planResultOf({
+			kind: 'plan',
+			document: {
+				models: [{ name: 'orders', action: 'create_table', reason: 'renamed', origin_model: 'orders_v1', old_name: { action: 'view_only', expires_at: '2026-12-18T00:00:00Z' } }],
+				migrations: [{ model: 'orders', origin_model: 'orders_v1', decision: 'renamed', completed_at: null, is_rename: true }],
+				sections: [{ section: 'renamed', total: 1, notes: [] }],
+				migration_steps: 3
+			}
+		} as never).plan!;
+		expect(plan.migration_steps).toBe(3);
+		expect(plan.models[0]).toMatchObject({ origin_model: 'orders_v1', old_name: { action: 'view_only' } });
+		expect(plan.migrations[0].is_rename).toBe(true);
+	});
+});
+
 describe('mergePlanPage', () => {
 	const summary = planResultOf({
 		kind: 'plan',
 		document: {
 			models: [{ name: 'orders', action: 'create_table', reason: 'query_changed' }],
 			pages: { routine_models: 2, unchanged: 3 },
+			sections: [{ section: 'routine_models', total: 2, notes: [] }],
+			migration_steps: 0,
 			changed: { counts: ['definition'], reach: 'all', runs: [{ node: 'model:orders', reason: 'definition changed', downstream_of: null }], held_back: [], unchanged: [] }
 		}
 	} as never).plan!;

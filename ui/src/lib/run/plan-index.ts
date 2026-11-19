@@ -5,11 +5,9 @@ import type { PlanDiff, PlanDocument, PlanPageSection, PlanSectionCount, PlanWar
 import { plural } from '$lib/format/plural';
 import { changedSections, loadedRows, looseWarnings, planSections, sectionSize, type PlanEntry, type PlanSection } from './plan-text';
 
-/** The groups in the index, in its order; the ones after the divider are the bulky, quiet ones. */
+/** The plan's groups in plan order; the index sorts them under Will run and Won't run. */
 export type PlanGroupKey = 'full_refresh' | 'changed' | 'renames' | 'first_run' | 'loads' | 'python' | 'held_back' | 'warnings' | 'unchanged' | 'skipped';
 const ORDER: PlanGroupKey[] = ['full_refresh', 'changed', 'renames', 'first_run', 'loads', 'python', 'held_back', 'warnings', 'unchanged', 'skipped'];
-/** The first group below the index's divider. */
-export const AFTER_DIVIDER: PlanGroupKey = 'warnings';
 const TITLES: Record<PlanGroupKey, string> = {
 	full_refresh: 'Full refresh',
 	changed: 'Changed',
@@ -342,7 +340,7 @@ export function planGroups(plan: PlanDocument, refresh: (job: string) => string 
 	const warningTotal = counts.find((c) => c.section === 'warnings')?.total ?? 0;
 	const grouped = plan.warning_groups ? serverWarningGroups(plan.warning_groups, warningTotal) : warnings.length ? groupWarnings(warnings) : [];
 	const warningKinds = plan.warning_groups ? plural(plan.warning_groups.length, 'kind') + (grouped.length > plan.warning_groups.length ? ' and more' : '') : plural(grouped.length, 'kind');
-	// A whole plan (an older server's, or the mock's) has every row and no counted notes.
+	// The default mock serves whole plans, with every row and no counted notes; the server always pages them.
 	const whole = !plan.sections;
 	return ORDER.flatMap((key) => {
 		const mine = counts.filter((c) => GROUP_OF[c.section] === key && c.total > 0);
@@ -404,23 +402,6 @@ export function withoutRows(plan: PlanDocument): PlanDocument {
 		changed: plan.changed && { ...plan.changed, runs: [], held_back: [], unchanged: [] },
 		synced_copy: plan.synced_copy && { ...plan.synced_copy, cursor_window_starts: {} }
 	};
-}
-
-/** The index's one-line summary, such as "94 changed, 672 new, 121 renames, 64 loads, 433 Python · 1,507 unchanged". */
-export function planSummaryLine(groups: PlanGroup[]): string {
-	const n = (key: PlanGroupKey) => groups.find((g) => g.key === key)?.count ?? 0;
-	const word: [PlanGroupKey, string][] = [
-		['full_refresh', 'full refresh'],
-		['changed', 'changed'],
-		['first_run', 'new'],
-		['renames', 'renames'],
-		['loads', 'loads'],
-		['python', 'Python'],
-		['held_back', 'held back']
-	];
-	const main = word.filter(([key]) => n(key)).map(([key, w]) => `${n(key).toLocaleString()} ${w}`);
-	const quiet = (['unchanged', 'skipped'] as PlanGroupKey[]).filter((key) => n(key)).map((key) => `${n(key).toLocaleString()} ${key === 'unchanged' ? 'unchanged' : 'skipped'}`);
-	return [main.join(', '), quiet.join(', ')].filter(Boolean).join(' · ');
 }
 
 /** The group a `?section=` names, else the first in the index. */

@@ -22,6 +22,7 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 		return { plan: null, error: [code, message].filter(Boolean).join(': ') + (help ? `\nhelp: ${help}` : '') };
 	}
 	const list = <T>(value: T[] | undefined): T[] => value ?? [];
+	if (!document.sections || typeof document.migration_steps !== 'number') return { plan: null, error: 'The server sent a plan without its section counts' };
 	return {
 		plan: {
 			selected_count: document.selected_count ?? 0,
@@ -39,7 +40,8 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			changed: document.changed ?? null,
 			...(document.ignore_audit_failures ? { ignore_audit_failures: true } : {}),
 			...(document.pages ? { pages: document.pages } : {}),
-			...(document.sections ? { sections: document.sections } : {}),
+			sections: document.sections,
+			migration_steps: document.migration_steps,
 			...(document.warning_groups ? { warning_groups: document.warning_groups } : {})
 		},
 		error: null

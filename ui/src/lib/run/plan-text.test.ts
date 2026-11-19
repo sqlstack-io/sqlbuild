@@ -10,7 +10,7 @@ const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	backfill: { action: 'forward', duration: null },
 	...over
 });
-const plan = (models: PlanModel[], over: Partial<PlanDocument> = {}): PlanDocument => ({
+const plan = (models: PlanModel[], over: Partial<Omit<PlanDocument, 'sections' | 'migration_steps'>> = {}): PlanDocument => ({
 	selected_count: models.length,
 	models,
 	seeds: [],
@@ -109,7 +109,7 @@ describe('plan text, as sqb plan prints it', () => {
 
 	it('shows a warning once, under the first entry for its model, when the model is in more than one changed section', () => {
 		const lag = { severity: 'warning', message: 'lag', model_name: 'orders' };
-		const p = plan([model('orders', { reason: 'query_changed' })], { warnings: [lag], retention: [{ model: 'orders', action: 'drop' }] });
+		const p = plan([model('orders', { reason: 'query_changed' })], { warnings: [lag], retention: [{ scope: 'table', name: 'analytics.orders', models: ['orders'], direction: 'decrease', actual_days: 7, desired_days: 1 }] });
 		expect(planSections(p).flatMap((s) => s.entries.map((e) => [s.title, e.warnings?.length ?? 0]))).toEqual([
 			['Retention', 1],
 			['Query changed', 0]

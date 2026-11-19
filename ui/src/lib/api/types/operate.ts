@@ -669,6 +669,12 @@ export type PlanModel = {
 	/** A config change of at most two plain keys in words, such as `full_refresh true → false`. */
 	config_change?: string;
 	schema_findings?: { kind: string; column: string; expected_type: string | null; actual_type: string | null }[];
+	/** The query changed as well as the name, on a renamed model. */
+	query_changed?: boolean;
+	/** The model a renamed model was renamed from. */
+	origin_model?: string;
+	/** What stays at a renamed model's old name. */
+	old_name?: PlanOldName | null;
 	/** A paged row's diff counts in place of its diff text, which `planDiff` reads on demand. */
 	diff_stats?: { query?: PlanDiffStats; config?: PlanDiffStats };
 };
@@ -684,8 +690,63 @@ export type PlanWarning = { severity: string; message: string; model_name?: stri
 /** One warning template and how many warnings fill it in; `subject` counts the named things it opens with, such as scenarios, when they repeat. */
 export type PlanWarningGroup = { template: string; count: number; subject: { noun: string; count: number } | null };
 
-/** `sqb plan --json` as the location printed it; sections the page doesn't show are kept as they are. */
-export type PlanDocument = {
+/** What a build does at a moved model's old name: keep a view there (`view`) reading the new one, until `expires_at`. */
+export type PlanOldName = { action: string; view?: string | null; reads?: string | null; expires_at?: string | null };
+
+/**
+ * A model migration: `model` takes its data from `origin_model` (a rename, or a move into a model that
+ * exists). `decision` says what this run does; `transfer` how a pending rename moves the data.
+ */
+export type PlanMigration = {
+	model: string;
+	origin_model?: string;
+	decision: string;
+	completed_at: string | null;
+	/** Whether this is a renamed model's own migration, which its Renamed row says, not a migration step. */
+	is_rename: boolean;
+	compatibility?: string;
+	transfer?: string | null;
+	old_name?: PlanOldName | null;
+};
+
+/** A column of `model` renamed from `origin_column` to `destination_column`. */
+export type PlanColumnMigration = { model: string; origin_column: string; destination_column: string; decision: string; completed_at?: string | null };
+
+/** A model's table type changing from `actual_type` to `desired_type`. */
+export type PlanTableTypeConversion = { model: string; actual_type?: string | null; desired_type?: string | null; downgrade?: boolean; irreversible_warning?: string | null };
+
+/** A time-travel retention change on a relation (`scope` `table` or `schema`), for the models it holds. */
+export type PlanRetention = {
+	scope?: string;
+	name?: string | null;
+	models?: string[];
+	desired_days?: number | null;
+	actual_days?: number | null;
+	direction?: string;
+	phase?: string;
+	irreversible_warning?: string | null;
+};
+
+/**
+ * `sqb plan --json` as the location printed it; sections the page doesn't show are kept as they are. A
+ * server summary has its sections counted and its migration steps with them; only the default mock
+ * serves a whole plan, without either.
+ */
+export type PlanDocument = PlanFields & (WholePlan | PlanSummaryCounts);
+
+/** The default mock's whole plan: every row, nothing counted. */
+type WholePlan = { sections?: undefined; migration_steps?: undefined };
+
+/** A server summary's counts. */
+type PlanSummaryCounts = {
+	/** The nonempty sections in plan order, each with the notes its rows share most. */
+	sections: PlanSectionCount[];
+	/** The migration steps: migrations other than renamed models' own, column migrations, table type and retention changes. */
+	migration_steps: number;
+};
+
+/** The fields of every plan document. */
+type PlanFields = {
 	selected_count: number;
 	models: PlanModel[];
 	seeds: { name: string; reason: string; qualified_name?: string }[];
@@ -693,10 +754,10 @@ export type PlanDocument = {
 	functions: { name: string; language: string; reason?: string }[];
 	python_nodes: { name: string; kind: string; phase: string; identity_status: string }[];
 	warnings: PlanWarning[];
-	migrations: { model: string; origin_model?: string; decision: string; completed_at: string | null }[];
-	column_migrations: { model: string; origin_column: string; destination_column: string; decision: string }[];
-	table_type_conversions: { model: string; actual_type?: string; desired_type?: string }[];
-	retention: { model: string; action?: string }[];
+	migrations: PlanMigration[];
+	column_migrations: PlanColumnMigration[];
+	table_type_conversions: PlanTableTypeConversion[];
+	retention: PlanRetention[];
 	/** What a location's preview planned from instead of the warehouse; `null` for a live plan. */
 	synced_copy: PlanSyncedCopy | null;
 	/** What `--changed` runs, holds back and skips; `null` without `--changed`. */
@@ -709,8 +770,6 @@ export type PlanDocument = {
 	pages?: Partial<Record<PlanPageSection, number>>;
 	/** A server summary's warnings by message template, largest first; the warnings section pages them in this order. */
 	warning_groups?: PlanWarningGroup[];
-	/** A server summary's nonempty sections in plan order, each with the notes its rows share most. */
-	sections?: PlanSectionCount[];
 	/** Rows of each paged section loaded so far, which is the offset of its next page. */
 	loaded?: Partial<Record<PlanPageSection, number>>;
 };

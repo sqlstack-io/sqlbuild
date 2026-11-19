@@ -7,18 +7,18 @@ import { groupWarnings } from '$lib/run/plan-index';
 import { seedSection } from '$lib/run/plan-text';
 import type { PlanDiff, PlanDiffStats, PlanDocument, PlanModel, PlanPage, PlanPageSection, PlanSectionCount, PlanSectionNote, PlanWarning } from '../types';
 
-const DOMAINS = ['orders', 'customers', 'inventory', 'payments', 'shipping', 'returns', 'pricing', 'suppliers', 'regions', 'finance', 'marketing', 'support'];
+export const DOMAINS = ['orders', 'customers', 'inventory', 'payments', 'shipping', 'returns', 'pricing', 'suppliers', 'regions', 'finance', 'marketing', 'support'];
 const LAYERS = ['stg', 'int', 'mart'];
 const NOUNS = ['daily_rollup', 'events', 'snapshot', 'curated', 'enriched', 'mapped', 'totals', 'history', 'latest', 'summary'];
 /** A neutral model name, distinct for each `i`. */
-const name = (i: number) => `${DOMAINS[i % DOMAINS.length]}__${LAYERS[Math.floor(i / DOMAINS.length) % LAYERS.length]}__${NOUNS[Math.floor(i / (DOMAINS.length * LAYERS.length)) % NOUNS.length]}_${i}`;
+export const name = (i: number) => `${DOMAINS[i % DOMAINS.length]}__${LAYERS[Math.floor(i / DOMAINS.length) % LAYERS.length]}__${NOUNS[Math.floor(i / (DOMAINS.length * LAYERS.length)) % NOUNS.length]}_${i}`;
 
-const HEAD = ['--- previous', '+++ current'];
+export const HEAD = ['--- previous', '+++ current'];
 /** A query diff of `added` and `removed` lines. */
-function queryDiff(i: number, added: number, removed: number): string[] {
+export function queryDiff(i: number, added: number, removed: number): string[] {
 	return [...HEAD, `@@ -1,${removed + 2} +1,${added + 2} @@`, ' select', ...Array.from({ length: removed }, (_, k) => `-    old_column_${k},`), ...Array.from({ length: added }, (_, k) => `+    new_column_${k}_${i},`), ` from ${name(i + 1)}`];
 }
-const model = (i: number, reason: string, extra: Partial<PlanModel> = {}): PlanModel => ({
+export const model = (i: number, reason: string, extra: Partial<PlanModel> = {}): PlanModel => ({
 	name: name(i),
 	materialization_type: 'table',
 	action: 'create_table',
@@ -27,7 +27,7 @@ const model = (i: number, reason: string, extra: Partial<PlanModel> = {}): PlanM
 	qualified_name: `analytics.${name(i)}`,
 	...extra
 });
-const incremental = (extra: Partial<PlanModel> = {}): Partial<PlanModel> => ({
+export const incremental = (extra: Partial<PlanModel> = {}): Partial<PlanModel> => ({
 	materialization_type: 'incremental',
 	action: 'incremental_merge',
 	incremental_strategy: 'merge',
@@ -67,7 +67,7 @@ export function largePlanDocument(changed: boolean): PlanDocument {
 			...Array.from({ length: 71 }, (_, k) => ({ severity: 'warning', message: `Scenario 'test_${DOMAINS[k % 12]}_${k % 24}' provides fixture for unknown model '${name(k + 3000)}'.` })),
 			...Array.from({ length: 3 }, (_, k) => ({ severity: 'warning', message: `Scenario 'test_returns_${k}' requires source 'raw.returns_${k}', but no fixture was provided. Add a CTE named __source__raw__returns_${k} AS (...).` }))
 		],
-		migrations: Array.from({ length: 121 }, (_, k) => ({ model: name(5000 + k), origin_model: name(6000 + k), decision: 'renamed', completed_at: null })),
+		migrations: Array.from({ length: 121 }, (_, k) => ({ model: name(5000 + k), origin_model: name(6000 + k), decision: 'migrate', completed_at: null, is_rename: false })),
 		column_migrations: [],
 		table_type_conversions: [],
 		retention: [],
@@ -98,7 +98,9 @@ function sectionRows(doc: PlanDocument, section: PlanPageSection): { rows: unkno
 	const byModel = (rows: { model: string }[]) => ({ rows, name: (row: unknown) => (row as { model: string }).model });
 	if (MODEL_SECTIONS.includes(section) || section === 'routine_models') {
 		const built = doc.models.filter((m) => m.action !== 'skip' && runsNode(`model:${m.name}`));
-		return named(built.filter((m) => (MODEL_SECTIONS.includes(m.reason as PlanPageSection) ? m.reason === section : section === 'routine_models')));
+		const rows = built.filter((m) => (MODEL_SECTIONS.includes(m.reason as PlanPageSection) ? m.reason === section : section === 'routine_models'));
+		// A renamed model is found by its old name too, as the server finds it.
+		return section === 'renamed' ? { rows, name: (row) => `${(row as PlanModel).name} ${(row as PlanModel).origin_model ?? ''}` } : named(rows);
 	}
 	const loads = (kind: string, reload: boolean) => named(doc.source_loads.filter((l) => l.kind === kind && l.is_reload === reload));
 	const changedFunction = (f: PlanDocument['functions'][number]) => !!f.reason && f.reason !== 'no_change';
@@ -110,7 +112,7 @@ function sectionRows(doc: PlanDocument, section: PlanPageSection): { rows: unkno
 		case 'table_type_conversions':
 			return byModel(doc.table_type_conversions);
 		case 'retention':
-			return byModel(doc.retention);
+			return { rows: doc.retention, name: (row) => ((row as PlanDocument['retention'][number]).models ?? []).join(' ') };
 		case 'loader_reloads':
 			return loads('loader', true);
 		case 'loader_loads':
@@ -172,6 +174,7 @@ export function planSummary(doc: PlanDocument): PlanDocument {
 		...empty,
 		sections,
 		pages: Object.fromEntries(sections.map((s) => [s.section, s.total])),
+		migration_steps: doc.migrations.filter((m) => !m.is_rename).length + doc.column_migrations.length + doc.table_type_conversions.length + doc.retention.length,
 		warning_groups: groupWarnings(doc.warnings).map((g) => ({ template: g.template, count: g.count, subject: subjectOf(g.label) })),
 		changed: doc.changed && { ...doc.changed, runs: [], held_back: [], unchanged: [] },
 		synced_copy: doc.synced_copy && { ...doc.synced_copy, cursor_window_starts: {} }
