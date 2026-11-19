@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.252.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.251.0...v0.252.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **build:** `materialized maintained`, `[maintained]`, `pause_maintained` and `--ignore-maintained-grace` are no longer accepted; use `materialized dynamic`, `[dynamic]`, `pause_dynamic` and `--ignore-dynamic-grace`. The materialization is part of a model's version identity, so each existing model is recreated once, with a full recompute, by its first build after the rename. Builds record pauses in `_sqlbuild_dynamic_pauses` and no longer read `_sqlbuild_maintained_pauses`: let builds on the previous version finish before upgrading, resume by hand any model a killed older build left suspended, then drop the old table.
+
+### Features
+
+* **build:** rename maintained models to dynamic and close their hold gaps ([#1594](https://github.com/sqlstack-io/sqlbuild/issues/1594)) ([1ccf4d9](https://github.com/sqlstack-io/sqlbuild/commit/1ccf4d995ab1dff9a8db3288cf03b89a59f440bc))
+
 ## [0.251.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.250.0...v0.251.0) (2026-11-19)
 
 
