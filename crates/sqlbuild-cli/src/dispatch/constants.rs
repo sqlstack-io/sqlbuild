@@ -145,7 +145,7 @@ pub(crate) const PLAN_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const BUILD_FIELDS: [Field; 40] = [
+const BUILD_FIELDS: [Field; 41] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -169,6 +169,7 @@ const BUILD_FIELDS: [Field; 40] = [
     same("allow_retention_decrease"),
     same("allow_missing_migration_origin"),
     same("allow_snapshot_schema_change"),
+    same("ignore_maintained_grace"),
     same("concurrency"),
     SELECT,
     field("selector_files", Source::SelectorFiles),

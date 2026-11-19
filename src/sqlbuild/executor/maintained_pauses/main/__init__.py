@@ -1,0 +1,1 @@
+"""Maintained pause entrypoints."""

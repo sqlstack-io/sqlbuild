@@ -4,6 +4,7 @@ pub mod load_changes_config;
 pub mod load_control_config;
 pub mod load_git_base_ref;
 pub mod load_local_config;
+pub mod load_maintained_config;
 pub mod load_pool_limits;
 pub mod load_project_config;
 pub mod load_project_setting_keys;

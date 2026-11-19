@@ -15,8 +15,9 @@ use crate::project::_helpers::help::{
 use crate::project::_helpers::keys::Place;
 use crate::project::_helpers::sections::{
     load_changes, load_constants, load_control, load_cost, load_cursors, load_dbt, load_diff,
-    load_git, load_janitor, load_local_dbt, load_microbatches, load_migrations, load_policy_flag,
-    load_pools, load_review, load_scenario, load_settings, load_snapshots, setting_overrides,
+    load_git, load_janitor, load_local_dbt, load_maintained, load_microbatches, load_migrations,
+    load_policy_flag, load_pools, load_review, load_scenario, load_settings, load_snapshots,
+    setting_overrides,
 };
 use crate::project::_helpers::sinks::load_sinks;
 use crate::project::_helpers::targets::{
@@ -30,7 +31,8 @@ use crate::project::constants::{
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{
-    Built, ChangesConfig, ConfigFile, ConfigPaths, ControlConfig, PoolLimits, ReviewConfig,
+    Built, ChangesConfig, ConfigFile, ConfigPaths, ControlConfig, MaintainedConfig, PoolLimits,
+    ReviewConfig,
 };
 use crate::project::types::{Entries, Fields, Loaded};
 use crate::recall::constants::RECALL_SECTION;
@@ -297,6 +299,7 @@ fn project_fields(payload: &Entries) -> Loaded<Fields> {
     }
     load_git(get(payload, "git"), PROJECT_FILE)?;
     load_review(get(payload, "review"), PROJECT_FILE)?;
+    load_maintained(get(payload, "maintained"), PROJECT_FILE)?;
     load_control(get(payload, "control"), PROJECT_FILE)?;
     load_changes(get(payload, "changes"), PROJECT_FILE)?;
     pool_limits(payload)?;
@@ -537,6 +540,11 @@ pub(crate) fn control_config(paths: &ConfigPaths) -> Result<ControlConfig, LoadF
 /// `[changes]` of `sqlbuild_project.toml`.
 pub(crate) fn changes_config(paths: &ConfigPaths) -> Result<ChangesConfig, LoadFailure> {
     project_section(paths, "changes", load_changes)
+}
+
+/// `[maintained]` of `sqlbuild_project.toml`.
+pub(crate) fn maintained_config(paths: &ConfigPaths) -> Result<MaintainedConfig, LoadFailure> {
+    project_section(paths, "maintained", load_maintained)
 }
 
 /// `[review]` of `sqlbuild_project.toml`.

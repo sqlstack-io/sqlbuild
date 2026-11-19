@@ -2631,6 +2631,17 @@
         "group": 1
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--ignore-maintained-grace"
+        ],
+        "dest": "ignore_maintained_grace",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--concurrency"

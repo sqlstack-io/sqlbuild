@@ -20,6 +20,7 @@ Online: https://sqlbuild.com/docs/concepts/project-configuration/
 - Project variables
 - Janitor
 - Migrations
+- Maintained
 - Scenario
 - Git
 - Review
@@ -189,6 +190,7 @@ A target is a named build context - the database and schema you build into, plus
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
 | `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
+| `pause_maintained` | `true` keeps this target's [maintained models](models/materializations.md#maintained) suspended between builds; each build refreshes the ones it selects. Default `false` |
 
 ```toml
 [connections.warehouse]
@@ -694,6 +696,21 @@ old_name_views = "30d"
 | Field | Default | Description |
 |-------|---------|-------------|
 | `old_name_views` | `"30d"` | How long a renamed model's old name keeps working through a [compatibility view](models/migrations.md#old-names) before janitor drops it. `false` keeps the old relation in place instead. A model's `old_name_view` header overrides it. |
+
+## Maintained
+
+How builds pause [maintained models](models/materializations.md#maintained) while they run:
+
+```toml
+[maintained]
+heartbeat_grace = "30m"
+allow_ignore_grace = false
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `heartbeat_grace` | `"30m"` | How long a build that paused maintained models may go silent before another build resumes them or takes them over. A fixed duration longer than `"1m"`, such as `"30m"` or `"2h"`; a build writes a heartbeat every minute |
+| `allow_ignore_grace` | `false` | Allow `sqb build --ignore-maintained-grace`, which takes over models another build holds without waiting for the grace. Without it the flag fails with `A719` |
 
 ## Scenario
 

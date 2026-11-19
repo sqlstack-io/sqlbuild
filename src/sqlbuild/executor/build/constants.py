@@ -11,6 +11,13 @@ INCREMENTAL_ACTIONS: frozenset[PlanAction] = frozenset(
         PlanAction.INCREMENTAL_MERGE,
     }
 )
+MAINTAINED_ACTIONS: frozenset[PlanAction] = frozenset(
+    {
+        PlanAction.CREATE_MAINTAINED,
+        PlanAction.ALTER_MAINTAINED,
+        PlanAction.KEEP_MAINTAINED,
+    }
+)
 
 BUILD_WORKER_FAILED_CODE: str = "B001"
 BUILD_UNKNOWN_RESOURCE_FAILED_CODE: str = "B002"

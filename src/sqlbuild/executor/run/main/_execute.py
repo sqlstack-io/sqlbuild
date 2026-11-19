@@ -44,6 +44,9 @@ from sqlbuild.executor.run._helpers.materializations.custom import (
 from sqlbuild.executor.run._helpers.materializations.incremental import (
     execute_incremental_entry as execute_incremental_entry,
 )
+from sqlbuild.executor.run._helpers.materializations.maintained import (
+    execute_maintained_entry as execute_maintained_entry,
+)
 from sqlbuild.executor.run._helpers.materializations.microbatch import (
     execute_microbatch_entry as execute_microbatch_entry,
 )
@@ -243,8 +246,11 @@ def _staged_lifecycle(
                     staging_schema=targets.target_schema,
                     staging_table=targets.staging_table,
                     declared_columns=declared_columns,
-                    table_type=entry.table_type,
-                    physical_storage=entry.physical_storage,
+                    table_config={
+                        "table_type": entry.table_type,
+                        "physical_storage": entry.physical_storage,
+                        "change_tracking": bool(entry.maintained_readers),
+                    },
                     statement_recorder=statement_recorder,
                 )
         except Exception as exc:

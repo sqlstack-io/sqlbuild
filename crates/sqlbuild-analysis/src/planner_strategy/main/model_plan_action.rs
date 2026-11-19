@@ -41,6 +41,13 @@ pub fn model_plan_action(
                 refreshed(PlanReason::NormalIncremental, false),
             ));
         }
+        MaterializationType::Maintained => {
+            let reason: PlanReason = refreshed(PlanReason::NoChange, true);
+            if reason == PlanReason::NoChange {
+                return Ok((PlanAction::KeepMaintained, reason));
+            }
+            return Ok((PlanAction::CreateMaintained, reason));
+        }
         MaterializationType::Table
         | MaterializationType::Incremental
         | MaterializationType::Seed => {}

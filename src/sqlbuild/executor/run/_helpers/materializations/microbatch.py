@@ -2957,7 +2957,7 @@ def _enforce_microbatch_types(
                 staging_schema=targets.target_schema,
                 staging_table=targets.delta_table,
                 declared_columns=declared_columns,
-                table_type=TableType.TRANSIENT,
+                table_config={"table_type": TableType.TRANSIENT, "physical_storage": {}},
                 statement_recorder=state.statement_recorder,
             )
     except Exception as exc:
@@ -3057,6 +3057,7 @@ def _apply_microbatch_dml(
                     config={
                         "table_type": context.entry.table_type,
                         "physical_storage": context.entry.physical_storage,
+                        "change_tracking": bool(context.entry.maintained_readers),
                     },
                     statement_recorder=state.statement_recorder,
                 )

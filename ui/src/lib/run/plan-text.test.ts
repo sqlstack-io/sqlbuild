@@ -35,6 +35,27 @@ describe('plan text, as sqb plan prints it', () => {
 		expect(actionText(model('a', { reason: 'first_run', backfill: { action: 'full', duration: null } }))).toBe('continue forward');
 	});
 
+	it('words maintained models as the CLI does, with no replay policy', () => {
+		const recreated = model('a', { action: 'create_maintained', reason: 'query_changed', backfill: { action: 'full', duration: null } });
+		expect(actionText(recreated)).toBe('recreate, full recompute');
+		expect(actionText(model('a', { action: 'create_maintained', reason: 'first_run' }))).toBe('create');
+		expect(actionText(model('a', { action: 'alter_maintained', reason: 'config_changed' }))).toBe('change refresh settings in place');
+		const [section] = planSections(plan([recreated]));
+		expect(section.entries[0].detail).toEqual([]);
+	});
+
+	it('says a kept maintained model recomputes in full when an upstream it reads is rebuilt', () => {
+		const kept = model('daily_totals', { materialization_type: 'maintained', action: 'keep_maintained', reinitialised_by: 'orders' });
+		const [routine] = planSections(plan([kept]));
+		expect(routine.entries).toEqual([{ name: 'daily_totals', value: 'maintained', detail: ['recomputes in full: orders is rebuilt'] }]);
+	});
+
+	it('says a kept maintained model is paused when the warehouse lists it as suspended', () => {
+		const kept = model('daily_totals', { materialization_type: 'maintained', action: 'keep_maintained', paused: true });
+		const [routine] = planSections(plan([kept]));
+		expect(routine.entries).toEqual([{ name: 'daily_totals', value: 'maintained', detail: ['paused: scheduled refreshes are suspended'] }]);
+	});
+
 	it('puts each change in its own section in reason order, then the routine models, and leaves skipped ones out', () => {
 		const sections = planSections(
 			plan([

@@ -1256,6 +1256,7 @@ class BuildScheduler:
                             watermark_resolver=self._watermark_resolver,
                             bound_views=bound_views,
                             fingerprint_writes=self._fingerprint_writes,
+                            maintained_hold=self._runtime.maintained_hold,
                         ),
                         promotion_mode=self._promotion_mode,
                         snapshots=self._snapshots,

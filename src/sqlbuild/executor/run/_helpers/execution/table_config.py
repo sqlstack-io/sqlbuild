@@ -17,10 +17,11 @@ def model_output_config(entry: ModelPlanEntry) -> dict[str, object]:
 
 
 def model_table_config(entry: ModelPlanEntry) -> dict[str, object]:
-    """The model's table type, physical layout and expected output columns."""
+    """The model's table type, physical layout, change tracking and expected output columns."""
 
     return {
         "table_type": entry.table_type,
+        "change_tracking": bool(entry.maintained_readers),
         "physical_storage": entry.physical_storage,
         **model_output_config(entry),
     }
