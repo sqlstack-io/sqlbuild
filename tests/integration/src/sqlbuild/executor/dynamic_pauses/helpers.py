@@ -101,6 +101,30 @@ class SyncDuringTakeoverAdapter(PausingDuckDbAdapter):
         return cursor
 
 
+class RefusingResumeAdapter(PausingDuckDbAdapter):
+    """Refuses to resume the models in `refused`, as a warehouse refusing the ALTER would."""
+
+    def __init__(self, *, refused: frozenset[str]) -> None:
+        super().__init__()
+        self._refused: frozenset[str] = refused
+
+    def render_dynamic_operation(
+        self, *, destination: str, operation: DynamicOperation
+    ) -> tuple[str, ...]:
+        name: str = destination.rsplit(".", 1)[-1]
+        refusing: bool = operation == DynamicOperation.RESUME and name in self._refused
+        {True: _refuse_resume, False: _allow_operation}[refusing](name)
+        return super().render_dynamic_operation(destination=destination, operation=operation)
+
+
+def _refuse_resume(name: str) -> None:
+    raise RuntimeError(f"insufficient privileges to resume {name}")
+
+
+def _allow_operation(name: str) -> None:
+    del name
+
+
 class TokenPausingDuckDbAdapter(PausingDuckDbAdapter):
     """Also reads a table's change token, as Snowflake does without a running warehouse."""
 

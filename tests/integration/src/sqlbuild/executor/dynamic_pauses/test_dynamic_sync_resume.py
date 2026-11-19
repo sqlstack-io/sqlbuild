@@ -20,12 +20,14 @@ from sqlbuild.executor.dynamic_pauses.models import OpenHold, ResumeOutcome
 from tests.integration.src.sqlbuild.executor.dynamic_pauses._test_types import (
     DoubleCloseTestCase,
     QuietTokenTestCase,
+    RefusedResumeTestCase,
     SyncDuringTakeoverTestCase,
     SyncResumeTestCase,
 )
 from tests.integration.src.sqlbuild.executor.dynamic_pauses.helpers import (
     LeaseProject,
     PausingDuckDbAdapter,
+    RefusingResumeAdapter,
     SyncDuringTakeoverAdapter,
     TokenPausingDuckDbAdapter,
     build_lease_project,
@@ -332,3 +334,129 @@ def test_given_a_sync_resuming_mid_takeover_when_the_build_holds_then_it_pauses_
     assert result.status == BuildStatus.SUCCESS
     assert tuple(adapter.operations) == test_case.expected_operations
     assert adapter.states == test_case.expected_states
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RefusedResumeTestCase(
+            description="a refused resume leaves that hold open and the others still close",
+            refused=frozenset({"daily_totals"}),
+            expected_resumed=(("dead_weekly", "weekly_totals"),),
+            expected_failures=(
+                "staging.daily_totals: insufficient privileges to resume daily_totals",
+            ),
+            expected_states={"daily_totals": "SUSPENDED", "weekly_totals": "ACTIVE"},
+            expected_events=(
+                ("paused", "dead_daily", "dead_daily", "daily_totals"),
+                ("paused", "dead_weekly", "dead_weekly", "weekly_totals"),
+                ("resumed", "dead_weekly", _SYNC, "weekly_totals"),
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_one_refused_resume_when_a_location_syncs_then_the_other_holds_still_close(
+    test_case: RefusedResumeTestCase, connection: Any
+) -> None:
+    adapter: RefusingResumeAdapter = RefusingResumeAdapter(refused=test_case.refused)
+    for run_id, name in (("dead_daily", "daily_totals"), ("dead_weekly", "weekly_totals")):
+        seed_hold(
+            adapter=adapter, connection=connection, run_id=run_id, name=name, idle_seconds=900
+        )
+
+    outcome: ResumeOutcome = resume_expired_holds(
+        adapter=adapter,
+        connection=connection,
+        location=(None, "staging"),
+        grace_seconds=_GRACE_SECONDS,
+        recorded_by=_SYNC,
+        quiet_token=None,
+    )
+
+    assert tuple((hold.run_id, hold.relation.name) for hold in outcome.resumed) == (
+        test_case.expected_resumed
+    )
+    assert outcome.failures == test_case.expected_failures
+    assert adapter.states == test_case.expected_states
+    assert pause_events(connection=connection) == list(test_case.expected_events)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "A sync that read the holds before a build took one over still resumes the model after "
+        "the build's state check. Whether to close this gap, and how, waits on the owner's "
+        "decision on the sync/takeover race (CHI-1569 review, finding 1)."
+    ),
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SyncDuringTakeoverTestCase(
+            description="a sync resuming from a stale read after the build's state check",
+            expected_operations=(("resume", "daily_totals"),),
+            expected_states={"daily_totals": "SUSPENDED"},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_sync_resuming_after_the_takeover_state_check_when_the_build_holds_then_the_model_stays_paused(
+    test_case: SyncDuringTakeoverTestCase,
+    adapter: PausingDuckDbAdapter,
+    connection: Any,
+    database_path: Path,
+) -> None:
+    case: LeaseProject = lease_project_case(
+        orders_query="SELECT 1 AS order_id", report_locations={}, refresh_on_build=False
+    )
+    _ = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=case,
+        runtime=BuildRuntimeParams(run_id="first_run"),
+        database_path=database_path,
+    )
+    plan = plan_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query="SELECT 1 AS order_id UNION ALL SELECT 2",
+            report_locations={},
+            refresh_on_build=False,
+        ),
+    )
+    dead: DynamicHold | None = hold_dynamic_models(
+        plan=plan,
+        adapter=adapter,
+        runtime=BuildRuntimeParams(run_id="dead_run"),
+        connection_config={"database": str(database_path)},
+    )
+    assert dead is not None
+    dead.acquire(connection=connection, on_progress=None)
+    stale: tuple[OpenHold, ...] = read_open_holds(
+        adapter=adapter, connection=connection, location=(None, "staging")
+    )
+    taking_over: DynamicHold | None = hold_dynamic_models(
+        plan=plan,
+        adapter=adapter,
+        runtime=BuildRuntimeParams(run_id="second_run", dynamic_heartbeat_grace_seconds=0),
+        connection_config={"database": str(database_path)},
+    )
+    assert taking_over is not None
+    taking_over.acquire(connection=connection, on_progress=None)
+    adapter.operations.clear()
+
+    _ = resume_holds(
+        adapter=adapter,
+        connection=connection,
+        location=(None, "staging"),
+        holds=stale,
+        recorded_by=_SYNC,
+    )
+    states: dict[str, str] = dict(adapter.states)
+    operations: tuple[tuple[str, str], ...] = tuple(adapter.operations)
+    taking_over.release(connection=connection)
+
+    assert operations == test_case.expected_operations
+    assert states == test_case.expected_states

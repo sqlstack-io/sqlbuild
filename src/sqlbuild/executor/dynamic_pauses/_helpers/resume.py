@@ -10,7 +10,12 @@ from sqlbuild.adapter.contract.types import DynamicListing, DynamicOperation
 from sqlbuild.adapter.relations.types import RelationChangeTokenReader
 from sqlbuild.executor.dynamic_pauses._helpers.sql import insert_sql, read_open_holds
 from sqlbuild.executor.dynamic_pauses.constants import SUSPENDED_STATE
-from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent, OpenHold, ResumeOutcome
+from sqlbuild.executor.dynamic_pauses.models import (
+    DynamicPauseEvent,
+    HoldsResumed,
+    OpenHold,
+    ResumeOutcome,
+)
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
 
 
@@ -53,22 +58,52 @@ def resume_holds(
     location: StateLocation,
     holds: tuple[OpenHold, ...],
     recorded_by: str,
-) -> None:
-    """Resume each held model that is still suspended, then close its hold."""
+) -> HoldsResumed:
+    """Resume each held model still suspended and close its hold; a failure leaves only it open."""
 
+    resumed: list[OpenHold] = []
+    failures: list[tuple[OpenHold, Exception]] = []
     for hold in holds:
-        if (
-            scheduling_state(adapter=adapter, connection=connection, relation=hold.relation)
-            == SUSPENDED_STATE
-        ):
-            run_dynamic_operation(
-                adapter=adapter,
-                connection=connection,
-                relation=hold.relation,
-                operation=DynamicOperation.RESUME,
-            )
-    if not holds:
-        return
+        try:
+            _resume_suspended(adapter=adapter, connection=connection, relation=hold.relation)
+        except Exception as error:
+            failures.append((hold, error))
+            continue
+        resumed.append(hold)
+    if resumed:
+        _close_holds(
+            adapter=adapter,
+            connection=connection,
+            location=location,
+            holds=(tuple(resumed), recorded_by),
+        )
+    return HoldsResumed(resumed=tuple(resumed), failures=tuple(failures))
+
+
+def _resume_suspended(
+    *, adapter: BaseAdapter, connection: Any, relation: CompiledRelationLocation
+) -> None:
+    if scheduling_state(adapter=adapter, connection=connection, relation=relation) == (
+        SUSPENDED_STATE
+    ):
+        run_dynamic_operation(
+            adapter=adapter,
+            connection=connection,
+            relation=relation,
+            operation=DynamicOperation.RESUME,
+        )
+
+
+def _close_holds(
+    *,
+    adapter: BaseAdapter,
+    connection: Any,
+    location: StateLocation,
+    holds: tuple[tuple[OpenHold, ...], str],
+) -> None:
+    closed: tuple[OpenHold, ...]
+    recorded_by: str
+    closed, recorded_by = holds
     adapter.execute(
         connection=connection,
         sql=insert_sql(
@@ -81,7 +116,7 @@ def resume_holds(
                     recorded_by=recorded_by,
                     relation=hold.relation,
                 )
-                for hold in holds
+                for hold in closed
             ),
         ),
     )
@@ -106,7 +141,7 @@ def resume_expired(
         schema=location[1],
         name=DYNAMIC_PAUSES_TABLE_NAME,
     ):
-        return ResumeOutcome(resumed=(), quiet_token=None)
+        return ResumeOutcome(resumed=(), failures=(), quiet_token=None)
     token: str | None = (
         adapter.read_relation_change_token(
             connection=connection,
@@ -118,7 +153,7 @@ def resume_expired(
         else None
     )
     if token is not None and token == quiet_token:
-        return ResumeOutcome(resumed=(), quiet_token=token)
+        return ResumeOutcome(resumed=(), failures=(), quiet_token=token)
     holds: tuple[OpenHold, ...] = read_open_holds(
         adapter=adapter, connection=connection, location=location
     )
@@ -133,11 +168,19 @@ def resume_expired(
         if hold.idle_seconds >= grace_seconds
         and (hold.relation.database, hold.relation.schema, hold.relation.name) not in live
     )
-    resume_holds(
+    outcome: HoldsResumed = resume_holds(
         adapter=adapter,
         connection=connection,
         location=location,
         holds=expired,
         recorded_by=recorded_by,
     )
-    return ResumeOutcome(resumed=expired, quiet_token=None if holds else token)
+    return ResumeOutcome(
+        resumed=outcome.resumed,
+        failures=tuple(f"{_dotted(hold.relation)}: {error}" for hold, error in outcome.failures),
+        quiet_token=None if holds else token,
+    )
+
+
+def _dotted(relation: CompiledRelationLocation) -> str:
+    return ".".join(part for part in (relation.database, relation.schema, relation.name) if part)

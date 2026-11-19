@@ -31,7 +31,7 @@ from sqlbuild.executor.dynamic_pauses.constants import (
     HELD_ELSEWHERE_CODE,
     SUSPENDED_STATE,
 )
-from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent, OpenHold
+from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent, HoldsResumed, OpenHold
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
 
 type _RelationKey = tuple[str | None, str | None, str]
@@ -230,15 +230,17 @@ class DynamicHold:
         elsewhere: tuple[OpenHold, ...] = tuple(
             hold for hold in expired if _key(hold.relation) not in held_keys
         )
-        resume_holds(
+        resumed: HoldsResumed = resume_holds(
             adapter=self._adapter,
             connection=connection,
             location=location,
             holds=elsewhere,
             recorded_by=self._run_id,
         )
+        self._report(holds=resumed.resumed, verb="Resumed")
+        if resumed.failures:
+            raise resumed.failures[0][1]
         taken: tuple[OpenHold, ...] = (*live, *(h for h in expired if h not in elsewhere))
-        self._report(holds=elsewhere, verb="Resumed")
         self._report(holds=taken, verb="Took over")
         return taken
 
