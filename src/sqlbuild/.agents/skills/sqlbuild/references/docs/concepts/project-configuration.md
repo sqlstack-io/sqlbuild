@@ -709,7 +709,7 @@ allow_ignore_grace = false
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `heartbeat_grace` | `"30m"` | How long a build that paused maintained models may go silent before another build resumes them or takes them over. A fixed duration of at least `"3m"`, such as `"30m"` or `"2h"`; a build writes a heartbeat every minute |
+| `heartbeat_grace` | `"30m"` | How long a build that paused maintained models may go silent before another build resumes them or takes them over. A fixed duration longer than `"1m"`, such as `"30m"` or `"2h"`; a build writes a heartbeat every minute |
 | `allow_ignore_grace` | `false` | Allow `sqb build --ignore-maintained-grace`, which takes over models another build holds without waiting for the grace. Without it the flag fails with `A719` |
 
 ## Scenario

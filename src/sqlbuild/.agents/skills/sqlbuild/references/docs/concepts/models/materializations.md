@@ -133,7 +133,7 @@ A build pauses the maintained models it changes, and those that read a model it 
 - A kept model is refreshed during the build when a model built later in the same build reads it, so that model reads current rows. `refresh_on_build` refreshes it in every build.
 - A target with `pause_maintained = true` leaves its maintained models suspended between builds and refreshes them only in builds; see [Targets](../project-configuration.md#targets).
 
-Two builds can't pause the same models at once. A build that needs a model another build holds fails with `A718`, naming that run. A build that stops without resuming, for example because its process was killed, leaves its models suspended. The next build that pauses maintained models on the target resumes them once that build has been silent for `[maintained] heartbeat_grace` (see [Maintained](../project-configuration.md#maintained)). Until then, resume them in Snowflake by hand, or run `sqb build --ignore-maintained-grace` where the project allows it.
+Two builds can't pause the same models at once. A build that needs a model another build holds fails with `A718`, naming that run. When two builds pause a model at the same moment, the one that recorded its pause first keeps it, and the other fails with `A718` without suspending or resuming anything. A build that stops without resuming, for example because its process was killed, leaves its models suspended. The next build that pauses maintained models on the target resumes them once that build has been silent for `[maintained] heartbeat_grace` (see [Maintained](../project-configuration.md#maintained)). Until then, resume them in Snowflake by hand, or run `sqb build --ignore-maintained-grace` where the project allows it.
 
 ### Error codes
 

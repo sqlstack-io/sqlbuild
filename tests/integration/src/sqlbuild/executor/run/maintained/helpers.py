@@ -31,11 +31,13 @@ class MaintainedDuckDbAdapter(DuckDbAdapter):
         session_warehouse: str | None,
         listed_settings: MaintainedListing | None = None,
         failing_query: str | None = None,
+        failing_renames: dict[str, str] | None = None,
     ) -> None:
         super().__init__()
         self.warehouse: str | None = session_warehouse
         self.listed_settings: MaintainedListing | None = listed_settings
         self.failing_query: str | None = failing_query
+        self.failing_renames: dict[str, str] = dict(failing_renames or {})
         self.created: list[tuple[str, str, str]] = []
         self.altered: list[tuple[str, str | None]] = []
 
@@ -56,7 +58,8 @@ class MaintainedDuckDbAdapter(DuckDbAdapter):
         return (f"CREATE TABLE {destination} AS {self.failing_query or sql}",)
 
     def render_rename(self, *, origin: str, destination: str) -> tuple[str, ...]:
-        return (f"ALTER TABLE {origin} RENAME TO {destination.split('.')[-1]}",)
+        renamed: str = f"ALTER TABLE {origin} RENAME TO {destination.split('.')[-1]}"
+        return (self.failing_renames.get(origin, renamed),)
 
     def render_rename_view(self, *, origin: str, destination: str) -> tuple[str, ...]:
         return (f"ALTER VIEW {origin} RENAME TO {destination.split('.')[-1]}",)

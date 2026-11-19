@@ -53,6 +53,15 @@ class TakenOverReleaseTestCase:
 
 
 @dataclass(frozen=True)
+class ConcurrentHoldTestCase:
+    description: str
+    expected_code: str
+    expected_winner: str
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
 class LifecycleLineTestCase:
     description: str
     states_before_second: dict[str, str]

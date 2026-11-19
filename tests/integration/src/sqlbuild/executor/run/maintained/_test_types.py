@@ -29,6 +29,17 @@ class MaintainedFailureTestCase:
 
 
 @dataclass(frozen=True)
+class FailedRestoreTestCase:
+    description: str
+    setup_sql: tuple[str, ...]
+    failing_query: str
+    failing_renames: dict[str, str]
+    expected_error_code: str
+    expected_fragments: tuple[str, ...]
+    expected_relations: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
 class ChangeTrackingTableTestCase:
     description: str
     maintained_readers: tuple[str, ...]

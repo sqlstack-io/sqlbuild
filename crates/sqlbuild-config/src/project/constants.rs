@@ -242,8 +242,8 @@ pub(crate) const SYNC_INTERVAL_HELP: &str =
 pub(crate) const MAINTAINED_KEYS: [&str; 2] = ["allow_ignore_grace", "heartbeat_grace"];
 /// How long a paused maintained model's heartbeat may be silent before another build takes over.
 pub(crate) const DEFAULT_HEARTBEAT_GRACE_SECONDS: u64 = 1_800;
-/// Three of a build's one-minute heartbeats, so a healthy build never looks silent.
-pub(crate) const MIN_HEARTBEAT_GRACE_SECONDS: u64 = 180;
+/// How often a build that holds maintained models writes a heartbeat; a grace must exceed it.
+pub(crate) const HEARTBEAT_INTERVAL_SECONDS: u64 = 60;
 pub(crate) const REVIEW_KEYS: [&str; 4] =
     ["against", "critical_tags", "downstream", "schema_prefix"];
 pub(crate) const REVIEW_DOWNSTREAM_POLICIES: [&str; 3] = ["critical", "all", "none"];

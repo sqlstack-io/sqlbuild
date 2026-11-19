@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlbuild._native import CompiledRelationLocation
 from sqlbuild.executor.maintained_pauses.types import MaintainedPauseEventType
@@ -21,8 +22,9 @@ class MaintainedPauseEvent:
 
 @dataclass(frozen=True)
 class OpenHold:
-    """A model a run paused and nobody resumed, with seconds since that run last wrote."""
+    """A model a run paused and nobody resumed, when it paused, and how long the run is silent."""
 
     run_id: str
     relation: CompiledRelationLocation
     idle_seconds: float
+    paused_at: datetime

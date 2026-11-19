@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,7 @@ from tests.integration.src.sqlbuild.executor.maintained_pauses._test_types impor
     HoldTakeoverTestCase,
     LifecycleLineTestCase,
     PauseLeaseTestCase,
+    ConcurrentHoldTestCase,
     TakenOverReleaseTestCase,
 )
 from tests.integration.src.sqlbuild.executor.maintained_pauses.helpers import (
@@ -553,3 +555,78 @@ def test_given_hold_taken_over_when_first_build_releases_then_it_resumes_nothing
     assert adapter.states == test_case.expected_states
     assert pause_events(connection=connection) == sorted(test_case.expected_events)
     holds[1].release(connection=connection)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ConcurrentHoldTestCase(
+            description="of two builds pausing a model at once, the later one backs out",
+            expected_code="A718",
+            expected_winner="early_run",
+            expected_states={"daily_totals": "SUSPENDED"},
+            expected_events=(
+                ("paused", "early_run", "early_run", "daily_totals"),
+                ("paused", "first_run", "first_run", "daily_totals"),
+                ("paused", "late_run", "late_run", "daily_totals"),
+                ("resumed", "first_run", "first_run", "daily_totals"),
+                ("resumed", "late_run", "late_run", "daily_totals"),
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_two_builds_pausing_together_when_both_record_a_pause_then_only_the_earliest_holds(
+    test_case: ConcurrentHoldTestCase,
+    adapter: PausingDuckDbAdapter,
+    connection: Any,
+    database_path: Path,
+) -> None:
+    _ = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(orders_query=_ORDERS, report_locations={}, refresh_on_build=False),
+        runtime=BuildRuntimeParams(run_id="first_run"),
+        database_path=database_path,
+    )
+    plan: PlanOutput = plan_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query=_MORE_ORDERS, report_locations={}, refresh_on_build=False
+        ),
+    )
+    early: MaintainedHold | None = hold_maintained_models(
+        plan=plan,
+        adapter=adapter,
+        runtime=BuildRuntimeParams(run_id="early_run"),
+        connection_config={"database": str(database_path)},
+    )
+    late: MaintainedHold | None = hold_maintained_models(
+        plan=plan,
+        adapter=adapter,
+        runtime=BuildRuntimeParams(run_id="late_run"),
+        connection_config={"database": str(database_path)},
+    )
+    assert early is not None
+    assert late is not None
+    read_state: Callable[..., str | None] = late._state
+
+    def state_then_rival_acquires(*, connection: Any, name: str) -> str | None:
+        state: str | None = read_state(connection=connection, name=name)
+        early.acquire(connection=connection, on_progress=None)
+        adapter.operations.clear()
+        return state
+
+    late._state = state_then_rival_acquires  # ty: ignore[invalid-assignment]
+
+    with pytest.raises(AdapterUserError) as raised:
+        with late.holding(connection=connection, on_progress=None):
+            pass
+
+    assert raised.value.code == test_case.expected_code
+    assert test_case.expected_winner in str(raised.value)
+    assert adapter.operations == []
+    assert adapter.states == test_case.expected_states
+    assert pause_events(connection=connection) == sorted(test_case.expected_events)
+    early.release(connection=connection)

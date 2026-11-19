@@ -9,6 +9,8 @@ from sqlbuild._native import (
     CompiledRelationLocation,
     ModelPlanEntry,
     PlanAction,
+    error_code,
+    error_message,
     fit_auxiliary_relation_name,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
@@ -21,7 +23,7 @@ from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
 )
 from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
 from sqlbuild.executor.run._helpers.materializations.view import execute_in_place_entry
-from sqlbuild.executor.run.constants import REPLACED_RELATION_SUFFIX
+from sqlbuild.executor.run.constants import REPLACED_RELATION_SUFFIX, RUN_STAGING_FAILED_CODE
 from sqlbuild.executor.run.models import ModelExecutionResult, ModelMaterializationContext
 
 _NO_WAREHOUSE_CODE: str = "A717"
@@ -139,13 +141,21 @@ def _replace_former(
     )
     try:
         _run(adapter=adapter, connection=connection, statements=statements, recorder=recorder)
-    except Exception:
-        rename(
-            connection=connection,
-            origin=aside,
-            destination=destination,
-            statement_recorder=recorder,
-        )
+    except Exception as create_error:
+        try:
+            rename(
+                connection=connection,
+                origin=aside,
+                destination=destination,
+                statement_recorder=recorder,
+            )
+        except Exception as restore_error:
+            raise AdapterUserError(
+                f"{error_message(create_error)}; restoring the former {former.value} "
+                f"also failed, so it is left at {aside}: {error_message(restore_error)}",
+                code=error_code(error=create_error, fallback_code=RUN_STAGING_FAILED_CODE),
+                help=f"rename {aside} back to {destination}, then build the model again",
+            ) from create_error
         raise
     drop(connection=connection, destination=aside, if_exists=True, statement_recorder=recorder)
 

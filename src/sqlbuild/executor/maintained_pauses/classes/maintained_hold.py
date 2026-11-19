@@ -124,6 +124,7 @@ class MaintainedHold:
                 ),
             ),
         )
+        self._yield_to_earlier(connection=connection, location=location)
         self._suspend_active(connection=connection, names=tuple(self._paused), states=states)
         self._heartbeat = self._new_heartbeat(self._write_heartbeat)
         self._heartbeat.start()
@@ -216,6 +217,38 @@ class MaintainedHold:
         self._report(holds=elsewhere, verb="Resumed")
         self._report(holds=taken, verb="Took over")
         return taken
+
+    def _yield_to_earlier(self, *, connection: Any, location: StateLocation) -> None:
+        """Read the pauses back; if another live hold on a model came first, close ours and stop."""
+
+        mine: set[_RelationKey] = {_key(self._held[name]) for name in self._paused}
+        if not mine:
+            return
+        rows: tuple[tuple[Any, ...], ...] = tuple(
+            self._adapter.query(
+                connection=connection,
+                sql=open_holds_sql(adapter=self._adapter, location=location),
+                limit=None,
+            ).rows
+        )
+        first: dict[_RelationKey, OpenHold] = {}
+        for hold in sorted(open_holds(rows=rows), key=lambda hold: (hold.paused_at, hold.run_id)):
+            if hold.idle_seconds < self._grace_seconds and _key(hold.relation) in mine:
+                first.setdefault(_key(hold.relation), hold)
+        winners: tuple[OpenHold, ...] = tuple(
+            hold for hold in first.values() if hold.run_id != self._run_id
+        )
+        if not winners:
+            return
+        self._record(
+            connection=connection,
+            events=tuple(
+                self._own(event_type=MaintainedPauseEventType.RESUMED, name=name)
+                for name in self._paused
+            ),
+        )
+        self._paused = []
+        raise _held_elsewhere(holds=winners)
 
     def _still_held(self, *, connection: Any) -> frozenset[_RelationKey] | None:
         """This run's holds nobody took over, or None when the pause table can't say."""

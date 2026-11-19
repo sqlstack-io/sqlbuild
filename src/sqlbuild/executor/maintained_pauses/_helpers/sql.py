@@ -84,7 +84,8 @@ def open_holds_sql(*, adapter: BaseAdapter, location: StateLocation) -> str:
     )
     return (
         f"SELECT p.{COLUMN_RUN_ID}, p.{COLUMN_RELATION_DATABASE}, p.{COLUMN_RELATION_SCHEMA}, "
-        f"p.{COLUMN_RELATION_NAME}, CAST(h.last_seen AS TIMESTAMP), CAST({now} AS TIMESTAMP) "
+        f"p.{COLUMN_RELATION_NAME}, CAST(h.last_seen AS TIMESTAMP), CAST({now} AS TIMESTAMP), "
+        f"CAST(p.{COLUMN_RECORDED_AT} AS TIMESTAMP) "
         f"FROM {table} p JOIN (SELECT {COLUMN_RUN_ID}, MAX({COLUMN_RECORDED_AT}) AS last_seen "
         f"FROM {table} WHERE {COLUMN_RECORDED_BY} = {COLUMN_RUN_ID} GROUP BY {COLUMN_RUN_ID}) h "
         f"ON h.{COLUMN_RUN_ID} = p.{COLUMN_RUN_ID} "
@@ -108,6 +109,7 @@ def open_holds(*, rows: tuple[tuple[Any, ...], ...]) -> tuple[OpenHold, ...]:
                 qualified_name=None,
             ),
             idle_seconds=_seconds_between(start=row[4], end=row[5]),
+            paused_at=row[6].replace(tzinfo=None),
         )
         for row in rows
     )

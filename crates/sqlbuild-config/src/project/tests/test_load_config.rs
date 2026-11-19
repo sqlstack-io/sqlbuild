@@ -88,12 +88,12 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
             )),
         },
         ProjectFailureTestCase {
-            description: "a grace shorter than three heartbeats would expire a healthy build",
-            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\nheartbeat_grace = '2m'\n",
+            description: "a grace no longer than the heartbeat interval would expire every build",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\nheartbeat_grace = '1m'\n",
             local: "",
             expected_failure: Some(ConfigFailure::at(
                 ConfigFile::Project,
-                "maintained.heartbeat_grace must be at least 3m, three of a build's one-minute heartbeats",
+                "maintained.heartbeat_grace must be longer than 1m: a build writes a heartbeat every minute, so a shorter grace expires builds that are still running",
             )),
         },
         ProjectFailureTestCase {
@@ -645,11 +645,11 @@ fn given_maintained_section_when_reading_then_returns_its_values_or_defaults() {
             },
         },
         MaintainedConfigTestCase {
-            description: "the shortest grace, three heartbeats",
+            description: "any grace longer than the heartbeat interval",
             project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\n\
-                      heartbeat_grace = '3m'\n",
+                      heartbeat_grace = '61s'\n",
             expected_config: MaintainedConfig {
-                heartbeat_grace_seconds: 180,
+                heartbeat_grace_seconds: 61,
                 allow_ignore_grace: false,
             },
         },

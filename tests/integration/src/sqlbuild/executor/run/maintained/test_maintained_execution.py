@@ -12,6 +12,7 @@ from sqlbuild.executor.run.main._execute import execute_maintained_entry
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from tests.integration.src.sqlbuild.executor.run.maintained._test_types import (
+    FailedRestoreTestCase,
     MaintainedFailureTestCase,
     MaintainedSuccessTestCase,
 )
@@ -167,3 +168,52 @@ def test_given_unbuildable_maintained_entry_when_executing_then_fails_keeping_th
     assert result.status == ExecutionStatus.FAILED
     assert result.error_code == test_case.expected_error_code
     assert listed_types(connection=connection) == list(test_case.expected_listed_types)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        FailedRestoreTestCase(
+            description="a failed create and a failed restore are both reported",
+            setup_sql=("CREATE TABLE staging.daily_totals AS SELECT 1 AS orders",),
+            failing_query="SELECT missing_column FROM staging.no_such_table",
+            failing_renames={
+                "staging.daily_totals__replaced": "SELECT restore_column FROM staging.no_restore"
+            },
+            expected_error_code="R002",
+            expected_fragments=("no_such_table", "no_restore", "daily_totals__replaced"),
+            expected_relations=(("daily_totals__replaced", "BASE TABLE"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_failed_create_and_restore_when_executing_then_reports_both_errors(
+    test_case: FailedRestoreTestCase, connection: Any
+) -> None:
+    adapter: MaintainedDuckDbAdapter = MaintainedDuckDbAdapter(
+        session_warehouse="SESSION_WH",
+        failing_query=test_case.failing_query,
+        failing_renames=test_case.failing_renames,
+    )
+    for sql in test_case.setup_sql:
+        connection.execute(sql)
+
+    result: ModelExecutionResult = execute_maintained_entry(
+        context=maintained_context(
+            adapter=adapter,
+            connection=connection,
+            action=PlanAction.CREATE_MAINTAINED,
+            refresh_warehouse=None,
+        )
+    )
+
+    assert result.status == ExecutionStatus.FAILED
+    assert result.error_code == test_case.expected_error_code
+    message: str = str(result.error_message)
+    assert [fragment in message for fragment in test_case.expected_fragments] == [True] * len(
+        test_case.expected_fragments
+    )
+    assert connection.execute(
+        "SELECT table_name, table_type FROM information_schema.tables "
+        "WHERE table_schema = 'staging' AND table_name LIKE 'daily_totals%' ORDER BY 1"
+    ).fetchall() == list(test_case.expected_relations)
