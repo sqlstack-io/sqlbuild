@@ -5,6 +5,7 @@ from dataclasses import dataclass
 class IdleDispatcherTestCase:
     description: str
     idle_seconds: float
+    polling_seconds: float
     expected_max_waits: int
     expected_max_delivery_seconds: float
 

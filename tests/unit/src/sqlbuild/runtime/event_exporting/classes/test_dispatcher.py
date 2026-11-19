@@ -130,6 +130,7 @@ def test_given_slow_exporter_when_enqueuing_then_execution_thread_is_not_blocked
         IdleDispatcherTestCase(
             description="an idle dispatcher waits for work instead of polling",
             idle_seconds=0.5,
+            polling_seconds=0.5,
             expected_max_waits=10,
             expected_max_delivery_seconds=0.5,
         ),
@@ -165,7 +166,11 @@ def test_given_idle_dispatcher_when_waiting_then_it_does_not_poll_and_still_deli
     time.sleep(0.05)
     waits.clear()
     time.sleep(test_case.idle_seconds)
-    idle_waits: int = sum(thread != caller_thread for thread, _ in waits)
+    # Other threads of a busy process wait too; only waits shorter than the idle safety timeout poll.
+    idle_waits: int = sum(
+        thread != caller_thread and timeout is not None and timeout < test_case.polling_seconds
+        for thread, timeout in waits
+    )
     started: float = time.monotonic()
     dispatcher.enqueue(lifecycle_event())
 
