@@ -66,6 +66,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--defer-sources-to` | Read managed source data from another target |
 | `--plan-from` | Read warehouse state `live`, or from the target's `synced_state` checked against the warehouse first; overrides the target's `plan_from`. See [Planning from synced state](../concepts/project-configuration.md#planning-from-synced-state) |
 | `--fail-fast` | Stop on first failure and skip remaining nodes |
+| `--ignore-maintained-grace` | Take over [maintained models](../concepts/models/materializations.md#during-a-build) another build holds, without waiting for `[maintained] heartbeat_grace`. Needs `allow_ignore_grace = true`, else fails with `A719` |
 | `--concurrency` | Number of worker connections (default: 1) |
 | `--test-timeout <duration>` | Time limit for each unit test the build runs, such as `30s`, or `disabled`; see [Time limits](../concepts/testing-reference.md#time-limits) |
 | `--verbose`, `-v` | Show lifecycle SQL inline after each model |
