@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.255.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.254.0...v0.255.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **plan:** plan requests (POST .../targets/{target}/plans) and plan location work now require a fresh field. Clients must send "fresh": false or true, and servers and locations must be upgraded together; a location from an earlier release rejects plan work from this server.
+
+### Performance Improvements
+
+* **plan:** faster plan previews and reuse of identical plans ([#1604](https://github.com/sqlstack-io/sqlbuild/issues/1604)) ([c0dbd13](https://github.com/sqlstack-io/sqlbuild/commit/c0dbd13364b0921ca54118f56a18a5d1f9b98624))
+
 ## [0.254.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.253.0...v0.254.0) (2026-11-19)
 
 
