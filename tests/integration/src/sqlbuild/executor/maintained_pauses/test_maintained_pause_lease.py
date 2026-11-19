@@ -22,13 +22,13 @@ from sqlbuild.executor.maintained_pauses.main.hold_maintained_models import (
     hold_maintained_models,
 )
 from tests.integration.src.sqlbuild.executor.maintained_pauses._test_types import (
+    ConcurrentHoldTestCase,
     FirstBuildTestCase,
     HeartbeatTestCase,
     HoldRefusalTestCase,
     HoldTakeoverTestCase,
     LifecycleLineTestCase,
     PauseLeaseTestCase,
-    ConcurrentHoldTestCase,
     TakenOverReleaseTestCase,
 )
 from tests.integration.src.sqlbuild.executor.maintained_pauses.helpers import (
@@ -409,6 +409,12 @@ def test_given_live_hold_when_building_then_stops_before_any_change(
             heartbeat_seconds=0.05,
             wait_seconds=0.4,
             expected_min_beats=2,
+        ),
+        HeartbeatTestCase(
+            description="a hold beats as soon as it is taken, not one interval later",
+            heartbeat_seconds=30.0,
+            wait_seconds=0.3,
+            expected_min_beats=1,
         ),
     ],
     ids=lambda case: case.description,

@@ -38,11 +38,12 @@ class MaintainedHeartbeat:
         self._thread.join()
 
     def _beat(self) -> None:
-        """Reconnect after a failed beat; the grace, not one beat, decides when a hold expires."""
+        """Beat at once, then every interval, so no gap exceeds one interval plus a write."""
 
         connection: Any = None
         sequence: int = 0
-        while not self._stopped.wait(self._interval_seconds):
+        stopped: bool = False
+        while not stopped:
             sequence += 1
             try:
                 if connection is None:
@@ -51,6 +52,7 @@ class MaintainedHeartbeat:
             except Exception as error:
                 self.failure = error
                 connection = self._closed(connection=connection)
+            stopped = self._stopped.wait(self._interval_seconds)
         _ = self._closed(connection=connection)
 
     def _closed(self, *, connection: Any) -> None:
