@@ -60,6 +60,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--no-cache` | Bypass the reusable compile-analysis cache for this invocation |
 | `--full-refresh` | Drop and rebuild selected models unless a model sets `full_refresh false`; `full_refresh true` forces a model even without this flag |
+| `--no-job-settings` | Ignore the settings of the jobs the selection names; see [Settings when a build names a job](../concepts/orchestration.md#settings-when-a-build-names-a-job) |
 | `--changed` | Build only the selected models and seeds that changed, and what they reach downstream; `--changed=definition,source_data` picks what counts. See [Building only what changed](#building-only-what-changed) |
 | `--reach` | With `--changed`: `job` stops at models another scheduled job refreshes, `all` builds everything downstream |
 | `--defer-to` | Resolve unselected model references against another target |

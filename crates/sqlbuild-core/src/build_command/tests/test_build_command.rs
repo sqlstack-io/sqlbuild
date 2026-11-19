@@ -151,6 +151,19 @@ fn given_run_context_when_rendering_then_sanitizes_and_groups_counts() {
             },
             expected_text: "Execution\n  command      sqb build\n  run_id       not set\n  target       dev\n  database     not set\n  schema       not set\n  warehouse    small (connection warehouse)\n  concurrency  0 configured limit\n  full_refresh true\n  selected     0 of 0 build resources\n  date vars    end_date=2026-01-31\n\nSelection files\n  selector_file a.txt (1 selector)\n  selector_file b.txt (2 selectors)\n\n",
         },
+        ContextTestCase {
+            description: "named jobs whose nodes run on their own warehouses",
+            facts: RunContextFacts {
+                command: "sqb build".to_owned(),
+                warehouse: Some(("small".to_owned(), "connection warehouse".to_owned())),
+                job_warehouses: vec![
+                    ("orders_job".to_owned(), "ORDERS_WH".to_owned()),
+                    ("refunds_job".to_owned(), "REFUNDS_WH".to_owned()),
+                ],
+                ..RunContextFacts::default()
+            },
+            expected_text: "Execution\n  command      sqb build\n  run_id       not set\n  target       not set\n  database     not set\n  schema       not set\n  warehouse    small (connection warehouse); nodes of job orders_job on ORDERS_WH; nodes of job refunds_job on REFUNDS_WH\n  concurrency  0 configured limit\n  full_refresh false\n  selected     0 of 0 build resources\n  date vars    not set\n\n",
+        },
     ];
 
     for test_case in test_cases {

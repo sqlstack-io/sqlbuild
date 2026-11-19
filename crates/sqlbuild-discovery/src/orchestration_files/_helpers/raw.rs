@@ -18,14 +18,12 @@ pub(crate) struct RawSchedule {
     pub(crate) default_status: InitialStatus,
 }
 
-/// `[retry]`, or `[on_failure]`; each key may still use its deprecated name.
+/// `[retry]`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawRetry {
     pub(crate) attempts: Option<Spanned<i64>>,
-    pub(crate) retries: Option<Spanned<i64>>,
     pub(crate) delay_seconds: Option<Spanned<i64>>,
-    pub(crate) retry_delay_seconds: Option<Spanned<i64>>,
 }
 
 #[derive(Deserialize)]
@@ -41,7 +39,6 @@ pub(crate) struct RawRun {
     pub(crate) pools: BTreeMap<String, Spanned<i64>>,
     pub(crate) schedule: Option<Spanned<RawSchedule>>,
     pub(crate) retry: Option<Spanned<RawRetry>>,
-    pub(crate) on_failure: Option<Spanned<RawRetry>>,
 }
 
 /// The job-only fields; the shared ones are read as `RawRun` from the same text.

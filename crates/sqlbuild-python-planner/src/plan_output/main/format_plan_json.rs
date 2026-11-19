@@ -14,7 +14,9 @@ use crate::plan_output::_helpers::plan_json::source_load_json;
 use crate::plan_output::_helpers::plan_json::table_type_json;
 use crate::plan_output::_helpers::plan_json::warning_json;
 use crate::plan_output::_helpers::values::mapped;
-use crate::plan_output::constants::CHANGED_KEY;
+use crate::plan_output::constants::{
+    CHANGED_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY, WAREHOUSE_JOBS_KEY,
+};
 use crate::plan_output::main::any::any;
 use crate::plan_output::main::dict::dict;
 use crate::plan_output::main::items::items;
@@ -25,6 +27,10 @@ use sqlbuild_core::plan_display::constants::SYNCED_COPY_KEY;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_project::compiled_project::constants::{
+    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
+};
 
 /// The plan as one JSON document, `json.dumps(indent=2)`.
 #[pyfunction]
@@ -107,7 +113,7 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
     )?;
     let metadata: Bound<'_, PyAny> = native_field(&plan, "metadata")?;
     if metadata.is_truthy()? {
-        result.set_item("metadata", metadata)?;
+        result.set_item("metadata", &metadata)?;
     }
     let synced_copy: Bound<'_, PyAny> = arguments.value(SYNCED_COPY_KEY)?;
     if !synced_copy.is_none() {
@@ -118,6 +124,25 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
     }
     if native_field(&plan, IGNORE_AUDIT_FAILURES_KEY)?.is_truthy()? {
         result.set_item(IGNORE_AUDIT_FAILURES_KEY, true)?;
+    }
+    for (key, label) in [
+        (
+            JOB_IGNORED_AUDIT_FAILURES_KEY,
+            IGNORE_AUDIT_FAILURES_JOBS_KEY,
+        ),
+        (JOB_FULL_REFRESH_KEY, FULL_REFRESH_JOBS_KEY),
+    ] {
+        let jobs: Bound<'_, PyAny> = mapping_get(&metadata, key)?;
+        if !jobs.is_none() {
+            result.set_item(
+                label,
+                PyList::new(py, jobs.try_iter()?.collect::<PyResult<Vec<_>>>()?)?,
+            )?;
+        }
+    }
+    let warehouses: Bound<'_, PyAny> = mapping_get(&metadata, JOB_WAREHOUSES_KEY)?;
+    if !warehouses.is_none() {
+        result.set_item(WAREHOUSE_JOBS_KEY, warehouses)?;
     }
     indented_json(result.as_any())
 }

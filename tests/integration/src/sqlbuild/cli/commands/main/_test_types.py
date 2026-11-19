@@ -1507,3 +1507,91 @@ class RunRecordSchemasTestCase:
     expected_absent_schemas: frozenset[str]
     expected_warnings: tuple[str, ...]
     expected_finished_status: str = "succeeded"
+
+
+@dataclass(frozen=True)
+class JobSettingsBuildTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    expected_amount: int
+    expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class JobSettingsConflictTestCase:
+    description: str
+    command_args: tuple[str, ...]
+    expected_fragment: str
+    extra_files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class JobFullRefreshTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    expected_counts: tuple[tuple[int, int], ...]
+
+
+@dataclass(frozen=True)
+class JobConcurrencyTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    job_nodes: tuple[str, ...]
+    build_nodes: tuple[str, ...]
+    expected_job_peak: int
+    expected_least_build_peak: int
+    # SQLBUILD_CONCURRENCY for the build; empty leaves it unset.
+    environment_concurrency: str = ""
+
+
+@dataclass(frozen=True)
+class JobOutputTestCase:
+    description: str
+    command_args: tuple[str, ...]
+    expected_exit_code: int
+    expected_present: tuple[str, ...]
+    expected_absent: tuple[str, ...]
+    extra_files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class JobWarehouseSwitchTestCase:
+    """A build naming jobs, and the warehouses its connections switch to after connecting."""
+
+    description: str
+    argv: tuple[str, ...]
+    expected_connect_warehouses: frozenset[str]
+    expected_switches: tuple[str, ...]
+    extra_files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class JobWarehouseOutputTestCase:
+    """A command naming jobs with warehouses, its exit code and what its output says."""
+
+    description: str
+    argv: tuple[str, ...]
+    expected_exit_code: int
+    expected_fragment: str
+
+
+@dataclass(frozen=True)
+class JobFlagParityTestCase:
+    """A single named job's run, and the global flags its node settings used to be."""
+
+    description: str
+    job_args: tuple[str, ...]
+    flag_plan_args: tuple[str, ...]
+    flag_build_args: tuple[str, ...]
+    expected_function_reasons: tuple[tuple[str, str], ...]
+    expected_full_refresh_counts: tuple[str, ...]
+    expected_exit_code: int
+
+
+@dataclass(frozen=True)
+class DynamicRefreshWarehouseTestCase:
+    """A build of a dynamic model through jobs, and the warehouse its refreshes are given."""
+
+    description: str
+    argv: tuple[str, ...]
+    expected_refresh_warehouses: tuple[str, ...]

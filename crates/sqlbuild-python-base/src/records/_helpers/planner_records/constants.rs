@@ -85,6 +85,8 @@ const R_PLANNER_OVERRIDES: RecordSpec = RecordSpec {
     fields: &[
         FieldSpec::new("cursor_overrides", FieldDefault::None),
         FieldSpec::new("full_refresh", FieldDefault::False),
+        FieldSpec::new("full_refresh_models", FieldDefault::EmptyFrozenset),
+        FieldSpec::new("full_refresh_functions", FieldDefault::EmptyFrozenset),
         FieldSpec::new("reload_sources", FieldDefault::False),
         FieldSpec::new("forced_stale_model_names", FieldDefault::EmptyTuple),
         FieldSpec::new("external_blocked_model_names", FieldDefault::EmptyTuple),

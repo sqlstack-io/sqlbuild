@@ -11,6 +11,7 @@ pub mod compiled_views;
 pub mod contracts;
 pub mod fingerprints;
 pub mod graph;
+pub mod job_settings;
 pub mod lineage;
 pub mod native_host;
 pub mod planner_identity;

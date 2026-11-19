@@ -1,6 +1,6 @@
 //! Every job and group a project declares, for resolving `job(...)` dependencies.
 
-use crate::compiled_project::_helpers::job_catalog::catalog_where;
+use crate::job_settings::_helpers::job_catalog::catalog_where;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_analysis::graph::models::JobSelection;
 use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;

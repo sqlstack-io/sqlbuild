@@ -1,6 +1,6 @@
 //! Resolve graph keys for native planning without building a public frozenset.
 
-use crate::compiled_project::main::graph_with_jobs::graph_with_jobs;
+use crate::job_settings::main::graph_with_jobs::graph_with_jobs;
 use crate::planner_selection::_helpers::selectors::graph_names;
 use crate::planner_selection::main::py_strings::py_strings;
 use crate::planner_selection::models::Carrier;

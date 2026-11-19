@@ -1,7 +1,7 @@
 //! The keys job and job group files accept, and the bounds on their run controls.
 
 /// Top-level keys of a job file.
-pub const JOB_KEYS: [&str; 13] = [
+pub const JOB_KEYS: [&str; 12] = [
     "name",
     "description",
     "select",
@@ -12,12 +12,11 @@ pub const JOB_KEYS: [&str; 13] = [
     "pools",
     "schedule",
     "retry",
-    "on_failure",
     "resources",
     "settings",
 ];
 /// Top-level keys of a job group file.
-pub const GROUP_KEYS: [&str; 11] = [
+pub const GROUP_KEYS: [&str; 10] = [
     "name",
     "description",
     "jobs",
@@ -27,7 +26,6 @@ pub const GROUP_KEYS: [&str; 11] = [
     "pools",
     "schedule",
     "retry",
-    "on_failure",
     "dependencies",
 ];
 /// The group table that sets how members wait for and react to the jobs they depend on.
@@ -40,16 +38,18 @@ pub(crate) const DEPENDENCY_FAILURE_KEY: &str = "on_failure";
 pub(crate) const DEPENDENCY_FAILURE_VALUES: [&str; 3] = ["partial", "skip", "run"];
 /// The fewest and most runs `retry.attempts` allows, the first run included.
 pub const ATTEMPTS_RANGE: (u8, u8) = (2, 11);
-/// The fewest and most reruns the deprecated `on_failure.retries` allows; `attempts` is one more.
-pub const RETRIES_RANGE: (u8, u8) = (1, 10);
 /// The shortest and longest `retry.delay_seconds`, a day.
 pub const RETRY_DELAY_RANGE: (u32, u32) = (0, 86_400);
-/// The retry table, and the deprecated name it replaces.
-pub(crate) const RETRY_TABLE: (&str, &str) = ("retry", "on_failure");
-/// The retry count key, and the deprecated name it replaces.
-pub(crate) const RETRY_ATTEMPTS_KEY: (&str, &str) = ("attempts", "retries");
-/// The retry delay key, and the deprecated name it replaces.
-pub(crate) const RETRY_DELAY_KEY: (&str, &str) = ("delay_seconds", "retry_delay_seconds");
+/// The retry table, and the keys of its run count and delay.
+pub(crate) const RETRY_TABLE: &str = "retry";
+pub(crate) const RETRY_ATTEMPTS_KEY: &str = "attempts";
+pub(crate) const RETRY_DELAY_KEY: &str = "delay_seconds";
+/// The removed retry table, and how to write it as `[retry]`.
+pub(crate) const REMOVED_RETRY_TABLE: (&str, &str) = (
+    "on_failure",
+    "`[on_failure]` is now `[retry]`; `attempts = retries + 1`, \
+     `delay_seconds = retry_delay_seconds`",
+);
 /// The job setting that moved under `[settings]`.
 pub(crate) const CONCURRENCY_KEY: &str = "concurrency";
 /// The most slots a job or job group may take of one pool.

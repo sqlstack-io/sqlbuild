@@ -81,3 +81,39 @@ pub(super) struct JobSettingsRejectionTestCase {
     pub(super) settings: BTreeMap<String, Json>,
     pub(super) expected_error: &'static str,
 }
+
+/// A command line and the settings it gives itself.
+pub(super) struct GivenSettingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) argv: &'static [&'static str],
+    pub(super) expected_given: Option<&'static [&'static str]>,
+}
+
+/// A server job run's frozen settings and the build arguments it passes.
+pub(super) struct JobRunArgumentsTestCase {
+    pub(super) description: &'static str,
+    pub(super) settings: serde_json::Value,
+    pub(super) expected_arguments: &'static [&'static str],
+}
+
+/// A command's parser and the job setting table rows it must match.
+pub(super) struct JobSettingTableTestCase {
+    pub(super) description: &'static str,
+    pub(super) command: &'static str,
+    pub(super) expected_rows: Vec<(String, Vec<String>)>,
+}
+
+/// The job settings of some scopes, each of which must render as one of its listed options.
+pub(super) struct RenderedSettingTestCase {
+    pub(super) description: &'static str,
+    pub(super) scope: sqlbuild_analysis::job_settings::models::SettingScope,
+    pub(super) whole_run: bool,
+    pub(super) expected_unrendered: Vec<&'static str>,
+}
+
+/// Settings whose table row disagrees with the parser, or leaks into a job run's arguments.
+pub(super) struct JobSettingFaultsTestCase {
+    pub(super) description: &'static str,
+    pub(super) faults: fn() -> Vec<&'static str>,
+    pub(super) expected_faults: Vec<&'static str>,
+}

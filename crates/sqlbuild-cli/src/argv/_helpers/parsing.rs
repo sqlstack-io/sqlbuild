@@ -1,6 +1,6 @@
 //! `ArgumentParser.parse_known_args`, reproduced over the command table.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use sqlbuild_core::text::main::is_decimal_digit::is_decimal_digit;
 
@@ -25,6 +25,8 @@ pub(crate) struct Run<'a> {
     /// The `prog` of the deepest sub-command parser entered so far.
     pub(crate) command_prog: Option<String>,
     pub(crate) usage_failure: Option<UsageFailure>,
+    /// The destination of every option the arguments wrote or excluded, at any parser level.
+    pub(crate) given: BTreeSet<String>,
 }
 
 /// `SystemExit` with this status.
@@ -363,6 +365,17 @@ impl<'p, 'r, 'h> Level<'p, 'r, 'h> {
         let parser: &ParserSpec = self.parser;
         let action: &ActionSpec = &parser.actions[index];
         self.seen.insert(action.id);
+        if !action.option_strings.is_empty() {
+            let excluded = parser.actions.iter().filter(|other| {
+                action.mutex_group.is_some() && other.mutex_group == action.mutex_group
+            });
+            for dest in std::iter::once(action)
+                .chain(excluded)
+                .filter_map(|given| given.dest.as_ref())
+            {
+                self.run.given.insert(dest.clone());
+            }
+        }
         let values: Option<Value> = self
             .run
             .action_values(action, &args)

@@ -90,9 +90,10 @@ query = "ADHOC_WH"
 Each command uses the first of these that is set:
 
 1. `--warehouse <name>`, for that run only
-2. The target's warehouse for the command's group
-3. The connection's `warehouse`
-4. The Snowflake user's default warehouse
+2. For `sqb build`, the `warehouse` of a named job, for that job's nodes only; see below
+3. The target's warehouse for the command's group
+4. The connection's `warehouse`
+5. The Snowflake user's default warehouse
 
 A location's syncs use the target's `sync` warehouse, else its `query` warehouse, else the
 connection's `warehouse`, so a sync never wakes the target's `build` warehouse just to read
@@ -108,9 +109,43 @@ sync = "TINY_WH"
 
 Runs that a location executes, such as `sqb build`, use their own command's group.
 
-Every connection a command opens uses the same warehouse. Tests and audits that run inside
+Every connection a command opens starts on the same warehouse. Tests and audits that run inside
 `sqb build` use the `build` warehouse. Under `sqb dbt`, dbt's own nodes use the warehouse in their
 dbt profile.
+
+### A job's own warehouse
+
+A job can run its nodes on a warehouse of its own:
+
+```toml
+# orchestration/jobs/nightly_orders_job.toml
+[settings]
+warehouse = "ORDERS_WH"
+```
+
+A server run of the job, and a build whose named jobs all set the same warehouse, such as
+`sqb build --select job:nightly_orders_job`, runs entirely on `ORDERS_WH`, as if passed
+`--warehouse ORDERS_WH`: setup, planning and bookkeeping included. Nodes the build selects outside
+the named jobs, such as upstream models in `--select +job:nightly_orders_job`, run there too.
+
+When the named jobs set different warehouses, or only some set one, each job's nodes run on its
+own warehouse. Its models' audits, its SQL tests, microbatch batches, source loads and Python nodes
+go with them, and loaders and Python code that open their own connections from the context's
+`connection_config` get the job's warehouse there too. A SQL test runs on a job warehouse only
+when every node it covers runs there. Everything else in the build, including nodes selected
+without naming a job and the build's own bookkeeping, stays on the `build` warehouse.
+
+The connection running a node switches with `USE WAREHOUSE` only when the node needs a different
+warehouse than the connection is on, and switches back before it runs a node outside the job.
+Connections return to the `build` warehouse when the build ends. Without a configured warehouse,
+SQLBuild reads the session's warehouse once before the first switch, so it can switch back.
+
+`--warehouse` puts the whole build on one warehouse and leaves the jobs' warehouses out. Two named
+jobs that give one node different warehouses fail with `S027`; see
+[Settings when a build names a job](../orchestration.md#settings-when-a-build-names-a-job).
+A job's warehouse must be a Snowflake identifier like a group warehouse (`C261`), and it needs the
+Snowflake adapter or one built on it (`C260`). Cost estimates read each query's warehouse, so a
+build's cost names every warehouse it used.
 
 A group warehouse wins over a connection `warehouse` from either file. To change one for yourself,
 set the group in `sqlbuild_local.toml`; the other group keeps its project value:

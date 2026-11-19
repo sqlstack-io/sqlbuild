@@ -115,6 +115,12 @@ from sqlbuild.executor.run.models import (
 )
 from sqlbuild.executor.run.types import MicrobatchBatchExecutor
 from sqlbuild.executor.scheduling.classes.recovering_connection_pool import RecoveringConnectionPool
+from sqlbuild.executor.scheduling.classes.session_warehouses import (
+    SessionWarehouses,
+    configured_warehouse,
+    with_session_warehouse,
+)
+from sqlbuild.executor.scheduling.constants import CONFIGURED_WAREHOUSE_KEY
 from sqlbuild.executor.scheduling.main._run_worker import run_worker_with_completion
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.executor.seed.constants import SEED_ENTRY_MISSING_CODE
@@ -162,6 +168,20 @@ def _resource_result_failed(result: object) -> bool:
     return getattr(result, "status", None) == ExecutionStatus.FAILED
 
 
+def _split_configured_warehouse(
+    connection_config: dict[str, object],
+) -> tuple[dict[str, object], tuple[bool, object]]:
+    """The connection config without the recorded build warehouse, and whether it had one."""
+
+    return (
+        {key: value for key, value in connection_config.items() if key != CONFIGURED_WAREHOUSE_KEY},
+        (
+            CONFIGURED_WAREHOUSE_KEY in connection_config,
+            connection_config.get(CONFIGURED_WAREHOUSE_KEY),
+        ),
+    )
+
+
 class BuildScheduler:
     """DAG-aware scheduler that dispatches nodes as their dependencies complete."""
 
@@ -189,7 +209,9 @@ class BuildScheduler:
             entry.model_name: entry for entry in plan.table_type_entries
         }
         self._adapter: BaseAdapter = adapter
-        self._connection_config: dict[str, object] = connection_config
+        self._connection_config, self._configured_warehouse = _split_configured_warehouse(
+            connection_config
+        )
         self._connections: tuple[Any, ...] = connections
         self._scheduler_connection: Any = scheduler_connection
         self._schema_prepared: bool = schema_prepared
@@ -242,6 +264,15 @@ class BuildScheduler:
             callbacks.python_identity_recorder
         )
         self._max_concurrency: int = len(connections)
+        self._init_job_limits(runtime)
+        self._node_warehouses: Mapping[CompiledObjectKey, str] = runtime.node_warehouses
+        self._session_warehouses: SessionWarehouses | None = (
+            SessionWarehouses(
+                adapter=adapter, home=configured_warehouse(connection_config=connection_config)
+            )
+            if runtime.node_warehouses
+            else None
+        )
         self._blocked_keys: set[CompiledObjectKey] = set()
         self._unbuilt_keys: set[CompiledObjectKey] = set(initial_state.initial_failed_keys)
         self._completed_keys: set[CompiledObjectKey] = set(initial_state.precompleted_keys)
@@ -305,6 +336,8 @@ class BuildScheduler:
             else:
                 self._run_concurrent()
         finally:
+            if self._session_warehouses is not None:
+                self._session_warehouses.restore()
             self._close_replacement_connections()
 
         enforce_execution_deadline()
@@ -468,19 +501,15 @@ class BuildScheduler:
                 if self._stop and not self._in_flight:
                     break
 
-                with self._microbatch_coordinator_lock:
-                    queued_coordinators: int = sum(
-                        1 for key in tuple(self._ready) if self._is_concurrent_microbatch(key)
-                    )
-                    self._microbatch_coordinator_demand = min(
-                        self._max_concurrency,
-                        len(self._microbatch_coordinators) + queued_coordinators,
-                    )
+                self._update_microbatch_coordinator_demand()
 
                 while self._ready and len(self._in_flight) < self._max_concurrency:
                     if self._stop:
                         break
-                    key: CompiledObjectKey = self._ready.popleft()
+                    next_key: CompiledObjectKey | None = self._take_ready_key()
+                    if next_key is None:
+                        break
+                    key: CompiledObjectKey = next_key
                     if key.resource_type == CompiledResourceType.SOURCE:
                         if key in self._blocked_keys:
                             self._record_skipped(key)
@@ -489,7 +518,7 @@ class BuildScheduler:
                         if not self._pre_dispatch(key):
                             self._mark_complete(key)
                             continue
-                        self._in_flight.add(key)
+                        self._start_in_flight(key)
                         pool.submit(copy_context().run, self._worker, key)
                         continue
                     if key in self._blocked_keys:
@@ -497,7 +526,9 @@ class BuildScheduler:
                         self._mark_complete(key)
                         continue
                     if self._is_concurrent_microbatch(key) and any(
-                        not self._is_concurrent_microbatch(candidate) for candidate in self._ready
+                        not self._is_concurrent_microbatch(candidate)
+                        and self._has_job_room(candidate)
+                        for candidate in self._ready
                     ):
                         self._ready.append(key)
                         continue
@@ -513,7 +544,7 @@ class BuildScheduler:
                                 self._ready.appendleft(key)
                                 break
                             self._microbatch_coordinators.add(key)
-                        self._in_flight.add(key)
+                        self._start_in_flight(key)
                         pool.submit(
                             copy_context().run,
                             self._concurrent_microbatch_worker,
@@ -521,7 +552,7 @@ class BuildScheduler:
                             pool=pool,
                         )
                         continue
-                    self._in_flight.add(key)
+                    self._start_in_flight(key)
                     pool.submit(copy_context().run, self._worker, key)
 
                 self._report_scheduler_state()
@@ -529,7 +560,7 @@ class BuildScheduler:
                     break
 
                 completion: NodeCompletion = self._completion_queue.get()
-                self._in_flight.discard(completion.key)
+                self._finish_in_flight(completion.key)
                 if completion.error is not None:
                     if escaped is None:
                         escaped = completion.error
@@ -540,6 +571,74 @@ class BuildScheduler:
             self._report_scheduler_state()
         if escaped is not None:
             raise escaped
+
+    def _update_microbatch_coordinator_demand(self) -> None:
+        """Count the running coordinators and the queued ones whose jobs would let them start."""
+
+        with self._microbatch_coordinator_lock:
+            queued_coordinators: int = sum(
+                1
+                for key in tuple(self._ready)
+                if self._is_concurrent_microbatch(key) and self._has_job_room(key)
+            )
+            self._microbatch_coordinator_demand = min(
+                self._max_concurrency,
+                len(self._microbatch_coordinators) + queued_coordinators,
+            )
+
+    def _init_job_limits(self, runtime: BuildRuntimeParams) -> None:
+        """Job limits, each node's jobs, and the lock coordinator threads take to count them."""
+
+        self._job_limits: Mapping[str, int] = runtime.job_limits
+        self._node_jobs: Mapping[CompiledObjectKey, tuple[str, ...]] = runtime.node_jobs
+        self._job_running: dict[str, int] = {}
+        self._job_lock: threading.Lock = threading.Lock()
+
+    def _take_ready_key(self) -> CompiledObjectKey | None:
+        """Remove and return the first ready node whose named jobs all have a free slot."""
+
+        if not self._job_limits or self._has_job_room(self._ready[0]):
+            return self._ready.popleft()
+        index: int
+        key: CompiledObjectKey
+        with self._job_lock:
+            for index, key in enumerate(self._ready):
+                if key in self._blocked_keys or self._jobs_have_room(self._node_jobs.get(key, ())):
+                    del self._ready[index]
+                    return key
+        return None
+
+    def _has_job_room(self, key: CompiledObjectKey) -> bool:
+        """Whether each job limiting `key` has a free slot; a node to skip never waits."""
+
+        if key in self._blocked_keys:
+            return True
+        with self._job_lock:
+            return self._jobs_have_room(self._node_jobs.get(key, ()))
+
+    def _jobs_have_room(self, jobs: tuple[str, ...]) -> bool:
+        """Whether each of `jobs` runs fewer nodes than its limit; the caller holds `_job_lock`."""
+
+        return all(self._job_running.get(job, 0) < self._job_limits[job] for job in jobs)
+
+    def _add_job_running(self, *, jobs: tuple[str, ...], change: int) -> None:
+        """Count `change` more running nodes in each of `jobs`; the caller holds `_job_lock`."""
+
+        job: str
+        for job in jobs:
+            self._job_running[job] = self._job_running.get(job, 0) + change
+
+    def _start_in_flight(self, key: CompiledObjectKey) -> None:
+        self._in_flight.add(key)
+        with self._job_lock:
+            self._add_job_running(jobs=self._node_jobs.get(key, ()), change=1)
+
+    def _finish_in_flight(self, key: CompiledObjectKey) -> None:
+        if key not in self._in_flight:
+            return
+        self._in_flight.discard(key)
+        with self._job_lock:
+            self._add_job_running(jobs=self._node_jobs.get(key, ()), change=-1)
 
     def _report_scheduler_state(self) -> None:
         callback: Callable[[SchedulerState], None] | None = self._callbacks.on_scheduler_state
@@ -609,12 +708,17 @@ class BuildScheduler:
                 ledger_path=(self._runtime_dir / "executions" / self._run_id / "statements.jsonl"),
                 on_statement_complete=self._on_statement_complete,
             ):
+                failure: str | None = self._switch_failure(key=key, connection=connection)
+                if failure is not None:
+                    return self._failed_model_result(key=key, error_message=failure)
                 return self._execute_model_node(
                     key=key,
                     connection=connection,
                     microbatch_batch_runner=lambda batches, concurrency, execute: (
                         self._run_microbatch_subwork(
                             pool=pool,
+                            jobs=self._node_jobs.get(key, ()),
+                            warehouse=self._node_warehouses.get(key),
                             coordinator_connection=connection,
                             batches=batches,
                             concurrency=concurrency,
@@ -630,6 +734,8 @@ class BuildScheduler:
         self,
         *,
         pool: ThreadPoolExecutor,
+        jobs: tuple[str, ...],
+        warehouse: str | None = None,
         coordinator_connection: Any,
         batches: tuple[BatchWindow, ...],
         concurrency: int,
@@ -652,12 +758,14 @@ class BuildScheduler:
                     pool.submit(
                         copy_context().run,
                         self._run_microbatch_batch_worker,
+                        jobs=jobs,
+                        warehouse=warehouse,
                         batch=batch,
                         execute=execute,
                     ),
                 )
             except BaseException:
-                self._release_microbatch_subworker()
+                self._release_microbatch_subworker(jobs)
                 raise
             return future, batch
 
@@ -666,7 +774,7 @@ class BuildScheduler:
         while (
             len(pending_batches) > 1
             and len(in_flight) < model_subworker_limit
-            and self._reserve_microbatch_subworker()
+            and self._reserve_microbatch_subworker(jobs)
         ):
             submitted_future, submitted_batch = submit_one()
             in_flight[submitted_future] = submitted_batch
@@ -678,7 +786,7 @@ class BuildScheduler:
         failed: bool = coordinator_result.failure is not None
         if failed:
             for future in in_flight:
-                self._cancel_microbatch_subworker(future=future)
+                self._cancel_microbatch_subworker(future=future, jobs=jobs)
         first_exception: BaseException | None = None
         while in_flight:
             completed, _ = wait(tuple(in_flight), return_when=FIRST_COMPLETED)
@@ -693,18 +801,18 @@ class BuildScheduler:
                         first_exception = exc
                     failed = True
                     for sibling in in_flight:
-                        self._cancel_microbatch_subworker(future=sibling)
+                        self._cancel_microbatch_subworker(future=sibling, jobs=jobs)
                     continue
                 results[batch.index] = outcome
                 if outcome.failure is not None:
                     failed = True
                     for sibling in in_flight:
-                        self._cancel_microbatch_subworker(future=sibling)
+                        self._cancel_microbatch_subworker(future=sibling, jobs=jobs)
             while (
                 not failed
                 and pending_batches
                 and len(in_flight) < model_subworker_limit
-                and self._reserve_microbatch_subworker()
+                and self._reserve_microbatch_subworker(jobs)
             ):
                 submitted_future, submitted_batch = submit_one()
                 in_flight[submitted_future] = submitted_batch
@@ -720,19 +828,25 @@ class BuildScheduler:
     def _run_microbatch_batch_worker(
         self,
         *,
+        jobs: tuple[str, ...],
+        warehouse: str | None = None,
         batch: BatchWindow,
         execute: MicrobatchBatchExecutor,
     ) -> MicrobatchPhaseOutcome:
         connection: Any = self._connection_pool.get()
         try:
+            if self._session_warehouses is not None:
+                self._session_warehouses.use(connection=connection, warehouse=warehouse)
             return execute(batch, connection)
         finally:
             try:
                 self._connection_pool.put(connection)
             finally:
-                self._release_microbatch_subworker()
+                self._release_microbatch_subworker(jobs)
 
-    def _reserve_microbatch_subworker(self) -> bool:
+    def _reserve_microbatch_subworker(self, jobs: tuple[str, ...]) -> bool:
+        """Take a sub-worker slot, and one in each of its coordinator's jobs, if all are free."""
+
         with self._microbatch_coordinator_lock:
             if (
                 max(
@@ -743,16 +857,24 @@ class BuildScheduler:
                 >= self._max_concurrency
             ):
                 return False
+            with self._job_lock:
+                if not self._jobs_have_room(jobs):
+                    return False
+                self._add_job_running(jobs=jobs, change=1)
             self._microbatch_subworkers += 1
             return True
 
-    def _release_microbatch_subworker(self) -> None:
+    def _release_microbatch_subworker(self, jobs: tuple[str, ...]) -> None:
         with self._microbatch_coordinator_lock:
             self._microbatch_subworkers -= 1
+            with self._job_lock:
+                self._add_job_running(jobs=jobs, change=-1)
 
-    def _cancel_microbatch_subworker(self, *, future: Future[MicrobatchPhaseOutcome]) -> None:
+    def _cancel_microbatch_subworker(
+        self, *, future: Future[MicrobatchPhaseOutcome], jobs: tuple[str, ...]
+    ) -> None:
         if not future.cancelled() and future.cancel():
-            self._release_microbatch_subworker()
+            self._release_microbatch_subworker(jobs)
 
     def _pre_dispatch(self, key: CompiledObjectKey) -> bool:
         """Run pre-dispatch checks. Returns False if the node should be skipped."""
@@ -945,6 +1067,16 @@ class BuildScheduler:
     ):
         """Execute a single node. Runs in a worker thread (or scheduler thread for serial)."""
 
+        failure: (
+            ModelExecutionResult
+            | SeedExecutionResult
+            | FunctionExecutionResult
+            | SqlTestExecutionResult
+            | LoadExecutionResult
+            | None
+        ) = self._enter_node_warehouse(key=key, connection=connection)
+        if failure is not None:
+            return failure
         if key.resource_type == CompiledResourceType.SEED:
             return self._execute_seed_node(key=key, connection=connection)
         if key.resource_type == CompiledResourceType.SOURCE:
@@ -962,6 +1094,104 @@ class BuildScheduler:
             error_message=f"unknown executable resource type '{key.resource_type}'",
         )
 
+    def _build_warehouse(self, connection: Any) -> str | None:
+        """The target's build warehouse, whichever job's or `--warehouse` `connection` is on now."""
+
+        overridden, configured = self._configured_warehouse
+        if overridden:
+            return configured if isinstance(configured, str) else None
+        if self._session_warehouses is None:
+            return self._adapter.session_warehouse(connection=connection)
+        return self._session_warehouses.build_warehouse(connection=connection)
+
+    def _switch_failure(self, *, key: CompiledObjectKey, connection: Any) -> str | None:
+        """Put `connection` on the node's job warehouse, or the build's; why it could not."""
+
+        if self._session_warehouses is None:
+            return None
+        warehouse: str | None = self._node_warehouses.get(key)
+        try:
+            self._session_warehouses.use(connection=connection, warehouse=warehouse)
+        except Exception as error:  # noqa: BLE001 - the node fails with the reason
+            return (
+                f"cannot run on warehouse {warehouse}: {error}"
+                if warehouse is not None
+                else f"cannot return to the build's warehouse: {error}"
+            )
+        return None
+
+    def _enter_node_warehouse(
+        self, *, key: CompiledObjectKey, connection: Any
+    ) -> (
+        ModelExecutionResult
+        | SeedExecutionResult
+        | FunctionExecutionResult
+        | SqlTestExecutionResult
+        | LoadExecutionResult
+        | None
+    ):
+        """Put `connection` on the node's warehouse; the node's own kind of failure if not."""
+
+        failure: str | None = self._switch_failure(key=key, connection=connection)
+        if failure is None:
+            return None
+        return self._failed_node_result(key=key, error_message=failure)
+
+    def _failed_model_result(
+        self, *, key: CompiledObjectKey, error_message: str
+    ) -> ModelExecutionResult:
+        return ModelExecutionResult(
+            model_name=key.name,
+            status=ExecutionStatus.FAILED,
+            error_code=BUILD_WORKER_FAILED_CODE,
+            error_message=error_message,
+        )
+
+    def _failed_node_result(
+        self, *, key: CompiledObjectKey, error_message: str
+    ) -> (
+        ModelExecutionResult
+        | SeedExecutionResult
+        | FunctionExecutionResult
+        | SqlTestExecutionResult
+        | LoadExecutionResult
+    ):
+        """The failed result of the node's own kind, so its kind's failure handling applies."""
+
+        if key.resource_type == CompiledResourceType.SEED:
+            return SeedExecutionResult(
+                seed_name=key.name,
+                status=ExecutionStatus.FAILED,
+                error_code=BUILD_WORKER_FAILED_CODE,
+                error_message=error_message,
+            )
+        if key.resource_type == CompiledResourceType.SOURCE:
+            source: SourceEntry = self._plan.source_map[key.name]
+            return LoadExecutionResult(
+                source_name=source.name,
+                loader_name=source.loader or "",
+                status=ExecutionStatus.FAILED,
+                target=source.table or source.name,
+                resource_kind=load_resource_kind(source),
+                error_message=error_message,
+            )
+        if key.resource_type in {CompiledResourceType.UDF, CompiledResourceType.TABLE_FN}:
+            return FunctionExecutionResult(
+                function_name=key.name,
+                status=ExecutionStatus.FAILED,
+                function_kind=str(key.resource_type),
+                error_code=BUILD_WORKER_FAILED_CODE,
+                error_message=error_message,
+            )
+        if key.resource_type == CompiledResourceType.SQL_TEST:
+            return SqlTestExecutionResult(
+                test_name=key.name,
+                outcome=SqlTestOutcome.ERROR,
+                error_code=BUILD_WORKER_FAILED_CODE,
+                error_message=error_message,
+            )
+        return self._failed_model_result(key=key, error_message=error_message)
+
     def _execute_source_node(
         self, *, key: CompiledObjectKey, connection: Any
     ) -> LoadExecutionResult:
@@ -977,7 +1207,10 @@ class BuildScheduler:
             loader_functions_by_name=self._loader_functions_by_name,
             loader_ref_entries=self._loader_ref_entries,
             adapter=self._adapter,
-            connection_config=self._connection_config,
+            connection_config=with_session_warehouse(
+                connection_config=self._connection_config,
+                warehouse=self._node_warehouses.get(key),
+            ),
             connection=connection,
             runtime=self._runtime,
             callbacks=self._callbacks,
@@ -1257,6 +1490,7 @@ class BuildScheduler:
                             bound_views=bound_views,
                             fingerprint_writes=self._fingerprint_writes,
                             dynamic_hold=self._runtime.dynamic_hold,
+                            build_warehouse=self._build_warehouse,
                         ),
                         promotion_mode=self._promotion_mode,
                         snapshots=self._snapshots,

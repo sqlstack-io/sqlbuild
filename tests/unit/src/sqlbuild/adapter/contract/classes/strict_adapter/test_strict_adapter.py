@@ -97,6 +97,8 @@ def test_given_first_class_adapters_when_checking_contract_then_no_method_comes_
                     "render_dynamic_operation",
                     "render_track_changes",
                     "session_warehouse",
+                    "use_session_warehouse",
+                    "current_session_warehouse",
                 }
             ),
             expected_output_relation=None,

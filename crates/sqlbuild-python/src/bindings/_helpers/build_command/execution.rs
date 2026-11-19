@@ -43,6 +43,9 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::jobs::build_concurrency::build_concurrency;
+use sqlbuild_python_compile::compile_driver::main::jobs::connection_limit::connection_limit;
+use sqlbuild_python_compile::compile_driver::main::jobs::job_run_context::job_run_context;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
@@ -165,6 +168,7 @@ fn run_context_facts(
             selector_count: native_field(&file, "selector_count")?.extract()?,
         });
     }
+    let (full_refresh_jobs, job_warehouses) = job_run_context(pipeline)?;
     Ok(RunContextFacts {
         command: EXECUTION_COMMAND.to_owned(),
         run_id: display_text(&native_field(&project, "run_id")?)?,
@@ -175,6 +179,8 @@ fn run_context_facts(
         concurrency: concurrency.limit,
         concurrency_source: concurrency.source.to_string(),
         full_refresh: context.request_flag("full_refresh")?,
+        full_refresh_jobs,
+        job_warehouses,
         selected_count,
         total_count,
         date_vars: (
@@ -190,7 +196,7 @@ pub(crate) fn write_run_context(
     context: &BuildContext<'_>,
     pipeline: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
-    let concurrency: EffectiveConcurrency = context.concurrency()?;
+    let concurrency: EffectiveConcurrency = build_concurrency(context.concurrency()?, pipeline)?;
     let facts: RunContextFacts = run_context_facts(context, pipeline, &concurrency)?;
     emit(
         &context.stream,
@@ -255,7 +261,7 @@ pub(crate) fn prepare_build_execution<'py>(
     })
     .and_then(|value| pyo3::Bound::new(py, value))
     .map(pyo3::Bound::into_any)?;
-    let concurrency = context.concurrency()?.limit;
+    let concurrency = connection_limit(context.concurrency()?, pipeline)?;
     if context.verbose {
         write_run_context(context, pipeline)?;
     } else {
@@ -337,6 +343,7 @@ pub(crate) fn execute_build_plan<'py>(
     let lifecycle: &DirectPythonLifecycle = preparation.lifecycle.get();
     let [start_ts, end_ts, start_int, end_int] = &preparation.cursors;
     let request = |name: &str| native_field(&context.request, name);
+    let planned = |name: &str| native_field(pipeline, name);
     let discovered: Bound<'py, PyAny> = context.get("discovered_inputs")?;
     let project_dir: Bound<'py, PyAny> = context.get("effective_project_dir")?;
     let target_config: TargetSettingsValues =
@@ -375,6 +382,9 @@ pub(crate) fn execute_build_plan<'py>(
                 ("end_cursor_int", end_int.clone()),
                 ("use_color", boolean(py, context.use_color)),
                 ("providers", providers.clone()),
+                ("job_limits", planned("job_limits")?),
+                ("node_jobs", planned("node_jobs")?),
+                ("node_warehouses", planned("node_warehouses")?),
                 (
                     "test_timeouts",
                     timeout_record(
@@ -676,6 +686,10 @@ fn check_runtime<'py>(
                 .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?,
             ),
             ("providers", providers.clone()),
+            (
+                "node_warehouses",
+                native_field(pipeline, "python_node_warehouses")?,
+            ),
         ],
     )
 }

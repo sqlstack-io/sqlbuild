@@ -1,6 +1,6 @@
 //! The command's job and job group names, loaded on first use; empty outside a command.
 
-use crate::compiled_project::_helpers::job_catalog::job_catalog;
+use crate::job_settings::_helpers::job_catalog::job_catalog;
 use pyo3::prelude::{PyResult, Python};
 
 /// The command's job and job group names, loaded on first use; empty outside a command.

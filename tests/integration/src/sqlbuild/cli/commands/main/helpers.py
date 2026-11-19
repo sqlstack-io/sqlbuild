@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import sqlite3
@@ -9,8 +10,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections import defaultdict
 from collections.abc import Callable, Iterable
-from itertools import takewhile
+from datetime import datetime, timedelta
+from itertools import accumulate, chain, compress, takewhile
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
@@ -54,6 +57,9 @@ _REFUND_RATES: str = (
     "final AS (SELECT * FROM by_product)\n"
     "SELECT * FROM final\n"
 )
+
+
+_COMPLETED_EVENT: str = "resource_attempt_completed"
 
 
 def artifact_tree(root: Path) -> dict[str, bytes]:
@@ -1591,3 +1597,262 @@ def prepare_warehouse(*, project_dir: Path, sql: str) -> None:
 
     with duckdb.connect(str(project_dir / "demo.duckdb")) as warehouse:
         warehouse.execute(sql)
+
+
+def peak_concurrency(*, events_path: Path, names: tuple[str, ...]) -> int:
+    """The most of `names` a build's event output shows running at once."""
+
+    events: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        event: dict[str, Any] = json.loads(line)
+        events[(event["event_type"], str(event.get("resource_name")))].append(event)
+    completions: list[dict[str, Any]] = list(
+        chain.from_iterable(events[(_COMPLETED_EVENT, name)] for name in names)
+    )
+    ends: list[tuple[datetime, float]] = [
+        (datetime.fromisoformat(event["occurred_at"]), event["duration_ms"])
+        for event in completions
+    ]
+    changes: list[tuple[datetime, int]] = sorted(
+        [(end - timedelta(milliseconds=duration), 1) for end, duration in ends]
+        + [(end, -1) for end, _ in ends]
+    )
+    return max(accumulate(change for _, change in changes), default=0)
+
+
+_CONNECT_MARKER: str = "-- connect"
+# The environment variable that sets a build's default concurrency.
+CONCURRENCY_VARIABLE: str = "SQLBUILD_CONCURRENCY"
+
+
+def _job_warehouse_model(source: str) -> str:
+    return f"MODEL (description 'Step.', materialized table);\nSELECT 1 AS id{source}\n"
+
+
+def _job_file(name: str, select: str, warehouse: str) -> str:
+    return (
+        f'name = "{name}"\ndescription = "Runs {select}."\nselect = "{select}"\n\n'
+        f'[settings]\nwarehouse = "{warehouse}"\n'
+    )
+
+
+def write_job_warehouse_project(*, project_dir: Path) -> None:
+    """A Snowflake chain stg -> orders -> orders_daily -> refunds -> summary and a task, with jobs
+    on their own warehouses: orders_wh_job, orders_copy_job (orders_daily on the same warehouse),
+    refunds_wh_job, refunds_alt_job (also refunds), tasks_wh_job and bad_wh_job, whose warehouse
+    is not an identifier."""
+
+    write_snowflake_warehouse_project(
+        project_dir=project_dir,
+        warehouses_section='[targets.dev.warehouses]\nbuild = "BUILD_WH"\n',
+        local_config="",
+    )
+    write_project_files(
+        project_dir=project_dir,
+        files={
+            "models/stg.sql": _job_warehouse_model(""),
+            "models/orders.sql": _job_warehouse_model(' FROM __ref("stg")'),
+            "models/orders_daily.sql": _job_warehouse_model(' FROM __ref("orders")'),
+            "models/refunds.sql": _job_warehouse_model(' FROM __ref("orders_daily")'),
+            "models/summary.sql": _job_warehouse_model(' FROM __ref("refunds")'),
+            "python/tasks.py": (
+                "from sqlbuild.tasks import task\n\n\n@task\ndef refresh_marker(ctx):\n"
+                '    """Refresh."""\n    ctx.execute_sql("SELECT \'task marker\'")\n'
+            ),
+            "orchestration/jobs/orders_wh_job.toml": _job_file(
+                "orders_wh_job", "orders orders_daily", "ORDERS_WH"
+            ),
+            "orchestration/jobs/refunds_wh_job.toml": _job_file(
+                "refunds_wh_job", "refunds", "REFUNDS_WH"
+            ),
+            "orchestration/jobs/orders_copy_job.toml": _job_file(
+                "orders_copy_job", "orders_daily", "ORDERS_WH"
+            ),
+            "orchestration/jobs/refunds_alt_job.toml": _job_file(
+                "refunds_alt_job", "refunds", "ALT_WH"
+            ),
+            "orchestration/jobs/tasks_wh_job.toml": _job_file(
+                "tasks_wh_job", "refresh_marker", "TASKS_WH"
+            ),
+            "orchestration/jobs/bad_wh_job.toml": _job_file("bad_wh_job", "stg", "bad wh"),
+        },
+    )
+
+
+def install_writable_offline_snowflake(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[list[dict[str, object]], list[str]]:
+    """The offline connector, accepting writes, with a marker before each connection's setup."""
+
+    connect_calls, executed_sql = install_offline_snowflake_connector(monkeypatch)
+    monkeypatch.setattr(
+        sys.modules[__name__], "_refuse_offline_snowflake_write", _accept_offline_snowflake_read
+    )
+    connector: ModuleType = sys.modules["snowflake.connector"]
+    connect: Callable[..., object] = connector.__dict__["connect"]
+
+    def marked_connect(**kwargs: object) -> object:
+        executed_sql.append(_CONNECT_MARKER)
+        raw: Any = connect(**kwargs)
+        raw._executed_sql = _ConnectionStatements(sink=executed_sql, connection=len(connect_calls))
+        return raw
+
+    monkeypatch.setitem(connector.__dict__, "connect", marked_connect)
+    return connect_calls, executed_sql
+
+
+class _ConnectionStatements:
+    """One offline connection's statement log: each statement in order, and which connection."""
+
+    def __init__(self, *, sink: list[str], connection: int) -> None:
+        self._sink: list[str] = sink
+        self._connection: int = connection
+
+    def append(self, sql: str) -> None:
+        self._sink.append(sql)
+        _STATEMENT_CONNECTIONS.setdefault(id(self._sink), []).append((self._connection, sql))
+
+
+# Each shared statement log's statements with the connection that ran them.
+_STATEMENT_CONNECTIONS: dict[int, list[tuple[int, str]]] = {}
+
+
+def warehouse_switches(executed_sql: list[str]) -> tuple[str, ...]:
+    """The warehouses statements switch to, leaving out each connection's first, its own setup."""
+
+    uses: list[tuple[int, str]] = [
+        (connection, sql.removeprefix(_USE_WAREHOUSE))
+        for connection, sql in filter(
+            lambda statement: statement[1].startswith(_USE_WAREHOUSE),
+            _STATEMENT_CONNECTIONS.get(id(executed_sql), []),
+        )
+    ]
+    first_use: dict[int, int] = {
+        connection: index for index, (connection, _) in reversed(list(enumerate(uses)))
+    }
+    return tuple(
+        compress(
+            (warehouse for _, warehouse in uses),
+            (first_use[connection] != index for index, (connection, _) in enumerate(uses)),
+        )
+    )
+
+
+_USE_WAREHOUSE: str = "USE WAREHOUSE "
+
+
+def run_cli_exit_code(argv: tuple[str, ...], project_dir: Path) -> int:
+    """The exit code of one CLI invocation in `project_dir`, returned or raised."""
+
+    try:
+        return int(main(["--no-color", "--project-dir", str(project_dir), *argv]) or 0)
+    except SystemExit as exited:
+        return int(exited.code or 0)
+
+
+_PARITY_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n'
+    ),
+    "functions/sql/udf__band.sql": (
+        "FUNCTION (description 'Band.', arguments (amount INT), returns VARCHAR);\n"
+        "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
+    ),
+    "models/parity_lookup.sql": (
+        "MODEL (description 'Lookup.', materialized table, "
+        "columns (id (type INTEGER, audits [not_null])));\nSELECT CAST(NULL AS INTEGER) AS id\n"
+    ),
+    "models/parity_events.sql": (
+        "MODEL (description 'Events.', materialized incremental, incremental_strategy append);\n"
+        'SELECT 1 AS event_id, __udf("udf__band")(5) AS band\n'
+    ),
+    "tests/unit/test_parity_events.sql": (
+        "TEST();\n\nWITH\n__ref__parity_lookup AS (SELECT 1 AS id),\n"
+        "__expected__parity_events AS (SELECT 99 AS event_id, 'x' AS band)\nSELECT 1\n"
+    ),
+    "audits/singular/events_have_lookups.sql": (
+        'AUDIT (name "events_have_lookups", severity error);\n'
+        'SELECT e.event_id FROM __ref("parity_events") e '
+        'LEFT JOIN __ref("parity_lookup") l ON e.event_id = l.id WHERE l.id IS NULL\n'
+    ),
+    "orchestration/jobs/parity_job.toml": (
+        'name = "parity_job"\ndescription = "Parity."\n'
+        'select = "udf__band parity_lookup parity_events"\n\n'
+        "[settings]\nfull_refresh = true\nrun_tests = false\nignore_audit_failures = true\n"
+    ),
+}
+PARITY_NODES: tuple[str, ...] = ("udf__band", "parity_lookup", "parity_events")
+
+
+def job_flag_parity_outcome(
+    *,
+    project_dir: Path,
+    args: tuple[tuple[str, ...], tuple[str, ...]],
+    capsys: pytest.CaptureFixture[str],
+) -> tuple[object, ...]:
+    """Build a parity project once without its job, then plan and build it with `args`: the
+    function reasons, full-refresh count, exit code, summary and ignored audits they report."""
+
+    plan_args, build_args = args
+
+    write_project_files(project_dir=project_dir, files=_PARITY_PROJECT_FILES)
+    base: list[str] = ["--no-color", "--project-dir", str(project_dir)]
+    main(
+        [
+            *base,
+            "build",
+            "--no-job-settings",
+            "--no-tests",
+            "--ignore-audit-failures",
+            "--select",
+            *PARITY_NODES,
+        ]
+    )
+    capsys.readouterr()
+    main([*base, "plan", *plan_args])
+    plan: str = capsys.readouterr().out
+    exit_code: int = main([*base, "build", *build_args])
+    build: str = capsys.readouterr().out
+    return (
+        tuple(re.findall(r"^  (\S+) +sql udf\n +reason: (.*)$", plan, re.M)),
+        tuple(re.findall(r"^Full refresh \((\d+)\)$", plan, re.M)),
+        exit_code,
+        tuple(re.findall(r"Completed [^\n]*?TOTAL=\d+", build)),
+        tuple(re.findall(r"audit .+ returned \d+ rows? \(ignored\)", build)),
+    )
+
+
+def unit_test_sql(*models: str) -> str:
+    """A unit test mocking orders_daily that expects one row from each of `models`."""
+
+    expected: str = ",\n".join(f"__expected__{model} AS (SELECT 1 AS id)" for model in models)
+    return f"TEST();\n\nWITH\n__ref__orders_daily AS (SELECT 1 AS id),\n{expected}\nSELECT 1\n"
+
+
+_DYNAMIC_FILES: dict[str, str] = {
+    "models/daily_orders.sql": (
+        "MODEL (description 'Daily orders.', materialized dynamic, refresh (lag 1h));\n"
+        "SELECT 1 AS id\n"
+    ),
+    "orchestration/jobs/dynamic_wh_job.toml": (
+        'name = "dynamic_wh_job"\ndescription = "Runs daily_orders."\nselect = "daily_orders"\n\n'
+        '[settings]\nwarehouse = "DYNAMIC_WH"\n'
+    ),
+}
+
+
+def write_dynamic_job_project(*, project_dir: Path) -> None:
+    """The job warehouse project plus dynamic model daily_orders, run by job dynamic_wh_job."""
+
+    write_job_warehouse_project(project_dir=project_dir)
+    write_project_files(project_dir=project_dir, files=_DYNAMIC_FILES)
+
+
+def dynamic_refresh_warehouses(executed_sql: list[str]) -> tuple[str, ...]:
+    """The warehouse each created dynamic table is given for its refreshes."""
+
+    statements: str = "\n".join(executed_sql)
+    return tuple(
+        re.findall(r"CREATE OR REPLACE DYNAMIC TABLE .*?WAREHOUSE = (\S+)", statements, re.S)
+    )

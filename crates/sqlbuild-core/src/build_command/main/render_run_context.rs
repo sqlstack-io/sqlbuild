@@ -6,6 +6,16 @@ use crate::build_command::models::RunContextFacts;
 use crate::cli_text::models::{CliDocument, CliStyle};
 use crate::number_text::main::format_thousands::format_thousands;
 
+/// `true`, the nodes of the named jobs that rebuild theirs from scratch, or `false`.
+fn full_refresh(facts: &RunContextFacts) -> String {
+    match facts.full_refresh_jobs.as_slice() {
+        _ if facts.full_refresh => true.to_string(),
+        [] => false.to_string(),
+        [job] => format!("nodes of job {}", sanitize(job)),
+        jobs => format!("nodes of jobs {}", sanitize(&jobs.join(", "))),
+    }
+}
+
 fn date_vars(facts: &RunContextFacts) -> String {
     match &facts.date_vars {
         (None, None) => NOT_SET.to_owned(),
@@ -18,10 +28,17 @@ fn date_vars(facts: &RunContextFacts) -> String {
 /// The resolved placement, mode and selection, then the selector files.
 #[must_use]
 pub fn render_run_context(facts: &RunContextFacts, style: CliStyle) -> String {
-    let warehouse: String = facts.warehouse.as_ref().map_or_else(
+    let mut warehouse: String = facts.warehouse.as_ref().map_or_else(
         || NOT_SET.to_owned(),
         |(warehouse, source)| format!("{} ({source})", sanitize(warehouse)),
     );
+    for (job, job_warehouse) in &facts.job_warehouses {
+        warehouse.push_str(&format!(
+            "; nodes of job {} on {}",
+            sanitize(job),
+            sanitize(job_warehouse)
+        ));
+    }
     let rows: Vec<(String, String)> = [
         ("command", sanitize(&facts.command)),
         ("run_id", display_value(facts.run_id.as_deref())),
@@ -41,7 +58,7 @@ pub fn render_run_context(facts: &RunContextFacts, style: CliStyle) -> String {
                 )
             },
         ),
-        ("full_refresh", facts.full_refresh.to_string()),
+        ("full_refresh", full_refresh(facts)),
         (
             "selected",
             format!(

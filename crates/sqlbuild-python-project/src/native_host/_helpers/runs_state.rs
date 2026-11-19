@@ -1,6 +1,6 @@
 //! Helpers of the runs table recorder: its DDL, the run's identity facts and its row cells.
 
-use crate::compiled_project::main::named_jobs::named_jobs;
+use crate::job_settings::main::named_jobs::named_jobs;
 use crate::native_host::models::RunCommandScope;
 use crate::native_host::models::RunIdentity;
 use pyo3::exceptions::{PyKeyError, PyOSError, PyValueError};

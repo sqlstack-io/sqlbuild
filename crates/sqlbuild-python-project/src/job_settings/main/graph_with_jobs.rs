@@ -1,6 +1,6 @@
 //! `graph` with the command's jobs attached when `selectors` name a job, otherwise `graph` itself.
 
-use crate::compiled_project::main::needed_jobs::needed_jobs;
+use crate::job_settings::main::needed_jobs::needed_jobs;
 use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::models::ProjectGraph;

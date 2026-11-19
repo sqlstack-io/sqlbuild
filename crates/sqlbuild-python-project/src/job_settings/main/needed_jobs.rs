@@ -1,6 +1,6 @@
 //! The command's jobs when `selectors` name one and `graph` has none attached yet.
 
-use crate::compiled_project::_helpers::job_catalog::job_catalog;
+use crate::job_settings::_helpers::job_catalog::job_catalog;
 use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::graph::models::{JobSelection, ProjectGraph};

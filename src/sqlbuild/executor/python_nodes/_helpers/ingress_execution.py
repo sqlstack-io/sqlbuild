@@ -31,6 +31,7 @@ from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
 from sqlbuild.executor.python_nodes._helpers.lifecycle_nodes import build_ingress_lifecycle_nodes
+from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
 from sqlbuild.executor.python_nodes.classes.ingress_results import IngressResultAccumulator
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
 from sqlbuild.executor.python_nodes.models import (
@@ -275,35 +276,47 @@ def _execute_ingress_loader(
             resource_name=loader.name,
             phase="load",
         ):
-            result: LoadExecutionResult = execute_source_load(
-                source_entry=source_entry,
-                loader_function=loader,
-                adapter=runtime.adapter,
-                connection_config=runtime.connection_config,
-                connection=runtime.connection,
-                runtime=LoadRuntimeParams(
-                    run_id=runtime.run_id,
-                    target=runtime.target,
-                    target_config=runtime.target_config,
-                    default_database=runtime.default_database,
-                    default_schema=runtime.default_schema,
-                    vars=runtime.vars,
-                    is_reload=runtime.is_reload,
-                    start_cursor_ts=runtime.start_cursor_ts,
-                    end_cursor_ts=runtime.end_cursor_ts,
-                    start_cursor_int=runtime.start_cursor_int,
-                    end_cursor_int=runtime.end_cursor_int,
-                    use_color=callbacks.use_color,
-                    providers=runtime.providers,
-                    result_store=runtime.result_store,
-                    project_relations=runtime.project_relations,
-                ),
-                statement_recorder=StatementRecorder(),
-                loader_ref_entries=_loader_ref_entries(
-                    loader_by_name=loader_by_name,
-                    source_by_loader_name=source_by_loader_name,
-                ),
-                source_ref_entries=source_map,
+            runtime, warehouse_failure = node_runtime(runtime=runtime, name=node.name)
+            result: LoadExecutionResult = (
+                LoadExecutionResult(
+                    source_name=source_entry.name,
+                    loader_name=loader.name,
+                    status=ExecutionStatus.FAILED,
+                    target=source_entry.table or source_entry.name,
+                    resource_kind=resource_kind,
+                    error_message=warehouse_failure,
+                )
+                if warehouse_failure is not None
+                else execute_source_load(
+                    source_entry=source_entry,
+                    loader_function=loader,
+                    adapter=runtime.adapter,
+                    connection_config=runtime.connection_config,
+                    connection=runtime.connection,
+                    runtime=LoadRuntimeParams(
+                        run_id=runtime.run_id,
+                        target=runtime.target,
+                        target_config=runtime.target_config,
+                        default_database=runtime.default_database,
+                        default_schema=runtime.default_schema,
+                        vars=runtime.vars,
+                        is_reload=runtime.is_reload,
+                        start_cursor_ts=runtime.start_cursor_ts,
+                        end_cursor_ts=runtime.end_cursor_ts,
+                        start_cursor_int=runtime.start_cursor_int,
+                        end_cursor_int=runtime.end_cursor_int,
+                        use_color=callbacks.use_color,
+                        providers=runtime.providers,
+                        result_store=runtime.result_store,
+                        project_relations=runtime.project_relations,
+                    ),
+                    statement_recorder=StatementRecorder(),
+                    loader_ref_entries=_loader_ref_entries(
+                        loader_by_name=loader_by_name,
+                        source_by_loader_name=source_by_loader_name,
+                    ),
+                    source_ref_entries=source_map,
+                )
             )
             results.record_load_result(name=node.name, result=result)
             persist_loader_result(
