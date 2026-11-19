@@ -27,7 +27,6 @@ pub(crate) mod cursor;
 pub(crate) mod dag_artifact;
 pub(crate) mod dagster_invocation;
 pub(crate) mod dbt_command;
-pub(crate) mod dbt_events;
 pub(crate) mod dbt_interop;
 pub(crate) mod debug_command;
 pub(crate) mod diagnostics;

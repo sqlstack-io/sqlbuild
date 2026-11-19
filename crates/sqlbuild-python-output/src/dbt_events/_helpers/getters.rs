@@ -3,17 +3,10 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::dbt_events::stream::DbtEventStreamUpdate;
-use sqlbuild_python_base::records::main::registry::class_of::class_of;
-use sqlbuild_python_base::records::models::GetterEntry;
+use crate::dbt_events::models::DbtEventStreamUpdate;
 
-/// The getter readers of this module's native pyclasses.
-pub(crate) const GETTERS: &[GetterEntry] = &[GetterEntry {
-    class: class_of::<DbtEventStreamUpdate>,
-    read: read_dbt_event_stream_update,
-}];
-
-fn read_dbt_event_stream_update<'py>(
+/// The getter values of a `DbtEventStreamUpdate`.
+pub(crate) fn read_dbt_event_stream_update<'py>(
     value: &Bound<'py, PyAny>,
     name: &str,
 ) -> Option<PyResult<Bound<'py, PyAny>>> {
