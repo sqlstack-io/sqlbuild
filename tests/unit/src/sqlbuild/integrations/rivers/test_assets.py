@@ -36,13 +36,13 @@ from tests.unit.src.sqlbuild.integrations.rivers.helpers import (
                 "analytics__normalize_email",
                 "analytics__orders",
                 "analytics__customers",
-                "task__prepare_orders",
+                "asset__prepare_orders",
                 "asset__orders_export",
             ),
             expected_order_deps=("raw__orders", "analytics__normalize_email"),
             expected_task_deps=("analytics__orders",),
-            expected_asset_deps=("task__prepare_orders",),
-            expected_task_kinds=["sqlbuild", "task"],
+            expected_asset_deps=("asset__prepare_orders",),
+            expected_task_kinds=["sqlbuild", "asset"],
             expected_asset_kinds=["sqlbuild", "asset"],
             expected_task_group="python",
             expected_asset_group="exports",
@@ -69,7 +69,7 @@ def test_given_python_augmented_dag_when_building_asset_defs_then_maps_python_no
     asset_defs_by_name: dict[str, tuple[Any, ...]] = {asset.name: (asset,) for asset in asset_defs}
     assert len(asset_defs_by_name) == len(asset_defs)
     order_def: Any = next(iter(asset_defs_by_name.get("analytics__orders", ())))
-    task_def: Any = next(iter(asset_defs_by_name.get("task__prepare_orders", ())))
+    task_def: Any = next(iter(asset_defs_by_name.get("asset__prepare_orders", ())))
     python_asset_def: Any = next(iter(asset_defs_by_name.get("asset__orders_export", ())))
 
     assert tuple(asset.name for asset in asset_defs) == test_case.expected_asset_names

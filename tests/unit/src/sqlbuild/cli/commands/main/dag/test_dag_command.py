@@ -191,7 +191,7 @@ def test_given_python_nodes_when_running_dag_json_then_outputs_artifact_metadata
     }
 
     assert exit_code == test_case.expected_exit_code
-    assert nodes_by_id[test_case.expected_task_id]["kind"] == "task"
+    assert nodes_by_id[test_case.expected_task_id]["kind"] == "asset"
     assert nodes_by_id[test_case.expected_task_id]["tags"] == test_case.expected_task_tags
     assert nodes_by_id[test_case.expected_task_id]["group"] == test_case.expected_task_group
     assert nodes_by_id[test_case.expected_task_id]["meta"] == test_case.expected_task_meta

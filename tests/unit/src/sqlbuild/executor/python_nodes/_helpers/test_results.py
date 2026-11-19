@@ -33,7 +33,6 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers._test_types import (
     PythonCheckReturnNormalizationTestCase,
     PythonNodeFailureResultTestCase,
     PythonNodeFanInPolicyTestCase,
-    PythonNodeReturnNormalizationErrorTestCase,
     PythonNodeReturnNormalizationTestCase,
 )
 from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
@@ -249,29 +248,6 @@ def test_given_python_node_return_when_normalizing_then_returns_execution_result
     assert result.materialized == test_case.expected_materialized
     assert result.skip_mode == test_case.expected_skip_mode
     assert result.skip_reason == test_case.expected_skip_reason
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        PythonNodeReturnNormalizationErrorTestCase(
-            description="rejects materialized flag on task result",
-            kind=PythonNodeKind.ASSET,
-            returned=PythonNodeResult(materialized=False),
-            expected_error_fragment="Only asset Python nodes",
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_non_asset_materialized_result_when_normalizing_then_raises(
-    test_case: PythonNodeReturnNormalizationErrorTestCase,
-) -> None:
-    with pytest.raises(ValueError, match=test_case.expected_error_fragment):
-        normalize_python_node_return(
-            node_name="fetch_orders",
-            kind=test_case.kind,
-            returned=test_case.returned,
-        )
 
 
 @pytest.mark.parametrize(

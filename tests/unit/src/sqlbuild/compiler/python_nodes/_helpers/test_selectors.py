@@ -156,7 +156,7 @@ def test_given_python_node_selectors_when_resolving_then_returns_expected_names(
     [
         PythonNodeSelectorErrorTestCase(
             description="raises when typed selector has wrong Python node kind",
-            select=("asset:export_orders",),
+            select=("check:export_orders",),
             exclude=(),
             expected_error_type=ValueError,
             expected_error_fragment="unknown Python node selector 'export_orders'",

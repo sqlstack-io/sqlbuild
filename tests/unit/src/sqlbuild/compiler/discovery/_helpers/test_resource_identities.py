@@ -192,7 +192,7 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
             expected_error_fragment="Invalid SQL hook identity 'GrantAccess'",
         ),
         DiscoveredResourceIdentityErrorTestCase(
-            description="Python task name",
+            description="Python asset name",
             project_files={
                 "python/tasks/orders.py": (
                     "from sqlbuild.assets import asset\n\n"
@@ -201,7 +201,7 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
                     "    return None\n"
                 )
             },
-            expected_error_fragment="Invalid task identity 'DailyTask'",
+            expected_error_fragment="Invalid asset identity 'DailyTask'",
         ),
     ],
     ids=lambda case: case.description,

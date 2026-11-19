@@ -143,8 +143,7 @@ class SlackProvider(Provider):
             expected_macro_paths=("macros/python/name_helpers.py",),
             expected_loader_names=("raw_orders",),
             expected_adapter_path="adapter.py",
-            expected_task_names=("fetch_window",),
-            expected_asset_names=("export_customers",),
+            expected_asset_names=("export_customers", "fetch_window"),
             expected_check_names=("export_customers_exists",),
             expected_hook_names=("notify_success",),
             expected_provider_names=("slack_provider",),
@@ -264,10 +263,6 @@ def test_given_project_repo_slice_when_discovering_inputs_then_it_returns_expect
     assert (
         tuple(loader_function.name for loader_function in discovered_inputs.loader_functions)
         == test_case.expected_loader_names
-    )
-    assert (
-        tuple(task_function.name for task_function in discovered_inputs.asset_functions)
-        == test_case.expected_task_names
     )
     assert (
         tuple(asset_function.name for asset_function in discovered_inputs.asset_functions)
@@ -426,7 +421,7 @@ def generated_loaders():
             expected_loader_names=("raw_orders",),
         ),
         DiscoverFactoryValidationTestCase(
-            description="generated task and asset dependency validates",
+            description="generated asset dependencies validate",
             repo_files=base_repo_files()
             | {
                 "python/factories/generated.py": """
@@ -448,8 +443,7 @@ def generated_nodes():
     return [prepare, export]
 """,
             },
-            expected_task_names=("prepare_orders",),
-            expected_asset_names=("orders_export",),
+            expected_asset_names=("prepare_orders", "orders_export"),
         ),
         DiscoverFactoryValidationTestCase(
             description="single-kind factory validates in factories folder",
@@ -469,7 +463,7 @@ def generated_tasks():
     return prepare
 """,
             },
-            expected_task_names=("prepare_orders",),
+            expected_asset_names=("prepare_orders",),
         ),
         DiscoverFactoryValidationTestCase(
             description="factory returning its own module-level node registers it once",
@@ -490,7 +484,7 @@ def order_nodes():
     return orders
 """,
             },
-            expected_task_names=("orders",),
+            expected_asset_names=("orders",),
         ),
         DiscoverFactoryValidationTestCase(
             description="factory binding its generated node to a module global registers it once",
@@ -512,7 +506,7 @@ def order_nodes():
     return orders
 """,
             },
-            expected_task_names=("orders",),
+            expected_asset_names=("orders",),
         ),
         DiscoverFactoryValidationTestCase(
             description="factory returning an imported python module node registers it once",
@@ -540,7 +534,7 @@ def prepare_orders(ctx):
     return None
 """,
             },
-            expected_task_names=("prepare_orders", "publish_orders"),
+            expected_asset_names=("prepare_orders", "publish_orders"),
         ),
         DiscoverFactoryValidationTestCase(
             description="factory can import ordinary private helper module",
@@ -562,10 +556,10 @@ def generated_tasks():
     return prepare
 """,
             },
-            expected_task_names=("prepare_orders",),
+            expected_asset_names=("prepare_orders",),
         ),
         DiscoverFactoryValidationTestCase(
-            description="generated check and task may depend on a model and a seed",
+            description="generated check and asset may depend on a model and a seed",
             repo_files=base_repo_files()
             | {
                 "python/factories/generated.py": """
@@ -588,7 +582,7 @@ def generated_nodes():
     return [export_countries, check_orders]
 """,
             },
-            expected_task_names=("export_countries",),
+            expected_asset_names=("export_countries",),
             expected_check_names=("check_orders",),
         ),
     ),
@@ -606,7 +600,6 @@ def test_given_generated_factory_nodes_when_discovering_inputs_then_validates_ex
     assert (
         tuple(loader.name for loader in result.loader_functions) == test_case.expected_loader_names
     )
-    assert tuple(task.name for task in result.asset_functions) == test_case.expected_task_names
     assert tuple(asset.name for asset in result.asset_functions) == test_case.expected_asset_names
     assert tuple(check.name for check in result.check_functions) == test_case.expected_check_names
 

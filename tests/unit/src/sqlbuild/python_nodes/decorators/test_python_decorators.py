@@ -100,7 +100,6 @@ def test_given_asset_decorator_when_reading_definition_then_returns_metadata(
         test_case.expected_column_descriptions
     )
     assert definition.column_lineage == test_case.expected_column_lineage
-    assert get_asset_definition(export_customers) is None
 
 
 @pytest.mark.parametrize(

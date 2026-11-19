@@ -668,11 +668,6 @@ symbols = ["read_loader_definition"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
-modules = ["sqlbuild.python_nodes.main.read_task_definition"]
-symbols = ["read_task_definition"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.python_nodes.models"]
 symbols = ["AuditCase", "NodeSetRef", "SqlResourceRef"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
@@ -1512,12 +1507,6 @@ rule = "FFS120"
 path = "src/sqlbuild/hooks.py"
 symbols = ["hook"]
 reason = "Bare @hook is evaluated by Python as hook(function), requiring positional function calling."
-
-[[targets.python.rule_exceptions]]
-rule = "FFS120"
-path = "src/sqlbuild/tasks.py"
-symbols = ["task"]
-reason = "Bare @task is evaluated by Python as task(function), requiring positional function calling."
 
 [[targets.python.rule_exceptions]]
 rule = "FFS120"

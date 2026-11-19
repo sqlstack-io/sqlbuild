@@ -499,7 +499,7 @@ def test_given_invalid_sql_model_dependency_when_validating_boundaries_then_rais
             exclude=(),
             expected_error_type=ValueError,
             expected_error_fragment=(
-                "loader 'load_events' depends on task 'prepare_orders', which reads SQL"
+                "loader 'load_events' depends on asset 'prepare_orders', which reads SQL"
             ),
         )
     ],

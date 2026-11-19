@@ -65,8 +65,8 @@ def build_previous_python_identity_map(
         "current": current_version_hash,
     }.get(str(previous_version_hash), previous_version_hash)
     identity_map: dict[tuple[str, str], Fingerprint] = {
-        ("task", "prepare_orders"): Fingerprint(
-            node_type="task",
+        ("asset", "prepare_orders"): Fingerprint(
+            node_type="asset",
             node_name="prepare_orders",
             target_database=None,
             target_schema="analytics",

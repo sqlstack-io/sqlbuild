@@ -28,8 +28,8 @@ const READ_FACTORY: UserCodeHost = UserCodeHost::ReadFactoryDefinition;
 const READ_AUDIT_FACTORY: UserCodeHost = UserCodeHost::ReadAuditFactoryDefinition;
 const READ_HOOK: UserCodeHost = UserCodeHost::ReadHookDefinition;
 const NOT_A_NODE: &str = "that is not a SQLBuild asset, loader, or check";
-/// The removed task module, and how `from sqlbuild import tasks` names it.
-const REMOVED_TASKS: (&str, (&str, &str)) = ("sqlbuild.tasks", ("sqlbuild", "tasks"));
+/// The package and name of the removed task module, as `from sqlbuild import tasks` names it.
+const REMOVED_TASKS: (&str, &str) = ("sqlbuild", "tasks");
 
 /// One Python-node kind: its reader, record class, bucket and copied definition fields.
 struct NodeKind {
@@ -343,9 +343,9 @@ fn imports_removed_tasks(error: &Bound<'_, PyAny>) -> bool {
     let text = |attribute: &str| -> Option<String> {
         error.getattr_opt(attribute).ok().flatten()?.extract().ok()
     };
-    let (module, (package, name)) = REMOVED_TASKS;
+    let (package, name) = REMOVED_TASKS;
     let imported: Option<String> = text("name");
-    imported.as_deref() == Some(module)
+    imported.as_deref() == Some(format!("{package}.{name}").as_str())
         || (imported.as_deref() == Some(package) && text("name_from").as_deref() == Some(name))
 }
 

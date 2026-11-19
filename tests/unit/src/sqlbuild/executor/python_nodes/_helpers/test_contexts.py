@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import logging
 from datetime import datetime
 
@@ -34,7 +33,6 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
     assert_base_context_fields,
     build_asset_context,
     build_task_context,
-    loader_only_attribute_names,
     skipped_upstream_task,
     upstream_task,
 )
@@ -203,59 +201,6 @@ def test_given_context_skip_when_mode_is_string_then_normalizes_to_skip_mode(
     skip_result: PythonNodeSkipResult = context.skip(reason="optional", mode=test_case.raw_mode)
 
     assert skip_result.mode is test_case.expected_mode
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        PythonNodeContextHelperTestCase(
-            description="task context result omits materialized flag and loader-only fields",
-            raw_name="scratch_orders",
-            database=None,
-            schema=None,
-            expected_qualified_name="default_db.default_schema.scratch_orders",
-            expected_execute_result="payload",
-            expected_query_result="ignored",
-            expected_recorded_events=(),
-            expected_logger_name="sqlbuild.task.fetch_orders",
-            expected_run_id="test_run",
-            expected_target="dev",
-            expected_vars={"batch": "hourly"},
-            expected_error_fragment="materialized",
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_task_context_when_inspecting_api_then_loader_only_fields_are_absent(
-    test_case: PythonNodeContextHelperTestCase,
-) -> None:
-    adapter: PythonNodeContextTestAdapter = PythonNodeContextTestAdapter()
-    context: AssetContext = build_task_context(
-        adapter=adapter,
-        statement_recorder=StatementRecorder(),
-        logger_name=test_case.expected_logger_name,
-    )
-
-    result: PythonNodeResult = context.result(
-        payload=test_case.expected_execute_result,
-        metadata={"source": "api"},
-    )
-
-    assert result == PythonNodeResult(
-        payload=test_case.expected_execute_result,
-        metadata={"source": "api"},
-        materialized=None,
-    )
-    assert test_case.expected_error_fragment not in inspect.signature(context.result).parameters
-    assert context.qualify_name(name=test_case.raw_name) == test_case.expected_qualified_name
-    assert not hasattr(context, loader_only_attribute_names()[0])
-    assert not hasattr(context, loader_only_attribute_names()[1])
-    assert not hasattr(context, loader_only_attribute_names()[2])
-    assert not hasattr(context, loader_only_attribute_names()[3])
-    assert not hasattr(context, loader_only_attribute_names()[4])
-    assert not hasattr(context, loader_only_attribute_names()[5])
-    assert not hasattr(context, loader_only_attribute_names()[6])
-    assert not hasattr(context, loader_only_attribute_names()[7])
 
 
 @pytest.mark.parametrize(

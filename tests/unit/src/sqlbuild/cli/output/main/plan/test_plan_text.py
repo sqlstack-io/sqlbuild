@@ -662,7 +662,6 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
                 "Plan ready  1 selected, 1 source to load, 3 Python nodes",
                 "Python ingress (2)",
                 "prepare_orders",
-                "task",
                 "publish_orders",
                 "asset",
                 "Python read-side (1)",
@@ -723,7 +722,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             expected_fragments=(
                 "Python ingress (1)",
                 "prepare_orders",
-                "task (changed)",
+                "asset (changed)",
                 "python diff:",
                 "source diff:",
                 "dependency diff:",
@@ -1202,9 +1201,9 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             expected_fragments=(
                 "Providers",
                 "\u2514\u2500\u2500 marker_provider",
+                "    ├── asset publish_orders (MarkerProvider)",
                 "    ├── hook mark_pre (MarkerProvider)",
-                "    ├── loader raw_orders (MarkerProvider)",
-                "    └── task publish_orders (MarkerProvider)",
+                "    └── loader raw_orders (MarkerProvider)",
             ),
             unexpected_fragments=("used by 3 selected Python surfaces", "parameter"),
         ),

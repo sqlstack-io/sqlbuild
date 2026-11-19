@@ -238,7 +238,14 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
                     "unique_key",
                     "write_strategy",
                 ),
-                "asset:prepare_orders": ("description", "group", "meta", "tags"),
+                "asset:prepare_orders": (
+                    "column_lineage",
+                    "columns",
+                    "description",
+                    "group",
+                    "meta",
+                    "tags",
+                ),
                 "asset:export_orders": (
                     "column_lineage",
                     "columns",

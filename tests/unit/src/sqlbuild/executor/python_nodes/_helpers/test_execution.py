@@ -18,7 +18,6 @@ from sqlbuild.executor.python_nodes._helpers.execution import (
 )
 from sqlbuild.executor.python_nodes.models import (
     PythonNodeExecutionResult,
-    PythonNodeResult,
     PythonNodeRunState,
     PythonNodeRuntime,
 )
@@ -32,7 +31,6 @@ from sqlbuild.provider.classes.container import ProviderContainer
 from sqlbuild.provider.classes.session import ProviderSession
 from sqlbuild.python_nodes.models import RetryPolicy
 from tests.unit.src.sqlbuild.executor.python_nodes._helpers._test_types import (
-    MalformedPythonOperationTestCase,
     PythonNodeExecutorTestCase,
     PythonNodeRetryExecutorTestCase,
     PythonPostCallLifecycleTestCase,
@@ -58,68 +56,9 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
     missing_context_provider_task,
     provider_asset,
     provider_task,
-    python_operation_events,
     skip_empty_orders,
     successful_sibling,
 )
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    (
-        MalformedPythonOperationTestCase(
-            description="task returns invalid materialized result",
-            operation_name="python_task",
-            expected_error_fragment="Only asset Python nodes may set materialized",
-        ),
-    ),
-    ids=lambda case: case.description,
-)
-def test_given_malformed_task_return_when_executing_then_operation_fails_once(
-    test_case: MalformedPythonOperationTestCase,
-) -> None:
-    events: list[LifecycleEvent] = []
-    invocations: list[str] = []
-    dispatcher: EventDispatcher = EventDispatcher()
-    dispatcher.subscribe_lifecycle(subscriber=events.append, accepts_opaque=False)
-
-    def malformed_task() -> PythonNodeResult:
-        invocations.append("called")
-        return PythonNodeResult(payload={"invalid": True}, materialized=True)
-
-    with invocation_scope("inv-malformed-task"), dispatcher_scope(dispatcher):
-        result: tuple[PythonNodeExecutionResult, ...] = execute_ordered_test_nodes(
-            nodes=(
-                DiscoveredAssetFunction(
-                    file_path=Path("/project/tasks/bad.py"),
-                    relative_path=Path("python/tasks/bad.py"),
-                    name="malformed_task",
-                    function=malformed_task,
-                    retry=RetryPolicy(max_attempts=3, retry_on=Exception, jitter=False),
-                ),
-            ),
-            statement_recorder=StatementRecorder(),
-            runtime=PythonNodeRuntime(
-                adapter=PythonNodeContextTestAdapter(),
-                connection_config={},
-                connection=object(),
-                run_id="run-malformed",
-                target="dev",
-                vars={},
-                is_reload=False,
-            ),
-        )
-
-    operation_events: tuple[LifecycleEvent, ...] = python_operation_events(events)
-    assert result[0].status == PythonNodeStatus.FAILED
-    assert test_case.expected_error_fragment in (result[0].error_message or "")
-    assert tuple(event.event_type for event in operation_events) == (
-        "operation_started",
-        "operation_failed",
-    )
-    assert operation_events[0].payload["operation_name"] == test_case.operation_name
-    assert operation_events[-1].payload["error_type"] == "ExecutorInputError"
-    assert invocations == ["called"]
 
 
 @pytest.mark.parametrize(
@@ -962,7 +901,7 @@ def test_given_retry_policy_when_transient_failures_then_retries_and_succeeds(
     assert tuple(flaky_task.cost_contexts) == tuple(
         CostResourceContext(
             run_id="test_run",
-            resource_type="task",
+            resource_type="asset",
             resource_name="flaky_task",
             phase="execute",
             attempt=attempt,

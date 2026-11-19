@@ -226,7 +226,7 @@ _RAW_SOURCES: dict[str, str] = {
             expected_error_fragments=(
                 "loader:raw_customers names model:customers as 'customers'",
                 "loaders run before models and seeds and cannot read them; read model:customers "
-                "from a task or asset instead",
+                "from an asset instead",
             ),
         ),
         PythonSqlReferenceErrorTestCase(

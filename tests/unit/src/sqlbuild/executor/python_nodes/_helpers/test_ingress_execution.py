@@ -299,7 +299,7 @@ def test_given_pre_recorded_hard_skip_when_scheduler_bypasses_downstream_then_on
         "hard",
     )
     assert events[0].payload["resource_kind"] == load_resource_kind(source_map["raw_orders"]).value
-    assert events[2].payload["resource_kind"] == "task"
+    assert events[2].payload["resource_kind"] == "asset"
     assert python_operation_events(events) == ()
     assert tuple(accumulator.python_results_by_name) == (
         "prepare_ingress_orders",

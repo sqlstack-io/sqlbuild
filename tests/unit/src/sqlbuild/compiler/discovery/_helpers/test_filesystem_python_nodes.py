@@ -1,4 +1,4 @@
-"""Tests for task and asset discovery."""
+"""Tests for asset discovery."""
 
 from __future__ import annotations
 
@@ -20,10 +20,10 @@ from sqlbuild._native import (
 )
 from sqlbuild.compiler.python_nodes.main.identity import build_python_node_identity
 from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
+    DiscoverAssetFunctionsTestCase,
     DiscoverCheckFunctionsTestCase,
     DiscoverPythonRootImportTestCase,
     DiscoverPythonRootNodesTestCase,
-    DiscoverTaskAssetFunctionsTestCase,
     PythonRootHelperIdentityTestCase,
     PythonRootProjectIsolationTestCase,
     RestoredPythonPackageIdentityTestCase,
@@ -60,8 +60,8 @@ def orders(ctx):
 @pytest.mark.parametrize(
     "test_case",
     [
-        DiscoverTaskAssetFunctionsTestCase(
-            description="discovers decorated tasks and assets from explicit folders",
+        DiscoverAssetFunctionsTestCase(
+            description="discovers decorated assets from explicit folders",
             files={
                 "python/tasks/windows.py": """
 from sqlbuild.assets import asset
@@ -94,22 +94,18 @@ def ignored_init_asset(ctx):
     return None
 """,
             },
-            expected_task_names=("fetch_window",),
-            expected_task_dependency_counts=(0,),
-            expected_task_tags=(("api",),),
-            expected_asset_names=("export_customers",),
-            expected_asset_dependency_counts=(1,),
-            expected_asset_column_names=(("customer_id",),),
-            expected_asset_lineage_columns=(("customer_id",),),
+            expected_asset_names=("export_customers", "fetch_window"),
+            expected_asset_dependency_counts=(1, 0),
+            expected_asset_tags=((), ("api",)),
+            expected_asset_column_names=(("customer_id",), ()),
+            expected_asset_lineage_columns=(("customer_id",), ()),
         ),
-        DiscoverTaskAssetFunctionsTestCase(
-            description="returns empty tuples when task and asset folders do not exist",
+        DiscoverAssetFunctionsTestCase(
+            description="returns empty tuples when asset folders do not exist",
             files={},
-            expected_task_names=(),
-            expected_task_dependency_counts=(),
-            expected_task_tags=(),
             expected_asset_names=(),
             expected_asset_dependency_counts=(),
+            expected_asset_tags=(),
             expected_asset_column_names=(),
             expected_asset_lineage_columns=(),
         ),
@@ -117,7 +113,7 @@ def ignored_init_asset(ctx):
     ids=lambda case: case.description,
 )
 def test_given_project_dir_when_discovering_python_nodes_then_returns_expected(
-    test_case: DiscoverTaskAssetFunctionsTestCase,
+    test_case: DiscoverAssetFunctionsTestCase,
     tmp_path: Path,
 ) -> None:
     relative_path: str
@@ -127,19 +123,12 @@ def test_given_project_dir_when_discovering_python_nodes_then_returns_expected(
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(contents, encoding="utf-8")
 
-    tasks: tuple[DiscoveredAssetFunction, ...] = tuple(
-        discover_python_node_functions(project_dir=tmp_path).assets
-    )
     assets: tuple[DiscoveredAssetFunction, ...] = tuple(
         discover_python_node_functions(project_dir=tmp_path).assets
     )
 
-    assert tuple(task.name for task in tasks) == test_case.expected_task_names
-    assert (
-        tuple(len(task.depends_on) for task in tasks) == test_case.expected_task_dependency_counts
-    )
-    assert tuple(task.tags for task in tasks) == test_case.expected_task_tags
     assert tuple(asset.name for asset in assets) == test_case.expected_asset_names
+    assert tuple(asset.tags for asset in assets) == test_case.expected_asset_tags
     assert tuple(len(asset.depends_on) for asset in assets) == (
         test_case.expected_asset_dependency_counts
     )
@@ -159,14 +148,12 @@ def test_given_project_dir_when_discovering_python_nodes_then_returns_expected(
 @pytest.mark.parametrize(
     "test_case",
     [
-        DiscoverTaskAssetFunctionsTestCase(
-            description="raises clear error when task import fails",
+        DiscoverAssetFunctionsTestCase(
+            description="raises clear error when a node import fails",
             files={"python/tasks/broken.py": "import missing_task_dependency\n"},
-            expected_task_names=(),
-            expected_task_dependency_counts=(),
-            expected_task_tags=(),
             expected_asset_names=(),
             expected_asset_dependency_counts=(),
+            expected_asset_tags=(),
             expected_asset_column_names=(),
             expected_asset_lineage_columns=(),
             expected_error_fragment="Failed to import Python node file",
@@ -175,7 +162,7 @@ def test_given_project_dir_when_discovering_python_nodes_then_returns_expected(
     ids=lambda case: case.description,
 )
 def test_given_python_node_import_error_when_discovering_then_raises_clear_error(
-    test_case: DiscoverTaskAssetFunctionsTestCase,
+    test_case: DiscoverAssetFunctionsTestCase,
     tmp_path: Path,
 ) -> None:
     relative_path: str
@@ -292,8 +279,8 @@ def orders_export_exists(ctx):
             },
             expected_nodes=(
                 ("loader", "raw_orders", "python/orders.py"),
-                ("task", "prepare_orders", "python/orders.py"),
                 ("asset", "orders_export", "python/orders.py"),
+                ("asset", "prepare_orders", "python/orders.py"),
                 ("check", "orders_export_exists", "python/orders.py"),
             ),
         ),
@@ -311,7 +298,7 @@ from sqlbuild.assets import asset
 def order_label(value):
     return str(value)
 
-LABEL = task
+LABEL = asset
 """,
                 "python/orders/ingest/loaders.py": """
 from sqlbuild.loaders import loader
@@ -348,8 +335,8 @@ def orders_export_exists(ctx):
             },
             expected_nodes=(
                 ("loader", "raw_orders", "python/orders/ingest/loaders.py"),
-                ("task", "label_orders", "python/orders/pipeline/tasks.py"),
                 ("asset", "orders_export", "python/exports/assets.py"),
+                ("asset", "label_orders", "python/orders/pipeline/tasks.py"),
                 ("check", "orders_export_exists", "python/exports/deep/nested/checks.py"),
             ),
         ),
@@ -379,7 +366,6 @@ def test_given_python_root_when_discovering_python_nodes_then_decorators_define_
 
     discovered: tuple[tuple[str, str, str], ...] = (
         *(("loader", node.name, node.relative_path.as_posix()) for node in result.loaders),
-        *(("task", node.name, node.relative_path.as_posix()) for node in result.assets),
         *(("asset", node.name, node.relative_path.as_posix()) for node in result.assets),
         *(("check", node.name, node.relative_path.as_posix()) for node in result.checks),
     )
