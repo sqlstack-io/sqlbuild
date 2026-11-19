@@ -25,15 +25,41 @@ pub enum DeclaredRun {
     },
 }
 
-/// How far one job setting reaches.
+/// How far one job setting reaches, which also decides how named jobs' values merge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingScope {
-    /// Only the job's own nodes.
+    /// Only the job's own nodes; two jobs giving one node different values conflict, unset not.
     Node,
-    /// A limit on how many of the job's own nodes run at once.
+    /// A limit on how many of the job's own nodes run at once; each job keeps its own.
     JobLimit,
-    /// The whole build.
+    /// The whole build; every named job must set it the same way, unset differing from set.
     Build,
+    /// Not a job setting: the run request owns it.
+    RunRequest,
+}
+
+/// When a group's jobs must agree on a build-wide setting.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GroupAgreement {
+    /// Already while each member runs as its own build, as it changes the compiled SQL.
+    EachBuild,
+    /// Once a group runs as one build.
+    OneBuild,
+}
+
+/// One build option as a job setting: how far it reaches and how named jobs merge it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct JobSettingSpec {
+    /// The setting's name, the build parser's destination of its options.
+    pub name: &'static str,
+    /// The command-line options that give it, which replace every named job's value.
+    pub options: &'static [&'static str],
+    pub scope: SettingScope,
+    /// Whether a Python node takes it; the other node settings act on SQL nodes only.
+    pub python_nodes: bool,
+    /// Whether one value every named job shares becomes the whole build's, setup included.
+    pub whole_run: bool,
+    pub group: GroupAgreement,
 }
 
 /// What the jobs a selection names give each of its nodes.
@@ -47,4 +73,19 @@ pub struct NodeJobSettings {
     pub retries: BTreeMap<ObjectKey, JobRetry>,
     /// Each named job's limit on how many of its nodes run at once.
     pub job_limits: BTreeMap<String, i64>,
+}
+
+/// What the named jobs give a build once the command line's own settings replace theirs.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ResolvedJobSettings {
+    /// The declared jobs less the settings the command line gives.
+    pub declared: BTreeMap<String, DeclaredRun>,
+    /// The jobs the selectors name.
+    pub named: Vec<String>,
+    /// The build-wide settings the named jobs agree on.
+    pub build: BTreeMap<String, Json>,
+    /// The whole-run node settings every named job sets to one value.
+    pub whole_run: BTreeMap<String, Json>,
+    /// Each selected node's settings and the jobs' limits, when the nodes were resolved.
+    pub nodes: Option<NodeJobSettings>,
 }

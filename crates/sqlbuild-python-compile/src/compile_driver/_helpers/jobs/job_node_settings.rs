@@ -12,11 +12,8 @@ use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::job_settings::constants::{NODE_CONFLICT_HELP, WAREHOUSE_SETTING};
 use sqlbuild_analysis::job_settings::errors::{JobSettingConflict, NodeJobSettingsError};
-use sqlbuild_analysis::job_settings::main::build_job_settings::build_job_settings;
-use sqlbuild_analysis::job_settings::main::named_jobs::named_jobs;
-use sqlbuild_analysis::job_settings::main::node_job_settings::node_job_settings;
-use sqlbuild_analysis::job_settings::main::without_given_settings::without_given_settings;
-use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings};
+use sqlbuild_analysis::job_settings::main::resolve_job_settings::resolve_job_settings;
+use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings, ResolvedJobSettings};
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_config::command_connection::main::check_job_warehouse::check_job_warehouse;
 use sqlbuild_config::command_connection::main::unsupported_job_warehouse::unsupported_job_warehouse;
@@ -52,9 +49,12 @@ use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scop
 
 const MODEL_KIND: &str = "model";
 const FUNCTION_KINDS: [&str; 2] = ["udf", "table_fn"];
-const FULL_REFRESH: &str = "full_refresh";
-const RUN_TESTS: &str = "run_tests";
-const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
+/// The node setting the planner's `full_refresh_models` and `full_refresh_functions` apply.
+pub(crate) const FULL_REFRESH: &str = "full_refresh";
+/// The node setting that drops a job's SQL tests from the plan.
+pub(crate) const RUN_TESTS: &str = "run_tests";
+/// The node setting each audit entry's `ignore_failure` takes.
+pub(crate) const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
 
 /// The `CliUserError` of a job warehouse that cannot be used.
 fn cli_error(py: Python<'_>, error: &CommandConnectionError) -> PyErr {
@@ -185,13 +185,6 @@ pub(crate) fn planned_job_settings(
     if cli_warehouse {
         given.insert(WAREHOUSE_SETTING.to_owned());
     }
-    let declared: BTreeMap<String, DeclaredRun> = without_given_settings(declared, &given);
-    let named: Vec<String> = named_jobs(&select, &declared);
-    if named.is_empty() {
-        return Ok(None);
-    }
-    build_job_settings(&named, &declared)
-        .map_err(|conflict| job_setting_conflict(py, &conflict))?;
     let all: Vec<String> = select.iter().chain(&exclude).cloned().collect();
     let compiled: Bound<'_, CompiledProjectGraph> = project_graph(project)?.cast_into()?;
     let selection = PythonAwareSelection::new(
@@ -202,15 +195,18 @@ pub(crate) fn planned_job_settings(
     let token_nodes =
         |token: &str, exclude: &[String]| selection.resolve_keys(&[token.to_owned()], exclude);
     let resolved = compiler_guard(|| {
-        Ok(node_job_settings(
-            selection.graph(),
-            (&select, &exclude),
-            &declared,
-            &token_nodes,
+        Ok(resolve_job_settings(
+            declared,
+            (&select, &given),
+            Some((selection.graph(), (&select, &exclude), &token_nodes)),
         ))
     })?;
     match resolved {
-        Ok(settings) => Ok(Some(PlannedJobSettings {
+        Ok(ResolvedJobSettings {
+            nodes: Some(settings),
+            declared,
+            ..
+        }) => Ok(Some(PlannedJobSettings {
             ignoring_jobs: jobs_setting(&settings, &declared, (IGNORE_AUDIT_FAILURES, None)),
             refreshing_jobs: jobs_setting(
                 &settings,
@@ -224,6 +220,7 @@ pub(crate) fn planned_job_settings(
             unattached_audit_reads: unattached_audit_reads(project)?,
             settings,
         })),
+        Ok(ResolvedJobSettings { nodes: None, .. }) => Ok(None),
         Err(NodeJobSettingsError::Selector(failure)) => Err(job_selector_error(py, &failure)),
         Err(NodeJobSettingsError::Conflict(conflict)) => Err(job_setting_conflict(py, &conflict)),
     }

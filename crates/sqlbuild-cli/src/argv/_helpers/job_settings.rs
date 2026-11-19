@@ -1,5 +1,7 @@
 //! Render job settings as options, check them against the build parser and parse without Python.
 
+use sqlbuild_analysis::job_settings::main::setting_scope::setting_scope;
+use sqlbuild_analysis::job_settings::models::SettingScope;
 use std::collections::BTreeMap;
 
 use serde_json::Value as Json;
@@ -15,25 +17,7 @@ pub(crate) fn setting_argument(
     name: &str,
     value: &Json,
 ) -> Result<Option<String>, String> {
-    if matches!(
-        name,
-        "help"
-            | "target"
-            | "project_dir"
-            | "select"
-            | "exclude"
-            | "select_file"
-            | "positional_select"
-            | "json"
-            | "json_output"
-            | "event_output"
-            | "manifest"
-            | "dbt_project_dir"
-            | "dbt_profiles_dir"
-            | "dbt_target"
-            | "dbt_target_path"
-            | "job_settings"
-    ) {
+    if setting_scope(name) == SettingScope::RunRequest {
         return Err(format!("job setting {name} is owned by the run request"));
     }
     let actions: Vec<&ActionSpec> = parser

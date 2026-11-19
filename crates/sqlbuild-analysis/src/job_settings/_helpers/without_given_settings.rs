@@ -6,7 +6,7 @@ use crate::job_settings::models::DeclaredRun;
 
 /// `declared` with each setting named in `given` removed from every job, so it never conflicts.
 #[must_use]
-pub fn without_given_settings(
+pub(crate) fn without_given_settings(
     mut declared: BTreeMap<String, DeclaredRun>,
     given: &BTreeSet<String>,
 ) -> BTreeMap<String, DeclaredRun> {

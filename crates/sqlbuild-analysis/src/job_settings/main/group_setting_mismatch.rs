@@ -4,10 +4,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use sqlbuild_discovery::orchestration_files::models::{GroupFile, OrchestrationInventory};
 
-use crate::job_settings::constants::GROUP_AGREED_SETTINGS;
-use crate::job_settings::main::build_job_settings::build_job_settings;
+use crate::job_settings::_helpers::build_job_settings::build_job_settings;
 use crate::job_settings::main::declared_runs::declared_runs;
-use crate::job_settings::models::DeclaredRun;
+use crate::job_settings::main::job_setting_spec::job_setting_spec;
+use crate::job_settings::models::{DeclaredRun, GroupAgreement};
 
 /// `run` keeping only the settings a group's jobs must agree on.
 fn agreed_settings_only(run: DeclaredRun) -> DeclaredRun {
@@ -15,7 +15,10 @@ fn agreed_settings_only(run: DeclaredRun) -> DeclaredRun {
         DeclaredRun::Job { settings, retry } => DeclaredRun::Job {
             settings: settings
                 .into_iter()
-                .filter(|(name, _)| GROUP_AGREED_SETTINGS.contains(&name.as_str()))
+                .filter(|(name, _)| {
+                    job_setting_spec(name)
+                        .is_some_and(|spec| spec.group == GroupAgreement::EachBuild)
+                })
                 .collect(),
             retry,
         },

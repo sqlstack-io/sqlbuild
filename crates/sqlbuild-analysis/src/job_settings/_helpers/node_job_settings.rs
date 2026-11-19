@@ -2,18 +2,16 @@
 
 use std::collections::BTreeMap;
 
-use serde_json::Value as Json;
-
 use crate::graph::models::ProjectGraph;
 use crate::job_settings::_helpers::node_values::node_values;
 use crate::job_settings::_helpers::selection::node_jobs;
-use crate::job_settings::constants::JOB_LIMIT_SETTING;
 use crate::job_settings::errors::NodeJobSettingsError;
-use crate::job_settings::models::{DeclaredRun, NodeJobSettings};
+use crate::job_settings::main::setting_scope::setting_scope;
+use crate::job_settings::models::{DeclaredRun, NodeJobSettings, SettingScope};
 use crate::job_settings::types::TokenNodes;
 
 /// Each node's named jobs, the settings they give it, and their limits.
-pub fn node_job_settings(
+pub(crate) fn node_job_settings(
     graph: &ProjectGraph,
     selection: (&[String], &[String]),
     declared: &BTreeMap<String, DeclaredRun>,
@@ -35,7 +33,10 @@ pub fn node_job_settings(
         }
         for job in jobs {
             if let Some(DeclaredRun::Job { settings, .. }) = declared.get(job)
-                && let Some(limit) = settings.get(JOB_LIMIT_SETTING).and_then(Json::as_i64)
+                && let Some(limit) = settings
+                    .iter()
+                    .find(|(name, _)| setting_scope(name) == SettingScope::JobLimit)
+                    .and_then(|(_, value)| value.as_i64())
             {
                 result.job_limits.insert(job.clone(), limit);
             }
