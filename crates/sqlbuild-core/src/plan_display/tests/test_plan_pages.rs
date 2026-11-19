@@ -57,7 +57,7 @@ fn given_a_plan_when_paging_each_section_then_every_section_pages_its_rows_in_pl
         SectionTestCase {
             description: "migrations",
             section: PlanPageSection::Migrations,
-            expected_rows: &["old_orders"],
+            expected_rows: &["old_orders", "totals"],
         },
         SectionTestCase {
             description: "column migrations",
@@ -72,7 +72,7 @@ fn given_a_plan_when_paging_each_section_then_every_section_pages_its_rows_in_pl
         SectionTestCase {
             description: "retention",
             section: PlanPageSection::Retention,
-            expected_rows: &["events"],
+            expected_rows: &["main.events"],
         },
         SectionTestCase {
             description: "loader reloads",
@@ -219,6 +219,24 @@ fn given_a_name_filter_when_paging_then_matching_rows_page_with_their_count() {
             ],
             expected_total: 2,
             expected_section_total: 6,
+        },
+        PageTestCase {
+            description: "a retention change matches by its models",
+            section: PlanPageSection::Retention,
+            window: (0, 50),
+            name: Some("EVENTS"),
+            expected_rows: &["main.events"],
+            expected_total: 1,
+            expected_section_total: 1,
+        },
+        PageTestCase {
+            description: "a renamed model matches by its old name",
+            section: PlanPageSection::Renamed,
+            window: (0, 50),
+            name: Some("orders_v1"),
+            expected_rows: &["old_orders"],
+            expected_total: 1,
+            expected_section_total: 1,
         },
         PageTestCase {
             description: "nothing matching is an empty page",
@@ -403,6 +421,11 @@ fn given_a_plan_when_summarised_then_sections_are_counts_and_no_row_list_is_left
                 {"template": "model … has no tests.", "count": 2, "subject": null},
                 {"template": "already-built dates keep their old results", "count": 1, "subject": null},
             ]),
+        },
+        SummaryFieldTestCase {
+            description: "migration steps leave out the renamed model's own migration",
+            pointer: "/migration_steps",
+            expected_value: json!(4),
         },
         SummaryFieldTestCase {
             description: "--changed facts stay",
@@ -708,6 +731,91 @@ fn given_config_diffs_when_paged_whole_or_detached_then_short_ones_read_as_one_c
                 test_case.expected_change.map(|change| json!(change)),
             ),
             "{}: the same with the diff text in the document or kept apart",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_renames_when_paged_or_summarised_then_rows_keep_their_marks_and_steps_leave_renames_out() {
+    let test_cases = [
+        SummaryFieldTestCase {
+            description: "a renamed row names the model it was renamed from",
+            pointer: "/renamed/origin_model",
+            expected_value: json!("orders_v1"),
+        },
+        SummaryFieldTestCase {
+            description: "a renamed row says what stays at its old name",
+            pointer: "/renamed/old_name/action",
+            expected_value: json!("view_only"),
+        },
+        SummaryFieldTestCase {
+            description: "a rename's own migration is marked",
+            pointer: "/migrations/0/is_rename",
+            expected_value: json!(true),
+        },
+        SummaryFieldTestCase {
+            description: "another migration is not",
+            pointer: "/migrations/1/is_rename",
+            expected_value: json!(false),
+        },
+    ];
+    let plan = full_plan();
+    let observed = json!({
+        "renamed": plan_section_page(&plan, PlanPageSection::Renamed, ((0, 1), None)).rows[0],
+        "migrations": plan_section_page(&plan, PlanPageSection::Migrations, ((0, 50), None)).rows,
+    });
+    for test_case in test_cases {
+        assert_eq!(
+            observed
+                .pointer(test_case.pointer)
+                .cloned()
+                .unwrap_or_default(),
+            test_case.expected_value,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_schema_retention_change_without_models_when_filtered_then_its_schema_name_matches() {
+    let test_cases = [
+        PageTestCase {
+            description: "a schema's retention change matches by the schema's name",
+            section: PlanPageSection::Retention,
+            window: (0, 50),
+            name: Some("ARCHIVE"),
+            expected_rows: &["analytics_archive"],
+            expected_total: 1,
+            expected_section_total: 2,
+        },
+        PageTestCase {
+            description: "a table's retention change still matches by its models",
+            section: PlanPageSection::Retention,
+            window: (0, 50),
+            name: Some("events"),
+            expected_rows: &["main.events"],
+            expected_total: 1,
+            expected_section_total: 2,
+        },
+    ];
+    let mut plan = full_plan();
+    plan["retention"]
+        .as_array_mut()
+        .expect("retention rows")
+        .push(json!({"scope": "schema", "name": "analytics_archive", "models": [], "desired_days": 30, "actual_days": 7, "direction": "increase"}));
+    for test_case in test_cases {
+        let page = plan_section_page(&plan, test_case.section, (test_case.window, test_case.name));
+
+        assert_eq!(
+            (labels(&page.rows), page.total, page.section_total),
+            (
+                owned(test_case.expected_rows),
+                test_case.expected_total,
+                test_case.expected_section_total
+            ),
+            "{}",
             test_case.description
         );
     }

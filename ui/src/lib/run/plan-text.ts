@@ -2,6 +2,7 @@
 // terminal read the same: work that runs first, one section per change reason with each model's detail,
 // then the routine models, functions, seeds and warnings.
 
+import { retentionStep } from './plan-steps';
 import type { PlanChanged, PlanDocument, PlanModel, PlanPageSection, PlanWarning, Trigger } from '$lib/api';
 import { formatIn } from '$lib/format/time';
 import { plural } from '$lib/format/plural';
@@ -169,7 +170,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	add('Migrations', plan.migrations.map((r) => ({ name: r.model, value: [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · '), detail: [] })), true, 'migrations');
 	add('Column migrations', plan.column_migrations.map((r) => ({ name: r.model, value: `${r.origin_column} → ${r.destination_column} · ${r.decision}`, detail: [] })), true, 'column_migrations');
 	add('Table type changes', plan.table_type_conversions.map((r) => ({ name: r.model, value: [r.actual_type, r.desired_type].filter(Boolean).join(' → '), detail: [] })), true, 'table_type_conversions');
-	add('Retention', plan.retention.map((r) => ({ name: r.model, value: r.action ?? '', detail: [] })), true, 'retention');
+	add('Retention', plan.retention.map((r) => retentionStep(r)).map((r) => ({ name: r.node, value: r.what, detail: r.warning ? [r.warning] : [] })), true, 'retention');
 	for (const kind of ['loader', 'source'] as const) {
 		const loads = plan.source_loads.filter((s) => s.kind === kind);
 		const label = kind === 'loader' ? 'Loaders' : 'Sources';

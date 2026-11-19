@@ -30,6 +30,10 @@ from tests.integration.src.sqlbuild.cli.commands.main.model_migrations.helpers i
     plan_json,
     planned_migrations,
     relation_names,
+    rename_migration_old_names,
+    rename_migrations,
+    renamed_models,
+    renamed_old_names,
     renamed_order_models,
     row_count,
     run_sqb,
@@ -55,6 +59,9 @@ _FIRST_RUN: str = "first_run"
                 ("orders_enriched", "customer_orders_enriched", "renamed"),
                 ("stg_orders", "stg_customer_orders", "migrate"),
             ),
+            # Only the view is built under its new name; the incremental models take their data
+            # over, so their migrations are steps, not renames.
+            expected_renames=(("orders_enriched", "customer_orders_enriched"),),
         )
     ],
     ids=lambda case: case.description,
@@ -71,6 +78,12 @@ def test_given_coordinated_renames_when_building_then_history_moves_automaticall
     rebuild_plan: dict[str, Any] = plan_json(project_dir=tmp_path, capsys=capsys)
 
     assert planned_migrations(plan) == test_case.expected_migrations
+    # Each renamed model's row names its old model, and its own migration is marked as the rename.
+    assert renamed_models(plan) == test_case.expected_renames
+    assert rename_migrations(plan) == test_case.expected_renames
+    # What stays at the old name is on the renamed row too, as its migration has it.
+    assert renamed_old_names(plan) == rename_migration_old_names(plan)
+    assert all(old_name is not None for old_name in renamed_old_names(plan).values())
     assert model_entry(plan=plan, name="stg_customer_orders")["reason"] != _FIRST_RUN
     assert model_entry(plan=plan, name="customer_daily_order_totals")["reason"] != _FIRST_RUN
     assert "Migrated main.stg_orders -> main.stg_customer_orders" in result.output
