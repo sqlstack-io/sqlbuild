@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.253.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.252.1...v0.253.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **jobs:** a job or job group file that still uses [on_failure], retries or retry_delay_seconds now fails to compile with an unknown-key error. Rename [on_failure] to [retry], replace retries = N with attempts = N + 1, and rename retry_delay_seconds to delay_seconds.
+
+### Features
+
+* **jobs:** apply named jobs' settings to the nodes they select ([#1597](https://github.com/sqlstack-io/sqlbuild/issues/1597)) ([559dda5](https://github.com/sqlstack-io/sqlbuild/commit/559dda5c91754582d88420ad023427f0edbbe943))
+
 ## [0.252.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.252.0...v0.252.1) (2026-11-19)
 
 
