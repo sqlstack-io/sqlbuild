@@ -165,7 +165,8 @@ The build role needs these grants:
 
 Dynamic tables refresh from changes, which needs change tracking on every table they read:
 
-- A table model that a maintained model reads, directly or through views, is built with change tracking on.
+- A table or snapshot model that a maintained model reads, directly or through views, is built with
+  change tracking on.
 - For a source table, Snowflake turns change tracking on when the build role owns the table.
   Otherwise its owner runs `ALTER TABLE <source> SET CHANGE_TRACKING = TRUE`.
 

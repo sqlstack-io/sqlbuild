@@ -61,7 +61,8 @@ whether it succeeds or fails.
 ## When a build dies
 
 - **One build at a time.** A build that needs a maintained model another build holds fails with
-  `A718`, naming that run. Wait for it to finish.
+  `A718`, naming that run. Wait for it to finish. Two builds that start at the same moment can
+  both fail this way; run one of them again.
 - **A stopped build leaves its models suspended.** A build killed before it resumes them, for
   example by `SIGKILL`, can't resume them itself.
 - **The next build resumes them.** The next build that pauses maintained models on the target
@@ -73,7 +74,5 @@ whether it succeeds or fails.
 
 ## Limitations
 
-- Writing out the default `refresh_mode incremental` recreates the model once.
-- A snapshot rebuilt in full loses change tracking; run `ALTER TABLE <snapshot> SET CHANGE_TRACKING = TRUE` before a maintained model reads it again.
 - Unit tests and scenarios treat a maintained model as a table.
 - On a target with `schema = "preserve"`, builds see each other's pauses only when their maintained models share a schema.

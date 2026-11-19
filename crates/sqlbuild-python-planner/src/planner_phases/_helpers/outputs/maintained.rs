@@ -16,6 +16,7 @@ use sqlbuild_analysis::maintained_refresh::models::{
     LiveDynamicTable, MaintainedRead, MaintainedSettings, RefreshLag,
 };
 use sqlbuild_analysis::planner_scope::constants::MODEL;
+use sqlbuild_core::fingerprint_identity::constants::DEFAULT_REFRESH_MODE;
 use sqlbuild_model_config::model_validation::main::fixed_duration_seconds::fixed_duration_seconds;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -35,8 +36,6 @@ const VIEW: &str = "view";
 const KEEP_MAINTAINED: &str = "keep_maintained";
 /// The scheduling state Snowflake lists for a dynamic table whose refreshes are paused.
 const SUSPENDED: &str = "SUSPENDED";
-/// The refresh mode of a maintained model that declares none, so Snowflake never picks one quietly.
-const DEFAULT_REFRESH_MODE: &str = "incremental";
 /// Actions that recreate the relation, which reinitialises every dynamic table reading it.
 const REPLACING_ACTIONS: [&str; 3] = ["create_table", "create_view", "create_maintained"];
 

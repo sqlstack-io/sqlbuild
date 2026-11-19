@@ -148,3 +148,15 @@ class TrackingDuckDbAdapter(DuckDbAdapter):
             config=config,
             statement_recorder=statement_recorder,
         )
+
+
+class TrackedSnapshotDuckDbAdapter(DuckDbAdapter):
+    """Records each table it is asked to track changes on after creating it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.tracked: list[str] = []
+
+    def render_track_changes(self, *, destination: str) -> tuple[str, ...]:
+        self.tracked.append(destination)
+        return ()

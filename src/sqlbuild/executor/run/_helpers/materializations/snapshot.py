@@ -800,6 +800,8 @@ def _create_initial_snapshot_target(
             valid_to_column=valid_to_column,
             initial_valid_from=entry.initial_valid_from,
         )
+    if entry.maintained_readers:
+        statements = (*statements, *adapter.render_track_changes(destination=target_qualified))
     statement_recorder.record_many(statements)
     statement: str
     for statement in statements:

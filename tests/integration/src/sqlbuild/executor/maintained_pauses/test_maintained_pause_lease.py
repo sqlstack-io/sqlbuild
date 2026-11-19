@@ -21,12 +21,16 @@ from sqlbuild.executor.maintained_pauses.classes.maintained_hold import Maintain
 from sqlbuild.executor.maintained_pauses.main.hold_maintained_models import (
     hold_maintained_models,
 )
+from sqlbuild.executor.maintained_pauses.models import MaintainedPauseEvent
+from sqlbuild.executor.maintained_pauses.types import MaintainedPauseEventType
 from tests.integration.src.sqlbuild.executor.maintained_pauses._test_types import (
     ConcurrentHoldTestCase,
+    CreatedModelHoldTestCase,
     FirstBuildTestCase,
     HeartbeatTestCase,
     HoldRefusalTestCase,
     HoldTakeoverTestCase,
+    LateCommitTestCase,
     LifecycleLineTestCase,
     PauseLeaseTestCase,
     TakenOverReleaseTestCase,
@@ -636,3 +640,158 @@ def test_given_two_builds_pausing_together_when_both_record_a_pause_then_only_th
     assert adapter.states == test_case.expected_states
     assert pause_events(connection=connection) == sorted(test_case.expected_events)
     early.release(connection=connection)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CreatedModelHoldTestCase(
+            description="of two builds creating a model, the later one backs out",
+            failing_resume_insert=False,
+            expected_code="A718",
+            expected_message_fragments=("early_run",),
+            expected_states={"daily_totals": "SUSPENDED"},
+            expected_events=(
+                ("paused", "early_run", "early_run", "daily_totals"),
+                ("paused", "late_run", "late_run", "daily_totals"),
+                ("resumed", "late_run", "late_run", "daily_totals"),
+            ),
+        ),
+        CreatedModelHoldTestCase(
+            description="a failed close of the later pause is reported with the hold",
+            failing_resume_insert=True,
+            expected_code="A718",
+            expected_message_fragments=("early_run", "pause table is read-only"),
+            expected_states={"daily_totals": "SUSPENDED"},
+            expected_events=(
+                ("paused", "early_run", "early_run", "daily_totals"),
+                ("paused", "late_run", "late_run", "daily_totals"),
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_two_builds_creating_a_model_when_both_pause_it_then_only_the_earliest_holds(
+    test_case: CreatedModelHoldTestCase,
+    adapter: PausingDuckDbAdapter,
+    connection: Any,
+    database_path: Path,
+) -> None:
+    plan: PlanOutput = plan_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(orders_query=_ORDERS, report_locations={}, refresh_on_build=False),
+    )
+    holds: dict[str, MaintainedHold] = {}
+    for run_id in ("early_run", "late_run"):
+        hold: MaintainedHold | None = hold_maintained_models(
+            plan=plan,
+            adapter=adapter,
+            runtime=BuildRuntimeParams(run_id=run_id),
+            connection_config={"database": str(database_path)},
+        )
+        assert hold is not None
+        hold.acquire(connection=connection, on_progress=None)
+        holds[run_id] = hold
+    late: MaintainedHold = holds["late_run"]
+    if test_case.failing_resume_insert:
+        record: Callable[..., None] = late._record
+
+        def record_unless_resume(
+            *, connection: Any, events: tuple[MaintainedPauseEvent, ...]
+        ) -> None:
+            if any(event.event_type == MaintainedPauseEventType.RESUMED for event in events):
+                raise RuntimeError("pause table is read-only")
+            record(connection=connection, events=events)
+
+        late._record = record_unless_resume  # ty: ignore[invalid-assignment]
+    adapter.states["daily_totals"] = "ACTIVE"
+    holds["early_run"].after_create(connection=connection, name="daily_totals")
+    adapter.states["daily_totals"] = "ACTIVE"
+
+    with pytest.raises(AdapterUserError) as raised:
+        late.after_create(connection=connection, name="daily_totals")
+    adapter.operations.clear()
+    late.release(connection=connection)
+
+    assert raised.value.code == test_case.expected_code
+    for fragment in test_case.expected_message_fragments:
+        assert fragment in str(raised.value)
+    assert adapter.operations == []
+    assert adapter.states == test_case.expected_states
+    assert pause_events(connection=connection) == sorted(test_case.expected_events)
+    holds["early_run"].release(connection=connection)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LateCommitTestCase(
+            description="a build whose pause commits after a rival read the table backs out",
+            expected_code="A718",
+            expected_rival="late_run",
+            expected_states={"daily_totals": "SUSPENDED"},
+            expected_events=(
+                ("paused", "early_run", "early_run", "daily_totals"),
+                ("paused", "first_run", "first_run", "daily_totals"),
+                ("paused", "late_run", "late_run", "daily_totals"),
+                ("resumed", "early_run", "early_run", "daily_totals"),
+                ("resumed", "first_run", "first_run", "daily_totals"),
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pause_committing_late_when_rival_paused_meanwhile_then_the_late_one_backs_out(
+    test_case: LateCommitTestCase,
+    adapter: PausingDuckDbAdapter,
+    connection: Any,
+    database_path: Path,
+) -> None:
+    _ = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(orders_query=_ORDERS, report_locations={}, refresh_on_build=False),
+        runtime=BuildRuntimeParams(run_id="first_run"),
+        database_path=database_path,
+    )
+    plan: PlanOutput = plan_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query=_MORE_ORDERS, report_locations={}, refresh_on_build=False
+        ),
+    )
+    holds: dict[str, MaintainedHold] = {}
+    for run_id in ("early_run", "late_run"):
+        hold: MaintainedHold | None = hold_maintained_models(
+            plan=plan,
+            adapter=adapter,
+            runtime=BuildRuntimeParams(run_id=run_id),
+            connection_config={"database": str(database_path)},
+        )
+        assert hold is not None
+        holds[run_id] = hold
+    execute: Callable[..., Any] = adapter.execute
+    now: str = adapter.render_current_utc_timestamp()
+
+    def execute_committing_late(*, connection: Any, sql: str) -> Any:
+        if not (sql.startswith("INSERT") and "'early_run'" in sql and "'paused'" in sql):
+            return execute(connection=connection, sql=sql)
+        started: Any = connection.execute(f"SELECT {now}").fetchone()[0]
+        holds["late_run"].acquire(connection=connection, on_progress=None)
+        return execute(
+            connection=connection, sql=sql.replace(now, f"TIMESTAMP '{started.isoformat()}'")
+        )
+
+    adapter.execute = execute_committing_late  # ty: ignore[invalid-assignment]
+
+    with pytest.raises(AdapterUserError) as raised:
+        holds["early_run"].acquire(connection=connection, on_progress=None)
+    adapter.execute = execute  # ty: ignore[invalid-assignment]
+
+    assert raised.value.code == test_case.expected_code
+    assert test_case.expected_rival in str(raised.value)
+    assert adapter.states == test_case.expected_states
+    assert pause_events(connection=connection) == sorted(test_case.expected_events)
+    holds["late_run"].release(connection=connection)

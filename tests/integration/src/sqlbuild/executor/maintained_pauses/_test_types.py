@@ -74,3 +74,22 @@ class HeartbeatTestCase:
     heartbeat_seconds: float
     wait_seconds: float
     expected_min_beats: int
+
+
+@dataclass(frozen=True)
+class CreatedModelHoldTestCase:
+    description: str
+    failing_resume_insert: bool
+    expected_code: str
+    expected_message_fragments: tuple[str, ...]
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class LateCommitTestCase:
+    description: str
+    expected_code: str
+    expected_rival: str
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
