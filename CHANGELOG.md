@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.252.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.252.0...v0.252.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **analysis:** one 256 function-call depth for Polyglot and SQLQuack's shared parsers ([#1596](https://github.com/sqlstack-io/sqlbuild/issues/1596)) ([e4276d1](https://github.com/sqlstack-io/sqlbuild/commit/e4276d149ce8e1378c800874cb2d1de78b0e7a41))
+
 ## [0.252.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.251.0...v0.252.0) (2026-11-19)
 
 
